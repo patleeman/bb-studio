@@ -169,5 +169,8 @@ notifications, including through the notification extension.
       scripts/testflight.sh --dry-run       # unsigned Release archive
       ```
    The build number is the UTC time, so each upload is newer than the last.
+   Upload only when Patrick asks for a build: batch changes into one upload,
+   not one per commit. Apple caps uploads per day, and each build means a new
+   install. To try a change on the phone meanwhile, use the Debug install above.
    Internal testers (you) get builds without App Review. TestFlight builds use
    production APNs, so the APNs key must be enabled for **Sandbox & Production**.
