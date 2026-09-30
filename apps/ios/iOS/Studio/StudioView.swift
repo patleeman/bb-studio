@@ -323,7 +323,7 @@ struct StudioView: View {
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(app.client) } }
             }
-            if query.isEmpty, !selecting, store.plugins.contains("talk") {
+            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages", "studio-tasks"]) {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -486,21 +486,40 @@ struct StudioView: View {
 
     // MARK: Header
 
+    /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
         HStack(spacing: 10) {
-            tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" }
-            tile("Record", "record.circle", .red) { recordingKind = "recording" }
-            if store.plugins.contains("pages") {
-                tile("Dictate Page", "doc.badge.plus", .blue) { dictatingPage = true }
+            if store.plugins.contains("talk") {
+                tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
+                    if store.plugins.contains("pages") {
+                        Button("Dictate a Page", systemImage: "doc.badge.plus") { dictatingPage = true }
+                    }
+                    Button("Record", systemImage: "record.circle") { recordingKind = "recording" }
+                }
+            }
+            tile("Write", "square.and.pencil", .blue) { app.sheet = .write } menu: {
+                ForEach(store.creatable.filter { $0.id != "task" }, id: \.id) { kind in
+                    Button("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol) {
+                        Task { await create(kind) }
+                    }
+                }
             }
             if store.plugins.contains("studio-tasks") {
-                tile("Tasks", "checklist", .green) { app.push(.tasks) }
+                tile("Task", "checklist", .green) { app.sheet = .newTasks } menu: {
+                    Button("Open Board", systemImage: "rectangle.split.3x1") { app.push(.tasks) }
+                }
+            }
+            if store.plugins.contains("talk") {
+                tile("Record", "record.circle", .red) { recordingKind = "recording" } menu: {}
             }
         }
         .padding(.vertical, 4)
     }
 
-    private func tile(_ title: String, _ symbol: String, _ tint: Color, action: @escaping () -> Void) -> some View {
+    private func tile(
+        _ title: String, _ symbol: String, _ tint: Color, action: @escaping () -> Void,
+        @ViewBuilder menu: () -> some View
+    ) -> some View {
         Button(action: action) {
             VStack(spacing: 6) {
                 Image(systemName: symbol).font(.title2).foregroundStyle(tint)
@@ -508,8 +527,10 @@ struct StudioView: View {
             }
             .frame(maxWidth: .infinity, minHeight: 72)
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
+            .contentShape(.contextMenuPreview, .rect(cornerRadius: 14))
         }
         .buttonStyle(.plain)
+        .contextMenu(menuItems: menu)
         .accessibilityIdentifier("studioAction")
     }
 

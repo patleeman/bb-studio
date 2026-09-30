@@ -129,6 +129,30 @@ struct NewThreadIntent: AppIntent {
     }
 }
 
+struct WriteIntent: AppIntent {
+    static let title: LocalizedStringResource = "Write in BB Studio"
+    static let description = IntentDescription("Open a blank note to save as a page, task or thread.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.sheet = .write
+        return .result()
+    }
+}
+
+struct NewTaskIntent: AppIntent {
+    static let title: LocalizedStringResource = "New BB task"
+    static let description = IntentDescription("Add tasks to the Studio board, one after another.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.sheet = .newTasks
+        return .result()
+    }
+}
+
 struct BBShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(
@@ -145,6 +169,12 @@ struct BBShortcuts: AppShortcutsProvider {
             systemImageName: "bubble.left.and.bubble.right")
         AppShortcut(
             intent: NewThreadIntent(), phrases: ["New \(.applicationName) thread"], shortTitle: "New thread",
-            systemImageName: "square.and.pencil")
+            systemImageName: "bubble.left.and.text.bubble.right")
+        AppShortcut(
+            intent: WriteIntent(), phrases: ["Write in \(.applicationName)", "Take a note in \(.applicationName)"],
+            shortTitle: "Write", systemImageName: "square.and.pencil")
+        AppShortcut(
+            intent: NewTaskIntent(), phrases: ["New \(.applicationName) task", "Add a task in \(.applicationName)"],
+            shortTitle: "New task", systemImageName: "checklist")
     }
 }

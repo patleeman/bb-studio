@@ -44,11 +44,15 @@ extension Route {
 enum Sheet: Identifiable, Hashable {
     case dictation(threadId: String?, autoStart: Bool)
     case voiceChat(threadId: String)
+    case write
+    case newTasks
 
     var id: String {
         switch self {
         case .dictation(let threadId, _): "dictation:\(threadId ?? "")"
         case .voiceChat(let threadId): "voice:\(threadId)"
+        case .write: "write"
+        case .newTasks: "newTasks"
         }
     }
 }
@@ -140,6 +144,8 @@ final class AppModel: ObservableObject {
         case "tasks": openStudio(kind: nil, .tasks)
         case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
         case "dictate": startDictation(threadId: id)
+        case "write": sheet = .write
+        case "new-task", "new-tasks": sheet = .newTasks
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)

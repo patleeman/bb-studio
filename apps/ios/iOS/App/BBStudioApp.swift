@@ -48,6 +48,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         return true
     }
 
+    func application(
+        _ application: UIApplication, configurationForConnecting connectingSceneSession: UISceneSession,
+        options: UIScene.ConnectionOptions
+    ) -> UISceneConfiguration {
+        let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
+        configuration.delegateClass = SceneDelegate.self
+        return configuration
+    }
+
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
         let label = "BB Studio · \(UIDevice.current.name)"
@@ -73,5 +82,34 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
             }
             completionHandler()
         }
+    }
+}
+
+/// Home Screen quick actions. Each one's type is the app link it opens.
+final class SceneDelegate: NSObject, UIWindowSceneDelegate {
+    static let shortcuts: [UIApplicationShortcutItem] = [
+        .init(type: "bbstudio://dictate", localizedTitle: "Dictate", localizedSubtitle: nil, icon: .init(systemImageName: "mic.fill")),
+        .init(type: "bbstudio://write", localizedTitle: "Write", localizedSubtitle: nil, icon: .init(systemImageName: "square.and.pencil")),
+        .init(type: "bbstudio://new-task", localizedTitle: "New Task", localizedSubtitle: nil, icon: .init(systemImageName: "checklist")),
+        .init(type: "bbstudio://new", localizedTitle: "New Thread", localizedSubtitle: nil, icon: .init(systemImageName: "bubble.left.and.text.bubble.right")),
+    ]
+
+    func scene(_ scene: UIScene, willConnectTo session: UISceneSession, options connectionOptions: UIScene.ConnectionOptions) {
+        UIApplication.shared.shortcutItems = Self.shortcuts
+        if let item = connectionOptions.shortcutItem { open(item) }
+    }
+
+    func windowScene(
+        _ windowScene: UIWindowScene, performActionFor shortcutItem: UIApplicationShortcutItem,
+        completionHandler: @escaping (Bool) -> Void
+    ) {
+        completionHandler(open(shortcutItem))
+    }
+
+    @discardableResult
+    private func open(_ item: UIApplicationShortcutItem) -> Bool {
+        guard let url = URL(string: item.type) else { return false }
+        Task { @MainActor in AppModel.shared.handle(url) }
+        return true
     }
 }

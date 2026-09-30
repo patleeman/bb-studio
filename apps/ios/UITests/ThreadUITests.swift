@@ -678,6 +678,50 @@ final class ThreadUITests: XCTestCase {
         shot("page-embed-opened")
     }
 
+    /// Studio's Write and Task tiles and the Home Screen links behind them. The page and
+    /// tasks it makes are scratch items, found by title and deleted afterwards.
+    func testQuickCapture() throws {
+        let stamp = Int(Date().timeIntervalSince1970)
+        let titles = ["QA quick page \(stamp)", "QA quick task \(stamp)", "QA quick task two \(stamp)"]
+        addTeardownBlock {
+            let items = (self.rpc("studio", "overview", NSNull())?["items"] as? [[String: Any]]) ?? []
+            for item in items where titles.contains(item["title"] as? String ?? "") {
+                let id = item["id"] as? String ?? ""
+                switch item["pluginId"] as? String {
+                case "pages": _ = self.rpc("pages", "remove", ["id": id])
+                case "studio-tasks": _ = self.rpc("studio-tasks", "delete", ["id": id])
+                default: break
+                }
+            }
+        }
+        app.open(URL(string: "bbstudio://studio")!)
+        let write = app.buttons["Write"].firstMatch
+        XCTAssertTrue(write.waitForExistence(timeout: 10), "Write tile")
+        XCTAssertTrue(app.buttons["Dictate"].exists && app.buttons["Task"].exists, "Dictate and Task tiles")
+        shot("capture-tiles")
+
+        write.tap()
+        let text = app.textViews["quickWriteText"]
+        XCTAssertTrue(text.waitForExistence(timeout: 5))
+        text.typeText("\(titles[0])\n\nA line under the title.")
+        shot("capture-write")
+        app.buttons["quickWriteSave"].tap()
+        XCTAssertTrue(app.staticTexts[titles[0]].firstMatch.waitForExistence(timeout: 15), "page opened")
+        shot("capture-write-saved")
+
+        app.open(URL(string: "bbstudio://new-task")!)
+        let field = app.textFields["quickTaskTitle"].exists ? app.textFields["quickTaskTitle"] : app.textViews["quickTaskTitle"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "quick task sheet")
+        field.typeText(titles[1] + "\n")
+        XCTAssertTrue(app.buttons[titles[1]].waitForExistence(timeout: 10), "first task added")
+        field.typeText(titles[2])
+        app.buttons["quickTaskAdd"].tap()
+        XCTAssertTrue(app.buttons[titles[2]].waitForExistence(timeout: 10), "second task added")
+        shot("capture-tasks")
+        let items = (rpc("studio", "overview", NSNull())?["items"] as? [[String: Any]]) ?? []
+        XCTAssertEqual(items.filter { titles.contains($0["title"] as? String ?? "") }.count, 3, "page and two tasks saved")
+    }
+
     private func rpc(_ plugin: String, _ method: String, _ input: Any) -> [String: Any]? {
         var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
