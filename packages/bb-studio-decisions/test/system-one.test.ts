@@ -1,4 +1,5 @@
-import test from "node:test";
+import { test, vi, afterEach } from "vitest";
+afterEach(() => vi.restoreAllMocks());
 import assert from "node:assert/strict";
 import { publicContract } from "../contract";
 import { askSystemOne, JevUnavailableError, UnavailableError, type Questions } from "../system-one";
@@ -19,10 +20,10 @@ const answers = {
   "collaborator:bot-a": { type: "noul", noul: 0.2 },
 };
 
-test("a caller's questions and state reach Jev unchanged, and every answer comes back", async (t) => {
+test("a caller's questions and state reach Jev unchanged, and every answer comes back", async () => {
   const bodies: { state: string; questions: unknown }[] = [];
-  t.mock.method(globalThis, "fetch", async (_url: string, init: RequestInit) => {
-    bodies.push(JSON.parse(String(init.body)));
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url: string | URL | Request, init?: RequestInit) => {
+    bodies.push(JSON.parse(String(init!.body)));
     return Response.json({ answers: { ...answers, extra: { type: "noul", noul: 1 } } });
   });
   const result = await askSystemOne({ zenApiKey: "k" }, { state: { message: "hi" }, questions }, signal(), env);
@@ -32,12 +33,12 @@ test("a caller's questions and state reach Jev unchanged, and every answer comes
   assert.deepEqual(JSON.parse(bodies[0]!.state), { message: "hi" });
 });
 
-test("an answer outside a choice's options, or a missing one, moves to the next provider", async (t) => {
+test("an answer outside a choice's options, or a missing one, moves to the next provider", async () => {
   const replies = [
     { answers: { ...answers, coordinator: { ...answers.coordinator, choice: "bot-z" } } },
     { answers: { coordinator: answers.coordinator } },
   ];
-  t.mock.method(globalThis, "fetch", async () => Response.json(replies.shift()));
+  vi.spyOn(globalThis, "fetch").mockImplementation(async () => Response.json(replies.shift()));
   await assert.rejects(
     askSystemOne({ typesafeApiKey: "a", zenApiKey: "b" }, { state: {}, questions }, signal(), env),
     /TypeSafe returned an unknown decision option\. OpenCode Zen omitted a required decision\./,

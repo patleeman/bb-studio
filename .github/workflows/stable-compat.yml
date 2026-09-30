@@ -10,7 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 11.10.0
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-      - run: node scripts/check-sdk-compat.mjs
+          cache: pnpm
+      - run: pnpm install --frozen-lockfile
+      - run: pnpm typecheck
+      - run: pnpm test
+      - run: pnpm check:compat
+      - run: pnpm check:docs
+      - run: pnpm check:marketplace

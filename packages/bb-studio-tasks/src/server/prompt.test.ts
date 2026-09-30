@@ -30,6 +30,17 @@ describe("handoffInput", () => {
     ]);
   });
 
+  it("mentions a linked Studio task", () => {
+    const input = handoffInput(task, [
+      { target: "item", plugin_id: "studio-tasks", item_id: "tsk_other", label: "Follow-up", href: "/plugins/studio-tasks/tasks/tsk_other" },
+    ], null);
+    expect(input.mentions).toEqual([{
+      start: input.text.indexOf("@Follow-up"),
+      end: input.text.indexOf("@Follow-up") + "@Follow-up".length,
+      resource: { kind: "plugin", pluginId: "studio-tasks", itemId: "task:tsk_other", label: "Follow-up" },
+    }]);
+  });
+
   it("leaves out what the task doesn't have", () => {
     const input = handoffInput({ ...task, title: "", description: " ", due: null }, [], null);
     expect(input.text).toMatch(/^Work on this task from Studio Tasks: "Untitled"\n\nThis thread follows the task/);

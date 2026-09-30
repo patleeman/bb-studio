@@ -1,16 +1,19 @@
 // The first message of a handed-off thread: the task, and its links as real
 // mentions, so each add-on's mention provider hands the agent the item's
 // contents.
-import { formatDue } from "../shared";
+import { formatDue, PLUGIN_ID as TASKS_PLUGIN_ID } from "../shared";
+import { PLUGIN_ID as PAGES_PLUGIN_ID } from "../../../bb-studio-pages/src/constants";
+import { PLUGIN_ID as DRAW_PLUGIN_ID } from "../../../bb-studio-draw/src/shared";
+import { PLUGIN_ID as ARTIFACTS_PLUGIN_ID } from "../../../bb-studio-artifacts/src/shared";
 import type { LinkRow, TaskRow } from "./store";
 
 /** Each Studio add-on's mention provider id; a mention's item id is `<provider>:<id>`. */
 export const MENTION_PROVIDERS: Record<string, string> = {
-  pages: "page",
+  [PAGES_PLUGIN_ID]: "page",
   talk: "recordings",
-  excalidraw: "drawing",
-  artifacts: "artifact",
-  tasks: "task",
+  [DRAW_PLUGIN_ID]: "drawing",
+  [ARTIFACTS_PLUGIN_ID]: "artifact",
+  [TASKS_PLUGIN_ID]: "task",
 };
 
 export type MentionResource =

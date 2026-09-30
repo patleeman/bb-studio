@@ -1,4 +1,4 @@
-import test from "node:test";
+import { test, vi, afterEach } from "vitest";
 import assert from "node:assert/strict";
 import { defaultFallback, fallbackSchema } from "../contract";
 

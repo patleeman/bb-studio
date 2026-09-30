@@ -190,7 +190,7 @@
         "channels",
         "automation",
         "notifications",
-        "studio"
+        "bb-studio"
       ],
       "author": {
         "name": "Patrick Lee",
@@ -211,9 +211,9 @@
       "icon": "ListView",
       "tags": [
         "sidebar",
-        "studio",
         "threads",
-        "projects"
+        "projects",
+        "bb-studio"
       ],
       "author": {
         "name": "Patrick Lee",

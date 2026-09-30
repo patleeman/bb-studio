@@ -19,4 +19,5 @@ done
 
 echo
 echo "Installed $ok plugin(s). Installed plugins from this repo:"
-bb plugin list 2>/dev/null | grep -E "^(studio|studio-chat|pages|talk|excalidraw|artifacts|studio-tasks|bot-teams|thread-list-plus|mobile)@" || true
+plugin_ids="$(node -e 'const {plugins}=require(process.argv[1]); process.stdout.write(plugins.map(p=>p.name).join("|"))' "$REPO_DIR/.bb/plugins.json")"
+bb plugin list 2>/dev/null | grep -E "^($plugin_ids)@" || true

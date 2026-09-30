@@ -92,14 +92,20 @@ plugin deletes its settings and secrets, so note them first.
 This is a pnpm workspace. [`@bb-studio/kit`](packages/bb-studio-kit/) holds the
 shared contract, UI and helpers; each plugin depends on it with
 `file:../bb-studio-kit`, and BB's Git install clones the whole repository, so it
-resolves without publishing the kit.
+resolves without publishing the kit. BB installs Git plugins with npm, so refresh
+each changed plugin lockfile using `scripts/refresh-locks.sh` before committing.
+The Studio plugins use `sonner` 1.x because the BB host shims its installed
+`sonner@1.7.4` instance.
 
 ```sh
 pnpm install
+pnpm check            # typecheck, tests, compatibility, documentation and marketplace
 pnpm typecheck
+pnpm test
 pnpm check:compat        # every plugin installs on the current stable BB
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
+scripts/refresh-locks.sh bb-studio-tasks  # refresh a plugin npm lock in a clean clone
 ```
 
 The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
