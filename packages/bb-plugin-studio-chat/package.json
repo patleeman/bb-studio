@@ -1,6 +1,7 @@
 {
   "name": "bb-plugin-studio-chat",
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "description": "Part of BB Studio. A chat that floats over your pages, drawings and other Studio items, knows which one you're looking at, and can hold any thread.",
   "engines": {

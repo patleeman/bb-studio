@@ -1,6 +1,7 @@
 {
   "name": "bb-plugin-artifacts",
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "description": "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection.",
   "engines": {

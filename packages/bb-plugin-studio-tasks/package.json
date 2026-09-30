@@ -1,6 +1,7 @@
 {
   "name": "bb-plugin-studio-tasks",
   "version": "0.1.0",
+  "license": "MIT",
   "type": "module",
   "description": "Part of BB Studio. A board of tasks you can hand to agents; each task follows its thread from working to review.",
   "engines": {

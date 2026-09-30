@@ -1,6 +1,7 @@
 {
   "name": "@bb-studio/kit",
   "version": "0.1.0",
+  "license": "MIT",
   "private": true,
   "type": "module",
   "description": "Shared contract and UI for BB Studio plugins. Bundled into each Studio plugin; not a plugin itself.",

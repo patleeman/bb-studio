@@ -88,3 +88,7 @@ pnpm plugins:install     # install every plugin from this checkout
 
 See [`AGENTS.md`](AGENTS.md) for the SDK pinning, marketplace and screenshot
 rules, and [`docs/`](docs/) for the design notes.
+
+## License
+
+[MIT](LICENSE)

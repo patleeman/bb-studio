@@ -1,6 +1,7 @@
 {
   "name": "bb-plugin-bot-teams",
   "version": "0.2.1",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "bb": ">=0.44.0",
