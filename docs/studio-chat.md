@@ -6,7 +6,7 @@ thread: a new one, or one you pick from the sidebar. It also knows what it's
 floating over. On a page it works on that page; on a drawing, that drawing.
 
 Plugin id `studio-chat`, display name "Studio Chat", in
-`packages/bb-plugin-studio-chat`.
+`packages/bb-studio-chat`.
 
 ## What BB gives us
 
@@ -59,7 +59,7 @@ storage, so a phone could find it too.
    a pointer, not the content, since the add-on's own tools always read the
    latest version.
 3. **Kind hints.** The tool names come from an optional `agentHint` on each
-   kind in the studio-kit contract (additive). Kinds without one get a
+   kind in the bb-studio-kit contract (additive). Kinds without one get a
    generic hint to use `studio_list_items`.
 4. **Following you.** A floated thread stays when you move to another item,
    and the "Viewing" chip updates. The chip's "Add to message" button would
@@ -89,7 +89,7 @@ We work around BB's gaps rather than wait on BB features.
   after "Open in split" while Studio Chat is installed, and dispatches
   `bb-studio:chat:float`, so neither plugin imports the other.
 - **The current route.** Overlays get no route from BB. The kit's
-  `usePathname()` (`packages/studio-kit/src/app/route.ts`) follows the
+  `usePathname()` (`packages/bb-studio-kit/src/app/route.ts`) follows the
   Navigation API's `currententrychange` and `popstate`, and polls
   `location.pathname` every 400ms as a fallback. The thread on screen comes
   from matching `/thr_…/` in the path.

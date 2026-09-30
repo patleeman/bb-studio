@@ -5,8 +5,8 @@ set -eu
 
 REPO_DIR="$(cd "$(dirname "$0")/.." && pwd)"
 ok=0
-for pkg in "$REPO_DIR"/packages/bb-plugin-*/; do
-	[ -d "$pkg" ] || continue
+for pkg in "$REPO_DIR"/packages/bb-studio*/; do
+	grep -q '"bb":' "$pkg/package.json" 2>/dev/null || continue
 	name="$(basename "$pkg")"
 	echo "==> bb plugin install $name"
 	if bb plugin install "$pkg" --yes; then

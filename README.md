@@ -5,19 +5,19 @@ tracking tasks, running bot teams, and keeping what your agents make. Every
 item lives in one Studio collection that you can search, tag, and hand to an
 agent.
 
-![Live BB screenshot of the Studio collection](packages/bb-plugin-studio/assets/staged-preview.png)
+![Live BB screenshot of the Studio collection](packages/bb-studio/assets/staged-preview.png)
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-plugin-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts, tasks and bots, with search, tags, project filters and tabs. |
-| [Studio Pages](packages/bb-plugin-pages/) | `pages` | Collaborative pages you write with your agents. |
-| [Studio Talk](packages/bb-plugin-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
-| [Studio Draw](packages/bb-plugin-excalidraw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
-| [Studio Artifacts](packages/bb-plugin-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
-| [Studio Tasks](packages/bb-plugin-studio-tasks/) | `studio-tasks` | A board of tasks you can hand to agents; each follows its thread from working to review. |
-| [Studio Teams](packages/bb-plugin-bot-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
-| [Studio Chat](packages/bb-plugin-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
-| [Studio Sidebar](packages/bb-plugin-thread-list-plus/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts, tasks and bots, with search, tags, project filters and tabs. |
+| [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents. |
+| [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
+| [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
+| [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
+| [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | A board of tasks you can hand to agents; each follows its thread from working to review. |
+| [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
+| [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
+| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
 
 Every add-on works on its own. With Studio installed, their items also appear in
 Studio's collection.
@@ -73,9 +73,9 @@ plugin deletes its settings and secrets, so note them first.
 
 ## Development
 
-This is a pnpm workspace. [`@bb-studio/kit`](packages/studio-kit/) holds the
+This is a pnpm workspace. [`@bb-studio/kit`](packages/bb-studio-kit/) holds the
 shared contract, UI and helpers; each plugin depends on it with
-`file:../studio-kit`, and BB's Git install clones the whole repository, so it
+`file:../bb-studio-kit`, and BB's Git install clones the whole repository, so it
 resolves without publishing the kit.
 
 ```sh

@@ -38,7 +38,7 @@ its @-mentions. Studio owns only the collection and the cross-kind actions.
 ## How Studio finds items
 
 Every add-on implements the same small RPC surface, the **Studio provider
-contract**, defined once in `packages/studio-kit/src/contract.ts`:
+contract**, defined once in `packages/bb-studio-kit/src/contract.ts`:
 
 | Method | Input | Output |
 |---|---|---|
@@ -113,7 +113,7 @@ panel (`/plugins/talk/recordings/<id>`). What changes is the panel root:
   collection filtered to that kind. Item pages still open in the add-on.
   Back buttons on item pages return to Studio.
 - **Studio not installed:** the add-on shows its own collection, rendered with
-  the same `studio-kit` components, limited to its kind.
+  the same `bb-studio-kit` components, limited to its kind.
 
 The add-on's frontend learns whether Studio is present with the kit's
 `useStudioPresent()`, which checks `sdk.plugins.list()` for an enabled,
@@ -125,10 +125,10 @@ writing BB's `sidebar.visiblePluginPanels` preference, and a one-time tip in
 the collection offers the same. A BB nav panel option to register a route
 without a sidebar row would make this automatic.
 
-## studio-kit: the shared design language
+## bb-studio-kit: the shared design language
 
-`packages/studio-kit` (`@bb-studio/kit`) is a source package, not a plugin.
-Each Studio plugin depends on it as `file:../studio-kit` and `bb plugin build`
+`packages/bb-studio-kit` (`@bb-studio/kit`) is a source package, not a plugin.
+Each Studio plugin depends on it as `file:../bb-studio-kit` and `bb plugin build`
 bundles it in.
 
 BB installs a Git plugin by cloning the repository and running

@@ -756,7 +756,7 @@ async function ensureChrome() {
 const captures = [
   {
     id: "thread-list-plus",
-    packageDir: "bb-plugin-thread-list-plus",
+    packageDir: "bb-studio-sidebar",
     showSidebar: true,
     setup: async (client) => {
       // Two Studio items opened become tabs in the Studio section, above the
@@ -799,7 +799,7 @@ const captures = [
   },
   {
     id: "thread-list-plus-dialog",
-    packageDir: "bb-plugin-thread-list-plus",
+    packageDir: "bb-studio-sidebar",
     fileName: "project-dialog.png",
     showSidebar: true,
     setup: async (client) => {
@@ -824,7 +824,7 @@ const captures = [
   },
   {
     id: "bots",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "staged-preview.png",
     setup: async (client) => {
       const threadId = await launchRoomThread();
@@ -846,7 +846,7 @@ const captures = [
   },
   {
     id: "bots-mentions",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "channel-mentions.png",
     setup: async (client) => {
       const threadId = await launchRoomThread();
@@ -878,7 +878,7 @@ const captures = [
   },
   {
     id: "bots-search",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "channel-search.png",
     setup: async (client) => {
       const threadId = await launchRoomThread();
@@ -899,7 +899,7 @@ const captures = [
   },
   {
     id: "bots-automations",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "channel-automations.png",
     setup: async (client) => {
       const threadId = await launchRoomThread();
@@ -914,7 +914,7 @@ const captures = [
   },
   {
     id: "bots-creation",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "bot-creation-thread.png",
     setup: async (client) => {
       const room = await pluginRpc("bot-teams", "createRoom", {
@@ -992,7 +992,7 @@ const captures = [
   },
   {
     id: "bots-profile",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "bot-profile.png",
     setup: async (client) => {
       await captures.find((capture) => capture.id === "bots-collection").setup(client);
@@ -1026,7 +1026,7 @@ const captures = [
   },
   {
     id: "bots-memory",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "bot-memory.png",
     setup: async (client) => {
       await captures.find((capture) => capture.id === "bots-profile").setup(client);
@@ -1051,7 +1051,7 @@ const captures = [
   },
   {
     id: "bots-collection",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "bots-collection.png",
     setup: async (client) => {
       await client.navigate("/");
@@ -1083,7 +1083,7 @@ const captures = [
   },
   {
     id: "bots-sidebar",
-    packageDir: "bb-plugin-bot-teams",
+    packageDir: "bb-studio-teams",
     fileName: "studio-sidebar.png",
     showSidebar: true,
     setup: async (client) => {
@@ -1124,7 +1124,7 @@ const captures = [
   },
   {
     id: "excalidraw",
-    packageDir: "bb-plugin-excalidraw",
+    packageDir: "bb-studio-draw",
     privateSidebar: true,
     setup: async (client) => {
       const { drawing, cleanup } = await seedDrawing();
@@ -1149,7 +1149,7 @@ const captures = [
   },
   {
     id: "studio-chat",
-    packageDir: "bb-plugin-studio-chat",
+    packageDir: "bb-studio-chat",
     privateSidebar: true,
     setup: async (client) => {
       const { drawing, cleanup } = await seedDrawing();
@@ -1190,7 +1190,7 @@ const captures = [
   },
   {
     id: "talk",
-    packageDir: "bb-plugin-talk",
+    packageDir: "bb-studio-talk",
     privateSidebar: true,
     setup: async (client) => {
       const recordingId = await seedTalkRecording(projectId);
@@ -1220,7 +1220,7 @@ const captures = [
   },
   {
     id: "pages",
-    packageDir: "bb-plugin-pages",
+    packageDir: "bb-studio-pages",
     privateSidebar: true,
     setup: async (client) => {
       const { page, cleanup } = await seedPages();
@@ -1249,7 +1249,7 @@ const captures = [
   },
   {
     id: "pages-collection",
-    packageDir: "bb-plugin-pages",
+    packageDir: "bb-studio-pages",
     fileName: "collection.png",
     privateSidebar: true,
     setup: async (client) => {
@@ -1276,7 +1276,7 @@ const captures = [
   },
   {
     id: "studio",
-    packageDir: "bb-plugin-studio",
+    packageDir: "bb-studio",
     privateSidebar: true,
     setup: async (client) => {
       const pages = await seedPages();
@@ -1314,7 +1314,7 @@ const captures = [
   },
   {
     id: "studio-search",
-    packageDir: "bb-plugin-studio",
+    packageDir: "bb-studio",
     fileName: "search.png",
     privateSidebar: true,
     setup: async (client) => {
@@ -1371,7 +1371,7 @@ const captures = [
   },
   {
     id: "artifacts",
-    packageDir: "bb-plugin-artifacts",
+    packageDir: "bb-studio-artifacts",
     privateSidebar: true,
     setup: async (client) => {
       const { artifactId, cleanup } = await seedArtifact();
@@ -1403,7 +1403,7 @@ const captures = [
   },
   {
     id: "studio-tasks",
-    packageDir: "bb-plugin-studio-tasks",
+    packageDir: "bb-studio-tasks",
     privateSidebar: true,
     setup: async (client) => {
       const seeded = [
@@ -1455,7 +1455,7 @@ try {
       const outputPath = join(repoRoot, "packages", capture.packageDir, "assets", capture.fileName ?? "staged-preview.png");
       // Use BB's real collapsed-sidebar state so publication does not expose
       // unrelated local projects/threads alongside the deterministic fixtures.
-      const privateSidebar = !capture.showSidebar && (capture.privateSidebar || (capture.packageDir === "bb-plugin-bot-teams" && capture.id !== "bots-forks"));
+      const privateSidebar = !capture.showSidebar && (capture.privateSidebar || (capture.packageDir === "bb-studio-teams" && capture.id !== "bots-forks"));
       if (privateSidebar) {
         await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
         await sleep(350);

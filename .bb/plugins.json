@@ -5,39 +5,39 @@
   "plugins": [
     {
       "name": "studio",
-      "source": "./packages/bb-plugin-studio"
+      "source": "./packages/bb-studio"
     },
     {
       "name": "studio-chat",
-      "source": "./packages/bb-plugin-studio-chat"
+      "source": "./packages/bb-studio-chat"
     },
     {
       "name": "pages",
-      "source": "./packages/bb-plugin-pages"
+      "source": "./packages/bb-studio-pages"
     },
     {
       "name": "talk",
-      "source": "./packages/bb-plugin-talk"
+      "source": "./packages/bb-studio-talk"
     },
     {
       "name": "excalidraw",
-      "source": "./packages/bb-plugin-excalidraw"
+      "source": "./packages/bb-studio-draw"
     },
     {
       "name": "artifacts",
-      "source": "./packages/bb-plugin-artifacts"
+      "source": "./packages/bb-studio-artifacts"
     },
     {
       "name": "studio-tasks",
-      "source": "./packages/bb-plugin-studio-tasks"
+      "source": "./packages/bb-studio-tasks"
     },
     {
       "name": "bot-teams",
-      "source": "./packages/bb-plugin-bot-teams"
+      "source": "./packages/bb-studio-teams"
     },
     {
       "name": "thread-list-plus",
-      "source": "./packages/bb-plugin-thread-list-plus"
+      "source": "./packages/bb-studio-sidebar"
     }
   ]
 }

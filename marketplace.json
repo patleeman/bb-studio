@@ -10,7 +10,7 @@
       "displayName": "Studio",
       "description": "The home of BB Studio. One collection for your pages, recordings, drawings, tasks and bots: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
       "icon": {
-        "url": "./packages/bb-plugin-studio/icons/studio.svg"
+        "url": "./packages/bb-studio/icons/studio.svg"
       },
       "tags": [
         "productivity",
@@ -25,7 +25,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-studio",
+          "subdir": "packages/bb-studio",
           "ref": "main"
         }
       }
@@ -35,7 +35,7 @@
       "displayName": "Studio Chat",
       "description": "Part of BB Studio. A chat that floats over your pages, drawings and other Studio items, knows which one you're looking at, and can hold any thread.",
       "icon": {
-        "url": "./packages/bb-plugin-studio-chat/assets/icon.svg"
+        "url": "./packages/bb-studio-chat/assets/icon.svg"
       },
       "tags": [
         "productivity",
@@ -50,7 +50,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-studio-chat",
+          "subdir": "packages/bb-studio-chat",
           "ref": "main"
         }
       }
@@ -60,7 +60,7 @@
       "displayName": "Studio Pages",
       "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, let one keep a page up to date, or explore what an agent noticed along the way.",
       "icon": {
-        "url": "./packages/bb-plugin-pages/icons/pages.svg"
+        "url": "./packages/bb-studio-pages/icons/pages.svg"
       },
       "tags": [
         "productivity",
@@ -77,7 +77,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-pages",
+          "subdir": "packages/bb-studio-pages",
           "ref": "main"
         }
       }
@@ -87,7 +87,7 @@
       "displayName": "Studio Talk",
       "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
       "icon": {
-        "url": "./packages/bb-plugin-talk/icons/talk.svg"
+        "url": "./packages/bb-studio-talk/icons/talk.svg"
       },
       "tags": [
         "productivity",
@@ -102,7 +102,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-talk",
+          "subdir": "packages/bb-studio-talk",
           "ref": "main"
         }
       }
@@ -112,7 +112,7 @@
       "displayName": "Studio Draw",
       "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations.",
       "icon": {
-        "url": "./packages/bb-plugin-excalidraw/assets/icon.svg"
+        "url": "./packages/bb-studio-draw/assets/icon.svg"
       },
       "tags": [
         "drawing",
@@ -126,7 +126,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-excalidraw",
+          "subdir": "packages/bb-studio-draw",
           "ref": "main"
         }
       }
@@ -136,7 +136,7 @@
       "displayName": "Studio Artifacts",
       "description": "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection.",
       "icon": {
-        "url": "./packages/bb-plugin-artifacts/assets/icon.svg"
+        "url": "./packages/bb-studio-artifacts/assets/icon.svg"
       },
       "tags": [
         "files",
@@ -150,7 +150,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-artifacts",
+          "subdir": "packages/bb-studio-artifacts",
           "ref": "main"
         }
       }
@@ -160,7 +160,7 @@
       "displayName": "Studio Tasks",
       "description": "Part of BB Studio. A board of tasks you can hand to agents; each task follows its thread from working to review.",
       "icon": {
-        "url": "./packages/bb-plugin-studio-tasks/assets/icon.svg"
+        "url": "./packages/bb-studio-tasks/assets/icon.svg"
       },
       "tags": [
         "tasks",
@@ -174,7 +174,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-studio-tasks",
+          "subdir": "packages/bb-studio-tasks",
           "ref": "main"
         }
       }
@@ -199,7 +199,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-bot-teams",
+          "subdir": "packages/bb-studio-teams",
           "ref": "main"
         }
       }
@@ -222,7 +222,7 @@
       "source": {
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-plugin-thread-list-plus",
+          "subdir": "packages/bb-studio-sidebar",
           "ref": "main"
         }
       }
