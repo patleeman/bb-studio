@@ -96,6 +96,7 @@ struct DrawingView: View {
     @State private var snapshot: Image?
     @State private var renaming = false
     @State private var newName = ""
+    @State private var chatting = false
 
     var body: some View {
         Group {
@@ -143,7 +144,13 @@ struct DrawingView: View {
             } label: { Image(systemName: "pencil") }
             .accessibilityLabel("Rename")
             .disabled(scene == nil)
+            if StudioStore.shared.plugins.contains("studio-chat") {
+                Button { chatting = true } label: { Image(systemName: "bubble.left.and.text.bubble.right") }
+                    .accessibilityLabel("Chat About This")
+                    .disabled(scene == nil)
+            }
         }
+        .studioChat(isPresented: $chatting, pluginId: "excalidraw", itemId: id, title: name, projectId: nil)
         .alert("Rename drawing", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}

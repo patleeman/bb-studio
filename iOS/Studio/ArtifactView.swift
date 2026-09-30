@@ -7,6 +7,7 @@ struct ArtifactView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     let id: String
+    @State private var chatting = false
     @State private var artifact: Artifact?
     @State private var versions: [ArtifactVersion] = []
     /// nil for the newest.
@@ -56,6 +57,9 @@ struct ArtifactView: View {
         .navigationTitle(artifact?.displayTitle ?? "Artifact")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
+        .studioChat(
+            isPresented: $chatting, pluginId: "artifacts", itemId: id, title: artifact?.displayTitle ?? "Artifact",
+            projectId: artifact?.projectId)
         .task(id: version?.id) { await loadText() }
         .task {
             listener = app.realtime.listen { event in
@@ -204,6 +208,7 @@ struct ArtifactView: View {
             Button {
                 app.newThread(text: "[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ")
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
+            StudioChatMenuButton(isPresented: $chatting)
             if let text, version?.isText == true {
                 Button {
                     UIPasteboard.general.string = text

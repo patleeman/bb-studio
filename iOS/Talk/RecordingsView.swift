@@ -14,6 +14,7 @@ struct RecordingDetailView: View {
     @State private var loaded = false
     @State private var error: String?
     @State private var creatingThread = false
+    @State private var chatting = false
     @State private var confirmingDelete = false
     @State private var renaming = false
     @State private var newTitle = ""
@@ -49,6 +50,7 @@ struct RecordingDetailView: View {
                 ShareLink(item: transcript).disabled(transcript.isEmpty)
                 Menu {
                     Button { creatingThread = true } label: { Label("New Thread", systemImage: "square.and.pencil") }
+                    StudioChatMenuButton(isPresented: $chatting)
                     Button { UIPasteboard.general.string = transcript } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
                     Button {
                         newTitle = recording?.title ?? ""
@@ -67,6 +69,7 @@ struct RecordingDetailView: View {
             }
         }
         .sheet(isPresented: $creatingThread) { NewThreadView(text: transcript) }
+        .studioChat(isPresented: $chatting, pluginId: "talk", itemId: id, title: recording?.title ?? "Recording", projectId: recording?.projectId)
         .confirmationDialog("Delete this recording?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
         } message: {

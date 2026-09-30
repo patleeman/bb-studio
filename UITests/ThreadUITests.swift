@@ -775,6 +775,67 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Show qa/chart.html"].firstMatch.tap()
     }
 
+    /// Studio Tasks on a scratch task (deleted after): the board, the task,
+    /// moving it with the Status menu, and a swipe to the next column.
+    func testTasks() throws {
+        let title = "QA task \(Int(Date().timeIntervalSince1970))"
+        let created = rpc("studio-tasks", "create", [
+            "title": title, "description": "Scratch task for a **UI test**.", "due": "2026-10-02", "assignee": "me",
+        ])
+        let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
+        addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
+        app.open(URL(string: "bbgo://tasks")!)
+        app.segmentedControls.buttons.element(boundBy: 0).tap()
+        let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 10), "task on the board")
+        shot("tasks-board")
+        row.tap()
+        XCTAssertTrue(app.staticTexts["UI test"].waitForExistence(timeout: 10) || app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Scratch task'")).firstMatch.exists, "description")
+        shot("task-detail")
+        app.buttons["taskStatus"].tap()
+        app.buttons["Review"].tap()
+        XCTAssertTrue(wait(10) { (self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "review" }, "moved to Review")
+        shot("task-review")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.segmentedControls.buttons.element(boundBy: 2).tap()
+        let moved = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        XCTAssertTrue(moved.waitForExistence(timeout: 10), "in the Review column")
+        moved.swipeRight()
+        app.buttons["Done"].firstMatch.tap()
+        XCTAssertTrue(wait(10) { (self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "done" }, "swiped to Done")
+        shot("tasks-done")
+    }
+
+    /// Starts a real Studio Chat thread from a scratch task, then deletes both.
+    func testStudioChat() throws {
+        let title = "QA chat task \(Int(Date().timeIntervalSince1970))"
+        let created = rpc("studio-tasks", "create", ["title": title, "description": "Scratch task.", "projectId": "proj_8ztiq6dkh5"])
+        let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
+        var threadId: String?
+        addTeardownBlock {
+            if let threadId { _ = self.api("DELETE", "/threads/\(threadId)", ["childThreadsConfirmed": false]) }
+            _ = self.rpc("studio-tasks", "delete", ["id": id])
+        }
+        app.open(URL(string: "bbgo://task/\(id)")!)
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "task menu")
+        more.tap()
+        app.buttons["Chat About This"].tap()
+        let field = app.textViews["studioChatField"].exists ? app.textViews["studioChatField"] : app.textFields["studioChatField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "chat sheet")
+        field.typeText("This is an automated UI test. Reply with just OK and do nothing else.")
+        shot("studio-chat-sheet")
+        app.buttons["Start"].tap()
+        XCTAssertTrue(wait(20) {
+            threadId = (self.rpc("studio-chat", "lastThread", ["pluginId": "studio-tasks", "id": id])?["threadId"] as? String)
+            return threadId != nil
+        }, "thread linked to the task")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'automated UI test'")).firstMatch.waitForExistence(timeout: 15), "opened the thread")
+        shot("studio-chat-thread")
+        // Let the agent finish so the thread deletes cleanly.
+        _ = wait(90) { (self.api("GET", "/threads/\(threadId!)", [:])?["status"] as? String).map { !["running", "starting", "queued"].contains($0) } ?? false }
+    }
+
     private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
             "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,
@@ -788,7 +849,7 @@ final class ThreadUITests: XCTestCase {
         var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
-        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        if method != "GET" { request.httpBody = try? JSONSerialization.data(withJSONObject: body) }
         var result: [String: Any]?
         let done = expectation(description: path)
         URLSession.shared.dataTask(with: request) { data, _, _ in

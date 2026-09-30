@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class StudioStore: ObservableObject {
     static let shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -215,6 +215,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
+        StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
     ]
 
     static func other(_ id: String) -> StudioKind {
@@ -346,6 +347,9 @@ struct StudioView: View {
             tile("Record", "record.circle", .red) { recordingKind = "recording" }
             if store.plugins.contains("pages") {
                 tile("Dictate Page", "doc.badge.plus", .blue) { dictatingPage = true }
+            }
+            if store.plugins.contains("studio-tasks") {
+                tile("Tasks", "checklist", .green) { app.push(.tasks) }
             }
         }
         .padding(.vertical, 4)
@@ -523,6 +527,7 @@ struct StudioView: View {
         case "talk": .recording(id: item.itemId)
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
+        case "studio-tasks": .task(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
     }
