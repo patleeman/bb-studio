@@ -31,6 +31,7 @@ targets:
         CODE_SIGN_ENTITLEMENTS: iOS/BBStudio.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
         INFOPLIST_FILE: iOS/Info.plist
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     scheme:
       testTargets:
         - BBStudioUITests
@@ -61,6 +62,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.share
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_FILE: Share/Info.plist
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Share/BBStudioShare.entitlements
   BBStudioWidgets:
     type: app-extension
@@ -74,6 +76,7 @@ targets:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.widgets
         TARGETED_DEVICE_FAMILY: "1,2"
         INFOPLIST_FILE: Widgets/Info.plist
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Widgets/BBStudioWidgets.entitlements
   BBStudioWatch:
     type: application
@@ -85,6 +88,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.watchkitapp
         INFOPLIST_FILE: Watch/Info.plist
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: Watch/BBStudioWatch.entitlements
         ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
     dependencies:
@@ -101,6 +105,7 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.watchkitapp.widgets
         INFOPLIST_FILE: WatchWidgets/Info.plist
+        ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
         CODE_SIGN_ENTITLEMENTS: WatchWidgets/BBStudioWatchWidgets.entitlements
   BBStudioUITests:
     type: bundle.ui-testing

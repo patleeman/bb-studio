@@ -70,7 +70,7 @@ struct WatchThreadView: View {
                     Text(row.isUser ? "You" : "Agent").font(.caption2).foregroundStyle(.secondary)
                     Text(LocalizedStringKey(row.text ?? "")).font(.footnote)
                 }
-                .listRowBackground(row.isUser ? Color.blue.opacity(0.25) : nil)
+                .listRowBackground(row.isUser ? Color.accentColor.opacity(0.25) : nil)
             }
             ForEach(interactions) { interaction in
                 Section { WatchInteraction(interaction: interaction, answer: answer) }

@@ -68,6 +68,7 @@ are unchanged, and old `bbgo://` links still open.
 | Hands-free voice chat with one thread (on-device STT, then the thread, then TTS). You can talk over it, and pick the voice and speed in Settings. Uses the iPhone mic even with Bluetooth audio, restarts after calls and route changes, warns when the mic sends only silence, and links to Settings when a permission is off | `iOS/Voice` |
 | Action button and Siri shortcuts: Dictate, Voice chat, Open thread, New thread, Write, New task, "Ask BB" (Siri waits for the reply and reads it). Home Screen quick actions (long-press the icon): Dictate, Write, New Task, New Thread; `bbstudio://write` and `bbstudio://new-task` open the same sheets | `iOS/App/Intents.swift`, `iOS/App/BBStudioApp.swift` |
 | Control Center and lock screen controls: Dictate, Voice chat, New thread | `Widgets/Controls.swift` |
+| The BB Studio theme's coral accent (#c7431a light, #ff7a45 dark, from the Silk S icon) on buttons, chips, your messages and unread dots, across the app, widgets, share sheet and watch. The BB Web tab follows the server's theme | `*/Assets.xcassets/AccentColor.colorset`, `project.yml` |
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |

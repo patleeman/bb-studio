@@ -499,7 +499,7 @@ struct InboxView: View {
         Button { toggleRead(thread) } label: {
             Label(thread.isUnread ? "Read" : "Unread", systemImage: thread.isUnread ? "envelope.open" : "envelope.badge")
         }
-        .tint(.blue)
+        .tint(.accentColor)
         Button { togglePin(thread) } label: {
             Label(thread.pinnedAt == nil ? "Pin" : "Unpin", systemImage: thread.pinnedAt == nil ? "pin" : "pin.slash")
         }
@@ -690,7 +690,7 @@ struct BotRow: View {
             if working {
                 ProgressView().controlSize(.small)
             } else if unread {
-                Circle().fill(.blue).frame(width: 8, height: 8)
+                Circle().fill(Color.accentColor).frame(width: 8, height: 8)
             }
         }
     }
@@ -719,7 +719,7 @@ struct ChannelRow: View {
                     .foregroundStyle(.red)
                     .accessibilityLabel("\(attention) need attention")
             }
-            if unread { Circle().fill(.blue).frame(width: 8, height: 8) }
+            if unread { Circle().fill(Color.accentColor).frame(width: 8, height: 8) }
         }
     }
 }
