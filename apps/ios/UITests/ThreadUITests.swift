@@ -796,6 +796,28 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Show qa/chart.html"].firstMatch.tap()
     }
 
+    /// `BBGO_QA_IMAGE_THREAD`: a reply with `![QA silk icon](/abs.png)`, an image
+    /// inside a paragraph, and a missing one.
+    func testMarkdownImage() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_IMAGE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
+        XCTAssertTrue(app.staticTexts["QA image reply"].waitForExistence(timeout: 15), "reply")
+        let loaded = app.descendants(matching: .any).matching(identifier: "markdownImage")
+        XCTAssertTrue(loaded["QA silk icon"].waitForExistence(timeout: 15), "absolute path loads")
+        XCTAssertTrue(app.staticTexts["Text before text after."].firstMatch.exists, "paragraph keeps its text")
+        app.swipeUp()
+        let sheet = loaded["QA inline sheet"]
+        XCTAssertTrue(sheet.waitForExistence(timeout: 15), "file:// image loads")
+        XCTAssertFalse(loaded["QA missing image"].exists, "missing file doesn't load")
+        XCTAssertTrue(app.descendants(matching: .any).matching(identifier: "markdownImageAlt")["QA missing image"].firstMatch
+            .waitForExistence(timeout: 15), "missing shows its alt text")
+        shot("markdown-image")
+        sheet.tap()
+        XCTAssertTrue(app.buttons["Done"].waitForExistence(timeout: 5), "full screen")
+        shot("markdown-image-full")
+        app.buttons["Done"].tap()
+    }
+
     /// Studio Tasks on a scratch task (deleted after): the board, the task,
     /// moving it with the Status menu, and a swipe to the next column.
     func testTasks() throws {

@@ -2,7 +2,7 @@ import SwiftUI
 
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
-/// code. `::artifact{id="…"}` lines become artifact cards and `::inline-vis{…}`
+/// code, and images. `::artifact{id="…"}` lines become artifact cards and `::inline-vis{…}`
 /// lines show the file they name, and `::task{id="…"}` lines task cards; other directives,
 /// such as `::reactions{…}`, are left out; see `Directive`.
 struct MarkdownText: View {
@@ -57,6 +57,8 @@ struct MarkdownText: View {
             InlineVisCard(vis: vis)
         case .task(let id):
             TaskCard(id: id)
+        case .image(let alt, let src):
+            MarkdownImage(alt: alt, src: src)
         }
     }
 
@@ -163,6 +165,8 @@ enum MarkdownBlock {
     case inlineVis(InlineVis)
     /// A Studio Tasks task, from an agent's `tasks_create`.
     case task(String)
+    /// `![alt](src)`, shown below the text of its paragraph.
+    case image(alt: String, src: String)
 
     private final class Box {
         let blocks: [MarkdownBlock]
@@ -188,7 +192,7 @@ enum MarkdownBlock {
         let lines = source.components(separatedBy: "\n")
 
         func flush() {
-            if !paragraph.isEmpty { blocks.append(.paragraph(paragraph.joined(separator: "\n"))) }
+            if !paragraph.isEmpty { blocks.append(contentsOf: withImages(paragraph.joined(separator: "\n"))) }
             if !items.isEmpty { blocks.append(.list(items)) }
             if !quote.isEmpty { blocks.append(.quote(quote.joined(separator: "\n"))) }
             paragraph = []
@@ -276,6 +280,19 @@ enum MarkdownBlock {
         }
         flush()
         return blocks
+    }
+
+    /// `![alt](src "title")`, with `<…>` around a src that has spaces.
+    private static let imagePattern = /!\[([^\]]*)\]\(\s*(?:<([^>]+)>|([^)\s]+))(?:\s+"[^"]*")?\s*\)/
+
+    /// A paragraph's text without its images, then the images.
+    private static func withImages(_ text: String) -> [MarkdownBlock] {
+        let images = text.matches(of: imagePattern).map {
+            MarkdownBlock.image(alt: String($0.1), src: String($0.2 ?? $0.3 ?? ""))
+        }
+        guard !images.isEmpty else { return [.paragraph(text)] }
+        let rest = text.replacing(imagePattern, with: "").replacing(/[ \t]{2,}/, with: " ").trimmingCharacters(in: .whitespacesAndNewlines)
+        return (rest.isEmpty ? [] : [.paragraph(rest)]) + images
     }
 
     private static func isTableDivider(_ line: String) -> Bool {
