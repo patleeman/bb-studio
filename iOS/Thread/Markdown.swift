@@ -304,6 +304,13 @@ struct Directive {
 struct MarkdownTable: View {
     let header: [String]
     let rows: [[String]]
+    @State private var available: CGFloat = 360
+
+    /// Widest a column gets before wrapping: a share of the screen, so a
+    /// couple of columns fit and wider tables scroll.
+    private var cellMax: CGFloat {
+        min(360, max(140, available / CGFloat(max(header.count, 1)) - 20))
+    }
 
     var body: some View {
         ScrollView(.horizontal, showsIndicators: false) {
@@ -319,18 +326,37 @@ struct MarkdownTable: View {
             .overlay(RoundedRectangle(cornerRadius: 8).strokeBorder(.separator))
             .clipShape(.rect(cornerRadius: 8))
         }
+        .onGeometryChange(for: CGFloat.self) { $0.size.width } action: { available = $0 }
     }
 
     @ViewBuilder
     private func cells(_ values: [String], bold: Bool) -> some View {
         ForEach(0..<header.count, id: \.self) { column in
-            Text(MarkdownText.inline(column < values.count ? values[column] : ""))
-                .fontWeight(bold ? .semibold : .regular)
-                .frame(maxWidth: 260, alignment: .leading)
-                .fixedSize(horizontal: false, vertical: true)
-                .padding(.horizontal, 10)
-                .padding(.vertical, 6)
+            CappedWidth(max: cellMax) {
+                Text(MarkdownText.inline(column < values.count ? values[column] : ""))
+                    .fontWeight(bold ? .semibold : .regular)
+            }
+            .padding(.horizontal, 10)
+            .padding(.vertical, 6)
         }
+    }
+}
+
+/// Its content's natural width up to `max`, wrapping past that, or the width
+/// of its column if wider. A horizontal scroll view offers no width, and
+/// without this the grid measures a cell at one width and draws it at another.
+private struct CappedWidth: Layout {
+    let max: CGFloat
+
+    func sizeThatFits(proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) -> CGSize {
+        guard let content = subviews.first else { return .zero }
+        var width = min(content.sizeThatFits(.unspecified).width.rounded(.up), max)
+        if let offered = proposal.width, offered.isFinite, offered > width { width = min(offered, max) }
+        return CGSize(width: width, height: content.sizeThatFits(ProposedViewSize(width: width, height: nil)).height)
+    }
+
+    func placeSubviews(in bounds: CGRect, proposal: ProposedViewSize, subviews: Subviews, cache: inout ()) {
+        subviews.first?.place(at: bounds.origin, anchor: .topLeading, proposal: ProposedViewSize(width: bounds.width, height: nil))
     }
 }
 

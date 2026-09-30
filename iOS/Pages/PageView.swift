@@ -93,6 +93,13 @@ extension PageModel {
     | Design | Ana | Done |
     | Build | Sam | In progress |
 
+    | Today | After |
+    |---|---|
+    | Pages collection (Studio Pages) | Becomes the **Library**, the only collection page |
+    | Recordings table (Studio Talk) | Removed as a collection page; filters and bulk actions move to the Library. |
+    | Drawings gallery (Studio Draw) | Removed as a collection page. Drawings appear in the Library with thumbnails. |
+    | Each item's own view | Stays with the plugin that owns it: the page editor, the recording view, the canvas. |
+
     ```chart
     {"type":"bar","title":"Signups","x":"label","series":["Signups"],"data":[{"label":"Mon","Signups":12},{"label":"Tue","Signups":19},{"label":"Wed","Signups":8},{"label":"Thu","Signups":24}]}
     ```
