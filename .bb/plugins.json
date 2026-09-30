@@ -1,0 +1,43 @@
+{
+  "$schema": "https://getbb.app/schemas/plugins.schema.json",
+  "schemaVersion": 1,
+  "name": "bb-studio",
+  "plugins": [
+    {
+      "name": "studio",
+      "source": "./packages/bb-plugin-studio"
+    },
+    {
+      "name": "studio-chat",
+      "source": "./packages/bb-plugin-studio-chat"
+    },
+    {
+      "name": "pages",
+      "source": "./packages/bb-plugin-pages"
+    },
+    {
+      "name": "talk",
+      "source": "./packages/bb-plugin-talk"
+    },
+    {
+      "name": "excalidraw",
+      "source": "./packages/bb-plugin-excalidraw"
+    },
+    {
+      "name": "artifacts",
+      "source": "./packages/bb-plugin-artifacts"
+    },
+    {
+      "name": "studio-tasks",
+      "source": "./packages/bb-plugin-studio-tasks"
+    },
+    {
+      "name": "bot-teams",
+      "source": "./packages/bb-plugin-bot-teams"
+    },
+    {
+      "name": "thread-list-plus",
+      "source": "./packages/bb-plugin-thread-list-plus"
+    }
+  ]
+}
