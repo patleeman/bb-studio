@@ -43,7 +43,7 @@ import {
 } from "../ui/mutation-errors.js";
 import { cn } from "@/lib/utils";
 import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
-import { useProjectCreation } from "./useProjectCreation.js";
+import { useProjectCreation } from "../studio/useProjectCreation.js";
 import {
   ConfirmDeleteDialog,
   ConfirmDeleteDialogContent,
@@ -1548,8 +1548,7 @@ function ProjectListComponent({
         sectionId={sectionId}
         onNewThread={
           hostId
-            ? () =>
-                openRootComposeForProject(personalProjectId, undefined, hostId)
+            ? () => openRootComposeForProject(personalProjectId, undefined, hostId)
             : handleCreateProjectlessThread
         }
         open={openSidebarMenu === menuId}

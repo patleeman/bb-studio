@@ -1,0 +1,48 @@
+--- a/source/app.tsx
++++ b/source/app.tsx
+@@ -1,0 +2 @@
++import { SidebarAnchors } from "@bb-studio/kit/app";
+@@ -17,0 +19 @@
++        <SidebarAnchors onNavigate={onNavigate} />
+@@ -30 +32 @@
+-    title: "Thread list",
++    title: "Studio Sidebar",
+@@ -32 +34 @@
+-      "Pinned threads, custom sections, projects, machines, and nested threads.",
++      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
+--- a/source/app/list/ProjectList.tsx
++++ b/source/app/list/ProjectList.tsx
+@@ -45,0 +46 @@
++import { useProjectCreation } from "../studio/useProjectCreation.js";
+@@ -1347,0 +1349 @@
++  const projectCreation = useProjectCreation(onProjectSelect);
+@@ -1733,0 +1736,2 @@
++        onNewProject: projectCreation.openDialog,
++        isCreatingProject: projectCreation.isCreating,
+@@ -1860,0 +1865 @@
++      {projectCreation.dialog}
+--- a/source/app/list/SidebarHeaderControls.tsx
++++ b/source/app/list/SidebarHeaderControls.tsx
+@@ -22,0 +23,2 @@
++  onNewProject?: () => void;
++  isCreatingProject?: boolean;
+--- a/source/app/list/SidebarViewItems.tsx
++++ b/source/app/list/SidebarViewItems.tsx
+@@ -0,0 +1 @@
++import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
+@@ -74,0 +76 @@
++      <StudioNewProjectItem onSelect={creation.onNewProject} disabled={creation.isCreatingProject} />
+@@ -81,0 +84 @@
++      <HiddenStudioSectionItems />
+--- a/source/app/rows/ThreadActionsMenu.tsx
++++ b/source/app/rows/ThreadActionsMenu.tsx
+@@ -51,0 +52 @@
++import { StudioChatFloatItem, useStudioChatFloat } from "../studio/StudioChatFloatItem.js";
+@@ -257,0 +259 @@
++  const studioChat = useStudioChatFloat();
+@@ -327 +329,4 @@
+-          {id === "split" && onOpenInSplit ? separator : null}
++          {id === "split" && studioChat ? (
++            <StudioChatFloatItem threadId={thread.id} surface={surface} />
++          ) : null}
++          {id === "split" && (onOpenInSplit || studioChat) ? separator : null}

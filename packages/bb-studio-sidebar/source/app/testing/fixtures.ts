@@ -2,7 +2,7 @@ import type {
   PluginSidebarProject,
   PluginSidebarThread,
 } from "@get-bb/plugin-sdk/app";
-import type { SidebarProject } from "./use-sidebar-data.js";
+import type { SidebarProject } from "../model/use-sidebar-data.js";
 
 export type SidebarThreadEnvironment = NonNullable<
   PluginSidebarThread["environment"]

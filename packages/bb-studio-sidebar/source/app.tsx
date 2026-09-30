@@ -1,7 +1,4 @@
-import {
-  definePluginApp,
-  type PluginThreadListProps,
-} from "@get-bb/plugin-sdk/app";
+import { definePluginApp, type PluginThreadListProps } from "@get-bb/plugin-sdk/app";
 import { SidebarAnchors } from "@bb-studio/kit/app";
 import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compact-viewport";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -19,7 +16,6 @@ function ThreadList({
     <CompactViewportOverrideProvider isCompactViewport={isCompactViewport}>
       <TooltipProvider>
         <PreferencesSync />
-        {/* Studio apps' sections, above the threads and in the same scroll area. */}
         <SidebarAnchors onNavigate={onNavigate} />
         <ProjectList
           activeThreadId={activeThreadId}

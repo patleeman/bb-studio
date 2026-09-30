@@ -1,0 +1,137 @@
+--- a/source/app/dnd/sidebarNestPreviewPlacement.test.ts
++++ b/source/app/dnd/sidebarNestPreviewPlacement.test.ts
+@@ -7 +7 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/dnd/useSectionThreadDnd.projection.test.tsx
++++ b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
+@@ -15 +15 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/dnd/useSectionThreadDnd.test.ts
++++ b/source/app/dnd/useSectionThreadDnd.test.ts
+@@ -5 +5 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/list/ProjectList.modes.test.tsx
++++ b/source/app/list/ProjectList.modes.test.tsx
+@@ -46 +46 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/list/ProjectList.sectionCreate.test.tsx
++++ b/source/app/list/ProjectList.sectionCreate.test.tsx
+@@ -16 +16 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/list/ProjectListSectionHeader.test.tsx
++++ b/source/app/list/ProjectListSectionHeader.test.tsx
+@@ -17 +17 @@
+-import { makeSidebarThread } from "../model/fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+--- a/source/app/list/ProjectRow.interactions.test.tsx
++++ b/source/app/list/ProjectRow.interactions.test.tsx
+@@ -31 +31 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/list/ProjectThreadTree.disclosure.test.tsx
++++ b/source/app/list/ProjectThreadTree.disclosure.test.tsx
+@@ -12 +12 @@
+-import { makeSidebarThread } from "../model/fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+--- a/source/app/list/SidebarHeaderControls.test.tsx
++++ b/source/app/list/SidebarHeaderControls.test.tsx
+@@ -174 +174 @@
+-    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
++    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
+--- a/source/app/list/sortComparator.test.ts
++++ b/source/app/list/sortComparator.test.ts
+@@ -15 +15 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/list/useSidebarThreadReveal.test.tsx
++++ b/source/app/list/useSidebarThreadReveal.test.tsx
+@@ -12 +12 @@
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/model/machine-thread-groups.test.ts
++++ b/source/app/model/machine-thread-groups.test.ts
+@@ -2 +2 @@
+-import { makeSidebarThread, type SidebarThreadOverrides } from "./fixtures.js";
++import { makeSidebarThread, type SidebarThreadOverrides } from "../testing/fixtures.js";
+--- a/source/app/model/pinned-sidebar-threads.test.ts
++++ b/source/app/model/pinned-sidebar-threads.test.ts
+@@ -6 +6 @@
+-} from "./fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/model/project-thread-groups.test.ts
++++ b/source/app/model/project-thread-groups.test.ts
+@@ -17 +17 @@
+-} from "./fixtures.js";
++} from "../testing/fixtures.js";
+--- a/source/app/model/thread-activity.test.ts
++++ b/source/app/model/thread-activity.test.ts
+@@ -10 +10 @@
+-import { makeSidebarThread, type SidebarThreadOverrides } from "./fixtures.js";
++import { makeSidebarThread, type SidebarThreadOverrides } from "../testing/fixtures.js";
+--- a/source/app/model/use-sidebar-data.test.ts
++++ b/source/app/model/use-sidebar-data.test.ts
+@@ -2 +2 @@
+-import { makeSidebarThread } from "./fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+--- a/source/app/rows/ThreadRow.test.tsx
++++ b/source/app/rows/ThreadRow.test.tsx
+@@ -21 +21 @@
+-import { makeSidebarThread } from "../model/fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+@@ -301 +301 @@
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+@@ -501 +501 @@
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+@@ -543 +543 @@
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+@@ -571 +571 @@
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+--- a/source/app.test.tsx
++++ b/source/app.test.tsx
+@@ -4,0 +5 @@
++import { registerSection, setSectionHidden } from "../../bb-studio-kit/src/app/sidebar-registry.js";
+@@ -11 +12 @@
+-import { makePluginProject, makeSidebarThread } from "./app/model/fixtures.js";
++import { makePluginProject, makeSidebarThread } from "./app/testing/fixtures.js";
+@@ -150,0 +152,16 @@
++  it("places Studio sections above threads and hides them when requested", async () => {
++    const unregister = registerSection({ pluginId: "pages", id: "tabs", title: "Studio", order: 0 });
++    try {
++      renderList({ organizationMode: "project" });
++      const anchor = await waitFor(() => document.querySelector('[data-studio-sidebar-anchor="pages:tabs"]'));
++      expect(anchor).not.toBeNull();
++      const sections = anchor?.closest('[data-studio-sidebar-sections]');
++      const threads = document.querySelector('[data-sidebar-thread-id]');
++      expect(sections!.compareDocumentPosition(threads!) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
++      setSectionHidden("pages:tabs", true);
++      await waitFor(() => expect(document.querySelector('[data-studio-sidebar-anchor="pages:tabs"]')).toBeNull());
++    } finally {
++      setSectionHidden("pages:tabs", false);
++      unregister();
++    }
++  });
+@@ -303,0 +321,15 @@
++  it("opens the New project dialog from Threads", async () => {
++    setPreferencesMirrorStorageForTest(null);
++    renderList({ organizationMode: "project" }, {
++      sdk: {
++        hosts: { list: async () => ([{ id: "host_laptop", name: "Laptop", status: "connected" }] as never) },
++        system: { config: async () => ({ primaryHostId: "host_laptop" } as never) },
++      },
++    });
++    await screen.findByText("Pinned thread");
++    fireEvent.keyDown(screen.getByRole("button", { name: /^Threads actions/ }), { key: "Enter" });
++    fireEvent.click(await screen.findByRole("menuitem", { name: "New project" }));
++    expect(await screen.findByRole("dialog", { name: "New project" })).not.toBeNull();
++    expect(screen.getByRole("textbox", { name: "Folder path" })).not.toBeNull();
++  });
++

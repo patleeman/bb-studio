@@ -1,5 +1,5 @@
+import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
 import type { ReactNode } from "react";
-import { showSidebarSection, useHiddenSidebarSections } from "@bb-studio/kit/app";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Icon } from "@/components/ui/icon";
 import {
@@ -73,13 +73,7 @@ export function SidebarHeaderMenuContents({
   }
   return (
     <>
-      <DropdownMenuItem
-        disabled={!creation.onNewProject || creation.isCreatingProject}
-        onSelect={creation.onNewProject}
-      >
-        <Icon name="FolderPlus" />
-        New project
-      </DropdownMenuItem>
+      <StudioNewProjectItem onSelect={creation.onNewProject} disabled={creation.isCreatingProject} />
       <DropdownMenuItem
         disabled={!creation.onNewSection || creation.isCreatingSection}
         onSelect={() => creation.onNewSection?.(anchorSectionId)}
@@ -138,20 +132,6 @@ export function SidebarHeaderMenuContents({
       )}
     </>
   );
-}
-
-/** Studio sections the user hid from their own ⋯ menu. */
-function HiddenStudioSectionItems() {
-  const hidden = useHiddenSidebarSections();
-  return hidden.map((section) => (
-    <DropdownMenuItem
-      key={section.key}
-      onSelect={() => showSidebarSection(section.key)}
-    >
-      <Icon name="Eye" />
-      Show {section.title}
-    </DropdownMenuItem>
-  ));
 }
 
 function SidebarViewItems({ page }: { page: SidebarViewPage }) {
