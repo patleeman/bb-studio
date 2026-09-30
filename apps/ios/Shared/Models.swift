@@ -532,6 +532,11 @@ public struct Segment: Decodable, Identifiable, Hashable, Sendable {
     public var sessionId: String
     public var status: String
     public var text: String?
+    /// Where the segment starts in recorded time: every earlier segment's duration added up.
+    public var offsetMs: Double?
+    public var durationMs: Double?
+    public var mimeType: String?
+    public var error: String?
 }
 
 public struct RecordingDetail: Decodable, Sendable {

@@ -652,6 +652,54 @@ final class ThreadUITests: XCTestCase {
         shot("page-comments-after")
     }
 
+    /// Plays real recordings, read-only: WebM/Opus ones from the browser and MP4 ones
+    /// from the phone. Playback crosses segments, skips, jumps from the transcript, and speeds up.
+    func testRecordingPlayback() throws {
+        let webm = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"] ?? "rec_ad0bc5936076aad9"
+        let mp4 = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"] ?? "rec_4e03a488bb709b29"
+        let position = app.staticTexts["playerPosition"]
+        func seconds() -> Int {
+            let parts = position.label.split(separator: ":").compactMap { Int($0) }
+            return parts.reduce(0) { $0 * 60 + $1 }
+        }
+        for id in [webm, mp4] {
+            app.open(URL(string: "bbstudio://recording/\(id)")!)
+            let play = app.buttons["Play"].firstMatch
+            XCTAssertTrue(play.waitForExistence(timeout: 10), "player bar")
+            play.tap()
+            XCTAssertTrue(app.buttons["Pause"].firstMatch.waitForExistence(timeout: 15), "playing \(id)")
+            sleep(3)
+            XCTAssertGreaterThanOrEqual(seconds(), 2, "position moves")
+            XCTAssertFalse(app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Couldn'")).firstMatch.exists, "no error")
+            // Past the first segment, which is at most 40 s.
+            for _ in 0..<3 { app.buttons["Forward 15 seconds"].tap() }
+            sleep(3)
+            XCTAssertGreaterThanOrEqual(seconds(), 47, "skipped across segments")
+            XCTAssertTrue(app.buttons["Pause"].firstMatch.exists, "still playing")
+            shot("recording-playing-\(id)")
+            app.buttons["Back 15 seconds"].tap()
+            sleep(1)
+            XCTAssertLessThan(seconds(), 47, "skipped back")
+            let links = app.links
+            if links.count > 1 {
+                links.element(boundBy: 0).tap()
+                sleep(2)
+                XCTAssertLessThan(seconds(), 10, "jumped to the first sentence")
+            }
+            app.buttons["Speed"].tap()
+            app.buttons["2×"].firstMatch.tap()
+            let before = seconds()
+            sleep(3)
+            XCTAssertGreaterThanOrEqual(seconds() - before, 5, "twice as fast")
+            app.buttons["Pause"].firstMatch.tap()
+            XCTAssertTrue(app.buttons["Play"].firstMatch.waitForExistence(timeout: 5), "paused")
+            let paused = seconds()
+            sleep(2)
+            XCTAssertEqual(seconds(), paused, "stays paused")
+            shot("recording-paused-\(id)")
+        }
+    }
+
     /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
     func testSaveToStudio() throws {
         let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))

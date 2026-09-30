@@ -523,6 +523,18 @@ extension BBClient {
         try await rpc("talk", "recording_get", ["id": .string(id)])
     }
 
+    /// One segment's audio, as it was recorded: WebM/Opus from a browser, MP4/AAC from the phone.
+    public func recordingAudio(_ id: String, segment: String) async throws -> Data {
+        var query = URLComponents()
+        query.queryItems = [URLQueryItem(name: "recording", value: id), URLQueryItem(name: "segment", value: segment)]
+        let path = "/api/v1/plugins/talk/http/audio?" + (query.percentEncodedQuery ?? "")
+        let (status, data) = try await raw(method: "GET", path: path, body: nil)
+        guard (200..<300).contains(status) else {
+            throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) for the segment's audio")
+        }
+        return data
+    }
+
     public func recordings(limit: Int = 50) async throws -> [Recording] {
         struct List: Decodable { var recordings: [Recording] }
         let list: List = try await rpc("talk", "recordings_list", ["limit": .from(limit)])
