@@ -4,7 +4,7 @@ import UIKit
 import UserNotifications
 
 @main
-struct BBGoApp: App {
+struct BBStudioApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel.shared
     @Environment(\.scenePhase) private var scenePhase
@@ -19,13 +19,13 @@ struct BBGoApp: App {
                     if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.openThread(id) }
                 }
                 .task {
-                    // `-openURL bbgo://…` drives headless simulator runs.
+                    // `-openURL bbstudio://…` drives headless simulator runs.
                     if let url = UserDefaults.standard.string(forKey: "openURL").flatMap(URL.init(string:)) {
                         model.handle(url)
                     }
                 }
         }
-        .commands { BBGoCommands() }
+        .commands { BBStudioCommands() }
     }
 }
 
@@ -50,7 +50,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
-        let label = "BB Go · \(UIDevice.current.name)"
+        let label = "BB Studio · \(UIDevice.current.name)"
         Task { try? await BBClient().registerPush(apnsToken: token, label: label) }
     }
 

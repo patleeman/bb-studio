@@ -9,7 +9,7 @@
   },
   "bb": {
     "name": "Mobile",
-    "description": "Server side of BB Go: relays push notifications to APNs for the native iOS app",
+    "description": "Server side of BB Studio: relays push notifications to APNs for the native iOS app",
     "branding": {
       "icon": "Smartphone"
     },

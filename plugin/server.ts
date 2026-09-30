@@ -1,6 +1,6 @@
-// bb-plugin-mobile — server side of BB Go, the personal native iOS app.
+// bb-plugin-mobile — server side of BB Studio, the personal native iOS app.
 //
-// BB's push-notifications plugin only speaks Expo push. BB Go registers
+// BB's push-notifications plugin only speaks Expo push. BB Studio registers
 // `apns:<device token>` subscriptions and points push-notifications'
 // `expoPushUrl` at this plugin's /push route, which sends those to APNs and
 // forwards every other token to Expo unchanged.
@@ -33,7 +33,7 @@ const LAST_DELIVERY_KEY = "last-delivery";
 /** Option buttons on a question notification; iOS shows about this many before it gets cramped. */
 const MAX_CHOICES = 6;
 const LIVE_KEY = "live";
-/** Thread ids whose notifications BB Go shouldn't get. */
+/** Thread ids whose notifications BB Studio shouldn't get. */
 const MUTED_KEY = "muted-threads";
 const MAX_MUTED = 500;
 
@@ -44,7 +44,7 @@ const hexToken = z
 
 const liveContract = defineRpcContract({
   live_register: {
-    experimental_description: "BB Go reports its Live Activity push tokens and activity lifecycle.",
+    experimental_description: "BB Studio reports its Live Activity push tokens and activity lifecycle.",
     input: z.object({
       pushToStartToken: hexToken.optional(),
       activityId: z.string().min(1).max(200).optional(),
@@ -54,12 +54,12 @@ const liveContract = defineRpcContract({
     output: z.object({ ok: z.literal(true) }),
   },
   mute_list: {
-    experimental_description: "Threads muted in BB Go.",
+    experimental_description: "Threads muted in BB Studio.",
     input: z.object({}).optional(),
     output: z.object({ threadIds: z.array(z.string()) }),
   },
   mute_set: {
-    experimental_description: "BB Go mutes or unmutes a thread's notifications on this phone.",
+    experimental_description: "BB Studio mutes or unmutes a thread's notifications on this phone.",
     input: z.object({ threadId: z.string().regex(/^thr_[A-Za-z0-9]+$/), muted: z.boolean() }),
     output: z.object({ threadIds: z.array(z.string()) }),
   },
@@ -399,7 +399,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.cli.register({
     name: "mobile",
-    summary: "BB Go push relay status",
+    summary: "BB Studio push relay status",
     commands: [{ name: "status", summary: "Show APNs setup and the last delivery", usage: "bb mobile status [--json]" }],
     async run(argv) {
       const [command] = argv.filter((arg) => arg !== "--json");

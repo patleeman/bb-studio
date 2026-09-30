@@ -12,6 +12,13 @@ public enum AppGroup {
     }
 }
 
+/// The app's own links. `bbstudio://` is from before the rename to BB Studio and still opens.
+public enum AppLink {
+    public static let scheme = "bbstudio"
+
+    public static func handles(_ url: URL) -> Bool { ["bbstudio", "bbgo"].contains(url.scheme ?? "") }
+}
+
 /// Last-known API responses on disk, so the app opens instantly and still
 /// shows something when the tailnet is unreachable.
 public enum DiskCache {

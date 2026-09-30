@@ -15,7 +15,7 @@ extension FocusedValues {
 
 /// Scene-wide, so they work whichever split-view column has focus; a
 /// shortcut on a button only reaches the column it's in.
-struct BBGoCommands: Commands {
+struct BBStudioCommands: Commands {
     @FocusedValue(\.thread) private var thread
 
     var body: some Commands {

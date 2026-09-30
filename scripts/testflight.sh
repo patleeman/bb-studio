@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Archives BB Go (with the watch app and extensions) and uploads it to TestFlight.
+# Archives BB Studio (with the watch app and extensions) and uploads it to TestFlight.
 #
 #   scripts/testflight.sh                 archive, sign, and upload
 #   scripts/testflight.sh --archive-only  signed archive, no upload (registers bundle IDs and the app group)
@@ -29,7 +29,7 @@ esac
 team_id=3753DAN98U
 out=build/testflight
 build_number="${BUILD_NUMBER:-$(date -u +%Y%m%d.%H%M)}"
-archive="$out/BBGo-$build_number.xcarchive"
+archive="$out/BBStudio-$build_number.xcarchive"
 log="$out/xcodebuild-$build_number.log"
 
 mkdir -p "$out"
@@ -49,7 +49,7 @@ $dry_run && signing=(CODE_SIGNING_ALLOWED=NO)
 
 echo "Archiving build $build_number (log: $log)…"
 if ! xcodebuild archive \
-  -project BBGo.xcodeproj -scheme BBGo -configuration Release \
+  -project BBStudio.xcodeproj -scheme BBStudio -configuration Release \
   -destination 'generic/platform=iOS' -archivePath "$archive" "${signing[@]}" \
   CURRENT_PROJECT_VERSION="$build_number" DEVELOPMENT_TEAM="$team_id" >"$log" 2>&1; then
   grep -E "error:" "$log" | sort -u | head -20 >&2

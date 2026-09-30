@@ -58,8 +58,8 @@ struct StatusWidgetView: View {
 
     private var headline: ThreadEntry? { entry.needsYou.first ?? entry.running.first }
     private var url: URL {
-        if let first = entry.needsYou.first { return URL(string: "bbgo://thread/\(first.id)")! }
-        return URL(string: "bbgo://inbox")!
+        if let first = entry.needsYou.first { return URL(string: "bbstudio://thread/\(first.id)")! }
+        return URL(string: "bbstudio://inbox")!
     }
 
     var body: some View {
@@ -89,7 +89,7 @@ struct StatusWidgetView: View {
                 counts
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach((entry.needsYou + entry.running).prefix(4)) { thread in
-                        Link(destination: URL(string: "bbgo://thread/\(thread.id)")!) {
+                        Link(destination: URL(string: "bbstudio://thread/\(thread.id)")!) {
                             HStack(spacing: 6) {
                                 Circle().fill(thread.needsYou ? Color.orange : .green).frame(width: 6, height: 6)
                                 Text(thread.displayTitle).font(.caption).lineLimit(1)
@@ -101,8 +101,8 @@ struct StatusWidgetView: View {
                     }
                     Spacer(minLength: 0)
                     HStack(spacing: 16) {
-                        Link(destination: URL(string: "bbgo://dictate")!) { Label("Dictate", systemImage: "mic.fill") }
-                        Link(destination: URL(string: "bbgo://voice")!) { Label("Voice", systemImage: "waveform") }
+                        Link(destination: URL(string: "bbstudio://dictate")!) { Label("Dictate", systemImage: "mic.fill") }
+                        Link(destination: URL(string: "bbstudio://voice")!) { Label("Voice", systemImage: "waveform") }
                     }
                     .font(.caption.weight(.semibold))
                 }

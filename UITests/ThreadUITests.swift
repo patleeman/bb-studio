@@ -23,10 +23,10 @@ final class ThreadUITests: XCTestCase {
     /// The split view and keyboard shortcuts; run on an iPad simulator. Nothing is sent.
     func testIPad() throws {
         guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
-        // A leftover "Open in BB Go?" prompt from `simctl openurl` swallows keys.
+        // A leftover "Open in BB Studio?" prompt from `simctl openurl` swallows keys.
         let prompt = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Cancel"]
         if prompt.exists { prompt.tap() }
-        app.open(URL(string: "bbgo://thread/\(ProcessInfo.processInfo.environment["BBGO_PROBE_THREAD"] ?? threadId)")!)
+        app.open(URL(string: "bbstudio://thread/\(ProcessInfo.processInfo.environment["BBGO_PROBE_THREAD"] ?? threadId)")!)
         XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 10), "composer")
         sleep(3)
         shot("ipad-thread")
@@ -48,7 +48,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testThread() throws {
-        app.open(URL(string: "bbgo://thread/\(threadId)")!)
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         guard app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10) else {
             throw XCTSkip("the thread's last reply has no reactions")
         }
@@ -121,7 +121,7 @@ final class ThreadUITests: XCTestCase {
     func testProbe() throws {
         let env = ProcessInfo.processInfo.environment
         guard let id = env["BBGO_PROBE_THREAD"] else { throw XCTSkip("no probe thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         sleep(4)
         shot("probe-0")
         for index in 1...(Int(env["BBGO_PROBE_SWIPES"] ?? "") ?? 3) {
@@ -144,7 +144,7 @@ final class ThreadUITests: XCTestCase {
     func testFeatures() throws {
         let env = ProcessInfo.processInfo.environment
         guard let id = env["BBGO_PROBE_THREAD"] else { throw XCTSkip("no probe thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let composer = app.textViews["Message"]
         XCTAssertTrue(composer.waitForExistence(timeout: 10), "composer")
         sleep(2)
@@ -173,7 +173,7 @@ final class ThreadUITests: XCTestCase {
         composer.typeText("Draft kept")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         sleep(1)
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         XCTAssertTrue(wait { (app.textViews["Message"].value as? String) == "Draft kept" }, "draft restored")
         clear(app.textViews["Message"])
         app.swipeDown(velocity: .slow)
@@ -204,7 +204,7 @@ final class ThreadUITests: XCTestCase {
     /// Every Pages block kind, from a built-in page rather than a real one.
     /// Automations, queue, usage and host settings. Read-only: nothing is run, paused or sent.
     func testTools() {
-        app.open(URL(string: "bbgo://automations")!)
+        app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
         sleep(2)
         shot("tools-automations")
@@ -212,25 +212,25 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
         sleep(2)
         shot("tools-automation")
-        app.open(URL(string: "bbgo://queue")!)
+        app.open(URL(string: "bbstudio://queue")!)
         XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 10))
         sleep(2)
         shot("tools-queue")
-        app.open(URL(string: "bbgo://usage")!)
+        app.open(URL(string: "bbstudio://usage")!)
         XCTAssertTrue(app.navigationBars["Usage"].waitForExistence(timeout: 10))
         sleep(2)
         shot("tools-usage")
-        app.open(URL(string: "bbgo://settings")!)
+        app.open(URL(string: "bbstudio://settings")!)
         XCTAssertTrue(app.switches["Keep Mac awake"].waitForExistence(timeout: 10), "keep awake")
         shot("tools-settings")
-        app.open(URL(string: "bbgo://home")!)
+        app.open(URL(string: "bbstudio://home")!)
         XCTAssertTrue(app.buttons["Automations"].waitForExistence(timeout: 10))
         shot("tools-home")
     }
 
     /// Read-only: opens sheets and screens, never sends, forks or compacts.
     func testThreadExtras() {
-        app.open(URL(string: "bbgo://thread/\(threadId)")!)
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let more = app.buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
@@ -261,16 +261,16 @@ final class ThreadUITests: XCTestCase {
         sleep(2)
         shot("extras-history")
         app.buttons["Done"].tap()
-        app.open(URL(string: "bbgo://archived")!)
+        app.open(URL(string: "bbstudio://archived")!)
         XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-archived")
-        app.open(URL(string: "bbgo://drawings")!)
+        app.open(URL(string: "bbstudio://drawings")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-drawings")
         if let id = ProcessInfo.processInfo.environment["BBGO_QA_DRAWING"] {
-            app.open(URL(string: "bbgo://drawing/\(id)")!)
+            app.open(URL(string: "bbstudio://drawing/\(id)")!)
             sleep(3)
             shot("extras-drawing")
         }
@@ -278,7 +278,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: filters Studio by kind, opens one of each, and searches. Records nothing.
     func testStudio() {
-        app.open(URL(string: "bbgo://studio")!)
+        app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
@@ -314,7 +314,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: browses attention, a channel, the queue and custom instructions.
     func testPluginScreens() {
-        app.open(URL(string: "bbgo://attention")!)
+        app.open(URL(string: "bbstudio://attention")!)
         XCTAssertTrue(app.navigationBars["Attention"].waitForExistence(timeout: 10))
         sleep(2)
         shot("plugins-attention-open")
@@ -328,7 +328,7 @@ final class ThreadUITests: XCTestCase {
             shot("plugins-channel")
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
-        app.open(URL(string: "bbgo://queue")!)
+        app.open(URL(string: "bbstudio://queue")!)
         XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 10))
         sleep(2)
         shot("plugins-queue")
@@ -347,7 +347,7 @@ final class ThreadUITests: XCTestCase {
     /// Records a few seconds from the microphone (the Mac's, in the simulator).
     /// Play speech near the mic while it runs; a silent recording is discarded by Talk.
     func testDictationCapture() {
-        app.open(URL(string: "bbgo://dictate")!)
+        app.open(URL(string: "bbstudio://dictate")!)
         sleep(8)
         shot("dictation-recording")
         let finish = app.buttons["checkmark"]
@@ -360,7 +360,7 @@ final class ThreadUITests: XCTestCase {
         app.terminate()
         app.launchArguments = ["-qaPageDemo"]
         app.launch()
-        app.open(URL(string: "bbgo://page/qa-demo")!)
+        app.open(URL(string: "bbstudio://page/qa-demo")!)
         XCTAssertTrue(app.staticTexts["Launch plan"].waitForExistence(timeout: 10))
         sleep(1)
         shot("page-demo-top")
@@ -371,7 +371,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Needs a running thread with a queued message.
     func testQueueRemove() throws {
-        app.open(URL(string: "bbgo://thread/\(threadId)")!)
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let remove = app.buttons["Remove from queue"].firstMatch
         guard remove.waitForExistence(timeout: 10) else { throw XCTSkip("nothing queued") }
         let count = app.buttons.matching(identifier: "Remove from queue").count
@@ -384,7 +384,7 @@ final class ThreadUITests: XCTestCase {
     /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
     func testQueueEdit() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let card = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Hello'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "queued card")
         card.tap()
@@ -402,7 +402,7 @@ final class ThreadUITests: XCTestCase {
     /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, with three or more queued.
     func testQueueReorder() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let summary = app.buttons["queueSummary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 10), "collapsed queue")
         shot("queue-collapsed")
@@ -426,7 +426,7 @@ final class ThreadUITests: XCTestCase {
     /// Renames the scratch thread from the ⋯ menu.
     func testRenameThread() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
@@ -435,13 +435,13 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(field.waitForExistence(timeout: 5), "title field")
         field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: ((field.value as? String) ?? "").count + 2))
-        field.typeText("BB Go renamed scratch")
+        field.typeText("BB Studio renamed scratch")
         sleep(1)
         shot("rename-thread")
         app.alerts.buttons["Rename"].tap()
         sleep(2)
         shot("renamed-thread")
-        XCTAssertTrue(app.navigationBars.staticTexts["BB Go renamed scratch"].waitForExistence(timeout: 10), "new title")
+        XCTAssertTrue(app.navigationBars.staticTexts["BB Studio renamed scratch"].waitForExistence(timeout: 10), "new title")
     }
 
     /// Opens voice chat on the scratch thread and checks it starts listening.
@@ -454,7 +454,7 @@ final class ThreadUITests: XCTestCase {
             }
             return false
         }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
@@ -476,7 +476,7 @@ final class ThreadUITests: XCTestCase {
     /// mentions `README.md`.
     func testFileLink() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_FILE_THREAD"] else { throw XCTSkip("no scratch thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'README.md'")).firstMatch
         XCTAssertTrue(text.waitForExistence(timeout: 15), "reply with a path")
         shot("file-link")
@@ -493,7 +493,7 @@ final class ThreadUITests: XCTestCase {
         app.terminate()
         app.launchArguments = ["-qaShelfDemo"]
         app.launch()
-        app.open(URL(string: "bbgo://thread/\(threadId)")!)
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
         shot("shelf-demo")
         app.buttons.matching(NSPredicate(format: "label CONTAINS 'complete'")).firstMatch.tap()
@@ -555,7 +555,7 @@ final class ThreadUITests: XCTestCase {
     /// card in the reply of the scratch thread `TEST_RUNNER_BBGO_QA_ARTIFACT_THREAD`.
     func testArtifact() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_ARTIFACT"] else { throw XCTSkip("no scratch artifact") }
-        app.open(URL(string: "bbgo://artifact/\(id)")!)
+        app.open(URL(string: "bbstudio://artifact/\(id)")!)
         XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "rendered Markdown")
         sleep(1)
         shot("artifact-viewer")
@@ -569,7 +569,7 @@ final class ThreadUITests: XCTestCase {
 
         // A reply with the card; queued messages show as plain text.
         guard let thread = ProcessInfo.processInfo.environment["BBGO_QA_ARTIFACT_THREAD"] else { return }
-        app.open(URL(string: "bbgo://thread/\(thread)")!)
+        app.open(URL(string: "bbstudio://thread/\(thread)")!)
         let card = app.buttons["artifactCard"].firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 15), "artifact card")
         sleep(1)
@@ -582,7 +582,7 @@ final class ThreadUITests: XCTestCase {
     /// version, and rename. Nothing is sent, so no thread starts.
     func testPageTools() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
-        app.open(URL(string: "bbgo://page/\(id)")!)
+        app.open(URL(string: "bbstudio://page/\(id)")!)
         XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "work bar")
         sleep(1)
         shot("page-work-bar")
@@ -612,7 +612,7 @@ final class ThreadUITests: XCTestCase {
     func testSaveToStudio() throws {
         let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
-        app.open(URL(string: "bbgo://thread/\(thread)")!)
+        app.open(URL(string: "bbstudio://thread/\(thread)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
@@ -639,7 +639,7 @@ final class ThreadUITests: XCTestCase {
                 _ = self.rpc("pages", "remove", ["id": item["id"] as? String ?? ""])
             }
         }
-        app.open(URL(string: "bbgo://studio")!)
+        app.open(URL(string: "bbstudio://studio")!)
         let new = app.buttons["New"].firstMatch
         XCTAssertTrue(new.waitForExistence(timeout: 10), "New menu")
         new.tap()
@@ -666,7 +666,7 @@ final class ThreadUITests: XCTestCase {
             """
         let page = rpc("pages", "create", ["projectId": NSNull(), "parentId": NSNull(), "title": "QA embeds", "markdown": markdown])
         let pageId = try XCTUnwrap((page?["page"] as? [String: Any])?["id"] as? String)
-        app.open(URL(string: "bbgo://page/\(pageId)")!)
+        app.open(URL(string: "bbstudio://page/\(pageId)")!)
         let embed = app.buttons["studioEmbed"].firstMatch
         XCTAssertTrue(embed.waitForExistence(timeout: 10), "embed card")
         sleep(2)
@@ -698,7 +698,7 @@ final class ThreadUITests: XCTestCase {
     func testPermissions() throws {
         let thread = try XCTUnwrap(scratchThread("QA permissions \(Int(Date().timeIntervalSince1970))"))
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
-        app.open(URL(string: "bbgo://thread/\(thread)")!)
+        app.open(URL(string: "bbstudio://thread/\(thread)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
         more.tap()
@@ -727,7 +727,7 @@ final class ThreadUITests: XCTestCase {
 
     /// A message's menu ends with when it was sent. Read-only on a real thread.
     func testMessageSentTime() throws {
-        app.open(URL(string: "bbgo://thread/thr_64r2wmjrim")!)
+        app.open(URL(string: "bbstudio://thread/thr_64r2wmjrim")!)
         let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
         XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
         sleep(2)
@@ -740,7 +740,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testTerminal() throws {
-        app.open(URL(string: "bbgo://terminals")!)
+        app.open(URL(string: "bbstudio://terminals")!)
         let host = app.buttons.containing(NSPredicate(format: "label CONTAINS 'MegaMac'")).firstMatch
         XCTAssertTrue(host.waitForExistence(timeout: 10), "machine list")
         shot("terminal-machines")
@@ -776,7 +776,7 @@ final class ThreadUITests: XCTestCase {
     /// Markdown file, a missing file and a bad height.
     func testInlineVis() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_VIS_THREAD"] else { throw XCTSkip("no scratch thread") }
-        app.open(URL(string: "bbgo://thread/\(id)")!)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         XCTAssertTrue(app.staticTexts["QA inline-vis reply"].waitForExistence(timeout: 15), "reply")
         XCTAssertTrue(app.webViews.staticTexts["QA chart (script ran)"].waitForExistence(timeout: 15), "HTML ran its script")
         shot("inline-vis-html")
@@ -805,7 +805,7 @@ final class ThreadUITests: XCTestCase {
         ])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
-        app.open(URL(string: "bbgo://tasks")!)
+        app.open(URL(string: "bbstudio://tasks")!)
         app.segmentedControls.buttons.element(boundBy: 0).tap()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 10), "task on the board")
@@ -840,7 +840,7 @@ final class ThreadUITests: XCTestCase {
             }
             _ = self.rpc("studio-tasks", "delete", ["id": id])
         }
-        app.open(URL(string: "bbgo://studio")!)
+        app.open(URL(string: "bbstudio://studio")!)
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15), "task in Studio")
         row.press(forDuration: 1)
@@ -874,7 +874,7 @@ final class ThreadUITests: XCTestCase {
             if let threadId { _ = self.api("DELETE", "/threads/\(threadId)", ["childThreadsConfirmed": false]) }
             _ = self.rpc("studio-tasks", "delete", ["id": id])
         }
-        app.open(URL(string: "bbgo://task/\(id)")!)
+        app.open(URL(string: "bbstudio://task/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10), "task menu")
         more.tap()
@@ -980,11 +980,12 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testBotInStudio() throws {
+        // A link from before the rename still opens.
         app.open(URL(string: "bbgo://bot/bot_32fb8c40db41abea")!)
         XCTAssertTrue(app.staticTexts["Chief of Staff"].firstMatch.waitForExistence(timeout: 10), "bot screen")
         XCTAssertTrue(app.staticTexts["Channels"].waitForExistence(timeout: 5) || app.staticTexts["CHANNELS"].exists, "channels")
         shot("bot-view")
-        app.open(URL(string: "bbgo://studio")!)
+        app.open(URL(string: "bbstudio://studio")!)
         let bots = app.buttons["Bots"].firstMatch
         for _ in 0..<4 where !bots.isHittable { app.scrollViews.containing(.button, identifier: "All").firstMatch.swipeLeft() }
         bots.tap()
@@ -1015,7 +1016,7 @@ final class ThreadUITests: XCTestCase {
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
         _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio-tasks", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
-        app.open(URL(string: "bbgo://studio")!)
+        app.open(URL(string: "bbstudio://studio")!)
         let search = app.searchFields.firstMatch
         if !search.waitForExistence(timeout: 5) { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 10), "search field")
@@ -1075,7 +1076,7 @@ final class ThreadUITests: XCTestCase {
         let created = rpc("studio-tasks", "create", ["title": title, "description": "", "projectId": "proj_8ztiq6dkh5"])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
-        app.open(URL(string: "bbgo://task/\(id)")!)
+        app.open(URL(string: "bbstudio://task/\(id)")!)
         let add = app.buttons["addTaskLink"]
         XCTAssertTrue(add.waitForExistence(timeout: 10), "Add Link")
         for _ in 0..<4 where !add.isHittable { app.swipeUp() }

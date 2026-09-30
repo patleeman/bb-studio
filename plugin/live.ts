@@ -1,4 +1,4 @@
-// The BB Go status Live Activity: one lock-screen summary of what is running
+// The BB Studio status Live Activity: one lock-screen summary of what is running
 // and what needs you. It exists only while something is running or waiting,
 // and this module decides when to start, update, and end it.
 

@@ -1,8 +1,15 @@
-# BB Go
+# BB Studio
 
-A personal native iOS and watchOS client for BB. The native parts cover
-what matters on the go. Everything else opens the BB web app in an in-app web
-view (the Web tab, and the safari button on every thread).
+A personal native iOS and watchOS app for BB and
+[BB Studio](https://github.com/patleeman/bb-studio): BB's threads, approvals,
+terminals and automations, plus the Studio suite of plugins (Studio, Pages,
+Talk, Draw, Artifacts, Tasks, Teams and Chat). Everything else opens the BB web
+app in an in-app web view (the Web tab, and the safari button on every thread).
+
+Studio features need the matching plugins from the bb-studio marketplace on the
+server. The app uses only those and the plugins that ship with BB, plus its own
+push relay in `plugin/`. The app was called BB Go; its bundle IDs and app group
+are unchanged, and old `bbgo://` links still open.
 
 | Feature | Where |
 |---|---|
@@ -20,7 +27,7 @@ view (the Web tab, and the safari button on every thread).
 | Change a thread's model, reasoning level, and permissions (Accept edits, Auto, Full access, up to the machine's ceiling) for its next turns. BB takes permissions with each message, so the choice goes out with the next one you send. Until then a card over the composer shows it, with Undo | `iOS/Thread/ExecutionSheet.swift` |
 | File edits show `+N −M` and open to a red/green diff | `iOS/Thread/DiffView.swift` |
 | Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
-| Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
+| Mute a thread's notifications (for all BB Studio devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
 | Read BB Pages (in Studio): each page's text, tables, callouts, stats, charts, and embeds. Embedded drawings, artifacts, recordings, tasks and other Studio items show as cards and open natively. Work with this page (a bar at the bottom starts a thread that knows the page, or hands it to an @mentioned bot), the page's past chats, rename, archive, and version history with save and restore. A thread started from a page links back to it | `iOS/Pages/` |
 | Automations: every schedule by project, next and last run, recent runs with output or their thread, run now, pause and resume | `iOS/Tools/AutomationsView.swift` |
 | Queue: every unsent message across threads, including drafts, scheduled sends, automatic retries, and waits on a busy thread, offline host or plugin (with Smart Queue's reason). Send now, edit or cancel | `iOS/Tools/QueueView.swift` |
@@ -55,7 +62,7 @@ view (the Web tab, and the safari button on every thread).
 | Studio tab: pages, recordings, dictations, drawings, and artifacts in one list, grouped by day, with kind and project filters, an Archived filter, search (titles plus the Studio plugin's content search, with the matching text shown in bold under the row), thumbnails for drawings and image artifacts, and swipe to delete or archive. Long-press for New Thread with This, each add-on's own actions (Copy Transcript, Copy as Markdown, Copy Text), Move to Project, and Archive or Restore. Dictate, Record, and Dictate Page (speak a new page) at the top. New (+) makes any kind Studio can create, like a page or a drawing, in the filtered project. Studio tags: colored tags on rows, tag filter chips, and Tags (toggle, New Tag…) on long-press, shown when the Studio plugin supports them; long-press a tag chip to rename or delete the tag. Select (also on search results) picks several items to archive or restore, move, tag, delete, or run an add-on's action on together. Uses the Studio plugin's overview when it's installed, or asks Pages, Talk, and Excalidraw directly | `iOS/Studio/StudioView.swift` |
 | Tasks (in Studio, with the Studio Tasks plugin): the board as To do, In progress, Review and Done columns with counts, swipe to move a task on or archive it, long-press to move it anywhere, and archived tasks on request. A task shows its description, due day, who it's for and its project; change status, edit, share, archive or delete. Hand it to an agent (project, provider, model and reasoning or the project's defaults, worktree or folder, a note). Link pages, drawings, artifacts, recordings and threads to it (Add Link…), or swipe a link away, follow its handoffs to their threads, send back review feedback, and archive its threads when it's done. `::task{…}` cards in replies open it, and the board updates live | `Shared/Tasks.swift`, `iOS/Studio/TasksView.swift` |
 | Studio Chat (with the Studio Chat plugin): Chat About This on a drawing, artifact, recording or task starts a thread with the project's default agent that knows the item, or continues the item's last chat | `Shared/StudioChat.swift`, `iOS/Studio/StudioChatSheet.swift` |
-| Bots in Studio: Bot Teams bots are a Studio kind with model and Working/Error badges; archive retires. A bot opens to its description, direct messages and channels (`bbgo://bot/<id>`) | `iOS/Inbox/BotView.swift` |
+| Bots in Studio: Bot Teams bots are a Studio kind with model and Working/Error badges; archive retires. A bot opens to its description, direct messages and channels (`bbstudio://bot/<id>`) | `iOS/Inbox/BotView.swift` |
 | Artifacts (in Studio): files agents save from threads. Markdown rendered (or as source), code and text in monospace, images zoomable, HTML and PDF in a sandboxed web view. Versions, share the file, copy text, New Thread with This, Save as Page, open the source thread, rename, move, delete. `::artifact{…}` cards in replies and Studio links in messages open natively. `::inline-vis{…}` previews in replies (BB's built-in inline-vis plugin): HTML visualizations from the workspace or thread storage run in a sandboxed web view at the reply's height, Markdown files render natively, with collapse, full screen, and the web app's errors for a missing file or bad height. Save Files to Studio (from the thread menu or a reply's long-press) lists the files a reply made plus the thread's storage, and saves the chosen ones as artifacts or new versions | `iOS/Studio/ArtifactView.swift`, `iOS/Studio/SaveToStudioSheet.swift`, `iOS/Thread/InlineVis.swift` |
 | Dictation and recordings through the Talk plugin, with an offline segment outbox. A standalone dictation can be saved as a page, and recordings open to their transcript with share, copy, new thread, rename, retry of failed transcription, and delete | `iOS/Talk` |
 | Hands-free voice chat with one thread (on-device STT, then the thread, then TTS). You can talk over it, and pick the voice and speed in Settings. Uses the iPhone mic even with Bluetooth audio, restarts after calls and route changes, warns when the mic sends only silence, and links to Settings when a permission is off | `iOS/Voice` |
@@ -64,7 +71,7 @@ view (the Web tab, and the safari button on every thread).
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `terminals`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings` | `AppModel.handle` |
+| URL scheme `bbstudio://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `terminals`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `plugin/live.ts` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |
@@ -83,7 +90,7 @@ so the tailnet is the boundary. You can change the server in Settings.
 ```sh
 brew install xcodegen
 xcodegen generate
-open BBGo.xcodeproj   # run the BBGo scheme on your iPhone; the watch app is embedded
+open BBStudio.xcodeproj   # run the BBStudio scheme on your iPhone; the watch app is embedded
 ```
 
 To install on your paired iPhone without TestFlight (a Debug build that
@@ -93,7 +100,7 @@ replaces the TestFlight one):
 scripts/device.sh
 ```
 
-Headless simulator runs: `-skipPushPrompt YES -openURL bbgo://thread/<id>`.
+Headless simulator runs: `-skipPushPrompt YES -openURL bbstudio://thread/<id>`.
 `-qaShelfDemo` (Debug builds) fills every thread's shelf with sample cards.
 
 UI tests click through Home and a thread (reaction chips, paste, the message
@@ -102,8 +109,8 @@ signed in to. Point them at a throwaway thread whose newest reply ends with a
 `::reactions` line:
 
 ```sh
-TEST_RUNNER_BBGO_QA_THREAD=thr_xxx xcodebuild test -scheme BBGo \
-  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -only-testing:BBGoUITests
+TEST_RUNNER_BBGO_QA_THREAD=thr_xxx xcodebuild test -scheme BBStudio \
+  -destination 'platform=iOS Simulator,name=iPhone 18 Pro' -only-testing:BBStudioUITests
 ```
 
 `testProbe` screenshots any thread while scrolling up through it, without

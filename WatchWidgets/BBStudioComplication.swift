@@ -76,12 +76,12 @@ struct ComplicationView: View {
 }
 
 @main
-struct BBGoComplication: Widget {
+struct BBStudioComplication: Widget {
     var body: some WidgetConfiguration {
         StaticConfiguration(kind: "BBGoStatus", provider: StatusProvider()) { entry in
             ComplicationView(entry: entry)
                 .containerBackground(.fill.tertiary, for: .widget)
-                .widgetURL(URL(string: "bbgo://inbox"))
+                .widgetURL(URL(string: "bbstudio://inbox"))
         }
         .configurationDisplayName("BB status")
         .description("Threads that need you and threads running.")

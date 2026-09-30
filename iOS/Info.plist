@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>BB Go</string>
+	<string>BB Studio</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -29,6 +29,7 @@
 			<string>nyc.plee.bbgo</string>
 			<key>CFBundleURLSchemes</key>
 			<array>
+				<string>bbstudio</string>
 				<string>bbgo</string>
 			</array>
 		</dict>
@@ -36,13 +37,13 @@
 	<key>ITSAppUsesNonExemptEncryption</key>
 	<false/>
 	<key>NSCameraUsageDescription</key>
-	<string>BB Go takes photos to attach to messages.</string>
+	<string>BB Studio takes photos to attach to messages.</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>BB Go records dictations and voice chats.</string>
+	<string>BB Studio records dictations and voice chats.</string>
 	<key>NSSpeechRecognitionUsageDescription</key>
-	<string>BB Go transcribes what you say in voice chat on this device.</string>
+	<string>BB Studio transcribes what you say in voice chat on this device.</string>
 	<key>NSLocalNetworkUsageDescription</key>
-	<string>BB Go connects to your BB server.</string>
+	<string>BB Studio connects to your BB server.</string>
 	<key>NSAppTransportSecurity</key>
 	<dict>
 		<key>NSAllowsArbitraryLoads</key>

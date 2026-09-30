@@ -1,6 +1,6 @@
 import Foundation
 
-/// Threads whose notifications the mobile plugin holds back from BB Go.
+/// Threads whose notifications the mobile plugin holds back from BB Studio.
 /// BB itself has no per-thread mute, so the relay keeps the list.
 @MainActor
 final class MutedThreads: ObservableObject {

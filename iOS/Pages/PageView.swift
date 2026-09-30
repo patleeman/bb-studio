@@ -69,7 +69,7 @@ final class PageModel: ObservableObject {
 }
 
 extension PageModel {
-    /// Every block kind, for UI tests (`-qaPageDemo`, `bbgo://page/qa-demo`).
+    /// Every block kind, for UI tests (`-qaPageDemo`, `bbstudio://page/qa-demo`).
     static let demo = #"""
     # Launch plan
 
@@ -146,7 +146,7 @@ struct PageView: View {
             }
         }
         .environment(\.openURL, OpenURLAction { url in
-            guard url.scheme == "bbgo", let id = url.pathComponents.dropFirst().first else { return .systemAction }
+            guard AppLink.handles(url), let id = url.pathComponents.dropFirst().first else { return .systemAction }
             switch url.host() {
             case "page": app.path.append(.page(id: id))
             case "thread": app.path.append(.thread(id: id))

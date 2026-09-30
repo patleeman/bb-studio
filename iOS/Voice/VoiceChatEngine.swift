@@ -70,12 +70,12 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
             needsSettings = true
             state = .failed(speech == .restricted
                 ? "Speech recognition is restricted on this iPhone (Screen Time or a profile)."
-                : "Speech recognition is off for BB Go. Turn it on in Settings, then try again.")
+                : "Speech recognition is off for BB Studio. Turn it on in Settings, then try again.")
             return
         }
         guard await AVAudioApplication.requestRecordPermission() else {
             needsSettings = true
-            state = .failed("Microphone access is off for BB Go. Turn it on in Settings, then try again.")
+            state = .failed("Microphone access is off for BB Studio. Turn it on in Settings, then try again.")
             return
         }
         do {

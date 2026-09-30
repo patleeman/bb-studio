@@ -2,7 +2,7 @@ import SwiftUI
 import WatchKit
 
 @main
-struct BBGoWatchApp: App {
+struct BBStudioWatchApp: App {
     var body: some Scene {
         WindowGroup {
             NavigationStack { WatchInboxView() }

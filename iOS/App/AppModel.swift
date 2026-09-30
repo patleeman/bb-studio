@@ -118,10 +118,10 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`, `bbgo://artifact/<id>`, `bbgo://bot/<id>`, `bbgo://terminals`,
-    /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://studio` (or `talk`), `bbgo://web`.
+    /// `bbstudio://thread/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://queue`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://attention`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://terminals`,
+    /// `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
-        guard url.scheme == "bbgo" else { return }
+        guard AppLink.handles(url) else { return }
         let id = url.pathComponents.dropFirst().first
         switch url.host() {
         case "thread": if let id { openThread(id) }

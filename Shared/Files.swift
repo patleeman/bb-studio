@@ -152,17 +152,17 @@ public enum FilePathLink {
         path.replacing(/(:\d+(-\d+)?(:\d+)?|#L\d+(-L?\d+)?)$/, with: "")
     }
 
-    /// `bbgo://file?path=…`, which the thread view opens in the file viewer.
+    /// `bbstudio://file?path=…`, which the thread view opens in the file viewer.
     public static func url(_ path: String) -> URL? {
         var components = URLComponents()
-        components.scheme = "bbgo"
+        components.scheme = AppLink.scheme
         components.host = "file"
         components.queryItems = [URLQueryItem(name: "path", value: path)]
         return components.url
     }
 
     public static func path(from url: URL) -> String? {
-        guard url.scheme == "bbgo", url.host() == "file" else { return nil }
+        guard AppLink.handles(url), url.host() == "file" else { return nil }
         return URLComponents(url: url, resolvingAgainstBaseURL: false)?.queryItems?.first { $0.name == "path" }?.value
     }
 }

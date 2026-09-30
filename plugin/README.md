@@ -1,6 +1,6 @@
 # bb-plugin-mobile
 
-Server side of BB Go. It relays BB push notifications to the native iOS app
+Server side of BB Studio. It relays BB push notifications to the native iOS app
 over APNs, and drives the app's status Live Activity. See `skills/mobile-push/SKILL.md` for settings and wiring.
 
 ```sh

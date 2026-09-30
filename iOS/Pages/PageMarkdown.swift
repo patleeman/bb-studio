@@ -106,8 +106,8 @@ enum PageSegment {
         var line = line.replacing(/@\[((?:\\.|[^\]\\])*)\]\(([a-z]+):([^)\s]+)\)/) { match in
             let label = match.1.isEmpty ? String(match.3) : String(match.1)
             switch match.2 {
-            case "page": return "[\(label)](bbgo://page/\(match.3))"
-            case "thread": return "[\(label)](bbgo://thread/\(match.3))"
+            case "page": return "[\(label)](bbstudio://page/\(match.3))"
+            case "thread": return "[\(label)](bbstudio://thread/\(match.3))"
             default: return "**\(label)**"
             }
         }
@@ -392,8 +392,8 @@ struct EmbedCard: View {
 
     private func link(_ kind: String, _ target: String) -> URL? {
         switch kind {
-        case "page": URL(string: "bbgo://page/\(target)")
-        case "thread": URL(string: "bbgo://thread/\(target)")
+        case "page": URL(string: "bbstudio://page/\(target)")
+        case "thread": URL(string: "bbstudio://thread/\(target)")
         default: URL(string: target).flatMap { $0.scheme?.hasPrefix("http") == true ? $0 : nil }
         }
     }

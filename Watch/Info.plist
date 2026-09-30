@@ -5,7 +5,7 @@
 	<key>CFBundleDevelopmentRegion</key>
 	<string>en</string>
 	<key>CFBundleDisplayName</key>
-	<string>BB Go</string>
+	<string>BB Studio</string>
 	<key>CFBundleExecutable</key>
 	<string>$(EXECUTABLE_NAME)</string>
 	<key>CFBundleIdentifier</key>
@@ -25,6 +25,6 @@
 	<key>WKCompanionAppBundleIdentifier</key>
 	<string>nyc.plee.bbgo</string>
 	<key>NSMicrophoneUsageDescription</key>
-	<string>BB Go dictates replies.</string>
+	<string>BB Studio dictates replies.</string>
 </dict>
 </plist>

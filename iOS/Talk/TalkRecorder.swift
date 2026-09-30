@@ -137,7 +137,7 @@ final class TalkRecorder: ObservableObject {
 
     private var silenceMessage: String {
         let from = inputName.map { " from \($0)" } ?? ""
-        return "The microphone sent only silence\(from). Check that BB Go has microphone access in Settings and no other app is using the mic, then try again."
+        return "The microphone sent only silence\(from). Check that BB Studio has microphone access in Settings and no other app is using the mic, then try again."
     }
 
     /// The last segment reaches the outbox a hop after capture stops.

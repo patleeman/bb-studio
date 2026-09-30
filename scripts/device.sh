@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# Builds BB Go (Debug, development signing) and installs it on a paired iPhone,
+# Builds BB Studio (Debug, development signing) and installs it on a paired iPhone,
 # replacing the TestFlight build. Much faster than a TestFlight round trip.
 #
 #   scripts/device.sh            build, install, and launch on the paired iPhone
@@ -22,15 +22,15 @@ xcodegen generate --quiet
 
 echo "Building for $device (log: $log)…"
 if ! xcodebuild build \
-  -project BBGo.xcodeproj -scheme BBGo -configuration Debug -destination "id=$device" \
+  -project BBStudio.xcodeproj -scheme BBStudio -configuration Debug -destination "id=$device" \
   -derivedDataPath "$out/DerivedData" -allowProvisioningUpdates -allowProvisioningDeviceRegistration >"$log" 2>&1; then
   grep -E "error:" "$log" | sort -u | head -20 >&2
   echo "Build failed; see $log." >&2
   exit 1
 fi
 
-app="$out/DerivedData/Build/Products/Debug-iphoneos/BBGo.app"
+app="$out/DerivedData/Build/Products/Debug-iphoneos/BBStudio.app"
 echo "Installing…"
 xcrun devicectl device install app --device "$device" "$app" >/dev/null
 xcrun devicectl device process launch --device "$device" nyc.plee.bbgo >/dev/null 2>&1 || true
-echo "Installed and launched BB Go on $device."
+echo "Installed and launched BB Studio on $device."

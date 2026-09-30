@@ -4,7 +4,7 @@ import Foundation
 /// Puts open threads in Spotlight search; picking one opens it in the app.
 enum Spotlight {
     static let domain = "nyc.plee.bbgo.threads"
-    /// Handoff: the Mac has no BB Go, so it opens `webpageURL` in the browser.
+    /// Handoff: the Mac has no BB Studio, so it opens `webpageURL` in the browser.
     static let threadActivityType = "nyc.plee.bbgo.thread"
 
     private static var indexedSignature = 0

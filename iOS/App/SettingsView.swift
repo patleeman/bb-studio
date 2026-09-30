@@ -56,7 +56,7 @@ struct SettingsView: View {
             }
             Section("Action button") {
                 Text(
-                    "Settings → Action Button → Shortcut, then pick a BB Go action: Dictate to BB, Voice chat with BB, or Open BB thread."
+                    "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, Voice chat with BB, or Open BB thread."
                 )
                 .font(.footnote)
             }

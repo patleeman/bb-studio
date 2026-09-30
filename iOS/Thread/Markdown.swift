@@ -81,7 +81,7 @@ struct MarkdownText: View {
         let linked = text.replacing(/@thread:(thr_[A-Za-z0-9]+)/) { match in
             let id = String(match.1)
             let title = ThreadTitles.titles[id].map { $0.replacingOccurrences(of: "]", with: "") } ?? id
-            return "[@\(title)](bbgo://thread/\(id))"
+            return "[@\(title)](bbstudio://thread/\(id))"
         }
         guard
             var attributed = try? AttributedString(
@@ -90,7 +90,7 @@ struct MarkdownText: View {
         for run in attributed.runs {
             guard let url = run.link else { continue }
             if url.scheme == "thread" {
-                attributed[run.range].link = URL(string: "bbgo://thread/\(url.absoluteString.dropFirst("thread:".count))")
+                attributed[run.range].link = URL(string: "bbstudio://thread/\(url.absoluteString.dropFirst("thread:".count))")
             } else if url.scheme == nil || url.scheme == "file" {
                 let path = url.scheme == "file" ? url.path : url.relativeString.removingPercentEncoding ?? url.relativeString
                 attributed[run.range].link = FilePathLink.url(FilePathLink.stripLine(path))

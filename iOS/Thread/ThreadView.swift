@@ -210,7 +210,7 @@ struct ThreadView: View {
                 openingFile = OpenFile(path: path)
                 return .handled
             }
-            guard url.scheme == "bbgo", url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
+            guard AppLink.handles(url), url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
                 return .systemAction
             }
             app.path.append(.thread(id: id))

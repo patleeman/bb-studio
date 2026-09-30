@@ -1,9 +1,9 @@
 ---
 name: mobile-push
-description: Check or configure the BB Go push relay (the Mobile plugin) that sends BB push notifications to the native iOS app over APNs and drives its status Live Activity.
+description: Check or configure the BB Studio push relay (the Mobile plugin) that sends BB push notifications to the native iOS app over APNs and drives its status Live Activity.
 ---
 
-# BB Go push relay
+# BB Studio push relay
 
 The Mobile plugin receives the push-notifications plugin's Expo-format batches
 at `POST /api/v1/plugins/mobile/http/push` (token auth). Tokens starting with
@@ -12,7 +12,7 @@ official mobile app keeps working.
 
 ## Status Live Activity
 
-BB Go shows one Live Activity, not one per thread: how many top-level threads
+BB Studio shows one Live Activity, not one per thread: how many top-level threads
 need you (a pending question, or an unread failure) and how many are running,
 plus the thread that needs you and the last notable event. The plugin starts
 it by push when something begins, updates it on thread events (and every two

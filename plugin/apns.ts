@@ -1,4 +1,4 @@
-// APNs delivery for BB Go. BB's push-notifications plugin posts Expo-format
+// APNs delivery for BB Studio. BB's push-notifications plugin posts Expo-format
 // batches to its relay URL; this module sends `apns:` tokens to Apple and
 // answers with Expo-format tickets so the sender's bookkeeping keeps working.
 import { createPrivateKey, sign, type KeyObject } from "node:crypto";

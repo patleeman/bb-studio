@@ -3,7 +3,7 @@ import SwiftUI
 import WidgetKit
 
 @main
-struct BBGoWidgets: WidgetBundle {
+struct BBStudioWidgets: WidgetBundle {
     var body: some Widget {
         BBStatusLiveActivity()
         StatusWidget()
