@@ -1,14 +1,17 @@
 import SwiftUI
 
 /// Everything the Studio add-ons made, in one list: pages, Talk recordings and
-/// dictations, drawings. Reads the Studio plugin when it's running and the
-/// add-ons directly when it isn't.
+/// dictations, drawings, artifacts. Reads the Studio plugin when it's running
+/// and the add-ons directly when it isn't.
 @MainActor
 final class StudioStore: ObservableObject {
     static let shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts"]
 
+    /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
+    /// What each add-on says its kinds can do, from the Studio plugin.
+    @Published private(set) var kindInfo: [StudioKindInfo] = []
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
     /// Listed by the Studio plugin, which can also search content and delete anything.
@@ -48,6 +51,7 @@ final class StudioStore: ObservableObject {
         guard !loaded else { return }
         if let snapshot = DiskCache.load(StudioSnapshot.self, key: StudioSnapshot.cacheKey) {
             items = snapshot.items
+            kindInfo = snapshot.kinds ?? []
             loaded = true
         }
         if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) {
@@ -64,9 +68,9 @@ final class StudioStore: ObservableObject {
         }
         do {
             let items = try await fetch(client)
-            self.items = items.filter { !$0.archived }.sorted { $0.updatedAt > $1.updatedAt }
+            self.items = items.sorted { $0.updatedAt > $1.updatedAt }
             error = nil
-            DiskCache.save(StudioSnapshot(items: self.items), as: StudioSnapshot.cacheKey)
+            DiskCache.save(StudioSnapshot(items: self.items, kinds: kindInfo), as: StudioSnapshot.cacheKey)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -76,11 +80,13 @@ final class StudioStore: ObservableObject {
     }
 
     private func fetch(_ client: BBClient) async throws -> [StudioItem] {
-        if plugins.contains("studio"), let items = try? await client.studioItems() {
+        if plugins.contains("studio"), let overview = try? await client.studioOverview() {
             viaStudio = true
-            return items
+            kindInfo = overview.kinds
+            return overview.items
         }
         viaStudio = false
+        kindInfo = []
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
         async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
         async let drawings = Self.attempt(plugins.contains("excalidraw")) { try await client.drawings() }
@@ -125,9 +131,30 @@ final class StudioStore: ObservableObject {
         items.removeAll { $0.pluginId == pluginId && $0.itemId == id }
     }
 
+    func info(_ item: StudioItem) -> StudioKindInfo? {
+        kindInfo.first { $0.pluginId == item.pluginId && $0.id == item.kind }
+    }
+
+    func archive(_ item: StudioItem, _ archived: Bool, client: BBClient) async throws {
+        let results = try await client.studioArchive(pluginId: item.pluginId, ids: [item.itemId], archived: archived)
+        if let failure = results.failed.first { throw BBError(status: 0, message: failure.error) }
+        update(item) { $0.archived = archived }
+    }
+
+    func move(_ item: StudioItem, to projectId: String?, client: BBClient) async throws {
+        let results = try await client.studioMove(pluginId: item.pluginId, ids: [item.itemId], projectId: projectId)
+        if let failure = results.failed.first { throw BBError(status: 0, message: failure.error) }
+        update(item) { $0.projectId = projectId }
+    }
+
+    private func update(_ item: StudioItem, _ change: (inout StudioItem) -> Void) {
+        guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
+        change(&items[index])
+    }
+
     /// Kinds in the order the filter shows them.
     var kinds: [StudioKind] {
-        let present = Set(items.map(\.kind))
+        let present = Set(items.filter { !$0.archived }.map(\.kind))
         let known = StudioKind.known.filter { present.contains($0.id) }
         let others = present.subtracting(StudioKind.known.map(\.id)).sorted().map(StudioKind.other)
         return known + others
@@ -146,6 +173,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "recording", label: "Recording", plural: "Recordings", symbol: "waveform", tint: .red),
         StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
+        StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
     ]
 
     static func other(_ id: String) -> StudioKind {
@@ -164,6 +192,8 @@ struct StudioView: View {
     @State private var recordingKind: String?
     @State private var dictatingPage = false
     @State private var deleting: StudioItem?
+    @State private var showArchived = false
+    @State private var notice: String?
 
     var body: some View {
         List {
@@ -175,7 +205,7 @@ struct StudioView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
-            if store.kinds.count > 1 {
+            if store.kinds.count > 1 || hasArchived {
                 Section { kindFilter }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -194,12 +224,26 @@ struct StudioView: View {
                 ProgressView()
             } else if !query.isEmpty, visible.isEmpty {
                 ContentUnavailableView.search(text: query)
+            } else if visible.isEmpty, showArchived {
+                ContentUnavailableView("Nothing archived", systemImage: "archivebox")
             } else if visible.isEmpty, store.error == nil {
                 ContentUnavailableView("Nothing here yet", systemImage: "square.stack",
                     description: Text(emptyText))
             }
         }
-        .navigationTitle("Studio")
+        .overlay(alignment: .bottom) {
+            if let notice {
+                Text(notice)
+                    .font(.subheadline.weight(.medium))
+                    .padding(.horizontal, 14)
+                    .padding(.vertical, 8)
+                    .background(.regularMaterial, in: .capsule)
+                    .padding(.bottom, 12)
+                    .transition(.move(edge: .bottom).combined(with: .opacity))
+            }
+        }
+        .animation(.snappy, value: notice)
+        .navigationTitle(showArchived ? "Archived" : "Studio")
         .searchable(text: $query, prompt: "Search Studio")
         .toolbar { ToolbarItem(placement: .topBarTrailing) { projectMenu } }
         .task(id: query) { await search() }
@@ -267,6 +311,9 @@ struct StudioView: View {
                         app.studioKind = app.studioKind == kind.id ? nil : kind.id
                     }
                 }
+                if hasArchived {
+                    chip("Archived", "archivebox", selected: showArchived) { showArchived.toggle() }
+                }
             }
             .padding(.vertical, 2)
         }
@@ -328,12 +375,47 @@ struct StudioView: View {
                 Button { deleting = item } label: { Label("Delete", systemImage: "trash") }
                     .tint(.red)
             }
-        }
-        .contextMenu {
-            Button { UIPasteboard.general.string = item.displayTitle } label: { Label("Copy Title", systemImage: "doc.on.doc") }
-            if canDelete(item) {
-                Button(role: .destructive) { deleting = item } label: { Label("Delete", systemImage: "trash") }
+            if store.info(item)?.canArchive == true {
+                Button { Task { await archive(item) } } label: {
+                    Label(item.archived ? "Restore" : "Archive", systemImage: item.archived ? "tray.and.arrow.up" : "archivebox")
+                }
+                .tint(.indigo)
             }
+        }
+        .contextMenu { menu(item) }
+    }
+
+    @ViewBuilder
+    private func menu(_ item: StudioItem) -> some View {
+        if let href = item.href {
+            Button {
+                app.newThread(text: "[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ")
+            } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
+        }
+        ForEach(store.info(item)?.actions ?? [], id: \.id) { action in
+            Button { Task { await run(action, on: item) } } label: {
+                Label(action.label.replacingOccurrences(of: "{count}", with: "1"), systemImage: action.result == "copy" ? "doc.on.doc" : "bolt")
+            }
+        }
+        Button { UIPasteboard.general.string = item.displayTitle } label: { Label("Copy Title", systemImage: "textformat") }
+        if store.viaStudio {
+            Section {
+                Menu {
+                    ForEach(moveChoices, id: \.id) { choice in
+                        Button { Task { await move(item, to: choice.id) } } label: {
+                            if choice.id == item.projectId { Label(choice.name, systemImage: "checkmark") } else { Text(choice.name) }
+                        }
+                    }
+                } label: { Label("Move to Project", systemImage: "folder") }
+                if store.info(item)?.canArchive == true {
+                    Button { Task { await archive(item) } } label: {
+                        Label(item.archived ? "Restore from Archive" : "Archive", systemImage: item.archived ? "tray.and.arrow.up" : "archivebox")
+                    }
+                }
+            }
+        }
+        if canDelete(item) {
+            Button(role: .destructive) { deleting = item } label: { Label("Delete", systemImage: "trash") }
         }
     }
 
@@ -342,9 +424,19 @@ struct StudioView: View {
         case "pages": .page(id: item.itemId)
         case "talk": .recording(id: item.itemId)
         case "excalidraw": .drawing(id: item.itemId)
-        default: nil
+        case "artifacts": .artifact(id: item.itemId)
+        default: item.href.flatMap(Route.init(href:))
         }
     }
+
+    /// Every project the phone knows, for Move.
+    private var moveChoices: [(id: String?, name: String)] {
+        [(nil, "No Project")] + store.projectNames
+            .sorted { $0.value.localizedStandardCompare($1.value) == .orderedAscending }
+            .map { ($0.key, $0.value) }
+    }
+
+    private var hasArchived: Bool { showArchived || store.items.contains(where: \.archived) }
 
     private func canDelete(_ item: StudioItem) -> Bool {
         store.viaStudio || ["pages", "talk", "excalidraw"].contains(item.pluginId)
@@ -356,6 +448,7 @@ struct StudioView: View {
 
     private var visible: [StudioItem] {
         store.items.filter { item in
+            if item.archived != showArchived { return false }
             if let kind = app.studioKind, item.kind != kind { return false }
             switch project {
             case "": break
@@ -402,7 +495,8 @@ struct StudioView: View {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
-        default: "Pages, recordings, dictations and drawings show up here."
+        case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
+        default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
     }
 
@@ -437,6 +531,52 @@ struct StudioView: View {
             store.error = BBClient.describe(error, server: app.client.baseURL)
         }
     }
+
+    private func archive(_ item: StudioItem) async {
+        do {
+            try await store.archive(item, !item.archived, client: app.client)
+            flash(item.archived ? "Restored" : "Archived")
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
+    private func move(_ item: StudioItem, to projectId: String?) async {
+        guard projectId != item.projectId else { return }
+        do {
+            try await store.move(item, to: projectId, client: app.client)
+            flash(projectId.flatMap { store.projectNames[$0] }.map { "Moved to \($0)" } ?? "Moved out of its project")
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
+    /// An add-on's own action, like Copy Transcript: copies what it returns, or says what it did.
+    private func run(_ action: StudioKindInfo.Action, on item: StudioItem) async {
+        do {
+            let result = try await app.client.studioAction(pluginId: item.pluginId, action: action.id, ids: [item.itemId])
+            if action.result == "copy" {
+                guard let text = result.text, !text.isEmpty else {
+                    flash(result.message ?? "Nothing to copy")
+                    return
+                }
+                UIPasteboard.general.string = text
+                flash(result.message ?? "Copied")
+            } else {
+                flash(result.message ?? "Done")
+            }
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
+    private func flash(_ message: String) {
+        notice = message
+        Task {
+            try? await Task.sleep(for: .seconds(2.5))
+            if notice == message { notice = nil }
+        }
+    }
 }
 
 struct StudioRow: View {
@@ -447,14 +587,17 @@ struct StudioRow: View {
         let kind = StudioKind.of(item.kind)
         HStack(alignment: .top, spacing: 12) {
             Group {
-                if let emoji = item.emoji {
+                if let path = item.thumbnailUrl {
+                    StudioThumbnail(item: item, path: path, kind: kind)
+                } else if let emoji = item.emoji {
                     Text(emoji).font(.title3)
                 } else {
                     Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
                 }
             }
-            .frame(width: 36, height: 36)
+            .frame(width: item.thumbnailUrl == nil ? 36 : 52, height: item.thumbnailUrl == nil ? 36 : 52)
             .background(kind.tint.opacity(0.12), in: .rect(cornerRadius: 9))
+            .clipShape(.rect(cornerRadius: 9))
             VStack(alignment: .leading, spacing: 3) {
                 HStack(alignment: .firstTextBaseline) {
                     Text(item.displayTitle)
@@ -499,5 +642,52 @@ struct StudioRow: View {
         case "success": .green
         default: .secondary
         }
+    }
+}
+
+/// A drawing or image artifact's picture. Drawings come as SVG, which UIKit
+/// can't show, so they're drawn from the scene instead and kept per revision.
+struct StudioThumbnail: View {
+    @EnvironmentObject private var app: AppModel
+    let item: StudioItem
+    let path: String
+    let kind: StudioKind
+    @State private var drawn: UIImage?
+
+    @MainActor private static let drawings = NSCache<NSString, UIImage>()
+
+    private var key: NSString { "\(item.itemId):\(item.updatedAt)" as NSString }
+
+    var body: some View {
+        if item.pluginId == "excalidraw" {
+            Group {
+                if let image = drawn ?? Self.drawings.object(forKey: key) {
+                    Image(uiImage: image).resizable().scaledToFill()
+                } else {
+                    Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
+                }
+            }
+            .task(id: key) { await draw() }
+        } else {
+            AsyncImage(url: URL(string: path, relativeTo: app.client.baseURL)) { image in
+                image.resizable().scaledToFill()
+            } placeholder: {
+                Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
+            }
+        }
+    }
+
+    private func draw() async {
+        guard Self.drawings.object(forKey: key) == nil,
+            let drawing = try? await app.client.drawing(item.itemId), !drawing.scene.elements.isEmpty
+        else { return }
+        let renderer = ImageRenderer(content: ExcalidrawCanvas(scene: drawing.scene)
+            .frame(width: 160, height: 160)
+            .background(.white)
+            .environment(\.colorScheme, .light))
+        renderer.scale = 2
+        guard let image = renderer.uiImage else { return }
+        Self.drawings.setObject(image, forKey: key)
+        drawn = image
     }
 }

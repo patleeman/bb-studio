@@ -282,7 +282,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
-        for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Drawings", "drawing")] {
+        for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Drawings", "drawing"), ("Artifacts", "artifact")] {
             let button = app.buttons[chip].firstMatch
             guard button.waitForExistence(timeout: 3) else { continue }
             button.tap()
@@ -549,6 +549,33 @@ final class ThreadUITests: XCTestCase {
             }
         }
         return row.exists
+    }
+
+    /// Opens a scratch artifact named by `TEST_RUNNER_BBGO_QA_ARTIFACT`, then its
+    /// card in the reply of the scratch thread `TEST_RUNNER_BBGO_QA_ARTIFACT_THREAD`.
+    func testArtifact() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_ARTIFACT"] else { throw XCTSkip("no scratch artifact") }
+        app.open(URL(string: "bbgo://artifact/\(id)")!)
+        XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "rendered Markdown")
+        sleep(1)
+        shot("artifact-viewer")
+        app.buttons["More"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["New Thread with This"].waitForExistence(timeout: 5), "menu")
+        shot("artifact-menu")
+        app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.9)).tap()
+        app.buttons["Show source"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS '# QA artifact'")).firstMatch.waitForExistence(timeout: 5))
+        shot("artifact-source")
+
+        // A reply with the card; queued messages show as plain text.
+        guard let thread = ProcessInfo.processInfo.environment["BBGO_QA_ARTIFACT_THREAD"] else { return }
+        app.open(URL(string: "bbgo://thread/\(thread)")!)
+        let card = app.buttons["artifactCard"].firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 15), "artifact card")
+        sleep(1)
+        shot("artifact-card")
+        card.tap()
+        XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "card opens the viewer")
     }
 
     private func scratchThread(_ title: String) -> String? {

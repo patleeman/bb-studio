@@ -81,6 +81,7 @@ struct RouteDestination: View {
         case .attention: AttentionView()
         case .drawing(let id): DrawingView(id: id)
         case .recording(let id): RecordingDetailView(id: id)
+        case .artifact(let id): ArtifactView(id: id)
         }
     }
 }

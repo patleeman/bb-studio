@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
-/// code. Directive lines such as `::reactions{…}` are left out; see `Directive`.
+/// code. `::artifact{id="…"}` lines become artifact cards; other directives,
+/// such as `::reactions{…}`, are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
 
@@ -49,6 +50,8 @@ struct MarkdownText: View {
             CodeBlock(language: language, code: code)
         case .rule:
             Divider().padding(.vertical, 2)
+        case .artifact(let id):
+            ArtifactCard(id: id)
         }
     }
 
@@ -149,6 +152,8 @@ enum MarkdownBlock {
     case table(header: [String], rows: [[String]])
     case code(language: String?, String)
     case rule
+    /// A Studio artifact an agent put in its reply.
+    case artifact(String)
 
     private final class Box {
         let blocks: [MarkdownBlock]
@@ -202,8 +207,11 @@ enum MarkdownBlock {
                 blocks.append(.code(language: language.isEmpty ? nil : language, code.joined(separator: "\n")))
             } else if trimmed.isEmpty {
                 flush()
-            } else if Directive(line: trimmed) != nil {
-                continue
+            } else if let directive = Directive(line: trimmed) {
+                if directive.name == "artifact", let id = directive.attributes["id"], Artifact.isId(id) {
+                    flush()
+                    blocks.append(.artifact(id))
+                }
             } else if let heading = trimmed.firstMatch(of: /^(#{1,6})\s+(.*)$/) {
                 flush()
                 blocks.append(.heading(heading.1.count, String(heading.2)))

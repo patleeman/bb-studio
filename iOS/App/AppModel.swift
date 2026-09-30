@@ -15,6 +15,23 @@ enum Route: Hashable {
     case attention
     case drawing(id: String)
     case recording(id: String)
+    case artifact(id: String)
+}
+
+extension Route {
+    /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
+    init?(href: String) {
+        let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
+        guard parts.count == 4, parts[0] == "plugins" else { return nil }
+        let id = parts[3]
+        switch (parts[1], parts[2]) {
+        case ("pages", "pages"): self = .page(id: id)
+        case ("artifacts", "artifacts"): self = .artifact(id: id)
+        case ("excalidraw", "drawings"): self = .drawing(id: id)
+        case ("talk", "recordings"): self = .recording(id: id)
+        default: return nil
+        }
+    }
 }
 
 enum Sheet: Identifiable, Hashable {
@@ -94,7 +111,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`,
+    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`, `bbgo://artifact/<id>`,
     /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://studio` (or `talk`), `bbgo://web`.
     func handle(_ url: URL) {
         guard url.scheme == "bbgo" else { return }
@@ -109,6 +126,7 @@ final class AppModel: ObservableObject {
         case "attention": open(.attention)
         case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
         case "pages": openStudio(kind: "page")
+        case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "dictate": startDictation(threadId: id)
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
@@ -133,6 +151,16 @@ final class AppModel: ObservableObject {
     func open(_ route: Route) {
         tab = .inbox
         path = [route]
+    }
+
+    /// Onto the stack of the tab showing, so Back returns where you were.
+    func push(_ route: Route) {
+        if tab == .studio {
+            studioPath.append(route)
+        } else {
+            tab = .inbox
+            path.append(route)
+        }
     }
 
     func openPage(_ id: String) {

@@ -186,6 +186,13 @@ struct ThreadView: View {
         .animation(.snappy, value: atBottom)
         .safeAreaInset(edge: .bottom) { composer }
         .environment(\.openURL, OpenURLAction { url in
+            // Agents link Studio items by their BB web path, which reads like a file path.
+            if let path = FilePathLink.path(from: url) ?? (url.host() == app.client.baseURL.host() ? url.path() : nil),
+                let route = Route(href: path)
+            {
+                app.path.append(route)
+                return .handled
+            }
             if let path = FilePathLink.path(from: url) {
                 openingFile = OpenFile(path: path)
                 return .handled

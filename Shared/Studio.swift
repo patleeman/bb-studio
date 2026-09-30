@@ -3,7 +3,7 @@ import Foundation
 // MARK: BB Studio
 
 /// One thing a Studio add-on made: a page, a Talk recording or dictation, a
-/// drawing. Comes from the Studio plugin's `overview` when it's running, or
+/// drawing, an artifact. Comes from the Studio plugin's `overview` when it's running, or
 /// straight from the add-ons when it isn't.
 public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
     public struct Fact: Codable, Hashable, Sendable {
@@ -12,8 +12,18 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
 
         /// A bare count reads as a word count only with its unit.
         public var display: String {
-            guard id == "words", let count = Int(value.replacingOccurrences(of: ",", with: "")) else { return value }
-            return count == 1 ? "1 word" : "\(value) words"
+            switch id {
+            case "words":
+                guard let count = Int(value.replacingOccurrences(of: ",", with: "")) else { return value }
+                return count == 1 ? "1 word" : "\(value) words"
+            case "versions":
+                return value == "1" ? "1 version" : "\(value) versions"
+            case "type" where value.contains("/"):
+                // Artifacts label images with their icon name.
+                return (value.split(separator: "/").last.map(String.init) ?? value).capitalized
+            default:
+                return value
+            }
         }
     }
 
@@ -37,6 +47,8 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
     public var preview: String?
     public var facts: [Fact]
     public var badge: Badge?
+    /// Server path of a picture of it: a drawing's SVG, an image artifact.
+    public var thumbnailUrl: String?
     /// App path that opens it in BB web.
     public var href: String?
     public var archived: Bool
@@ -52,7 +64,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case pluginId, itemId = "id", kind, title, icon, projectId, parentId, createdAt, updatedAt
-        case preview, facts, badge, href, archived
+        case preview, facts, badge, thumbnailUrl, href, archived
     }
 
     public init(from decoder: Decoder) throws {
@@ -69,6 +81,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
         preview = try? c.decode(String.self, forKey: .preview)
         facts = (try? c.decode([Fact].self, forKey: .facts)) ?? []
         badge = try? c.decode(Badge.self, forKey: .badge)
+        thumbnailUrl = try? c.decode(String.self, forKey: .thumbnailUrl)
         href = try? c.decode(String.self, forKey: .href)
         archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
     }
@@ -126,6 +139,9 @@ extension StudioItem {
             createdAt: drawing.createdAt, updatedAt: drawing.updatedAt,
             facts: drawing.elementCount.map { [Fact(id: "elements", value: $0 == 1 ? "1 shape" : "\($0) shapes")] } ?? [],
             href: "/plugins/excalidraw/drawings/\(drawing.id)")
+        if drawing.elementCount ?? 0 > 0 {
+            thumbnailUrl = "/api/v1/plugins/excalidraw/http/thumbnail?drawing=\(drawing.id)&v=\(Int(drawing.updatedAt))"
+        }
     }
 
     /// `65_000` → `1:05`.
@@ -136,18 +152,96 @@ extension StudioItem {
     }
 }
 
+/// What an add-on says about one kind of item: its bulk actions and whether it archives.
+public struct StudioKindInfo: Codable, Hashable, Sendable {
+    public struct Action: Codable, Hashable, Sendable {
+        public var id: String
+        /// May hold `{count}`.
+        public var label: String
+        /// "copy" puts the returned text on the clipboard; "toast" shows the message.
+        public var result: String
+    }
+
+    public var pluginId: String
+    public var id: String
+    public var label: String
+    public var plural: String
+    public var actions: [Action]
+    public var canArchive: Bool
+    public var blurb: String
+}
+
 /// The last Studio list, for opening instantly and offline.
 public struct StudioSnapshot: Codable, Sendable {
     public static let cacheKey = "studio-items"
     public var items: [StudioItem]
+    public var kinds: [StudioKindInfo]?
 }
 
 extension BBClient {
-    /// Every add-on's items, from the Studio plugin.
-    public func studioItems() async throws -> [StudioItem] {
-        struct Overview: Decodable { var items: [StudioItem] }
+    /// Every add-on's items and kinds, from the Studio plugin.
+    public func studioOverview() async throws -> (items: [StudioItem], kinds: [StudioKindInfo]) {
+        struct Kind: Decodable {
+            var id: String
+            var label: String
+            var plural: String
+            var actions: [StudioKindInfo.Action]?
+            var canArchive: Bool?
+            var blurb: String?
+        }
+        struct Provider: Decodable {
+            var pluginId: String
+            var kinds: [Kind]
+        }
+        struct Overview: Decodable {
+            var items: [StudioItem]
+            var providers: [Provider]?
+        }
         let overview: Overview = try await rpc("studio", "overview")
-        return overview.items
+        let kinds = (overview.providers ?? []).flatMap { provider in
+            provider.kinds.map {
+                StudioKindInfo(
+                    pluginId: provider.pluginId, id: $0.id, label: $0.label, plural: $0.plural,
+                    actions: $0.actions ?? [], canArchive: $0.canArchive ?? false, blurb: $0.blurb ?? "")
+            }
+        }
+        return (overview.items, kinds)
+    }
+
+    /// Ids the add-on couldn't change, with why.
+    public struct StudioResults: Decodable, Sendable {
+        public struct Failure: Decodable, Sendable {
+            public var id: String
+            public var error: String
+        }
+        public var done: [String]
+        public var failed: [Failure]
+    }
+
+    public func studioArchive(pluginId: String, ids: [String], archived: Bool) async throws -> StudioResults {
+        try await rpc(
+            "studio", "archive",
+            ["pluginId": .string(pluginId), "ids": .array(ids.map { .string($0) }), "archived": .bool(archived)])
+    }
+
+    /// Moves items to a project, or out of every project with nil.
+    public func studioMove(pluginId: String, ids: [String], projectId: String?) async throws -> StudioResults {
+        try await rpc(
+            "studio", "move",
+            ["pluginId": .string(pluginId), "ids": .array(ids.map { .string($0) }),
+             "projectId": projectId.map { .string($0) } ?? .null])
+    }
+
+    /// Runs a kind's action. `text` is what a copy action copies; `message` what a toast says.
+    public func studioAction(pluginId: String, action: String, ids: [String]) async throws -> (message: String?, text: String?) {
+        struct Result: Decodable {
+            var message: String?
+            var text: String?
+        }
+        let result: Result = try await rpc(
+            "studio", "action",
+            ["pluginId": .string(pluginId), "action": .string(action), "ids": .array(ids.map { .string($0) })])
+        return (result.message, result.text)
     }
 
     /// `<plugin>:<id>` keys of items whose content matches.
