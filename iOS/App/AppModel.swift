@@ -10,6 +10,9 @@ enum Route: Hashable {
     case automation(Automation)
     case usage
     case queue
+    case archived
+    case drawings
+    case drawing(id: String)
 }
 
 enum Sheet: Identifiable, Hashable {
@@ -70,7 +73,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`,
+    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://drawing[/<id>]`,
     /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://talk`, `bbgo://web`.
     func handle(_ url: URL) {
         guard url.scheme == "bbgo" else { return }
@@ -81,6 +84,8 @@ final class AppModel: ObservableObject {
         case "automations": open(.automations)
         case "queue": open(.queue)
         case "usage": open(.usage)
+        case "archived": open(.archived)
+        case "drawing", "drawings": path = [.drawings] + (id.map { [.drawing(id: $0)] } ?? []); tab = .inbox
         case "dictate": startDictation(threadId: id)
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()

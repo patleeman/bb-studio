@@ -28,6 +28,7 @@ public struct ThreadEntry: Codable, Identifiable, Hashable, Sendable {
     public var pinSortKey: String?
     public var environmentBranchName: String?
     public var environmentPath: String?
+    public var environmentId: String?
     public var runtime: Runtime?
 
     public var displayTitle: String {

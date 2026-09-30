@@ -23,6 +23,11 @@ struct ThreadView: View {
     @State private var selecting: SelectionText?
     @State private var position = ScrollPosition()
     @State private var pickingSendTime = false
+    @State private var showingFiles = false
+    @State private var showingHistory = false
+    @State private var confirmingCompact = false
+    /// Set while the composer holds a rewrite of the last message.
+    @State private var editing = false
     @AppStorage("runningPlugins") private var runningPlugins = ""
 
     init(threadId: String) {
@@ -51,6 +56,23 @@ struct ThreadView: View {
                 pickingSendTime = false
                 send(at: date)
             }
+        }
+        .sheet(isPresented: $showingFiles) {
+            if let environmentId = model.thread?.environmentId {
+                FilesView(environmentId: environmentId)
+            }
+        }
+        .sheet(isPresented: $showingHistory) {
+            PromptHistoryView(threadId: model.threadId) { text in
+                showingHistory = false
+                draft = text
+                composerFocused = true
+            }
+        }
+        .confirmationDialog("Compact this thread?", isPresented: $confirmingCompact, titleVisibility: .visible) {
+            Button("Compact") { Task { await model.run { try await $0.compact(model.threadId) } } }
+        } message: {
+            Text("The agent summarizes the conversation so far to free up context.")
         }
         .sheet(isPresented: $choosingModel) {
             ExecutionSheet(threadId: model.threadId, providerId: model.thread?.providerId)
@@ -162,6 +184,16 @@ struct ThreadView: View {
                     }
                     Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
                     Button { choosingModel = true } label: { Label("Model & reasoning", systemImage: "cpu") }
+                    if model.thread?.environmentId != nil {
+                        Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
+                    }
+                    Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
+                    Section {
+                        Button {
+                            Task { if let id = await model.fork() { app.path.append(.thread(id: id)) } }
+                        } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
+                        Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
+                    }
                     let isMuted = muted.ids.contains(model.threadId)
                     Button {
                         Task {
@@ -198,6 +230,8 @@ struct ThreadView: View {
                 }
                 let items = TimelineItem.group(model.rows)
                 let unread = unreadItem(in: items)
+                let editable = lastUserRowId
+                let sideChat = runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil
                 ForEach(items) { item in
                     // One view per item, so scrolling to the item lands on the divider.
                     VStack(alignment: .leading, spacing: 14) {
@@ -211,7 +245,8 @@ struct ThreadView: View {
                                     react: { draftReply($0) },
                                     quote: { quote($0) },
                                     select: { selecting = SelectionText(text: $0) },
-                                    sideChat: runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil)
+                                    sideChat: sideChat,
+                                    edit: row.id == editable ? startEditing : nil)
                             case .activity(let rows):
                                 ActivityGroup(rows: rows)
                             }
@@ -391,6 +426,7 @@ struct ThreadView: View {
 
     /// Clears the field right away and puts the text back if sending fails.
     private func send() {
+        if editing { return saveEdit() }
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let files = attachments
         let sentMentions = mentions
@@ -407,6 +443,17 @@ struct ThreadView: View {
         }
     }
 
+    private var lastUserRowId: String? {
+        model.rows.last { $0.isConversation && $0.isUser }?.id
+    }
+
+    private func startEditing(_ text: String) {
+        editing = true
+        draft = text
+        attachments = []
+        composerFocused = true
+    }
+
     /// Text only: a scheduled message can't carry attachments.
     private func send(at date: Date) {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
@@ -416,6 +463,19 @@ struct ThreadView: View {
             if await !model.send(text, mentions: sentMentions, at: date), draft.isEmpty {
                 draft = text
                 mentions = sentMentions
+            }
+        }
+    }
+
+    private func saveEdit() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentMentions = mentions
+        editing = false
+        draft = ""
+        Task {
+            if await !model.run({ try await $0.editLastMessage(model.threadId, text: text, mentions: sentMentions) }), draft.isEmpty {
+                draft = text
+                editing = true
             }
         }
     }
@@ -436,6 +496,27 @@ struct ThreadView: View {
     private var composer: some View {
         VStack(spacing: 6) {
             ThreadShelf(model: model)
+            if model.thread?.status == "error", !editing {
+                ShelfCard(icon: "exclamationmark.triangle", tint: .red) {
+                    Text("The last turn failed").lineLimit(1)
+                } trailing: {
+                    Button("Retry") { Task { await model.run { try await $0.retry(model.threadId) } } }
+                        .font(.footnote.weight(.semibold))
+                        .padding(.trailing, 6)
+                }
+            }
+            if editing {
+                ShelfCard(icon: "pencil", tint: .accentColor) {
+                    Text("Editing your last message").lineLimit(1)
+                } trailing: {
+                    Button("Cancel") {
+                        editing = false
+                        draft = ""
+                    }
+                    .font(.footnote.weight(.semibold))
+                    .padding(.trailing, 6)
+                }
+            }
             if composerFocused, let query = MentionSuggestions.query(in: draft) {
                 MentionSuggestions(query: query, threadId: model.threadId, projectId: model.thread?.projectId, pick: insert)
             }
@@ -476,7 +557,7 @@ struct ThreadView: View {
                 .keyboardShortcut(.return, modifiers: .command)
                 // Long-press to schedule.
                 .contextMenu {
-                    if canSend, attachments.isEmpty {
+                    if canSend, attachments.isEmpty, !editing {
                         Section("Send Later") {
                             ForEach(SendTimePicker.presets, id: \.title) { preset in
                                 Button(preset.title) { send(at: preset.date()) }
@@ -485,7 +566,7 @@ struct ThreadView: View {
                         }
                     }
                 }
-                .accessibilityLabel(model.thread?.isRunning == true ? "Queue message" : "Send")
+                .accessibilityLabel(editing ? "Save edit" : model.thread?.isRunning == true ? "Queue message" : "Send")
             }
         }
         .padding(.horizontal)

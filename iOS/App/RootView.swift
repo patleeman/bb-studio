@@ -71,6 +71,9 @@ struct InboxTab: View {
         case .automation(let automation): AutomationView(automation: automation).id(automation.id)
         case .usage: UsageView()
         case .queue: QueueView()
+        case .archived: ArchivedView()
+        case .drawings: DrawingsView()
+        case .drawing(let id): DrawingView(id: id)
         }
     }
 }

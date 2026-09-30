@@ -335,6 +335,10 @@ struct InboxView: View {
         if plugins.contains("account-pool") {
             NavigationLink(value: Route.usage) { Label("Usage", systemImage: "gauge.with.dots.needle.33percent") }
         }
+        if plugins.contains("excalidraw") {
+            NavigationLink(value: Route.drawings) { Label("Drawings", systemImage: "scribble.variable") }
+        }
+        NavigationLink(value: Route.archived) { Label("Archived", systemImage: "archivebox") }
     }
 
     private func expanded(_ id: String) -> Binding<Bool> {

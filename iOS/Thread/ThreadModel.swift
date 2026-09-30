@@ -365,6 +365,31 @@ final class ThreadModel: ObservableObject {
         }
     }
 
+    /// Runs a thread action that changes the timeline, then refreshes.
+    @discardableResult
+    func run(_ action: (BBClient) async throws -> Void) async -> Bool {
+        guard let client else { return false }
+        do {
+            try await action(client)
+            confirmations += 1
+            await refreshLatest()
+            return true
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return false
+        }
+    }
+
+    func fork() async -> String? {
+        guard let client else { return nil }
+        do {
+            return try await client.fork(threadId)
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return nil
+        }
+    }
+
     /// Opens a side chat about `text` and returns its thread.
     func sideChat(about text: String) async -> String? {
         guard let client else { return nil }

@@ -11,6 +11,8 @@ struct MessageBubble: View {
     var select: (String) -> Void = { _ in }
     /// Nil where side chats aren't available.
     var sideChat: ((String) -> Void)?
+    /// Only on the newest message the user sent.
+    var edit: ((String) -> Void)?
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -57,6 +59,9 @@ struct MessageBubble: View {
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
         Button { select(plainText) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
         Button { quote(plainText) } label: { Label("Quote", systemImage: "text.quote") }
+        if let edit {
+            Button { edit(plainText) } label: { Label("Edit", systemImage: "pencil") }
+        }
         if let sideChat {
             Button { sideChat(plainText) } label: { Label("Side Chat", systemImage: "bubble.left.and.text.bubble.right") }
         }

@@ -228,6 +228,54 @@ final class ThreadUITests: XCTestCase {
         shot("tools-home")
     }
 
+    /// Read-only: opens sheets and screens, never sends, forks or compacts.
+    func testThreadExtras() {
+        app.open(URL(string: "bbgo://thread/\(threadId)")!)
+        let more = app.buttons["More"]
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        XCTAssertTrue(app.buttons["Fork thread"].waitForExistence(timeout: 5))
+        XCTAssertTrue(app.buttons["Compact context"].exists)
+        shot("extras-menu")
+        app.buttons["Files & changes"].tap()
+        XCTAssertTrue(app.segmentedControls.buttons["Changes"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("extras-changes")
+        app.staticTexts.matching(NSPredicate(format: "label ENDSWITH '.md'")).firstMatch.tap()
+        sleep(2)
+        shot("extras-diff")
+        if app.buttons["View file"].waitForExistence(timeout: 3) {
+            app.buttons["View file"].tap()
+            sleep(2)
+            shot("extras-file")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.segmentedControls.buttons["Files"].tap()
+        sleep(1)
+        shot("extras-files")
+        app.buttons["Done"].tap()
+        more.tap()
+        app.buttons["Recent prompts"].tap()
+        XCTAssertTrue(app.navigationBars["Recent prompts"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("extras-history")
+        app.buttons["Done"].tap()
+        app.open(URL(string: "bbgo://archived")!)
+        XCTAssertTrue(app.navigationBars["Archived"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("extras-archived")
+        app.open(URL(string: "bbgo://drawings")!)
+        XCTAssertTrue(app.navigationBars["Drawings"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("extras-drawings")
+        if let id = ProcessInfo.processInfo.environment["BBGO_QA_DRAWING"] {
+            app.open(URL(string: "bbgo://drawing/\(id)")!)
+            sleep(3)
+            shot("extras-drawing")
+        }
+    }
+
     func testPageDemo() {
         app.terminate()
         app.launchArguments = ["-qaPageDemo"]
