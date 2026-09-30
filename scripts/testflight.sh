@@ -5,8 +5,11 @@
 #   scripts/testflight.sh --archive-only  signed archive, no upload (registers bundle IDs and the app group)
 #   scripts/testflight.sh --dry-run       unsigned Release archive only
 #
-# Signing and upload use the Apple ID signed into Xcode (Settings → Accounts).
-# An App Store Connect API key can't manage App Groups, so it can't sign this app.
+# Signing and upload use the App Store Connect API key named in
+# ~/.config/bbgo/testflight.env (ASC_KEY_ID, ASC_ISSUER_ID, ASC_KEY_PATH) when it
+# exists. The Apple ID signed into Xcode is the fallback, but xcodebuild can't
+# read its credential while the Mac is locked ("Failed to Use Accounts").
+# The key can't register App Groups; the app's group already exists.
 # BUILD_NUMBER overrides the build number, which defaults to the UTC time
 # (YYYYMMDD.HHMM), so every upload is higher than the last.
 set -euo pipefail
@@ -32,7 +35,16 @@ log="$out/xcodebuild-$build_number.log"
 mkdir -p "$out"
 xcodegen generate --quiet
 
-signing=(-allowProvisioningUpdates)
+auth=()
+env_file="$HOME/.config/bbgo/testflight.env"
+if [[ -f "$env_file" ]]; then
+  # shellcheck disable=SC1090
+  source "$env_file"
+  auth=(-authenticationKeyPath "${ASC_KEY_PATH/#\~/$HOME}" -authenticationKeyID "$ASC_KEY_ID"
+    -authenticationKeyIssuerID "$ASC_ISSUER_ID")
+fi
+
+signing=(-allowProvisioningUpdates "${auth[@]}")
 $dry_run && signing=(CODE_SIGNING_ALLOWED=NO)
 
 echo "Archiving build $build_number (log: $log)…"
@@ -69,7 +81,7 @@ PLIST
 echo "Uploading to App Store Connect…"
 if ! xcodebuild -exportArchive \
   -archivePath "$archive" -exportOptionsPlist "$options" -exportPath "$out/export-$build_number" \
-  -allowProvisioningUpdates >>"$log" 2>&1; then
+  -allowProvisioningUpdates "${auth[@]}" >>"$log" 2>&1; then
   grep -E "error:" "$log" | sort -u | head -20 >&2
   echo "Upload failed; see $log." >&2
   exit 1
