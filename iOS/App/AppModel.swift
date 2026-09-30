@@ -99,6 +99,7 @@ final class AppModel: ObservableObject {
         case "studio", "talk": openStudio(kind: nil)
         case "web": tab = .web
         case "settings": tab = .settings
+        case "file": break  // Opened by the thread view, which knows the workspace.
         default: tab = .inbox
         }
     }

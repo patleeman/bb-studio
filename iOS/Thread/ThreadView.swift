@@ -27,6 +27,7 @@ struct ThreadView: View {
     @State private var showingHistory = false
     @State private var confirmingCompact = false
     @State private var renaming = false
+    @State private var openingFile: OpenFile?
     @State private var newTitle = ""
     @State private var reviewingPlan: PlanReview?
     /// Set while the composer holds a rewrite of the last message.
@@ -61,6 +62,19 @@ struct ThreadView: View {
             SendTimePicker { date in
                 pickingSendTime = false
                 send(at: date)
+            }
+        }
+        .sheet(item: $openingFile) { file in
+            NavigationStack {
+                if let environmentId = model.thread?.environmentId {
+                    WorkspaceFileView(environmentId: environmentId, path: file.path)
+                        .toolbar {
+                            ToolbarItem(placement: .cancellationAction) { Button("Done") { openingFile = nil } }
+                        }
+                } else {
+                    ContentUnavailableView("No workspace", systemImage: "folder.badge.questionmark",
+                        description: Text("This thread has no environment to read \(file.path) from."))
+                }
             }
         }
         .sheet(isPresented: $showingFiles) {
@@ -172,6 +186,10 @@ struct ThreadView: View {
         .animation(.snappy, value: atBottom)
         .safeAreaInset(edge: .bottom) { composer }
         .environment(\.openURL, OpenURLAction { url in
+            if let path = FilePathLink.path(from: url) {
+                openingFile = OpenFile(path: path)
+                return .handled
+            }
             guard url.scheme == "bbgo", url.host() == "thread", let id = url.pathComponents.dropFirst().first else {
                 return .systemAction
             }
@@ -728,4 +746,10 @@ struct PendingBubble: View {
         .frame(maxWidth: .infinity, alignment: .trailing)
         .padding(.leading, 40)
     }
+}
+
+/// A file tapped in a message, shown in a sheet.
+private struct OpenFile: Identifiable {
+    let path: String
+    var id: String { path }
 }

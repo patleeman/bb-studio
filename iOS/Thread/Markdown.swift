@@ -67,8 +67,8 @@ struct MarkdownText: View {
     }
 
     /// Inline markdown with BB's conventions: `@thread:thr_…` mentions open the
-    /// thread in the app, and workspace file links (no scheme) show as code,
-    /// since the phone has no file to open.
+    /// thread in the app, and workspace files, as links or as paths in inline
+    /// code, open in the thread's file viewer.
     static func inline(_ text: String) -> AttributedString {
         let linked = text.replacing(/@thread:(thr_[A-Za-z0-9]+)/) { match in
             let id = String(match.1)
@@ -84,8 +84,13 @@ struct MarkdownText: View {
             if url.scheme == "thread" {
                 attributed[run.range].link = URL(string: "bbgo://thread/\(url.absoluteString.dropFirst("thread:".count))")
             } else if url.scheme == nil || url.scheme == "file" {
-                attributed[run.range].link = nil
-                attributed[run.range].inlinePresentationIntent = .code
+                let path = url.scheme == "file" ? url.path : url.relativeString.removingPercentEncoding ?? url.relativeString
+                attributed[run.range].link = FilePathLink.url(FilePathLink.stripLine(path))
+            }
+        }
+        for run in attributed.runs where run.link == nil && run.inlinePresentationIntent?.contains(.code) == true {
+            if let path = FilePathLink.path(inCode: String(attributed[run.range].characters)) {
+                attributed[run.range].link = FilePathLink.url(path)
             }
         }
         return attributed

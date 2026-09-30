@@ -282,11 +282,19 @@ struct WorkspaceFileView: View {
         }
         .task {
             do {
-                file = try await app.client.workspaceFile(environmentId, path: path)
+                file = try await app.client.workspaceFile(environmentId, path: await relativePath())
             } catch {
                 self.error = BBClient.describe(error, server: app.client.baseURL)
             }
         }
+    }
+
+    /// Absolute paths inside the workspace become relative; the server reads
+    /// every path from the workspace root.
+    private func relativePath() async -> String {
+        guard path.hasPrefix("/"), let root = try? await app.client.environmentRoot(environmentId) else { return path }
+        let prefix = root.hasSuffix("/") ? root : root + "/"
+        return path.hasPrefix(prefix) ? String(path.dropFirst(prefix.count)) : path
     }
 
     /// Joins hard-wrapped source lines into paragraphs, the way Markdown

@@ -471,6 +471,24 @@ final class ThreadUITests: XCTestCase {
         app.buttons["End"].tap()
     }
 
+    /// Taps a file path in a reply and checks the file viewer opens. Scratch
+    /// thread only, named by `TEST_RUNNER_BBGO_QA_FILE_THREAD`, whose last reply
+    /// mentions `README.md`.
+    func testFileLink() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_FILE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'README.md'")).firstMatch
+        XCTAssertTrue(text.waitForExistence(timeout: 15), "reply with a path")
+        shot("file-link")
+        let link = text.links["README.md"].firstMatch.exists ? text.links["README.md"].firstMatch : app.links["README.md"].firstMatch
+        XCTAssertTrue(link.waitForExistence(timeout: 5), "path is a link")
+        link.tap()
+        XCTAssertTrue(app.navigationBars["README.md"].waitForExistence(timeout: 10), "file viewer")
+        sleep(2)
+        shot("file-viewer")
+        app.buttons["Done"].tap()
+    }
+
     func testShelfDemo() {
         app.terminate()
         app.launchArguments = ["-qaShelfDemo"]
