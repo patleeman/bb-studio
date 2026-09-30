@@ -216,6 +216,8 @@ struct InboxView: View {
     @State private var renaming: ThreadEntry?
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
+    /// Whether the server runs the pages plugin; remembered so the row shows offline.
+    @AppStorage("pagesAvailable") private var pagesAvailable = false
 
     var body: some View {
         List {
@@ -231,6 +233,11 @@ struct InboxView: View {
                     ContentUnavailableView.search(text: query)
                 }
             } else {
+                if query.isEmpty, pagesAvailable {
+                    Section {
+                        NavigationLink(value: Route.pages) { Label("Pages", systemImage: "doc.richtext") }
+                    }
+                }
                 if query.isEmpty, !model.channels.isEmpty {
                     collapsible("channels", "Channels") {
                         ForEach(model.channels) { room in
@@ -293,6 +300,10 @@ struct InboxView: View {
             isPresented: Binding(get: { app.newThreadDraft != nil }, set: { if !$0 { app.newThreadDraft = nil } })
         ) {
             NewThreadView(text: app.newThreadDraft ?? "")
+        }
+        .task(id: app.serverURL) {
+            if let running = try? await app.client.isPluginRunning("pages") { pagesAvailable = running }
+            await MutedThreads.shared.refresh()
         }
         .task(id: app.serverURL) {
             model.restore()
@@ -479,6 +490,15 @@ struct ConnectionBanner: View {
 struct ThreadRow: View {
     let thread: ThreadEntry
     var project: String?
+    @ObservedObject private var muted = MutedThreads.shared
+    /// Written by the thread screen as the reader types; see `Drafts`.
+    @AppStorage private var draft: Data?
+
+    init(thread: ThreadEntry, project: String? = nil) {
+        self.thread = thread
+        self.project = project
+        _draft = AppStorage("draft.\(thread.id)")
+    }
 
     var body: some View {
         HStack(alignment: .top, spacing: 10) {
@@ -488,6 +508,10 @@ struct ThreadRow: View {
                     .font(.body.weight(thread.isUnread ? .semibold : .regular))
                     .lineLimit(2)
                 HStack(spacing: 4) {
+                    if draft != nil {
+                        Text("Draft").foregroundStyle(.red)
+                        Text("·")
+                    }
                     if let project {
                         Text(project)
                         Text("·")
@@ -495,6 +519,9 @@ struct ThreadRow: View {
                     Text(
                         Date(timeIntervalSince1970: (thread.latestAttentionAt ?? thread.updatedAt) / 1000),
                         format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                    if muted.ids.contains(thread.id) {
+                        Image(systemName: "bell.slash").accessibilityLabel("Muted")
+                    }
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)

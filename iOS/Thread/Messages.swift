@@ -283,6 +283,7 @@ struct ActivityGroup: View {
                     Image(systemName: "exclamationmark.triangle.fill").foregroundStyle(.orange)
                 }
                 Text(summary).lineLimit(1)
+                if !running, let stats = diffStats { DiffStats(stats: stats) }
             }
             .font(.footnote)
             .foregroundStyle(.secondary)
@@ -291,6 +292,12 @@ struct ActivityGroup: View {
     }
 
     private var work: [TimelineRow] { rows.filter { $0.kind == "work" } }
+
+    private var diffStats: TimelineRow.FileChange.Stats? {
+        let all = rows.compactMap { $0.change?.diffStats }
+        guard !all.isEmpty else { return nil }
+        return .init(added: all.map(\.added).reduce(0, +), removed: all.map(\.removed).reduce(0, +))
+    }
     private var running: Bool { rows.contains { $0.status == "inProgress" || $0.status == "running" || $0.status == "pending" } }
     private var failed: Bool { rows.contains { $0.status == "failed" || $0.status == "error" } }
 
@@ -302,7 +309,7 @@ struct ActivityGroup: View {
         var counts: [String] = []
         let commands = work.filter { $0.workKind == "command" }.count
         let reads = work.filter { $0.workKind == "file-read" }.count
-        let edits = Set(work.filter { $0.workKind == "file-change" }.compactMap { $0.presentation?.title ?? $0.path }).count
+        let edits = Set(work.filter { $0.workKind == "file-change" }.compactMap { $0.change?.path ?? $0.path }).count
         let tools = work.filter { $0.workKind == "tool" }.count
         if commands > 0 { counts.append("\(commands) command\(commands == 1 ? "" : "s")") }
         if reads > 0 { counts.append("read \(reads) file\(reads == 1 ? "" : "s")") }
@@ -328,6 +335,7 @@ struct ActivityStep: View {
                         .lineLimit(showingOutput ? nil : 2)
                         .multilineTextAlignment(.leading)
                     Spacer(minLength: 0)
+                    if let stats = row.change?.diffStats { DiffStats(stats: stats) }
                     if hasDetail {
                         Image(systemName: "chevron.right")
                             .font(.caption2)
@@ -338,7 +346,11 @@ struct ActivityStep: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
-            if showingOutput, let detail {
+            if showingOutput, let diff = row.change?.diff {
+                DiffView(diff: diff)
+                    .frame(maxHeight: 360)
+                    .padding(.leading, 24)
+            } else if showingOutput, let detail {
                 ScrollView(.horizontal, showsIndicators: false) {
                     Text(detail)
                         .font(.caption2.monospaced())
@@ -359,7 +371,7 @@ struct ActivityStep: View {
         return lines.count > 60 ? lines.prefix(60).joined(separator: "\n") + "\n… \(lines.count - 60) more lines" : text
     }
 
-    private var hasDetail: Bool { detail != nil }
+    private var hasDetail: Bool { detail != nil || row.change?.diff?.isEmpty == false }
 
     private var icon: String {
         if row.status == "failed" || row.status == "error" { return "xmark.circle" }
@@ -380,6 +392,14 @@ struct ActivityStep: View {
     static func label(for row: TimelineRow) -> String {
         if let command = row.command { return "$ \(command)" }
         let done = !(row.status == "inProgress" || row.status == "running" || row.status == "pending")
+        if let path = row.change?.path {
+            let verb = switch row.change?.kind {
+            case "add": done ? "Created" : "Creating"
+            case "delete": done ? "Deleted" : "Deleting"
+            default: done ? "Edited" : "Editing"
+            }
+            return "\(verb) \(URL(fileURLWithPath: path).lastPathComponent)"
+        }
         let verb = done ? row.presentation?.label?.completed : row.presentation?.label?.pending
         let subject = row.presentation?.title ?? row.path.map { URL(fileURLWithPath: $0).lastPathComponent }
         if let verb, let subject { return "\(verb) \(subject)" }

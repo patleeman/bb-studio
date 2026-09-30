@@ -23,6 +23,7 @@ struct BBGoApp: App {
                     }
                 }
         }
+        .commands { BBGoCommands() }
     }
 }
 

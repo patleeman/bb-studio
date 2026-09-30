@@ -1,11 +1,11 @@
 import XCTest
 
 /// Clicks through the thread screen against the live BB server the simulator
-/// app is signed in to. Set `BBGO_QA_THREAD` to a throwaway thread whose last
-/// assistant message ends with a `::reactions` directive.
+/// app is signed in to. Set `TEST_RUNNER_BBGO_QA_THREAD` to a thread whose last
+/// assistant message ends with a `::reactions` directive. Nothing is sent.
 final class ThreadUITests: XCTestCase {
     private let app = XCUIApplication()
-    private var threadId: String { ProcessInfo.processInfo.environment["BBGO_QA_THREAD"] ?? "thr_rnqmnycvy4" }
+    private var threadId: String { ProcessInfo.processInfo.environment["BBGO_QA_THREAD"] ?? "thr_64r2wmjrim" }
 
     override func setUp() {
         continueAfterFailure = true
@@ -20,9 +20,38 @@ final class ThreadUITests: XCTestCase {
         shot("home-bottom")
     }
 
-    func testThread() {
+    /// The split view and keyboard shortcuts; run on an iPad simulator. Nothing is sent.
+    func testIPad() throws {
+        guard UIDevice.current.userInterfaceIdiom == .pad else { throw XCTSkip("iPad only") }
+        // A leftover "Open in BB Go?" prompt from `simctl openurl` swallows keys.
+        let prompt = XCUIApplication(bundleIdentifier: "com.apple.springboard").buttons["Cancel"]
+        if prompt.exists { prompt.tap() }
+        app.open(URL(string: "bbgo://thread/\(ProcessInfo.processInfo.environment["BBGO_PROBE_THREAD"] ?? threadId)")!)
+        XCTAssertTrue(app.textViews["Message"].waitForExistence(timeout: 10), "composer")
+        sleep(3)
+        shot("ipad-thread")
+        app.buttons["Find"].tap()
+        XCTAssertTrue(app.textFields["Find in thread"].waitForExistence(timeout: 3), "find bar")
+        app.textFields["Find in thread"].typeText("the")
+        let first = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '1 of '")).firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 20), "match count")
+        app.typeKey("g", modifierFlags: .command)
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH '2 of '")).firstMatch.waitForExistence(timeout: 3), "⌘G steps")
+        shot("ipad-find")
+        app.buttons["Done"].firstMatch.tap()
+        app.typeKey("m", modifierFlags: [.command, .shift])
+        XCTAssertTrue(app.navigationBars["Model"].waitForExistence(timeout: 5), "⇧⌘M opens the model sheet")
+        app.buttons["Cancel"].tap()
+        app.typeKey("n", modifierFlags: .command)
+        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 5), "⌘N opens a new thread")
+        shot("ipad-new")
+    }
+
+    func testThread() throws {
         app.open(URL(string: "bbgo://thread/\(threadId)")!)
-        XCTAssertTrue(app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10), "reaction chip")
+        guard app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10) else {
+            throw XCTSkip("the thread's last reply has no reactions")
+        }
         let chip = app.buttons.matching(identifier: "reaction").allElementsBoundByIndex.last!
         let chipText = chip.label
         sleep(2)
@@ -108,6 +137,82 @@ final class ThreadUITests: XCTestCase {
                 return
             }
         }
+    }
+
+    /// Find, mentions, drafts, diffs and the model sheet, without sending or
+    /// saving anything, so it can point at any thread: TEST_RUNNER_BBGO_PROBE_THREAD.
+    func testFeatures() throws {
+        let env = ProcessInfo.processInfo.environment
+        guard let id = env["BBGO_PROBE_THREAD"] else { throw XCTSkip("no probe thread") }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        let composer = app.textViews["Message"]
+        XCTAssertTrue(composer.waitForExistence(timeout: 10), "composer")
+        sleep(2)
+        // Drafts outlive a run that stopped early.
+        clear(composer)
+
+        // Find in thread.
+        app.buttons["More"].tap()
+        app.buttons["Find in thread"].tap()
+        let field = app.textFields["Find in thread"]
+        XCTAssertTrue(field.waitForExistence(timeout: 3), "find field")
+        field.typeText("the")
+        XCTAssertTrue(wait(20) { app.staticTexts.matching(NSPredicate(format: "label CONTAINS ' of '")).firstMatch.exists }, "match count")
+        shot("find-1")
+        app.buttons["Earlier match"].tap()
+        sleep(1)
+        shot("find-2")
+        app.buttons["Done"].firstMatch.tap()
+
+        // @ suggestions, then the draft surviving a trip back to Home.
+        composer.tap()
+        composer.typeText("@at")
+        XCTAssertTrue(app.buttons["mention"].firstMatch.waitForExistence(timeout: 5), "mention suggestions")
+        shot("mentions")
+        clear(composer)
+        composer.typeText("Draft kept")
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        sleep(1)
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        XCTAssertTrue(wait { (app.textViews["Message"].value as? String) == "Draft kept" }, "draft restored")
+        clear(app.textViews["Message"])
+        app.swipeDown(velocity: .slow)
+
+        // Model sheet, cancelled.
+        app.buttons["More"].tap()
+        app.buttons["Model & reasoning"].tap()
+        XCTAssertTrue(app.navigationBars["Model"].waitForExistence(timeout: 5), "model sheet")
+        sleep(2)
+        shot("model")
+        app.buttons["Cancel"].tap()
+
+        // An edit's diff.
+        let edited = app.buttons.matching(NSPredicate(format: "label CONTAINS[c] 'edited'")).firstMatch
+        for _ in 0..<12 where !edited.isHittable {
+            app.swipeDown(velocity: .slow)
+            sleep(1)
+        }
+        guard edited.isHittable else { return XCTFail("no edits on screen") }
+        edited.tap()
+        let step = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Edited ' OR label BEGINSWITH 'Created '")).firstMatch
+        XCTAssertTrue(step.waitForExistence(timeout: 3), "edit step")
+        step.tap()
+        sleep(1)
+        shot("diff")
+    }
+
+    /// Every Pages block kind, from a built-in page rather than a real one.
+    func testPageDemo() {
+        app.terminate()
+        app.launchArguments = ["-qaPageDemo"]
+        app.launch()
+        app.open(URL(string: "bbgo://page/qa-demo")!)
+        XCTAssertTrue(app.staticTexts["Launch plan"].waitForExistence(timeout: 10))
+        sleep(1)
+        shot("page-demo-top")
+        app.swipeUp(velocity: .slow)
+        sleep(1)
+        shot("page-demo-bottom")
     }
 
     /// Needs a running thread with a queued message.

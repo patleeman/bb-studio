@@ -46,7 +46,7 @@ struct InboxTab: View {
     var body: some View {
         if sizeClass == .regular {
             NavigationSplitView {
-                InboxView()
+                InboxView().navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 480)
             } detail: {
                 NavigationStack(path: $model.path) {
                     ContentUnavailableView("No thread selected", systemImage: "bubble.left.and.bubble.right")
@@ -65,6 +65,8 @@ struct InboxTab: View {
         switch route {
         case .thread(let id): ThreadView(threadId: id).id(id)
         case .room(let room): ChannelView(room: room)
+        case .pages: PagesView()
+        case .page(let id): PageView(pageId: id).id(id)
         }
     }
 }

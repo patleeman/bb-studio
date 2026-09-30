@@ -8,6 +8,8 @@ struct ComposerField: UIViewRepresentable {
     @Binding var focused: Bool
     var placeholder = "Message"
     var maxLines = 6
+    /// Room on the right for a button over the field.
+    var trailingInset: CGFloat = 12
     var onPasteImages: ([UIImage]) -> Void
 
     func makeUIView(context: Context) -> PastingTextView {
@@ -28,6 +30,10 @@ struct ComposerField: UIViewRepresentable {
     func updateUIView(_ view: PastingTextView, context: Context) {
         context.coordinator.parent = self
         view.onPasteImages = onPasteImages
+        if view.textContainerInset.right != trailingInset {
+            view.textContainerInset.right = trailingInset
+            view.invalidateIntrinsicContentSize()
+        }
         if view.text != text {
             view.text = text
             view.placeholder.isHidden = !text.isEmpty

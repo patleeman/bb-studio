@@ -33,6 +33,9 @@ const LAST_DELIVERY_KEY = "last-delivery";
 /** Option buttons on a question notification; iOS shows about this many before it gets cramped. */
 const MAX_CHOICES = 6;
 const LIVE_KEY = "live";
+/** Thread ids whose notifications BB Go shouldn't get. */
+const MUTED_KEY = "muted-threads";
+const MAX_MUTED = 500;
 
 const hexToken = z
   .string()
@@ -49,6 +52,16 @@ const liveContract = defineRpcContract({
       endedActivityId: z.string().min(1).max(200).optional(),
     }),
     output: z.object({ ok: z.literal(true) }),
+  },
+  mute_list: {
+    experimental_description: "Threads muted in BB Go.",
+    input: z.object({}).optional(),
+    output: z.object({ threadIds: z.array(z.string()) }),
+  },
+  mute_set: {
+    experimental_description: "BB Go mutes or unmutes a thread's notifications on this phone.",
+    input: z.object({ threadId: z.string().regex(/^thr_[A-Za-z0-9]+$/), muted: z.boolean() }),
+    output: z.object({ threadIds: z.array(z.string()) }),
   },
 });
 
@@ -194,6 +207,19 @@ export default async function plugin(bb: BbPluginApi) {
     messages.forEach((message, index) =>
       (message.to.startsWith(APNS_TOKEN_PREFIX) ? apnsIndexes : expoIndexes).push(index),
     );
+
+    // Muted threads are dropped for the app only; other subscribers still get them.
+    const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
+    if (muted.size > 0) {
+      for (let position = apnsIndexes.length - 1; position >= 0; position--) {
+        const index = apnsIndexes[position]!;
+        const threadId = messages[index]!.data?.threadId;
+        if (typeof threadId === "string" && muted.has(threadId)) {
+          tickets[index] = { status: "ok" };
+          apnsIndexes.splice(position, 1);
+        }
+      }
+    }
 
     if (apnsIndexes.length > 0) {
       await enrichInteractions(apnsIndexes.map((index) => messages[index]!));
@@ -358,6 +384,16 @@ export default async function plugin(bb: BbPluginApi) {
       });
       scheduleReconcile();
       return { ok: true as const };
+    },
+    async mute_list() {
+      return { threadIds: (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [] };
+    },
+    async mute_set(input) {
+      const current = (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [];
+      const rest = current.filter((id) => id !== input.threadId);
+      const threadIds = input.muted ? [...rest, input.threadId].slice(-MAX_MUTED) : rest;
+      await bb.storage.kv.set(MUTED_KEY, threadIds);
+      return { threadIds };
     },
   });
 

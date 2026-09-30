@@ -61,11 +61,28 @@ public struct TimelineRow: Codable, Identifiable, Hashable, Sendable {
     public var command: String?
     public var status: String?
     public var createdAt: Double?
+    public var startedAt: Double?
     public var toolName: String?
     public var path: String?
     public var output: String?
     public var attachments: Attachments?
     public var presentation: Presentation?
+    public var change: FileChange?
+
+    /// An edited file: `diff` is unified-diff hunks, sometimes with `---`/`+++` headers.
+    public struct FileChange: Codable, Hashable, Sendable {
+        public struct Stats: Codable, Hashable, Sendable {
+            public var added: Int
+            public var removed: Int
+        }
+
+        public var path: String?
+        /// `add`, `update`, `delete` or `move`.
+        public var kind: String?
+        public var movePath: String?
+        public var diff: String?
+        public var diffStats: Stats?
+    }
 
     public struct Attachments: Codable, Hashable, Sendable {
         public var imageUrls: [String]?
@@ -103,9 +120,16 @@ public struct TimelinePage: Codable, Sendable {
         public var olderCursor: TimelineCursor?
     }
 
+    /// Only the rows that changed since `afterSequence`, when the server still has that snapshot.
+    public struct Delta: Codable, Sendable {
+        public var upsertRows: [TimelineRow]
+        public var rowOrder: [String]?
+    }
+
     public var rows: [TimelineRow]
     public var maxSeq: Int?
     public var timelinePage: PageInfo?
+    public var delta: Delta?
     public var activeThinking: Thinking?
     public var pendingTodos: Todos?
     public var goal: Goal?

@@ -8,6 +8,8 @@ final class ThreadModel: ObservableObject {
     /// False until the first page arrives from the cache or the server.
     @Published var loaded = false
     @Published var hasOlder = false
+    /// Loading every earlier page, for find in thread.
+    @Published var loadingAll = false
     @Published var error: String?
     @Published var sending = false
     @Published var interactions: [PendingInteraction] = []
@@ -15,6 +17,8 @@ final class ThreadModel: ObservableObject {
     @Published var queued: [QueuedMessage] = []
     /// Bumped on each successful send or answer, for haptics.
     @Published var confirmations = 0
+    /// The first row that arrived since the reader last looked, for the "New" divider.
+    @Published var unreadFrom: String?
 
     /// What BB shows above the composer: todos, goal, plan mode, background work, model fallback.
     struct Shelf: Equatable {
@@ -66,7 +70,12 @@ final class ThreadModel: ObservableObject {
     private var loadingOlder = false
     private var listener: UUID?
     private var refreshTask: Task<Void, Never>?
-    private var refreshAgain = false
+    /// Change kinds waiting for the next refresh; nil refreshes everything.
+    private var pending: Set<String>? = []
+    /// What the newest page was built from: its `maxSeq`, for asking only for what
+    /// changed since, and its first row, where that page starts in `rows`.
+    private var maxSeq: Int?
+    private var windowStart: String?
     private weak var app: AppModel?
 
     init(threadId: String) {
@@ -79,10 +88,10 @@ final class ThreadModel: ObservableObject {
         listener = app.realtime.listen { [weak self] event in
             guard let self else { return }
             switch event {
-            case .changed(let entity, let id, _) where entity == "thread" && id == self.threadId:
-                self.scheduleRefresh()
+            case .changed(let entity, let id, let changes) where entity == "thread" && id == self.threadId:
+                self.scheduleRefresh(changes.isEmpty ? nil : Set(changes))
             case .connected:
-                self.scheduleRefresh()
+                self.scheduleRefresh(nil)
             default:
                 break
             }
@@ -116,12 +125,16 @@ final class ThreadModel: ObservableObject {
         do {
             async let thread = client.thread(threadId)
             let page = try await client.timeline(threadId)
+            let fresh = try await thread
             rows = page.rows
             loaded = true
+            unreadFrom = Self.firstUnread(in: page.rows, thread: fresh)
             shelf = Shelf(page)
             olderCursor = page.timelinePage?.olderCursor
             hasOlder = page.timelinePage?.hasOlderRows ?? false
-            self.thread = try await thread
+            maxSeq = page.maxSeq
+            windowStart = page.rows.first?.id
+            self.thread = fresh
             error = nil
             cache()
             await loadInteractions()
@@ -134,43 +147,110 @@ final class ThreadModel: ObservableObject {
         }
     }
 
-    /// Streaming output arrives as a burst of change signals; refetch the latest window at most every ~300ms.
-    private func scheduleRefresh() {
-        refreshAgain = true
+    /// BB web's rule: after the last read, the first row the reader didn't write.
+    private static func firstUnread(in rows: [TimelineRow], thread: ThreadEntry) -> String? {
+        guard let lastRead = thread.lastReadAt, thread.isUnread else { return nil }
+        return rows.first { ($0.startedAt ?? $0.createdAt ?? 0) > lastRead && !$0.isUser }?.id
+    }
+
+    /// Streaming output arrives as a burst of change signals; coalesce them into
+    /// at most one refresh every ~150ms.
+    private func scheduleRefresh(_ changes: Set<String>?) {
+        if let changes, let known = pending { pending = known.union(changes) } else { pending = nil }
         guard refreshTask == nil else { return }
         refreshTask = Task {
-            while refreshAgain {
-                refreshAgain = false
-                try? await Task.sleep(for: .milliseconds(300))
-                await refreshLatest()
+            while pending?.isEmpty != true {
+                try? await Task.sleep(for: .milliseconds(150))
+                let changes = pending
+                pending = []
+                await refresh(changes)
             }
             refreshTask = nil
         }
     }
 
-    /// Replaces the newest window and keeps any older pages already loaded above it.
+    /// Refetches everything the next turn could have touched.
     func refreshLatest() async {
+        await refresh(nil)
+    }
+
+    /// Fetches only what `changes` could have touched. Marking the thread read
+    /// comes back as `read-state-changed`, which on its own needs nothing.
+    private func refresh(_ changes: Set<String>?) async {
         guard let client else { return }
+        func touched(_ kinds: String...) -> Bool { changes.map { !$0.isDisjoint(with: kinds) } ?? true }
+        if changes?.contains("history-rewritten") == true { maxSeq = nil }
         do {
-            async let thread = client.thread(threadId)
-            let page = try await client.timeline(threadId)
-            shelf = Shelf(page)
-            if let first = page.rows.first, let index = rows.firstIndex(where: { $0.id == first.id }) {
-                rows = Array(rows[..<index]) + page.rows
-            } else {
-                rows = page.rows
-                olderCursor = page.timelinePage?.olderCursor
-                hasOlder = page.timelinePage?.hasOlderRows ?? false
+            let wantsThread = touched("status-changed", "title-changed", "archived-changed", "pin-state-changed")
+            async let thread = wantsThread ? client.thread(threadId) : nil
+            var grew = false
+            if touched("events-appended", "history-rewritten", "status-changed") {
+                grew = try await refreshTimeline(client)
             }
-            self.thread = try await thread
+            if let thread = try await thread { self.thread = thread }
             error = nil
-            cache()
-            await loadInteractions()
-            try? await client.markRead(threadId)
+            if touched("interactions-changed", "queue-changed", "status-changed") { await loadInteractions() }
+            if grew {
+                cache()
+                try? await client.markRead(threadId)
+            }
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
+    }
+
+    /// Updates the newest page, as a delta when BB still has the last one. Whether rows changed.
+    private func refreshTimeline(_ client: BBClient) async throws -> Bool {
+        let page = try await client.timeline(threadId, after: maxSeq)
+        shelf = Shelf(page)
+        if let delta = page.delta {
+            guard let window = applying(delta) else {
+                // Rows out of step with BB's; start over from a full page.
+                maxSeq = nil
+                return try await refreshTimeline(client)
+            }
+            maxSeq = page.maxSeq
+            return replaceLatest(with: window)
+        }
+        maxSeq = page.maxSeq
+        if let first = page.rows.first, rows.contains(where: { $0.id == first.id }) {
+            return replaceLatest(with: page.rows)
+        }
+        rows = page.rows
+        windowStart = page.rows.first?.id
+        olderCursor = page.timelinePage?.olderCursor
+        hasOlder = page.timelinePage?.hasOlderRows ?? false
+        return true
+    }
+
+    /// The newest page with `delta` applied, or nil when a row it names is missing.
+    private func applying(_ delta: TimelinePage.Delta) -> [TimelineRow]? {
+        let start = windowStart.flatMap { id in rows.firstIndex { $0.id == id } } ?? rows.startIndex
+        var window = Array(rows[start...])
+        if let order = delta.rowOrder {
+            var known = Dictionary(rows.map { ($0.id, $0) }, uniquingKeysWith: { $1 })
+            for row in delta.upsertRows { known[row.id] = row }
+            window = order.compactMap { known[$0] }
+            guard window.count == order.count else { return nil }
+        } else {
+            for row in delta.upsertRows {
+                if let index = window.firstIndex(where: { $0.id == row.id }) { window[index] = row } else { window.append(row) }
+            }
+        }
+        // It has to start on a row already here, to know where the older pages end.
+        guard let first = window.first, rows.contains(where: { $0.id == first.id }) else { return nil }
+        return window
+    }
+
+    /// Swaps in the newest page and keeps the older pages above it. Whether anything changed.
+    private func replaceLatest(with window: [TimelineRow]) -> Bool {
+        guard let first = window.first, let index = rows.firstIndex(where: { $0.id == first.id }) else { return false }
+        windowStart = first.id
+        let updated = Array(rows[..<index]) + window
+        guard updated != rows else { return false }
+        rows = updated
+        return true
     }
 
     /// `GET /threads/:id` has no pending-interaction flag, so ask every time.
@@ -230,21 +310,38 @@ final class ThreadModel: ObservableObject {
         return false
     }
 
-    func send(_ text: String, attachments: [PendingAttachment] = []) async -> Bool {
+    /// The whole thread, so find in thread sees every message.
+    func loadAll() async {
+        guard hasOlder, !loadingAll else { return }
+        loadingAll = true
+        defer { loadingAll = false }
+        while hasOlder, !Task.isCancelled {
+            if await !loadOlder() {
+                // Another load is in flight; wait for it rather than give up.
+                guard loadingOlder else { return }
+                try? await Task.sleep(for: .milliseconds(200))
+            }
+        }
+    }
+
+    func send(_ text: String, mentions: [Mention] = [], attachments: [PendingAttachment] = []) async -> Bool {
         guard let client else { return false }
         sending = true
         defer { sending = false }
         do {
             if attachments.isEmpty {
-                try await client.send(threadId, text: text)
+                try await client.send(threadId, text: text, mentions: mentions)
             } else {
                 let projectId: String
                 if let known = thread?.projectId { projectId = known } else { projectId = try await client.thread(threadId).projectId }
                 let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: client)
-                try await client.send(threadId, text: text, attachments: inputs)
+                try await client.send(threadId, text: text, attachments: inputs, mentions: mentions)
             }
             confirmations += 1
             await refreshLatest()
+            return true
+        } catch where BBClient.neverArrived(error) && attachments.isEmpty {
+            Outbox.shared.add(threadId: threadId, text: text, mentions: mentions)
             return true
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -272,6 +369,13 @@ enum TimelineItem: Identifiable {
         switch self {
         case .message(let row): row.id
         case .activity(let rows): "activity:\(rows.first?.id ?? "")"
+        }
+    }
+
+    var rows: [TimelineRow] {
+        switch self {
+        case .message(let row): [row]
+        case .activity(let rows): rows
         }
     }
 

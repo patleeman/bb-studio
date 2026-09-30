@@ -29,6 +29,16 @@ extension BBClient {
     public static func isUnreachable(_ error: Error) -> Bool {
         (error as? URLError).map { $0.code != .cancelled } ?? false
     }
+
+    /// The request never left the phone or never reached BB, so sending again can't duplicate it.
+    /// Timeouts and dropped connections don't count: BB may have acted before the reply was lost.
+    public static func neverArrived(_ error: Error) -> Bool {
+        guard let code = (error as? URLError)?.code else { return false }
+        return [
+            .notConnectedToInternet, .cannotConnectToHost, .cannotFindHost, .dnsLookupFailed, .dataNotAllowed,
+            .internationalRoamingOff, .callIsActive,
+        ].contains(code)
+    }
 }
 
 /// Talks to a BB server over its public API. BB has no client auth: over
@@ -172,10 +182,13 @@ extension BBClient {
         try await get("/api/v1/projects")
     }
 
-    public func timeline(_ threadId: String, before cursor: TimelineCursor? = nil, segments: Int = 8) async throws
-        -> TimelinePage
+    /// `after` asks for a delta against the page that had that `maxSeq`; the server
+    /// answers with a full page when it no longer has it.
+    public func timeline(_ threadId: String, before cursor: TimelineCursor? = nil, after: Int? = nil, segments: Int = 8)
+        async throws -> TimelinePage
     {
         var path = "/api/v1/threads/\(threadId)/timeline?segmentLimit=\(segments)"
+        if let after { path += "&afterSequence=\(after)" }
         if let cursor {
             let anchor = cursor.anchorId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor.anchorId
             path += "&beforeAnchorSeq=\(cursor.anchorSeq)&beforeAnchorId=\(anchor)"
@@ -184,10 +197,8 @@ extension BBClient {
     }
 
     @discardableResult
-    public func send(_ threadId: String, text: String) async throws -> SendResult {
-        try await post(
-            "/api/v1/threads/\(threadId)/send",
-            ["input": [["type": "text", "text": .string(text), "mentions": []]], "mode": "queue-if-active"])
+    public func send(_ threadId: String, text: String, mentions: [Mention] = []) async throws -> SendResult {
+        try await send(threadId, text: text, attachments: [], mentions: mentions)
     }
 
     /// The newest assistant message in a thread.
@@ -271,14 +282,19 @@ extension BBClient {
     }
 
     @discardableResult
-    public func send(_ threadId: String, text: String, attachments: [JSONValue]) async throws -> SendResult {
+    public func send(_ threadId: String, text: String, attachments: [JSONValue], mentions: [Mention] = []) async throws
+        -> SendResult
+    {
         try await post(
-            "/api/v1/threads/\(threadId)/send", ["input": Self.input(text, attachments), "mode": "queue-if-active"])
+            "/api/v1/threads/\(threadId)/send",
+            ["input": Self.input(text, attachments, mentions), "mode": "queue-if-active"])
     }
 
-    private static func input(_ text: String, _ attachments: [JSONValue]) -> JSONValue {
+    private static func input(_ text: String, _ attachments: [JSONValue], _ mentions: [Mention] = []) -> JSONValue {
         var input = attachments
-        if !text.isEmpty { input.append(["type": "text", "text": .string(text), "mentions": []]) }
+        if !text.isEmpty {
+            input.append(["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))])
+        }
         return .array(input)
     }
 

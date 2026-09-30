@@ -10,7 +10,18 @@ view (the Web tab, and the safari button on every thread).
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
 | New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app) | `iOS/Inbox/NewThreadView.swift` |
-| Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. The ⋯ menu has Voice chat, Open in BB web, and Share link | `iOS/Thread/ThreadView.swift` |
+| Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. The ⋯ menu has Voice chat, Find in thread, Model & reasoning, Mute notifications, Open in BB web, and Share link | `iOS/Thread/ThreadView.swift` |
+| Live updates fetch only what changed: new rows since the last sequence, and the thread or its approvals only when those changed | `iOS/Thread/ThreadModel.swift` |
+| A red "New" line where you left off; the thread opens there when there's something unread | `iOS/Thread/ThreadView.swift` |
+| Find in thread: searches every message, with a match count and up/down to step through them | `iOS/Thread/FindBar.swift` |
+| Drafts are kept per thread, and Home marks threads that have one | `iOS/Thread/Drafts.swift` |
+| `@` suggests threads, bots, channels, DMs, and recordings, and sends them as real BB mentions | `iOS/Thread/MentionSuggestions.swift`, `Shared/Mentions.swift` |
+| The composer grows with the message, then offers a full-screen editor | `iOS/Thread/ThreadView.swift` |
+| Change a thread's model and reasoning level for its next turns | `iOS/Thread/ExecutionSheet.swift` |
+| File edits show `+N −M` and open to a red/green diff | `iOS/Thread/DiffView.swift` |
+| Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
+| Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
+| Read BB Pages: the list, and each page's text, tables, callouts, stats, charts, and embeds | `iOS/Pages/` |
 | Markdown in replies and your own messages: headings, nested and task lists, quotes, tables, code blocks with Copy, and `@thread` mentions that show the thread's title and open it. Long messages of yours fold at 15 lines with Show more, as in BB web | `iOS/Thread/Markdown.swift`, `iOS/Thread/Messages.swift` |
 | Image attachments in a thread show three to a row; tap one to view it full size | `iOS/Thread/Messages.swift` |
 | Emoji reactions from `::reactions{items="…"}`: tapping a chip drafts the reply (it doesn't send), as in BB web. Long-press any reply for Agree, Disagree, Do it, and Clarify | `iOS/Thread/Messages.swift` |
@@ -30,9 +41,9 @@ view (the Web tab, and the safari button on every thread).
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbgo://thread/<id>`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
+| URL scheme `bbgo://thread/<id>`, `page/<id>`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `plugin/live.ts` |
-| iPad: sidebar tabs, and a split view with the inbox beside the thread | `iOS/App/RootView.swift` |
+| iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |
 | Watch app: inbox, last messages, dictated or quick replies, and answering approvals and questions (relayed through the phone) | `Watch/` |
 | Watch complication: needs-you and running counts | `WatchWidgets/` |
