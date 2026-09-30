@@ -4,7 +4,17 @@ import SwiftUI
 /// so this reads and writes through its RPC rather than core threads.
 struct ChannelView: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
     let room: Room
+    /// The channel as last loaded, with its members and settings.
+    @State private var current: Room?
+    @State private var bots: [Bot] = []
+    @State private var runs: [RoomRun] = []
+    @State private var activeJobs: [RoomJob] = []
+    @State private var busy = false
+    @State private var stopping = false
+    @State private var retrying: String?
+    @State private var showingDetails = false
     @State private var name: String?
     @State private var renaming = false
     @State private var newName = ""
@@ -18,6 +28,72 @@ struct ChannelView: View {
     @State private var approvals: [PendingInteraction] = []
 
     var body: some View {
+        transcript
+        .defaultScrollAnchor(.bottom)
+        .scrollDismissesKeyboard(.interactively)
+        .safeAreaInset(edge: .bottom) { composer }
+        .overlay(alignment: .top) {
+            if let error { Text(error).font(.caption).padding(8).background(.red.opacity(0.15), in: .capsule) }
+        }
+        .sheet(isPresented: $dictating) {
+            DictationView(threadId: nil, autoStart: true) { text in draft += (draft.isEmpty ? "" : " ") + text }
+        }
+        .navigationTitle("#\(name ?? room.name)")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button { showingDetails = true } label: { Label("Members & Settings", systemImage: "person.2") }
+                    Button {
+                        newName = name ?? room.name
+                        renaming = true
+                    } label: { Label("Rename channel", systemImage: "pencil") }
+                    Button { showingAutomations = true } label: { Label("Automations", systemImage: "clock.arrow.circlepath") }
+                } label: { Image(systemName: "ellipsis") }
+                .accessibilityLabel("More")
+            }
+        }
+        .sheet(isPresented: $showingAutomations) { ChannelAutomationsSheet(room: room) }
+        .sheet(isPresented: $showingDetails) {
+            ChannelDetailsSheet(room: current ?? room, bots: bots) { updated in
+                if let updated {
+                    current = updated
+                    name = updated.name
+                    if updated.archived == true { dismiss() }
+                } else {
+                    dismiss()
+                }
+            }
+        }
+        .alert("Rename channel", isPresented: $renaming) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let next = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !next.isEmpty, next != (name ?? room.name) else { return }
+                Task {
+                    do {
+                        name = try await app.client.renameRoom(room.id, name: next).name
+                    } catch {
+                        self.error = error.localizedDescription
+                    }
+                }
+            }
+        }
+        .task {
+            listener = app.realtime.listen { event in
+                if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" {
+                    Task { await load() }
+                }
+            }
+            await load()
+            bots = (try? await app.client.botTeams().bots) ?? bots
+        }
+        .onDisappear { if let listener { app.realtime.removeListener(listener) } }
+    }
+
+    private var transcript: some View {
         ScrollView {
             LazyVStack(alignment: .leading, spacing: 14) {
                 ForEach(messages) { message in
@@ -26,8 +102,12 @@ struct ChannelView: View {
                             .font(.caption.weight(.semibold))
                             .foregroundStyle(message.isOwner ? Color.accentColor : .secondary)
                         MarkdownText(message.text).textSelection(.enabled)
+                        if let run = failedRouting[message.id] { routingFailure(run) }
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                ForEach(runs.filter { $0.routing == "error" && !messages.map(\.id).contains($0.id) }) { run in
+                    routingFailure(run)
                 }
                 ForEach(approvals) { interaction in
                     InteractionCard(
@@ -51,12 +131,14 @@ struct ChannelView: View {
             }
             .padding()
         }
-        .defaultScrollAnchor(.bottom)
-        .scrollDismissesKeyboard(.interactively)
-        .safeAreaInset(edge: .bottom) {
+    }
+
+    private var composer: some View {
+        VStack(spacing: 0) {
+            if busy { workingBar }
             HStack(alignment: .bottom, spacing: 8) {
                 Button { dictating = true } label: { Image(systemName: "mic.fill").font(.title3) }
-                TextField("Message #\(room.name)", text: $draft, axis: .vertical)
+                TextField("Message #\(name ?? room.name)", text: $draft, axis: .vertical)
                     .lineLimit(1...6)
                     .padding(.horizontal, 12)
                     .padding(.vertical, 8)
@@ -76,60 +158,96 @@ struct ChannelView: View {
             }
             .padding(.horizontal)
             .padding(.vertical, 8)
-            .background(.bar)
         }
-        .overlay(alignment: .top) {
-            if let error { Text(error).font(.caption).padding(8).background(.red.opacity(0.15), in: .capsule) }
-        }
-        .sheet(isPresented: $dictating) {
-            DictationView(threadId: nil, autoStart: true) { text in draft += (draft.isEmpty ? "" : " ") + text }
-        }
-        .navigationTitle("#\(name ?? room.name)")
-        .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button {
-                        newName = name ?? room.name
-                        renaming = true
-                    } label: { Label("Rename channel", systemImage: "pencil") }
-                    Button { showingAutomations = true } label: { Label("Automations", systemImage: "clock.arrow.circlepath") }
-                } label: { Image(systemName: "ellipsis") }
-                .accessibilityLabel("More")
-            }
-        }
-        .sheet(isPresented: $showingAutomations) { ChannelAutomationsSheet(room: room) }
-        .alert("Rename channel", isPresented: $renaming) {
-            TextField("Name", text: $newName)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") {
-                let next = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !next.isEmpty, next != (name ?? room.name) else { return }
+        .background(.bar)
+    }
+
+    /// Messages whose routing failed, by message id.
+    private var failedRouting: [String: RoomRun] {
+        Dictionary(runs.filter { $0.routing == "error" }.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
+    }
+
+    /// Nobody was picked to answer: the routing model failed. Retry routes the message again.
+    private func routingFailure(_ run: RoomRun) -> some View {
+        HStack(alignment: .firstTextBaseline, spacing: 8) {
+            Label(run.routingError ?? "Couldn't choose which bots answer.", systemImage: "exclamationmark.triangle.fill")
+                .font(.caption)
+                .foregroundStyle(.red)
+            Spacer(minLength: 0)
+            Button {
                 Task {
+                    retrying = run.id
                     do {
-                        name = try await app.client.renameRoom(room.id, name: next).name
+                        try await app.client.retryRouting(room.id, message: run.id)
+                        await load()
                     } catch {
-                        self.error = error.localizedDescription
+                        self.error = BBClient.describe(error, server: app.client.baseURL)
                     }
+                    retrying = nil
                 }
+            } label: {
+                if retrying == run.id { ProgressView() } else { Text("Retry Routing") }
             }
+            .font(.caption.weight(.semibold))
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(retrying != nil)
         }
-        .task {
-            listener = app.realtime.listen { event in
-                if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" {
-                    Task { await load() }
+    }
+
+    /// Who's working, and Stop to cancel all of it.
+    private var workingBar: some View {
+        HStack(spacing: 8) {
+            ProgressView().controlSize(.small)
+            Text(workingText)
+                .font(.footnote)
+                .foregroundStyle(.secondary)
+                .lineLimit(1)
+            Spacer(minLength: 0)
+            Button(role: .destructive) {
+                Task {
+                    stopping = true
+                    do {
+                        try await app.client.stopRoom(room.id)
+                        await load()
+                    } catch {
+                        self.error = BBClient.describe(error, server: app.client.baseURL)
+                    }
+                    stopping = false
                 }
+            } label: {
+                Label("Stop", systemImage: "stop.fill")
             }
-            await load()
+            .font(.footnote.weight(.semibold))
+            .buttonStyle(.bordered)
+            .controlSize(.small)
+            .disabled(stopping)
         }
-        .onDisappear { if let listener { app.realtime.removeListener(listener) } }
+        .padding(.horizontal)
+        .padding(.top, 8)
+    }
+
+    private var workingText: String {
+        let names = Array(Set(activeJobs.map { job in bots.first { $0.id == job.botId }?.name ?? "A bot" })).sorted()
+        switch names.count {
+        case 0: return "Choosing who answers…"
+        case 1: return "\(names[0]) is working…"
+        case 2: return "\(names[0]) and \(names[1]) are working…"
+        default: return "\(names.count) bots are working…"
+        }
     }
 
     private func load() async {
         do {
             let page = try await app.client.room(room.id)
             messages = page.messages
+            if let room = page.room {
+                current = room
+                name = room.name
+            }
+            runs = page.runs ?? []
+            activeJobs = page.activeJobs
+            busy = page.busy
             error = nil
             let wanted = Set((page.approvals ?? []).map(\.id))
             var pending: [PendingInteraction] = []

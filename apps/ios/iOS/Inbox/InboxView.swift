@@ -257,6 +257,7 @@ struct InboxView: View {
     @State private var query = ""
     @State private var renaming: ThreadEntry?
     @State private var renamingRoom: Room?
+    @State private var creatingChannel = false
     /// A direct message's thread id.
     @State private var renamingDirect: String?
     @State private var deleting: ThreadEntry?
@@ -282,7 +283,7 @@ struct InboxView: View {
                 if query.isEmpty {
                     collapsible("tools", "Tools") { tools }
                 }
-                if query.isEmpty, !model.channels.isEmpty {
+                if query.isEmpty, model.botTeams != nil {
                     collapsible("channels", "Channels") {
                         ForEach(model.channels) { room in
                             NavigationLink(value: Route.room(room)) {
@@ -297,6 +298,10 @@ struct InboxView: View {
                                 } label: { Label("Rename", systemImage: "pencil") }
                             }
                         }
+                        Button { creatingChannel = true } label: {
+                            Label("New Channel", systemImage: "plus")
+                        }
+                        .foregroundStyle(.secondary)
                     }
                 }
                 if query.isEmpty, !model.directMessages.isEmpty {
@@ -337,6 +342,12 @@ struct InboxView: View {
                         try await app.client.rename(thread.id, title: title.isEmpty ? nil : title)
                     }
                 }
+            }
+        }
+        .sheet(isPresented: $creatingChannel) {
+            NewChannelSheet { room in
+                Task { await model.load(app.client) }
+                app.push(.room(room))
             }
         }
         .alert("Rename channel", isPresented: Binding(get: { renamingRoom != nil }, set: { if !$0 { renamingRoom = nil } })) {
@@ -386,7 +397,17 @@ struct InboxView: View {
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { app.startDictation() } label: { Image(systemName: "mic") }
-                Button { app.newThread() } label: { Image(systemName: "square.and.pencil") }
+                Menu {
+                    Button { app.newThread() } label: { Label("New Thread", systemImage: "square.and.pencil") }
+                    if model.botTeams != nil {
+                        Button { creatingChannel = true } label: { Label("New Channel", systemImage: "number") }
+                    }
+                } label: {
+                    Image(systemName: "square.and.pencil")
+                } primaryAction: {
+                    app.newThread()
+                }
+                .accessibilityLabel("New Thread")
             }
         }
         .sheet(

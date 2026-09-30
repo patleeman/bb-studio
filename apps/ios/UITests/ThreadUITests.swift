@@ -700,6 +700,67 @@ final class ThreadUITests: XCTestCase {
         }
     }
 
+    /// Makes a scratch channel from Home, changes its mode, permissions and members,
+    /// then deletes it. No message is sent, so no bot runs. The mode goes Smart and
+    /// back to Everyone, the remembered default, so that setting ends where it was.
+    func testChannelManagement() throws {
+        let name = "QA channel \(Int(Date().timeIntervalSince1970))"
+        func channel() -> [String: Any]? {
+            (rpc("bot-teams", "list", NSNull())?["rooms"] as? [[String: Any]])?.first { $0["name"] as? String == name }
+        }
+        addTeardownBlock {
+            if let id = channel()?["id"] as? String { _ = self.rpc("bot-teams", "deleteRoom", ["id": id]) }
+        }
+        let bots = (rpc("bot-teams", "list", NSNull())?["bots"] as? [[String: Any]]) ?? []
+        let bot = try XCTUnwrap(bots.first { $0["retired"] as? Bool != true }?["name"] as? String)
+        app.buttons["New Channel"].firstMatch.tap()
+        let field = app.textFields["channelNameField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "new channel sheet")
+        field.typeText(name)
+        shot("channel-new")
+        app.navigationBars["New Channel"].buttons["Create"].tap()
+        XCTAssertTrue(app.navigationBars["#\(name)"].waitForExistence(timeout: 10), "opened the channel")
+        XCTAssertFalse(app.buttons["Stop"].exists, "nothing to stop")
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Members & Settings"].tap()
+        let mode = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Mode'")).firstMatch
+        XCTAssertTrue(mode.waitForExistence(timeout: 5), "details")
+        mode.tap()
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Smart'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["A coordinator picks collaborators, work order, and busy-bot actions"].waitForExistence(timeout: 5), "smart")
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Permissions'")).firstMatch.tap()
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Auto'")).firstMatch.tap()
+        let member = app.buttons.containing(NSPredicate(format: "label BEGINSWITH %@", bot)).firstMatch
+        XCTAssertTrue(member.waitForExistence(timeout: 5), "members")
+        member.tap()
+        let joined = NSPredicate { _, _ in (channel()?["memberIds"] as? [String])?.count == 1 }
+        wait(for: [expectation(for: joined, evaluatedWith: nil)], timeout: 10)
+        shot("channel-details")
+        var room = try XCTUnwrap(channel())
+        XCTAssertEqual(room["responseBehavior"] as? String, "smart")
+        XCTAssertEqual(room["permissionMode"] as? String, "auto")
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Mode'")).firstMatch.tap()
+        app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Everyone'")).firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["Every bot in the channel can answer"].waitForExistence(timeout: 5), "everyone")
+        app.buttons["Done"].tap()
+        XCTAssertTrue(app.staticTexts["\(bot) joined the channel."].waitForExistence(timeout: 10), "join message")
+        shot("channel-joined")
+        room = try XCTUnwrap(channel())
+        XCTAssertEqual(room["responseBehavior"] as? String, "everyone")
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Members & Settings"].tap()
+        let delete = app.buttons["Delete Channel"].firstMatch
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Mode'")).firstMatch.waitForExistence(timeout: 5))
+        for _ in 0..<6 where !delete.isHittable { app.swipeUp() }
+        delete.tap()
+        // The confirmation's button, not the form's.
+        let deletes = app.buttons.matching(NSPredicate(format: "label == 'Delete Channel'"))
+        XCTAssertTrue(deletes.element(boundBy: 1).waitForExistence(timeout: 5), "confirmation")
+        deletes.element(boundBy: deletes.count - 1).tap()
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10), "back home")
+        XCTAssertNil(channel(), "deleted")
+    }
+
     /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
     func testSaveToStudio() throws {
         let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))
