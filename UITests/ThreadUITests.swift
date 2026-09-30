@@ -344,6 +344,24 @@ final class ThreadUITests: XCTestCase {
         shot("queue-removed")
     }
 
+    /// Rewrites the first queued message. Only runs against a scratch thread
+    /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
+    func testQueueEdit() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        let card = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Hello'")).firstMatch
+        XCTAssertTrue(card.waitForExistence(timeout: 10), "queued card")
+        card.tap()
+        let editor = app.textViews["queuedMessageEditor"]
+        XCTAssertTrue(editor.waitForExistence(timeout: 5), "editor")
+        editor.typeText(" today")
+        shot("queue-edit")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'this today'")).firstMatch.waitForExistence(timeout: 10),
+            "edited text on the card")
+        shot("queue-edited")
+    }
+
     func testShelfDemo() {
         app.terminate()
         app.launchArguments = ["-qaShelfDemo"]

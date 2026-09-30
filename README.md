@@ -23,7 +23,7 @@ view (the Web tab, and the safari button on every thread).
 | Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
 | Read BB Pages: the list, and each page's text, tables, callouts, stats, charts, and embeds | `iOS/Pages/` |
 | Automations: every schedule by project, next and last run, recent runs with output or their thread, run now, pause and resume | `iOS/Tools/AutomationsView.swift` |
-| Queue: every unsent message across threads, including drafts, scheduled sends, automatic retries, and waits on a busy thread, offline host or plugin (with Smart Queue's reason). Send now or cancel | `iOS/Tools/QueueView.swift` |
+| Queue: every unsent message across threads, including drafts, scheduled sends, automatic retries, and waits on a busy thread, offline host or plugin (with Smart Queue's reason). Send now, edit or cancel | `iOS/Tools/QueueView.swift` |
 | Drafts: long-press Send, then Save as Draft to park a message on the thread until you send it | `Shared/PluginExtras.swift` |
 | Attention: what bots flagged across channels (decisions, blockers, updates). Open, Snoozed and Done; swipe to mark done or snooze, or open the channel. Home shows open attention and approval counts per channel | `iOS/Tools/AttentionView.swift` |
 | Channel approvals: bots' pending tool approvals and questions show in their channel and are answered there | `iOS/Inbox/ChannelView.swift` |
@@ -42,7 +42,8 @@ view (the Web tab, and the safari button on every thread).
 | Emoji reactions from `::reactions{items="…"}`: tapping a chip drafts the reply (it doesn't send), as in BB web. Long-press any reply for Agree, Disagree, Do it, and Clarify | `iOS/Thread/Messages.swift` |
 | Long-press a message: Copy, Select Text, Quote, Share | `iOS/Thread/Messages.swift` |
 | Tool activity collapses into one row per run ("3 commands, 2 edits"). Tap for each step and its output | `iOS/Thread/Messages.swift` |
-| The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (send now, remove) | `iOS/Thread/ThreadShelf.swift` |
+| Edit a queued message or draft before it sends. Attachments stay, @-mentions stay while their text does, and the edit is refused if the message sent or changed meanwhile | `iOS/Tools/QueuedMessageEditor.swift`, `BBClient.editQueued` |
+| The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (tap to edit, send now, remove) | `iOS/Thread/ThreadShelf.swift` |
 | Paste text or images into the composer. Images become attachments | `iOS/Thread/Composer.swift` |
 | Answer approvals (command, file, permission, plan) and questions in the thread, including the ask-user-question plugin's multi-question forms and secret requests (values go straight to the server and aren't kept). Other plugin forms open the web app | `iOS/Thread/InteractionCard.swift`, `Shared/Interactions.swift` |
 | Attachments from photos, the camera, or files (JPEG re-encoded, 35 MB limit) | `iOS/Thread/Attachments.swift` |

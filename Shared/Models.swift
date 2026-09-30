@@ -29,6 +29,7 @@ public struct ThreadEntry: Codable, Identifiable, Hashable, Sendable {
     public var environmentBranchName: String?
     public var environmentPath: String?
     public var environmentId: String?
+    public var queuedMessageCount: Int?
     public var runtime: Runtime?
 
     public var displayTitle: String {
@@ -42,7 +43,11 @@ public struct ThreadEntry: Codable, Identifiable, Hashable, Sendable {
         return (lastReadAt ?? 0) < latestAttentionAt
     }
 
-    public var isRunning: Bool { ["pending", "starting", "active", "stopping"].contains(status) }
+    public var isRunning: Bool {
+        // Pending with nothing set up and a message queued: it's waiting on a scheduled first send.
+        if status == "pending", environmentId == nil, (queuedMessageCount ?? 0) > 0 { return false }
+        return ["pending", "starting", "active", "stopping"].contains(status)
+    }
     public var needsAttention: Bool { hasPendingInteraction == true || status == "error" }
 
     public var projectName: String? {

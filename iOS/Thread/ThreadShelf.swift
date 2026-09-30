@@ -4,7 +4,9 @@ import SwiftUI
 /// background work, todos and queued messages. Each shows only when it applies.
 struct ThreadShelf: View {
     @ObservedObject var model: ThreadModel
+    @EnvironmentObject private var app: AppModel
     @AppStorage("dismissedFallbacks") private var dismissedFallbacks = ""
+    @State private var editing: QueuedMessage?
 
     var body: some View {
         let shelf = model.shelf
@@ -55,11 +57,18 @@ struct ThreadShelf: View {
             }
             ForEach(model.queued) { message in
                 ShelfCard(icon: message.isRetry ? "arrow.clockwise" : message.isDraft ? "doc.text" : "clock", tint: .secondary) {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(message.text.isEmpty ? "Attachment" : message.text).lineLimit(2)
-                        Text(message.attachmentCount > 0 ? "\(message.status) · \(message.attachmentCount) attachment\(message.attachmentCount == 1 ? "" : "s")" : message.status)
-                            .font(.caption2).foregroundStyle(.secondary)
+                    Button {
+                        if message.editable != false { editing = message }
+                    } label: {
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(message.text.isEmpty ? "Attachment" : message.text).lineLimit(2)
+                            Text(message.attachmentCount > 0 ? "\(message.status) · \(message.attachmentCount) attachment\(message.attachmentCount == 1 ? "" : "s")" : message.status)
+                                .font(.caption2).foregroundStyle(.secondary)
+                        }
+                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .contentShape(.rect)
                     }
+                    .accessibilityHint(message.editable != false ? "Edits the message" : "")
                 } trailing: {
                     HStack(spacing: 2) {
                         Button {
@@ -73,10 +82,27 @@ struct ThreadShelf: View {
                         }
                     }
                 }
+                .contextMenu {
+                    if message.editable != false {
+                        Button { editing = message } label: { Label("Edit", systemImage: "pencil") }
+                    }
+                    Button {
+                        Task { await model.perform { try await $0.sendQueuedNow($1, message.id) } }
+                    } label: { Label("Send Now", systemImage: "arrow.up.circle") }
+                    Button { UIPasteboard.general.string = message.text } label: { Label("Copy", systemImage: "doc.on.doc") }
+                    Button(role: .destructive) {
+                        Task { await model.perform { try await $0.deleteQueued($1, message.id) } }
+                    } label: { Label("Remove", systemImage: "trash") }
+                }
             }
         }
         .animation(.snappy, value: model.shelf)
         .animation(.snappy, value: model.queued)
+        .sheet(item: $editing) { message in
+            QueuedMessageEditor(client: app.client, message: message) {
+                Task { await model.loadInteractions() }
+            }
+        }
     }
 
     private func dismiss(_ label: String, action: @escaping () -> Void) -> some View {

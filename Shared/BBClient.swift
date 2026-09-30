@@ -254,6 +254,52 @@ extension BBClient {
         }
     }
 
+    /// Rewrites a queued message's text. Attachments stay; @-mentions stay
+    /// when their text is still there. Fails if it was sent or changed meanwhile.
+    /// `original` is the text the editor opened with.
+    public func editQueued(_ threadId: String, _ id: String, from original: String, to text: String) async throws {
+        let rows: JSONValue = try await get("/api/v1/threads/\(threadId)/queued-messages")
+        guard let row = rows.arrayValue?.first(where: { $0["id"]?.stringValue == id }),
+            case .number(let updatedAt)? = row["updatedAt"], let content = row["content"]?.arrayValue
+        else { throw BBError(status: 404, message: "That message already sent.") }
+        let current = content.compactMap { $0["type"]?.stringValue == "text" ? $0["text"]?.stringValue : nil }.joined(separator: "\n")
+        guard current == original else { throw BBError(status: 409, message: "That message changed while you were editing it.") }
+
+        // Every old mention's text, in order.
+        var mentions: [(label: String, resource: JSONValue)] = []
+        for item in content where item["type"]?.stringValue == "text" {
+            let itemText = item["text"]?.stringValue ?? ""
+            for mention in item["mentions"]?.arrayValue ?? [] {
+                guard case .number(let start)? = mention["start"], case .number(let end)? = mention["end"],
+                    let resource = mention["resource"], start >= 0, end <= Double(itemText.utf16.count), start < end
+                else { continue }
+                mentions.append((String(decoding: Array(itemText.utf16)[Int(start)..<Int(end)], as: UTF16.self), resource))
+            }
+        }
+        // Keep each mention whose text still appears, in order.
+        var kept: [JSONValue] = [], cursor = text.startIndex
+        for mention in mentions {
+            guard let range = text.range(of: mention.label, range: cursor..<text.endIndex) else { continue }
+            let start = text.utf16.distance(from: text.startIndex, to: range.lowerBound)
+            kept.append(["start": .number(Double(start)), "end": .number(Double(start + mention.label.utf16.count)), "resource": mention.resource])
+            cursor = range.upperBound
+        }
+        let textItem: JSONValue = ["type": "text", "text": .string(text), "mentions": .array(kept)]
+        var input: [JSONValue] = [], placed = false
+        for item in content {
+            if item["type"]?.stringValue == "text" {
+                if !placed, !text.isEmpty { input.append(textItem) }
+                placed = true
+            } else {
+                input.append(item)
+            }
+        }
+        if !placed, !text.isEmpty { input.insert(textItem, at: 0) }
+        guard !input.isEmpty else { throw BBError(status: 400, message: "A queued message can't be empty.") }
+        let _: JSONValue = try await patch("/api/v1/threads/\(threadId)/queued-messages/\(id)",
+            ["expectedUpdatedAt": .number(updatedAt), "input": .array(input)])
+    }
+
     /// Sends a queued message now. `steer` puts it into the running turn;
     /// `auto` waits for the turn to end if one is running.
     public func sendQueuedNow(_ threadId: String, _ id: String, mode: String = "steer") async throws {

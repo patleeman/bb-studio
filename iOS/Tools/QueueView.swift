@@ -8,6 +8,7 @@ struct QueueView: View {
     @State private var loaded = false
     @State private var error: String?
     @State private var done = 0
+    @State private var editing: QueuedMessage?
     private var titles: [String: String] { ThreadTitles.titles }
 
     var body: some View {
@@ -37,6 +38,12 @@ struct QueueView: View {
             }
         }
         .sensoryFeedback(.success, trigger: done)
+        .sheet(item: $editing) { message in
+            QueuedMessageEditor(client: app.client, message: message) {
+                done += 1
+                Task { await load() }
+            }
+        }
     }
 
     @ViewBuilder
@@ -55,6 +62,10 @@ struct QueueView: View {
                             Label(message.isRetry ? "Retry now" : "Send now", systemImage: "arrow.up.circle")
                         }
                         .tint(.accentColor)
+                        if message.editable != false {
+                            Button { editing = message } label: { Label("Edit", systemImage: "pencil") }
+                                .tint(.orange)
+                        }
                     }
                     .swipeActions(edge: .trailing) {
                         Button(role: .destructive) { Task { await act(message) { try await $0.deleteQueued($1, message.id) } } } label: {
@@ -64,6 +75,9 @@ struct QueueView: View {
                     .contextMenu {
                         Button { Task { await act(message) { try await $0.sendQueuedNow($1, message.id, mode: "auto") } } } label: {
                             Label(message.isRetry ? "Retry now" : "Send now", systemImage: "arrow.up.circle")
+                        }
+                        if message.editable != false {
+                            Button { editing = message } label: { Label("Edit", systemImage: "pencil") }
                         }
                         Button { UIPasteboard.general.string = message.text } label: { Label("Copy", systemImage: "doc.on.doc") }
                         Button(role: .destructive) { Task { await act(message) { try await $0.deleteQueued($1, message.id) } } } label: {
