@@ -1,9 +1,10 @@
 /*
  * BB Studio
  *
- * The colors of the Silk S app icon: deep teal-black like the icon's ground,
- * the ribbon's warm coral-to-amber face as the one accent, and its teal back
- * for file paths. Light mode keeps the same pairing on a cool, pale surface.
+ * The colors of the Silk S app icon: the icon's teal ground (a lifted slate in
+ * dark mode, about as bright as Cobalt2), the ribbon's warm coral-to-amber face
+ * as the one accent, and its teal back for file paths. Light mode keeps the
+ * same pairing on a cool, pale surface.
  *
  * The anchors are oklch on purpose: Chrome drops the hue of a dark hex color
  * inside color-mix(in oklch), which tints every derived surface red. Ink and
@@ -41,15 +42,15 @@
 }
 
 .dark {
-  --canvas: oklch(0.192 0.016 218);
+  --canvas: oklch(0.3 0.035 220);
   --ink: oklch(0.945 0.008 210);
-  --sidebar: oklch(0.165 0.015 220);
+  --sidebar: oklch(0.27 0.033 221);
 
   --primary: #ff7a45;
   --primary-foreground: #1a0c07;
-  --muted-foreground: oklch(0.82 0.012 212);
-  --subtle-foreground: oklch(0.76 0.012 213);
-  --readback-foreground: oklch(0.79 0.012 212);
+  --muted-foreground: oklch(0.89 0.012 212);
+  --subtle-foreground: oklch(0.83 0.012 213);
+  --readback-foreground: oklch(0.86 0.012 212);
 
   --destructive: #ff5c7a;
   --destructive-foreground: #1a0c07;
