@@ -8,6 +8,7 @@ struct SettingsView: View {
     @AppStorage(VoiceChatEngine.voiceKey) private var voiceId = ""
     @AppStorage(VoiceChatEngine.rateKey) private var rate = 1.08
     @State private var preview = AVSpeechSynthesizer()
+    @AppStorage("runningPlugins") private var runningPlugins = ""
 
     var body: some View {
         Form {
@@ -24,6 +25,13 @@ struct SettingsView: View {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
             }
             ServerControls()
+            if runningPlugins.split(separator: ",").contains("custom-instructions") {
+                Section("Agents") {
+                    NavigationLink { CustomInstructionsView() } label: {
+                        Label("Custom Instructions", systemImage: "text.quote")
+                    }
+                }
+            }
             Section {
                 Picker("Voice", selection: $voiceId) {
                     Text("Best installed").tag("")

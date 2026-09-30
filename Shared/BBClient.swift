@@ -114,6 +114,10 @@ public final class BBClient: @unchecked Sendable {
         try await request("PATCH", path, body: body)
     }
 
+    public func put<T: Decodable>(_ path: String, _ body: JSONValue) async throws -> T {
+        try await request("PUT", path, body: body)
+    }
+
     private struct RPCEnvelope<T: Decodable>: Decodable {
         var ok: Bool
         var result: T?
@@ -132,6 +136,19 @@ public final class BBClient: @unchecked Sendable {
                 message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
         }
         return result
+    }
+
+    /// For methods whose result can be `null`.
+    public func rpcIfPresent<T: Decodable>(_ pluginId: String, _ method: String, _ input: JSONValue = .null) async throws -> T? {
+        let data = try encoder.encode(input)
+        let (status, responseData) = try await raw(
+            method: "POST", path: "/api/v1/plugins/\(pluginId)/rpc/\(method)", body: data)
+        guard let envelope = try? decoder.decode(RPCEnvelope<T>.self, from: responseData), envelope.ok else {
+            throw BBError(
+                status: status,
+                message: Self.errorMessage(responseData) ?? "\(pluginId).\(method) failed (HTTP \(status))")
+        }
+        return envelope.result
     }
 
     fileprivate static func errorMessage(_ data: Data) -> String? {

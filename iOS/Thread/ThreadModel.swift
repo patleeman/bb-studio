@@ -15,6 +15,8 @@ final class ThreadModel: ObservableObject {
     @Published var interactions: [PendingInteraction] = []
     @Published var shelf = Shelf()
     @Published var queued: [QueuedMessage] = []
+    /// A plan the agent is waiting on you to review in Plannotator.
+    @Published var planReview: PlanReview?
     /// Bumped on each successful send or answer, for haptics.
     @Published var confirmations = 0
     /// The first row that arrived since the reader last looked, for the "New" divider.
@@ -92,6 +94,8 @@ final class ThreadModel: ObservableObject {
                 self.scheduleRefresh(changes.isEmpty ? nil : Set(changes))
             case .connected:
                 self.scheduleRefresh(nil)
+            case .pluginSignal(let pluginId, _, _) where pluginId == "plannotator":
+                Task { await self.loadPlanReview() }
             default:
                 break
             }
@@ -138,6 +142,7 @@ final class ThreadModel: ObservableObject {
             error = nil
             cache()
             await loadInteractions()
+            await loadPlanReview()
             try? await client.markRead(threadId)
             await ThreadTitles.fetchUnknown(in: rows.compactMap(\.text), client: client)
         } catch where BBClient.isCancellation(error) {
@@ -277,7 +282,7 @@ final class ThreadModel: ObservableObject {
     func resolve(_ interaction: PendingInteraction, _ resolution: JSONValue) async -> Bool {
         guard let client else { return false }
         do {
-            try await client.resolve(interaction, resolution)
+            try await client.settle(interaction, resolution)
             interactions.removeAll { $0.id == interaction.id }
             confirmations += 1
             await refreshLatest()
@@ -287,6 +292,17 @@ final class ThreadModel: ObservableObject {
             await loadInteractions()
             return false
         }
+    }
+
+    func cancel(_ interaction: PendingInteraction) async {
+        guard let client else { return }
+        do {
+            try await client.cancel(interaction)
+            interactions.removeAll { $0.id == interaction.id }
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+        }
+        await loadInteractions()
     }
 
     /// Whether rows were added.
@@ -342,6 +358,31 @@ final class ThreadModel: ObservableObject {
             return true
         } catch where BBClient.neverArrived(error) && attachments.isEmpty {
             Outbox.shared.add(threadId: threadId, text: text, mentions: mentions)
+            return true
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return false
+        }
+    }
+
+    func loadPlanReview() async {
+        guard let client,
+              (UserDefaults.standard.string(forKey: "runningPlugins") ?? "").split(separator: ",").contains("plannotator")
+        else { return }
+        if let review = try? await client.activePlanReview(threadId) {
+            planReview = review
+        } else {
+            planReview = nil
+        }
+    }
+
+    /// Holds the message in the queue until it's sent from the queue.
+    func saveDraft(_ text: String, mentions: [Mention]) async -> Bool {
+        guard let client else { return false }
+        do {
+            try await client.saveDraft(threadId, text: text, mentions: mentions)
+            confirmations += 1
+            await loadInteractions()
             return true
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

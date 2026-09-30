@@ -73,6 +73,7 @@ struct InboxTab: View {
         case .queue: QueueView()
         case .archived: ArchivedView()
         case .drawings: DrawingsView()
+        case .attention: AttentionView()
         case .drawing(let id): DrawingView(id: id)
         }
     }

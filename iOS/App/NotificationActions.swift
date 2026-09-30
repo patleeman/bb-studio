@@ -62,15 +62,13 @@ enum NotificationActions {
                 guard let interactionId, let index = Int(action.dropFirst(choicePrefix.count)) else { return false }
                 let pending = try await client.interactions(threadId)
                 guard let interaction = pending.first(where: { $0.id == interactionId }),
-                    let question = interaction.payload.questions?.first,
+                    let question = interaction.allQuestions?.first,
                     let options = question.options, options.indices.contains(index)
                 else {
                     await confirm(threadId, "That question isn't waiting anymore. Tap to open the thread.")
                     return true
                 }
-                try await client.resolve(
-                    interaction,
-                    PendingInteraction.answerResolution([question.id: InteractionAnswer(selected: [options[index].value])]))
+                try await client.settle(interaction, interaction.answer([question.id: InteractionAnswer(selected: [options[index].value])]))
             case reply:
                 let text = (response as? UNTextInputNotificationResponse)?.userText
                     .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -83,7 +81,7 @@ enum NotificationActions {
                         await confirm(threadId, "Couldn't answer from here. Tap to open the thread.")
                         return true
                     }
-                    try await client.resolve(interaction, resolution)
+                    try await client.settle(interaction, resolution)
                 } else {
                     try await client.send(threadId, text: text)
                 }

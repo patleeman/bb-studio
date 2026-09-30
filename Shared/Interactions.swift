@@ -9,9 +9,53 @@ public struct PendingInteraction: Codable, Identifiable, Hashable, Sendable {
     public var status: String
     public var createdAt: Double?
     public var payload: InteractionPayload
+    public var origin: Origin?
 
-    /// Approvals and questions can be answered natively; plugin forms need the web app.
-    public var isNative: Bool { payload.kind == "approval" || payload.kind == "user_question" }
+    public struct Origin: Codable, Hashable, Sendable {
+        public var kind: String
+        public var pluginId: String?
+        public var rendererId: String?
+    }
+
+    /// Approvals, questions, and the ask-user-question and secrets plugin
+    /// forms are answered natively; other plugin forms need the web app.
+    public var isNative: Bool {
+        payload.kind == "approval" || payload.kind == "user_question" || pluginQuestions != nil || secretRequest != nil
+    }
+
+    /// Core questions, or the ask-user-question plugin's.
+    public var allQuestions: [InteractionQuestion]? { payload.questions ?? pluginQuestions }
+
+    /// Which plugin form this is, for `kind: plugin` requests.
+    public var rendererId: String? { payload.kind == "plugin" ? origin?.rendererId : nil }
+
+    /// The ask-user-question plugin's questions, which share the core shape.
+    public var pluginQuestions: [InteractionQuestion]? {
+        guard rendererId == "ask-user-question", let questions = payload.data?["questions"] else { return nil }
+        return questions.decoded()
+    }
+
+    /// The secrets plugin asking for credentials to write to a dotenv file.
+    public var secretRequest: SecretRequest? {
+        guard rendererId == "secret-request" else { return nil }
+        return payload.data?.decoded()
+    }
+}
+
+public struct SecretRequest: Decodable, Hashable, Sendable {
+    public struct Destination: Decodable, Hashable, Sendable {
+        public var kind: String
+        public var path: String
+    }
+
+    public struct Field: Decodable, Hashable, Sendable {
+        public var name: String
+        public var description: String?
+    }
+
+    public var purpose: String?
+    public var destination: Destination
+    public var fields: [Field]
 }
 
 public struct InteractionPayload: Codable, Hashable, Sendable {
@@ -24,6 +68,7 @@ public struct InteractionPayload: Codable, Hashable, Sendable {
     public var questions: [InteractionQuestion]?
     // plugin and extension kinds
     public var title: String?
+    public var data: JSONValue?
 }
 
 public struct ApprovalSubject: Codable, Hashable, Sendable {
@@ -82,6 +127,8 @@ extension PendingInteraction {
             }
         case "user_question":
             return payload.questions?.first?.prompt ?? "BB has a question"
+        case "plugin" where pluginQuestions != nil:
+            return pluginQuestions?.first?.prompt ?? payload.title ?? "BB has a question"
         default:
             return payload.title ?? "BB needs input"
         }
@@ -107,6 +154,13 @@ extension PendingInteraction {
         return ["decision": .string(decision), "grantedPermissions": granted]
     }
 
+    /// Core questions resolve with `kind: user_answer`; the plugin's form
+    /// responds with just the answers.
+    public func answer(_ answers: [String: InteractionAnswer]) -> JSONValue {
+        let resolution = Self.answerResolution(answers)
+        return pluginQuestions != nil ? ["answers": resolution["answers"] ?? [:]] : resolution
+    }
+
     public static func answerResolution(_ answers: [String: InteractionAnswer]) -> JSONValue {
         var object: [String: JSONValue] = [:]
         for (id, answer) in answers {
@@ -120,7 +174,7 @@ extension PendingInteraction {
 
     /// A free-text reply to every question, for the notification and watch reply box.
     public func textAnswer(_ text: String) -> JSONValue? {
-        guard let questions = payload.questions, !questions.isEmpty else { return nil }
+        guard let questions = allQuestions, !questions.isEmpty else { return nil }
         var answers: [String: InteractionAnswer] = [:]
         for question in questions {
             if question.allowFreeText {
@@ -134,7 +188,7 @@ extension PendingInteraction {
                 return nil
             }
         }
-        return Self.answerResolution(answers)
+        return answer(answers)
     }
 }
 
@@ -157,6 +211,21 @@ extension BBClient {
     @discardableResult
     public func resolve(_ interaction: PendingInteraction, _ resolution: JSONValue) async throws -> PendingInteraction {
         try await post("/api/v1/threads/\(interaction.threadId)/interactions/\(interaction.id)/resolve", resolution)
+    }
+
+    /// Plugin forms take the plugin's own response; everything else resolves.
+    public func settle(_ interaction: PendingInteraction, _ value: JSONValue) async throws {
+        if interaction.payload.kind == "plugin" {
+            let _: JSONValue = try await post(
+                "/api/v1/threads/\(interaction.threadId)/interactions/\(interaction.id)/respond", ["value": value])
+        } else {
+            _ = try await resolve(interaction, value)
+        }
+    }
+
+    /// Declines a plugin form; the plugin sees it as cancelled.
+    public func cancel(_ interaction: PendingInteraction) async throws {
+        let _: JSONValue = try await post("/api/v1/threads/\(interaction.threadId)/interactions/\(interaction.id)/cancel")
     }
 
     /// Resolves by ids only, for notification actions that have no payload at hand.

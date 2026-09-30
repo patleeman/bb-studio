@@ -26,6 +26,7 @@ struct ThreadView: View {
     @State private var showingFiles = false
     @State private var showingHistory = false
     @State private var confirmingCompact = false
+    @State private var reviewingPlan: PlanReview?
     /// Set while the composer holds a rewrite of the last message.
     @State private var editing = false
     @AppStorage("runningPlugins") private var runningPlugins = ""
@@ -44,6 +45,9 @@ struct ThreadView: View {
                         .toolbar { Button("Done") { showingWeb = false } }
                 }
             }
+        }
+        .sheet(item: $reviewingPlan, onDismiss: { Task { await model.loadPlanReview() } }) { review in
+            PlanReviewSheet(review: review) { await model.loadPlanReview() }
         }
         .sheet(isPresented: $dictating) {
             DictationView(threadId: model.threadId, autoStart: true) { text in
@@ -265,6 +269,7 @@ struct ThreadView: View {
                     InteractionCard(
                         interaction: interaction,
                         resolve: { await model.resolve(interaction, $0) },
+                        cancel: { await model.cancel(interaction) },
                         openWeb: { showingWeb = true })
                     .id(interaction.id)
                 }
@@ -467,6 +472,18 @@ struct ThreadView: View {
         }
     }
 
+    private func saveDraft() {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentMentions = mentions
+        draft = ""
+        Task {
+            if await !model.saveDraft(text, mentions: sentMentions), draft.isEmpty {
+                draft = text
+                mentions = sentMentions
+            }
+        }
+    }
+
     private func saveEdit() {
         let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
         let sentMentions = mentions
@@ -501,6 +518,20 @@ struct ThreadView: View {
                     Text("The last turn failed").lineLimit(1)
                 } trailing: {
                     Button("Retry") { Task { await model.run { try await $0.retry(model.threadId) } } }
+                        .font(.footnote.weight(.semibold))
+                        .padding(.trailing, 6)
+                }
+            }
+            if let review = model.planReview {
+                ShelfCard(icon: "doc.text.magnifyingglass", tint: .orange) {
+                    VStack(alignment: .leading, spacing: 2) {
+                        Text("Plan ready for review").fontWeight(.medium)
+                        if let title = review.title, !title.isEmpty {
+                            Text(title).font(.caption2).foregroundStyle(.secondary).lineLimit(1)
+                        }
+                    }
+                } trailing: {
+                    Button("Review") { reviewingPlan = review }
                         .font(.footnote.weight(.semibold))
                         .padding(.trailing, 6)
                 }
@@ -558,6 +589,9 @@ struct ThreadView: View {
                 // Long-press to schedule.
                 .contextMenu {
                     if canSend, attachments.isEmpty, !editing {
+                        if runningPlugins.split(separator: ",").contains("drafts") {
+                            Button { saveDraft() } label: { Label("Save as Draft", systemImage: "doc.text") }
+                        }
                         Section("Send Later") {
                             ForEach(SendTimePicker.presets, id: \.title) { preset in
                                 Button(preset.title) { send(at: preset.date()) }

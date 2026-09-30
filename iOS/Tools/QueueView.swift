@@ -15,16 +15,17 @@ struct QueueView: View {
             if let error {
                 Section { ConnectionBanner(message: error) { await load() } }
             }
+            section("Drafts", messages.filter(\.isDraft))
             section("Scheduled", messages.filter { !$0.isRetry && $0.waitingOn?.kind == "time" })
             section("Retries", messages.filter(\.isRetry))
-            section("Waiting", messages.filter { !$0.isRetry && $0.waitingOn?.kind != "time" })
+            section("Waiting", messages.filter { !$0.isRetry && !$0.isDraft && $0.waitingOn?.kind != "time" })
         }
         .overlay {
             if !loaded {
                 ProgressView()
             } else if messages.isEmpty, error == nil {
                 ContentUnavailableView("Nothing queued", systemImage: "tray",
-                    description: Text("Scheduled messages and automatic retries show here."))
+                    description: Text("Drafts, scheduled messages and automatic retries show here."))
             }
         }
         .navigationTitle("Queue")
@@ -119,6 +120,7 @@ struct QueuedRow: View {
 
     private var icon: String {
         if message.isRetry { return "arrow.clockwise" }
+        if message.isDraft { return "doc.text" }
         switch message.waitingOn?.kind {
         case "time": return "clock"
         case "host-offline": return "desktopcomputer"

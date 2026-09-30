@@ -31,6 +31,12 @@ public enum JSONValue: Codable, Hashable, Sendable {
         }
     }
 
+    /// Re-decodes this value as `T`; nil when it doesn't fit.
+    public func decoded<T: Decodable>(as type: T.Type = T.self) -> T? {
+        guard let data = try? JSONEncoder().encode(self) else { return nil }
+        return try? JSONDecoder().decode(T.self, from: data)
+    }
+
     public subscript(key: String) -> JSONValue? {
         if case .object(let object) = self { return object[key] }
         return nil

@@ -118,7 +118,7 @@ struct WatchThreadView: View {
         status = "Sending…"
         Task {
             do {
-                try await client.resolve(interaction, resolution)
+                try await client.settle(interaction, resolution)
                 interactions.removeAll { $0.id == interaction.id }
                 status = nil
                 WKInterfaceDevice.current().play(.success)
@@ -154,7 +154,7 @@ struct WatchInteraction: View {
     @State private var text = ""
 
     var body: some View {
-        Label(interaction.payload.kind == "user_question" ? "Question" : "Needs approval", systemImage: "hand.raised.fill")
+        Label(interaction.allQuestions != nil ? "Question" : "Needs approval", systemImage: "hand.raised.fill")
             .font(.caption2)
             .foregroundStyle(.orange)
         if interaction.payload.kind == "approval" {
@@ -167,14 +167,12 @@ struct WatchInteraction: View {
                 }
                 .foregroundStyle(decision == "deny" ? .red : .green)
             }
-        } else if interaction.payload.kind == "user_question", let questions = interaction.payload.questions {
+        } else if let questions = interaction.allQuestions {
             Text(questions.map(\.prompt).joined(separator: "\n")).font(.footnote)
             if questions.count == 1, let question = questions.first, !question.multiSelect {
                 ForEach(question.options ?? [], id: \.value) { option in
                     Button(option.label) {
-                        answer(
-                            interaction,
-                            PendingInteraction.answerResolution([question.id: InteractionAnswer(selected: [option.value])]))
+                        answer(interaction, interaction.answer([question.id: InteractionAnswer(selected: [option.value])]))
                     }
                 }
             }

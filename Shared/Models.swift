@@ -204,6 +204,9 @@ public struct QueuedMessage: Decodable, Identifiable, Hashable, Sendable {
     public struct WaitingOn: Decodable, Hashable, Sendable {
         public var kind: String
         public var hostName: String?
+        public var pluginId: String?
+        /// Why a plugin is holding it, e.g. Smart Queue's follow-up decision.
+        public var reason: String?
     }
 
     /// `inline` for a message the user wrote; `retry` for an automatic retry.
@@ -224,6 +227,8 @@ public struct QueuedMessage: Decodable, Identifiable, Hashable, Sendable {
     public var createdAt: Double?
 
     public var isRetry: Bool { payload?.kind == "retry" }
+    /// Held by the drafts plugin until you send it yourself.
+    public var isDraft: Bool { waitingOn?.kind == "plugin" && waitingOn?.pluginId == "drafts" }
 
     /// Why it hasn't gone yet, in a few words.
     public var status: String {
@@ -235,6 +240,8 @@ public struct QueuedMessage: Decodable, Identifiable, Hashable, Sendable {
         }
         switch waitingOn?.kind {
         case "time": return when.map { "Sends \($0)" } ?? "Scheduled"
+        case "plugin" where isDraft: return "Draft · send it when you're ready"
+        case "plugin" where waitingOn?.reason?.isEmpty == false: return waitingOn!.reason!
         case "host-offline": return "Waiting for \(waitingOn?.hostName ?? "the host") to come online"
         case "thread-busy", nil: return "Queued"
         case let kind?: return "Waiting · \(kind.replacingOccurrences(of: "-", with: " "))"
@@ -413,6 +420,9 @@ public struct BotTeamsList: Codable, Sendable {
     public var directThreads: [String: DirectThread]
     public var directConversations: [String: [DirectConversation]]?
     public var directThreadInfo: [String: DirectThreadInfo]?
+    /// Open attention items and pending approvals per channel id.
+    public var attentionCounts: [String: Int]?
+    public var approvalCounts: [String: Int]?
 
     /// The sidebar's Direct messages: each current bot's conversations that are
     /// not archived, newest first. Retired bots are left out.
@@ -440,9 +450,23 @@ public struct RoomMessage: Decodable, Identifiable, Hashable, Sendable {
     public var isOwner: Bool { botId == nil && speaker == "You" }
 }
 
+/// A bot's pending approval or question, forwarded into its channel. It's a
+/// core interaction on the bot's work thread.
+public struct ChannelApproval: Decodable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var threadId: String
+    public var botId: String
+    public var roomId: String
+    public var kind: String
+    public var title: String
+    public var detail: String?
+    public var createdAt: Double
+}
+
 public struct RoomPage: Decodable, Sendable {
     public var messages: [RoomMessage]
     public var hasOlder: Bool?
+    public var approvals: [ChannelApproval]?
 }
 
 // MARK: Talk

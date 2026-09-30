@@ -240,7 +240,11 @@ struct InboxView: View {
                 if query.isEmpty, !model.channels.isEmpty {
                     collapsible("channels", "Channels") {
                         ForEach(model.channels) { room in
-                            NavigationLink(value: Route.room(room)) { ChannelRow(room: room) }
+                            NavigationLink(value: Route.room(room)) {
+                                ChannelRow(room: room,
+                                           attention: model.botTeams?.attentionCounts?[room.id] ?? 0,
+                                           approvals: model.botTeams?.approvalCounts?[room.id] ?? 0)
+                            }
                         }
                     }
                 }
@@ -329,6 +333,10 @@ struct InboxView: View {
         }
         if plugins.contains("automations") {
             NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
+        }
+        if plugins.contains("bot-teams") {
+            NavigationLink(value: Route.attention) { Label("Attention", systemImage: "bell.badge") }
+                .badge(model.botTeams?.attentionCounts?.values.reduce(0, +) ?? 0)
         }
         NavigationLink(value: Route.queue) { Label("Queue", systemImage: "tray.full") }
             .badge(queuedCount)
@@ -604,6 +612,8 @@ struct BotRow: View {
 
 struct ChannelRow: View {
     let room: Room
+    var attention = 0
+    var approvals = 0
 
     var body: some View {
         let unread = (room.updatedAt ?? 0) > (room.lastReadAt ?? .infinity)
@@ -611,6 +621,18 @@ struct ChannelRow: View {
             Label(room.name, systemImage: "number")
                 .font(.body.weight(unread ? .semibold : .regular))
             Spacer()
+            if approvals > 0 {
+                Label("\(approvals)", systemImage: "hand.raised.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.orange)
+                    .accessibilityLabel("\(approvals) waiting for approval")
+            }
+            if attention > 0 {
+                Label("\(attention)", systemImage: "bell.fill")
+                    .font(.caption.weight(.semibold))
+                    .foregroundStyle(.red)
+                    .accessibilityLabel("\(attention) need attention")
+            }
             if unread { Circle().fill(.blue).frame(width: 8, height: 8) }
         }
     }

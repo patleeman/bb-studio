@@ -1,9 +1,11 @@
 import SwiftUI
 
-/// Answers a pending approval or question in place. Plugin forms fall back to the web app.
+/// Answers a pending approval, question, or secret request in place. Other
+/// plugin forms fall back to the web app.
 struct InteractionCard: View {
     let interaction: PendingInteraction
     let resolve: (JSONValue) async -> Bool
+    var cancel: () async -> Void = {}
     let openWeb: () -> Void
 
     @State private var answers: [String: InteractionAnswer] = [:]
@@ -18,6 +20,14 @@ struct InteractionCard: View {
             switch interaction.payload.kind {
             case "approval": approval
             case "user_question": questions
+            case "plugin" where interaction.pluginQuestions != nil:
+                if let title = interaction.payload.title { Text(title).font(.subheadline.weight(.semibold)) }
+                questions
+                Button("Skip", role: .cancel) { decline() }.font(.footnote)
+            case "plugin" where interaction.secretRequest != nil:
+                if let request = interaction.secretRequest {
+                    SecretRequestForm(request: request, submit: submit, decline: decline)
+                }
             default:
                 Text(interaction.summary).font(.subheadline)
                 Button("Open in web", action: openWeb).buttonStyle(.bordered)
@@ -39,7 +49,8 @@ struct InteractionCard: View {
     }
 
     private var header: String {
-        interaction.payload.kind == "user_question" ? "BB has a question" : "Waiting for your approval"
+        if interaction.secretRequest != nil { return "An agent needs credentials" }
+        return interaction.allQuestions != nil ? "BB has a question" : "Waiting for your approval"
     }
 
     // MARK: Approval
@@ -79,7 +90,7 @@ struct InteractionCard: View {
     // MARK: Questions
 
     @ViewBuilder private var questions: some View {
-        let questions = interaction.payload.questions ?? []
+        let questions = interaction.allQuestions ?? []
         ForEach(questions) { question in
             VStack(alignment: .leading, spacing: 6) {
                 Text(question.prompt).font(.subheadline.weight(.medium))
@@ -110,7 +121,7 @@ struct InteractionCard: View {
                 }
             }
         }
-        Button("Send answer") { submit(PendingInteraction.answerResolution(answers)) }
+        Button("Send answer") { submit(interaction.answer(answers)) }
             .buttonStyle(.borderedProminent)
             .controlSize(.small)
             .disabled(questions.contains { answers[$0.id]?.isEmpty ?? true })
@@ -134,11 +145,90 @@ struct InteractionCard: View {
             set: { answers[id, default: InteractionAnswer()].freeText = $0 })
     }
 
+    private func decline() {
+        working = true
+        Task {
+            await cancel()
+            working = false
+        }
+    }
+
     private func submit(_ resolution: JSONValue) {
         working = true
         Task {
             _ = await resolve(resolution)
             working = false
         }
+    }
+}
+
+/// Masked fields for the secrets plugin. Values go straight to BB, which
+/// writes them to the named dotenv file; nothing is kept on the phone.
+private struct SecretRequestForm: View {
+    let request: SecretRequest
+    let submit: (JSONValue) -> Void
+    let decline: () -> Void
+    @State private var values: [String: String] = [:]
+    @State private var revealed: Set<String> = []
+
+    var body: some View {
+        if let purpose = request.purpose { Text(purpose).font(.subheadline) }
+        Label(request.destination.path, systemImage: "doc.badge.gearshape")
+            .font(.caption.monospaced())
+            .foregroundStyle(.secondary)
+            .lineLimit(1)
+            .truncationMode(.head)
+        ForEach(request.fields, id: \.name) { field in
+            VStack(alignment: .leading, spacing: 4) {
+                Text(field.name).font(.caption.monospaced().weight(.semibold))
+                if let description = field.description {
+                    Text(description).font(.caption).foregroundStyle(.secondary)
+                }
+                HStack {
+                    Group {
+                        if revealed.contains(field.name) {
+                            TextField("Value", text: binding(field.name))
+                        } else {
+                            SecureField("Value", text: binding(field.name))
+                        }
+                    }
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .textContentType(.password)
+                    .textFieldStyle(.roundedBorder)
+                    Button {
+                        if revealed.contains(field.name) { revealed.remove(field.name) } else { revealed.insert(field.name) }
+                    } label: {
+                        Image(systemName: revealed.contains(field.name) ? "eye.slash" : "eye")
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel(revealed.contains(field.name) ? "Hide value" : "Show value")
+                }
+            }
+        }
+        HStack {
+            Button("Save") {
+                let trimmed = values.mapValues { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+                submit(["values": .object(trimmed.mapValues(JSONValue.string))])
+                values = [:]
+            }
+            .buttonStyle(.borderedProminent)
+            .disabled(!complete)
+            Button("Decline", role: .destructive, action: decline)
+                .buttonStyle(.bordered)
+        }
+        .controlSize(.small)
+    }
+
+    /// Every field, single-line, as the plugin requires.
+    private var complete: Bool {
+        request.fields.allSatisfy { field in
+            let value = values[field.name]?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
+            return !value.isEmpty && !value.contains(where: \.isNewline)
+        }
+    }
+
+    private func binding(_ name: String) -> Binding<String> {
+        Binding(get: { values[name] ?? "" }, set: { values[name] = $0 })
     }
 }

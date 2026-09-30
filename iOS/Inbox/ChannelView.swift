@@ -10,6 +10,8 @@ struct ChannelView: View {
     @State private var error: String?
     @State private var listener: UUID?
     @State private var dictating = false
+    /// Tool approvals and questions from bots working on this channel's jobs.
+    @State private var approvals: [PendingInteraction] = []
 
     var body: some View {
         ScrollView {
@@ -22,6 +24,25 @@ struct ChannelView: View {
                         MarkdownText(message.text).textSelection(.enabled)
                     }
                     .frame(maxWidth: .infinity, alignment: .leading)
+                }
+                ForEach(approvals) { interaction in
+                    InteractionCard(
+                        interaction: interaction,
+                        resolve: { value in
+                            do {
+                                try await app.client.settle(interaction, value)
+                                approvals.removeAll { $0.id == interaction.id }
+                                return true
+                            } catch {
+                                self.error = error.localizedDescription
+                                return false
+                            }
+                        },
+                        cancel: {
+                            try? await app.client.cancel(interaction)
+                            approvals.removeAll { $0.id == interaction.id }
+                        },
+                        openWeb: { app.path.append(.thread(id: interaction.threadId)) })
                 }
             }
             .padding()
@@ -75,8 +96,15 @@ struct ChannelView: View {
 
     private func load() async {
         do {
-            messages = try await app.client.room(room.id).messages
+            let page = try await app.client.room(room.id)
+            messages = page.messages
             error = nil
+            let wanted = Set((page.approvals ?? []).map(\.id))
+            var pending: [PendingInteraction] = []
+            for thread in Set((page.approvals ?? []).map(\.threadId)) {
+                pending += (try? await app.client.interactions(thread))?.filter { wanted.contains($0.id) } ?? []
+            }
+            approvals = pending.sorted { $0.id < $1.id }
         } catch {
             self.error = error.localizedDescription
         }

@@ -23,7 +23,12 @@ view (the Web tab, and the safari button on every thread).
 | Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
 | Read BB Pages: the list, and each page's text, tables, callouts, stats, charts, and embeds | `iOS/Pages/` |
 | Automations: every schedule by project, next and last run, recent runs with output or their thread, run now, pause and resume | `iOS/Tools/AutomationsView.swift` |
-| Queue: every unsent message across threads, including scheduled sends, automatic retries, and waits on a busy thread or offline host. Send now or cancel | `iOS/Tools/QueueView.swift` |
+| Queue: every unsent message across threads, including drafts, scheduled sends, automatic retries, and waits on a busy thread, offline host or plugin (with Smart Queue's reason). Send now or cancel | `iOS/Tools/QueueView.swift` |
+| Drafts: long-press Send, then Save as Draft to park a message on the thread until you send it | `Shared/PluginExtras.swift` |
+| Attention: what bots flagged across channels (decisions, blockers, updates). Open, Snoozed and Done; swipe to mark done or snooze, or open the channel. Home shows open attention and approval counts per channel | `iOS/Tools/AttentionView.swift` |
+| Channel approvals: bots' pending tool approvals and questions show in their channel and are answered there | `iOS/Inbox/ChannelView.swift` |
+| Plan reviews: when an agent asks for a Plannotator review, a card opens the review UI; cancel from its menu | `iOS/Thread/PlanReviewSheet.swift` |
+| Custom instructions: edit the text BB adds to every agent's system prompt (Settings → Agents) | `iOS/App/CustomInstructionsView.swift` |
 | Usage: each pooled Claude and Codex account's 5-hour and weekly limits, with reset times | `iOS/Tools/UsageView.swift` |
 | Send later: long-press Send for 30 minutes, 1 hour, 3 hours, tomorrow at 9, or a picked time | `iOS/Thread/SendLater.swift` |
 | Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
@@ -39,7 +44,7 @@ view (the Web tab, and the safari button on every thread).
 | Tool activity collapses into one row per run ("3 commands, 2 edits"). Tap for each step and its output | `iOS/Thread/Messages.swift` |
 | The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (send now, remove) | `iOS/Thread/ThreadShelf.swift` |
 | Paste text or images into the composer. Images become attachments | `iOS/Thread/Composer.swift` |
-| Answer approvals (command, file, permission, plan) and questions in the thread. Plugin forms open the web app | `iOS/Thread/InteractionCard.swift`, `Shared/Interactions.swift` |
+| Answer approvals (command, file, permission, plan) and questions in the thread, including the ask-user-question plugin's multi-question forms and secret requests (values go straight to the server and aren't kept). Other plugin forms open the web app | `iOS/Thread/InteractionCard.swift`, `Shared/Interactions.swift` |
 | Attachments from photos, the camera, or files (JPEG re-encoded, 35 MB limit) | `iOS/Thread/Attachments.swift` |
 | Offline cache: the inbox and recent thread messages show before the network answers | `DiskCache`, `ThreadModel` |
 | Connection banner when BB is unreachable (usually Tailscale off), with Open Tailscale and Retry | `ConnectionBanner` |
@@ -51,7 +56,7 @@ view (the Web tab, and the safari button on every thread).
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `drawings`, `drawing/<id>`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
+| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `drawings`, `drawing/<id>`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `plugin/live.ts` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |

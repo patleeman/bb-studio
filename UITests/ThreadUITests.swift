@@ -276,6 +276,38 @@ final class ThreadUITests: XCTestCase {
         }
     }
 
+    /// Read-only: browses attention, a channel, the queue and custom instructions.
+    func testPluginScreens() {
+        app.open(URL(string: "bbgo://attention")!)
+        XCTAssertTrue(app.navigationBars["Attention"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("plugins-attention-open")
+        app.segmentedControls.buttons["Done"].tap()
+        sleep(2)
+        shot("plugins-attention-done")
+        let first = app.cells.firstMatch
+        if first.waitForExistence(timeout: 5) {
+            first.tap()
+            sleep(3)
+            shot("plugins-channel")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        app.open(URL(string: "bbgo://queue")!)
+        XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("plugins-queue")
+        app.tabBars.buttons["Settings"].tap()
+        let instructions = app.buttons["Custom Instructions"]
+        if instructions.waitForExistence(timeout: 5) {
+            instructions.tap()
+            XCTAssertTrue(app.navigationBars["Custom Instructions"].waitForExistence(timeout: 10))
+            sleep(2)
+            shot("plugins-instructions")
+            app.navigationBars.buttons.element(boundBy: 0).tap()
+        }
+        shot("plugins-settings")
+    }
+
     func testPageDemo() {
         app.terminate()
         app.launchArguments = ["-qaPageDemo"]
