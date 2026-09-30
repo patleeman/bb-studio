@@ -1,4 +1,4 @@
-name: Stable BB compatibility
+name: CI
 
 on:
   push:
