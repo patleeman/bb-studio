@@ -43,15 +43,17 @@ BB application in a staged environment before handoff.
 - Start the normal BB application and use its full rendered UI. Seed the
   plugin's primary workflow with safe, deterministic local data.
 - Add the plugin to the capture definitions in
-  `scripts/capture-plugin-screenshots.mjs`, including an assertion for the
+  `scripts/capture/captures/<plugin>.mjs`, including an assertion for the
   live surface and the data that must be visible. Run it with a seeded thread:
 
   ```sh
   BB_CAPTURE_PROJECT_ID=proj_... \
   BB_CAPTURE_THREAD_ID=thr_... \
-  node scripts/capture-plugin-screenshots.mjs
+  node scripts/capture-plugin-screenshots.mjs --plugin mobile
   ```
 
+- `scripts/capture-plugin-screenshots.mjs` composes the driver, BB helpers, seeders,
+  and per-plugin captures in `scripts/capture/`. Use `--plugin <id>` for one plugin, `BB_CAPTURE_ONLY` for capture IDs, or omit both to capture all.
 - The script must drive the real BB nav panel, settings page, thread action,
   host surface, or CLI-backed surface and write
   `packages/<plugin>/assets/staged-preview.png`.

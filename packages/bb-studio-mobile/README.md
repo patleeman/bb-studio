@@ -14,3 +14,10 @@ npm test
 bb plugin build
 bb plugin install .
 ```
+
+## Staged preview
+
+![Studio Mobile settings in the running BB app](assets/staged-preview.png)
+
+The live BB plugin settings show the APNs environment and Expo relay URL. No
+private APNs key or device token is staged for the capture.
