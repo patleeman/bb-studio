@@ -469,6 +469,14 @@ public struct DirectThreadInfo: Codable, Hashable, Sendable {
     public var updatedAt: Double?
 }
 
+/// A bot's MISSION.md or MEMORY.md. `version` is a hash of the text.
+public struct BotDocument: Codable, Sendable, Hashable {
+    public var text: String
+    public var version: String
+
+    public static let files = ["MISSION.md", "MEMORY.md"]
+}
+
 public struct BotTeamsList: Codable, Sendable {
     public var bots: [Bot]
     public var rooms: [Room]

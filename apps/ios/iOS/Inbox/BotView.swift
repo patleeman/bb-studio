@@ -27,6 +27,14 @@ struct BotView: View {
                         Text(description).foregroundStyle(.secondary)
                     }
                 }
+                Section {
+                    NavigationLink { BotDocumentView(bot: bot, file: "MISSION.md") } label: {
+                        Label("Mission", systemImage: "scope")
+                    }
+                    NavigationLink { BotDocumentView(bot: bot, file: "MEMORY.md") } label: {
+                        Label("Memory", systemImage: "brain")
+                    }
+                }
                 let dms = teams?.directMessages.filter { $0.bot.id == id } ?? []
                 if !dms.isEmpty {
                     Section("Direct messages") {

@@ -514,6 +514,18 @@ extension BBClient {
         let _: JSONValue = try await rpc("bot-teams", "retryRouting", ["id": .string(id), "requestId": .string(message)])
     }
 
+    /// A bot's MISSION.md or MEMORY.md, with the version a save must match.
+    public func botDocument(_ id: String, file: String) async throws -> BotDocument {
+        try await rpc("bot-teams", "document", ["id": .string(id), "file": .string(file)])
+    }
+
+    /// Saves a bot's file. Fails if it changed since `version` was read.
+    public func saveBotDocument(_ id: String, file: String, text: String, version: String) async throws -> BotDocument {
+        try await rpc(
+            "bot-teams", "saveDocument",
+            ["id": .string(id), "file": .string(file), "text": .string(text), "version": .string(version)])
+    }
+
     @discardableResult
     public func sendToRoom(_ id: String, text: String) async throws -> RoomMessage {
         try await rpc(
