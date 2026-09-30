@@ -75,7 +75,7 @@ struct ThreadView: View {
         .sheet(item: $openingFile) { file in
             NavigationStack {
                 if let environmentId = model.thread?.environmentId {
-                    WorkspaceFileView(environmentId: environmentId, path: file.path)
+                    WorkspaceFileView(environmentId: environmentId, path: file.path, threadId: model.threadId)
                         .toolbar {
                             ToolbarItem(placement: .cancellationAction) { Button("Done") { openingFile = nil } }
                         }

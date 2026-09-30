@@ -151,7 +151,7 @@ public final class BBClient: @unchecked Sendable {
         return envelope.result
     }
 
-    fileprivate static func errorMessage(_ data: Data) -> String? {
+    static func errorMessage(_ data: Data) -> String? {
         guard let json = try? JSONDecoder().decode(JSONValue.self, from: data) else {
             return String(data: data, encoding: .utf8).map { String($0.prefix(200)) }
         }

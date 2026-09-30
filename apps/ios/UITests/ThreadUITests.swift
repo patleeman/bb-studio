@@ -473,18 +473,21 @@ final class ThreadUITests: XCTestCase {
 
     /// Taps a file path in a reply and checks the file viewer opens. Scratch
     /// thread only, named by `TEST_RUNNER_BBGO_QA_FILE_THREAD`, whose last reply
-    /// mentions `README.md`.
+    /// mentions `README.md`, or the file named by `TEST_RUNNER_BBGO_QA_FILE_NAME`
+    /// (a link to `/tmp/…` checks files outside the workspace).
     func testFileLink() throws {
         guard let id = ProcessInfo.processInfo.environment["BBGO_QA_FILE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        let name = ProcessInfo.processInfo.environment["BBGO_QA_FILE_NAME"] ?? "README.md"
         app.open(URL(string: "bbstudio://thread/\(id)")!)
-        let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'README.md'")).firstMatch
+        let text = app.staticTexts.matching(NSPredicate(format: "label CONTAINS %@", name)).firstMatch
         XCTAssertTrue(text.waitForExistence(timeout: 15), "reply with a path")
         shot("file-link")
-        let link = text.links["README.md"].firstMatch.exists ? text.links["README.md"].firstMatch : app.links["README.md"].firstMatch
+        let link = text.links[name].firstMatch.exists ? text.links[name].firstMatch : app.links[name].firstMatch
         XCTAssertTrue(link.waitForExistence(timeout: 5), "path is a link")
         link.tap()
-        XCTAssertTrue(app.navigationBars["README.md"].waitForExistence(timeout: 10), "file viewer")
+        XCTAssertTrue(app.navigationBars[name].waitForExistence(timeout: 10), "file viewer")
         sleep(2)
+        XCTAssertFalse(app.staticTexts["Couldn't open the file"].exists, "file loads")
         shot("file-viewer")
         app.buttons["Done"].tap()
     }

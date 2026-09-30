@@ -250,6 +250,8 @@ struct WorkspaceFileView: View {
     @EnvironmentObject private var app: AppModel
     let environmentId: String
     let path: String
+    /// Lets a path outside the workspace, like `/tmp/shot.png`, open from the host.
+    var threadId: String?
     @State private var file: WorkspaceFile?
     @State private var error: String?
     @State private var raw = false
@@ -282,7 +284,12 @@ struct WorkspaceFileView: View {
         }
         .task {
             do {
-                file = try await app.client.workspaceFile(environmentId, path: await relativePath())
+                let path = await relativePath()
+                if path.hasPrefix("/"), let threadId {
+                    file = try await app.client.hostFile(threadId: threadId, path: path)
+                } else {
+                    file = try await app.client.workspaceFile(environmentId, path: path)
+                }
             } catch {
                 self.error = BBClient.describe(error, server: app.client.baseURL)
             }
@@ -290,7 +297,7 @@ struct WorkspaceFileView: View {
     }
 
     /// Absolute paths inside the workspace become relative; the server reads
-    /// every path from the workspace root.
+    /// every path from the workspace root. Paths outside it stay absolute.
     private func relativePath() async -> String {
         guard path.hasPrefix("/"), let root = try? await app.client.environmentRoot(environmentId) else { return path }
         let prefix = root.hasSuffix("/") ? root : root + "/"
@@ -330,8 +337,12 @@ struct WorkspaceFileView: View {
     @ViewBuilder
     private func content(_ file: WorkspaceFile) -> some View {
         if file.mimeType?.hasPrefix("image/") == true, let data = file.data, let image = UIImage(data: data) {
-            ScrollView([.horizontal, .vertical]) {
-                Image(uiImage: image).resizable().scaledToFit().frame(maxWidth: 800).padding()
+            // Fit the screen, never wider than the image itself.
+            ScrollView {
+                Image(uiImage: image).resizable().scaledToFit()
+                    .frame(maxWidth: min(image.size.width, 800))
+                    .padding()
+                    .frame(maxWidth: .infinity)
             }
         } else if let text = file.text {
             let shown = String(text.prefix(Self.maxCharacters))

@@ -1,4 +1,5 @@
 import Foundation
+import UniformTypeIdentifiers
 
 /// A file or directory in a thread's workspace.
 public struct WorkspacePath: Decodable, Hashable, Sendable, Identifiable {
@@ -85,6 +86,24 @@ extension BBClient {
             URLQueryItem(name: "path", value: path),
         ]
         return try await get("/api/v1/environments/\(environmentId)/diff/file?\(components.percentEncodedQuery ?? "")")
+    }
+
+    /// Any file on the thread's host, like a screenshot in `/tmp`, which the
+    /// workspace endpoint can't reach. Read the way BB web opens such links.
+    public func hostFile(threadId: String, path: String) async throws -> WorkspaceFile {
+        var components = URLComponents()
+        components.queryItems = [URLQueryItem(name: "path", value: path)]
+        let (status, data) = try await raw(
+            method: "GET", path: "/api/v1/threads/\(threadId)/host-files/content?\(components.percentEncodedQuery ?? "")", body: nil)
+        guard (200..<300).contains(status) else {
+            throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) for \(path)")
+        }
+        let mimeType = UTType(filenameExtension: URL(fileURLWithPath: path).pathExtension)?.preferredMIMEType
+        if mimeType?.hasPrefix("image/") != true, let text = String(data: data, encoding: .utf8) {
+            return WorkspaceFile(content: text, contentEncoding: "utf8", mimeType: mimeType, sizeBytes: data.count)
+        }
+        return WorkspaceFile(
+            content: data.base64EncodedString(), contentEncoding: "base64", mimeType: mimeType, sizeBytes: data.count)
     }
 
     /// Uncommitted changes as one unified diff per file, keyed by path.
