@@ -1,0 +1,58 @@
+/*
+ * BB Studio
+ *
+ * The colors of the Silk S app icon: deep teal-black like the icon's ground,
+ * the ribbon's warm coral-to-amber face as the one accent, and its teal back
+ * for file paths. Light mode keeps the same pairing on a cool, pale surface.
+ *
+ * The anchors are oklch on purpose: Chrome drops the hue of a dark hex color
+ * inside color-mix(in oklch), which tints every derived surface red. Ink and
+ * canvas share a hue family so the mixed grays stay teal, not olive.
+ */
+
+:root,
+.light {
+  --canvas: oklch(0.977 0.004 205);
+  --ink: oklch(0.22 0.023 221);
+  /* The sidebar sits on the icon's ground: a touch cooler in light, deeper in dark. */
+  --sidebar: oklch(0.955 0.009 205);
+
+  --primary: #c7431a;
+  --primary-foreground: #ffffff;
+  --muted-foreground: color-mix(in oklch, var(--ink) 70%, var(--canvas));
+  --subtle-foreground: color-mix(in oklch, var(--ink) 58%, var(--canvas));
+  --readback-foreground: color-mix(in oklch, var(--ink) 64%, var(--canvas));
+
+  --destructive: #d42f55;
+  --destructive-foreground: #ffffff;
+  --destructive-text: #c2254a;
+  --warning: #f2a33a;
+  --warning-text: #8a5a00;
+  --attention: #e08a1e;
+  --success: #177a50;
+  --diff-added: #177a50;
+  --diff-removed: #c2254a;
+  --pr-merged: #8250df;
+  --file-accent: #127a80;
+}
+
+.dark {
+  --canvas: oklch(0.192 0.016 218);
+  --ink: oklch(0.945 0.008 210);
+  --sidebar: oklch(0.165 0.015 220);
+
+  --primary: #ff7a45;
+  --primary-foreground: #1a0c07;
+
+  --destructive: #ff5c7a;
+  --destructive-foreground: #1a0c07;
+  --destructive-text: #ff5c7a;
+  --warning: #ffc766;
+  --warning-text: #ffc766;
+  --attention: #ffb347;
+  --success: #4fd69c;
+  --diff-added: #4fd69c;
+  --diff-removed: #ff5c7a;
+  --pr-merged: #b58cff;
+  --file-accent: #4fd1c9;
+}

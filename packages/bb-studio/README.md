@@ -54,6 +54,10 @@ text with the match in bold.
   collection hands over to Studio filtered to its kind, and item pages lead
   back to Studio. Studio's ⋯ menu can hide the add-ons' sidebar rows, so
   Studio is the only entry. Without Studio, each add-on works on its own.
+- **The BB Studio theme**: the app icon's colors for all of BB, light and
+  dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
+  Pick **BB Studio** in Settings → Appearance, or run `bb theme set
+  plugin:studio:bb-studio`.
 - **For agents**: the `studio_list_items` and `studio_tag_items` tools, the
   `bb studio` CLI, and a `studio` skill.
 
