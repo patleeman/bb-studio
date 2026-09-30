@@ -471,7 +471,7 @@ struct StudioRow: View {
                     Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
                 HStack(spacing: 4) {
-                    Text(([kind.label] + [project].compactMap { $0 } + item.facts.map(\.value)).joined(separator: " · "))
+                    Text(([kind.label] + [project].compactMap { $0 } + item.facts.map(\.display)).joined(separator: " · "))
                         .lineLimit(1)
                     if let badge = item.badge {
                         Text(badge.label)

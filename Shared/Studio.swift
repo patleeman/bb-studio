@@ -9,6 +9,12 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
     public struct Fact: Codable, Hashable, Sendable {
         public var id: String
         public var value: String
+
+        /// A bare count reads as a word count only with its unit.
+        public var display: String {
+            guard id == "words", let count = Int(value.replacingOccurrences(of: ",", with: "")) else { return value }
+            return count == 1 ? "1 word" : "\(value) words"
+        }
     }
 
     public struct Badge: Codable, Hashable, Sendable {

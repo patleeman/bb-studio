@@ -301,9 +301,12 @@ final class ThreadUITests: XCTestCase {
             app.buttons[chip].firstMatch.tap()
         }
         let search = app.searchFields.firstMatch
+        if !search.waitForExistence(timeout: 2) {
+            app.collectionViews.firstMatch.swipeDown()
+        }
         if search.waitForExistence(timeout: 3) {
             search.tap()
-            search.typeText("plan")
+            search.typeText("roadmap")
             sleep(2)
             shot("studio-search")
         }
