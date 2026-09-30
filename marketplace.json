@@ -58,7 +58,7 @@
     {
       "id": "pages",
       "displayName": "Studio Pages",
-      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, or let one keep a page up to date.",
+      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, let one keep a page up to date, or explore what an agent noticed along the way.",
       "icon": {
         "url": "./packages/bb-plugin-pages/icons/pages.svg"
       },
@@ -67,6 +67,7 @@
         "documents",
         "collaboration",
         "bots",
+        "agents",
         "bb-studio"
       ],
       "author": {
