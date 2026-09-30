@@ -36,11 +36,14 @@ struct ThreadView: View {
     /// Set while the composer holds a rewrite of the last message.
     @State private var editing = false
     @AppStorage("runningPlugins") private var runningPlugins = ""
+    /// Permissions chosen in Model & permissions, waiting for the next message.
+    @AppStorage private var pendingPermission: String?
 
     private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("artifacts") }
 
     init(threadId: String) {
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
+        _pendingPermission = AppStorage("permissionMode.\(threadId)", store: AppGroup.defaults)
     }
 
     var body: some View {
@@ -279,6 +282,7 @@ struct ThreadView: View {
                             Label("Share link", systemImage: "square.and.arrow.up")
                         }
                     }
+                    Button { UIPasteboard.general.string = model.threadId } label: { Label("Copy Thread ID", systemImage: "number") }
                 } label: {
                     Image(systemName: "ellipsis")
                 }
@@ -585,6 +589,19 @@ struct ThreadView: View {
                         .font(.footnote.weight(.semibold))
                         .padding(.trailing, 6)
                 }
+            }
+            if let pendingPermission, !editing {
+                ShelfCard(icon: "lock.shield", tint: pendingPermission == "full" ? .orange : .accentColor) {
+                    Button { choosingModel = true } label: {
+                        Text("Next message: \(PermissionMode.label(pendingPermission))").lineLimit(1)
+                    }
+                    .buttonStyle(.plain)
+                } trailing: {
+                    Button("Undo") { PermissionMode.setPending(nil, for: model.threadId) }
+                        .font(.footnote.weight(.semibold))
+                        .padding(.trailing, 6)
+                }
+                .accessibilityIdentifier("pendingPermission")
             }
             if let review = model.planReview {
                 ShelfCard(icon: "doc.text.magnifyingglass", tint: .orange) {

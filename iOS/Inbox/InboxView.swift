@@ -530,6 +530,7 @@ struct InboxView: View {
                 systemImage: thread.isUnread ? "envelope.open" : "envelope.badge")
         }
         Button { app.startVoiceChat(threadId: thread.id) } label: { Label("Voice chat", systemImage: "waveform") }
+        Button { UIPasteboard.general.string = thread.id } label: { Label("Copy Thread ID", systemImage: "number") }
         Divider()
         Button { Task { await model.archive(app.client, thread) } } label: {
             Label("Archive", systemImage: "archivebox")

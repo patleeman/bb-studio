@@ -10,14 +10,14 @@ view (the Web tab, and the safari button on every thread).
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename (threads, channels and DMs) | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
 | New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app) | `iOS/Inbox/NewThreadView.swift` |
-| Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. File paths in messages (inline code like `docs/plan.md:12`, or Markdown file links) open in the file viewer. The ⋯ menu has Voice chat, Find in thread, Rename, Model & permissions, Mute notifications, Open in BB web, and Share link | `iOS/Thread/ThreadView.swift` |
+| Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. File paths in messages (inline code like `docs/plan.md:12`, or Markdown file links) open in the file viewer. The ⋯ menu has Voice chat, Find in thread, Rename, Model & permissions, Mute notifications, Open in BB web, Share link, and Copy Thread ID (also on a thread row's long-press) | `iOS/Thread/ThreadView.swift` |
 | Live updates fetch only what changed: new rows since the last sequence, and the thread or its approvals only when those changed | `iOS/Thread/ThreadModel.swift` |
 | A red "New" line where you left off; the thread opens there when there's something unread | `iOS/Thread/ThreadView.swift` |
 | Find in thread: searches every message, with a match count and up/down to step through them | `iOS/Thread/FindBar.swift` |
 | Drafts are kept per thread, and Home marks threads that have one | `iOS/Thread/Drafts.swift` |
 | `@` suggests threads, bots, channels, DMs, and recordings, and sends them as real BB mentions | `iOS/Thread/MentionSuggestions.swift`, `Shared/Mentions.swift` |
 | The composer grows with the message, then offers a full-screen editor | `iOS/Thread/ThreadView.swift` |
-| Change a thread's model, reasoning level, and permissions (Accept edits, Auto, Full access, up to the machine's ceiling) for its next turns. BB takes permissions with each message, so the choice goes out with the next one you send | `iOS/Thread/ExecutionSheet.swift` |
+| Change a thread's model, reasoning level, and permissions (Accept edits, Auto, Full access, up to the machine's ceiling) for its next turns. BB takes permissions with each message, so the choice goes out with the next one you send. Until then a card over the composer shows it, with Undo | `iOS/Thread/ExecutionSheet.swift` |
 | File edits show `+N −M` and open to a red/green diff | `iOS/Thread/DiffView.swift` |
 | Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
 | Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
@@ -41,7 +41,7 @@ view (the Web tab, and the safari button on every thread).
 | Markdown in replies and your own messages: headings, nested and task lists, quotes, tables, code blocks with Copy, and `@thread` mentions that show the thread's title and open it. Long messages of yours fold at 15 lines with Show more, as in BB web | `iOS/Thread/Markdown.swift`, `iOS/Thread/Messages.swift` |
 | Image attachments in a thread show three to a row; tap one to view it full size | `iOS/Thread/Messages.swift` |
 | Emoji reactions from `::reactions{items="…"}`: tapping a chip drafts the reply (it doesn't send), as in BB web. Long-press any reply for Agree, Disagree, Do it, and Clarify | `iOS/Thread/Messages.swift` |
-| Long-press a message: Copy, Select Text, Quote, Share | `iOS/Thread/Messages.swift` |
+| Long-press a message: when it was sent, Copy, Select Text, Quote, Share. Long-press an edit or file read in the steps for Open File and Copy Path, or a command for Copy Command | `iOS/Thread/Messages.swift` |
 | Tool activity collapses into one row per run ("3 commands, 2 edits"). Tap for each step and its output | `iOS/Thread/Messages.swift` |
 | Edit a queued message or draft before it sends. Attachments stay, @-mentions stay while their text does, and the edit is refused if the message sent or changed meanwhile | `iOS/Tools/QueuedMessageEditor.swift`, `BBClient.editQueued` |
 | The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (tap to edit, send now, remove). Two or more queued messages fold into one "N queued" row; expanded, hold and drag to reorder, or use Move to Top / Up / Down | `iOS/Thread/ThreadShelf.swift` |

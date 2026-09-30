@@ -710,12 +710,33 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Accept edits"].firstMatch.tap()
         app.buttons["Save"].tap()
         XCTAssertTrue(more.waitForExistence(timeout: 5))
+        let pending = app.descendants(matching: .any)["pendingPermission"].firstMatch
+        XCTAssertTrue(pending.waitForExistence(timeout: 5), "pending permissions over the composer")
+        shot("permissions-pending")
         sleep(1)
         more.tap()
+        XCTAssertTrue(app.buttons["Copy Thread ID"].exists, "Copy Thread ID")
         app.buttons["Model & permissions"].tap()
         XCTAssertTrue(picker.waitForExistence(timeout: 10))
         XCTAssertTrue(picker.label.contains("Accept edits") || (picker.value as? String)?.contains("Accept edits") == true, "kept the choice: \(picker.label)")
         shot("permissions-kept")
+        app.buttons["Cancel"].tap()
+        app.buttons["Undo"].tap()
+        XCTAssertTrue(wait(5) { !pending.exists }, "undo clears it")
+    }
+
+    /// A message's menu ends with when it was sent. Read-only on a real thread.
+    func testMessageSentTime() throws {
+        app.open(URL(string: "bbgo://thread/thr_64r2wmjrim")!)
+        let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
+        XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
+        sleep(2)
+        let message = try XCTUnwrap(texts.allElementsBoundByIndex.last { $0.isHittable }, "a message on screen")
+        message.press(forDuration: 1)
+        let sent = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Sent '")).firstMatch
+        let button = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Sent '")).firstMatch
+        XCTAssertTrue(sent.waitForExistence(timeout: 5) || button.exists, "sent time in the menu")
+        shot("message-sent-time")
     }
 
     func testTerminal() throws {

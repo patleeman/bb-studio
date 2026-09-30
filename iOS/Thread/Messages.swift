@@ -58,6 +58,11 @@ struct MessageBubble: View {
 
     @ViewBuilder
     private var menu: some View {
+        if let createdAt = row.createdAt {
+            Section {
+                Text(Self.sentLabel(createdAt))
+            }
+        }
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
         Button { select(plainText) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
         Button { quote(plainText) } label: { Label("Quote", systemImage: "text.quote") }
@@ -80,6 +85,15 @@ struct MessageBubble: View {
                 }
             }
         }
+    }
+
+    /// "Sent Today at 2:46 PM", or the date for older messages.
+    static func sentLabel(_ createdAt: Double) -> String {
+        let date = Date(timeIntervalSince1970: createdAt / 1000)
+        let time = date.formatted(date: .omitted, time: .shortened)
+        if Calendar.current.isDateInToday(date) { return "Sent Today at \(time)" }
+        if Calendar.current.isDateInYesterday(date) { return "Sent Yesterday at \(time)" }
+        return "Sent \(date.formatted(date: .abbreviated, time: .shortened))"
     }
 
     @ViewBuilder
@@ -339,6 +353,7 @@ struct ActivityGroup: View {
 
 struct ActivityStep: View {
     let row: TimelineRow
+    @Environment(\.openURL) private var openURL
     @State private var showingOutput = false
 
     var body: some View {
@@ -364,6 +379,17 @@ struct ActivityStep: View {
                 .contentShape(.rect)
             }
             .buttonStyle(.plain)
+            .contextMenu {
+                if let path = filePath {
+                    if row.change?.kind != "delete", let url = FilePathLink.url(path) {
+                        Button { openURL(url) } label: { Label("Open File", systemImage: "doc.text") }
+                    }
+                    Button { UIPasteboard.general.string = path } label: { Label("Copy Path", systemImage: "doc.on.doc") }
+                }
+                if let command = row.command {
+                    Button { UIPasteboard.general.string = command } label: { Label("Copy Command", systemImage: "doc.on.doc") }
+                }
+            }
             if showingOutput, let diff = row.change?.diff {
                 DiffView(diff: diff)
                     .frame(maxHeight: 360)
@@ -387,6 +413,11 @@ struct ActivityStep: View {
         guard let text, !text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty else { return nil }
         let lines = text.components(separatedBy: "\n")
         return lines.count > 60 ? lines.prefix(60).joined(separator: "\n") + "\n… \(lines.count - 60) more lines" : text
+    }
+
+    /// The file an edit or read touched.
+    private var filePath: String? {
+        row.change?.path ?? (["file-change", "file-read"].contains(row.workKind ?? "") ? row.path : nil)
     }
 
     private var hasDetail: Bool { detail != nil || row.change?.diff?.isEmpty == false }
