@@ -5,6 +5,9 @@ import SwiftUI
 struct ChannelView: View {
     @EnvironmentObject private var app: AppModel
     let room: Room
+    @State private var name: String?
+    @State private var renaming = false
+    @State private var newName = ""
     @State private var messages: [RoomMessage] = []
     @State private var draft = ""
     @State private var error: String?
@@ -80,9 +83,35 @@ struct ChannelView: View {
         .sheet(isPresented: $dictating) {
             DictationView(threadId: nil, autoStart: true) { text in draft += (draft.isEmpty ? "" : " ") + text }
         }
-        .navigationTitle("#\(room.name)")
+        .navigationTitle("#\(name ?? room.name)")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(.hidden, for: .tabBar)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Menu {
+                    Button {
+                        newName = name ?? room.name
+                        renaming = true
+                    } label: { Label("Rename channel", systemImage: "pencil") }
+                } label: { Image(systemName: "ellipsis") }
+                .accessibilityLabel("More")
+            }
+        }
+        .alert("Rename channel", isPresented: $renaming) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let next = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !next.isEmpty, next != (name ?? room.name) else { return }
+                Task {
+                    do {
+                        name = try await app.client.renameRoom(room.id, name: next).name
+                    } catch {
+                        self.error = error.localizedDescription
+                    }
+                }
+            }
+        }
         .task {
             listener = app.realtime.listen { event in
                 if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" {

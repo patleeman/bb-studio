@@ -38,6 +38,14 @@ struct VoiceChatView: View {
                 Button { engine.tap() } label: { orb }
                     .buttonStyle(.plain)
                 Text(caption).font(.footnote).foregroundStyle(.secondary)
+                    .multilineTextAlignment(.center).padding(.horizontal)
+                if engine.needsSettings, let url = URL(string: UIApplication.openSettingsURLString) {
+                    Link("Open Settings", destination: url).font(.footnote.weight(.semibold))
+                }
+                if let input = engine.silentInput, engine.state == .listening {
+                    Label("No sound from \(input)", systemImage: "mic.slash")
+                        .font(.footnote).foregroundStyle(.orange)
+                }
 
                 HStack(spacing: 40) {
                     Button { engine.togglePause() } label: {

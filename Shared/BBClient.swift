@@ -300,6 +300,14 @@ extension BBClient {
             ["expectedUpdatedAt": .number(updatedAt), "input": .array(input)])
     }
 
+    /// Moves a queued message between two neighbours in the thread's queue.
+    public func reorderQueued(_ threadId: String, _ id: String, previous: String?, next: String?) async throws {
+        let _: JSONValue = try await patch("/api/v1/threads/\(threadId)/queued-messages/\(id)/order", [
+            "previousQueuedMessageId": previous.map(JSONValue.string) ?? .null,
+            "nextQueuedMessageId": next.map(JSONValue.string) ?? .null,
+        ])
+    }
+
     /// Sends a queued message now. `steer` puts it into the running turn;
     /// `auto` waits for the turn to end if one is running.
     public func sendQueuedNow(_ threadId: String, _ id: String, mode: String = "steer") async throws {
@@ -460,6 +468,11 @@ extension BBClient {
 
     public func room(_ id: String, limit: Int = 60) async throws -> RoomPage {
         try await rpc("bot-teams", "room", ["id": .string(id), "limit": .from(limit)])
+    }
+
+    @discardableResult
+    public func renameRoom(_ id: String, name: String) async throws -> Room {
+        try await rpc("bot-teams", "updateRoom", ["id": .string(id), "name": .string(String(name.prefix(80)))])
     }
 
     @discardableResult

@@ -398,6 +398,79 @@ final class ThreadUITests: XCTestCase {
         shot("queue-edited")
     }
 
+    /// Collapses, expands and drags queued messages. Scratch thread only,
+    /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, with three or more queued.
+    func testQueueReorder() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        let summary = app.buttons["queueSummary"]
+        XCTAssertTrue(summary.waitForExistence(timeout: 10), "collapsed queue")
+        shot("queue-collapsed")
+        summary.tap()
+        let cards = app.buttons.matching(NSPredicate(format: "label CONTAINS 'scratch message'"))
+        XCTAssertTrue(wait(5) { cards.count >= 3 }, "expanded cards")
+        shot("queue-expanded")
+        let from = cards.element(boundBy: cards.count - 1).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+        let to = cards.element(boundBy: 0).coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.3))
+        from.press(forDuration: 0.8, thenDragTo: to, withVelocity: .slow, thenHoldForDuration: 0.5)
+        sleep(2)
+        if app.buttons["Move to Top"].exists || app.buttons["Move Up"].exists {
+            app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.2)).tap()
+            sleep(1)
+        }
+        shot("queue-dragged")
+        app.buttons["Collapse queue"].firstMatch.tap()
+        XCTAssertTrue(summary.waitForExistence(timeout: 5), "collapsed again")
+    }
+
+    /// Renames the scratch thread from the ⋯ menu.
+    func testRenameThread() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        app.buttons["Rename"].tap()
+        let field = app.alerts.textFields.firstMatch
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "title field")
+        field.coordinate(withNormalizedOffset: CGVector(dx: 0.97, dy: 0.5)).tap()
+        field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: ((field.value as? String) ?? "").count + 2))
+        field.typeText("BB Go renamed scratch")
+        sleep(1)
+        shot("rename-thread")
+        app.alerts.buttons["Rename"].tap()
+        sleep(2)
+        shot("renamed-thread")
+        XCTAssertTrue(app.navigationBars.staticTexts["BB Go renamed scratch"].waitForExistence(timeout: 10), "new title")
+    }
+
+    /// Opens voice chat on the scratch thread and checks it starts listening.
+    func testVoiceChat() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        addUIInterruptionMonitor(withDescription: "permissions") { alert in
+            for label in ["Allow", "OK"] where alert.buttons[label].exists {
+                alert.buttons[label].tap()
+                return true
+            }
+            return false
+        }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        app.buttons["Voice chat"].tap()
+        sleep(2)
+        app.tap()
+        sleep(5)
+        shot("voice-chat")
+        // The simulator can't grant speech recognition, so accept the Settings path too.
+        let listening = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Listening'")).firstMatch
+        XCTAssertTrue(listening.waitForExistence(timeout: 5) || app.links["Open Settings"].exists || app.buttons["Open Settings"].exists,
+            "listening, or a way to fix the permission")
+        app.buttons["Pause"].tap()
+        app.buttons["End"].tap()
+    }
+
     func testShelfDemo() {
         app.terminate()
         app.launchArguments = ["-qaShelfDemo"]

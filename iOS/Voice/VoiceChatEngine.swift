@@ -23,6 +23,10 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
     @Published private(set) var turns: [Turn] = []
     @Published private(set) var threadTitle = ""
     @Published var paused = false
+    /// The input's name when it has sent nothing but silence for a few seconds.
+    @Published private(set) var silentInput: String?
+    /// A permission is off, so the fix is in Settings.
+    @Published private(set) var needsSettings = false
 
     let threadId: String
     private let client: BBClient
@@ -40,6 +44,12 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
     private var checkTask: Task<Void, Never>?
     /// What is being read aloud, to tell your voice from the speaker's echo.
     private var speakingText = ""
+    /// Loudest input since listening started, written from the audio thread.
+    private let level = InputLevel()
+    private var levelTask: Task<Void, Never>?
+    /// Recognition tasks that ended with nothing heard, back to back.
+    private var emptyEnds = 0
+    private var observers: [NSObjectProtocol] = []
 
     /// How long a pause ends your turn.
     private let endOfTurn: Duration = .milliseconds(1600)
@@ -56,16 +66,28 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         let speech = await withCheckedContinuation { continuation in
             SFSpeechRecognizer.requestAuthorization { continuation.resume(returning: $0) }
         }
-        guard speech == .authorized, await AVAudioApplication.requestRecordPermission() else {
-            state = .failed("Speech recognition or microphone access is off.")
+        guard speech == .authorized else {
+            needsSettings = true
+            state = .failed(speech == .restricted
+                ? "Speech recognition is restricted on this iPhone (Screen Time or a profile)."
+                : "Speech recognition is off for BB Go. Turn it on in Settings, then try again.")
+            return
+        }
+        guard await AVAudioApplication.requestRecordPermission() else {
+            needsSettings = true
+            state = .failed("Microphone access is off for BB Go. Turn it on in Settings, then try again.")
             return
         }
         do {
+            // Default mode and A2DP, as dictation does: `.voiceChat` routes input
+            // to a Bluetooth headset's HFP mic, which is often silent or muted.
             let session = AVAudioSession.sharedInstance()
-            try session.setCategory(.playAndRecord, mode: .voiceChat, options: [.defaultToSpeaker, .allowBluetoothHFP])
+            try session.setCategory(.playAndRecord, mode: .default, options: [.defaultToSpeaker, .allowBluetoothA2DP])
             try session.setActive(true)
             // Echo cancellation, so the mic can keep listening while a reply plays.
+            // Voice processing needs the output side of the graph too.
             try? engine.inputNode.setVoiceProcessingEnabled(true)
+            _ = engine.mainMixerNode
         } catch {
             state = .failed(error.localizedDescription)
             return
@@ -77,6 +99,7 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
                 self.scheduleCheck()
             }
         }
+        observe()
         if let thread = try? await client.thread(threadId) { threadTitle = thread.displayTitle }
         baselineReplyId = try? await latestReply()?.id
         listen()
@@ -86,6 +109,9 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         stopListening()
         synthesizer.stopSpeaking(at: .immediate)
         checkTask?.cancel()
+        levelTask?.cancel()
+        observers.forEach(NotificationCenter.default.removeObserver)
+        observers = []
         if let listener { realtime.removeListener(listener) }
         realtime.unsubscribeThread(threadId)
         state = .idle
@@ -141,16 +167,26 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         let current = generation
 
         let input = engine.inputNode
-        input.installTap(onBus: 0, bufferSize: 2048, format: input.outputFormat(forBus: 0)) { buffer, _ in
+        let format = input.outputFormat(forBus: 0)
+        guard format.sampleRate > 0, format.channelCount > 0 else {
+            state = .failed("No microphone is available. Check Settings → Privacy → Microphone.")
+            return false
+        }
+        let level = level
+        level.reset()
+        input.installTap(onBus: 0, bufferSize: 2048, format: format) { buffer, _ in
             request.append(buffer)
+            level.record(buffer)
         }
         do {
             engine.prepare()
             try engine.start()
         } catch {
-            state = .failed(error.localizedDescription)
+            input.removeTap(onBus: 0)
+            state = .failed("The microphone couldn't start: \(error.localizedDescription)")
             return false
         }
+        watchLevel(current)
         recognition = recognizer.recognitionTask(with: request) { [weak self] result, error in
             let text = result?.bestTranscription.formattedString
             Task { @MainActor in
@@ -162,10 +198,18 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
                 guard self.state == .listening else { return }
                 if let text, !text.isEmpty {
                     self.partial = text
+                    self.emptyEnds = 0
                     self.armSilenceTimer()
                 }
                 // Recognition ends on its own after long silence; start a fresh task.
-                if error != nil, self.partial.isEmpty {
+                // One that keeps failing straight away is broken, so say why.
+                if let error, self.partial.isEmpty {
+                    self.emptyEnds += 1
+                    if self.emptyEnds >= 4 {
+                        self.stopListening()
+                        self.state = .failed("Speech recognition stopped: \(error.localizedDescription)")
+                        return
+                    }
                     try? await Task.sleep(for: .seconds(1))
                     if self.generation == current, self.state == .listening { self.listen() }
                 }
@@ -192,13 +236,53 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         }
     }
 
+    /// Shows which input is silent after three seconds of nothing, and clears
+    /// it as soon as sound arrives.
+    private func watchLevel(_ current: Int) {
+        levelTask?.cancel()
+        silentInput = nil
+        levelTask = Task {
+            let started = ContinuousClock.now
+            while !Task.isCancelled, generation == current {
+                try? await Task.sleep(for: .seconds(1))
+                guard generation == current else { return }
+                if level.peak > 0.0003 {
+                    silentInput = nil
+                } else if ContinuousClock.now - started > .seconds(3) {
+                    silentInput = AVAudioSession.sharedInstance().currentRoute.inputs.first?.portName ?? "the microphone"
+                }
+            }
+        }
+    }
+
+    /// A new route (headphones, CarPlay) or an interruption (a call) stops the
+    /// engine; pick listening back up once it's over.
+    private func observe() {
+        let center = NotificationCenter.default
+        let resume: @Sendable (Notification) -> Void = { [weak self] note in
+            if note.name == AVAudioSession.interruptionNotification,
+                (note.userInfo?[AVAudioSessionInterruptionTypeKey] as? UInt) == AVAudioSession.InterruptionType.began.rawValue
+            { return }
+            Task { @MainActor in
+                guard let self, self.state == .listening || self.state == .speaking, !self.paused else { return }
+                try? await Task.sleep(for: .milliseconds(300))
+                try? AVAudioSession.sharedInstance().setActive(true)
+                if self.state == .listening { self.listen() } else { self.startRecognition() }
+            }
+        }
+        observers = [
+            center.addObserver(forName: .AVAudioEngineConfigurationChange, object: engine, queue: nil, using: resume),
+            center.addObserver(forName: AVAudioSession.interruptionNotification, object: nil, queue: nil, using: resume),
+        ]
+    }
+
     private func stopListening() {
         generation += 1
         silenceTask?.cancel()
-        if engine.isRunning {
-            engine.inputNode.removeTap(onBus: 0)
-            engine.stop()
-        }
+        levelTask?.cancel()
+        silentInput = nil
+        engine.inputNode.removeTap(onBus: 0)
+        if engine.isRunning { engine.stop() }
         request?.endAudio()
         recognition?.cancel()
         request = nil
@@ -294,5 +378,23 @@ final class VoiceChatEngine: NSObject, ObservableObject, AVSpeechSynthesizerDele
         text = text.replacing(/\[([^\]]+)\]\([^)]+\)/) { String($0.output.1) }
         text = text.replacing(/[`*_#>|]/, with: "")
         return text
+    }
+}
+
+/// The loudest buffer seen since `reset`, shared with the audio tap.
+private final class InputLevel: @unchecked Sendable {
+    private let lock = NSLock()
+    private var value: Float = 0
+
+    var peak: Float { lock.withLock { value } }
+
+    func reset() { lock.withLock { value = 0 } }
+
+    func record(_ buffer: AVAudioPCMBuffer) {
+        guard let samples = buffer.floatChannelData?[0], buffer.frameLength > 0 else { return }
+        var sum: Float = 0
+        for i in 0..<Int(buffer.frameLength) { sum += samples[i] * samples[i] }
+        let rms = (sum / Float(buffer.frameLength)).squareRoot()
+        lock.withLock { value = max(value, rms) }
     }
 }

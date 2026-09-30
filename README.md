@@ -7,10 +7,10 @@ view (the Web tab, and the safari button on every thread).
 | Feature | Where |
 |---|---|
 | Home: the BB web sidebar on the phone. Channels, direct messages (current bots, unarchived threads), Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
-| Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename | `iOS/Inbox/InboxView.swift` |
+| Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename (threads, channels and DMs) | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
 | New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app) | `iOS/Inbox/NewThreadView.swift` |
-| Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. The ⋯ menu has Voice chat, Find in thread, Model & reasoning, Mute notifications, Open in BB web, and Share link | `iOS/Thread/ThreadView.swift` |
+| Thread view with live updates, send, and stop. Opens at the newest message and follows new output only while you're at the bottom; a jump button brings you back. Older pages load as you reach the top, without moving what you're reading. The ⋯ menu has Voice chat, Find in thread, Rename, Model & reasoning, Mute notifications, Open in BB web, and Share link | `iOS/Thread/ThreadView.swift` |
 | Live updates fetch only what changed: new rows since the last sequence, and the thread or its approvals only when those changed | `iOS/Thread/ThreadModel.swift` |
 | A red "New" line where you left off; the thread opens there when there's something unread | `iOS/Thread/ThreadView.swift` |
 | Find in thread: searches every message, with a match count and up/down to step through them | `iOS/Thread/FindBar.swift` |
@@ -43,7 +43,7 @@ view (the Web tab, and the safari button on every thread).
 | Long-press a message: Copy, Select Text, Quote, Share | `iOS/Thread/Messages.swift` |
 | Tool activity collapses into one row per run ("3 commands, 2 edits"). Tap for each step and its output | `iOS/Thread/Messages.swift` |
 | Edit a queued message or draft before it sends. Attachments stay, @-mentions stay while their text does, and the edit is refused if the message sent or changed meanwhile | `iOS/Tools/QueuedMessageEditor.swift`, `BBClient.editQueued` |
-| The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (tap to edit, send now, remove) | `iOS/Thread/ThreadShelf.swift` |
+| The shelf above the composer: model fallback, plan mode (exit), goal (clear), background work, todo progress, and queued messages (tap to edit, send now, remove). Two or more queued messages fold into one "N queued" row; expanded, hold and drag to reorder, or use Move to Top / Up / Down | `iOS/Thread/ThreadShelf.swift` |
 | Paste text or images into the composer. Images become attachments | `iOS/Thread/Composer.swift` |
 | Answer approvals (command, file, permission, plan) and questions in the thread, including the ask-user-question plugin's multi-question forms and secret requests (values go straight to the server and aren't kept). Other plugin forms open the web app | `iOS/Thread/InteractionCard.swift`, `Shared/Interactions.swift` |
 | Attachments from photos, the camera, or files (JPEG re-encoded, 35 MB limit) | `iOS/Thread/Attachments.swift` |
@@ -52,7 +52,7 @@ view (the Web tab, and the safari button on every thread).
 | Actionable notifications: Approve, Deny, Approve plan, Answer, and Reply from the lock screen. Multiple-choice questions get a button per option | `iOS/App/NotificationActions.swift`, `NotificationService/`, `plugin/apns.ts` |
 | Studio tab: pages, recordings, dictations, and drawings in one list, grouped by day, with kind and project filters, search (titles plus the Studio plugin's content search), and swipe to delete. Dictate, Record, and Dictate Page (speak a new page) at the top. Uses the Studio plugin's overview when it's installed, or asks Pages, Talk, and Excalidraw directly | `iOS/Studio/StudioView.swift` |
 | Dictation and recordings through the Talk plugin, with an offline segment outbox. A standalone dictation can be saved as a page, and recordings open to their transcript with share, copy, new thread, and delete | `iOS/Talk` |
-| Hands-free voice chat with one thread (on-device STT, then the thread, then TTS). You can talk over it, and pick the voice and speed in Settings | `iOS/Voice` |
+| Hands-free voice chat with one thread (on-device STT, then the thread, then TTS). You can talk over it, and pick the voice and speed in Settings. Uses the iPhone mic even with Bluetooth audio, restarts after calls and route changes, warns when the mic sends only silence, and links to Settings when a permission is off | `iOS/Voice` |
 | Action button and Siri shortcuts: Dictate, Voice chat, Open thread, New thread, "Ask BB" (Siri waits for the reply and reads it) | `iOS/App/Intents.swift` |
 | Control Center and lock screen controls: Dictate, Voice chat, New thread | `Widgets/Controls.swift` |
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |

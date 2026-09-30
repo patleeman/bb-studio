@@ -26,6 +26,8 @@ struct ThreadView: View {
     @State private var showingFiles = false
     @State private var showingHistory = false
     @State private var confirmingCompact = false
+    @State private var renaming = false
+    @State private var newTitle = ""
     @State private var reviewingPlan: PlanReview?
     /// Set while the composer holds a rewrite of the last message.
     @State private var editing = false
@@ -71,6 +73,15 @@ struct ThreadView: View {
                 showingHistory = false
                 draft = text
                 composerFocused = true
+            }
+        }
+        .alert("Rename thread", isPresented: $renaming) {
+            TextField("Title", text: $newTitle)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                model.thread?.title = title.isEmpty ? nil : title
+                Task { await model.perform { try await $0.rename($1, title: title.isEmpty ? nil : title) } }
             }
         }
         .confirmationDialog("Compact this thread?", isPresented: $confirmingCompact, titleVisibility: .visible) {
@@ -187,6 +198,10 @@ struct ThreadView: View {
                         Label("Voice chat", systemImage: "waveform")
                     }
                     Button { finding = true } label: { Label("Find in thread", systemImage: "magnifyingglass") }
+                    Button {
+                        newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
+                        renaming = true
+                    } label: { Label("Rename", systemImage: "pencil") }
                     Button { choosingModel = true } label: { Label("Model & reasoning", systemImage: "cpu") }
                     if model.thread?.environmentId != nil {
                         Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }

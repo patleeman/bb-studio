@@ -214,6 +214,9 @@ struct InboxView: View {
     @StateObject private var model = InboxModel()
     @State private var query = ""
     @State private var renaming: ThreadEntry?
+    @State private var renamingRoom: Room?
+    /// A direct message's thread id.
+    @State private var renamingDirect: String?
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
     /// The server's running plugins, comma-separated; remembered so the tool rows show offline.
@@ -245,6 +248,12 @@ struct InboxView: View {
                                            attention: model.botTeams?.attentionCounts?[room.id] ?? 0,
                                            approvals: model.botTeams?.approvalCounts?[room.id] ?? 0)
                             }
+                            .contextMenu {
+                                Button {
+                                    newTitle = room.name
+                                    renamingRoom = room
+                                } label: { Label("Rename", systemImage: "pencil") }
+                            }
                         }
                     }
                 }
@@ -254,6 +263,12 @@ struct InboxView: View {
                             NavigationLink(value: Route.thread(id: dm.threadId)) {
                                 BotRow(bot: dm.bot, title: dm.info?.title, unread: dm.info?.unread == true,
                                     working: model.botTeams?.directThreads[dm.bot.id]?.status == "active")
+                            }
+                            .contextMenu {
+                                Button {
+                                    newTitle = dm.info?.title ?? ""
+                                    renamingDirect = dm.threadId
+                                } label: { Label("Rename", systemImage: "pencil") }
                             }
                         }
                     }
@@ -278,6 +293,39 @@ struct InboxView: View {
                 Task {
                     await model.perform(app.client, thread.id, local: { $0.title = title.isEmpty ? nil : title }) {
                         try await app.client.rename(thread.id, title: title.isEmpty ? nil : title)
+                    }
+                }
+            }
+        }
+        .alert("Rename channel", isPresented: Binding(get: { renamingRoom != nil }, set: { if !$0 { renamingRoom = nil } })) {
+            TextField("Name", text: $newTitle)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                guard let room = renamingRoom else { return }
+                let name = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !name.isEmpty, name != room.name else { return }
+                Task {
+                    do {
+                        try await app.client.renameRoom(room.id, name: name)
+                        await model.load(app.client)
+                    } catch {
+                        model.error = BBClient.describe(error, server: app.client.baseURL)
+                    }
+                }
+            }
+        }
+        .alert("Rename conversation", isPresented: Binding(get: { renamingDirect != nil }, set: { if !$0 { renamingDirect = nil } })) {
+            TextField("Title", text: $newTitle)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                guard let id = renamingDirect else { return }
+                let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
+                Task {
+                    do {
+                        try await app.client.rename(id, title: title.isEmpty ? nil : title)
+                        await model.load(app.client)
+                    } catch {
+                        model.error = BBClient.describe(error, server: app.client.baseURL)
                     }
                 }
             }

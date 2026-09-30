@@ -7,6 +7,7 @@ struct ThreadShelf: View {
     @EnvironmentObject private var app: AppModel
     @AppStorage("dismissedFallbacks") private var dismissedFallbacks = ""
     @State private var editing: QueuedMessage?
+    @State private var queueExpanded = false
 
     var body: some View {
         let shelf = model.shelf
@@ -55,45 +56,28 @@ struct ThreadShelf: View {
             if !shelf.todos.isEmpty {
                 TodoCard(items: shelf.todos)
             }
-            ForEach(model.queued) { message in
-                ShelfCard(icon: message.isRetry ? "arrow.clockwise" : message.isDraft ? "doc.text" : "clock", tint: .secondary) {
-                    Button {
-                        if message.editable != false { editing = message }
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(message.text.isEmpty ? "Attachment" : message.text).lineLimit(2)
-                            Text(message.attachmentCount > 0 ? "\(message.status) · \(message.attachmentCount) attachment\(message.attachmentCount == 1 ? "" : "s")" : message.status)
-                                .font(.caption2).foregroundStyle(.secondary)
-                        }
-                        .frame(maxWidth: .infinity, alignment: .leading)
-                        .contentShape(.rect)
+            if model.queued.count > 1, !queueExpanded {
+                queueSummary
+            } else {
+                if model.queued.count > 1 { queueHeader }
+                List {
+                    ForEach(model.queued) { message in
+                        queuedCard(message)
+                            .listRowInsets(EdgeInsets(top: 3, leading: 0, bottom: 3, trailing: 0))
+                            .listRowSeparator(.hidden)
+                            .listRowBackground(Color.clear)
                     }
-                    .accessibilityHint(message.editable != false ? "Edits the message" : "")
-                } trailing: {
-                    HStack(spacing: 2) {
-                        Button {
-                            Task { await model.perform { try await $0.sendQueuedNow($1, message.id) } }
-                        } label: {
-                            Image(systemName: "arrow.up.circle").frame(width: 30, height: 30)
-                        }
-                        .accessibilityLabel("Send now")
-                        dismiss("Remove from queue") {
-                            Task { await model.perform { try await $0.deleteQueued($1, message.id) } }
-                        }
+                    .onMove { from, to in
+                        guard let index = from.first else { return }
+                        move(model.queued[index].id, to: to > index ? to - 1 : to)
                     }
                 }
-                .contextMenu {
-                    if message.editable != false {
-                        Button { editing = message } label: { Label("Edit", systemImage: "pencil") }
-                    }
-                    Button {
-                        Task { await model.perform { try await $0.sendQueuedNow($1, message.id) } }
-                    } label: { Label("Send Now", systemImage: "arrow.up.circle") }
-                    Button { UIPasteboard.general.string = message.text } label: { Label("Copy", systemImage: "doc.on.doc") }
-                    Button(role: .destructive) {
-                        Task { await model.perform { try await $0.deleteQueued($1, message.id) } }
-                    } label: { Label("Remove", systemImage: "trash") }
-                }
+                .listStyle(.plain)
+                .scrollContentBackground(.hidden)
+                .scrollBounceBehavior(.basedOnSize)
+                .environment(\.defaultMinListRowHeight, 40)
+                .contentMargins(.vertical, 0, for: .scrollContent)
+                .frame(height: min(CGFloat(model.queued.count) * 55, 250))
             }
         }
         .animation(.snappy, value: model.shelf)
@@ -103,6 +87,119 @@ struct ThreadShelf: View {
                 Task { await model.loadInteractions() }
             }
         }
+    }
+
+    /// Two or more queued messages fold into one row so the shelf stays short.
+    private var queueSummary: some View {
+        let next = model.queued[0]
+        return ShelfCard(icon: "tray.full", tint: .secondary) {
+            Button { withAnimation(.snappy) { queueExpanded = true } } label: {
+                VStack(alignment: .leading, spacing: 1) {
+                    Text("\(model.queued.count) queued").fontWeight(.medium)
+                    Text(next.text.isEmpty ? "Attachment" : next.text).foregroundStyle(.secondary).lineLimit(1)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .accessibilityIdentifier("queueSummary")
+            .accessibilityHint("Shows the queued messages")
+        } trailing: {
+            chevron(expanded: false) { queueExpanded = true }
+        }
+    }
+
+    private var queueHeader: some View {
+        Button { withAnimation(.snappy) { queueExpanded = false } } label: {
+            HStack {
+                Text("\(model.queued.count) queued · hold and drag to reorder")
+                    .font(.caption).foregroundStyle(.secondary)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                Image(systemName: "chevron.down").font(.caption2.weight(.semibold)).foregroundStyle(.secondary)
+                    .frame(width: 30, height: 22)
+            }
+            .padding(.leading, 12).padding(.trailing, 4)
+            .contentShape(.rect)
+        }
+        .buttonStyle(.plain)
+        .accessibilityLabel("Collapse queue")
+    }
+
+    private func chevron(expanded: Bool, action: @escaping () -> Void) -> some View {
+        Button { withAnimation(.snappy, action) } label: {
+            Image(systemName: "chevron.up")
+                .font(.caption2.weight(.semibold))
+                .rotationEffect(.degrees(expanded ? 180 : 0))
+                .frame(width: 30, height: 30)
+        }
+        .foregroundStyle(.secondary)
+        .accessibilityLabel(expanded ? "Collapse queue" : "Expand queue")
+    }
+
+    private func queuedCard(_ message: QueuedMessage) -> some View {
+        ShelfCard(icon: message.isRetry ? "arrow.clockwise" : message.isDraft ? "doc.text" : "clock", tint: .secondary) {
+            Button {
+                if message.editable != false { editing = message }
+            } label: {
+                VStack(alignment: .leading, spacing: 2) {
+                    Text(message.text.isEmpty ? "Attachment" : message.text).lineLimit(2)
+                    Text(message.attachmentCount > 0 ? "\(message.status) · \(message.attachmentCount) attachment\(message.attachmentCount == 1 ? "" : "s")" : message.status)
+                        .font(.caption2).foregroundStyle(.secondary)
+                }
+                .frame(maxWidth: .infinity, alignment: .leading)
+                .contentShape(.rect)
+            }
+            .accessibilityHint(message.editable != false ? "Edits the message" : "")
+        } trailing: {
+            HStack(spacing: 2) {
+                Button {
+                    Task { await model.perform { try await $0.sendQueuedNow($1, message.id) } }
+                } label: {
+                    Image(systemName: "arrow.up.circle").frame(width: 30, height: 30)
+                }
+                .accessibilityLabel("Send now")
+                dismiss("Remove from queue") {
+                    Task { await model.perform { try await $0.deleteQueued($1, message.id) } }
+                }
+            }
+        }
+        .contextMenu {
+            if message.editable != false {
+                Button { editing = message } label: { Label("Edit", systemImage: "pencil") }
+            }
+            Button {
+                Task { await model.perform { try await $0.sendQueuedNow($1, message.id) } }
+            } label: { Label("Send Now", systemImage: "arrow.up.circle") }
+            if model.queued.count > 1, let index = model.queued.firstIndex(where: { $0.id == message.id }) {
+                if index > 0 {
+                    Button { move(message.id, to: 0) } label: { Label("Move to Top", systemImage: "arrow.up.to.line") }
+                    Button { move(message.id, to: index - 1) } label: { Label("Move Up", systemImage: "arrow.up") }
+                }
+                if index < model.queued.count - 1 {
+                    Button { move(message.id, to: index + 1) } label: { Label("Move Down", systemImage: "arrow.down") }
+                }
+            }
+            Button { UIPasteboard.general.string = message.text } label: { Label("Copy", systemImage: "doc.on.doc") }
+            Button(role: .destructive) {
+                Task { await model.perform { try await $0.deleteQueued($1, message.id) } }
+            } label: { Label("Remove", systemImage: "trash") }
+        }
+    }
+
+    /// Moves a queued message to `index` right away, then tells the server
+    /// which neighbours it now sits between. A refresh follows either way.
+    @discardableResult
+    private func move(_ id: String, to index: Int?) -> Bool {
+        guard let index, let from = model.queued.firstIndex(where: { $0.id == id }), from != index else { return false }
+        withAnimation(.snappy) {
+            let message = model.queued.remove(at: from)
+            model.queued.insert(message, at: min(index, model.queued.count))
+        }
+        let ids = model.queued.map(\.id)
+        guard let at = ids.firstIndex(of: id) else { return false }
+        let previous = at > 0 ? ids[at - 1] : nil
+        let next = at + 1 < ids.count ? ids[at + 1] : nil
+        Task { await model.perform { try await $0.reorderQueued($1, id, previous: previous, next: next) } }
+        return true
     }
 
     private func dismiss(_ label: String, action: @escaping () -> Void) -> some View {
