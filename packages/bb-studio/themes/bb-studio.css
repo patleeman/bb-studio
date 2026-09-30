@@ -8,20 +8,24 @@
  * The anchors are oklch on purpose: Chrome drops the hue of a dark hex color
  * inside color-mix(in oklch), which tints every derived surface red. Ink and
  * canvas share a hue family so the mixed grays stay teal, not olive.
+ *
+ * The text tiers are set per mode, not mixed from ink. BB draws some labels
+ * at 40-75% opacity on top of them (tool rows, sidebar headers, "No threads"),
+ * so they sit brighter than a plain mix would, at or above BB's default theme.
  */
 
 :root,
 .light {
-  --canvas: oklch(0.977 0.004 205);
+  --canvas: oklch(0.985 0.003 205);
   --ink: oklch(0.22 0.023 221);
   /* The sidebar sits on the icon's ground: a touch cooler in light, deeper in dark. */
-  --sidebar: oklch(0.955 0.009 205);
+  --sidebar: oklch(0.965 0.007 205);
 
   --primary: #c7431a;
   --primary-foreground: #ffffff;
-  --muted-foreground: color-mix(in oklch, var(--ink) 70%, var(--canvas));
-  --subtle-foreground: color-mix(in oklch, var(--ink) 58%, var(--canvas));
-  --readback-foreground: color-mix(in oklch, var(--ink) 64%, var(--canvas));
+  --muted-foreground: oklch(0.4 0.018 218);
+  --subtle-foreground: oklch(0.46 0.016 216);
+  --readback-foreground: oklch(0.43 0.017 217);
 
   --destructive: #d42f55;
   --destructive-foreground: #ffffff;
@@ -43,6 +47,9 @@
 
   --primary: #ff7a45;
   --primary-foreground: #1a0c07;
+  --muted-foreground: oklch(0.82 0.012 212);
+  --subtle-foreground: oklch(0.76 0.012 213);
+  --readback-foreground: oklch(0.79 0.012 212);
 
   --destructive: #ff5c7a;
   --destructive-foreground: #1a0c07;
