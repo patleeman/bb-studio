@@ -34,6 +34,7 @@ view (the Web tab, and the safari button on every thread).
 | Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
 | Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
 | Files & changes: a thread's uncommitted changes with diffs, a file browser, file search, and file previews (images, rendered Markdown, text) | `iOS/Thread/FilesView.swift` |
+| Terminals: BB's persistent terminals, from a thread's ⋯ menu (its workspace) or Home → Terminals (any connected machine). A full VT terminal (SwiftTerm) with a key bar for Esc, Ctrl, Tab and arrows; new shell or run a command; rename, restart, close, paste, copy output, text size. Reconnects replay only missed output, and the shell keeps running when you leave | `iOS/Terminal/`, `Shared/Terminals.swift` |
 | Edit the last message you sent, retry a failed turn, fork, compact, and resend a recent prompt | `ThreadView`, `iOS/Thread/PromptHistoryView.swift` |
 | Archived threads: search, open, and unarchive | `iOS/Tools/ArchivedView.swift` |
 | Drawings (in Studio): Excalidraw drawings rendered natively, with zoom, live updates while an agent draws, and share as an image | `iOS/Tools/DrawingsView.swift` |
@@ -59,7 +60,7 @@ view (the Web tab, and the safari button on every thread).
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings` | `AppModel.handle` |
+| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `terminals`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings` | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `plugin/live.ts` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |

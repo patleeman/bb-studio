@@ -430,6 +430,7 @@ struct InboxView: View {
         if plugins.contains("account-pool") {
             NavigationLink(value: Route.usage) { Label("Usage", systemImage: "gauge.with.dots.needle.33percent") }
         }
+        NavigationLink(value: Route.machines) { Label("Terminals", systemImage: "apple.terminal") }
         NavigationLink(value: Route.archived) { Label("Archived", systemImage: "archivebox") }
     }
 

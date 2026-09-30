@@ -5,6 +5,10 @@ options:
     iOS: "26.0"
     watchOS: "26.0"
   createIntermediateGroups: true
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.11.2
 settings:
   base:
     DEVELOPMENT_TEAM: 3753DAN98U
@@ -31,6 +35,7 @@ targets:
       testTargets:
         - BBGoUITests
     dependencies:
+      - package: SwiftTerm
       - target: BBGoWatch
       - target: BBGoWidgets
       - target: BBGoShare

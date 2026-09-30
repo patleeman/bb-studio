@@ -578,6 +578,38 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "card opens the viewer")
     }
 
+    func testTerminal() throws {
+        app.open(URL(string: "bbgo://terminals")!)
+        let host = app.buttons.containing(NSPredicate(format: "label CONTAINS 'MegaMac'")).firstMatch
+        XCTAssertTrue(host.waitForExistence(timeout: 10), "machine list")
+        shot("terminal-machines")
+        host.tap()
+        let create = app.buttons["newTerminal"]
+        XCTAssertTrue(create.waitForExistence(timeout: 10), "terminal list")
+        create.tap()
+        let canvas = app.descendants(matching: .any)["terminalCanvas"]
+        XCTAssertTrue(canvas.waitForExistence(timeout: 10), "terminal screen")
+        let connecting = app.staticTexts["Connecting…"]
+        let deadline = Date().addingTimeInterval(15)
+        while connecting.exists && Date() < deadline { sleep(1) }
+        XCTAssertFalse(connecting.exists, "attached")
+        sleep(2)
+        canvas.tap()
+        app.typeText("echo bbgo-qa-$((6*7))\n")
+        sleep(3)
+        shot("terminal-shell")
+        app.buttons["Terminal actions"].tap()
+        XCTAssertTrue(app.buttons["Close Terminal"].waitForExistence(timeout: 5), "menu")
+        shot("terminal-menu")
+        app.buttons["Close Terminal"].tap()
+        let confirm = app.buttons["Close Terminal"].firstMatch
+        XCTAssertTrue(confirm.waitForExistence(timeout: 5))
+        confirm.tap()
+        XCTAssertTrue(create.waitForExistence(timeout: 10), "back on the list")
+        sleep(1)
+        shot("terminal-list")
+    }
+
     private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
             "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,

@@ -230,6 +230,9 @@ struct ThreadView: View {
                     Button { choosingModel = true } label: { Label("Model & reasoning", systemImage: "cpu") }
                     if model.thread?.environmentId != nil {
                         Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
+                        Button { app.push(.terminals(scope: .thread(model.threadId), title: "Terminals")) } label: {
+                            Label("Terminals", systemImage: "apple.terminal")
+                        }
                     }
                     Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
                     Section {

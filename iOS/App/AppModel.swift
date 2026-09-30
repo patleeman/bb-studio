@@ -16,6 +16,8 @@ enum Route: Hashable {
     case drawing(id: String)
     case recording(id: String)
     case artifact(id: String)
+    case terminals(scope: TerminalScope, title: String)
+    case machines
 }
 
 extension Route {
@@ -111,7 +113,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`, `bbgo://artifact/<id>`,
+    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`, `bbgo://artifact/<id>`, `bbgo://terminals`,
     /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://studio` (or `talk`), `bbgo://web`.
     func handle(_ url: URL) {
         guard url.scheme == "bbgo" else { return }
@@ -124,6 +126,7 @@ final class AppModel: ObservableObject {
         case "usage": open(.usage)
         case "archived": open(.archived)
         case "attention": open(.attention)
+        case "terminals", "terminal": open(.machines)
         case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
         case "pages": openStudio(kind: "page")
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
