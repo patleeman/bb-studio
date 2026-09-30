@@ -57,6 +57,20 @@ with the source `git:github.com/patleeman/bb-studio@main` (or run the
 The `@bb-studio` suffix matters if you have another marketplace that lists
 the same IDs. Without it, BB refuses the install and lists the choices.
 
+### Coming from patleeman/bb-plugins
+
+These plugins also ship in [patleeman/bb-plugins](https://github.com/patleeman/bb-plugins)
+for now, with the same IDs. BB won't move an installed plugin to a new source,
+so to switch one, remove it and install it from here:
+
+```sh
+bb plugin remove talk
+bb plugin install talk@bb-studio --yes
+```
+
+Your items (pages, recordings, drawings, tasks, bots) are kept, but removing a
+plugin deletes its settings and secrets, so note them first.
+
 ## Development
 
 This is a pnpm workspace. [`@bb-studio/kit`](packages/studio-kit/) holds the
