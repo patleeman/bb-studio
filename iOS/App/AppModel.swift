@@ -129,6 +129,7 @@ final class AppModel: ObservableObject {
         case "terminals", "terminal": open(.machines)
         case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
         case "pages": openStudio(kind: "page")
+        case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "dictate": startDictation(threadId: id)
         case "voice": startVoiceChat(threadId: id)

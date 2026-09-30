@@ -290,10 +290,24 @@ struct PageChart: View {
 
 struct EmbedCard: View {
     let embed: Embed
+    @EnvironmentObject private var app: AppModel
+    @ObservedObject private var studio = StudioStore.shared
+
+    /// Embeds of other add-ons' items, by the add-on that makes them.
+    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk", "task": "studio-tasks"]
 
     var body: some View {
         let target = embed.target ?? embed.url ?? embed.id ?? ""
         let kind = embed.kind ?? "bookmark"
+        if let ref = Self.studioRef(kind, target) {
+            studioCard(kind, ref)
+        } else {
+            linkCard(kind, target)
+        }
+    }
+
+    @ViewBuilder
+    private func linkCard(_ kind: String, _ target: String) -> some View {
         let content = HStack(spacing: 10) {
             Image(systemName: symbol(kind)).foregroundStyle(.secondary).frame(width: 24)
             VStack(alignment: .leading, spacing: 2) {
@@ -311,6 +325,69 @@ struct EmbedCard: View {
         } else {
             content
         }
+    }
+
+    /// A drawing, artifact, recording, task or any Studio item: its row from Studio, opening natively.
+    private func studioCard(_ kind: String, _ ref: (pluginId: String, id: String)) -> some View {
+        let item = studio.items.first { $0.pluginId == ref.pluginId && $0.itemId == ref.id }
+        let label = kind == "item" ? (item.map { StudioKind.of($0.kind).label } ?? "Studio item") : StudioKind.of(kind).label
+        return Button { open(item, ref) } label: {
+            Group {
+                if let item {
+                    StudioRow(item: item, project: nil)
+                } else {
+                    HStack(spacing: 10) {
+                        Image(systemName: kind == "task" ? "checkmark.circle" : StudioKind.of(kind).symbol)
+                            .foregroundStyle(.secondary).frame(width: 24)
+                        VStack(alignment: .leading, spacing: 2) {
+                            Text(embed.title.flatMap { $0.isEmpty ? nil : $0 } ?? label).font(.subheadline.weight(.semibold))
+                            Text(studio.loaded ? "\(label) not found" : "Loading…").font(.caption).foregroundStyle(.secondary)
+                        }
+                        Spacer(minLength: 0)
+                    }
+                }
+            }
+            .padding(12)
+            .frame(maxWidth: .infinity, alignment: .leading)
+            .background(.fill.tertiary, in: .rect(cornerRadius: 12))
+        }
+        .buttonStyle(.plain)
+        .accessibilityIdentifier("studioEmbed")
+        .task {
+            guard item == nil, studio.items.isEmpty else { return }
+            studio.restore()
+            if studio.items.isEmpty { await studio.load(app.client) }
+        }
+    }
+
+    private func open(_ item: StudioItem?, _ ref: (pluginId: String, id: String)) {
+        let href = item?.href
+        if let route = href.flatMap(Route.init(href:)) ?? Self.route(ref) {
+            app.push(route)
+        } else if let href, let url = URL(string: href, relativeTo: app.client.baseURL) {
+            // Add-ons the app doesn't draw natively, like Studio Tasks, open in BB web.
+            UIApplication.shared.open(url)
+        }
+    }
+
+    private static func route(_ ref: (pluginId: String, id: String)) -> Route? {
+        switch ref.pluginId {
+        case "excalidraw": .drawing(id: ref.id)
+        case "artifacts": .artifact(id: ref.id)
+        case "talk": .recording(id: ref.id)
+        case "pages": .page(id: ref.id)
+        default: nil
+        }
+    }
+
+    /// The add-on item an embed points at: an id for a known kind, `pluginId:id` for "item".
+    static func studioRef(_ kind: String, _ target: String) -> (pluginId: String, id: String)? {
+        guard !target.isEmpty else { return nil }
+        if let pluginId = studioPlugins[kind] { return (pluginId, target) }
+        guard kind == "item", let split = target.firstIndex(of: ":"), split != target.startIndex,
+            target.index(after: split) != target.endIndex
+        else { return nil }
+        return (String(target[..<split]), String(target[target.index(after: split)...]))
     }
 
     private func link(_ kind: String, _ target: String) -> URL? {
@@ -333,7 +410,7 @@ struct EmbedCard: View {
         case "bookmark": target
         case "page": "Page"
         case "thread": "Thread"
-        default: "Drawing"
+        default: "Embed"
         }
     }
 
@@ -342,7 +419,7 @@ struct EmbedCard: View {
         case "page": "doc.text"
         case "thread": "bubble.left.and.bubble.right"
         case "bookmark": "link"
-        default: "scribble"
+        default: "square.dashed"
         }
     }
 }

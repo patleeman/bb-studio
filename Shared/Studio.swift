@@ -52,6 +52,8 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
     /// App path that opens it in BB web.
     public var href: String?
     public var archived: Bool
+    /// Studio tag ids, from the Studio plugin's overview.
+    public var tags: [String]?
 
     public var id: String { "\(pluginId):\(itemId)" }
 
@@ -64,7 +66,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case pluginId, itemId = "id", kind, title, icon, projectId, parentId, createdAt, updatedAt
-        case preview, facts, badge, thumbnailUrl, href, archived
+        case preview, facts, badge, thumbnailUrl, href, archived, tags
     }
 
     public init(from decoder: Decoder) throws {
@@ -84,6 +86,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
         thumbnailUrl = try? c.decode(String.self, forKey: .thumbnailUrl)
         href = try? c.decode(String.self, forKey: .href)
         archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
+        tags = try? c.decode([String].self, forKey: .tags)
     }
 
     public init(
@@ -169,6 +172,23 @@ public struct StudioKindInfo: Codable, Hashable, Sendable {
     public var actions: [Action]
     public var canArchive: Bool
     public var blurb: String
+    /// "rpc" when Studio's New can make one.
+    public var createMode: String?
+}
+
+/// A label the user puts on Studio items from any add-on.
+public struct StudioTag: Codable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var name: String
+    /// `#rrggbb`.
+    public var color: String
+}
+
+public struct StudioOverview: Sendable {
+    public var items: [StudioItem]
+    public var kinds: [StudioKindInfo]
+    /// Nil when the Studio plugin predates tags.
+    public var tags: [StudioTag]?
 }
 
 /// The last Studio list, for opening instantly and offline.
@@ -176,11 +196,13 @@ public struct StudioSnapshot: Codable, Sendable {
     public static let cacheKey = "studio-items"
     public var items: [StudioItem]
     public var kinds: [StudioKindInfo]?
+    public var tags: [StudioTag]?
 }
 
 extension BBClient {
     /// Every add-on's items and kinds, from the Studio plugin.
-    public func studioOverview() async throws -> (items: [StudioItem], kinds: [StudioKindInfo]) {
+    public func studioOverview() async throws -> StudioOverview {
+        struct Create: Decodable { var mode: String }
         struct Kind: Decodable {
             var id: String
             var label: String
@@ -188,6 +210,7 @@ extension BBClient {
             var actions: [StudioKindInfo.Action]?
             var canArchive: Bool?
             var blurb: String?
+            var create: Create?
         }
         struct Provider: Decodable {
             var pluginId: String
@@ -196,16 +219,56 @@ extension BBClient {
         struct Overview: Decodable {
             var items: [StudioItem]
             var providers: [Provider]?
+            var tags: [StudioTag]?
         }
         let overview: Overview = try await rpc("studio", "overview")
         let kinds = (overview.providers ?? []).flatMap { provider in
             provider.kinds.map {
                 StudioKindInfo(
                     pluginId: provider.pluginId, id: $0.id, label: $0.label, plural: $0.plural,
-                    actions: $0.actions ?? [], canArchive: $0.canArchive ?? false, blurb: $0.blurb ?? "")
+                    actions: $0.actions ?? [], canArchive: $0.canArchive ?? false, blurb: $0.blurb ?? "",
+                    createMode: $0.create?.mode)
             }
         }
-        return (overview.items, kinds)
+        return StudioOverview(items: overview.items, kinds: kinds, tags: overview.tags)
+    }
+
+    /// A new, empty item of a kind whose `createMode` is "rpc".
+    public func studioCreate(pluginId: String, kind: String, projectId: String?) async throws -> StudioItem {
+        struct Created: Decodable {
+            var itemId: String
+            var kind: String
+            var title: String
+            var href: String?
+            enum CodingKeys: String, CodingKey { case itemId = "id", kind, title, href }
+        }
+        struct Result: Decodable { var item: Created }
+        let result: Result = try await rpc(
+            "studio", "create",
+            ["pluginId": .string(pluginId), "kind": .string(kind), "projectId": projectId.map { .string($0) } ?? .null])
+        let created = result.item
+        let now = Date.now.timeIntervalSince1970 * 1000
+        return StudioItem(
+            pluginId: pluginId, itemId: created.itemId, kind: created.kind, title: created.title,
+            projectId: projectId, createdAt: now, updatedAt: now, href: created.href)
+    }
+
+    /// Makes a tag, or returns the one with this name.
+    public func createStudioTag(_ name: String) async throws -> StudioTag {
+        struct Result: Decodable { var tag: StudioTag }
+        let result: Result = try await rpc("studio", "createTag", ["name": .string(String(name.prefix(40)))])
+        return result.tag
+    }
+
+    public func deleteStudioTag(_ id: String) async throws {
+        let _: JSONValue = try await rpc("studio", "deleteTag", ["id": .string(id)])
+    }
+
+    public func tagStudioItems(_ items: [StudioItem], add: [String], remove: [String]) async throws {
+        let refs: [JSONValue] = items.map { ["pluginId": .string($0.pluginId), "id": .string($0.itemId)] }
+        let _: JSONValue = try await rpc(
+            "studio", "tagItems",
+            ["items": .array(refs), "add": .array(add.map { .string($0) }), "remove": .array(remove.map { .string($0) })])
     }
 
     /// Ids the add-on couldn't change, with why.

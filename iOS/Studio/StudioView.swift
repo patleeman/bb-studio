@@ -12,6 +12,9 @@ final class StudioStore: ObservableObject {
     @Published private(set) var items: [StudioItem] = []
     /// What each add-on says its kinds can do, from the Studio plugin.
     @Published private(set) var kindInfo: [StudioKindInfo] = []
+    /// Studio's tags, in name order.
+    @Published private(set) var tags: [StudioTag] = []
+    @Published private(set) var supportsTags = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
     /// Listed by the Studio plugin, which can also search content and delete anything.
@@ -30,6 +33,8 @@ final class StudioStore: ObservableObject {
         listener = app.realtime.listen { [weak self] event in
             guard let self else { return }
             switch event {
+            // Studio's open-tabs channel changes nothing listed here.
+            case .pluginSignal("studio", "studio-tabs", _): break
             case .pluginSignal(let pluginId, _, _) where Self.addOns.contains(pluginId): scheduleReload(app.client)
             case .connected: scheduleReload(app.client)
             default: break
@@ -52,6 +57,8 @@ final class StudioStore: ObservableObject {
         if let snapshot = DiskCache.load(StudioSnapshot.self, key: StudioSnapshot.cacheKey) {
             items = snapshot.items
             kindInfo = snapshot.kinds ?? []
+            tags = snapshot.tags ?? []
+            supportsTags = snapshot.tags != nil
             loaded = true
         }
         if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) {
@@ -70,7 +77,7 @@ final class StudioStore: ObservableObject {
             let items = try await fetch(client)
             self.items = items.sorted { $0.updatedAt > $1.updatedAt }
             error = nil
-            DiskCache.save(StudioSnapshot(items: self.items, kinds: kindInfo), as: StudioSnapshot.cacheKey)
+            DiskCache.save(StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil), as: StudioSnapshot.cacheKey)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -83,10 +90,14 @@ final class StudioStore: ObservableObject {
         if plugins.contains("studio"), let overview = try? await client.studioOverview() {
             viaStudio = true
             kindInfo = overview.kinds
+            tags = overview.tags ?? []
+            supportsTags = overview.tags != nil
             return overview.items
         }
         viaStudio = false
         kindInfo = []
+        tags = []
+        supportsTags = false
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
         async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
         async let drawings = Self.attempt(plugins.contains("excalidraw")) { try await client.drawings() }
@@ -147,6 +158,36 @@ final class StudioStore: ObservableObject {
         update(item) { $0.projectId = projectId }
     }
 
+    /// Kinds Studio's New can make, like pages and drawings.
+    var creatable: [StudioKindInfo] { kindInfo.filter { $0.createMode == "rpc" } }
+
+    func create(_ kind: StudioKindInfo, projectId: String?, client: BBClient) async throws -> StudioItem {
+        let item = try await client.studioCreate(pluginId: kind.pluginId, kind: kind.id, projectId: projectId)
+        items.insert(item, at: 0)
+        return item
+    }
+
+    /// Puts the tag on the item, or takes it off.
+    func toggle(_ tag: StudioTag, on item: StudioItem, client: BBClient) async throws {
+        let has = item.tags?.contains(tag.id) == true
+        try await client.tagStudioItems([item], add: has ? [] : [tag.id], remove: has ? [tag.id] : [])
+        update(item) { item in
+            var ids = item.tags ?? []
+            if has { ids.removeAll { $0 == tag.id } } else { ids.append(tag.id) }
+            item.tags = ids
+        }
+    }
+
+    /// Makes a tag (or finds the one with this name) and puts it on the item.
+    func addTag(named name: String, to item: StudioItem, client: BBClient) async throws {
+        let tag = try await client.createStudioTag(name)
+        if !tags.contains(where: { $0.id == tag.id }) {
+            tags.append(tag)
+            tags.sort { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+        }
+        if item.tags?.contains(tag.id) != true { try await toggle(tag, on: item, client: client) }
+    }
+
     private func update(_ item: StudioItem, _ change: (inout StudioItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         change(&items[index])
@@ -194,6 +235,9 @@ struct StudioView: View {
     @State private var deleting: StudioItem?
     @State private var showArchived = false
     @State private var notice: String?
+    @State private var tagFilter: String?
+    @State private var tagging: StudioItem?
+    @State private var newTag = ""
 
     var body: some View {
         List {
@@ -205,7 +249,7 @@ struct StudioView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
-            if store.kinds.count > 1 || hasArchived {
+            if store.kinds.count > 1 || hasArchived || !usedTags.isEmpty {
                 Section { kindFilter }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -245,7 +289,12 @@ struct StudioView: View {
         .animation(.snappy, value: notice)
         .navigationTitle(showArchived ? "Archived" : "Studio")
         .searchable(text: $query, prompt: "Search Studio")
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { projectMenu } }
+        .toolbar {
+            if !store.creatable.isEmpty {
+                ToolbarItem(placement: .topBarTrailing) { newMenu }
+            }
+            ToolbarItem(placement: .topBarTrailing) { projectMenu }
+        }
         .task(id: query) { await search() }
         .refreshable { await store.load(app.client) }
         .task(id: app.serverURL) {
@@ -261,6 +310,19 @@ struct StudioView: View {
             DictationView(threadId: nil, autoStart: true, insertLabel: ("Create Page", "doc.richtext")) { text in
                 Task { await createPage(text) }
             }
+        }
+        .alert("New Tag", isPresented: Binding(get: { tagging != nil }, set: { if !$0 { tagging = nil } })) {
+            TextField("Name", text: $newTag)
+            Button("Cancel", role: .cancel) { newTag = "" }
+            Button("Add") {
+                guard let item = tagging else { return }
+                let name = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+                newTag = ""
+                guard !name.isEmpty else { return }
+                Task { await addTag(name, to: item) }
+            }
+        } message: {
+            Text("Tags work across pages, recordings, drawings and artifacts.")
         }
         .confirmationDialog(
             "Delete \u{201C}\(deleting?.displayTitle ?? "")\u{201D}?",
@@ -311,6 +373,11 @@ struct StudioView: View {
                         app.studioKind = app.studioKind == kind.id ? nil : kind.id
                     }
                 }
+                ForEach(usedTags) { tag in
+                    chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
+                        tagFilter = tagFilter == tag.id ? nil : tag.id
+                    }
+                }
                 if hasArchived {
                     chip("Archived", "archivebox", selected: showArchived) { showArchived.toggle() }
                 }
@@ -320,10 +387,10 @@ struct StudioView: View {
         .scrollClipDisabled()
     }
 
-    private func chip(_ title: String, _ symbol: String?, selected: Bool, action: @escaping () -> Void) -> some View {
+    private func chip(_ title: String, _ symbol: String?, selected: Bool, tint: Color? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
             HStack(spacing: 5) {
-                if let symbol { Image(systemName: symbol).font(.caption) }
+                if let symbol { Image(systemName: symbol).font(.caption).foregroundStyle(selected ? .white : tint ?? .primary) }
                 Text(title).font(.subheadline.weight(.medium))
             }
             .padding(.horizontal, 12)
@@ -334,6 +401,25 @@ struct StudioView: View {
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .sensoryFeedback(.selection, trigger: selected)
+    }
+
+    private var newMenu: some View {
+        Menu {
+            ForEach(store.creatable, id: \.id) { kind in
+                Button { Task { await create(kind) } } label: {
+                    Label("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol)
+                }
+            }
+        } label: {
+            Image(systemName: "plus")
+        }
+        .accessibilityLabel("New")
+    }
+
+    /// Tags on at least one item, plus the one being filtered by.
+    private var usedTags: [StudioTag] {
+        let used = Set(store.items.flatMap { $0.tags ?? [] })
+        return store.tags.filter { used.contains($0.id) || $0.id == tagFilter }
     }
 
     private var projectMenu: some View {
@@ -361,7 +447,9 @@ struct StudioView: View {
 
     @ViewBuilder
     private func row(_ item: StudioItem) -> some View {
-        let content = StudioRow(item: item, project: project.isEmpty ? projectName(item) : nil)
+        let content = StudioRow(
+            item: item, project: project.isEmpty ? projectName(item) : nil,
+            tags: store.tags.filter { item.tags?.contains($0.id) == true })
         Group {
             if let route = route(item) {
                 NavigationLink(value: route) { content }
@@ -400,6 +488,16 @@ struct StudioView: View {
         Button { UIPasteboard.general.string = item.displayTitle } label: { Label("Copy Title", systemImage: "textformat") }
         if store.viaStudio {
             Section {
+                if store.supportsTags {
+                    Menu {
+                        ForEach(store.tags) { tag in
+                            Button { Task { await toggle(tag, on: item) } } label: {
+                                if item.tags?.contains(tag.id) == true { Label(tag.name, systemImage: "checkmark") } else { Text(tag.name) }
+                            }
+                        }
+                        Button { tagging = item } label: { Label("New Tag…", systemImage: "plus") }
+                    } label: { Label("Tags", systemImage: "tag") }
+                }
                 Menu {
                     ForEach(moveChoices, id: \.id) { choice in
                         Button { Task { await move(item, to: choice.id) } } label: {
@@ -450,6 +548,7 @@ struct StudioView: View {
         store.items.filter { item in
             if item.archived != showArchived { return false }
             if let kind = app.studioKind, item.kind != kind { return false }
+            if let tagFilter, item.tags?.contains(tagFilter) != true { return false }
             switch project {
             case "": break
             case "none": if item.projectId != nil { return false }
@@ -524,6 +623,33 @@ struct StudioView: View {
         }
     }
 
+    private func create(_ kind: StudioKindInfo) async {
+        let projectId = project.isEmpty || project == "none" ? nil : project
+        do {
+            let item = try await store.create(kind, projectId: projectId, client: app.client)
+            if let route = route(item) { app.studioPath.append(route) }
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
+    private func toggle(_ tag: StudioTag, on item: StudioItem) async {
+        do {
+            try await store.toggle(tag, on: item, client: app.client)
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
+    private func addTag(_ name: String, to item: StudioItem) async {
+        do {
+            try await store.addTag(named: name, to: item, client: app.client)
+            flash("Tagged \(name)")
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
     private func delete(_ item: StudioItem) async {
         do {
             try await store.delete(item, client: app.client)
@@ -582,6 +708,7 @@ struct StudioView: View {
 struct StudioRow: View {
     let item: StudioItem
     let project: String?
+    var tags: [StudioTag] = []
 
     var body: some View {
         let kind = StudioKind.of(item.kind)
@@ -623,6 +750,15 @@ struct StudioRow: View {
                             .padding(.vertical, 1)
                             .foregroundStyle(tone(badge.tone))
                             .background(tone(badge.tone).opacity(0.15), in: .capsule)
+                    }
+                    ForEach(tags) { tag in
+                        Text(tag.name)
+                            .font(.caption2.weight(.medium))
+                            .padding(.horizontal, 6)
+                            .padding(.vertical, 1)
+                            .foregroundStyle(Color(hex: tag.color))
+                            .background(Color(hex: tag.color).opacity(0.15), in: .capsule)
+                            .lineLimit(1)
                     }
                 }
                 .font(.caption)
@@ -689,5 +825,18 @@ struct StudioThumbnail: View {
         guard let image = renderer.uiImage else { return }
         Self.drawings.setObject(image, forKey: key)
         drawn = image
+    }
+}
+
+extension Color {
+    /// `#rrggbb`, or gray when it isn't one.
+    init(hex: String) {
+        let digits = hex.hasPrefix("#") ? String(hex.dropFirst()) : hex
+        guard digits.count == 6, let value = UInt32(digits, radix: 16) else {
+            self = .gray
+            return
+        }
+        self.init(
+            red: Double(value >> 16 & 0xFF) / 255, green: Double(value >> 8 & 0xFF) / 255, blue: Double(value & 0xFF) / 255)
     }
 }

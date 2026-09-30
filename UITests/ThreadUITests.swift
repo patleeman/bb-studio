@@ -625,6 +625,75 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Done"].tap()
     }
 
+    /// Studio's New menu makes a page (deleted after), and a scratch page's
+    /// Studio embeds show their items and open them.
+    func testStudioHub() throws {
+        let start = Date().timeIntervalSince1970 * 1000
+        addTeardownBlock {
+            // Pages this test made: untitled ones created since it started.
+            let overview = self.rpc("studio", "overview", NSNull())
+            for item in (overview?["items"] as? [[String: Any]]) ?? [] {
+                guard item["pluginId"] as? String == "pages", (item["createdAt"] as? Double ?? 0) >= start,
+                    (item["title"] as? String ?? "").isEmpty || item["title"] as? String == "Untitled" || item["title"] as? String == "QA embeds"
+                else { continue }
+                _ = self.rpc("pages", "remove", ["id": item["id"] as? String ?? ""])
+            }
+        }
+        app.open(URL(string: "bbgo://studio")!)
+        let new = app.buttons["New"].firstMatch
+        XCTAssertTrue(new.waitForExistence(timeout: 10), "New menu")
+        new.tap()
+        let newPage = app.buttons["New Page"]
+        XCTAssertTrue(newPage.waitForExistence(timeout: 5), "New Page")
+        shot("studio-new-menu")
+        newPage.tap()
+        XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "new page opens")
+        shot("studio-new-page")
+
+        let recording = try XCTUnwrap(
+            ((rpc("studio", "overview", NSNull())?["items"] as? [[String: Any]]) ?? [])
+                .first { $0["kind"] as? String == "recording" }?["id"] as? String)
+        let markdown = """
+            # QA embeds
+
+            ```embed
+            {"kind":"recording","target":"\(recording)"}
+            ```
+
+            ```embed
+            {"kind":"task","target":"task_missing","title":"A task"}
+            ```
+            """
+        let page = rpc("pages", "create", ["projectId": NSNull(), "parentId": NSNull(), "title": "QA embeds", "markdown": markdown])
+        let pageId = try XCTUnwrap((page?["page"] as? [String: Any])?["id"] as? String)
+        app.open(URL(string: "bbgo://page/\(pageId)")!)
+        let embed = app.buttons["studioEmbed"].firstMatch
+        XCTAssertTrue(embed.waitForExistence(timeout: 10), "embed card")
+        sleep(2)
+        shot("page-studio-embeds")
+        embed.tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'Transcript' OR label CONTAINS 'transcript'")).firstMatch.waitForExistence(timeout: 10)
+            || app.navigationBars.count > 0, "recording opens")
+        sleep(1)
+        shot("page-embed-opened")
+    }
+
+    private func rpc(_ plugin: String, _ method: String, _ input: Any) -> [String: Any]? {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        request.httpMethod = "POST"
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)
+        var result: [String: Any]?
+        let done = expectation(description: method)
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            let json = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            result = json?["result"] as? [String: Any]
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 20)
+        return result
+    }
+
     func testTerminal() throws {
         app.open(URL(string: "bbgo://terminals")!)
         let host = app.buttons.containing(NSPredicate(format: "label CONTAINS 'MegaMac'")).firstMatch
