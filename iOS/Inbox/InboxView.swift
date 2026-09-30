@@ -328,9 +328,6 @@ struct InboxView: View {
     @ViewBuilder
     private var tools: some View {
         let plugins = Set(runningPlugins.split(separator: ",").map(String.init))
-        if plugins.contains("pages") {
-            NavigationLink(value: Route.pages) { Label("Pages", systemImage: "doc.richtext") }
-        }
         if plugins.contains("automations") {
             NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
         }
@@ -342,9 +339,6 @@ struct InboxView: View {
             .badge(queuedCount)
         if plugins.contains("account-pool") {
             NavigationLink(value: Route.usage) { Label("Usage", systemImage: "gauge.with.dots.needle.33percent") }
-        }
-        if plugins.contains("excalidraw") {
-            NavigationLink(value: Route.drawings) { Label("Drawings", systemImage: "scribble.variable") }
         }
         NavigationLink(value: Route.archived) { Label("Archived", systemImage: "archivebox") }
     }

@@ -1,93 +1,89 @@
 import SwiftUI
 
-/// The Talk tab: start a dictation or long recording, and browse past ones.
-struct RecordingsView: View {
-    @EnvironmentObject private var app: AppModel
-    @State private var recordings: [Recording] = []
-    @State private var error: String?
-    @State private var recordingKind: String?
-
-    var body: some View {
-        List {
-            Section {
-                HStack {
-                    Button { recordingKind = "dictation" } label: {
-                        Label("Dictate", systemImage: "mic.fill").frame(maxWidth: .infinity)
-                    }
-                    Button { recordingKind = "recording" } label: {
-                        Label("Record", systemImage: "record.circle").frame(maxWidth: .infinity)
-                    }
-                }
-                .buttonStyle(.borderedProminent)
-                .listRowBackground(Color.clear)
-            }
-            if let error { Text(error).foregroundStyle(.red).font(.footnote) }
-            Section("Recent") {
-                ForEach(recordings) { recording in
-                    NavigationLink {
-                        RecordingDetailView(recording: recording)
-                    } label: {
-                        VStack(alignment: .leading, spacing: 2) {
-                            Text(recording.title).lineLimit(1)
-                            Text(recording.preview).font(.caption).foregroundStyle(.secondary).lineLimit(2)
-                            HStack {
-                                Text(
-                                    Date(timeIntervalSince1970: recording.createdAt / 1000),
-                                    format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                                Text("· \(Int(recording.durationMs / 1000))s · \(recording.status)")
-                            }
-                            .font(.caption2)
-                            .foregroundStyle(.tertiary)
-                        }
-                    }
-                }
-            }
-        }
-        .navigationTitle("Talk")
-        .refreshable { await load() }
-        .task { await load() }
-        .sheet(item: $recordingKind) { kind in
-            DictationView(threadId: nil, autoStart: true, kind: kind)
-                .onDisappear { Task { await load() } }
-        }
-    }
-
-    private func load() async {
-        do {
-            recordings = try await app.client.recordings()
-            error = nil
-        } catch {
-            self.error = error.localizedDescription
-        }
-    }
-}
-
 extension String: @retroactive Identifiable {
     public var id: String { self }
 }
 
+/// One Talk recording or dictation: its transcript, to share or start a thread with.
 struct RecordingDetailView: View {
     @EnvironmentObject private var app: AppModel
-    let recording: Recording
+    @Environment(\.dismiss) private var dismiss
+    let id: String
+    @State private var recording: Recording?
     @State private var transcript = ""
+    @State private var loaded = false
+    @State private var error: String?
     @State private var creatingThread = false
+    @State private var confirmingDelete = false
 
     var body: some View {
         ScrollView {
-            Text(transcript.isEmpty ? recording.preview : transcript)
-                .textSelection(.enabled)
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
+            VStack(alignment: .leading, spacing: 12) {
+                if let recording {
+                    HStack(spacing: 6) {
+                        Text(Date(timeIntervalSince1970: recording.createdAt / 1000), format: .dateTime.month().day().hour().minute())
+                        Text("·")
+                        Text(StudioItem.clock(recording.durationMs))
+                        if let words = recording.wordCount {
+                            Text("·")
+                            Text("\(words) words")
+                        }
+                    }
+                    .font(.caption)
+                    .foregroundStyle(.secondary)
+                }
+                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                Text(transcript.isEmpty ? (recording?.preview ?? "") : transcript)
+                    .textSelection(.enabled)
+                    .frame(maxWidth: .infinity, alignment: .leading)
+            }
+            .padding()
         }
-        .navigationTitle(recording.title)
+        .overlay { if !loaded { ProgressView() } }
+        .navigationTitle(recording?.title ?? "Recording")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
             ToolbarItemGroup(placement: .topBarTrailing) {
-                ShareLink(item: transcript)
-                Button { creatingThread = true } label: { Image(systemName: "square.and.pencil") }
+                ShareLink(item: transcript).disabled(transcript.isEmpty)
+                Menu {
+                    Button { creatingThread = true } label: { Label("New Thread", systemImage: "square.and.pencil") }
+                    Button { UIPasteboard.general.string = transcript } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
+                    Button(role: .destructive) { confirmingDelete = true } label: { Label("Delete", systemImage: "trash") }
+                } label: {
+                    Image(systemName: "ellipsis")
+                }
+                .disabled(recording == nil)
             }
         }
         .sheet(isPresented: $creatingThread) { NewThreadView(text: transcript) }
-        .task { transcript = (try? await app.client.recording(recording.id).transcript) ?? "" }
+        .confirmationDialog("Delete this recording?", isPresented: $confirmingDelete, titleVisibility: .visible) {
+            Button("Delete", role: .destructive) { Task { await delete() } }
+        } message: {
+            Text("Its audio and transcript go too. This can't be undone.")
+        }
+        .task { await load() }
+    }
+
+    private func load() async {
+        do {
+            let detail = try await app.client.recording(id)
+            recording = detail.recording
+            transcript = detail.transcript
+            error = nil
+        } catch where BBClient.isCancellation(error) {
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+        loaded = true
+    }
+
+    private func delete() async {
+        do {
+            try await app.client.deleteRecording(id)
+            StudioStore.shared.removed(pluginId: "talk", id: id)
+            dismiss()
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
     }
 }

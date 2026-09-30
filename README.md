@@ -21,7 +21,7 @@ view (the Web tab, and the safari button on every thread).
 | File edits show `+N −M` and open to a red/green diff | `iOS/Thread/DiffView.swift` |
 | Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
 | Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
-| Read BB Pages: the list, and each page's text, tables, callouts, stats, charts, and embeds | `iOS/Pages/` |
+| Read BB Pages (in Studio): each page's text, tables, callouts, stats, charts, and embeds | `iOS/Pages/` |
 | Automations: every schedule by project, next and last run, recent runs with output or their thread, run now, pause and resume | `iOS/Tools/AutomationsView.swift` |
 | Queue: every unsent message across threads, including drafts, scheduled sends, automatic retries, and waits on a busy thread, offline host or plugin (with Smart Queue's reason). Send now, edit or cancel | `iOS/Tools/QueueView.swift` |
 | Drafts: long-press Send, then Save as Draft to park a message on the thread until you send it | `Shared/PluginExtras.swift` |
@@ -36,7 +36,7 @@ view (the Web tab, and the safari button on every thread).
 | Files & changes: a thread's uncommitted changes with diffs, a file browser, file search, and file previews (images, rendered Markdown, text) | `iOS/Thread/FilesView.swift` |
 | Edit the last message you sent, retry a failed turn, fork, compact, and resend a recent prompt | `ThreadView`, `iOS/Thread/PromptHistoryView.swift` |
 | Archived threads: search, open, and unarchive | `iOS/Tools/ArchivedView.swift` |
-| Drawings: Excalidraw drawings rendered natively, with zoom, live updates while an agent draws, and share as an image | `iOS/Tools/DrawingsView.swift` |
+| Drawings (in Studio): Excalidraw drawings rendered natively, with zoom, live updates while an agent draws, and share as an image | `iOS/Tools/DrawingsView.swift` |
 | Markdown in replies and your own messages: headings, nested and task lists, quotes, tables, code blocks with Copy, and `@thread` mentions that show the thread's title and open it. Long messages of yours fold at 15 lines with Show more, as in BB web | `iOS/Thread/Markdown.swift`, `iOS/Thread/Messages.swift` |
 | Image attachments in a thread show three to a row; tap one to view it full size | `iOS/Thread/Messages.swift` |
 | Emoji reactions from `::reactions{items="…"}`: tapping a chip drafts the reply (it doesn't send), as in BB web. Long-press any reply for Agree, Disagree, Do it, and Clarify | `iOS/Thread/Messages.swift` |
@@ -50,14 +50,15 @@ view (the Web tab, and the safari button on every thread).
 | Offline cache: the inbox and recent thread messages show before the network answers | `DiskCache`, `ThreadModel` |
 | Connection banner when BB is unreachable (usually Tailscale off), with Open Tailscale and Retry | `ConnectionBanner` |
 | Actionable notifications: Approve, Deny, Approve plan, Answer, and Reply from the lock screen. Multiple-choice questions get a button per option | `iOS/App/NotificationActions.swift`, `NotificationService/`, `plugin/apns.ts` |
-| Dictation and recordings through the Talk plugin, with an offline segment outbox | `iOS/Talk` |
+| Studio tab: pages, recordings, dictations, and drawings in one list, grouped by day, with kind and project filters, search (titles plus the Studio plugin's content search), and swipe to delete. Dictate, Record, and Dictate Page (speak a new page) at the top. Uses the Studio plugin's overview when it's installed, or asks Pages, Talk, and Excalidraw directly | `iOS/Studio/StudioView.swift` |
+| Dictation and recordings through the Talk plugin, with an offline segment outbox. A standalone dictation can be saved as a page, and recordings open to their transcript with share, copy, new thread, and delete | `iOS/Talk` |
 | Hands-free voice chat with one thread (on-device STT, then the thread, then TTS). You can talk over it, and pick the voice and speed in Settings | `iOS/Voice` |
 | Action button and Siri shortcuts: Dictate, Voice chat, Open thread, New thread, "Ask BB" (Siri waits for the reply and reads it) | `iOS/App/Intents.swift` |
 | Control Center and lock screen controls: Dictate, Voice chat, New thread | `Widgets/Controls.swift` |
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `drawings`, `drawing/<id>`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
+| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings` | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `plugin/live.ts` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |

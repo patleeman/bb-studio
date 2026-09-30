@@ -9,9 +9,11 @@ struct RootView: View {
                 .tabItem { Label("Home", systemImage: "house") }
             .tag(Tab.inbox)
 
-            NavigationStack { RecordingsView() }
-                .tabItem { Label("Talk", systemImage: "waveform") }
-                .tag(Tab.talk)
+            NavigationStack(path: $model.studioPath) {
+                StudioView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+            }
+            .tabItem { Label("Studio", systemImage: "square.stack") }
+            .tag(Tab.studio)
 
             NavigationStack {
                 WebView(url: model.serverURL)
@@ -50,18 +52,22 @@ struct InboxTab: View {
             } detail: {
                 NavigationStack(path: $model.path) {
                     ContentUnavailableView("No thread selected", systemImage: "bubble.left.and.bubble.right")
-                        .navigationDestination(for: Route.self, destination: destination)
+                        .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
                 }
             }
         } else {
             NavigationStack(path: $model.path) {
-                InboxView().navigationDestination(for: Route.self, destination: destination)
+                InboxView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
         }
     }
+}
 
-    @ViewBuilder
-    private func destination(_ route: Route) -> some View {
+/// The screen for a route, in whichever tab pushed it.
+struct RouteDestination: View {
+    let route: Route
+
+    var body: some View {
         switch route {
         case .thread(let id): ThreadView(threadId: id).id(id)
         case .room(let room): ChannelView(room: room)
@@ -75,6 +81,7 @@ struct InboxTab: View {
         case .drawings: DrawingsView()
         case .attention: AttentionView()
         case .drawing(let id): DrawingView(id: id)
+        case .recording(let id): RecordingDetailView(id: id)
         }
     }
 }

@@ -14,6 +14,7 @@ enum Route: Hashable {
     case drawings
     case attention
     case drawing(id: String)
+    case recording(id: String)
 }
 
 enum Sheet: Identifiable, Hashable {
@@ -29,7 +30,7 @@ enum Sheet: Identifiable, Hashable {
 }
 
 enum Tab: Hashable {
-    case inbox, talk, web, settings
+    case inbox, studio, web, settings
 }
 
 @MainActor
@@ -40,6 +41,9 @@ final class AppModel: ObservableObject {
     @Published private(set) var realtime: BBRealtime
     @Published var tab: Tab = .inbox
     @Published var path: [Route] = []
+    @Published var studioPath: [Route] = []
+    /// The Studio tab's kind filter; nil for everything.
+    @Published var studioKind: String?
     @Published var sheet: Sheet?
     /// Opens the new-thread composer, optionally prefilled.
     @Published var newThreadDraft: String?
@@ -75,7 +79,7 @@ final class AppModel: ObservableObject {
     }
 
     /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`,
-    /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://talk`, `bbgo://web`.
+    /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://studio` (or `talk`), `bbgo://web`.
     func handle(_ url: URL) {
         guard url.scheme == "bbgo" else { return }
         let id = url.pathComponents.dropFirst().first
@@ -87,11 +91,12 @@ final class AppModel: ObservableObject {
         case "usage": open(.usage)
         case "archived": open(.archived)
         case "attention": open(.attention)
-        case "drawing", "drawings": path = [.drawings] + (id.map { [.drawing(id: $0)] } ?? []); tab = .inbox
+        case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
+        case "pages": openStudio(kind: "page")
         case "dictate": startDictation(threadId: id)
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
-        case "talk": tab = .talk
+        case "studio", "talk": openStudio(kind: nil)
         case "web": tab = .web
         case "settings": tab = .settings
         default: tab = .inbox
@@ -114,8 +119,13 @@ final class AppModel: ObservableObject {
     }
 
     func openPage(_ id: String) {
-        tab = .inbox
-        path = [.pages, .page(id: id)]
+        openStudio(kind: nil, .page(id: id))
+    }
+
+    func openStudio(kind: String?, _ route: Route? = nil) {
+        tab = .studio
+        if let kind { studioKind = kind }
+        studioPath = route.map { [$0] } ?? []
     }
 
     func startDictation(threadId: String? = nil) {

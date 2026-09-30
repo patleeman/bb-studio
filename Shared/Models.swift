@@ -488,6 +488,9 @@ public struct Recording: Decodable, Identifiable, Hashable, Sendable {
     public var pendingCount: Int
     public var failedCount: Int
     public var preview: String
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var wordCount: Int?
 }
 
 public struct Segment: Decodable, Identifiable, Hashable, Sendable {

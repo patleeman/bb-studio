@@ -266,13 +266,46 @@ final class ThreadUITests: XCTestCase {
         sleep(2)
         shot("extras-archived")
         app.open(URL(string: "bbgo://drawings")!)
-        XCTAssertTrue(app.navigationBars["Drawings"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-drawings")
         if let id = ProcessInfo.processInfo.environment["BBGO_QA_DRAWING"] {
             app.open(URL(string: "bbgo://drawing/\(id)")!)
             sleep(3)
             shot("extras-drawing")
+        }
+    }
+
+    /// Read-only: filters Studio by kind, opens one of each, and searches. Records nothing.
+    func testStudio() {
+        app.open(URL(string: "bbgo://studio")!)
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("studio-all")
+        for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Drawings", "drawing")] {
+            let button = app.buttons[chip].firstMatch
+            guard button.waitForExistence(timeout: 3) else { continue }
+            button.tap()
+            sleep(1)
+            shot("studio-\(name)s")
+            // Items only: the quick-action tiles start real recordings.
+            let first = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch
+            if first.waitForExistence(timeout: 3) {
+                first.tap()
+                sleep(3)
+                shot("studio-\(name)")
+                XCTAssertFalse(app.navigationBars["Recording"].exists)
+                app.navigationBars.buttons.firstMatch.tap()
+                sleep(1)
+            }
+            app.buttons[chip].firstMatch.tap()
+        }
+        let search = app.searchFields.firstMatch
+        if search.waitForExistence(timeout: 3) {
+            search.tap()
+            search.typeText("plan")
+            sleep(2)
+            shot("studio-search")
         }
     }
 

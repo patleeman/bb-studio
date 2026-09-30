@@ -12,14 +12,23 @@ struct DictationView: View {
     let autoStart: Bool
     var kind = "dictation"
     var onInsert: ((String) -> Void)?
+    /// Label and symbol for the `onInsert` button.
+    var insertLabel = ("Insert", "text.insert")
+    @AppStorage("runningPlugins") private var runningPlugins = ""
 
     @State private var text = ""
     @State private var creatingThread = false
+    @State private var savingPage = false
+    @State private var saveError: String?
 
-    init(threadId: String?, autoStart: Bool, kind: String = "dictation", onInsert: ((String) -> Void)? = nil) {
+    init(
+        threadId: String?, autoStart: Bool, kind: String = "dictation", insertLabel: (String, String) = ("Insert", "text.insert"),
+        onInsert: ((String) -> Void)? = nil
+    ) {
         self.threadId = threadId
         self.autoStart = autoStart
         self.kind = kind
+        self.insertLabel = insertLabel
         self.onInsert = onInsert
     }
 
@@ -95,7 +104,7 @@ struct DictationView: View {
                 Button {
                     onInsert(trimmed)
                     dismiss()
-                } label: { wide("Insert", "text.insert") }
+                } label: { wide(insertLabel.0, insertLabel.1) }
                 .buttonStyle(.borderedProminent)
             } else if let threadId {
                 Button {
@@ -105,6 +114,13 @@ struct DictationView: View {
                     }
                 } label: { wide("Send to thread", "paperplane.fill") }
                 .buttonStyle(.borderedProminent)
+            } else if runningPlugins.split(separator: ",").contains("pages") {
+                Button { Task { await saveAsPage(trimmed) } } label: {
+                    if savingPage { ProgressView().frame(maxWidth: .infinity) } else { wide("Save as Page", "doc.richtext") }
+                }
+                .buttonStyle(.borderedProminent)
+                .disabled(savingPage)
+                if let saveError { Text(saveError).font(.footnote).foregroundStyle(.red) }
             }
             HStack {
                 Button { creatingThread = true } label: { wide("New thread", "square.and.pencil") }
@@ -116,6 +132,18 @@ struct DictationView: View {
             .buttonStyle(.bordered)
         }
         .disabled(trimmed.isEmpty)
+    }
+
+    private func saveAsPage(_ markdown: String) async {
+        savingPage = true
+        defer { savingPage = false }
+        do {
+            let page = try await app.client.createPage(title: PageTitle.from(markdown), markdown: markdown)
+            dismiss()
+            app.openPage(page.id)
+        } catch {
+            saveError = BBClient.describe(error, server: app.client.baseURL)
+        }
     }
 
     private func circle(_ symbol: String, _ color: Color) -> some View {
@@ -147,5 +175,19 @@ struct LevelMeter: View {
             history.removeFirst()
             history.append(value)
         }
+    }
+}
+
+enum PageTitle {
+    /// The first sentence or line of what was said, cut to a title's length.
+    static func from(_ text: String) -> String {
+        let line = text.split(whereSeparator: \.isNewline).first.map(String.init) ?? text
+        var sentence = line.prefix { !".?!".contains($0) }.trimmingCharacters(in: .whitespaces)
+        if sentence.count > 60 {
+            sentence = String(sentence.prefix(60))
+            if let space = sentence.lastIndex(of: " ") { sentence = String(sentence[..<space]) }
+            sentence += "…"
+        }
+        return sentence
     }
 }
