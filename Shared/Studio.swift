@@ -256,6 +256,15 @@ extension BBClient {
             "studio", "remove", ["pluginId": .string(pluginId), "ids": .array(ids.map { .string($0) })])
     }
 
+    public func renameRecording(_ id: String, title: String) async throws {
+        let _: JSONValue = try await rpc("talk", "recording_rename", ["id": .string(id), "title": .string(String(title.prefix(160)))])
+    }
+
+    /// Transcribes a recording's failed segments again.
+    public func retryRecording(_ id: String) async throws {
+        let _: JSONValue = try await rpc("talk", "recording_retry", ["id": .string(id)])
+    }
+
     public func deleteRecording(_ id: String) async throws {
         let _: JSONValue = try await rpc("talk", "recording_delete", ["id": .string(id)])
     }

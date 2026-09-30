@@ -578,6 +578,53 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "card opens the viewer")
     }
 
+    /// A scratch page named by `TEST_RUNNER_BBGO_QA_PAGE`: the work bar, a saved
+    /// version, and rename. Nothing is sent, so no thread starts.
+    func testPageTools() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
+        app.open(URL(string: "bbgo://page/\(id)")!)
+        XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "work bar")
+        sleep(1)
+        shot("page-work-bar")
+        app.buttons["More"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Version History"].waitForExistence(timeout: 5), "menu")
+        shot("page-menu")
+        app.buttons["Version History"].tap()
+        let save = app.buttons["Save a Version Now"]
+        XCTAssertTrue(save.waitForExistence(timeout: 5), "history")
+        save.tap()
+        app.alerts.textFields.firstMatch.typeText("QA version")
+        app.alerts.buttons["Save"].tap()
+        XCTAssertTrue(app.buttons.containing(NSPredicate(format: "label CONTAINS 'QA version'")).firstMatch.waitForExistence(timeout: 10), "saved version")
+        shot("page-history")
+        app.buttons["Done"].tap()
+        app.buttons["More"].firstMatch.tap()
+        app.buttons["Rename"].tap()
+        let title = app.alerts.textFields.firstMatch
+        XCTAssertTrue(title.waitForExistence(timeout: 5))
+        title.typeText(" renamed")
+        app.alerts.buttons["Rename"].tap()
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'renamed'")).firstMatch.waitForExistence(timeout: 10), "renamed")
+        shot("page-renamed")
+    }
+
+    /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
+    func testSaveToStudio() throws {
+        let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))
+        addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
+        app.open(URL(string: "bbgo://thread/\(thread)")!)
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        let item = app.buttons["Save Files to Studio…"]
+        XCTAssertTrue(item.waitForExistence(timeout: 5), "menu item")
+        item.tap()
+        XCTAssertTrue(app.navigationBars["Save to Studio"].waitForExistence(timeout: 5), "sheet")
+        XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'didn\\'t create'")).firstMatch.waitForExistence(timeout: 10), "empty state")
+        shot("save-to-studio")
+        app.buttons["Done"].tap()
+    }
+
     func testTerminal() throws {
         app.open(URL(string: "bbgo://terminals")!)
         let host = app.buttons.containing(NSPredicate(format: "label CONTAINS 'MegaMac'")).firstMatch

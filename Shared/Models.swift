@@ -74,6 +74,8 @@ public struct TimelineRow: Codable, Identifiable, Hashable, Sendable {
     public var attachments: Attachments?
     public var presentation: Presentation?
     public var change: FileChange?
+    /// The last event of the turn this row came from.
+    public var sourceSeqEnd: Double?
 
     /// An edited file: `diff` is unified-diff hunks, sometimes with `---`/`+++` headers.
     public struct FileChange: Codable, Hashable, Sendable {

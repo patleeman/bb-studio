@@ -121,6 +121,12 @@ struct PageView: View {
     @StateObject private var model: PageModel
     @State private var showingWeb = false
     @State private var copied = false
+    @State private var chats: [PageChat] = []
+    @State private var renaming = false
+    @State private var newTitle = ""
+    @State private var showingHistory = false
+    @State private var confirmingArchive = false
+    @State private var notice: String?
 
     init(pageId: String) {
         _model = StateObject(wrappedValue: PageModel(pageId: pageId))
@@ -153,6 +159,25 @@ struct PageView: View {
         .toolbar {
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
+                    if !chats.isEmpty {
+                        Menu {
+                            ForEach(chats, id: \.threadId) { chat in
+                                Button { app.push(.thread(id: chat.threadId)) } label: {
+                                    Text(Date(timeIntervalSince1970: chat.createdAt / 1000), format: .dateTime.month().day().hour().minute())
+                                }
+                            }
+                        } label: {
+                            Label("Chats (\(chats.count))", systemImage: "bubble.left.and.bubble.right")
+                        }
+                    }
+                    Section {
+                        Button {
+                            newTitle = meta?.title ?? ""
+                            renaming = true
+                        } label: { Label("Rename", systemImage: "pencil") }
+                        Button { showingHistory = true } label: { Label("Version History", systemImage: "clock.arrow.circlepath") }
+                        Button { confirmingArchive = true } label: { Label("Archive", systemImage: "archivebox") }
+                    }
                     Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
                     Button {
                         UIPasteboard.general.string = model.markdown
@@ -171,6 +196,28 @@ struct PageView: View {
             }
         }
         .sensoryFeedback(.success, trigger: copied)
+        .safeAreaInset(edge: .bottom) {
+            if !gone { PageWorkBar(page: meta, pageId: model.pageId, notice: $notice) { await loadChats() } }
+        }
+        .overlay(alignment: .top) {
+            if let notice {
+                Text(notice).font(.footnote).padding(.horizontal, 12).padding(.vertical, 6)
+                    .background(.regularMaterial, in: .capsule).padding(.top, 4)
+                    .onTapGesture { self.notice = nil }
+                    .task { try? await Task.sleep(for: .seconds(4)); self.notice = nil }
+            }
+        }
+        .alert("Rename page", isPresented: $renaming) {
+            TextField("Title", text: $newTitle)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") { Task { await perform { try await $0.updatePage(model.pageId, title: newTitle) } } }
+        }
+        .confirmationDialog("Archive this page?", isPresented: $confirmingArchive, titleVisibility: .visible) {
+            Button("Archive") { Task { await perform { try await $0.updatePage(model.pageId, archived: true) } } }
+        } message: {
+            Text("It leaves the page list. Restore it from BB web.")
+        }
+        .sheet(isPresented: $showingHistory) { PageHistorySheet(pageId: model.pageId) }
         .sheet(isPresented: $showingWeb) {
             NavigationStack {
                 WebView(url: app.client.webURL(forPage: model.pageId))
@@ -183,9 +230,23 @@ struct PageView: View {
             store.attach(app)
             model.attach(app)
             if store.page(model.pageId) == nil { Task { await store.load(app.client) } }
+            Task { await loadChats() }
             await model.load(app.client)
         }
         .onDisappear { model.detach() }
+    }
+
+    private func loadChats() async {
+        chats = ((try? await app.client.pageChats(model.pageId)) ?? []).sorted { $0.createdAt > $1.createdAt }
+    }
+
+    private func perform(_ action: (BBClient) async throws -> Void) async {
+        do {
+            try await action(app.client)
+            await store.load(app.client)
+        } catch {
+            notice = BBClient.describe(error, server: app.client.baseURL)
+        }
     }
 
     private var content: some View {

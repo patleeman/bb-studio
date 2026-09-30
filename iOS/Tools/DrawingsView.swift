@@ -94,6 +94,8 @@ struct DrawingView: View {
     @GestureState private var pinch: CGFloat = 1
     @GestureState private var drag: CGSize = .zero
     @State private var snapshot: Image?
+    @State private var renaming = false
+    @State private var newName = ""
 
     var body: some View {
         Group {
@@ -134,6 +136,28 @@ struct DrawingView: View {
         .toolbar {
             if let snapshot {
                 ShareLink(item: snapshot, preview: SharePreview(name, image: snapshot))
+            }
+            Button {
+                newName = name
+                renaming = true
+            } label: { Image(systemName: "pencil") }
+            .accessibilityLabel("Rename")
+            .disabled(scene == nil)
+        }
+        .alert("Rename drawing", isPresented: $renaming) {
+            TextField("Name", text: $newName)
+            Button("Cancel", role: .cancel) {}
+            Button("Rename") {
+                let newName = newName.trimmingCharacters(in: .whitespacesAndNewlines)
+                guard !newName.isEmpty else { return }
+                Task {
+                    do {
+                        try await app.client.renameDrawing(id, name: newName)
+                        name = newName
+                    } catch {
+                        self.error = BBClient.describe(error, server: app.client.baseURL)
+                    }
+                }
             }
         }
         .task {

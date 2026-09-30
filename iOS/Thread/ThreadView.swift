@@ -25,6 +25,9 @@ struct ThreadView: View {
     @State private var pickingSendTime = false
     @State private var showingFiles = false
     @State private var showingHistory = false
+    @State private var savingFiles: SaveToStudioRequest?
+    /// The page this thread was started from with "Work with this page".
+    @State private var sourcePage: PageMeta?
     @State private var confirmingCompact = false
     @State private var renaming = false
     @State private var openingFile: OpenFile?
@@ -33,6 +36,8 @@ struct ThreadView: View {
     /// Set while the composer holds a rewrite of the last message.
     @State private var editing = false
     @AppStorage("runningPlugins") private var runningPlugins = ""
+
+    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("artifacts") }
 
     init(threadId: String) {
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
@@ -82,6 +87,7 @@ struct ThreadView: View {
                 FilesView(environmentId: environmentId)
             }
         }
+        .sheet(item: $savingFiles) { SaveToStudioSheet(request: $0) }
         .sheet(isPresented: $showingHistory) {
             PromptHistoryView(threadId: model.threadId) { text in
                 showingHistory = false
@@ -135,6 +141,9 @@ struct ThreadView: View {
             }
             model.attach(app)
             Task { await muted.refresh() }
+            if runningPlugins.split(separator: ",").contains("pages") {
+                Task { sourcePage = try? await app.client.chatPage(model.threadId) }
+            }
             await model.load()
         }
         .onChange(of: draft) { _, text in
@@ -235,6 +244,16 @@ struct ThreadView: View {
                         }
                     }
                     Button { showingHistory = true } label: { Label("Recent prompts", systemImage: "clock.arrow.circlepath") }
+                    if canSaveFiles {
+                        Button { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: nil) } label: {
+                            Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
+                        }
+                    }
+                    if let sourcePage {
+                        Button { app.push(.page(id: sourcePage.id)) } label: {
+                            Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")
+                        }
+                    }
                     Section {
                         Button {
                             Task { if let id = await model.fork() { app.path.append(.thread(id: id)) } }
@@ -293,7 +312,8 @@ struct ThreadView: View {
                                     quote: { quote($0) },
                                     select: { selecting = SelectionText(text: $0) },
                                     sideChat: sideChat,
-                                    edit: row.id == editable ? startEditing : nil)
+                                    edit: row.id == editable ? startEditing : nil,
+                                    saveFiles: canSaveFiles ? { savingFiles = SaveToStudioRequest(threadId: model.threadId, seq: $0) } : nil)
                             case .activity(let rows):
                                 ActivityGroup(rows: rows)
                             }

@@ -127,4 +127,56 @@ extension BBClient {
         let result: Result = try await rpc("artifacts", "threadArtifacts", ["threadId": .string(threadId)])
         return result.artifacts
     }
+
+    /// Files a reply produced (the reply ending at `seq`, or the latest one) and the thread's storage files.
+    public func artifactCandidates(threadId: String, seq: Int?) async throws -> ArtifactCandidates {
+        try await rpc("artifacts", "candidates", ["threadId": .string(threadId), "seq": seq.map { .number(Double($0)) } ?? .null])
+    }
+
+    /// Saves files into Studio; a file saved before gets a new version.
+    public func saveFilesToStudio(threadId: String, paths: [String]) async throws -> SavedFiles {
+        try await rpc(
+            "artifacts", "saveFiles", ["threadId": .string(threadId), "paths": .array(paths.prefix(50).map { .string($0) })])
+    }
+}
+
+public struct ArtifactCandidates: Decodable, Sendable {
+    public struct File: Decodable, Identifiable, Hashable, Sendable {
+        public var path: String
+        public var display: String
+        /// image, created, changed or storage.
+        public var kind: String
+        /// Set when it is already in Studio.
+        public var artifactId: String?
+        public var id: String { path }
+
+        public var symbol: String {
+            switch kind {
+            case "image": "photo"
+            case "created": "doc.badge.plus"
+            case "changed": "pencil.line"
+            default: "tray.full"
+            }
+        }
+    }
+
+    public var reply: [File]
+    public var storage: [File]
+    /// Why thread storage couldn't be listed, e.g. its machine is offline.
+    public var storageError: String?
+}
+
+public struct SavedFiles: Decodable, Sendable {
+    public struct Saved: Decodable, Sendable {
+        public var path: String
+        public var artifactId: String
+        /// created, versioned or unchanged.
+        public var outcome: String
+    }
+    public struct Failed: Decodable, Sendable {
+        public var path: String
+        public var error: String
+    }
+    public var saved: [Saved]
+    public var failed: [Failed]
 }

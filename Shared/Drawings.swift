@@ -151,6 +151,10 @@ extension BBClient {
         return result.updatedAt
     }
 
+    public func renameDrawing(_ id: String, name: String) async throws {
+        let _: JSONValue = try await rpc("excalidraw", "renameDrawing", ["id": .string(id), "name": .string(String(name.prefix(200)))])
+    }
+
     public func deleteDrawing(_ id: String) async throws {
         let _: JSONValue = try await rpc("excalidraw", "deleteDrawing", ["id": .string(id)])
     }

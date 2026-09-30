@@ -13,6 +13,8 @@ struct MessageBubble: View {
     var sideChat: ((String) -> Void)?
     /// Only on the newest message the user sent.
     var edit: ((String) -> Void)?
+    /// Saves the files this reply produced to Studio; nil without the artifacts plugin.
+    var saveFiles: ((Int?) -> Void)?
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -66,6 +68,11 @@ struct MessageBubble: View {
             Button { sideChat(plainText) } label: { Label("Side Chat", systemImage: "bubble.left.and.text.bubble.right") }
         }
         ShareLink(item: plainText) { Label("Share", systemImage: "square.and.arrow.up") }
+        if !row.isUser, let saveFiles {
+            Button { saveFiles(row.sourceSeqEnd.map { Int($0) }) } label: {
+                Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
+            }
+        }
         if !row.isUser {
             Section("React") {
                 ForEach(defaultReactions, id: \.self) { item in
