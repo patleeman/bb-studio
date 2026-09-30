@@ -1,0 +1,116 @@
+name: BBStudio
+options:
+  bundleIdPrefix: nyc.plee
+  deploymentTarget:
+    iOS: "26.0"
+    watchOS: "26.0"
+  createIntermediateGroups: true
+packages:
+  SwiftTerm:
+    url: https://github.com/migueldeicaza/SwiftTerm
+    exactVersion: 1.11.2
+settings:
+  base:
+    DEVELOPMENT_TEAM: 3753DAN98U
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  BBStudio:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS
+      - path: Shared
+      - path: LiveActivity
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: iOS/BBStudio.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_FILE: iOS/Info.plist
+    scheme:
+      testTargets:
+        - BBStudioUITests
+    dependencies:
+      - package: SwiftTerm
+      - target: BBStudioWatch
+      - target: BBStudioWidgets
+      - target: BBStudioShare
+      - target: BBStudioNotifications
+  BBStudioNotifications:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: NotificationService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.notifications
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: NotificationService/Info.plist
+  BBStudioShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Share
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.share
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: Share/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Share/BBStudioShare.entitlements
+  BBStudioWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: LiveActivity
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: Widgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Widgets/BBStudioWidgets.entitlements
+  BBStudioWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Watch
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.watchkitapp
+        INFOPLIST_FILE: Watch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Watch/BBStudioWatch.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: BBStudioWatchWidgets
+  BBStudioWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: WatchWidgets
+      - path: Shared/AppGroup.swift
+      - path: Shared/ThreadSummary.swift
+      - path: Shared/Models.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.watchkitapp.widgets
+        INFOPLIST_FILE: WatchWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: WatchWidgets/BBStudioWatchWidgets.entitlements
+  BBStudioUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: BBStudio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.uitests
+        TEST_TARGET_NAME: BBStudio
+        GENERATE_INFOPLIST_FILE: YES
