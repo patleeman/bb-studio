@@ -308,6 +308,18 @@ final class ThreadUITests: XCTestCase {
         shot("plugins-settings")
     }
 
+    /// Records a few seconds from the microphone (the Mac's, in the simulator).
+    /// Play speech near the mic while it runs; a silent recording is discarded by Talk.
+    func testDictationCapture() {
+        app.open(URL(string: "bbgo://dictate")!)
+        sleep(8)
+        shot("dictation-recording")
+        let finish = app.buttons["checkmark"]
+        if finish.waitForExistence(timeout: 3) { finish.tap() }
+        sleep(20)
+        shot("dictation-result")
+    }
+
     func testPageDemo() {
         app.terminate()
         app.launchArguments = ["-qaPageDemo"]

@@ -1,4 +1,5 @@
 import Foundation
+import os
 
 /// Finished segments wait here on disk until `segment_put` succeeds, so audio
 /// recorded on a flaky connection (or before a crash) still reaches Talk.
@@ -73,6 +74,7 @@ final class TalkOutbox: ObservableObject {
                 remove(name)
                 backoff = 2
             } catch let error as BBError where error.status == 400 || error.message.contains("No recording") {
+                Logger(subsystem: "nyc.plee.bbgo", category: "talk").error("segment rejected: \(error.message, privacy: .public)")
                 // Rejected, or deleted in Talk: the audio has nowhere to go.
                 remove(name)
             } catch {
