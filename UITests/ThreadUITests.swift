@@ -806,6 +806,43 @@ final class ThreadUITests: XCTestCase {
         shot("tasks-done")
     }
 
+    /// Tags a scratch task from Studio's long-press menu, then deletes the tag and the task.
+    func testStudioTags() throws {
+        let stamp = Int(Date().timeIntervalSince1970)
+        let title = "QA tag task \(stamp)", tagName = "QA tag \(stamp)"
+        let created = rpc("studio-tasks", "create", ["title": title, "description": ""])
+        let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
+        func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
+        addTeardownBlock {
+            for tag in (overview()?["tags"] as? [[String: Any]]) ?? [] where tag["name"] as? String == tagName {
+                _ = self.rpc("studio", "deleteTag", ["id": tag["id"] as? String ?? ""])
+            }
+            _ = self.rpc("studio-tasks", "delete", ["id": id])
+        }
+        app.open(URL(string: "bbgo://studio")!)
+        let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15), "task in Studio")
+        row.press(forDuration: 1)
+        app.buttons["Tags"].tap()
+        app.buttons["New Tag…"].tap()
+        app.alerts.textFields.firstMatch.typeText(tagName)
+        app.alerts.buttons["Add"].tap()
+        func tagged() -> Bool {
+            let tagId = ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == tagName }?["id"] as? String
+            let item = ((overview()?["items"] as? [[String: Any]]) ?? []).first { $0["pluginId"] as? String == "studio-tasks" && $0["id"] as? String == id }
+            return tagId != nil && (item?["tags"] as? [String])?.contains(tagId!) == true
+        }
+        XCTAssertTrue(wait(10, tagged), "task tagged")
+        XCTAssertTrue(app.staticTexts[tagName].firstMatch.waitForExistence(timeout: 10) || app.buttons[tagName].firstMatch.exists, "tag chip")
+        shot("studio-tags")
+        row.press(forDuration: 1)
+        app.buttons["Tags"].tap()
+        shot("studio-tags-menu")
+        // The lifted row's chip has the same name; the menu's item comes first.
+        app.buttons.matching(identifier: tagName).firstMatch.tap()
+        XCTAssertTrue(wait(10) { !tagged() }, "tag removed")
+    }
+
     /// Starts a real Studio Chat thread from a scratch task, then deletes both.
     func testStudioChat() throws {
         let title = "QA chat task \(Int(Date().timeIntervalSince1970))"

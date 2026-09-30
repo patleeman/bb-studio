@@ -323,7 +323,7 @@ struct StudioView: View {
                 Task { await addTag(name, to: item) }
             }
         } message: {
-            Text("Tags work across pages, recordings, drawings and artifacts.")
+            Text("Tags work across every kind of Studio item.")
         }
         .confirmationDialog(
             "Delete \u{201C}\(deleting?.displayTitle ?? "")\u{201D}?",
@@ -746,7 +746,9 @@ struct StudioRow: View {
                     Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
                 HStack(spacing: 4) {
-                    Text(([kind.label] + [project].compactMap { $0 } + item.facts.map(\.display)).joined(separator: " · "))
+                    // Empty facts, like a task with no due day, and ones the badge already says, are left out.
+                    let facts = item.facts.map(\.display).filter { !$0.isEmpty && $0 != item.badge?.label }
+                    Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
                         .lineLimit(1)
                     if let badge = item.badge {
                         Text(badge.label)
