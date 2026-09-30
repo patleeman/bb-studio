@@ -45,23 +45,62 @@ final class TalkOutbox: ObservableObject {
         kick()
     }
 
+    /// Recordings to mark finishing once all their audio has uploaded. Talk
+    /// deletes a recording that finishes before any audio arrives.
+    private var finishing: Set<String> {
+        get { Set(UserDefaults.standard.stringArray(forKey: "talkFinishAfterUpload") ?? []) }
+        set { UserDefaults.standard.set(Array(newValue), forKey: "talkFinishAfterUpload") }
+    }
+
+    func finishWhenSent(_ recordingId: String) {
+        finishing.insert(recordingId)
+        kick()
+    }
+
+    /// Waits until the recording is marked finishing, or the deadline passes.
+    /// Returns whether it was.
+    func waitForFinish(_ recordingId: String, until deadline: Date) async -> Bool {
+        kick()
+        while finishing.contains(recordingId), Date() < deadline {
+            try? await Task.sleep(for: .milliseconds(300))
+        }
+        return !finishing.contains(recordingId)
+    }
+
     func kick() {
-        guard running == nil, pending > 0 else { return }
+        guard running == nil, pending > 0 || !finishing.isEmpty else { return }
         running = Task {
             await run()
             running = nil
         }
     }
 
-    func drain(until deadline: Date) async {
-        kick()
-        while pending > 0, Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(300))
+    private func run() async {
+        var backoff: Double = 2
+        while true {
+            await upload(&backoff)
+            await markFinished()
+            if entries().isEmpty && finishing.isEmpty { return }
+            try? await Task.sleep(for: .seconds(backoff))
+            backoff = min(backoff * 2, 30)
         }
     }
 
-    private func run() async {
-        var backoff: Double = 2
+    private func markFinished() async {
+        let waiting = Set(entries().map(\.1.recordingId))
+        for id in finishing where !waiting.contains(id) {
+            do {
+                try await client.setRecordingState(id, "finishing")
+                finishing.remove(id)
+            } catch let error as BBError where error.status == 400 || error.message.hasPrefix("No recording") {
+                finishing.remove(id)
+            } catch {
+                return
+            }
+        }
+    }
+
+    private func upload(_ backoff: inout Double) async {
         while let (name, entry) = entries().first {
             guard let audio = try? Data(contentsOf: directory.appendingPathComponent("\(name).m4a")) else {
                 remove(name)
@@ -78,8 +117,7 @@ final class TalkOutbox: ObservableObject {
                 // Rejected, or deleted in Talk: the audio has nowhere to go.
                 remove(name)
             } catch {
-                try? await Task.sleep(for: .seconds(backoff))
-                backoff = min(backoff * 2, 30)
+                return
             }
         }
     }

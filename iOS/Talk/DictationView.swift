@@ -46,6 +46,12 @@ struct DictationView: View {
                         Text(startedAt, style: .timer).font(.system(size: 48, weight: .light).monospacedDigit())
                     }
                     LevelMeter(level: recorder.level).frame(height: 60)
+                    if let input = recorder.silentInput {
+                        Label("No sound from \(input)", systemImage: "mic.slash")
+                            .font(.callout)
+                            .foregroundStyle(.orange)
+                            .accessibilityIdentifier("dictationSilent")
+                    }
                     if outbox.pending > 0 { Text("\(outbox.pending) segment(s) uploading").font(.caption) }
                     Spacer()
                     HStack(spacing: 40) {
