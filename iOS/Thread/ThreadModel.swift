@@ -104,6 +104,11 @@ final class ThreadModel: ObservableObject {
 
     func detach() {
         guard let app else { return }
+        if loaded { cache() }
+        if readPending {
+            let client = app.client
+            Task { await markRead(client, force: true) }
+        }
         app.realtime.unsubscribeThread(threadId)
         if let listener { app.realtime.removeListener(listener) }
     }
@@ -115,7 +120,28 @@ final class ThreadModel: ObservableObject {
         var rows: [TimelineRow]
     }
 
-    private func cache() {
+    private var lastCached = ContinuousClock.now - .seconds(60)
+    private var lastMarkedRead = ContinuousClock.now - .seconds(60)
+    /// Rows arrived since the last mark.
+    private var readPending = false
+
+    /// Each mark comes back as a read-state change that every open list refetches
+    /// on, so while a turn streams, mark at most every 5 seconds and once on leaving.
+    private func markRead(_ client: BBClient, force: Bool = false) async {
+        guard force || ContinuousClock.now - lastMarkedRead > .seconds(5) else {
+            readPending = true
+            return
+        }
+        lastMarkedRead = .now
+        readPending = false
+        try? await client.markRead(threadId)
+    }
+
+    /// A streaming turn grows the rows several times a second: write at most every
+    /// 10 seconds, and once more on the way out.
+    private func cache(force: Bool = true) {
+        guard force || ContinuousClock.now - lastCached > .seconds(10) else { return }
+        lastCached = .now
         DiskCache.save(Snapshot(thread: thread, rows: Array(rows.suffix(200))), as: "thread-\(threadId)")
     }
 
@@ -196,8 +222,8 @@ final class ThreadModel: ObservableObject {
             error = nil
             if touched("interactions-changed", "queue-changed", "status-changed") { await loadInteractions() }
             if grew {
-                cache()
-                try? await client.markRead(threadId)
+                cache(force: false)
+                await markRead(client)
             }
         } catch where BBClient.isCancellation(error) {
         } catch {

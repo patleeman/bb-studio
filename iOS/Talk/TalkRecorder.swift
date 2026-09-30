@@ -71,6 +71,7 @@ final class TalkRecorder: ObservableObject {
         } catch {
             log.error("start failed: \(error.localizedDescription, privacy: .public)")
             _ = capture.stop()
+            try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             phase = .failed(error.localizedDescription)
         }
     }
@@ -120,6 +121,8 @@ final class TalkRecorder: ObservableObject {
         guard phase == .recording, let id = recordingId else { return }
         let segments = capture.stop()
         heartbeatTask?.cancel()
+        // An active session with the audio background mode keeps the app awake.
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         phase = .idle
         Task {
             await waitForHandoff(segments)

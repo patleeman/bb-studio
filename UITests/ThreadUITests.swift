@@ -519,6 +519,62 @@ final class ThreadUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 4))
     }
 
+    /// The socket closes in the background: on return the inbox catches up on what
+    /// changed meanwhile, then stays live. Creates two scratch threads, held
+    /// with a far-off send, and deletes them.
+    func testResumeReconnects() throws {
+        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
+        let tag = String(UUID().uuidString.prefix(6))
+        XCUIDevice.shared.press(.home)
+        sleep(3)
+        let away = try XCTUnwrap(scratchThread("QA away \(tag)"))
+        addTeardownBlock { _ = self.api("DELETE", "/threads/\(away)", ["childThreadsConfirmed": false]) }
+        app.activate()
+        sleep(3)
+        XCTAssertTrue(scrollTo("QA away \(tag)"), "picks up changes made while in the background")
+        let live = try XCTUnwrap(scratchThread("QA live \(tag)"))
+        addTeardownBlock { _ = self.api("DELETE", "/threads/\(live)", ["childThreadsConfirmed": false]) }
+        sleep(4)
+        XCTAssertTrue(scrollTo("QA live \(tag)"), "live again after returning")
+        shot("resume")
+    }
+
+    /// The inbox list renders only the rows on screen: look further down, then back up.
+    private func scrollTo(_ text: String) -> Bool {
+        let row = app.staticTexts.containing(NSPredicate(format: "label CONTAINS %@", text)).firstMatch
+        for up in [true, false] {
+            for _ in 0..<6 {
+                if row.exists { return true }
+                if up { app.swipeUp() } else { app.swipeDown() }
+            }
+        }
+        return row.exists
+    }
+
+    private func scratchThread(_ title: String) -> String? {
+        let json = api("POST", "/threads", [
+            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,
+            "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
+            "input": [["type": "text", "text": "Scratch thread for a UI test. Do nothing.", "mentions": [String]()]],
+        ])
+        return json?["id"] as? String ?? (json?["thread"] as? [String: Any])?["id"] as? String
+    }
+
+    private func api(_ method: String, _ path: String, _ body: [String: Any]) -> [String: Any]? {
+        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
+        request.httpMethod = method
+        request.setValue("application/json", forHTTPHeaderField: "Content-Type")
+        request.httpBody = try? JSONSerialization.data(withJSONObject: body)
+        var result: [String: Any]?
+        let done = expectation(description: path)
+        URLSession.shared.dataTask(with: request) { data, _, _ in
+            result = data.flatMap { try? JSONSerialization.jsonObject(with: $0) as? [String: Any] }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 15)
+        return result
+    }
+
     private func wait(_ timeout: TimeInterval = 5, _ condition: () -> Bool) -> Bool {
         let end = Date().addingTimeInterval(timeout)
         while Date() < end {

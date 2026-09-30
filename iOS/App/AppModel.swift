@@ -55,7 +55,8 @@ final class AppModel: ObservableObject {
         let client = BBClient()
         self.client = client
         realtime = BBRealtime(client: client)
-        realtime.start()
+        // Started when the scene becomes active, so a background launch (a watch
+        // relay, a Live Activity token) doesn't open a socket.
         realtime.subscribeThreadList()
         flushOutboxOnConnect()
     }
@@ -70,6 +71,21 @@ final class AppModel: ObservableObject {
         realtime.start()
         realtime.subscribeThreadList()
         flushOutboxOnConnect()
+    }
+
+    /// The socket keeps the radio awake, and nothing shows its updates in the
+    /// background: close it there and reconnect (which refetches) on return.
+    /// Voice chat keeps it, since it waits on replies with the screen locked.
+    func scenePhaseChanged(_ phase: ScenePhase) {
+        switch phase {
+        case .background:
+            if case .voiceChat = sheet { return }
+            realtime.stop()
+        case .active:
+            realtime.start()
+        default:
+            break
+        }
     }
 
     private func flushOutboxOnConnect() {

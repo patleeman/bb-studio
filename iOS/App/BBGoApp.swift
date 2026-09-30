@@ -7,12 +7,14 @@ import UserNotifications
 struct BBGoApp: App {
     @UIApplicationDelegateAdaptor(AppDelegate.self) private var appDelegate
     @StateObject private var model = AppModel.shared
+    @Environment(\.scenePhase) private var scenePhase
 
     var body: some Scene {
         WindowGroup {
             RootView()
                 .environmentObject(model)
                 .onOpenURL { model.handle($0) }
+                .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhaseChanged(phase) }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
                     if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.openThread(id) }
                 }

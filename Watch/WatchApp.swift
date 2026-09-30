@@ -58,6 +58,7 @@ struct WatchThreadView: View {
     @State private var interactions: [PendingInteraction] = []
     @State private var reply = ""
     @State private var status: String?
+    @Environment(\.scenePhase) private var scenePhase
     private var client: BBClient { WatchModel.shared.client }
 
     private static let quickReplies = ["Yes", "No", "Continue", "Looks good"]
@@ -93,12 +94,15 @@ struct WatchThreadView: View {
             if let status { Text(status).font(.caption2).foregroundStyle(.secondary) }
         }
         .navigationTitle(title)
-        .task {
+        // No socket on the watch: poll while the view is open and the wrist is up.
+        // Each poll relays through the phone, so it costs both batteries.
+        .task(id: scenePhase == .active) {
+            guard scenePhase == .active else { return }
             await load()
             try? await client.markRead(threadId)
-            // No socket on the watch: poll while the view is open.
             while !Task.isCancelled {
-                try? await Task.sleep(for: .seconds(thread?.isRunning == true ? 4 : 15))
+                try? await Task.sleep(for: .seconds(thread?.isRunning == true ? 8 : 30))
+                guard !Task.isCancelled else { return }
                 await load()
             }
         }

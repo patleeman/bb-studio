@@ -14,13 +14,20 @@ final class InboxModel: ObservableObject {
 
     private var listener: UUID?
     private var reloadTask: Task<Void, Never>?
+    private var reloadDue: ContinuousClock.Instant?
+    private var reloadBots = false
+    private var lastReload = ContinuousClock.now - .seconds(60)
+    private var savedSignature: Int?
 
     func attach(_ app: AppModel) {
         if let listener { app.realtime.removeListener(listener) }
         listener = app.realtime.listen { [weak self] event in
             switch event {
-            case .changed(let entity, _, _) where entity == "thread":
-                self?.scheduleReload(app.client, bots: false)
+            case .changed(let entity, _, let changes) where entity == "thread":
+                // A running agent appends events several times a second, and nothing
+                // in the list shows them; its status changes bring the fresh row.
+                let streaming = !changes.isEmpty && changes.allSatisfy { $0 == "events-appended" }
+                self?.scheduleReload(app.client, bots: false, within: streaming ? .seconds(30) : .milliseconds(400))
             case .pluginSignal(let pluginId, _, _) where pluginId == "bot-teams":
                 self?.scheduleReload(app.client, bots: true)
             case .connected:
@@ -31,13 +38,28 @@ final class InboxModel: ObservableObject {
         }
     }
 
-    /// Change signals arrive in bursts while agents run; coalesce them.
-    private func scheduleReload(_ client: BBClient, bots: Bool) {
-        reloadTask?.cancel()
+    /// Change signals arrive in bursts while agents run: coalesce them, and
+    /// reload at most every few seconds, since each reload is a sidebar fetch.
+    private func scheduleReload(_ client: BBClient, bots: Bool, within delay: Duration = .milliseconds(400)) {
+        reloadBots = reloadBots || bots
+        let due = max(ContinuousClock.now + delay, lastReload + .seconds(3))
+        reloadDue = min(reloadDue ?? due, due)
+        guard reloadTask == nil else { return }
         reloadTask = Task {
-            try? await Task.sleep(for: .milliseconds(400))
-            guard !Task.isCancelled else { return }
-            await load(client, bots: bots)
+            while let due = reloadDue {
+                let wait = due - ContinuousClock.now
+                if wait > .zero {
+                    // Short naps, so a sooner request cuts a long wait short.
+                    try? await Task.sleep(for: min(wait, .milliseconds(500)))
+                    continue
+                }
+                reloadDue = nil
+                lastReload = .now
+                let bots = reloadBots
+                reloadBots = false
+                await load(client, bots: bots)
+            }
+            reloadTask = nil
         }
     }
 
@@ -53,27 +75,36 @@ final class InboxModel: ObservableObject {
     func load(_ client: BBClient, bots: Bool = true) async {
         do {
             async let sidebar = client.sidebar()
-            if bots { botTeams = try? await client.botTeams() }
-            if preferences == nil || bots { preferences = (try? await client.sidebarPreferences()) ?? preferences }
+            // Every assignment re-renders the inbox, so only on change.
+            if bots, let teams = try? await client.botTeams(), !Self.same(teams, botTeams) { botTeams = teams }
+            if preferences == nil || bots, let prefs = try? await client.sidebarPreferences(), prefs != preferences {
+                preferences = prefs
+            }
             let bootstrap = try await sidebar
-            self.sidebar = bootstrap
+            if !Self.same(bootstrap, self.sidebar) { self.sidebar = bootstrap }
             let projects = bootstrap.projects + [bootstrap.personalProject]
-            projectNames = Dictionary(projects.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+            let names = Dictionary(projects.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
+            if names != projectNames { projectNames = names }
             let all = projects.flatMap(\.threads).filter { $0.visibility != "hidden" && $0.archivedAt == nil }
             let ids = Set(all.map(\.id))
             // A child whose parent is not listed stands on its own, as in the sidebar.
-            threads = all.filter { $0.parentThreadId.map { !ids.contains($0) } ?? true }
-            children = Dictionary(grouping: all.filter { $0.parentThreadId.map(ids.contains) ?? false }) { $0.parentThreadId! }
+            let top = all.filter { $0.parentThreadId.map { !ids.contains($0) } ?? true }
+            if top != threads { threads = top }
+            let grouped = Dictionary(grouping: all.filter { $0.parentThreadId.map(ids.contains) ?? false }) { $0.parentThreadId! }
                 .mapValues(Self.sidebarSorted)
+            if grouped != children { children = grouped }
             for thread in all { ThreadTitles.set(thread.id, thread.displayTitle) }
             // Titles that mention archived threads: fetch those names too.
             await ThreadTitles.fetchUnknown(in: all.map(\.displayTitle), client: client)
             LiveStatus.shared.sync(self.threads)
             Spotlight.index(self.threads, projectNames: projectNames)
             error = nil
-            DiskCache.save(
-                InboxSnapshot(threads: self.threads, botTeams: botTeams, projectNames: projectNames),
-                as: InboxSnapshot.cacheKey)
+            let snapshot = InboxSnapshot(threads: self.threads, botTeams: botTeams, projectNames: projectNames)
+            let signature = Self.encoded(snapshot)?.hashValue
+            if signature == nil || signature != savedSignature {
+                DiskCache.save(snapshot, as: InboxSnapshot.cacheKey)
+                savedSignature = signature
+            }
             StatusWidgets.reloadIfChanged(self.threads)
             PhoneRelay.shared.pushStatus(self.threads)
         } catch where BBClient.isCancellation(error) {
@@ -81,6 +112,17 @@ final class InboxModel: ObservableObject {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
         loaded = true
+    }
+
+    private static func encoded(_ value: some Encodable) -> Data? {
+        let encoder = JSONEncoder()
+        encoder.outputFormatting = .sortedKeys
+        return try? encoder.encode(value)
+    }
+
+    private static func same<T: Encodable>(_ a: T, _ b: T?) -> Bool {
+        guard let b, let data = encoded(a) else { return false }
+        return data == encoded(b)
     }
 
     // MARK: Actions

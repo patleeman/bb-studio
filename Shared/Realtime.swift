@@ -28,6 +28,7 @@ public final class BBRealtime {
     public func start() {
         guard !running else { return }
         running = true
+        retryDelay = 1
         connect()
     }
 
@@ -66,7 +67,8 @@ public final class BBRealtime {
     }
 
     private func connect() {
-        guard running else { return }
+        // A reconnect that was waiting when the socket was stopped and restarted.
+        guard running, task == nil else { return }
         let task = URLSession.shared.webSocketTask(with: client.webSocketURL)
         self.task = task
         task.resume()

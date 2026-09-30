@@ -16,8 +16,7 @@ struct RootView: View {
             .tag(Tab.studio)
 
             NavigationStack {
-                WebView(url: model.serverURL)
-                    .ignoresSafeArea(edges: .bottom)
+                WebTab()
                     .navigationTitle("BB Web")
                     .navigationBarTitleDisplayMode(.inline)
             }
@@ -82,6 +81,31 @@ struct RouteDestination: View {
         case .attention: AttentionView()
         case .drawing(let id): DrawingView(id: id)
         case .recording(let id): RecordingDetailView(id: id)
+        }
+    }
+}
+
+/// BB Web keeps its own socket and re-renders on every change, even on another
+/// tab, so it unloads once it has been out of sight for a while.
+private struct WebTab: View {
+    @EnvironmentObject private var model: AppModel
+    @State private var mounted = false
+
+    var body: some View {
+        Group {
+            if mounted {
+                WebView(url: model.serverURL).ignoresSafeArea(edges: .bottom)
+            } else {
+                Color.clear
+            }
+        }
+        .task(id: model.tab == .web) {
+            guard model.tab != .web else {
+                mounted = true
+                return
+            }
+            try? await Task.sleep(for: .seconds(120))
+            if !Task.isCancelled { mounted = false }
         }
     }
 }
