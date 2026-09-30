@@ -2,35 +2,17 @@ import { z } from "zod";
 import type { Bot, RoomMessage } from "./contract";
 import type { RoutingPlan, RoutingTask, DispatchAction, RoutingDecision } from "./send-mode";
 import { mentioned, mentionsEveryone } from "./mentions";
+import type { JevAsk, JevQuestion } from "./decisions";
 
 export type JevSettings = {
-  zenApiKey?: string;
-  jevModel?: string;
-  jevTimeoutMs?: number;
+  /** Studio Decisions' System One call. */
+  ask: JevAsk;
   jevActionConfidence?: number;
 };
-type Question =
-  | { type: "noul"; instructions: string }
-  | { type: "choice"; instructions: string; criteria: Record<string, string> };
-const probability = z.number().min(0).max(1);
-const answerSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("noul"), noul: probability }),
-  z.object({
-    type: z.literal("choice"),
-    choice: z.string(),
-    confidence: probability,
-    probabilities: z.record(z.string(), probability),
-  }),
-]);
-const responseSchema = z.object({
-  answers: z.record(z.string(), answerSchema),
-});
-const settingsSchema = z.object({
-  zenApiKey: z.string().optional(),
-  jevModel: z.string().trim().min(1).max(100).default("jev-1.13"),
-  jevTimeoutMs: z.number().int().min(250).max(15000).default(5000),
-  jevActionConfidence: probability.default(0.7),
-});
+type Question = JevQuestion;
+const confidenceSchema = z.number().min(0).max(1).catch(0.7);
+const minimumConfidence = (settings: JevSettings) =>
+  confidenceSchema.parse(settings.jevActionConfidence ?? 0.7);
 
 /** A referential owner follow-up immediately after a bot answer has one safe recipient. */
 export function continuationBotId(
@@ -46,6 +28,7 @@ export function continuationBotId(
   return previous.botId;
 }
 
+/** Asks Jev through Studio Decisions and checks every answer against its question. */
 export async function askJev(
   settings: JevSettings,
   state: unknown,
@@ -53,53 +36,9 @@ export async function askJev(
   signal: AbortSignal,
 ) {
   signal.throwIfAborted();
-  const config = settingsSchema.parse(settings);
-  const key = config.zenApiKey?.trim() || process.env.OPENCODE_API_KEY?.trim();
-  if (!key)
-    throw new Error(
-      "Set the OpenCode Zen API key in Studio Teams settings to use Jev.",
-    );
-  // Node 20's AbortSignal.any() holds its sources weakly, so a bare
-  // AbortSignal.timeout() there can be collected before it fires. Own the timer.
-  const request = new AbortController();
-  const abort = () => request.abort(signal.reason);
-  signal.addEventListener("abort", abort, { once: true });
-  const timer = setTimeout(
-    () => request.abort(new DOMException("The operation was aborted due to timeout", "TimeoutError")),
-    config.jevTimeoutMs,
-  );
-  let body: unknown;
-  try {
-    const response = await fetch("https://opencode.ai/zen/v1/systemone", {
-      method: "POST",
-      redirect: "error",
-      headers: {
-        Authorization: `Bearer ${key}`,
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        model: config.jevModel,
-        state: JSON.stringify(state),
-        questions,
-      }),
-      signal: request.signal,
-    });
-    if (!response.ok) {
-      await response.body?.cancel();
-      throw new Error(
-        `Jev classification failed (HTTP ${response.status}). Check the Zen key, credits, and model in Studio Teams settings.`,
-      );
-    }
-    body = await response.json();
-  } finally {
-    clearTimeout(timer);
-    signal.removeEventListener("abort", abort);
-  }
-  const parsed = responseSchema.safeParse(body);
-  if (!parsed.success)
-    throw new Error("Jev returned an invalid decision response.");
+  const answers = await settings.ask(state, questions, signal);
   for (const [id, question] of Object.entries(questions)) {
-    const answer = parsed.data.answers[id];
+    const answer = answers[id];
     if (!answer || answer.type !== question.type)
       throw new Error("Jev omitted a required decision.");
     if (
@@ -110,7 +49,7 @@ export async function askJev(
       throw new Error("Jev returned an unknown decision option.");
   }
   signal.throwIfAborted();
-  return parsed.data.answers;
+  return answers;
 }
 
 export function jevRoutingRequest(
@@ -224,7 +163,7 @@ export async function selectJevBots(
     request.questions,
     signal,
   );
-  const minimum = settingsSchema.parse(settings).jevActionConfidence;
+  const minimum = minimumConfidence(settings);
   const decision = (key: string) => {
     const answer = answers[key];
     if (answer?.type !== "choice") throw new Error("Jev returned an invalid routing decision.");
@@ -293,7 +232,7 @@ export async function selectJevActions(
   }
   if (!recipientIds.length) return [];
   const answers = await askJev(settings, state, questions, signal);
-  const minimum = settingsSchema.parse(settings).jevActionConfidence;
+  const minimum = minimumConfidence(settings);
   return recipientIds.map((botId) => {
     const answer = answers[botId];
     if (answer?.type !== "choice") throw new Error("Jev returned an invalid routing decision.");

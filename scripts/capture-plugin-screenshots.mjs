@@ -19,6 +19,7 @@
  */
 
 import { spawn } from "node:child_process";
+import { createServer } from "node:http";
 import { mkdir, mkdtemp, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
@@ -1501,6 +1502,77 @@ const captures = [
         const bottom = group.getBoundingClientRect().bottom + 24;
         return { x: 0, y: 0, width: window.innerWidth, height: Math.round(bottom) };
       })()`),
+  },
+  {
+    id: "decisions",
+    packageDir: "bb-studio-decisions",
+    setup: async (client) => {
+      // A local stand-in for TypeSafe's System One API, so the connection test
+      // answers without a key: each choice picks its first option.
+      const jev = createServer((request, response) => {
+        let body = "";
+        request.on("data", (chunk) => (body += chunk));
+        request.on("end", () => {
+          const { questions } = JSON.parse(body);
+          const answers = Object.fromEntries(Object.entries(questions).map(([id, question]) => {
+            if (question.type === "noul") return [id, { type: "noul", noul: 0.9 }];
+            const choice = Object.keys(question.criteria)[0];
+            return [id, { type: "choice", choice, confidence: 0.9, probabilities: { [choice]: 0.9 } }];
+          }));
+          response.writeHead(200, { "content-type": "application/json" }).end(JSON.stringify({ answers }));
+        });
+      });
+      await new Promise((resolvePromise) => jev.listen(0, "127.0.0.1", resolvePromise));
+      const endpoint = `http://localhost:${jev.address().port}/v1/system-one`;
+      // Stage the custom provider and a known fallback model, then restore the owner's.
+      const { values } = JSON.parse(await bbCli(["plugin", "config", "smart-decisions", "--json"]));
+      const previousFallback = JSON.parse(await bbCli(["smart-decisions", "fallback", "--json"]));
+      const staged = { jevProvider: "custom", customJevEndpoint: endpoint, customJevModel: "jev-local" };
+      for (const [key, value] of Object.entries(staged)) await bbCli(["plugin", "config", "smart-decisions", "set", key, value]);
+      await bbCli(["smart-decisions", "fallback", "codex", "gpt-6-luna", "low"]);
+      const restore = async () => {
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+        for (const key of Object.keys(staged))
+          await (typeof values[key] === "string"
+            ? bbCli(["plugin", "config", "smart-decisions", "set", key, values[key]])
+            : bbCli(["plugin", "config", "smart-decisions", "unset", key]));
+        await (previousFallback.mode === "model"
+          ? bbCli(["smart-decisions", "fallback", previousFallback.providerId, previousFallback.model, ...(previousFallback.reasoningLevel ? [previousFallback.reasoningLevel] : [])])
+          : bbCli(["smart-decisions", "fallback", previousFallback.mode]));
+        await new Promise((resolvePromise) => jev.close(resolvePromise));
+      };
+      try {
+        await client.navigate("/settings/plugins/smart-decisions");
+        await client.waitForText("Studio Decisions");
+        await client.waitForText("for Smart Queue and for plugins such as Studio Teams");
+        await client.waitForText("Jev connection");
+        await client.waitForText("for Smart Queue and Studio Teams");
+        await client.waitForText(`Custom (${new URL(endpoint).host}) · jev-local`);
+        await client.waitForText("Fallback model");
+        await client.waitForText("A specific model");
+        // BB's model picker shows codex's GPT-6-Luna as "6-Luna".
+        await client.waitForText("6-Luna\nLow");
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1120, deviceScaleFactor: 1, mobile: false });
+        await sleep(400);
+        // The live connection check proves the staged provider answers.
+        await client.clickButtonText("Test");
+        await client.waitForText(`Jev answered through Custom (${new URL(endpoint).host})`, 20000);
+        await client.evaluate(`(() => {
+          const picker = Array.from(document.querySelectorAll("button"))
+            .find((candidate) => candidate.innerText.includes("6-Luna"));
+          let pane = picker?.parentElement;
+          while (pane && pane.scrollHeight <= pane.clientHeight) pane = pane.parentElement;
+          if (!pane) throw new Error("Settings scroll pane not found");
+          pane.scrollTop = pane.scrollHeight;
+          return true;
+        })()`);
+        await sleep(400);
+      } catch (error) {
+        await restore();
+        throw error;
+      }
+      return restore;
+    },
   },
 ];
 

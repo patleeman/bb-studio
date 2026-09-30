@@ -3532,7 +3532,7 @@ test("bot publication rejects host paths outside its workspace before reading", 
   }
 });
 
-test("router validates model output and uses provider capabilities for both attempts", async () => {
+test("router validates model output and asks Studio Decisions' model with the bot's host and provider", async () => {
   const { selectBots, parseRouting } = await import("../smart-router");
   const x = setup();
   try {
@@ -3542,67 +3542,36 @@ test("router validates model output and uses provider capabilities for both atte
       /unknown bot/,
     );
     assert.throws(() => parseRouting("sure, wake Atlas", [x.a]));
-    x.harness.inspection.sdk.stub("providers.list", async () => [
-      {
-        id: "pi",
-        available: true,
-        reasoningLevels: [{ id: "none" }],
-        capabilities: { permissionModes: ["full"] },
-      },
-      {
-        id: "codex",
-        available: true,
-        reasoningLevels: [{ id: "low" }],
-        capabilities: { permissionModes: ["accept-edits", "full"] },
-      },
-    ]);
-    let waits = 0;
-    x.harness.inspection.sdk.stub("threads.wait", async () => {
-      if (++waits === 1) throw new Error("Primary offline");
-      return {};
-    });
-    x.harness.inspection.sdk.stub("threads.output", async () => ({
-      output: JSON.stringify({ botIds: [x.a.id] }),
-    }));
-    x.harness.inspection.sdk.stub("threads.delete", async () => ({ ok: true }));
+    const requests: { hostId: string; providerId: string | null }[] = [];
     const m = x.runtime.send(x.room, "Question", randomUUID());
     assert.deepEqual(
       await selectBots(
-        x.bb,
-        x.store,
         {
-          routingProvider: "pi",
-          routingModel: "fast",
-          routingFallbackProvider: "codex",
-          routingFallbackModel: "fallback",
+          ask: async () => {
+            throw new Error("The Jev engine must not run.");
+          },
+          model: async (request) => {
+            requests.push(request);
+            return JSON.stringify({ botIds: [x.a.id] });
+          },
         },
-        x.a.projectId,
         x.a.hostId,
+        x.a.providerId,
         m,
         [],
         [x.a],
         x.runtime.abort.signal,
+        [],
+        [x.a.id],
+        true,
       ),
       [x.a.id],
     );
-    const args = x.harness.inspection.sdk
-      .callsTo("threads.spawn")
-      .map((c) => c[0] as { reasoningLevel: string; permissionMode: string });
     assert.deepEqual(
-      args.map((a) => [a.reasoningLevel, a.permissionMode]),
-      [
-        ["none", "full"],
-        ["low", "accept-edits"],
-      ],
+      requests.map((r) => [r.hostId, r.providerId]),
+      [[x.a.hostId, x.a.providerId]],
     );
-    assert.equal(x.harness.inspection.sdk.callsTo("threads.delete").length, 2);
-    assert.deepEqual(x.harness.inspection.sdk.callsTo("providers.list")[0], [
-      { hostId: x.a.hostId },
-    ]);
-    assert.equal(
-      x.store.db.prepare("SELECT * FROM routing_sessions").all().length,
-      0,
-    );
+    assert.equal(x.harness.inspection.sdk.callsTo("threads.spawn").length, 0, "Studio Decisions owns the session");
   } finally {
     await x.close();
   }

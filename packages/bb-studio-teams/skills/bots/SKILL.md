@@ -295,8 +295,8 @@ eligible bot routes every message to it automatically. Native tools `bots_channe
 `channel request` reports routing state and errors as well as bot work. When routing
 fails, use `channel retry-routing CHANNEL REQUEST_ID`, mention a bot in the channel, or
 ask the owner about routing settings; do not duplicate a successfully sent message.
-Routing provider and model settings live in Plugins → Bots → Settings and are also
-available through `bb plugin config bot-teams`. They use existing BB provider credentials.
+The classifier's keys and models live in Studio Decisions (Plugins → Studio Decisions →
+Settings). Studio Teams keeps only the classifier choice and confidence threshold.
 
 Write like a teammate in chat: usually one to three sentences, no default headings,
 assistant introductions, repeated summaries, or filler. Expand only when useful or
@@ -348,17 +348,15 @@ the hourly/daily budgets. Limits do not block reconciliation of existing work.
 ## Classifier setup
 
 Jev is the default classifier for recipient selection, busy-session actions, and
-implicit delegation returns. Set the OpenCode Zen API key in Studio Teams settings; it is
-stored as a secret. The server's `OPENCODE_API_KEY` is also supported. Never print
-or paste a credential into chat.
+implicit delegation returns. Studio Teams asks it through the Studio Decisions plugin,
+which must be installed. Its Jev provider keys, model, and timeout are set there; see
+`bb smart-decisions status`. Never print or paste a credential into chat.
 
-`bb plugin config bot-teams set jevModel jev-1.13` selects the Jev model.
-`jevTimeoutMs` controls the direct request deadline (default 5000 ms), and
-`jevActionConfidence` controls when steer/fork becomes a safer follow-up (default
-0.7). Classifier failures expose Retry routing; they never launch a slow agent
-fallback. Select `routingEngine providers` explicitly to use the legacy
-`routingProvider` / `routingModel` and fallback settings. Select `routingEngine
-jev` to restore direct classification.
+`bb plugin config bot-teams set jevActionConfidence 0.7` controls when steer/fork
+becomes a safer follow-up (default 0.7). Classifier failures expose Retry routing;
+they never launch a slow agent fallback. Select `routingEngine providers` explicitly
+to use Studio Decisions' fallback model in a temporary hidden session instead. Select
+`routingEngine jev` to restore direct classification.
 
 ## Request the owner's attention
 

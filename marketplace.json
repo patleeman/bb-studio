@@ -273,6 +273,30 @@
           "ref": "main"
         }
       }
+    },
+    {
+      "id": "smart-decisions",
+      "displayName": "Studio Decisions",
+      "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and it routes Studio Teams channels.",
+      "icon": {
+        "url": "./packages/bb-studio-decisions/assets/icon.svg"
+      },
+      "tags": [
+        "threads",
+        "automation",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-decisions",
+          "ref": "main"
+        }
+      }
     }
   ]
 }

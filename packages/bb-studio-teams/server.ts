@@ -1,4 +1,5 @@
 import { classifyJevReturn } from "./jev";
+import { decisionsClient } from "./decisions";
 import { ChannelNotifications, notificationSchema } from "./notifications";
 import { AttentionReplies, StaleAttentionReplyError } from "./attention-replies";
 import { ChannelApprovals } from "./approvals";
@@ -190,26 +191,7 @@ export default async function plugin(bb: BbPluginApi) {
       options: ["jev", "providers"],
       default: "jev",
       description:
-        "Jev makes a direct structured decision. Providers uses slower temporary agent sessions.",
-    },
-    zenApiKey: {
-      type: "string",
-      label: "OpenCode Zen API key",
-      secret: true,
-      description:
-        "Used only by the Jev classifier. Falls back to the server's OPENCODE_API_KEY environment variable.",
-    },
-    jevModel: {
-      type: "string",
-      label: "Jev model",
-      default: "jev-1.13",
-    },
-    jevTimeoutMs: {
-      type: "number",
-      label: "Jev timeout (milliseconds)",
-      default: 5000,
-      experimental_schema: z.number().int().min(250).max(15000),
-      description: "Direct request deadline, from 250 to 15000 milliseconds.",
+        "Both run through Studio Decisions, which holds the keys and models. Jev makes a fast structured decision. Providers runs its fallback model in a slower temporary session.",
     },
     jevActionConfidence: {
       type: "number",
@@ -219,30 +201,10 @@ export default async function plugin(bb: BbPluginApi) {
       description:
         "A value from 0 to 1. Uncertain parallel work becomes serialized; uncertain steer or fork becomes follow-up.",
     },
-    routingProvider: {
-      type: "string",
-      label: "Routing provider",
-      default: "pi",
-    },
-    routingModel: {
-      type: "string",
-      label: "Routing model",
-      default: "opencode-go/qwen3.8-flash",
-      description:
-        "A fast model from your BB provider catalog. Smart channels use it to select bots and choose steer, follow-up, or fork for busy sessions.",
-    },
-    routingFallbackProvider: {
-      type: "string",
-      label: "Fallback routing provider",
-      default: "codex",
-    },
-    routingFallbackModel: {
-      type: "string",
-      label: "Fallback routing model",
-      default: "gpt-5.6-luna",
-    },
   });
   notifications.preferences = () => settings.get();
+  const decisions = decisionsClient(bb);
+  const routingSettings = async () => ({ ...(await settings.get()), ask: decisions.jev, model: decisions.model });
   runtime.route = async (
     message,
     room,
@@ -252,15 +214,13 @@ export default async function plugin(bb: BbPluginApi) {
     requiredBotIds,
   ) => {
     if (!members.length) return [];
-    const config = await settings.get();
+    const config = await routingSettings();
     const routingStarted = Date.now();
     try {
       return await selectBots(
-        bb,
-        store,
         config,
-        members[0]!.projectId,
         members[0]!.hostId,
+        members[0]!.providerId,
         message,
         store.visibleMessages(room.id, 9).filter((m) => m.id !== message.id).slice(-8),
         members,
@@ -279,7 +239,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
   runtime.returnDecision = async (group, signal) => {
     const bot = store.get(group.requesterBotId),
-      config = await settings.get();
+      config = await routingSettings();
     const started = Date.now();
     try {
       if (config.routingEngine === "jev")
@@ -289,11 +249,9 @@ export default async function plugin(bb: BbPluginApi) {
           signal,
         );
       return await runClassifier(
-        bb,
-        store,
         config,
-        bot.projectId,
         bot.hostId,
+        bot.providerId,
         `return:${group.id}`,
         runtime.delegations.classificationPrompt(group),
         signal,

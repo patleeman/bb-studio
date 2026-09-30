@@ -718,3 +718,11 @@ opens a channel, then an empty fixture in the native pinned list, then another
 channel and a DM. It asserts that no channel remains selected after either
 transition. Both transitions and the navigation group passed live after the
 plugin was rebuilt and reloaded.
+
+## Classifier moved to Studio Decisions — 2026-09-30
+
+The Zen API key, Jev model, timeout, and provider routing models moved to the
+new Studio Decisions plugin, which Studio Teams calls over plugin RPC
+(`systemOne.ask`, `model.ask`). Existing values for those settings are not
+migrated; set them again in Studio Decisions. Unit tests stub the RPC client;
+`test/jev.test.ts` covers the missing, unconfigured, and failing cases.

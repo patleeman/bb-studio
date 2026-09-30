@@ -46,6 +46,10 @@
     {
       "name": "emoji-react",
       "source": "./packages/bb-studio-reactions"
+    },
+    {
+      "name": "smart-decisions",
+      "source": "./packages/bb-studio-decisions"
     }
   ]
 }

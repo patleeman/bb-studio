@@ -19,10 +19,12 @@ agent.
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
+| [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and routes Studio Teams channels. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
 Every add-on works on its own. With Studio installed, their items also appear in
-Studio's collection. Studio Reactions doesn't use Studio at all.
+Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
+all. Studio Teams needs Studio Decisions for its channel routing.
 
 ## iOS app
 
@@ -55,6 +57,8 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - studio-chat: a chat that floats over Studio items
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
+   - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue and
+     Studio Teams routing; needed by bot-teams
    - mobile: push notifications for the BB Studio iOS app; only if I use it
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
 4. Run `bb plugin list`, confirm each installed plugin is running, and report

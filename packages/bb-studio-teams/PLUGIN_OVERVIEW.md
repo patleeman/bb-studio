@@ -14,7 +14,7 @@ Direct messages lists each private thread with a bot as one row: the bot's avata
 
 Profiles, files, channels, and work survive BB restarts. Mission schedules are optional and off by default. Bots use your existing BB providers and permissions on the primary machine.
 
-Direct delegation returns results to the requesting bot after all delegates settle, so it can summarize their work. Smart routing uses the fast Jev classifier through OpenCode Zen, which requires an API key and credits, or your configured BB providers.
+Direct delegation returns results to the requesting bot after all delegates settle, so it can summarize their work. Smart routing uses the fast Jev classifier or a fallback model, both set up once in Studio Decisions, which must be installed.
 
 ## Automate with the BB CLI
 
