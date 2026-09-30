@@ -105,9 +105,13 @@ final class LiveStatus {
         }
     }
 
-    /// Fails quietly when the mobile plugin isn't installed yet.
+    /// Fails quietly when the mobile plugin isn't installed yet. The relay keeps one
+    /// phone's activity, so the simulator (UI tests) never reports: its tokens aren't
+    /// valid APNs tokens, and a valid-looking one would take over from the phone's.
     private func register(_ input: [String: JSONValue]) async {
-        let _: JSONValue? = try? await client.rpc("mobile", "live_register", .object(input))
+        #if !targetEnvironment(simulator)
+            let _: JSONValue? = try? await client.rpc("mobile", "live_register", .object(input))
+        #endif
     }
 }
 
