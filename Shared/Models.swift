@@ -199,10 +199,52 @@ public struct QueuedMessage: Decodable, Identifiable, Hashable, Sendable {
         public var text: String?
     }
 
+    /// What the message is waiting for: `thread-busy`, `time`, `host-offline`, …
+    public struct WaitingOn: Decodable, Hashable, Sendable {
+        public var kind: String
+        public var hostName: String?
+    }
+
+    /// `inline` for a message the user wrote; `retry` for an automatic retry.
+    public struct Payload: Decodable, Hashable, Sendable {
+        public var kind: String
+        public var attempt: Int?
+        public var reason: String?
+    }
+
     public var id: String
+    public var threadId: String?
     public var content: [Input]
     public var sendAt: Double?
     public var editable: Bool?
+    public var waitingOn: WaitingOn?
+    public var payload: Payload?
+    public var initiator: String?
+    public var createdAt: Double?
+
+    public var isRetry: Bool { payload?.kind == "retry" }
+
+    /// Why it hasn't gone yet, in a few words.
+    public var status: String {
+        let due = sendAt.map { Date(timeIntervalSince1970: $0 / 1000) }
+        let when = due.map { $0 < .now ? "overdue since \(Self.time($0).replacingOccurrences(of: "at ", with: ""))" : Self.time($0) }
+        if isRetry {
+            let reason = payload?.reason ?? "Retry"
+            return when.map { "\(reason) · retries \($0)" } ?? reason
+        }
+        switch waitingOn?.kind {
+        case "time": return when.map { "Sends \($0)" } ?? "Scheduled"
+        case "host-offline": return "Waiting for \(waitingOn?.hostName ?? "the host") to come online"
+        case "thread-busy", nil: return "Queued"
+        case let kind?: return "Waiting · \(kind.replacingOccurrences(of: "-", with: " "))"
+        }
+    }
+
+    private static func time(_ date: Date) -> String {
+        Calendar.current.isDateInToday(date)
+            ? "at " + date.formatted(date: .omitted, time: .shortened)
+            : date.formatted(.dateTime.weekday(.abbreviated).month(.abbreviated).day().hour().minute())
+    }
 
     public var text: String {
         content.compactMap { $0.type == "text" ? $0.text : nil }.joined(separator: "\n")

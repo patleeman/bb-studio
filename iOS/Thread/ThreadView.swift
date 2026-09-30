@@ -22,6 +22,8 @@ struct ThreadView: View {
     @State private var atTop = false
     @State private var selecting: SelectionText?
     @State private var position = ScrollPosition()
+    @State private var pickingSendTime = false
+    @AppStorage("runningPlugins") private var runningPlugins = ""
 
     init(threadId: String) {
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
@@ -42,6 +44,12 @@ struct ThreadView: View {
             DictationView(threadId: model.threadId, autoStart: true) { text in
                 draft = draft.isEmpty ? text : draft + " " + text
                 composerFocused = true
+            }
+        }
+        .sheet(isPresented: $pickingSendTime) {
+            SendTimePicker { date in
+                pickingSendTime = false
+                send(at: date)
             }
         }
         .sheet(isPresented: $choosingModel) {
@@ -202,7 +210,8 @@ struct ThreadView: View {
                                     projectId: model.thread?.projectId,
                                     react: { draftReply($0) },
                                     quote: { quote($0) },
-                                    select: { selecting = SelectionText(text: $0) })
+                                    select: { selecting = SelectionText(text: $0) },
+                                    sideChat: runningPlugins.split(separator: ",").contains("side-chat") ? openSideChat : nil)
                             case .activity(let rows):
                                 ActivityGroup(rows: rows)
                             }
@@ -398,6 +407,25 @@ struct ThreadView: View {
         }
     }
 
+    /// Text only: a scheduled message can't carry attachments.
+    private func send(at date: Date) {
+        let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
+        let sentMentions = mentions
+        draft = ""
+        Task {
+            if await !model.send(text, mentions: sentMentions, at: date), draft.isEmpty {
+                draft = text
+                mentions = sentMentions
+            }
+        }
+    }
+
+    private func openSideChat(_ text: String) {
+        Task {
+            if let id = await model.sideChat(about: text) { app.path.append(.thread(id: id)) }
+        }
+    }
+
     /// Replaces the `@word` being typed with the mention.
     private func insert(_ mention: Mention) {
         guard let query = MentionSuggestions.query(in: draft) else { return }
@@ -446,6 +474,17 @@ struct ThreadView: View {
                 }
                 .disabled(!canSend)
                 .keyboardShortcut(.return, modifiers: .command)
+                // Long-press to schedule.
+                .contextMenu {
+                    if canSend, attachments.isEmpty {
+                        Section("Send Later") {
+                            ForEach(SendTimePicker.presets, id: \.title) { preset in
+                                Button(preset.title) { send(at: preset.date()) }
+                            }
+                            Button { pickingSendTime = true } label: { Label("Pick a Time…", systemImage: "calendar") }
+                        }
+                    }
+                }
                 .accessibilityLabel(model.thread?.isRunning == true ? "Queue message" : "Send")
             }
         }

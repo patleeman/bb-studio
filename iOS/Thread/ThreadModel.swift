@@ -349,6 +349,33 @@ final class ThreadModel: ObservableObject {
         }
     }
 
+    /// Queues the message on the server to go at `date`.
+    func send(_ text: String, mentions: [Mention], at date: Date) async -> Bool {
+        guard let client else { return false }
+        sending = true
+        defer { sending = false }
+        do {
+            _ = try await client.send(threadId, text: text, mentions: mentions, at: date)
+            confirmations += 1
+            await loadInteractions()
+            return true
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return false
+        }
+    }
+
+    /// Opens a side chat about `text` and returns its thread.
+    func sideChat(about text: String) async -> String? {
+        guard let client else { return nil }
+        do {
+            return try await client.sideChat(from: threadId, about: text)
+        } catch {
+            self.error = BBClient.describe(error, server: client.baseURL)
+            return nil
+        }
+    }
+
     func stop() async {
         try? await client?.stop(threadId)
     }

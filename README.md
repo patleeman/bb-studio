@@ -22,6 +22,12 @@ view (the Web tab, and the safari button on every thread).
 | Messages written while BB is unreachable wait in an outbox and send, in order, when it's back. Failures that may have reached BB wait for Try again, so nothing sends twice | `iOS/Thread/Outbox.swift` |
 | Mute a thread's notifications (for all BB Go devices, through the relay). Notifications group by thread | `iOS/Thread/MutedThreads.swift`, `plugin/server.ts` |
 | Read BB Pages: the list, and each page's text, tables, callouts, stats, charts, and embeds | `iOS/Pages/` |
+| Automations: every schedule by project, next and last run, recent runs with output or their thread, run now, pause and resume | `iOS/Tools/AutomationsView.swift` |
+| Queue: every unsent message across threads, including scheduled sends, automatic retries, and waits on a busy thread or offline host. Send now or cancel | `iOS/Tools/QueueView.swift` |
+| Usage: each pooled Claude and Codex account's 5-hour and weekly limits, with reset times | `iOS/Tools/UsageView.swift` |
+| Send later: long-press Send for 30 minutes, 1 hour, 3 hours, tomorrow at 9, or a picked time | `iOS/Thread/SendLater.swift` |
+| Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
+| Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
 | Markdown in replies and your own messages: headings, nested and task lists, quotes, tables, code blocks with Copy, and `@thread` mentions that show the thread's title and open it. Long messages of yours fold at 15 lines with Show more, as in BB web | `iOS/Thread/Markdown.swift`, `iOS/Thread/Messages.swift` |
 | Image attachments in a thread show three to a row; tap one to view it full size | `iOS/Thread/Messages.swift` |
 | Emoji reactions from `::reactions{items="…"}`: tapping a chip drafts the reply (it doesn't send), as in BB web. Long-press any reply for Agree, Disagree, Do it, and Clarify | `iOS/Thread/Messages.swift` |
@@ -41,7 +47,7 @@ view (the Web tab, and the safari button on every thread).
 | Home and lock screen status widgets | `Widgets/StatusWidget.swift` |
 | Spotlight indexes open threads. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbgo://thread/<id>`, `page/<id>`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
+| URL scheme `bbgo://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `new`, `dictate`, `voice[/<id>]`, `talk`, `web`, `settings` | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `plugin/live.ts` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |

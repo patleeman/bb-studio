@@ -23,6 +23,7 @@ struct SettingsView: View {
             } footer: {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
             }
+            ServerControls()
             Section {
                 Picker("Voice", selection: $voiceId) {
                     Text("Best installed").tag("")

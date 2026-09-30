@@ -54,10 +54,10 @@ struct ThreadShelf: View {
                 TodoCard(items: shelf.todos)
             }
             ForEach(model.queued) { message in
-                ShelfCard(icon: "clock", tint: .secondary) {
+                ShelfCard(icon: message.isRetry ? "arrow.clockwise" : "clock", tint: .secondary) {
                     VStack(alignment: .leading, spacing: 2) {
                         Text(message.text.isEmpty ? "Attachment" : message.text).lineLimit(2)
-                        Text(message.attachmentCount > 0 ? "Queued · \(message.attachmentCount) attachment\(message.attachmentCount == 1 ? "" : "s")" : "Queued")
+                        Text(message.attachmentCount > 0 ? "\(message.status) · \(message.attachmentCount) attachment\(message.attachmentCount == 1 ? "" : "s")" : message.status)
                             .font(.caption2).foregroundStyle(.secondary)
                     }
                 } trailing: {

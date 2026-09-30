@@ -59,8 +59,8 @@ extension BBClient {
         return envelope.pages.filter { $0.archived != true }
     }
 
-    /// Whether a plugin is installed and running on the server.
-    public func isPluginRunning(_ id: String) async throws -> Bool {
+    /// The ids of plugins installed and running on the server.
+    public func runningPlugins() async throws -> Set<String> {
         struct List: Decodable {
             struct Plugin: Decodable {
                 var id: String
@@ -69,7 +69,7 @@ extension BBClient {
             var plugins: [Plugin]
         }
         let list: List = try await get("/api/v1/plugins")
-        return list.plugins.contains { $0.id == id && $0.status == "running" }
+        return Set(list.plugins.filter { $0.status == "running" }.map(\.id))
     }
 
     public func webURL(forPage id: String) -> URL {

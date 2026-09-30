@@ -67,6 +67,10 @@ struct InboxTab: View {
         case .room(let room): ChannelView(room: room)
         case .pages: PagesView()
         case .page(let id): PageView(pageId: id).id(id)
+        case .automations: AutomationsView()
+        case .automation(let automation): AutomationView(automation: automation).id(automation.id)
+        case .usage: UsageView()
+        case .queue: QueueView()
         }
     }
 }

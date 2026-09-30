@@ -202,6 +202,32 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Every Pages block kind, from a built-in page rather than a real one.
+    /// Automations, queue, usage and host settings. Read-only: nothing is run, paused or sent.
+    func testTools() {
+        app.open(URL(string: "bbgo://automations")!)
+        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("tools-automations")
+        app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch.tap()
+        XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
+        sleep(2)
+        shot("tools-automation")
+        app.open(URL(string: "bbgo://queue")!)
+        XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("tools-queue")
+        app.open(URL(string: "bbgo://usage")!)
+        XCTAssertTrue(app.navigationBars["Usage"].waitForExistence(timeout: 10))
+        sleep(2)
+        shot("tools-usage")
+        app.open(URL(string: "bbgo://settings")!)
+        XCTAssertTrue(app.switches["Keep Mac awake"].waitForExistence(timeout: 10), "keep awake")
+        shot("tools-settings")
+        app.open(URL(string: "bbgo://home")!)
+        XCTAssertTrue(app.buttons["Automations"].waitForExistence(timeout: 10))
+        shot("tools-home")
+    }
+
     func testPageDemo() {
         app.terminate()
         app.launchArguments = ["-qaPageDemo"]

@@ -9,6 +9,8 @@ struct MessageBubble: View {
     var react: (String) -> Void = { _ in }
     var quote: (String) -> Void = { _ in }
     var select: (String) -> Void = { _ in }
+    /// Nil where side chats aren't available.
+    var sideChat: ((String) -> Void)?
     @EnvironmentObject private var app: AppModel
 
     private var text: String { row.text ?? "" }
@@ -55,6 +57,9 @@ struct MessageBubble: View {
         Button { UIPasteboard.general.string = plainText } label: { Label("Copy", systemImage: "doc.on.doc") }
         Button { select(plainText) } label: { Label("Select Text", systemImage: "selection.pin.in.out") }
         Button { quote(plainText) } label: { Label("Quote", systemImage: "text.quote") }
+        if let sideChat {
+            Button { sideChat(plainText) } label: { Label("Side Chat", systemImage: "bubble.left.and.text.bubble.right") }
+        }
         ShareLink(item: plainText) { Label("Share", systemImage: "square.and.arrow.up") }
         if !row.isUser {
             Section("React") {

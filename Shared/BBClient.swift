@@ -237,9 +237,10 @@ extension BBClient {
         }
     }
 
-    /// Sends a queued message now, steering it into the running turn.
-    public func sendQueuedNow(_ threadId: String, _ id: String) async throws {
-        let _: JSONValue = try await post("/api/v1/threads/\(threadId)/queued-messages/\(id)/send", ["mode": "steer"])
+    /// Sends a queued message now. `steer` puts it into the running turn;
+    /// `auto` waits for the turn to end if one is running.
+    public func sendQueuedNow(_ threadId: String, _ id: String, mode: String = "steer") async throws {
+        let _: JSONValue = try await post("/api/v1/threads/\(threadId)/queued-messages/\(id)/send", ["mode": .string(mode)])
     }
 
     public func clearGoal(_ threadId: String) async throws {

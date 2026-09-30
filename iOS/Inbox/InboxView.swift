@@ -216,8 +216,9 @@ struct InboxView: View {
     @State private var renaming: ThreadEntry?
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
-    /// Whether the server runs the pages plugin; remembered so the row shows offline.
-    @AppStorage("pagesAvailable") private var pagesAvailable = false
+    /// The server's running plugins, comma-separated; remembered so the tool rows show offline.
+    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @State private var queuedCount = 0
 
     var body: some View {
         List {
@@ -233,10 +234,8 @@ struct InboxView: View {
                     ContentUnavailableView.search(text: query)
                 }
             } else {
-                if query.isEmpty, pagesAvailable {
-                    Section {
-                        NavigationLink(value: Route.pages) { Label("Pages", systemImage: "doc.richtext") }
-                    }
+                if query.isEmpty {
+                    collapsible("tools", "Tools") { tools }
                 }
                 if query.isEmpty, !model.channels.isEmpty {
                     collapsible("channels", "Channels") {
@@ -302,8 +301,15 @@ struct InboxView: View {
             NewThreadView(text: app.newThreadDraft ?? "")
         }
         .task(id: app.serverURL) {
-            if let running = try? await app.client.isPluginRunning("pages") { pagesAvailable = running }
+            if let running = try? await app.client.runningPlugins() { runningPlugins = running.sorted().joined(separator: ",") }
             await MutedThreads.shared.refresh()
+        }
+        // The queue changes on its own (retries fire, scheduled sends go out).
+        .task(id: app.serverURL) {
+            while !Task.isCancelled {
+                if let queued = try? await app.client.allQueuedMessages() { queuedCount = queued.count }
+                try? await Task.sleep(for: .seconds(60))
+            }
         }
         .task(id: app.serverURL) {
             model.restore()
@@ -314,6 +320,22 @@ struct InboxView: View {
 
     /// Section expansion survives relaunches, like the sidebar's collapsed groups.
     @AppStorage("collapsedHomeGroups") private var collapsedGroups = ""
+
+    @ViewBuilder
+    private var tools: some View {
+        let plugins = Set(runningPlugins.split(separator: ",").map(String.init))
+        if plugins.contains("pages") {
+            NavigationLink(value: Route.pages) { Label("Pages", systemImage: "doc.richtext") }
+        }
+        if plugins.contains("automations") {
+            NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
+        }
+        NavigationLink(value: Route.queue) { Label("Queue", systemImage: "tray.full") }
+            .badge(queuedCount)
+        if plugins.contains("account-pool") {
+            NavigationLink(value: Route.usage) { Label("Usage", systemImage: "gauge.with.dots.needle.33percent") }
+        }
+    }
 
     private func expanded(_ id: String) -> Binding<Bool> {
         Binding(
