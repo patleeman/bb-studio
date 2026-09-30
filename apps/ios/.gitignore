@@ -2,5 +2,3 @@ build/
 *.xcodeproj/
 DerivedData/
 .DS_Store
-plugin/node_modules/
-plugin/dist/

@@ -226,6 +226,29 @@
           "ref": "main"
         }
       }
+    },
+    {
+      "id": "mobile",
+      "displayName": "Studio Mobile",
+      "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions, muted threads, and a status Live Activity.",
+      "icon": "Smartphone",
+      "tags": [
+        "mobile",
+        "notifications",
+        "ios",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-mobile",
+          "ref": "main"
+        }
+      }
     }
   ]
 }

@@ -1,7 +1,7 @@
 import Foundation
 
 /// "Needs you" and "running" as the Live Activity, widgets, and plugin
-/// (`plugin/live.ts`) all count them: top-level threads only.
+/// (`packages/bb-studio-mobile/live.ts`) all count them: top-level threads only.
 public struct ThreadSummary: Sendable {
     public var needsYou: [ThreadEntry]
     public var running: [ThreadEntry]

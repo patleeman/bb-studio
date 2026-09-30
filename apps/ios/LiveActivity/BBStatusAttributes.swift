@@ -2,7 +2,7 @@ import ActivityKit
 import Foundation
 
 /// The one BB Studio Live Activity: what needs you and how much is running.
-/// The mobile plugin pushes `ContentState` as JSON (`plugin/live.ts`), so the
+/// The mobile plugin pushes `ContentState` as JSON (`packages/bb-studio-mobile/live.ts`), so the
 /// type name and keys must match what it sends.
 struct BBStatusAttributes: ActivityAttributes {
     struct ContentState: Codable, Hashable {

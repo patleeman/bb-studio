@@ -1,7 +1,7 @@
 import UIKit
 import UserNotifications
 
-/// Lock-screen actions on BB pushes. The relay (plugin/apns.ts) picks the category.
+/// Lock-screen actions on BB pushes. The relay (packages/bb-studio-mobile/apns.ts) picks the category.
 enum NotificationActions {
     static let approve = "BB_APPROVE"
     static let deny = "BB_DENY"

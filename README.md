@@ -18,9 +18,18 @@ agent.
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
+| [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
 Every add-on works on its own. With Studio installed, their items also appear in
 Studio's collection.
+
+## iOS app
+
+[`apps/ios`](apps/ios/) is BB Studio for iPhone and Apple Watch: BB's threads,
+approvals, terminals and automations, plus native Studio, Pages, Talk, Draw,
+Artifacts, Tasks and Teams. It talks to your BB server and uses the plugins
+above; install `mobile` for push notifications. See its
+[README](apps/ios/README.md) to build it and ship it to TestFlight.
 
 ## Install
 
@@ -44,6 +53,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - bot-teams: persistent bots in channels
    - studio-chat: a chat that floats over Studio items
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
+   - mobile: push notifications for the BB Studio iOS app; only if I use it
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
 4. Run `bb plugin list`, confirm each installed plugin is running, and report
    anything that failed with its error.
@@ -85,6 +95,9 @@ pnpm check:compat        # every plugin installs on the current stable BB
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
 ```
+
+The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)
+from `apps/ios`; its README has the commands.
 
 See [`AGENTS.md`](AGENTS.md) for the SDK pinning, marketplace and screenshot
 rules, and [`docs/`](docs/) for the design notes.
