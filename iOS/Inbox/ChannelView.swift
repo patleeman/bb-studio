@@ -13,6 +13,7 @@ struct ChannelView: View {
     @State private var error: String?
     @State private var listener: UUID?
     @State private var dictating = false
+    @State private var showingAutomations = false
     /// Tool approvals and questions from bots working on this channel's jobs.
     @State private var approvals: [PendingInteraction] = []
 
@@ -93,10 +94,12 @@ struct ChannelView: View {
                         newName = name ?? room.name
                         renaming = true
                     } label: { Label("Rename channel", systemImage: "pencil") }
+                    Button { showingAutomations = true } label: { Label("Automations", systemImage: "clock.arrow.circlepath") }
                 } label: { Image(systemName: "ellipsis") }
                 .accessibilityLabel("More")
             }
         }
+        .sheet(isPresented: $showingAutomations) { ChannelAutomationsSheet(room: room) }
         .alert("Rename channel", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}

@@ -20,6 +20,7 @@ enum Route: Hashable {
     case task(id: String)
     case terminals(scope: TerminalScope, title: String)
     case machines
+    case bot(id: String)
 }
 
 extension Route {
@@ -34,6 +35,7 @@ extension Route {
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
         case ("studio-tasks", "tasks"): self = .task(id: id)
+        case ("bot-teams", "bots"): self = .bot(id: id)
         default: return nil
         }
     }
@@ -116,7 +118,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`, `bbgo://artifact/<id>`, `bbgo://terminals`,
+    /// `bbgo://thread/<id>`, `bbgo://page/<id>`, `bbgo://automations`, `bbgo://queue`, `bbgo://usage`, `bbgo://archived`, `bbgo://attention`, `bbgo://drawing[/<id>]`, `bbgo://artifact/<id>`, `bbgo://bot/<id>`, `bbgo://terminals`,
     /// `bbgo://dictate`, `bbgo://voice[/<id>]`, `bbgo://studio` (or `talk`), `bbgo://web`.
     func handle(_ url: URL) {
         guard url.scheme == "bbgo" else { return }
@@ -136,6 +138,7 @@ final class AppModel: ObservableObject {
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
         case "task": openStudio(kind: nil, id.map { .task(id: $0) } ?? .tasks)
         case "tasks": openStudio(kind: nil, .tasks)
+        case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
         case "dictate": startDictation(threadId: id)
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()

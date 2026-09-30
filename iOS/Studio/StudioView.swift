@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class StudioStore: ObservableObject {
     static let shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks", "bot-teams"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -216,6 +216,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
+        StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
     ]
 
     static func other(_ id: String) -> StudioKind {
@@ -528,6 +529,7 @@ struct StudioView: View {
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
         case "studio-tasks": .task(id: item.itemId)
+        case "bot-teams": .bot(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
     }
@@ -600,6 +602,8 @@ struct StudioView: View {
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
+        case "task": "Tasks you and your agents track show up here."
+        case "bot": "Bot Teams bots show up here. Set one up from a chat in BB web."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
     }

@@ -894,6 +894,104 @@ final class ThreadUITests: XCTestCase {
         _ = wait(90) { (self.api("GET", "/threads/\(threadId!)", [:])?["status"] as? String).map { !["running", "starting", "queued"].contains($0) } ?? false }
     }
 
+    /// Read-only on Command Center's real automations; writes only touch a
+    /// disabled one-off scratch automation 300 days out, deleted at the end.
+    func testChannelAutomations() throws {
+        let channel = "1a5943b7-4148-436b-94b0-aab0a5401064"
+        let room = app.staticTexts["Command Center"].firstMatch
+        XCTAssertTrue(room.waitForExistence(timeout: 10), "channel in Home")
+        room.tap()
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10), "channel menu")
+        more.tap()
+        app.buttons["Automations"].tap()
+        let reminder = app.staticTexts["Daily garbage-day reminder"].firstMatch
+        XCTAssertTrue(reminder.waitForExistence(timeout: 10), "automations listed")
+        XCTAssertTrue(app.staticTexts["Every day at 19:00 · America/New_York"].exists, "schedule described")
+        shot("channel-automations")
+        reminder.tap()
+        XCTAssertTrue(app.staticTexts["Status"].waitForExistence(timeout: 10), "detail")
+        for _ in 0..<6 where !app.staticTexts["RUNS"].exists && !app.staticTexts["Runs"].exists { app.swipeUp() }
+        XCTAssertTrue(app.buttons["Run Now"].exists && app.buttons["Pause"].exists, "actions shown")
+        XCTAssertTrue(app.staticTexts["RUNS"].exists || app.staticTexts["Runs"].exists, "runs section")
+        _ = wait(5) { !self.app.activityIndicators.firstMatch.exists }
+        shot("channel-automation-detail")
+
+        // Create through the editor on the scratch-safe path.
+        let name = "QA automation \(Int(Date().timeIntervalSince1970))"
+        var createdId: String?
+        addTeardownBlock {
+            let list = self.rpc("bot-teams", "automationList", ["channelId": channel, "limit": 50])
+            for case let automation as [String: Any] in list?["automations"] as? [Any] ?? []
+            where (automation["name"] as? String)?.hasPrefix("QA automation") == true {
+                _ = self.rpc("bot-teams", "automationAction", [
+                    "channelId": channel, "automationId": automation["id"] as! String, "action": "delete"])
+            }
+        }
+        app.navigationBars.buttons.element(boundBy: 0).tap()
+        app.buttons["New Automation"].tap()
+        let nameField = app.textFields["automationName"]
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5), "editor")
+        nameField.tap()
+        nameField.typeText(name)
+        let prompt = app.textViews["automationPrompt"].exists ? app.textViews["automationPrompt"] : app.textFields["automationPrompt"]
+        prompt.tap()
+        prompt.typeText("UI test scratch. Never runs.")
+        app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Repeat'")).firstMatch.tap()
+        app.buttons["Once"].firstMatch.tap()
+        let toggle = app.switches["Start enabled"].firstMatch
+        if !toggle.isHittable { app.swipeUp() }
+        toggle.switches.firstMatch.exists ? toggle.switches.firstMatch.tap() : toggle.tap()
+        XCTAssertEqual(toggle.value as? String, "0", "created paused")
+        shot("channel-automation-editor")
+        app.buttons["Save"].tap()
+        let created = app.staticTexts[name].firstMatch
+        XCTAssertTrue(created.waitForExistence(timeout: 10), "created and listed")
+        let list = rpc("bot-teams", "automationList", ["channelId": channel, "limit": 50])
+        let automation = (list?["automations"] as? [[String: Any]])?.first { $0["name"] as? String == name }
+        createdId = automation?["id"] as? String
+        XCTAssertEqual(automation?["enabled"] as? Bool, false, "saved disabled")
+        XCTAssertEqual((automation?["trigger"] as? [String: Any])?["triggerType"] as? String, "once")
+        // Push it far out so nothing can fire even if a later step enables it.
+        if let id = createdId {
+            _ = rpc("bot-teams", "automationUpdate", [
+                "channelId": channel, "automationId": id,
+                "trigger": ["triggerType": "once", "runAt": (Date().timeIntervalSince1970 + 300 * 86400) * 1000]])
+        }
+
+        let bar = app.navigationBars["Automations"].frame.maxY
+        for _ in 0..<4 where created.frame.minY < bar { app.swipeDown() }
+        for _ in 0..<4 where !created.isHittable { app.swipeUp() }
+        created.tap()
+        let resumed = app.buttons["Resume"].waitForExistence(timeout: 10)
+        shot("channel-automation-created")
+        XCTAssertTrue(resumed, "paused detail")
+        app.buttons["Edit"].tap()
+        XCTAssertTrue(nameField.waitForExistence(timeout: 5))
+        nameField.tap()
+        nameField.typeText(" edited")
+        app.buttons["Save"].tap()
+        XCTAssertTrue(app.navigationBars["\(name) edited"].waitForExistence(timeout: 10), "renamed")
+        app.buttons["Delete"].firstMatch.tap()
+        app.buttons.matching(identifier: "Delete").allElementsBoundByIndex.last { $0.isHittable }?.tap()
+        XCTAssertTrue(reminder.waitForExistence(timeout: 10), "back to list")
+        XCTAssertTrue(wait(10) { !self.app.staticTexts["\(name) edited"].exists }, "deleted")
+        shot("channel-automations-after")
+    }
+
+    func testBotInStudio() throws {
+        app.open(URL(string: "bbgo://bot/bot_32fb8c40db41abea")!)
+        XCTAssertTrue(app.staticTexts["Chief of Staff"].firstMatch.waitForExistence(timeout: 10), "bot screen")
+        XCTAssertTrue(app.staticTexts["Channels"].waitForExistence(timeout: 5) || app.staticTexts["CHANNELS"].exists, "channels")
+        shot("bot-view")
+        app.open(URL(string: "bbgo://studio")!)
+        let bots = app.buttons["Bots"].firstMatch
+        for _ in 0..<4 where !bots.isHittable { app.scrollViews.containing(.button, identifier: "All").firstMatch.swipeLeft() }
+        bots.tap()
+        XCTAssertTrue(app.staticTexts["Red4"].firstMatch.waitForExistence(timeout: 10), "bots listed in Studio")
+        shot("studio-bots")
+    }
+
     private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
             "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,

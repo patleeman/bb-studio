@@ -86,6 +86,7 @@ struct RouteDestination: View {
         case .task(let id): TaskView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
         case .machines: MachinesView()
+        case .bot(let id): BotView(id: id)
         }
     }
 }
