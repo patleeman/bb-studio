@@ -42,7 +42,7 @@ const hexToken = z
   .transform((value) => value.toLowerCase())
   .refine(isHexToken, "Expected a hex APNs token");
 
-const liveContract = defineRpcContract({
+export const liveContract = defineRpcContract({
   live_register: {
     experimental_description: "BB Studio reports its Live Activity push tokens and activity lifecycle.",
     input: z.object({

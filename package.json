@@ -14,12 +14,16 @@
     "test": "pnpm -r --if-present test",
     "check:docs": "node scripts/check-docs.mjs",
     "check:marketplace": "node scripts/check-marketplace.mjs",
-    "check": "pnpm typecheck && pnpm test && pnpm check:compat && pnpm check:docs && pnpm check:marketplace"
+    "check": "pnpm typecheck && pnpm test && pnpm check:compat && pnpm check:docs && pnpm check:marketplace && pnpm check:contracts",
+    "gen:contracts": "tsx scripts/gen-contracts.mjs",
+    "check:contracts": "tsx scripts/gen-contracts.mjs --check"
   },
   "devDependencies": {
     "ajv": "8.17.1",
     "ajv-formats": "3.0.1",
-    "typescript": "^5.7.0"
+    "tsx": "4.20.6",
+    "typescript": "^5.7.0",
+    "zod": "4.6.5"
   },
   "packageManager": "pnpm@11.10.0",
   "engines": {

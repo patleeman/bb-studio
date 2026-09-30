@@ -1,0 +1,3764 @@
+{
+  "pluginId": "pages",
+  "methods": {
+    "tree": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "updatedBy": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "refresh": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "botId": {
+                          "type": "string"
+                        },
+                        "cron": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "instructions": {
+                          "type": "string",
+                          "maxLength": 4000
+                        },
+                        "lastAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nextAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "botId",
+                        "cron",
+                        "instructions",
+                        "lastAt",
+                        "nextAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "projectId",
+                "parentId",
+                "title",
+                "icon",
+                "position",
+                "createdAt",
+                "updatedAt",
+                "updatedBy",
+                "archived",
+                "refresh"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "pages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "create": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^pg_[a-f0-9]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "title": {
+            "default": "",
+            "type": "string",
+            "maxLength": 200
+          },
+          "icon": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 200000
+          }
+        },
+        "required": [
+          "projectId",
+          "parentId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "position": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "refresh": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string"
+                      },
+                      "cron": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      "lastAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "nextAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "cron",
+                      "instructions",
+                      "lastAt",
+                      "nextAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "projectId",
+              "parentId",
+              "title",
+              "icon",
+              "position",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "archived",
+              "refresh"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "update": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "icon": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^pg_[a-f0-9]{12}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "position": {
+            "type": "number"
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "position": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "refresh": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string"
+                      },
+                      "cron": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      "lastAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "nextAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "cron",
+                      "instructions",
+                      "lastAt",
+                      "nextAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "projectId",
+              "parentId",
+              "title",
+              "icon",
+              "position",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "archived",
+              "refresh"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "remove": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "deleted": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "deleted"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "updatedBy": {
+                    "type": "string"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  },
+                  "refresh": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "botId": {
+                            "type": "string"
+                          },
+                          "cron": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "instructions": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "lastAt": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "nextAt": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "botId",
+                          "cron",
+                          "instructions",
+                          "lastAt",
+                          "nextAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "projectId",
+                  "parentId",
+                  "title",
+                  "icon",
+                  "position",
+                  "createdAt",
+                  "updatedAt",
+                  "updatedBy",
+                  "archived",
+                  "refresh"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "linkPreview": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "url": {
+            "type": "string",
+            "maxLength": 2000,
+            "format": "uri"
+          }
+        },
+        "required": [
+          "url"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string"
+          },
+          "description": {
+            "type": "string"
+          },
+          "image": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "title",
+          "description",
+          "image"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "studioItems": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "kindLabel": {
+                  "type": "string"
+                },
+                "kindIcon": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "preview": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "facts": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "badge": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pluginId",
+                "id",
+                "kind",
+                "kindLabel",
+                "kindIcon",
+                "title",
+                "icon",
+                "preview",
+                "facts",
+                "badge",
+                "thumbnailUrl",
+                "href",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "artifactView": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "view": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "type": {
+                    "type": "string",
+                    "enum": [
+                      "image",
+                      "html",
+                      "markdown",
+                      "code",
+                      "text",
+                      "pdf",
+                      "other"
+                    ]
+                  },
+                  "name": {
+                    "type": "string"
+                  },
+                  "url": {
+                    "type": "string"
+                  },
+                  "text": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "type",
+                  "name",
+                  "url",
+                  "text"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "view"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "markdown": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "markdown": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "markdown"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "replaceMarkdown": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "markdown": {
+            "type": "string",
+            "maxLength": 200000
+          },
+          "snapshotName": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id",
+          "markdown",
+          "snapshotName"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "position": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "refresh": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string"
+                      },
+                      "cron": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      "lastAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "nextAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "cron",
+                      "instructions",
+                      "lastAt",
+                      "nextAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "projectId",
+              "parentId",
+              "title",
+              "icon",
+              "position",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "archived",
+              "refresh"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "search": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "query": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "query"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pages": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": "string"
+                },
+                "position": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "updatedBy": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "refresh": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "botId": {
+                          "type": "string"
+                        },
+                        "cron": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 120
+                        },
+                        "instructions": {
+                          "type": "string",
+                          "maxLength": 4000
+                        },
+                        "lastAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "nextAt": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "botId",
+                        "cron",
+                        "instructions",
+                        "lastAt",
+                        "nextAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "projectId",
+                "parentId",
+                "title",
+                "icon",
+                "position",
+                "createdAt",
+                "updatedAt",
+                "updatedBy",
+                "archived",
+                "refresh"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "pages"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bots": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "reason": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "bots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "handle": {
+                  "type": "string"
+                },
+                "avatar": {
+                  "type": "string"
+                },
+                "description": {
+                  "type": "string"
+                },
+                "working": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "handle",
+                "avatar",
+                "description",
+                "working"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "available",
+          "reason",
+          "bots"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "requests": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "pageId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "requests": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "botId": {
+                  "type": "string"
+                },
+                "botName": {
+                  "type": "string"
+                },
+                "threadId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "mention",
+                    "comment",
+                    "refresh"
+                  ]
+                },
+                "blockId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "commentThreadId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "summary": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "queued",
+                    "working",
+                    "done",
+                    "failed"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "result": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "botId",
+                "botName",
+                "threadId",
+                "kind",
+                "blockId",
+                "commentThreadId",
+                "summary",
+                "status",
+                "error",
+                "result",
+                "createdAt",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "requests"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "setRefresh": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "refresh": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "botId": {
+                    "type": "string"
+                  },
+                  "cron": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 120
+                  },
+                  "instructions": {
+                    "type": "string",
+                    "maxLength": 4000
+                  }
+                },
+                "required": [
+                  "botId",
+                  "cron",
+                  "instructions"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "refresh"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "page": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": "string"
+              },
+              "position": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "refresh": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "botId": {
+                        "type": "string"
+                      },
+                      "cron": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 120
+                      },
+                      "instructions": {
+                        "type": "string",
+                        "maxLength": 4000
+                      },
+                      "lastAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      },
+                      "nextAt": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "botId",
+                      "cron",
+                      "instructions",
+                      "lastAt",
+                      "nextAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "projectId",
+              "parentId",
+              "title",
+              "icon",
+              "position",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "archived",
+              "refresh"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "refreshNow": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "request": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "botId": {
+                "type": "string"
+              },
+              "botName": {
+                "type": "string"
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "mention",
+                  "comment",
+                  "refresh"
+                ]
+              },
+              "blockId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "commentThreadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "summary": {
+                "type": "string"
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "queued",
+                  "working",
+                  "done",
+                  "failed"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "result": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "botId",
+              "botName",
+              "threadId",
+              "kind",
+              "blockId",
+              "commentThreadId",
+              "summary",
+              "status",
+              "error",
+              "result",
+              "createdAt",
+              "updatedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "request"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "work": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "request": {
+            "type": "object",
+            "properties": {
+              "projectId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "providerId": {
+                "type": "string",
+                "minLength": 1
+              },
+              "model": {
+                "type": "string"
+              },
+              "reasoningLevel": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "xhigh",
+                  "max",
+                  "ultra",
+                  "ultracode"
+                ]
+              },
+              "permissionMode": {
+                "type": "string",
+                "enum": [
+                  "accept-edits",
+                  "auto",
+                  "full"
+                ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              },
+              "executionInputSources": {
+                "type": "object",
+                "properties": {
+                  "model": {
+                    "type": "string",
+                    "enum": [
+                      "client-preference",
+                      "explicit"
+                    ]
+                  },
+                  "permissionMode": {
+                    "type": "string",
+                    "enum": [
+                      "client-preference",
+                      "explicit"
+                    ]
+                  },
+                  "providerId": {
+                    "type": "string",
+                    "enum": [
+                      "client-preference",
+                      "explicit"
+                    ]
+                  },
+                  "reasoningLevel": {
+                    "type": "string",
+                    "enum": [
+                      "client-preference",
+                      "explicit"
+                    ]
+                  },
+                  "serviceTier": {
+                    "type": "string",
+                    "enum": [
+                      "client-preference",
+                      "explicit"
+                    ]
+                  }
+                }
+              },
+              "environment": {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              "input": {
+                "minItems": 1,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "$ref": "#/$defs/__schema1"
+                  }
+                }
+              },
+              "sendAt": {
+                "type": "integer",
+                "exclusiveMinimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "projectId",
+              "providerId",
+              "model",
+              "reasoningLevel",
+              "permissionMode",
+              "executionInputSources",
+              "environment",
+              "input"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "request"
+        ],
+        "$defs": {
+          "__schema0": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema0"
+                }
+              }
+            ]
+          },
+          "__schema1": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "number"
+              },
+              {
+                "type": "boolean"
+              },
+              {
+                "type": "null"
+              },
+              {
+                "type": "array",
+                "items": {
+                  "$ref": "#/$defs/__schema1"
+                }
+              },
+              {
+                "type": "object",
+                "propertyNames": {
+                  "type": "string"
+                },
+                "additionalProperties": {
+                  "$ref": "#/$defs/__schema1"
+                }
+              }
+            ]
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "botName": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "botName"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "chats": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pageId": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "pageId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "chats": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "threadId",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "chats"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "chatPage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "page": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": "string"
+                  },
+                  "position": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "updatedBy": {
+                    "type": "string"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  },
+                  "refresh": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "botId": {
+                            "type": "string"
+                          },
+                          "cron": {
+                            "type": "string",
+                            "minLength": 1,
+                            "maxLength": 120
+                          },
+                          "instructions": {
+                            "type": "string",
+                            "maxLength": 4000
+                          },
+                          "lastAt": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          },
+                          "nextAt": {
+                            "type": [
+                              "number",
+                              "null"
+                            ]
+                          }
+                        },
+                        "required": [
+                          "botId",
+                          "cron",
+                          "instructions",
+                          "lastAt",
+                          "nextAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "projectId",
+                  "parentId",
+                  "title",
+                  "icon",
+                  "position",
+                  "createdAt",
+                  "updatedAt",
+                  "updatedBy",
+                  "archived",
+                  "refresh"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "page"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "snapshots": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "snapshots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "actor": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "label",
+                "actor",
+                "createdAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "snapshots"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "snapshot": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "label": {
+            "type": "string",
+            "maxLength": 120
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "snapshot": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "actor": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "id",
+              "label",
+              "actor",
+              "createdAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "snapshot"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "restore": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "snapshotId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "snapshotId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "comments": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "includeResolved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "resolved": {
+                  "type": "boolean"
+                },
+                "blockId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "quote": {
+                  "type": "string"
+                },
+                "comments": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "author": {
+                        "type": "string"
+                      },
+                      "authorName": {
+                        "type": "string"
+                      },
+                      "text": {
+                        "type": "string"
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "author",
+                      "authorName",
+                      "text",
+                      "createdAt"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "resolved",
+                "blockId",
+                "quote",
+                "comments",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commentBlocks": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "blocks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "text": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "text"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "blocks"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commentCreate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "block": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "quote": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          }
+        },
+        "required": [
+          "id",
+          "block",
+          "text"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "threadId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commentReply": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "thread": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "text": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 8000
+          }
+        },
+        "required": [
+          "id",
+          "thread",
+          "text"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "commentResolve": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}$"
+          },
+          "thread": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "resolved": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "thread",
+          "resolved"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "turnId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emoji": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId",
+          "label"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "turnId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "generating",
+                  "ready",
+                  "error"
+                ]
+              },
+              "followUps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emoji": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "emoji",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "generatedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "regeneratedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "job": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "explainerId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "generate",
+                          "regenerate"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "collecting",
+                          "starting",
+                          "writing",
+                          "saving",
+                          "ready",
+                          "error",
+                          "cancelled",
+                          "interrupted"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "progress": {
+                        "type": "number"
+                      },
+                      "error": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "explainerId",
+                      "kind",
+                      "status",
+                      "label",
+                      "detail",
+                      "progress",
+                      "error",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "parentId",
+              "threadId",
+              "messageId",
+              "turnId",
+              "emoji",
+              "label",
+              "pageId",
+              "projectId",
+              "href",
+              "status",
+              "followUps",
+              "generatedAt",
+              "regeneratedAt",
+              "error",
+              "createdAt",
+              "updatedAt",
+              "job"
+            ],
+            "additionalProperties": false
+          },
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "explainer",
+          "started"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exploreRegenerate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "turnId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "generating",
+                  "ready",
+                  "error"
+                ]
+              },
+              "followUps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emoji": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "emoji",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "generatedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "regeneratedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "job": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "explainerId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "generate",
+                          "regenerate"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "collecting",
+                          "starting",
+                          "writing",
+                          "saving",
+                          "ready",
+                          "error",
+                          "cancelled",
+                          "interrupted"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "progress": {
+                        "type": "number"
+                      },
+                      "error": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "explainerId",
+                      "kind",
+                      "status",
+                      "label",
+                      "detail",
+                      "progress",
+                      "error",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "parentId",
+              "threadId",
+              "messageId",
+              "turnId",
+              "emoji",
+              "label",
+              "pageId",
+              "projectId",
+              "href",
+              "status",
+              "followUps",
+              "generatedAt",
+              "regeneratedAt",
+              "error",
+              "createdAt",
+              "updatedAt",
+              "job"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "explainer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exploreStop": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "turnId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "pageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "generating",
+                      "ready",
+                      "error"
+                    ]
+                  },
+                  "followUps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "emoji": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "emoji",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "generatedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "regeneratedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "job": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "explainerId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "regenerate"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "collecting",
+                              "starting",
+                              "writing",
+                              "saving",
+                              "ready",
+                              "error",
+                              "cancelled",
+                              "interrupted"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "progress": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "explainerId",
+                          "kind",
+                          "status",
+                          "label",
+                          "detail",
+                          "progress",
+                          "error",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "parentId",
+                  "threadId",
+                  "messageId",
+                  "turnId",
+                  "emoji",
+                  "label",
+                  "pageId",
+                  "projectId",
+                  "href",
+                  "status",
+                  "followUps",
+                  "generatedAt",
+                  "regeneratedAt",
+                  "error",
+                  "createdAt",
+                  "updatedAt",
+                  "job"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "explainer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explainer": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "turnId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "pageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "generating",
+                      "ready",
+                      "error"
+                    ]
+                  },
+                  "followUps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "emoji": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "emoji",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "generatedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "regeneratedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "job": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "explainerId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "regenerate"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "collecting",
+                              "starting",
+                              "writing",
+                              "saving",
+                              "ready",
+                              "error",
+                              "cancelled",
+                              "interrupted"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "progress": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "explainerId",
+                          "kind",
+                          "status",
+                          "label",
+                          "detail",
+                          "progress",
+                          "error",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "parentId",
+                  "threadId",
+                  "messageId",
+                  "turnId",
+                  "emoji",
+                  "label",
+                  "pageId",
+                  "projectId",
+                  "href",
+                  "status",
+                  "followUps",
+                  "generatedAt",
+                  "regeneratedAt",
+                  "error",
+                  "createdAt",
+                  "updatedAt",
+                  "job"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "explainer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explainersForMessage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "generating",
+                    "ready",
+                    "error"
+                  ]
+                },
+                "followUps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "emoji": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "emoji",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "generatedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "regeneratedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "job": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "explainerId": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "generate",
+                            "regenerate"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "collecting",
+                            "starting",
+                            "writing",
+                            "saving",
+                            "ready",
+                            "error",
+                            "cancelled",
+                            "interrupted"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "explainerId",
+                        "kind",
+                        "status",
+                        "label",
+                        "detail",
+                        "progress",
+                        "error",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "parentId",
+                "threadId",
+                "messageId",
+                "turnId",
+                "emoji",
+                "label",
+                "pageId",
+                "projectId",
+                "href",
+                "status",
+                "followUps",
+                "generatedAt",
+                "regeneratedAt",
+                "error",
+                "createdAt",
+                "updatedAt",
+                "job"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "explainers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explainers": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "generating",
+                    "ready",
+                    "error"
+                  ]
+                },
+                "followUps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "emoji": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "emoji",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "generatedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "regeneratedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "job": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "explainerId": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "generate",
+                            "regenerate"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "collecting",
+                            "starting",
+                            "writing",
+                            "saving",
+                            "ready",
+                            "error",
+                            "cancelled",
+                            "interrupted"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "explainerId",
+                        "kind",
+                        "status",
+                        "label",
+                        "detail",
+                        "progress",
+                        "error",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "parentId",
+                "threadId",
+                "messageId",
+                "turnId",
+                "emoji",
+                "label",
+                "pageId",
+                "projectId",
+                "href",
+                "status",
+                "followUps",
+                "generatedAt",
+                "regeneratedAt",
+                "error",
+                "createdAt",
+                "updatedAt",
+                "job"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "explainers"
+        ],
+        "additionalProperties": false
+      }
+    }
+  }
+}

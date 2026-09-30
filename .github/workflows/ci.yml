@@ -23,3 +23,4 @@ jobs:
       - run: pnpm check:compat
       - run: pnpm check:docs
       - run: pnpm check:marketplace
+      - run: pnpm check:contracts
