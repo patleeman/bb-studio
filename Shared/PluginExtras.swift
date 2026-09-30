@@ -34,13 +34,14 @@ extension BBClient {
 extension BBClient {
     /// Queues the message on the thread without sending it.
     public func saveDraft(_ threadId: String, text: String, mentions: [Mention] = []) async throws {
-        let _: JSONValue = try await post(
-            "/api/v1/threads/\(threadId)/send",
-            [
-                "input": .array([["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]]),
-                "mode": "queue-if-active",
-                "pluginSubmission": ["pluginId": "drafts", "data": ["kind": "draft"]],
-            ])
+        var body: [String: JSONValue] = [
+            "input": .array([["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]]),
+            "mode": "queue-if-active",
+            "pluginSubmission": ["pluginId": "drafts", "data": ["kind": "draft"]],
+        ]
+        PermissionMode.apply(threadId, to: &body)
+        let _: JSONValue = try await post("/api/v1/threads/\(threadId)/send", .object(body))
+        PermissionMode.sent(threadId, body)
     }
 }
 

@@ -116,7 +116,8 @@ struct NewThreadView: View {
 
     private var permissionModes: [String] {
         let provider = providerId.isEmpty ? defaults?.providerId : providerId
-        return options?.providers.first { $0.id == provider }?.capabilities?.permissionModes ?? []
+        let modes = options?.providers.first { $0.id == provider }?.capabilities?.permissionModes ?? []
+        return PermissionMode.allowed(modes, ceiling: options?.permissionCeiling)
     }
 
     private func providerName(_ id: String) -> String? {
@@ -127,14 +128,7 @@ struct NewThreadView: View {
         value.map { "Default (\($0))" } ?? "Default"
     }
 
-    private func permissionLabel(_ mode: String) -> String {
-        switch mode {
-        case "accept-edits": "Accept edits"
-        case "auto": "Auto"
-        case "full": "Full access"
-        default: mode
-        }
-    }
+    private func permissionLabel(_ mode: String) -> String { PermissionMode.label(mode) }
 
     private func create() async {
         creating = true

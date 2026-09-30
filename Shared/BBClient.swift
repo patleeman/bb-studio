@@ -357,9 +357,11 @@ extension BBClient {
     public func send(_ threadId: String, text: String, attachments: [JSONValue], mentions: [Mention] = []) async throws
         -> SendResult
     {
-        try await post(
-            "/api/v1/threads/\(threadId)/send",
-            ["input": Self.input(text, attachments, mentions), "mode": "queue-if-active"])
+        var body: [String: JSONValue] = ["input": Self.input(text, attachments, mentions), "mode": "queue-if-active"]
+        PermissionMode.apply(threadId, to: &body)
+        let result: SendResult = try await post("/api/v1/threads/\(threadId)/send", .object(body))
+        PermissionMode.sent(threadId, body)
+        return result
     }
 
     private static func input(_ text: String, _ attachments: [JSONValue], _ mentions: [Mention] = []) -> JSONValue {
@@ -537,5 +539,19 @@ extension BBClient {
         let _: JSONValue = try await rpc(
             "push-notifications", "pushSubscriptions.add",
             ["expoPushToken": .string("apns:\(apnsToken)"), "platform": "ios", "deviceLabel": .string(label)])
+    }
+}
+
+extension PermissionMode {
+    /// Adds the pending mode to a send body.
+    static func apply(_ threadId: String, to body: inout [String: JSONValue]) {
+        guard let mode = pending(threadId) else { return }
+        body["permissionMode"] = .string(mode)
+        body["executionInputSources"] = ["permissionMode": "explicit"]
+    }
+
+    /// The message carried it; from now on the thread has it.
+    static func sent(_ threadId: String, _ body: [String: JSONValue]) {
+        if case .string(let mode)? = body["permissionMode"], pending(threadId) == mode { setPending(nil, for: threadId) }
     }
 }

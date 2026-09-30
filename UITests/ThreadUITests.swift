@@ -694,6 +694,30 @@ final class ThreadUITests: XCTestCase {
         return result
     }
 
+    /// Picks a thread's permissions on a scratch thread; the sheet then shows the choice.
+    func testPermissions() throws {
+        let thread = try XCTUnwrap(scratchThread("QA permissions \(Int(Date().timeIntervalSince1970))"))
+        addTeardownBlock { _ = self.api("DELETE", "/threads/\(thread)", ["childThreadsConfirmed": false]) }
+        app.open(URL(string: "bbgo://thread/\(thread)")!)
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 10))
+        more.tap()
+        app.buttons["Model & permissions"].tap()
+        let picker = app.buttons["permissionPicker"].firstMatch
+        XCTAssertTrue(picker.waitForExistence(timeout: 10), "permissions picker")
+        shot("permissions-sheet")
+        picker.tap()
+        app.buttons["Accept edits"].firstMatch.tap()
+        app.buttons["Save"].tap()
+        XCTAssertTrue(more.waitForExistence(timeout: 5))
+        sleep(1)
+        more.tap()
+        app.buttons["Model & permissions"].tap()
+        XCTAssertTrue(picker.waitForExistence(timeout: 10))
+        XCTAssertTrue(picker.label.contains("Accept edits") || (picker.value as? String)?.contains("Accept edits") == true, "kept the choice: \(picker.label)")
+        shot("permissions-kept")
+    }
+
     func testTerminal() throws {
         app.open(URL(string: "bbgo://terminals")!)
         let host = app.buttons.containing(NSPredicate(format: "label CONTAINS 'MegaMac'")).firstMatch

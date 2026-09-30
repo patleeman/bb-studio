@@ -236,7 +236,7 @@ struct ThreadView: View {
                         newTitle = model.thread?.title ?? model.thread?.displayTitle ?? ""
                         renaming = true
                     } label: { Label("Rename", systemImage: "pencil") }
-                    Button { choosingModel = true } label: { Label("Model & reasoning", systemImage: "cpu") }
+                    Button { choosingModel = true } label: { Label("Model & permissions", systemImage: "cpu") }
                     if model.thread?.environmentId != nil {
                         Button { showingFiles = true } label: { Label("Files & changes", systemImage: "folder") }
                         Button { app.push(.terminals(scope: .thread(model.threadId), title: "Terminals")) } label: {

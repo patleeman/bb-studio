@@ -341,6 +341,38 @@ public struct ExecutionOptions: Decodable, Sendable {
 
     public var providers: [Provider]
     public var models: [Model]
+    /// The most any thread may get, set per machine.
+    public var permissionCeiling: String?
+}
+
+/// How much an agent may do without asking: accept-edits, auto or full.
+public enum PermissionMode {
+    public static let all = ["accept-edits", "auto", "full"]
+
+    public static func label(_ mode: String) -> String {
+        switch mode {
+        case "accept-edits": "Accept edits"
+        case "auto": "Auto"
+        case "full": "Full access"
+        default: mode
+        }
+    }
+
+    /// The provider's modes, up to the ceiling.
+    public static func allowed(_ modes: [String], ceiling: String?) -> [String] {
+        guard let ceiling, let top = all.firstIndex(of: ceiling) else { return modes }
+        return modes.filter { (all.firstIndex(of: $0) ?? 0) <= top }
+    }
+
+    /// A mode picked for a thread on this phone, sent with its next message:
+    /// BB takes permissions per message, and the thread keeps the last one.
+    public static func pending(_ threadId: String) -> String? {
+        AppGroup.defaults.string(forKey: "permissionMode.\(threadId)")
+    }
+
+    public static func setPending(_ mode: String?, for threadId: String) {
+        AppGroup.defaults.set(mode, forKey: "permissionMode.\(threadId)")
+    }
 }
 
 public struct Project: Codable, Identifiable, Hashable, Sendable {

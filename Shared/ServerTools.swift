@@ -131,12 +131,14 @@ extension BBClient {
 
     /// Queues the message to go at `date` rather than now.
     public func send(_ threadId: String, text: String, mentions: [Mention] = [], at date: Date) async throws -> SendResult {
-        try await post(
-            "/api/v1/threads/\(threadId)/send",
-            [
-                "input": .array([["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]]),
-                "mode": "queue-if-active",
-                "sendAt": .number((date.timeIntervalSince1970 * 1000).rounded()),
-            ])
+        var body: [String: JSONValue] = [
+            "input": .array([["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))]]),
+            "mode": "queue-if-active",
+            "sendAt": .number((date.timeIntervalSince1970 * 1000).rounded()),
+        ]
+        PermissionMode.apply(threadId, to: &body)
+        let result: SendResult = try await post("/api/v1/threads/\(threadId)/send", .object(body))
+        PermissionMode.sent(threadId, body)
+        return result
     }
 }
