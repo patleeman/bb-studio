@@ -6,6 +6,8 @@ final class PageModel: ObservableObject {
     @Published var markdown: String?
     @Published var error: String?
     @Published var missing = false
+    /// Nil until loaded, or when the server's Pages has no comment API.
+    @Published var comments: [PageCommentThread]?
 
     private var listener: UUID?
     private weak var realtime: BBRealtime?
@@ -59,6 +61,7 @@ final class PageModel: ObservableObject {
             error = nil
             missing = false
             DiskCache.save(markdown, as: cacheKey)
+            await loadComments(client)
         } catch where BBClient.isCancellation(error) {
         } catch let failure as BBError where failure.message.localizedCaseInsensitiveContains("not found") {
             missing = true
@@ -66,6 +69,18 @@ final class PageModel: ObservableObject {
             self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
+
+    func loadComments(_ client: BBClient) async {
+        do {
+            let threads = try await client.pageComments(pageId)
+            if comments != threads { comments = threads }
+        } catch where BBClient.isCancellation(error) {
+        } catch {
+            comments = nil
+        }
+    }
+
+    var openComments: Int { comments?.filter { !$0.resolved }.count ?? 0 }
 }
 
 extension PageModel {
@@ -114,7 +129,7 @@ extension PageModel {
     """#
 }
 
-/// One page, rendered natively from its Markdown. Read-only.
+/// One page, rendered natively from its Markdown. The text is read-only; comments aren't.
 struct PageView: View {
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var store = PagesStore.shared
@@ -127,6 +142,7 @@ struct PageView: View {
     @State private var showingHistory = false
     @State private var confirmingArchive = false
     @State private var notice: String?
+    @State private var showingComments = false
 
     init(pageId: String) {
         _model = StateObject(wrappedValue: PageModel(pageId: pageId))
@@ -157,6 +173,18 @@ struct PageView: View {
         .navigationTitle(meta?.displayTitle ?? "Page")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if model.comments != nil, !gone {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingComments = true } label: {
+                        HStack(spacing: 3) {
+                            Image(systemName: "text.bubble")
+                            if model.openComments > 0 { Text("\(model.openComments)").font(.subheadline.monospacedDigit()) }
+                        }
+                    }
+                    .accessibilityLabel("Comments")
+                    .accessibilityValue(model.openComments > 0 ? "\(model.openComments) open" : "")
+                }
+            }
             ToolbarItem(placement: .topBarTrailing) {
                 Menu {
                     if !chats.isEmpty {
@@ -218,6 +246,7 @@ struct PageView: View {
             Text("It leaves the page list. Restore it from BB web.")
         }
         .sheet(isPresented: $showingHistory) { PageHistorySheet(pageId: model.pageId) }
+        .sheet(isPresented: $showingComments) { PageCommentsSheet(model: model) }
         .sheet(isPresented: $showingWeb) {
             NavigationStack {
                 WebView(url: app.client.webURL(forPage: model.pageId))

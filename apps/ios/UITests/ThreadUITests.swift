@@ -611,6 +611,47 @@ final class ThreadUITests: XCTestCase {
         shot("page-renamed")
     }
 
+    /// Comments on a scratch page named by `TEST_RUNNER_BBGO_QA_PAGE` that has one
+    /// open thread: reply, resolve, then start a new thread on "Ship it".
+    func testPageComments() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
+        // Reopen the first thread and drop what earlier runs added.
+        let threads = (rpc("pages", "comments", ["id": id, "includeResolved": true])?["threads"] as? [[String: Any]]) ?? []
+        let first = try XCTUnwrap(threads.min { ($0["updatedAt"] as? Double ?? 0) < ($1["updatedAt"] as? Double ?? 0) }?["id"] as? String)
+        _ = rpc("pages", "commentResolve", ["id": id, "thread": first, "resolved": false])
+        for thread in threads where thread["id"] as? String != first {
+            _ = rpc("pages", "commentResolve", ["id": id, "thread": thread["id"] as? String ?? "", "resolved": true])
+        }
+        app.open(URL(string: "bbstudio://page/\(id)")!)
+        let comments = app.buttons["Comments"].firstMatch
+        XCTAssertTrue(comments.waitForExistence(timeout: 10), "comments button")
+        shot("page-comments-button")
+        comments.tap()
+        XCTAssertTrue(app.navigationBars["Comments"].waitForExistence(timeout: 5), "sheet")
+        XCTAssertTrue(app.staticTexts["Is this final?"].waitForExistence(timeout: 10), "thread")
+        let reply = app.textFields["Reply"].firstMatch
+        reply.tap()
+        reply.typeText("QA reply")
+        app.buttons["Send Reply"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["QA reply"].firstMatch.waitForExistence(timeout: 10), "reply")
+        shot("page-comments")
+        app.buttons["Resolve"].firstMatch.tap()
+        XCTAssertTrue(app.staticTexts["No open comments"].waitForExistence(timeout: 10), "resolved")
+        app.buttons["New Comment"].firstMatch.tap()
+        XCTAssertTrue(app.navigationBars["New Comment"].waitForExistence(timeout: 5), "composer")
+        let field = app.textFields["newCommentField"]
+        XCTAssertTrue(field.waitForExistence(timeout: 5), "comment field")
+        field.tap()
+        field.typeText("QA new thread")
+        let block = app.buttons.containing(NSPredicate(format: "label CONTAINS 'Ship it'")).firstMatch
+        XCTAssertTrue(block.waitForExistence(timeout: 10), "blocks")
+        block.tap()
+        shot("page-comment-new")
+        app.navigationBars["New Comment"].buttons["Post"].tap()
+        XCTAssertTrue(app.staticTexts["QA new thread"].waitForExistence(timeout: 10), "new thread")
+        shot("page-comments-after")
+    }
+
     /// The Save to Studio sheet on a scratch thread that never runs, so there's nothing to save.
     func testSaveToStudio() throws {
         let thread = try XCTUnwrap(scratchThread("QA save to studio \(Int(Date().timeIntervalSince1970))"))

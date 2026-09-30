@@ -86,6 +86,17 @@ export const snapshotSchema = z.object({
 });
 export type SnapshotView = z.infer<typeof snapshotSchema>;
 
+const commentText = z.string().trim().min(1).max(8000);
+
+export const commentThreadSchema = z.object({
+  id: z.string(),
+  resolved: z.boolean(),
+  blockId: z.string().nullable(),
+  quote: z.string(),
+  comments: z.array(z.object({ id: z.string(), author: z.string(), authorName: z.string(), text: z.string(), createdAt: z.number() })),
+  updatedAt: z.number(),
+});
+
 // What BB's new-thread composer submits, whitelisted like Studio Teams does. Core
 // threads.spawn validates the host-owned environment and prompt input.
 export const chatRequestSchema = z.object({
@@ -229,6 +240,29 @@ export const rpcContract = defineRpcContract({
   },
   restore: {
     input: z.object({ snapshotId: z.string() }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  /** Comment threads for clients without the editor (the phone). Authors come named. */
+  comments: {
+    input: z.object({ id: pageId, includeResolved: z.boolean().optional() }),
+    output: z.object({ threads: z.array(commentThreadSchema) }),
+  },
+  /** Blocks with text that a new comment can be anchored to. */
+  commentBlocks: {
+    input: z.object({ id: pageId }),
+    output: z.object({ blocks: z.array(z.object({ id: z.string(), text: z.string() })) }),
+  },
+  /** Starts a thread as the user. An @bot in the text reaches that bot, as in the editor. */
+  commentCreate: {
+    input: z.object({ id: pageId, block: z.string().min(1).max(100), quote: z.string().max(500).optional(), text: commentText }),
+    output: z.object({ threadId: z.string() }),
+  },
+  commentReply: {
+    input: z.object({ id: pageId, thread: z.string().min(1).max(100), text: commentText }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  commentResolve: {
+    input: z.object({ id: pageId, thread: z.string().min(1).max(100), resolved: z.boolean() }),
     output: z.object({ ok: z.boolean() }),
   },
   // Explore: explainer pages for what agents noticed along the way.

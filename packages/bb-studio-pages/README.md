@@ -75,7 +75,10 @@ afterwards.
   Studio item, or a date. Page and thread mentions open where they point.
 - **Comments.** Select text to comment on it. Threads show in a floating
   card where you can reply, react, edit, and resolve. Agents can read, start,
-  reply to, and resolve threads.
+  reply to, and resolve threads. Clients without the editor, like the BB
+  Studio phone app, use the `comments`, `commentBlocks`, `commentCreate`,
+  `commentReply` and `commentResolve` RPCs, which write as you, so an @bot in
+  a comment reaches the bot the same way.
 - **A collection of pages.** The **Pages** nav item lists every page, with
   search over titles and content, filters, a project filter, and a list or
   grid view. **New page** opens a blank full-page document.

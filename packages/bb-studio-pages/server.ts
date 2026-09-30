@@ -10,7 +10,8 @@ import { FILES_PATH, HUMAN_USER_ID, MAX_UPLOAD_BYTES, MERMAID_PATH, PLUGIN_ID, P
 import { rpcContract } from "./src/contract";
 import { studioEmbeds } from "./src/embeds";
 import { fetchPreview } from "./src/unfurl";
-import { applyEdits, readMarkdown } from "./src/doc";
+import { createThread, listThreads, reply, setResolved } from "./src/comments";
+import { applyEdits, readMarkdown, textBlocks } from "./src/doc";
 import { EXPLORE_USAGE, registerExplore } from "./src/explore/register";
 import { isExploreWorker } from "./src/explore/worker";
 import type { Socket } from "./src/hub";
@@ -164,6 +165,21 @@ export default async function plugin(bb: BbPluginApi) {
     return meta;
   };
 
+  // Comment RPCs write as the user. A non-string origin is what the hub and
+  // the bot watcher treat as a human edit, like an editor socket's.
+  const CLIENT_ORIGIN = { client: "rpc" };
+  const authorNames = async (authors: string[]) => {
+    const names = new Map<string, string>();
+    const unique = [...new Set(authors)];
+    const directory = unique.some((author) => author.startsWith("bot:")) ? await bots.list().catch(() => null) : null;
+    for (const author of unique) {
+      if (author === HUMAN_USER_ID) names.set(author, "You");
+      else if (author.startsWith("bot:")) names.set(author, directory?.bots.find((bot) => `bot:${bot.id}` === author)?.name ?? "Bot");
+      else if (author.startsWith("agent:thr_")) names.set(author, (await service.actorForThread(author.slice(6))).actor.name);
+    }
+    return names;
+  };
+
   const studio = studioSchemas(z);
   const embeds = studioEmbeds(bb.sdk, studio);
 
@@ -307,6 +323,36 @@ export default async function plugin(bb: BbPluginApi) {
       return { snapshot: { id: row.id, label: row.label, actor: row.actor, createdAt: row.created_at } };
     },
     restore: ({ snapshotId }) => ({ ok: service.restore(snapshotId, HUMAN_USER_ID) }),
+    comments: async ({ id, includeResolved }) => {
+      requireMeta(id);
+      const threads = listThreads(service.hub.open(id).doc, { includeResolved });
+      const names = await authorNames(threads.flatMap((thread) => thread.comments.map((comment) => comment.author)));
+      return {
+        threads: threads.map((thread) => ({
+          ...thread,
+          comments: thread.comments.map((comment) => ({ ...comment, authorName: names.get(comment.author) ?? "Agent" })),
+        })),
+      };
+    },
+    commentBlocks: ({ id }) => {
+      requireMeta(id);
+      return { blocks: textBlocks(service.hub.open(id).doc) };
+    },
+    commentCreate: async ({ id, block, quote, text }) => {
+      requireMeta(id);
+      const { threadId } = await createThread(service.hub.open(id).doc, HUMAN_USER_ID, { block, quote, text }, CLIENT_ORIGIN);
+      return { threadId };
+    },
+    commentReply: ({ id, thread, text }) => {
+      requireMeta(id);
+      reply(service.hub.open(id).doc, HUMAN_USER_ID, thread, text, CLIENT_ORIGIN);
+      return { ok: true };
+    },
+    commentResolve: ({ id, thread, resolved }) => {
+      requireMeta(id);
+      setResolved(service.hub.open(id).doc, HUMAN_USER_ID, thread, resolved, CLIENT_ORIGIN);
+      return { ok: true };
+    },
     ...explore.rpc,
   });
 

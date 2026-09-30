@@ -330,6 +330,16 @@ export function commentAnchors(doc: Y.Doc): Map<string, { blockId: string; text:
   return anchors;
 }
 
+/** Blocks with text, in order: what a new comment can be anchored to. */
+export function textBlocks(doc: Y.Doc): { id: string; text: string }[] {
+  const root = yXmlFragmentToProseMirrorRootNode(fragmentOf(doc), pmSchema());
+  return blockContainers(root).flatMap((block) => {
+    const content = block.node.firstChild;
+    const text = content?.isTextblock ? content.textContent.trim() : "";
+    return text ? [{ id: block.id, text: truncate(text, 280) }] : [];
+  });
+}
+
 // ---------------------------------------------------------------------------
 // Presence
 

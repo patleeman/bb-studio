@@ -9,6 +9,7 @@ import {
   readMarkdown,
   restoreFromState,
   seedMarkdown,
+  textBlocks,
 } from "./doc";
 import { shortId } from "./markdown";
 
@@ -114,5 +115,16 @@ describe("comments", async () => {
     expect(listThreads(doc)).toEqual([]);
     await expect(createThread(doc, "bot:bot_1", { block: block!, quote: "missing", text: "x" }, "t")).rejects.toThrow(/not found/);
     expect(listThreads(doc, { includeResolved: true })).toHaveLength(1);
+  });
+
+  it("lists text blocks to anchor to and accepts a client origin", async () => {
+    const doc = page("# Plan\n\n---\n\n- [ ] Ship it\n");
+    expect(textBlocks(doc).map((block) => block.text)).toEqual(["Plan", "Ship it"]);
+    const origins: unknown[] = [];
+    doc.on("update", (_update: Uint8Array, origin: unknown) => origins.push(origin));
+    const client = { client: "rpc" };
+    await createThread(doc, "user", { block: textBlocks(doc)[1]!.id, text: "When?" }, client);
+    expect(origins.length).toBeGreaterThan(0);
+    expect(origins.every((origin) => origin === client)).toBe(true);
   });
 });

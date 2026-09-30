@@ -37,6 +37,32 @@ public struct PageChat: Decodable, Hashable, Sendable {
     public var createdAt: Double
 }
 
+/// A comment thread on a page, anchored to text in one block.
+public struct PageCommentThread: Decodable, Identifiable, Hashable, Sendable {
+    public struct Comment: Decodable, Identifiable, Hashable, Sendable {
+        public var id: String
+        /// `user` for you, `bot:<id>` or `agent:<thread id>` otherwise.
+        public var author: String
+        public var authorName: String
+        public var text: String
+        public var createdAt: Double
+    }
+
+    public var id: String
+    public var resolved: Bool
+    public var blockId: String?
+    /// The commented text.
+    public var quote: String
+    public var comments: [Comment]
+    public var updatedAt: Double
+}
+
+/// A block with text that a new comment can be anchored to.
+public struct PageTextBlock: Decodable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var text: String
+}
+
 /// The last page tree, for opening instantly and offline.
 public struct PagesSnapshot: Codable, Sendable {
     public static let cacheKey = "pages-tree"
@@ -44,7 +70,7 @@ public struct PagesSnapshot: Codable, Sendable {
     public var projectNames: [String: String]
 }
 
-// MARK: Pages (read-only)
+// MARK: Pages
 
 extension BBClient {
     /// Every page, global and in all projects, archived ones left out.
@@ -132,6 +158,35 @@ extension BBClient {
 
     public func restorePage(snapshotId: String) async throws {
         let _: JSONValue = try await rpc("pages", "restore", ["snapshotId": .string(snapshotId)])
+    }
+
+    /// Every comment thread, resolved ones included.
+    public func pageComments(_ id: String) async throws -> [PageCommentThread] {
+        struct Result: Decodable { var threads: [PageCommentThread] }
+        let result: Result = try await rpc("pages", "comments", ["id": .string(id), "includeResolved": .bool(true)])
+        return result.threads
+    }
+
+    public func pageCommentBlocks(_ id: String) async throws -> [PageTextBlock] {
+        struct Result: Decodable { var blocks: [PageTextBlock] }
+        let result: Result = try await rpc("pages", "commentBlocks", ["id": .string(id)])
+        return result.blocks
+    }
+
+    /// Starts a thread as you. An @bot in the text reaches that bot, as in the editor.
+    public func commentOnPage(_ id: String, block: String, text: String) async throws {
+        let _: JSONValue = try await rpc(
+            "pages", "commentCreate", ["id": .string(id), "block": .string(block), "text": .string(String(text.prefix(8000)))])
+    }
+
+    public func replyToPageComment(_ id: String, thread: String, text: String) async throws {
+        let _: JSONValue = try await rpc(
+            "pages", "commentReply", ["id": .string(id), "thread": .string(thread), "text": .string(String(text.prefix(8000)))])
+    }
+
+    public func resolvePageComment(_ id: String, thread: String, resolved: Bool) async throws {
+        let _: JSONValue = try await rpc(
+            "pages", "commentResolve", ["id": .string(id), "thread": .string(thread), "resolved": .bool(resolved)])
     }
 
     /// The ids of plugins installed and running on the server.

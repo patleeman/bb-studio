@@ -95,7 +95,7 @@ export async function createThread(
   doc: Y.Doc,
   author: string,
   input: { block: string; quote?: string; text: string },
-  origin: string,
+  origin: unknown,
 ): Promise<{ threadId: string; blockId: string }> {
   let pending: Promise<ThreadData> | null = null;
   // The store writes synchronously; the outer transaction tags it with origin.
@@ -111,12 +111,12 @@ export async function createThread(
   }
 }
 
-export function reply(doc: Y.Doc, author: string, threadId: string, text: string, origin: string): void {
+export function reply(doc: Y.Doc, author: string, threadId: string, text: string, origin: unknown): void {
   requireThread(doc, threadId);
   doc.transact(() => void store(doc, author).addComment({ threadId, comment: { body: textBody(text) } }), origin);
 }
 
-export function setResolved(doc: Y.Doc, author: string, threadId: string, resolved: boolean, origin: string): void {
+export function setResolved(doc: Y.Doc, author: string, threadId: string, resolved: boolean, origin: unknown): void {
   requireThread(doc, threadId);
   doc.transact(() => {
     const threads = store(doc, author);
