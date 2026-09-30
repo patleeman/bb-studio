@@ -144,6 +144,6 @@ for (const [pluginId, namespace, path, exportName] of plugins) {
   }]));
   const document = { pluginId, methods, ...(pluginId === "studio" ? { StudioItem: item } : {}) };
   await output(`contracts/${pluginId}.schema.json`, `${JSON.stringify(document, null, 2)}\n`);
-  await output(`apps/ios/Shared/Generated/${namespace}.swift`, swiftSource(namespace, document.methods, document.StudioItem));
+  await output(`apps/ios/Shared/Generated/${namespace}Contract.swift`, swiftSource(namespace, document.methods, document.StudioItem));
   console.log(`${check ? "Checked" : "Generated"} ${pluginId}: ${Object.keys(document.methods).length} methods`);
 }
