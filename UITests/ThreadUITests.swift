@@ -992,6 +992,111 @@ final class ThreadUITests: XCTestCase {
         shot("studio-bots")
     }
 
+    /// Finds two scratch tasks by their description, renames and deletes a scratch
+    /// tag, archives one task and deletes both from select mode.
+    func testStudioBulk() throws {
+        let stamp = Int(Date().timeIntervalSince1970)
+        let word = "zebracorn\(stamp)", titleA = "QA bulk A \(stamp)", titleB = "QA bulk B \(stamp)"
+        let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
+        var ids: [String] = []
+        for title in [titleA, titleB] {
+            let created = rpc("studio-tasks", "create", ["title": title, "description": "Has \(word) inside.", "projectId": "proj_8ztiq6dkh5"])
+            ids.append(try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String))
+        }
+        func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
+        func tagId(_ name: String) -> String? {
+            ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == name }?["id"] as? String
+        }
+        func task(_ id: String) -> [String: Any]? { self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any] }
+        addTeardownBlock {
+            for name in [tagName, renamed] { if let id = tagId(name) { _ = self.rpc("studio", "deleteTag", ["id": id]) } }
+            for id in ids { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
+        }
+        let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
+        _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio-tasks", "id": ids[0]]], "add": [tag], "remove": [String]()])
+
+        app.open(URL(string: "bbgo://studio")!)
+        let search = app.searchFields.firstMatch
+        if !search.waitForExistence(timeout: 5) { app.swipeDown() }
+        XCTAssertTrue(search.waitForExistence(timeout: 10), "search field")
+        search.tap()
+        search.typeText(word)
+        XCTAssertTrue(app.staticTexts.matching(identifier: "studioSnippet").firstMatch.waitForExistence(timeout: 10), "content snippet")
+        shot("studio-snippet")
+
+        // The tag chip: rename, then delete.
+        let chips = app.scrollViews.containing(.button, identifier: "All").firstMatch
+        let chip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", tagName)).firstMatch
+        for _ in 0..<6 where !chip.isHittable { chips.swipeLeft() }
+        XCTAssertTrue(chip.waitForExistence(timeout: 10), "tag chip")
+        chip.press(forDuration: 1.5)
+        shot("studio-tag-menu")
+        app.buttons["Rename Tag…"].tap()
+        let field = app.alerts.textFields.firstMatch
+        clear(field)
+        field.typeText(renamed)
+        // The alert slides up with the keyboard; tap once it's settled.
+        sleep(1)
+        app.alerts.buttons["Rename"].tap()
+        XCTAssertTrue(wait(10) { tagId(renamed) != nil && tagId(tagName) == nil }, "tag renamed")
+        let renamedChip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", renamed)).firstMatch
+        XCTAssertTrue(renamedChip.waitForExistence(timeout: 10), "renamed chip")
+        for _ in 0..<6 where !renamedChip.isHittable { chips.swipeLeft() }
+        renamedChip.press(forDuration: 1)
+        app.buttons["Delete Tag…"].tap()
+        app.buttons["Delete Tag"].firstMatch.tap()
+        XCTAssertTrue(wait(10) { tagId(renamed) == nil }, "tag deleted")
+
+        // Archive one from select mode.
+        app.buttons["Select"].tap()
+        let rowA = app.cells.containing(NSPredicate(format: "label CONTAINS %@", titleA)).firstMatch
+        XCTAssertTrue(rowA.waitForExistence(timeout: 10), "row A")
+        rowA.tap()
+        XCTAssertTrue(app.otherElements["studioSelectionBar"].waitForExistence(timeout: 5) || app.buttons["Archive"].exists, "selection bar")
+        shot("studio-select")
+        app.buttons["Archive"].tap()
+        XCTAssertTrue(wait(10) { task(ids[0])?["archived"] as? Bool == true }, "archived")
+
+        // Delete what's left. Rows are picked one by one: Select All would take real items if the search were lost.
+        app.buttons["Select"].tap()
+        let rowB = app.cells.containing(NSPredicate(format: "label CONTAINS %@", titleB)).firstMatch
+        XCTAssertTrue(rowB.waitForExistence(timeout: 10), "row B")
+        rowB.tap()
+        app.buttons["Delete"].firstMatch.tap()
+        app.sheets.buttons["Delete"].firstMatch.tap()
+        XCTAssertTrue(wait(10) { task(ids[1]) == nil }, "deleted from select mode")
+        shot("studio-bulk-done")
+    }
+
+    /// Links a scratch task to the first linkable item, then opens the handoff
+    /// sheet's agent pickers without starting anything; deletes the task.
+    func testTaskLinksAndHandOff() throws {
+        let title = "QA link task \(Int(Date().timeIntervalSince1970))"
+        let created = rpc("studio-tasks", "create", ["title": title, "description": "", "projectId": "proj_8ztiq6dkh5"])
+        let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
+        addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
+        app.open(URL(string: "bbgo://task/\(id)")!)
+        let add = app.buttons["addTaskLink"]
+        XCTAssertTrue(add.waitForExistence(timeout: 10), "Add Link")
+        for _ in 0..<4 where !add.isHittable { app.swipeUp() }
+        add.tap()
+        XCTAssertTrue(app.navigationBars["Add Link"].waitForExistence(timeout: 5), "picker")
+        let first = app.cells.firstMatch
+        XCTAssertTrue(first.waitForExistence(timeout: 10), "linkables")
+        shot("task-link-picker")
+        first.tap()
+        XCTAssertTrue(wait(10) { ((self.rpc("studio-tasks", "get", ["id": id])?["links"] as? [Any]) ?? []).count == 1 }, "linked")
+        shot("task-linked")
+
+        let handOff = app.buttons["Hand to an Agent"]
+        for _ in 0..<4 where !handOff.isHittable { app.swipeDown() }
+        handOff.tap()
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Provider'")).firstMatch.waitForExistence(timeout: 10), "provider picker")
+        XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Default ('")).firstMatch.waitForExistence(timeout: 10), "project default shown")
+        shot("task-handoff-agent")
+        app.buttons["Cancel"].tap()
+    }
+
     private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
             "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,

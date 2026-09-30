@@ -214,6 +214,7 @@ struct TaskView: View {
     @State private var chatting = false
     @State private var editing = false
     @State private var handingOff = false
+    @State private var addingLink = false
     @State private var sendingBack = false
     @State private var feedback = ""
     @State private var confirmingDelete = false
@@ -262,6 +263,13 @@ struct TaskView: View {
                 HandOffSheet(task: task) { threadId in
                     Task { await load() }
                     app.path.append(.thread(id: threadId))
+                }
+            }
+        }
+        .sheet(isPresented: $addingLink) {
+            if let task = detail?.task {
+                TaskLinkPicker(projectId: task.projectId, linked: Set((detail?.links ?? []).map { "\($0.target):\($0.pluginId ?? ""):\($0.itemId)" })) { link in
+                    await run("Linked") { try await app.client.linkTask(id, link: link) }
                 }
             }
         }
@@ -360,15 +368,15 @@ struct TaskView: View {
                     }
                 }
             }
-            if let links = detail?.links, !links.isEmpty {
-                Section("Links") {
-                    ForEach(links, id: \.self) { link in
-                        linkRow(link)
-                            .swipeActions {
-                                Button(role: .destructive) { Task { await unlink(link) } } label: { Label("Remove", systemImage: "link.badge.minus") }
-                            }
-                    }
+            Section("Links") {
+                ForEach(detail?.links ?? [], id: \.self) { link in
+                    linkRow(link)
+                        .swipeActions {
+                            Button(role: .destructive) { Task { await unlink(link) } } label: { Label("Remove", systemImage: "link.badge.minus") }
+                        }
                 }
+                Button { addingLink = true } label: { Label("Add Link…", systemImage: "link.badge.plus") }
+                    .accessibilityIdentifier("addTaskLink")
             }
         }
     }
@@ -578,6 +586,73 @@ struct TaskEditor: View {
 }
 
 /// Hands a task to the project's default agent in a new thread.
+/// Pages, drawings, artifacts, recordings and threads a task can point to.
+private struct TaskLinkPicker: View {
+    let projectId: String?
+    let linked: Set<String>
+    let pick: (TaskLink) async -> Void
+    @EnvironmentObject private var app: AppModel
+    @Environment(\.dismiss) private var dismiss
+    @State private var items: [TaskLinkable]?
+    @State private var query = ""
+    @State private var error: String?
+
+    var body: some View {
+        NavigationStack {
+            Group {
+                if let items {
+                    let shown = items.filter { !linked.contains($0.id) && (query.isEmpty || $0.label.localizedCaseInsensitiveContains(query)) }
+                    if shown.isEmpty {
+                        ContentUnavailableView(query.isEmpty ? "Nothing to link" : "No matches", systemImage: "link")
+                    } else {
+                        List(shown) { item in
+                            Button {
+                                Task {
+                                    await pick(item.link)
+                                    dismiss()
+                                }
+                            } label: {
+                                HStack {
+                                    Label(item.label.isEmpty ? "Untitled" : item.label, systemImage: symbol(item))
+                                        .foregroundStyle(.primary)
+                                    Spacer()
+                                    Text(item.kind).font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
+                } else if let error {
+                    ContentUnavailableView("Couldn't load", systemImage: "exclamationmark.triangle", description: Text(error))
+                } else {
+                    ProgressView()
+                }
+            }
+            .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
+            .navigationTitle("Add Link")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .task {
+                do {
+                    items = try await app.client.taskLinkables(projectId: projectId)
+                } catch {
+                    self.error = BBClient.describe(error, server: app.client.baseURL)
+                }
+            }
+        }
+    }
+
+    private func symbol(_ item: TaskLinkable) -> String {
+        if item.target == "thread" { return "bubble.left.and.bubble.right" }
+        switch item.pluginId {
+        case "pages": return "doc.richtext"
+        case "talk": return "waveform"
+        case "excalidraw": return "scribble.variable"
+        case "artifacts": return "doc.text.image"
+        default: return "square.dashed"
+        }
+    }
+}
+
 private struct HandOffSheet: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -588,6 +663,12 @@ private struct HandOffSheet: View {
     @State private var workspace = "worktree"
     @State private var starting = false
     @State private var error: String?
+    // The agent. Empty means the project's default.
+    @State private var defaults: ExecutionChoice?
+    @State private var options: ExecutionOptions?
+    @State private var providerId = ""
+    @State private var modelId = ""
+    @State private var reasoning = ""
 
     var body: some View {
         NavigationStack {
@@ -602,7 +683,24 @@ private struct HandOffSheet: View {
                         Text("The project's folder").tag("folder")
                     }
                 } footer: {
-                    Text("Starts a thread with the project's default agent. Its first message is the task and its links; the task follows the thread to Review.")
+                    Text("Starts a thread whose first message is the task and its links; the task follows the thread to Review.")
+                }
+                Section("Agent") {
+                    Picker("Provider", selection: $providerId) {
+                        Text(defaultLabel(defaults?.providerId.map { id in options?.providers.first { $0.id == id }?.displayName ?? id }))
+                            .tag("")
+                        ForEach(options?.providers.filter { $0.available != false } ?? []) { Text($0.displayName).tag($0.id) }
+                    }
+                    Picker("Model", selection: $modelId) {
+                        Text(defaultLabel(defaultModelName)).tag("")
+                        ForEach(options?.models ?? []) { Text($0.displayName).tag($0.id) }
+                    }
+                    if !reasoningLevels.isEmpty {
+                        Picker("Reasoning", selection: $reasoning) {
+                            Text(defaultLabel(providerId.isEmpty && modelId.isEmpty ? defaults?.reasoningLevel : nil)).tag("")
+                            ForEach(reasoningLevels, id: \.self) { Text($0.capitalized).tag($0) }
+                        }
+                    }
                 }
                 Section("Note for the agent") {
                     TextField("Optional", text: $note, axis: .vertical).lineLimit(3...8)
@@ -620,8 +718,36 @@ private struct HandOffSheet: View {
                 }
             }
             .onAppear { projectId = task.projectId ?? "" }
+            .task(id: projectId) {
+                guard !projectId.isEmpty else { return }
+                defaults = (try? await app.client.projectDefaults(projectId)) ?? nil
+                if providerId.isEmpty { await loadOptions() }
+            }
+            .task(id: providerId) {
+                modelId = ""
+                reasoning = ""
+                await loadOptions()
+            }
         }
     }
+
+    private func loadOptions() async {
+        options = try? await app.client.executionOptions(providerId: providerId.isEmpty ? defaults?.providerId : providerId)
+    }
+
+    private var selectedModel: ExecutionOptions.Model? {
+        let id = modelId.isEmpty && providerId.isEmpty ? defaults?.model : modelId
+        return options?.models.first { $0.id == id || $0.model == id } ?? options?.models.first { $0.isDefault == true }
+    }
+
+    private var defaultModelName: String? {
+        guard providerId.isEmpty else { return options?.models.first { $0.isDefault == true }?.displayName }
+        return defaults?.model.map { id in options?.models.first { $0.id == id || $0.model == id }?.displayName ?? id }
+    }
+
+    private var reasoningLevels: [String] { selectedModel?.supportedReasoningEfforts?.map(\.reasoningEffort) ?? [] }
+
+    private func defaultLabel(_ value: String?) -> String { value.map { "Default (\($0))" } ?? "Default" }
 
     private var projects: [(id: String, name: String)] {
         StudioStore.shared.projectNames
@@ -635,7 +761,9 @@ private struct HandOffSheet: View {
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
             let threadId = try await app.client.handOffTask(
-                task.id, projectId: projectId, note: trimmed.isEmpty ? nil : trimmed, workspace: workspace)
+                task.id, projectId: projectId, providerId: providerId.isEmpty ? nil : providerId,
+                model: modelId.isEmpty ? nil : modelId, reasoningLevel: reasoning.isEmpty ? nil : reasoning,
+                note: trimmed.isEmpty ? nil : trimmed, workspace: workspace)
             dismiss()
             started(threadId)
         } catch {

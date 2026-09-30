@@ -118,10 +118,11 @@ final class StudioStore: ObservableObject {
         do { return .success(try await fetch()) } catch { return .failure(error) }
     }
 
-    func search(_ query: String, client: BBClient) async -> Set<String> {
-        if viaStudio { return (try? await client.studioSearch(query)) ?? [] }
-        guard plugins.contains("pages"), let pages = try? await client.searchPages(query) else { return [] }
-        return Set(pages.map { "pages:\($0.id)" })
+    /// Keys of items whose content matches, with the matching text when there is one.
+    func search(_ query: String, client: BBClient) async -> [String: String] {
+        if viaStudio { return (try? await client.studioSearch(query)) ?? [:] }
+        guard plugins.contains("pages"), let pages = try? await client.searchPages(query) else { return [:] }
+        return Dictionary(pages.map { ("pages:\($0.id)", "") }, uniquingKeysWith: { a, _ in a })
     }
 
     func delete(_ item: StudioItem, client: BBClient) async throws {
@@ -188,6 +189,72 @@ final class StudioStore: ObservableObject {
         if item.tags?.contains(tag.id) != true { try await toggle(tag, on: item, client: client) }
     }
 
+    // MARK: Many at once
+
+    /// Runs `change` once per add-on, since Studio takes one add-on's ids at a
+    /// time. Returns what couldn't be changed, as "title: why".
+    private func perPlugin(
+        _ items: [StudioItem], _ change: (String, [String]) async throws -> BBClient.StudioResults
+    ) async -> (done: Set<String>, failures: [String]) {
+        var done: Set<String> = []
+        var failures: [String] = []
+        for (pluginId, group) in Dictionary(grouping: items, by: \.pluginId) {
+            do {
+                let results = try await change(pluginId, group.map(\.itemId))
+                done.formUnion(results.done.map { "\(pluginId):\($0)" })
+                for failure in results.failed {
+                    let title = group.first { $0.itemId == failure.id }?.displayTitle ?? failure.id
+                    failures.append("\(title): \(failure.error)")
+                }
+            } catch {
+                failures.append((error as? BBError)?.message ?? error.localizedDescription)
+            }
+        }
+        return (done, failures)
+    }
+
+    func archive(_ items: [StudioItem], _ archived: Bool, client: BBClient) async -> [String] {
+        let result = await perPlugin(items) { try await client.studioArchive(pluginId: $0, ids: $1, archived: archived) }
+        for index in self.items.indices where result.done.contains(self.items[index].id) { self.items[index].archived = archived }
+        return result.failures
+    }
+
+    func move(_ items: [StudioItem], to projectId: String?, client: BBClient) async -> [String] {
+        let result = await perPlugin(items) { try await client.studioMove(pluginId: $0, ids: $1, projectId: projectId) }
+        for index in self.items.indices where result.done.contains(self.items[index].id) { self.items[index].projectId = projectId }
+        return result.failures
+    }
+
+    func delete(_ items: [StudioItem], client: BBClient) async -> [String] {
+        let result = await perPlugin(items) { try await client.studioRemove(pluginId: $0, ids: $1) }
+        self.items.removeAll { result.done.contains($0.id) }
+        return result.failures
+    }
+
+    /// Puts the tag on all of them, or takes it off all of them when they all have it.
+    func toggle(_ tag: StudioTag, on items: [StudioItem], client: BBClient) async throws {
+        let all = items.allSatisfy { $0.tags?.contains(tag.id) == true }
+        try await client.tagStudioItems(items, add: all ? [] : [tag.id], remove: all ? [tag.id] : [])
+        let keys = Set(items.map(\.id))
+        for index in self.items.indices where keys.contains(self.items[index].id) {
+            var ids = self.items[index].tags ?? []
+            ids.removeAll { $0 == tag.id }
+            if !all { ids.append(tag.id) }
+            self.items[index].tags = ids
+        }
+    }
+
+    func renameTag(_ tag: StudioTag, to name: String, client: BBClient) async throws {
+        let renamed = try await client.renameStudioTag(tag.id, name: name)
+        tags = (tags.filter { $0.id != tag.id } + [renamed]).sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
+    func deleteTag(_ tag: StudioTag, client: BBClient) async throws {
+        try await client.deleteStudioTag(tag.id)
+        tags.removeAll { $0.id == tag.id }
+        for index in items.indices { items[index].tags?.removeAll { $0 == tag.id } }
+    }
+
     private func update(_ item: StudioItem, _ change: (inout StudioItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         change(&items[index])
@@ -231,7 +298,8 @@ struct StudioView: View {
     @ObservedObject private var store = StudioStore.shared
     @AppStorage("studioProject") private var project = ""
     @State private var query = ""
-    @State private var contentMatches: Set<String> = []
+    /// Content matches, keyed like items, with the matching text.
+    @State private var contentMatches: [String: String] = [:]
     @State private var recordingKind: String?
     @State private var dictatingPage = false
     @State private var deleting: StudioItem?
@@ -240,13 +308,22 @@ struct StudioView: View {
     @State private var tagFilter: String?
     @State private var tagging: StudioItem?
     @State private var newTag = ""
+    @State private var editMode: EditMode = .inactive
+    @State private var selection: Set<String> = []
+    @State private var deletingSelected = false
+    @State private var taggingSelected = false
+    @State private var renamingTag: StudioTag?
+    @State private var deletingTag: StudioTag?
+
+    private var selecting: Bool { editMode.isEditing }
+    private var selected: [StudioItem] { store.items.filter { selection.contains($0.id) } }
 
     var body: some View {
-        List {
+        List(selection: $selection) {
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(app.client) } }
             }
-            if query.isEmpty, store.plugins.contains("talk") {
+            if query.isEmpty, !selecting, store.plugins.contains("talk") {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -289,13 +366,37 @@ struct StudioView: View {
             }
         }
         .animation(.snappy, value: notice)
-        .navigationTitle(showArchived ? "Archived" : "Studio")
+        .safeAreaInset(edge: .bottom) {
+            if selecting { selectionBar }
+        }
+        .environment(\.editMode, $editMode)
+        .navigationTitle(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio")
+        .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
         .searchable(text: $query, prompt: "Search Studio")
+        // Keep Select reachable, so search results can be acted on together.
+        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .toolbar {
-            if !store.creatable.isEmpty {
-                ToolbarItem(placement: .topBarTrailing) { newMenu }
+            if selecting {
+                ToolbarItem(placement: .topBarLeading) {
+                    let all = Set(visible.map(\.id))
+                    Button(all.isSubset(of: selection) && !all.isEmpty ? "Deselect All" : "Select All") {
+                        selection = all.isSubset(of: selection) ? [] : all
+                    }
+                }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button("Done") { endSelecting() }.fontWeight(.semibold)
+                }
+            } else {
+                if !store.creatable.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) { newMenu }
+                }
+                ToolbarItem(placement: .topBarTrailing) { projectMenu }
+                if store.viaStudio, !visible.isEmpty {
+                    ToolbarItem(placement: .topBarTrailing) {
+                        Button("Select") { withAnimation { editMode = .active } }
+                    }
+                }
             }
-            ToolbarItem(placement: .topBarTrailing) { projectMenu }
         }
         .task(id: query) { await search() }
         .refreshable { await store.load(app.client) }
@@ -325,6 +426,49 @@ struct StudioView: View {
             }
         } message: {
             Text("Tags work across every kind of Studio item.")
+        }
+        .alert("New Tag", isPresented: $taggingSelected) {
+            TextField("Name", text: $newTag)
+            Button("Cancel", role: .cancel) { newTag = "" }
+            Button("Add") {
+                let name = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+                newTag = ""
+                guard !name.isEmpty else { return }
+                Task { await addTag(name, toSelected: selected) }
+            }
+        } message: {
+            Text("Adds it to the \(selection.count) selected items.")
+        }
+        .alert("Rename Tag", isPresented: Binding(get: { renamingTag != nil }, set: { if !$0 { renamingTag = nil } })) {
+            TextField("Name", text: $newTag)
+            Button("Cancel", role: .cancel) { newTag = "" }
+            Button("Rename") {
+                guard let tag = renamingTag else { return }
+                let name = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
+                newTag = ""
+                guard !name.isEmpty, name != tag.name else { return }
+                Task { await attempt { try await store.renameTag(tag, to: name, client: app.client) } }
+            }
+        }
+        .confirmationDialog(
+            "Delete the tag \u{201C}\(deletingTag?.name ?? "")\u{201D}?",
+            isPresented: Binding(get: { deletingTag != nil }, set: { if !$0 { deletingTag = nil } }),
+            titleVisibility: .visible
+        ) {
+            Button("Delete Tag", role: .destructive) {
+                guard let tag = deletingTag else { return }
+                if tagFilter == tag.id { tagFilter = nil }
+                Task { await attempt { try await store.deleteTag(tag, client: app.client) } }
+            }
+        } message: {
+            Text("It comes off every item. The items stay.")
+        }
+        .confirmationDialog(
+            "Delete \(selection.count) items?", isPresented: $deletingSelected, titleVisibility: .visible
+        ) {
+            Button("Delete", role: .destructive) { Task { await bulk("Deleted") { await store.delete(selected, client: app.client) } } }
+        } message: {
+            Text(selected.contains { $0.kind == "page" } ? "Sub-pages of any pages go too. This can't be undone." : "This can't be undone.")
         }
         .confirmationDialog(
             "Delete \u{201C}\(deleting?.displayTitle ?? "")\u{201D}?",
@@ -381,6 +525,13 @@ struct StudioView: View {
                 ForEach(usedTags) { tag in
                     chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
                         tagFilter = tagFilter == tag.id ? nil : tag.id
+                    }
+                    .contextMenu {
+                        Button {
+                            newTag = tag.name
+                            renamingTag = tag
+                        } label: { Label("Rename Tag…", systemImage: "pencil") }
+                        Button(role: .destructive) { deletingTag = tag } label: { Label("Delete Tag…", systemImage: "trash") }
                     }
                 }
                 if hasArchived {
@@ -454,9 +605,11 @@ struct StudioView: View {
     private func row(_ item: StudioItem) -> some View {
         let content = StudioRow(
             item: item, project: project.isEmpty ? projectName(item) : nil,
-            tags: store.tags.filter { item.tags?.contains($0.id) == true })
+            tags: store.tags.filter { item.tags?.contains($0.id) == true },
+            snippet: query.isEmpty ? nil : contentMatches[item.id].flatMap { $0.isEmpty ? nil : $0 },
+            highlight: query.trimmingCharacters(in: .whitespaces))
         Group {
-            if let route = route(item) {
+            if !selecting, let route = route(item) {
                 NavigationLink(value: route) { content }
                     .accessibilityIdentifier("studioItem")
             } else {
@@ -562,7 +715,7 @@ struct StudioView: View {
             default: if item.projectId != project { return false }
             }
             guard !query.isEmpty else { return true }
-            return contentMatches.contains(item.id)
+            return contentMatches[item.id] != nil
                 || item.title.localizedCaseInsensitiveContains(query)
                 || (item.preview?.localizedCaseInsensitiveContains(query) ?? false)
         }
@@ -613,7 +766,7 @@ struct StudioView: View {
     private func search() async {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2 else {
-            contentMatches = []
+            contentMatches = [:]
             return
         }
         try? await Task.sleep(for: .milliseconds(300))
@@ -705,6 +858,127 @@ struct StudioView: View {
         }
     }
 
+    // MARK: Selection
+
+    private var selectionBar: some View {
+        let items = selected
+        let archivable = !items.isEmpty && items.allSatisfy { store.info($0)?.canArchive == true }
+        let restoring = !items.isEmpty && items.allSatisfy(\.archived)
+        // Add-on actions work when everything picked is the same kind.
+        let kinds = Set(items.map { "\($0.pluginId):\($0.kind)" })
+        let actions = kinds.count == 1 ? store.info(items[0])?.actions ?? [] : []
+        return HStack(spacing: 0) {
+            if archivable {
+                barButton(restoring ? "Restore" : "Archive", restoring ? "tray.and.arrow.up" : "archivebox") {
+                    Task { await bulk(restoring ? "Restored" : "Archived") { await store.archive(items, !restoring, client: app.client) } }
+                }
+            }
+            Menu {
+                ForEach(moveChoices, id: \.id) { choice in
+                    Button(choice.name) {
+                        Task {
+                            await bulk(choice.id.flatMap { store.projectNames[$0] }.map { "Moved to \($0)" } ?? "Moved out of projects") {
+                                await store.move(items, to: choice.id, client: app.client)
+                            }
+                        }
+                    }
+                }
+            } label: { barLabel("Move", "folder") }
+            if store.supportsTags {
+                Menu {
+                    ForEach(store.tags) { tag in
+                        Button { Task { await attempt { try await store.toggle(tag, on: items, client: app.client) } } } label: {
+                            if items.allSatisfy({ $0.tags?.contains(tag.id) == true }) { Label(tag.name, systemImage: "checkmark") } else { Text(tag.name) }
+                        }
+                    }
+                    Button { taggingSelected = true } label: { Label("New Tag…", systemImage: "plus") }
+                } label: { barLabel("Tags", "tag") }
+            }
+            if !actions.isEmpty {
+                Menu {
+                    ForEach(actions, id: \.id) { action in
+                        Button(action.label.replacingOccurrences(of: "{count}", with: "\(items.count)")) {
+                            Task { await run(action, on: items) }
+                        }
+                    }
+                } label: { barLabel("More", "ellipsis.circle") }
+            }
+            barButton("Delete", "trash", role: .destructive) { deletingSelected = true }
+        }
+        .disabled(items.isEmpty)
+        .padding(.horizontal, 8)
+        .padding(.vertical, 6)
+        .glassEffect(in: .capsule)
+        .padding(.horizontal)
+        .padding(.bottom, 4)
+        .accessibilityIdentifier("studioSelectionBar")
+    }
+
+    private func barLabel(_ title: String, _ symbol: String) -> some View {
+        VStack(spacing: 3) {
+            Image(systemName: symbol).font(.body)
+            Text(title).font(.caption2)
+        }
+        .frame(maxWidth: .infinity, minHeight: 44)
+        .contentShape(.rect)
+    }
+
+    private func barButton(_ title: String, _ symbol: String, role: ButtonRole? = nil, action: @escaping () -> Void) -> some View {
+        Button(role: role, action: action) { barLabel(title, symbol) }
+            .buttonStyle(.plain)
+            .foregroundStyle(role == .destructive ? Color.red : .accentColor)
+            .accessibilityLabel(title)
+    }
+
+    private func endSelecting() {
+        withAnimation { editMode = .inactive }
+        selection = []
+    }
+
+    /// A bulk change: says what happened, or what didn't work.
+    private func bulk(_ done: String, _ change: () async -> [String]) async {
+        let count = selection.count
+        let failures = await change()
+        if failures.isEmpty {
+            flash("\(done) \(count) item\(count == 1 ? "" : "s")")
+            endSelecting()
+        } else {
+            flash(failures.count == 1 ? failures[0] : "\(failures.count) couldn't be changed: \(failures[0])")
+        }
+    }
+
+    private func attempt(_ change: () async throws -> Void) async {
+        do { try await change() } catch { flash(BBClient.describe(error, server: app.client.baseURL)) }
+    }
+
+    private func addTag(_ name: String, toSelected items: [StudioItem]) async {
+        await attempt {
+            let tag = try await app.client.createStudioTag(name)
+            await store.load(app.client)
+            let fresh = store.items.filter { item in items.contains { $0.id == item.id } }
+            if !fresh.allSatisfy({ $0.tags?.contains(tag.id) == true }) {
+                try await store.toggle(tag, on: fresh, client: app.client)
+            }
+            flash("Tagged \(name)")
+        }
+    }
+
+    private func run(_ action: StudioKindInfo.Action, on items: [StudioItem]) async {
+        guard let pluginId = items.first?.pluginId else { return }
+        do {
+            let result = try await app.client.studioAction(pluginId: pluginId, action: action.id, ids: items.map(\.itemId))
+            if action.result == "copy", let text = result.text, !text.isEmpty {
+                UIPasteboard.general.string = text
+                flash(result.message ?? "Copied")
+            } else {
+                flash(result.message ?? "Done")
+            }
+            endSelecting()
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
     private func flash(_ message: String) {
         notice = message
         Task {
@@ -718,6 +992,9 @@ struct StudioRow: View {
     let item: StudioItem
     let project: String?
     var tags: [StudioTag] = []
+    /// Content that matched a search, shown in place of the preview.
+    var snippet: String?
+    var highlight = ""
 
     var body: some View {
         let kind = StudioKind.of(item.kind)
@@ -746,7 +1023,10 @@ struct StudioRow: View {
                         .foregroundStyle(.secondary)
                         .lineLimit(1)
                 }
-                if let preview = item.preview, !preview.isEmpty {
+                if let snippet {
+                    Text(Self.highlighted(snippet, highlight)).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                        .accessibilityIdentifier("studioSnippet")
+                } else if let preview = item.preview, !preview.isEmpty {
                     Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
                 }
                 HStack(spacing: 4) {
@@ -778,6 +1058,19 @@ struct StudioRow: View {
         }
         .padding(.vertical, 2)
         .accessibilityElement(children: .combine)
+    }
+
+    /// The snippet with each match of the search in bold.
+    static func highlighted(_ text: String, _ query: String) -> AttributedString {
+        var result = AttributedString(text.trimmingCharacters(in: .whitespacesAndNewlines))
+        guard !query.isEmpty else { return result }
+        var searchRange = result.startIndex..<result.endIndex
+        while let found = result[searchRange].range(of: query, options: [.caseInsensitive, .diacriticInsensitive]) {
+            result[found].font = .subheadline.weight(.semibold)
+            result[found].foregroundColor = .primary
+            searchRange = found.upperBound..<result.endIndex
+        }
+        return result
     }
 
     private func tone(_ tone: String) -> Color {

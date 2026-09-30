@@ -260,6 +260,12 @@ extension BBClient {
         return result.tag
     }
 
+    public func renameStudioTag(_ id: String, name: String) async throws -> StudioTag {
+        struct Result: Decodable { var tag: StudioTag }
+        let result: Result = try await rpc("studio", "renameTag", ["id": .string(id), "name": .string(String(name.prefix(40)))])
+        return result.tag
+    }
+
     public func deleteStudioTag(_ id: String) async throws {
         let _: JSONValue = try await rpc("studio", "deleteTag", ["id": .string(id)])
     }
@@ -307,16 +313,20 @@ extension BBClient {
         return (result.message, result.text)
     }
 
-    /// `<plugin>:<id>` keys of items whose content matches.
-    public func studioSearch(_ query: String) async throws -> Set<String> {
-        struct Result: Decodable { var keys: [String] }
+    /// `<plugin>:<id>` keys of items whose content matches, each with the
+    /// matching text when the add-on gave one ("" when it didn't).
+    public func studioSearch(_ query: String) async throws -> [String: String] {
+        struct Result: Decodable {
+            var keys: [String]
+            var snippets: [String: String]?
+        }
         let result: Result = try await rpc("studio", "search", ["query": .string(String(query.prefix(200)))])
-        return Set(result.keys)
+        return Dictionary(result.keys.map { ($0, result.snippets?[$0] ?? "") }, uniquingKeysWith: { a, _ in a })
     }
 
-    public func studioRemove(pluginId: String, ids: [String]) async throws {
-        let _: JSONValue = try await rpc(
-            "studio", "remove", ["pluginId": .string(pluginId), "ids": .array(ids.map { .string($0) })])
+    @discardableResult
+    public func studioRemove(pluginId: String, ids: [String]) async throws -> StudioResults {
+        try await rpc("studio", "remove", ["pluginId": .string(pluginId), "ids": .array(ids.map { .string($0) })])
     }
 
     public func renameRecording(_ id: String, title: String) async throws {

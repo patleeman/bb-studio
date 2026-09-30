@@ -100,6 +100,27 @@ public struct TaskLink: Codable, Hashable, Sendable {
     public var itemId: String
     public var label: String
     public var href: String?
+
+    public init(target: String, pluginId: String?, itemId: String, label: String, href: String?) {
+        self.target = target
+        self.pluginId = pluginId
+        self.itemId = itemId
+        self.label = label
+        self.href = href
+    }
+}
+
+/// Something a task can link to, from `linkables`: a Studio item or a thread.
+public struct TaskLinkable: Decodable, Hashable, Identifiable, Sendable {
+    public var target: String
+    public var pluginId: String?
+    public var itemId: String
+    public var label: String
+    public var href: String?
+    /// "Page", "Drawing", "Thread" and so on.
+    public var kind: String
+    public var id: String { "\(target):\(pluginId ?? ""):\(itemId)" }
+    public var link: TaskLink { TaskLink(target: target, pluginId: pluginId, itemId: itemId, label: label, href: href) }
 }
 
 public struct TaskDetail: Sendable {
@@ -172,12 +193,33 @@ extension BBClient {
         ])
     }
 
-    /// Starts a thread on the task with the project's default agent; "worktree" keeps its changes apart.
-    public func handOffTask(_ id: String, projectId: String?, note: String?, workspace: String) async throws -> String {
+    /// Pages, drawings, artifacts, recordings and the project's recent threads.
+    public func taskLinkables(projectId: String?) async throws -> [TaskLinkable] {
+        struct Result: Decodable { var items: [TaskLinkable] }
+        let result: Result = try await rpc("studio-tasks", "linkables", ["projectId": projectId.map(JSONValue.string) ?? .null])
+        return result.items
+    }
+
+    public func linkTask(_ id: String, link: TaskLink) async throws {
+        let _: OK = try await rpc("studio-tasks", "link", [
+            "id": .string(id),
+            "link": [
+                "target": .string(link.target), "pluginId": link.pluginId.map(JSONValue.string) ?? .null,
+                "itemId": .string(link.itemId), "label": .string(link.label), "href": link.href.map(JSONValue.string) ?? .null,
+            ],
+        ])
+    }
+
+    /// Starts a thread on the task; nil agent settings mean the project's default. "worktree" keeps its changes apart.
+    public func handOffTask(
+        _ id: String, projectId: String?, providerId: String? = nil, model: String? = nil, reasoningLevel: String? = nil,
+        note: String?, workspace: String
+    ) async throws -> String {
         struct Result: Decodable { var threadId: String }
         let result: Result = try await rpc("studio-tasks", "handOff", [
             "id": .string(id), "projectId": projectId.map(JSONValue.string) ?? .null,
-            "providerId": .null, "model": .null, "reasoningLevel": .null,
+            "providerId": providerId.map(JSONValue.string) ?? .null, "model": model.map(JSONValue.string) ?? .null,
+            "reasoningLevel": reasoningLevel.map(JSONValue.string) ?? .null,
             "note": note.map(JSONValue.string) ?? .null, "workspace": .string(workspace),
         ])
         return result.threadId
