@@ -33,7 +33,7 @@ import {
   type PluginComposerApi,
   type PluginMessageActionContext,
   type PluginMessageDirectiveProps,
-} from "@bb/plugin-sdk/app";
+} from "@get-bb/plugin-sdk/app";
 import { Button } from "@/components/ui/button";
 import { Icon } from "@/components/ui/icon";
 import { Input } from "@/components/ui/input";
@@ -185,7 +185,7 @@ function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
             const composer = pickComposer(mountedComposers, message.threadId);
             if (composer === null) {
               toast.error(
-                "Emoji reactions need the thread composer open — open this thread in the main view and try again.",
+                "Open this thread's composer to react, in the main view or Studio Chat.",
               );
               return;
             }
@@ -310,7 +310,7 @@ function EmojiReactionsSettings() {
       if (!response.ok || body?.ok !== true) {
         throw new Error(body?.error ?? `HTTP ${response.status}`);
       }
-      toast.success("Emoji reactions saved");
+      toast.success("Reactions saved");
       // Apply immediately: the host only re-interprets a frontend when its
       // bundle hash changes or the plugin re-appears, so a disable/enable
       // cycle re-runs setup, which re-reads the fresh settings.
@@ -322,12 +322,12 @@ function EmojiReactionsSettings() {
       });
       if (!disable.ok || !enable.ok) {
         toast.error(
-          "Saved, but the selection menu could not be refreshed automatically — reload the app window to see the new reactions.",
+          "Saved, but the menu didn't refresh. Reload the window to see the new reactions.",
         );
       }
     } catch (error) {
       toast.error(
-        `Failed to save emoji reactions: ${
+        `Couldn't save reactions: ${
           error instanceof Error ? error.message : String(error)
         }`,
       );
@@ -339,12 +339,10 @@ function EmojiReactionsSettings() {
   return (
     <div className="space-y-3">
       <p className="text-sm text-muted-foreground">
-        Each reaction appears as an emoji-only button in the assistant-message
-        text-selection menu (the menu is a single horizontal row, so labels
-        would make it too wide). Clicking one drafts a reply with the
-        highlighted text quoted and the full reaction text — emoji + label —
-        in the order chosen below. Save &amp; apply refreshes the menu
-        immediately.
+        Each reaction shows as its emoji in the text selection menu and the
+        bar under messages. Clicking one drafts a reply with the reaction and,
+        if you choose, the text you selected. Save &amp; apply updates the
+        menus right away.
       </p>
       <div className="space-y-2">
         {items.map((item, index) => (
@@ -381,8 +379,8 @@ function EmojiReactionsSettings() {
         ))}
         {items.length === 0 ? (
           <p className="text-sm text-muted-foreground">
-            No reactions. Add one below — empty lists hide the emoji buttons
-            in the selection menu.
+            No reactions yet. Add one, or leave the list empty to hide the
+            reaction buttons.
           </p>
         ) : null}
       </div>
@@ -426,8 +424,8 @@ function EmojiReactionsSettings() {
       <div className="rounded-md border border-border p-3 space-y-2">
         <p className="text-sm font-medium">Where reactions appear</p>
         <p className="text-xs text-muted-foreground">
-          Toggle the surfaces where emoji reactions show up. At least one
-          location must stay enabled to keep reactions visible.
+          Choose where reactions show. With all three off, they're hidden
+          everywhere.
         </p>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input
@@ -436,7 +434,7 @@ function EmojiReactionsSettings() {
             onChange={(event) => setShowInSelectionMenu(event.target.checked)}
             className="size-4 accent-foreground"
           />
-          Show in text selection menu (floating menu &amp; right-click)
+          In the text selection menu and right-click menu
         </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input
@@ -445,7 +443,7 @@ function EmojiReactionsSettings() {
             onChange={(event) => setShowInAssistantBar(event.target.checked)}
             className="size-4 accent-foreground"
           />
-          Show at bottom of assistant messages
+          Under assistant messages
         </label>
         <label className="flex cursor-pointer items-center gap-2 text-sm">
           <input
@@ -454,12 +452,11 @@ function EmojiReactionsSettings() {
             onChange={(event) => setShowInUserBar(event.target.checked)}
             className="size-4 accent-foreground"
           />
-          Show at bottom of user messages
+          Under your messages
         </label>
         {!showInSelectionMenu && !showInAssistantBar && !showInUserBar ? (
           <p className="text-xs text-amber-600 dark:text-amber-400">
-            All locations are disabled — reactions will be hidden everywhere
-            until you re-enable at least one.
+            All three are off, so reactions are hidden everywhere.
           </p>
         ) : null}
       </div>
@@ -475,10 +472,10 @@ function EmojiReactionsSettings() {
           Smart reactions
         </label>
         <p className="text-xs text-muted-foreground">
-          The assistant suggests reactions that fit each reply that needs an
-          answer, shown as buttons under the message. It uses the reactions
-          above when they fit and writes specific ones for distinct options.
-          Applies to threads started or resumed after you save.
+          When a reply asks you something, the assistant adds buttons with
+          reactions that fit it. It uses yours when they fit and writes its
+          own for distinct options. Applies to threads that start or resume
+          after you save.
         </p>
       </div>
 
@@ -527,7 +524,7 @@ export default definePluginApp((app) => {
           const composer = pickComposer(mountedComposers, context.threadId);
           if (composer === null) {
             toast.error(
-              "Emoji reactions need the thread composer open — open this thread in the main view and try again.",
+              "Open this thread's composer to react, in the main view or Studio Chat.",
             );
             return;
           }
@@ -561,9 +558,9 @@ export default definePluginApp((app) => {
 
   app.slots.settingsSection({
     id: "emoji-reactions-editor",
-    title: "Emoji reactions",
+    title: "Reactions",
     description:
-      "Reactions shown in the assistant-message text-selection menu and per-message action bar.",
+      "Reactions in the text selection menu and the bar under messages, and smart reactions.",
     component: EmojiReactionsSettings,
   });
 
@@ -601,6 +598,10 @@ export default definePluginApp((app) => {
       const reactionTitles = new Set(
         items.map((i) => (i.emoji || i.label || i.text).trim()).filter(Boolean),
       );
+
+      const isReactionButton = (button: HTMLButtonElement): boolean =>
+        reactionTitles.has((button.getAttribute("aria-label") ?? "").trim()) ||
+        reactionTitles.has((button.textContent ?? "").trim());
 
       const isSelectionMenuButton = (button: HTMLButtonElement): boolean =>
         (button.textContent ?? "").trim().length > 0;
@@ -671,11 +672,10 @@ export default definePluginApp((app) => {
       const sweep = () => {
         // 1) Fresh buttons that still carry the plugin icon
         for (const icon of Array.from(document.querySelectorAll(ICON_SELECTOR))) {
+          // Only reaction buttons: the same icon also marks this plugin in
+          // the settings nav, the plugin page header, and the plugin list.
           const button = icon.closest("button") as HTMLButtonElement | null;
-          if (button === null) {
-            icon.remove();
-            continue;
-          }
+          if (button === null || !isReactionButton(button)) continue;
 
           const isSelection = isSelectionMenuButton(button);
           const role = isSelection ? null : getMessageRole(button);

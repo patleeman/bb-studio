@@ -1,10 +1,10 @@
-# Emoji React
+# Studio Reactions
 
-> Install from the [BB Community marketplace](https://github.com/get-bb/marketplace/blob/main/entries/emoji-react.json).
+> **Studio Reactions** is part of **[BB Studio](../../README.md)**. It works on its own and doesn't need the Studio collection.
 
-Emoji reactions in the assistant-message text-selection menu **and the
-per-message action bar** — a port of NeonPilot's `system-reply-actions`
-extension to bb.
+Emoji reactions on replies, in the text selection menu and the bar under
+each message. It started as a port of NeonPilot's `system-reply-actions`
+extension.
 
 Select any text in an agent response, and the floating selection menu (next
 to "Add to chat") shows one emoji button per configured reaction. Clicking
@@ -17,7 +17,7 @@ one drafts a reply:
 ```
 
 and focuses the composer. Each reaction is a user-configurable emoji + label
-pair, editable in **Tools → Extensions → Emoji React → Emoji reactions**.
+pair, editable in the **Reactions** section of the plugin's settings page.
 The reaction buttons show the emoji only (the host renders plugin actions
 with the plugin's compact icon — identical for every reaction — so a content
 script swaps that icon for the emoji glyph in the per-message action bar and
@@ -61,7 +61,7 @@ than 60 characters, and drops items without both an emoji and a label.
 
 ## Staged preview
 
-![Live BB screenshot of Emoji React settings](assets/staged-preview.png)
+![Live BB screenshot of Studio Reactions settings](assets/staged-preview.png)
 
 Captured from the running BB application with configured reaction data. The
 settings page shows the default reaction list, the location toggles, and the
@@ -78,7 +78,7 @@ smart reactions on, start a thread with that question, and pass its ID as
 
 ## Settings
 
-- **Emoji reactions** (`emojiItems`) — comma-separated `emoji label` items.
+- **Reactions** (`emojiItems`) — comma-separated `emoji label` items.
   Each item appears as one button in the selection menu and is used verbatim
   as the drafted reply text. Empty removes all reaction buttons.
   Default: `👍 Agree, 👎 Disagree, ✅ Do it, ❓ Clarify`
@@ -88,13 +88,13 @@ smart reactions on, start a thread with that question, and pass its ID as
 - **Quote position** (`quotePosition`) — where the quote goes relative to the
   reaction text: `before` (default) drafts the quote first, then the reaction;
   `after` drafts the reaction first, then the quote.
-- **Show in text selection menu** (`showInSelectionMenu`) — when enabled
+- **In the text selection menu** (`showInSelectionMenu`) — when enabled
   (default), reactions appear in the floating text-selection menu and the
   right-click context menu.
-- **Show at bottom of assistant messages** (`showInAssistantBar`) — when
+- **Under assistant messages** (`showInAssistantBar`) — when
   enabled (default), reactions appear as buttons at the bottom of assistant
   messages (the per-message action bar).
-- **Show at bottom of user messages** (`showInUserBar`) — when enabled
+- **Under your messages** (`showInUserBar`) — when enabled
   (default), reactions appear as buttons at the bottom of your own messages.
 
 - **Smart reactions** (`smartReactions`) — off by default. When enabled, the
@@ -106,8 +106,8 @@ reactions to be visible. The editor has a **Where reactions appear** group
 with those three toggles, so you can keep only the selection menu, only the
 bottom bars, or a mix.
 
-Edit them in the plugin's settings page (the "Emoji reactions" editor, or the
-raw fields below it) or via the CLI:
+Edit them in the plugin's settings page (the **Reactions** editor, or the raw
+fields below it) or via the CLI:
 
 ```sh
 bb plugin config emoji-react set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
@@ -159,7 +159,7 @@ re-interpretation.
   swapping — selection-menu buttons are detected by text content, action-bar
   buttons by role heuristics (assistant vs user via ancestor attributes).
 
-## Development
+## Develop
 
 ```sh
 bb plugin install .    # register

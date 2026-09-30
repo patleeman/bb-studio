@@ -5,7 +5,7 @@
 // that writes to the thread whose message it came from. If none is mounted
 // for that thread, the most recently mounted composer takes it, as before.
 
-import type { PluginComposerScope } from "@bb/plugin-sdk/app";
+import type { PluginComposerScope } from "@get-bb/plugin-sdk/app";
 
 /** The thread a composer scope sends to, or null for a new thread. */
 function scopeThread(scope: PluginComposerScope): string | null {

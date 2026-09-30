@@ -13,7 +13,7 @@
 // settings synchronously at frontend-interpretation time, so a settings
 // change takes effect after the plugin's frontend is re-interpreted (the
 // settings editor performs a disable/enable cycle to apply immediately).
-import type { BbPluginApi } from "@bb/plugin-sdk";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { DEFAULT_EMOJI_ITEMS, parseEmojiItems } from "./src/emoji-items";
 import { smartReactionInstructions } from "./src/smart-reactions";
 
@@ -21,17 +21,17 @@ export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
     emojiItems: {
       type: "string",
-      label: "Emoji reactions (comma separated)",
+      label: "Reactions",
       default: DEFAULT_EMOJI_ITEMS,
       description:
-        "Each item is shown as an emoji-only button in the assistant-message text-selection menu (the menu is a single horizontal row) and drafted as the reply text. Format: emoji + label, e.g. \"👍 Agree\". Empty removes all reaction buttons.",
+        "Comma-separated emoji and label pairs, such as \"👍 Agree\". Each shows as its emoji and is drafted as your reply. Leave empty to hide the buttons.",
     },
     quoteSelection: {
       type: "boolean",
-      label: "Quote the highlighted text in the reply",
+      label: "Quote the highlighted text",
       default: true,
       description:
-        "When enabled, reacting drafts the highlighted text as a quote block, so the agent sees exactly what you reacted to.",
+        "Reacting drafts the text you selected as a quote, so the agent sees what you reacted to.",
     },
     quotePosition: {
       type: "select",
@@ -39,35 +39,35 @@ export default async function plugin(bb: BbPluginApi) {
       options: ["before", "after"],
       default: "before",
       description:
-        "Where the quote block goes relative to the reaction text: \"before\" drafts the quote first, then the reaction; \"after\" drafts the reaction first, then the quote.",
+        "Put the quote \"before\" or \"after\" the reaction.",
     },
     showInSelectionMenu: {
       type: "boolean",
-      label: "Show in text selection menu",
+      label: "In the text selection menu",
       default: true,
       description:
-        "When enabled, reactions appear in the floating text-selection menu (when you select text) and in the right-click context menu.",
+        "Show reactions in the menu that opens when you select text, and in the right-click menu.",
     },
     showInAssistantBar: {
       type: "boolean",
-      label: "Show at bottom of assistant messages",
+      label: "Under assistant messages",
       default: true,
       description:
-        "When enabled, reactions appear as buttons at the bottom of assistant messages (the per-message action bar).",
+        "Show reactions in the bar under assistant messages.",
     },
     showInUserBar: {
       type: "boolean",
-      label: "Show at bottom of user messages",
+      label: "Under your messages",
       default: true,
       description:
-        "When enabled, reactions appear as buttons at the bottom of your own messages.",
+        "Show reactions in the bar under your own messages.",
     },
     smartReactions: {
       type: "boolean",
       label: "Smart reactions",
       default: false,
       description:
-        "When enabled, the assistant suggests reactions that fit each reply that needs an answer, shown as buttons under the message. It prefers the reactions above. Applies to threads started or resumed after the change.",
+        "When a reply asks you something, the assistant adds buttons with reactions that fit it, preferring yours. Applies to threads that start or resume after the change.",
     },
   });
 

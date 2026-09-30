@@ -4,12 +4,12 @@
   "license": "MIT",
   "type": "module",
   "engines": {
-    "bb": ">=0.39",
-    "bbPluginSdk": ">=0.4.16"
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
-    "name": "Emoji React",
-    "description": "Emoji reactions in the assistant-message text-selection menu and per-message action bar. Select text, pick a reaction from the menu (or use the action-bar buttons), and it drafts a reply — the reaction list is configurable in settings. Optional smart reactions let the assistant suggest the reactions that fit each reply.",
+    "name": "Studio Reactions",
+    "description": "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer. Optional smart reactions let the assistant suggest the ones that fit each reply.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
@@ -32,6 +32,7 @@
     "tailwind-merge": "^3.4.0"
   },
   "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
     "@radix-ui/react-dialog": "^1.1.19",
     "@types/better-sqlite3": "^7.6.12",
     "@types/node": "^22.0.0",

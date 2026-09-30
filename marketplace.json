@@ -252,14 +252,15 @@
     },
     {
       "id": "emoji-react",
-      "displayName": "Emoji React",
-      "description": "Emoji reactions in the assistant-message text-selection menu and per-message action bar. Select text, pick a reaction from the menu (or use the action-bar buttons), and it drafts a reply — the reaction list is configurable in settings. Optional smart reactions let the assistant suggest the reactions that fit each reply.",
+      "displayName": "Studio Reactions",
+      "description": "Part of BB Studio. Emoji reactions on replies: pick one from the text selection menu or the bar under a message, and it drafts your answer. Optional smart reactions let the assistant suggest the ones that fit each reply.",
       "icon": {
         "url": "./packages/bb-studio-reactions/assets/icon.svg"
       },
       "tags": [
         "interface",
-        "threads"
+        "threads",
+        "bb-studio"
       ],
       "author": {
         "name": "Patrick Lee",

@@ -1435,17 +1435,18 @@ const captures = [
     },
   },
   {
-    id: "emoji-react",
+    id: "reactions",
     packageDir: "bb-studio-reactions",
     setup: async (client) => {
       await client.navigate("/settings/plugins/emoji-react");
-      await client.waitForText("Emoji reactions");
+      await client.waitForText("Studio Reactions");
+      await client.waitForText("Reactions in the text selection menu and the bar under messages");
       await client.waitForText("👍 Agree");
       await client.waitForText("Quote the highlighted text");
     },
   },
   {
-    id: "emoji-react",
+    id: "reactions-smart",
     packageDir: "bb-studio-reactions",
     fileName: "smart-reactions.png",
     privateSidebar: true,

@@ -7,18 +7,13 @@
     "jsx": "react-jsx",
     "lib": [
       "ES2022",
-      "DOM"
+      "DOM",
+      "DOM.Iterable"
     ],
     "types": [
       "node"
     ],
     "paths": {
-      "@bb/plugin-sdk": [
-        "./types/bb-plugin-sdk.d.ts"
-      ],
-      "@bb/plugin-sdk/app": [
-        "./types/bb-plugin-sdk-app.d.ts"
-      ],
       "@/*": [
         "./*"
       ]

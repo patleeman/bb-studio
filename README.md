@@ -18,11 +18,11 @@ agent.
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
-| [Emoji React](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on assistant replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
+| [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
 Every add-on works on its own. With Studio installed, their items also appear in
-Studio's collection. Emoji React doesn't use Studio at all.
+Studio's collection. Studio Reactions doesn't use Studio at all.
 
 ## iOS app
 
@@ -54,7 +54,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - bot-teams: persistent bots in channels
    - studio-chat: a chat that floats over Studio items
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
-   - emoji-react: emoji reactions that draft quick replies
+   - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - mobile: push notifications for the BB Studio iOS app; only if I use it
 3. Install each one I choose with `bb plugin install <id>@bb-studio --yes`.
 4. Run `bb plugin list`, confirm each installed plugin is running, and report
