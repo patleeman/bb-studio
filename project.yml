@@ -1,0 +1,111 @@
+name: BBGo
+options:
+  bundleIdPrefix: nyc.plee
+  deploymentTarget:
+    iOS: "26.0"
+    watchOS: "26.0"
+  createIntermediateGroups: true
+settings:
+  base:
+    DEVELOPMENT_TEAM: 3753DAN98U
+    CODE_SIGN_STYLE: Automatic
+    SWIFT_VERSION: "5.0"
+    MARKETING_VERSION: "0.1.0"
+    CURRENT_PROJECT_VERSION: "1"
+targets:
+  BBGo:
+    type: application
+    platform: iOS
+    sources:
+      - path: iOS
+      - path: Shared
+      - path: LiveActivity
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo
+        TARGETED_DEVICE_FAMILY: "1,2"
+        CODE_SIGN_ENTITLEMENTS: iOS/BBGo.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+        INFOPLIST_FILE: iOS/Info.plist
+    scheme:
+      testTargets:
+        - BBGoUITests
+    dependencies:
+      - target: BBGoWatch
+      - target: BBGoWidgets
+      - target: BBGoShare
+      - target: BBGoNotifications
+  BBGoNotifications:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: NotificationService
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.notifications
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: NotificationService/Info.plist
+  BBGoShare:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Share
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.share
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: Share/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Share/BBGoShare.entitlements
+  BBGoWidgets:
+    type: app-extension
+    platform: iOS
+    sources:
+      - path: Widgets
+      - path: LiveActivity
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.widgets
+        TARGETED_DEVICE_FAMILY: "1,2"
+        INFOPLIST_FILE: Widgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Widgets/BBGoWidgets.entitlements
+  BBGoWatch:
+    type: application
+    platform: watchOS
+    sources:
+      - path: Watch
+      - path: Shared
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.watchkitapp
+        INFOPLIST_FILE: Watch/Info.plist
+        CODE_SIGN_ENTITLEMENTS: Watch/BBGoWatch.entitlements
+        ASSETCATALOG_COMPILER_APPICON_NAME: AppIcon
+    dependencies:
+      - target: BBGoWatchWidgets
+  BBGoWatchWidgets:
+    type: app-extension
+    platform: watchOS
+    sources:
+      - path: WatchWidgets
+      - path: Shared/AppGroup.swift
+      - path: Shared/ThreadSummary.swift
+      - path: Shared/Models.swift
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.watchkitapp.widgets
+        INFOPLIST_FILE: WatchWidgets/Info.plist
+        CODE_SIGN_ENTITLEMENTS: WatchWidgets/BBGoWatchWidgets.entitlements
+  BBGoUITests:
+    type: bundle.ui-testing
+    platform: iOS
+    sources:
+      - path: UITests
+    dependencies:
+      - target: BBGo
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.uitests
+        TEST_TARGET_NAME: BBGo
+        GENERATE_INFOPLIST_FILE: YES

@@ -1,0 +1,70 @@
+import SwiftUI
+
+struct RootView: View {
+    @EnvironmentObject private var model: AppModel
+
+    var body: some View {
+        TabView(selection: $model.tab) {
+            InboxTab()
+                .tabItem { Label("Home", systemImage: "house") }
+            .tag(Tab.inbox)
+
+            NavigationStack { RecordingsView() }
+                .tabItem { Label("Talk", systemImage: "waveform") }
+                .tag(Tab.talk)
+
+            NavigationStack {
+                WebView(url: model.serverURL)
+                    .ignoresSafeArea(edges: .bottom)
+                    .navigationTitle("BB Web")
+                    .navigationBarTitleDisplayMode(.inline)
+            }
+            .tabItem { Label("Web", systemImage: "globe") }
+            .tag(Tab.web)
+
+            NavigationStack { SettingsView() }
+                .tabItem { Label("Settings", systemImage: "gear") }
+                .tag(Tab.settings)
+        }
+        .tabViewStyle(.sidebarAdaptable)
+        .sheet(item: $model.sheet) { sheet in
+            switch sheet {
+            case .dictation(let threadId, let autoStart):
+                DictationView(threadId: threadId, autoStart: autoStart)
+            case .voiceChat(let threadId):
+                VoiceChatView(threadId: threadId)
+            }
+        }
+    }
+}
+
+/// A stack on iPhone; on iPad, the inbox beside the open thread.
+struct InboxTab: View {
+    @EnvironmentObject private var model: AppModel
+    @Environment(\.horizontalSizeClass) private var sizeClass
+
+    var body: some View {
+        if sizeClass == .regular {
+            NavigationSplitView {
+                InboxView()
+            } detail: {
+                NavigationStack(path: $model.path) {
+                    ContentUnavailableView("No thread selected", systemImage: "bubble.left.and.bubble.right")
+                        .navigationDestination(for: Route.self, destination: destination)
+                }
+            }
+        } else {
+            NavigationStack(path: $model.path) {
+                InboxView().navigationDestination(for: Route.self, destination: destination)
+            }
+        }
+    }
+
+    @ViewBuilder
+    private func destination(_ route: Route) -> some View {
+        switch route {
+        case .thread(let id): ThreadView(threadId: id).id(id)
+        case .room(let room): ChannelView(room: room)
+        }
+    }
+}
