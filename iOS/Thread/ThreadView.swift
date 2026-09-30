@@ -194,6 +194,7 @@ struct ThreadView: View {
         .overlay(alignment: .bottomTrailing) { jumpButton }
         .animation(.snappy, value: atBottom)
         .safeAreaInset(edge: .bottom) { composer }
+        .environment(\.threadId, model.threadId)
         .environment(\.openURL, OpenURLAction { url in
             // Agents link Studio items by their BB web path, which reads like a file path.
             if let path = FilePathLink.path(from: url) ?? (url.host() == app.client.baseURL.host() ? url.path() : nil),

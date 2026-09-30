@@ -2,7 +2,8 @@ import SwiftUI
 
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
-/// code. `::artifact{id="…"}` lines become artifact cards; other directives,
+/// code. `::artifact{id="…"}` lines become artifact cards and `::inline-vis{…}`
+/// lines show the file they name; other directives,
 /// such as `::reactions{…}`, are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
@@ -52,6 +53,8 @@ struct MarkdownText: View {
             Divider().padding(.vertical, 2)
         case .artifact(let id):
             ArtifactCard(id: id)
+        case .inlineVis(let vis):
+            InlineVisCard(vis: vis)
         }
     }
 
@@ -154,6 +157,8 @@ enum MarkdownBlock {
     case rule
     /// A Studio artifact an agent put in its reply.
     case artifact(String)
+    /// A workspace or thread-storage file shown in the reply.
+    case inlineVis(InlineVis)
 
     private final class Box {
         let blocks: [MarkdownBlock]
@@ -211,6 +216,9 @@ enum MarkdownBlock {
                 if directive.name == "artifact", let id = directive.attributes["id"], Artifact.isId(id) {
                     flush()
                     blocks.append(.artifact(id))
+                } else if directive.name == "inline-vis" {
+                    flush()
+                    blocks.append(.inlineVis(InlineVis(directive)))
                 }
             } else if let heading = trimmed.firstMatch(of: /^(#{1,6})\s+(.*)$/) {
                 flush()

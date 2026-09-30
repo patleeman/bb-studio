@@ -750,6 +750,31 @@ final class ThreadUITests: XCTestCase {
         shot("terminal-list")
     }
 
+    /// A reply's `::inline-vis` directives on a scratch thread named by
+    /// `TEST_RUNNER_BBGO_QA_VIS_THREAD`: an HTML chart whose script runs, a
+    /// Markdown file, a missing file and a bad height.
+    func testInlineVis() throws {
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_VIS_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbgo://thread/\(id)")!)
+        XCTAssertTrue(app.staticTexts["QA inline-vis reply"].waitForExistence(timeout: 15), "reply")
+        XCTAssertTrue(app.webViews.staticTexts["QA chart (script ran)"].waitForExistence(timeout: 15), "HTML ran its script")
+        shot("inline-vis-html")
+        app.swipeUp()
+        XCTAssertTrue(app.staticTexts["QA notes"].waitForExistence(timeout: 10), "Markdown file")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Preview file not found'")).firstMatch
+            .waitForExistence(timeout: 10), "missing file")
+        XCTAssertTrue(app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'height must be'")).firstMatch.exists, "bad height")
+        shot("inline-vis-markdown")
+        app.buttons["Open qa/notes.md full screen"].tap()
+        XCTAssertTrue(app.navigationBars["notes.md"].waitForExistence(timeout: 5), "full screen")
+        shot("inline-vis-full")
+        app.buttons["Done"].tap()
+        app.buttons["Hide qa/chart.html"].firstMatch.tap()
+        XCTAssertTrue(app.buttons["Show qa/chart.html"].firstMatch.waitForExistence(timeout: 5), "collapsed")
+        shot("inline-vis-collapsed")
+        app.buttons["Show qa/chart.html"].firstMatch.tap()
+    }
+
     private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
             "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,

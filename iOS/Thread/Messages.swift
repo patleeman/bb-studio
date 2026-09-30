@@ -125,6 +125,7 @@ struct ClampedText: View {
     var body: some View {
         VStack(alignment: .trailing, spacing: 4) {
             MarkdownText(text)
+                .environment(\.threadId, nil)
                 .fixedSize(horizontal: false, vertical: true)
                 .onGeometryChange(for: CGFloat.self) { $0.size.height } action: { fullHeight = $0 }
                 .frame(maxHeight: expanded ? nil : limit, alignment: .top)
