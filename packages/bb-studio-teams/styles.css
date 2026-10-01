@@ -1203,3 +1203,7 @@
   width: 14px;
   height: 14px;
 }
+
+/* Bot work at the end of a channel's transcript, under the last message. */
+.channel-transcript-end:empty { display: none; }
+.channel-transcript-work { padding: 2px 8px; }
