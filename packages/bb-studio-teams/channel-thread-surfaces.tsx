@@ -115,12 +115,10 @@ function useTranscriptEnd(anchor: HTMLElement | null) {
 
 /**
  * Who is working on what, with Stop, at the end of the transcript like the
- * thread's own working indicator; above the composer, like a thread's
- * follow-ups, requests a bot raised for you (acknowledge or snooze them
- * here, or reply in the channel). A channel with no bots yet says how to add
- * one. Renders nothing otherwise.
+ * thread's own working indicator. Registered as a bare banner: it only
+ * anchors the portal, so it must not draw a card above the composer.
  */
-export function ChannelComposerBanner() {
+export function ChannelTranscriptWork() {
   const view = useComposerView();
   const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
   const { surface, load } = useChannelSurface(threadId);
@@ -132,24 +130,8 @@ export function ChannelComposerBanner() {
   const transcriptEnd = useTranscriptEnd(surface ? anchor : null);
   const marker = <span hidden ref={setAnchor} />;
   if (!surface) return null;
-  if (!surface.room.memberIds.length)
-    return (
-      <p className="channel-banner-empty">
-        No bots here yet. Type <kbd>@</kbd> and pick a bot to add it to this channel.
-      </p>
-    );
   const live = railLive(surface.jobs);
   const routing = railRoutingCount(surface.runs);
-  const requests = surface.attention;
-  const answer = async (id: string, action: "acknowledge" | "snooze") => {
-    setError(null);
-    try {
-      await rpc.call("attentionUpdate", action === "snooze" ? { id, action, minutes: 60 } : { id, action });
-      load();
-    } catch (cause) {
-      setError(message(cause));
-    }
-  };
   const stop = async (jobId: string) => {
     setStopping(jobId);
     setError(null);
@@ -207,6 +189,7 @@ export function ChannelComposerBanner() {
           </div>
         );
       })}
+      {error && <p role="alert" className="channel-banner-error">{error}</p>}
     </div>
   );
   return (
@@ -214,32 +197,63 @@ export function ChannelComposerBanner() {
       {marker}
       {/* Until the transcript is found, the work shows here instead. */}
       {transcriptEnd ? work && createPortal(work, transcriptEnd) : work}
-      {(requests.length > 0 || error) && (
-        <div className="channel-banner" role="status" aria-label="Channel requests">
-          {requests.map((request) => {
-            const bot = surface.bots.find((b) => b.id === request.message.botId);
-            return (
-              <div className="channel-banner-request" key={request.id}>
-                <span className="channel-banner-avatar" aria-hidden><Icon name="BellDot" /></span>
-                <span className="channel-banner-request-text" title={request.message.text}>
-                  <strong>{attentionReasons[request.reason]}</strong>
-                  {bot ? ` from ${bot.name}` : ""}: {request.message.text.replace(/\s+/gu, " ")}
-                </span>
-                <span className="channel-banner-request-actions">
-                  <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "acknowledge")}>
-                    Acknowledge
-                  </Button>
-                  <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "snooze")}>
-                    Snooze 1 hour
-                  </Button>
-                </span>
-              </div>
-            );
-          })}
-          {error && <p role="alert" className="channel-banner-error">{error}</p>}
-        </div>
-      )}
     </>
+  );
+}
+
+/**
+ * Above the composer, like a thread's follow-ups: requests a bot raised for
+ * you (acknowledge or snooze them here, or reply in the channel). A channel
+ * with no bots yet says how to add one. Renders nothing otherwise.
+ */
+export function ChannelComposerBanner() {
+  const view = useComposerView();
+  const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
+  const { surface, load } = useChannelSurface(threadId);
+  const rpc = useRpc<typeof rpcContract>();
+  const [error, setError] = useState<string | null>(null);
+  if (!surface) return null;
+  if (!surface.room.memberIds.length)
+    return (
+      <p className="channel-banner-empty">
+        No bots here yet. Type <kbd>@</kbd> and pick a bot to add it to this channel.
+      </p>
+    );
+  const requests = surface.attention;
+  if (!requests.length && !error) return null;
+  const answer = async (id: string, action: "acknowledge" | "snooze") => {
+    setError(null);
+    try {
+      await rpc.call("attentionUpdate", action === "snooze" ? { id, action, minutes: 60 } : { id, action });
+      load();
+    } catch (cause) {
+      setError(message(cause));
+    }
+  };
+  return (
+    <div className="channel-banner" role="status" aria-label="Channel requests">
+      {requests.map((request) => {
+        const bot = surface.bots.find((b) => b.id === request.message.botId);
+        return (
+          <div className="channel-banner-request" key={request.id}>
+            <span className="channel-banner-avatar" aria-hidden><Icon name="BellDot" /></span>
+            <span className="channel-banner-request-text" title={request.message.text}>
+              <strong>{attentionReasons[request.reason]}</strong>
+              {bot ? ` from ${bot.name}` : ""}: {request.message.text.replace(/\s+/gu, " ")}
+            </span>
+            <span className="channel-banner-request-actions">
+              <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "acknowledge")}>
+                Acknowledge
+              </Button>
+              <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "snooze")}>
+                Snooze 1 hour
+              </Button>
+            </span>
+          </div>
+        );
+      })}
+      {error && <p role="alert" className="channel-banner-error">{error}</p>}
+    </div>
   );
 }
 

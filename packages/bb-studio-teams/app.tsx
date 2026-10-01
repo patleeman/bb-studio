@@ -67,6 +67,7 @@ import "./styles.css";
 import { botTeamsIcons } from "./icons";
 import {
   ChannelComposerBanner,
+  ChannelTranscriptWork,
   ChannelHandoffPrefill,
   ChannelThreadHeader,
 } from "./channel-thread-surfaces";
@@ -441,7 +442,10 @@ export default definePluginApp((app) => {
       { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
       { id: "channel-settings", component: ChannelSettings },
     ],
-    banners: [{ id: "channel-work", component: ChannelComposerBanner }],
+    banners: [
+      { id: "channel-work", chrome: "bare", component: ChannelTranscriptWork },
+      { id: "channel-requests", component: ChannelComposerBanner },
+    ],
     richText: {
       onDraftChange: (draft, view) => {
         if (view.scope.kind === "thread")
