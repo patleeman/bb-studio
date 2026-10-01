@@ -28,6 +28,7 @@ import { ProviderComments } from "./src/provider-comments";
 import { routeCommentMentions } from "./src/comment-routing";
 import { homeData } from "./src/home";
 import { firstThreadItemRefs } from "./src/thread-item-refs";
+import { respondToNeed } from "./src/needs-you";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -114,6 +115,10 @@ export default async function plugin(bb: BbPluginApi) {
   void bb.sdk.threads.list({ limit: 200 }).then((threads) => {
     for (const thread of threads) tryLinkComposerThread(thread);
   }).catch(() => {});
+  bb.events.on("interaction.pending", () => {
+    changes.append(null);
+    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+  });
   /** Every window's sidebar refetches its tabs. */
   const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 
@@ -186,7 +191,13 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   bb.rpc.register(rpcContract, {
-    home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, projectId, periodDays),
+    home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
+    homeRespond: async (input) => {
+      await respondToNeed(bb.sdk, input);
+      changes.append(null);
+      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+      return { ok: true };
+    },
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
     searchAll: async ({ query, kinds, projectId, limit }) => {
@@ -343,9 +354,15 @@ export default async function plugin(bb: BbPluginApi) {
         const item = (await hub.get(input.ref.pluginId, [input.ref.id]))[0];
         void routeCommentMentions(bb.sdk, input.ref, input.body, item?.href ?? `${input.ref.pluginId}:${input.ref.id}`).catch(() => { /* Teams is optional. */ });
       }
+      changes.append(null);
+      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
       return { comment };
     },
-    commentResolve: async ({ ref, id, resolved }) => ({ ok: (await providerComments.resolve(ref, id, resolved)) ?? services.resolveComment(ref, id, resolved) }),
+    commentResolve: async ({ ref, id, resolved }) => {
+      const ok = (await providerComments.resolve(ref, id, resolved)) ?? services.resolveComment(ref, id, resolved);
+      if (ok) { changes.append(null); bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }); }
+      return { ok };
+    },
     versions: async ({ ref }) => ({ versions: (await providerHistory.versions(ref)) ?? services.versions(ref) }),
     versionCreate: ({ ref, bytes, label, actor }) => ({ version: services.addVersion(ref, Buffer.from(bytes, "base64"), label, actor) }),
     versionRead: async ({ ref, id }) => { const bytes = (await providerHistory.read(ref, id)) ?? services.versionBytes(ref, id); return { bytes: bytes ? Buffer.from(bytes).toString("base64") : null }; },

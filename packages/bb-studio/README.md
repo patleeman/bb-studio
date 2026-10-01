@@ -24,7 +24,12 @@ text with the match in bold.
 
 ## What you get
 
-- **Home** (sidebar → Studio) brings together due and review tasks, active threads
+- **Home** (sidebar → Studio) puts **Needs you** first: pending thread approvals
+  and questions, Teams attention, review and due tasks, and unresolved comment
+  replies or mentions. Rows open their source; simple approvals and single-text
+  questions can be answered in place. This is a live view of the sources, with
+  no separate read or done state.
+- Home also brings together due and review tasks, active threads
   and bots, recent items, today's automations and Studio activity. Sections whose
   add-ons are unavailable stay hidden. The Activity tab shows measured thread
   turns, duration and failures, plus Teams bot usage and configured limits.

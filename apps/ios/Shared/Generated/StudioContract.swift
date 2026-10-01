@@ -4,6 +4,7 @@ import Foundation
 public enum Studio {
   public enum Method {
     public static let home = "home"
+    public static let homeRespond = "homeRespond"
     public static let overview = "overview"
     public static let items = "items"
     public static let changes = "changes"
@@ -41,6 +42,8 @@ public enum Studio {
   }
 
   public typealias Home = HomeOutput
+
+  public typealias HomeRespond = HomeRespondOutput
 
   public typealias OverviewInput = StudioJSONValue
 
@@ -127,6 +130,97 @@ public enum Studio {
     public init(projectId: String? = nil, periodDays: Int? = nil) {
       self.projectId = projectId
       self.periodDays = periodDays
+    }
+  }
+
+  public enum HomeOutputNeedsYouItemKind: Sendable, Hashable, Codable {
+    case approval
+    case question
+    case attention
+    case review
+    case due
+    case reply
+    case mention
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "approval": self = .approval
+      case "question": self = .question
+      case "attention": self = .attention
+      case "review": self = .review
+      case "due": self = .due
+      case "reply": self = .reply
+      case "mention": self = .mention
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .approval: try container.encode("approval")
+      case .question: try container.encode("question")
+      case .attention: try container.encode("attention")
+      case .review: try container.encode("review")
+      case .due: try container.encode("due")
+      case .reply: try container.encode("reply")
+      case .mention: try container.encode("mention")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum HomeOutputNeedsYouItemResponseKind: Sendable, Hashable, Codable {
+    case approval
+    case question
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "approval": self = .approval
+      case "question": self = .question
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .approval: try container.encode("approval")
+      case .question: try container.encode("question")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct HomeOutputNeedsYouItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var source: String?
+    public var kind: HomeOutputNeedsYouItemKind?
+    public var title: String?
+    public var body: String?
+    public var href: String?
+    public var createdAt: Double?
+    public var priority: Double?
+    public var threadId: String?
+    public var interactionId: String?
+    public var responseKind: HomeOutputNeedsYouItemResponseKind?
+
+    public init(id: String? = nil, source: String? = nil, kind: HomeOutputNeedsYouItemKind? = nil, title: String? = nil, body: String? = nil, href: String? = nil, createdAt: Double? = nil, priority: Double? = nil, threadId: String? = nil, interactionId: String? = nil, responseKind: HomeOutputNeedsYouItemResponseKind? = nil) {
+      self.id = id
+      self.source = source
+      self.kind = kind
+      self.title = title
+      self.body = body
+      self.href = href
+      self.createdAt = createdAt
+      self.priority = priority
+      self.threadId = threadId
+      self.interactionId = interactionId
+      self.responseKind = responseKind
     }
   }
 
@@ -377,6 +471,7 @@ public enum Studio {
   }
 
   public struct HomeOutput: Sendable, Hashable, Codable {
+    public var needsYou: [HomeOutputNeedsYouItem]?
     public var due: [HomeOutputDueItem]?
     public var review: [HomeOutputReviewItem]?
     public var working: HomeOutputWorking?
@@ -385,7 +480,8 @@ public enum Studio {
     public var activity: [HomeOutputActivityItem]?
     public var dashboard: HomeOutputDashboard?
 
-    public init(due: [HomeOutputDueItem]? = nil, review: [HomeOutputReviewItem]? = nil, working: HomeOutputWorking? = nil, recent: [HomeOutputRecentItem]? = nil, automations: [HomeOutputAutomationsItem]? = nil, activity: [HomeOutputActivityItem]? = nil, dashboard: HomeOutputDashboard? = nil) {
+    public init(needsYou: [HomeOutputNeedsYouItem]? = nil, due: [HomeOutputDueItem]? = nil, review: [HomeOutputReviewItem]? = nil, working: HomeOutputWorking? = nil, recent: [HomeOutputRecentItem]? = nil, automations: [HomeOutputAutomationsItem]? = nil, activity: [HomeOutputActivityItem]? = nil, dashboard: HomeOutputDashboard? = nil) {
+      self.needsYou = needsYou
       self.due = due
       self.review = review
       self.working = working
@@ -393,6 +489,55 @@ public enum Studio {
       self.automations = automations
       self.activity = activity
       self.dashboard = dashboard
+    }
+  }
+
+  public enum HomeRespondInputAction: Sendable, Hashable, Codable {
+    case approve
+    case deny
+    case answer
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "approve": self = .approve
+      case "deny": self = .deny
+      case "answer": self = .answer
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .approve: try container.encode("approve")
+      case .deny: try container.encode("deny")
+      case .answer: try container.encode("answer")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct HomeRespondInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var interactionId: String?
+    public var action: HomeRespondInputAction?
+    public var answer: String?
+
+    public init(threadId: String? = nil, interactionId: String? = nil, action: HomeRespondInputAction? = nil, answer: String? = nil) {
+      self.threadId = threadId
+      self.interactionId = interactionId
+      self.action = action
+      self.answer = answer
+    }
+  }
+
+  public struct HomeRespondOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

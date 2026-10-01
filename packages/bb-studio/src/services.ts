@@ -89,6 +89,11 @@ export class StudioServices {
       .map((row) => ({ id: row.id, ref, parentId: row.parent_id, anchor: row.anchor, actor: readActor(row.actor), body: row.body, createdAt: row.created_at, resolvedAt: row.resolved_at }));
   }
 
+  openComments(): ItemComment[] {
+    const refs = this.db.prepare("SELECT DISTINCT plugin_id, item_id FROM item_comments WHERE resolved_at IS NULL").all() as { plugin_id: string; item_id: string }[];
+    return refs.flatMap((row) => this.comments(readRef(row.plugin_id, row.item_id)));
+  }
+
   resolveComment(ref: Ref, id: string, resolved: boolean): boolean {
     return this.db.prepare("UPDATE item_comments SET resolved_at = ? WHERE id = ? AND plugin_id = ? AND item_id = ?")
       .run(resolved ? Date.now() : null, id, ref.pluginId, ref.id).changes > 0;

@@ -2,8 +2,11 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { StudioHub } from "./hub";
 import type { StudioServices } from "./services";
+import type { ProviderComments } from "./provider-comments";
+import { needsYouData } from "./needs-you";
 
-const task = z.object({ id: z.string(), title: z.string(), status: z.string(), due: z.string().nullable(), projectId: z.string().nullable(), archived: z.boolean() });
+const task = z.object({ id: z.string(), title: z.string(), status: z.string(), due: z.string().nullable(), projectId: z.string().nullable(), archived: z.boolean(), priority: z.enum(["none", "low", "medium", "high", "urgent"]).optional(), updatedAt: z.number().optional() });
+const statuses = z.object({ columns: z.array(z.object({ id: z.string(), label: z.string() })) });
 const teams = z.object({
   bots: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), working: z.boolean() })),
   rooms: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string() })),
@@ -40,7 +43,7 @@ export function summarizeBotJobs(jobs: readonly { startedAt: number | null; upda
     durationMs: completed.reduce((total, job) => total + Math.max(0, job.updatedAt - job.startedAt!), 0) };
 }
 
-export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioServices, projectId?: string, periodDays = 7) {
+export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioServices, providerComments: ProviderComments, projectId?: string, periodDays = 7) {
   const now = Date.now();
   const today = day(new Date(now));
   const since = now - periodDays * 86_400_000;
@@ -54,8 +57,15 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
     available.has("studio-tasks") ? call("studio-tasks", "board", {}, z.object({ tasks: z.array(task) })).catch(() => null) : null,
     available.has("bot-teams") ? call("bot-teams", "list", null, teams).catch(() => null) : null,
   ]);
+  const statusSets = new Map(await Promise.all([...new Set(board?.tasks.map((item) => item.projectId) ?? [])].map(async (id) => {
+    const result = await call("studio-tasks", "statuses", { projectId: id }, statuses).catch(() => null);
+    return [id, new Set(result?.columns.filter((column) => column.id === "review" || /\breview\b/i.test(column.label)).map((column) => column.id) ?? ["review"])] as const;
+  })));
+  const inReview = (item: { projectId: string | null; status: string }) => (statusSets.get(item.projectId) ?? new Set(["review"])).has(item.status);
   const due = board?.tasks.filter((item) => !item.archived && item.status !== "done" && item.due && item.due <= today && sameProject(item, projectId)).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? "")).slice(0, 8) ?? null;
-  const review = board?.tasks.filter((item) => !item.archived && item.status === "review" && sameProject(item, projectId)).slice(0, 8) ?? null;
+  const review = board?.tasks.filter((item) => !item.archived && inReview(item) && sameProject(item, projectId)).slice(0, 8) ?? null;
+  const needsYou = await needsYouData(sdk, services, providerComments, overview.items,
+    board?.tasks ?? null, roster?.rooms ?? null, projectId, inReview);
   const activeThreads = threadList.filter((thread) => ["active", "starting", "pending", "stopping"].includes(thread.status));
   const working = {
     threads: activeThreads.map((thread) => ({ id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, projectId: thread.projectId })).slice(0, 12),
@@ -90,5 +100,5 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
       durationMs: botJobs.durationMs + botDirect.reduce((total, entry) => total + entry.durationMs, 0),
       active: summary?.active ?? 0, limits: summary?.limits ?? null };
   })) : null;
-  return { due, review, working, recent, automations, activity, dashboard: { periodDays, threads, bots } };
+  return { needsYou, due, review, working, recent, automations, activity, dashboard: { periodDays, threads, bots } };
 }

@@ -1,0 +1,130 @@
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { z } from "zod";
+import type { HubItem } from "./hub";
+import type { ProviderComments } from "./provider-comments";
+import type { ItemComment, StudioServices } from "./services";
+
+const attentionPage = z.object({ items: z.array(z.object({ id: z.string(), roomId: z.string(), reason: z.string(), createdAt: z.number(), channelName: z.string(), message: z.object({ id: z.string(), text: z.string() }) })), nextOffset: z.number().nullable() });
+
+export interface NeedEntry {
+  id: string;
+  source: string;
+  kind: "approval" | "question" | "attention" | "review" | "due" | "reply" | "mention";
+  title: string;
+  body: string;
+  href: string;
+  createdAt: number;
+  priority: number;
+  threadId?: string;
+  interactionId?: string;
+  responseKind?: "approval" | "question";
+}
+
+type Sdk = Pick<BbPluginApi["sdk"], "threads" | "plugins">;
+type Task = { id: string; title: string; status: string; due: string | null; projectId: string | null; archived: boolean; priority?: "none" | "low" | "medium" | "high" | "urgent"; updatedAt?: number };
+type Room = { id: string; projectId: string };
+const localDay = () => { const date = new Date(); return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-"); };
+const mentionedUser = (body: string) => /@(?:user|you)\b/i.test(body) || /@\[[^\]]+\]\(user:[^)]+\)/i.test(body);
+
+export function commentNeeds(comments: readonly ItemComment[], item: HubItem): NeedEntry[] {
+  const byId = new Map(comments.map((comment) => [comment.id, comment]));
+  return comments.flatMap((comment) => {
+    if (comment.actor.kind === "user" || comment.resolvedAt !== null) return [];
+    const parent = comment.parentId ? byId.get(comment.parentId) : null;
+    if (parent?.resolvedAt !== null && parent) return [];
+    const mention = mentionedUser(comment.body);
+    if (!mention && !(parent && parent.actor.kind === "user")) return [];
+    return [{ id: `comment:${item.pluginId}:${item.id}:${comment.id}`, source: item.pluginId,
+      kind: mention ? "mention" as const : "reply" as const,
+      title: `${mention ? "Mention" : "Reply"} on ${item.title || "Untitled"}`,
+      body: comment.body.slice(0, 500), href: item.href, createdAt: comment.createdAt, priority: mention ? 75 : 65 }];
+  });
+}
+
+function interactionEntry(thread: { id: string; title: string | null; titleFallback: string | null }, interaction: { id: string; payload: unknown; createdAt?: number }): NeedEntry {
+  const payload = interaction.payload as { kind?: string; reason?: string | null; availableDecisions?: string[]; questions?: Array<{ header?: string; prompt?: string; question?: string; allowFreeText?: boolean }> };
+  const question = payload.kind === "user_question";
+  const first = payload.questions?.[0];
+  return { id: `interaction:${interaction.id}`, source: "bb", kind: question ? "question" : "approval",
+    title: first?.header || (question ? "Question" : "Approval needed"),
+    body: first?.prompt ?? first?.question ?? payload.reason ?? thread.title ?? thread.titleFallback ?? "This thread needs your input.",
+    href: `/threads/${thread.id}`, createdAt: interaction.createdAt ?? Date.now(), priority: 100,
+    threadId: thread.id, interactionId: interaction.id,
+    ...(question ? (payload.questions?.length === 1 && first?.allowFreeText ? { responseKind: "question" as const } : {})
+      : payload.availableDecisions?.includes("allow_once") && payload.availableDecisions.includes("deny") ? { responseKind: "approval" as const } : {}) };
+}
+
+export async function respondToNeed(sdk: Sdk, input: { threadId: string; interactionId: string; action: "approve" | "deny" | "answer"; answer?: string }) {
+  const interaction = await sdk.threads.interactions.get({ threadId: input.threadId, interactionId: input.interactionId });
+  if (interaction.status !== "pending") throw new Error("This request has already been answered.");
+  const payload = interaction.payload as { kind?: string; availableDecisions?: string[]; questions?: Array<{ id: string; allowFreeText?: boolean }>; subject?: { kind?: string; permissions?: { network?: { enabled?: boolean }; fileSystem?: unknown } } };
+  if (input.action === "answer") {
+    if (payload.kind !== "user_question" || payload.questions?.length !== 1 || !payload.questions[0]?.allowFreeText || !input.answer?.trim()) throw new Error("Open the thread to answer this question.");
+    await sdk.threads.interactions.respond({ threadId: input.threadId, interactionId: input.interactionId,
+      value: { kind: "user_answer", answers: { [payload.questions[0].id]: { selected: [], freeText: input.answer.trim() } } } });
+  } else {
+    if (payload.kind === "user_question") throw new Error("Open the thread to answer this question.");
+    if (!payload.availableDecisions?.includes(input.action === "deny" ? "deny" : "allow_once")) throw new Error("Open the thread to respond to this approval.");
+    const value = input.action === "deny" ? { decision: "deny" } : {
+      decision: "allow_once",
+      grantedPermissions: payload.subject?.kind === "permission_grant" ? {
+        network: payload.subject.permissions?.network?.enabled ? { enabled: true } : null,
+        fileSystem: payload.subject.permissions?.fileSystem ?? null,
+      } : null,
+    };
+    await sdk.threads.interactions.respond({ threadId: input.threadId, interactionId: input.interactionId,
+      value: value as Parameters<typeof sdk.threads.interactions.respond>[0]["value"] });
+  }
+}
+
+export async function needsYouData(sdk: Sdk, services: StudioServices, providerComments: ProviderComments,
+  items: readonly HubItem[], tasks: readonly Task[] | null, rooms: readonly Room[] | null, projectId?: string,
+  inReview: (task: Task) => boolean = (task) => task.status === "review"): Promise<NeedEntry[]> {
+  const entries: NeedEntry[] = [];
+  const today = localDay();
+  for (const task of tasks ?? []) {
+    if (task.archived || (projectId && task.projectId !== projectId && task.projectId !== null)) continue;
+    const href = `/plugins/studio-tasks/tasks/${task.id}`;
+    const boost = task.priority === "urgent" ? 15 : task.priority === "high" ? 8 : 0;
+    if (inReview(task)) entries.push({ id: `task:review:${task.id}`, source: "studio-tasks", kind: "review", title: task.title, body: "Ready for review", href, createdAt: task.updatedAt ?? Date.now(), priority: 80 + boost });
+    if (task.status !== "done" && task.due && task.due <= today) entries.push({ id: `task:due:${task.id}`, source: "studio-tasks", kind: "due", title: task.title, body: task.due < today ? `Overdue since ${task.due}` : "Due today", href, createdAt: task.updatedAt ?? Date.now(), priority: 60 + boost });
+  }
+  for (let offset = 0; ; offset += 200) {
+    const page = await sdk.threads.list({ ...(projectId ? { projectId } : {}), archived: false, limit: 200, offset }).catch(() => []);
+    const pending = page.filter((thread) => thread.hasPendingInteraction);
+    const rows = await Promise.all(pending.map(async (thread) => {
+      const interactions = await sdk.threads.interactions.list({ threadId: thread.id }).catch(() => []);
+      return interactions.filter((interaction) => interaction.status === "pending").map((interaction) => interactionEntry(thread, interaction));
+    }));
+    entries.push(...rows.flat());
+    if (page.length < 200) break;
+  }
+  if (rooms) {
+    const roomProjects = new Map(rooms.map((room) => [room.id, room.projectId]));
+    for (let offset = 0; ; ) {
+      const page = await sdk.plugins.callRpc({ pluginId: "bot-teams", method: "attentionList", input: { status: "open", limit: 50, offset } as never, outputSchema: attentionPage, signal: AbortSignal.timeout(5000) }).catch(() => null);
+      if (!page) break;
+      entries.push(...page.items.filter((attention) => !projectId || roomProjects.get(attention.roomId) === projectId).map((attention) => ({
+        id: `attention:${attention.id}`, source: "bot-teams", kind: "attention" as const,
+        title: `${attention.channelName}: ${attention.reason}`, body: attention.message.text.slice(0, 500),
+        href: `/plugins/bot-teams/channels/${attention.roomId}/message/${attention.message.id}`, createdAt: attention.createdAt, priority: attention.reason === "blocker" ? 90 : 70,
+      })));
+      if (page.nextOffset === null) break;
+      offset = page.nextOffset;
+    }
+  }
+  const visible = items.filter((item) => !item.archived && (!projectId || item.projectId === projectId || item.projectId === null));
+  const local = services.openComments();
+  const localByItem = new Map<string, ItemComment[]>();
+  for (const comment of local) {
+    const key = `${comment.ref.pluginId}:${comment.ref.id}`;
+    localByItem.set(key, [...(localByItem.get(key) ?? []), comment]);
+  }
+  for (const item of visible) if (item.pluginId !== "pages") entries.push(...commentNeeds(localByItem.get(`${item.pluginId}:${item.id}`) ?? [], item));
+  const pages = visible.filter((item) => item.pluginId === "pages");
+  for (let index = 0; index < pages.length; index += 8) {
+    const chunk = await Promise.all(pages.slice(index, index + 8).map(async (item) => commentNeeds(await providerComments.list({ pluginId: item.pluginId, id: item.id }).catch(() => null) ?? [], item)));
+    entries.push(...chunk.flat());
+  }
+  return entries.sort((a, b) => b.priority - a.priority || b.createdAt - a.createdAt).slice(0, 30);
+}

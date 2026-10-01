@@ -19,7 +19,9 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
         }
         await pluginRpc("studio", "recordActivity", { ref: { pluginId: "studio-tasks", id: ids[0] }, actor: { kind: "user" }, verb: "updated", at: Date.now(), summary: "QA Review launch copy is ready" });
         await client.navigate("/plugins/studio/studio");
-        for (const label of ["Due today and overdue", "In review", "Recent items", "Activity", "QA Ship onboarding guide", "QA Review launch copy"]) await client.waitForText(label);
+        for (const label of ["Needs you", "Due today and overdue", "In review", "Recent items", "Activity", "QA Ship onboarding guide", "QA Review launch copy"]) await client.waitForText(label);
+        const needs = await client.evaluate(`(() => { const heading = [...document.querySelectorAll("h2")].find((node) => node.textContent === "Needs you"); return heading?.closest("section")?.innerText ?? ""; })()`);
+        if (!needs.includes("QA Ship onboarding guide") || !needs.includes("QA Review launch copy")) throw new Error("Home did not derive the staged task requests");
         await sleep(600);
       } catch (error) { await cleanup(); throw error; }
       return cleanup;

@@ -21,6 +21,71 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "needsYou": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "source": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "approval",
+                    "question",
+                    "attention",
+                    "review",
+                    "due",
+                    "reply",
+                    "mention"
+                  ]
+                },
+                "title": {
+                  "type": "string"
+                },
+                "body": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "priority": {
+                  "type": "number"
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "interactionId": {
+                  "type": "string"
+                },
+                "responseKind": {
+                  "type": "string",
+                  "enum": [
+                    "approval",
+                    "question"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "source",
+                "kind",
+                "title",
+                "body",
+                "href",
+                "createdAt",
+                "priority"
+              ],
+              "additionalProperties": false
+            }
+          },
           "due": {
             "anyOf": [
               {
@@ -470,6 +535,50 @@
           "automations",
           "activity",
           "dashboard"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "homeRespond": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          },
+          "interactionId": {
+            "type": "string"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "approve",
+              "deny",
+              "answer"
+            ]
+          },
+          "answer": {
+            "type": "string",
+            "maxLength": 10000
+          }
+        },
+        "required": [
+          "threadId",
+          "interactionId",
+          "action"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
         ],
         "additionalProperties": false
       }

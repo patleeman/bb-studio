@@ -34,6 +34,7 @@ const homeTask = z.object({ id: z.string(), title: z.string(), status: z.string(
 const homeThread = z.object({ id: z.string(), title: z.string(), status: z.string(), projectId: z.string() });
 const homeBot = z.object({ id: z.string(), name: z.string(), projectId: z.string() });
 const homeActivity = activityEvent.extend({ id: z.number() });
+const needEntry = z.object({ id: z.string(), source: z.string(), kind: z.enum(["approval", "question", "attention", "review", "due", "reply", "mention"]), title: z.string(), body: z.string(), href: z.string(), createdAt: z.number(), priority: z.number(), threadId: z.string().optional(), interactionId: z.string().optional(), responseKind: z.enum(["approval", "question"]).optional() });
 const usageLimits = z.object({ turnsPerHour: z.number(), turnsPerDay: z.number(), minutesPerTurn: z.number(), concurrentForks: z.number() });
 const thread = z.object({ threadId: z.string(), ref: itemRef, role: z.string(), state: z.string(), createdAt: z.number(), updatedAt: z.number(), metadata: z.record(z.string(), z.string()) });
 const comment = z.object({ id: z.string(), ref: itemRef, parentId: z.string().nullable(), anchor: z.string().nullable(), actor, body: z.string(), createdAt: z.number(), resolvedAt: z.number().nullable() });
@@ -57,6 +58,7 @@ export const rpcContract = defineRpcContract({
   home: {
     input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
     output: z.object({
+      needsYou: z.array(needEntry).optional(),
       due: z.array(homeTask).nullable(), review: z.array(homeTask).nullable(),
       working: z.object({ threads: z.array(homeThread), bots: z.array(homeBot).nullable() }),
       recent: z.array(z.object({ pluginId: z.string(), id: z.string(), title: z.string(), href: z.string(), kind: z.string(), updatedAt: z.number() })),
@@ -65,6 +67,7 @@ export const rpcContract = defineRpcContract({
       dashboard: z.object({ periodDays: z.number(), threads: z.array(homeThread.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number() })), bots: z.array(homeBot.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number(), active: z.number(), limits: usageLimits.nullable() })).nullable() }),
     }),
   },
+  homeRespond: { input: z.object({ threadId: z.string(), interactionId: z.string(), action: z.enum(["approve", "deny", "answer"]), answer: z.string().max(10_000).optional() }), output: z.object({ ok: z.boolean() }) },
   /** Every provider and all of their items. */
   overview: {
     input: z.null(),

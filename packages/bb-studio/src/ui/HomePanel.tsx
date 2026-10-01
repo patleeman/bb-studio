@@ -18,6 +18,20 @@ function Row({ title, detail, href }: { title: string; detail?: string; href?: s
     : <div className="flex items-center gap-3 px-3 py-2 text-sm">{content}</div>;
 }
 
+function NeedRow({ entry, onRespond }: { entry: NonNullable<Home["needsYou"]>[number]; onRespond: (entry: NonNullable<Home["needsYou"]>[number], action: "approve" | "deny" | "answer", answer?: string) => Promise<void> }) {
+  const [answer, setAnswer] = useState("");
+  const [busy, setBusy] = useState(false);
+  const respond = async (action: "approve" | "deny" | "answer") => {
+    setBusy(true);
+    try { await onRespond(entry, action, answer); } finally { setBusy(false); }
+  };
+  return <div className="space-y-2 px-3 py-2 text-sm">
+    <button type="button" onClick={() => openAppPath(entry.href)} className="block w-full text-left focus-visible:outline-2 focus-visible:outline-ring"><span className="font-medium">{entry.title}</span><span className="ml-2 text-xs capitalize text-muted-foreground">{entry.kind}</span><span className="mt-0.5 block line-clamp-2 text-muted-foreground">{entry.body}</span></button>
+    {entry.responseKind === "approval" ? <div className="flex gap-2"><button disabled={busy} type="button" onClick={() => void respond("approve")} className="rounded-md border border-border px-2 py-1 hover:bg-state-hover disabled:opacity-50">Approve once</button><button disabled={busy} type="button" onClick={() => void respond("deny")} className="rounded-md border border-border px-2 py-1 hover:bg-state-hover disabled:opacity-50">Deny</button></div> : null}
+    {entry.responseKind === "question" ? <form onSubmit={(event) => { event.preventDefault(); void respond("answer"); }} className="flex gap-2"><input aria-label={`Answer ${entry.title}`} value={answer} onChange={(event) => setAnswer(event.target.value)} className="min-w-0 flex-1 rounded-md border border-border bg-background px-2 py-1" /><button disabled={busy || !answer.trim()} type="submit" className="rounded-md border border-border px-2 py-1 hover:bg-state-hover disabled:opacity-50">Answer</button></form> : null}
+  </div>;
+}
+
 export function HomePanel({ tab }: { tab: "today" | "activity" }) {
   const rpc = useRpc<typeof rpcContract>();
   const context = useBbContext();
@@ -32,7 +46,13 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
       .then((later) => { if (later.reset || later.changes.length) void rpc.call("home", { projectId: context.projectId ?? undefined, periodDays }).then(setData); })
       .catch((cause: unknown) => setError(errorMessage(cause)));
   }, [context.projectId, periodDays, rpc]);
+  const respond = useCallback(async (entry: NonNullable<Home["needsYou"]>[number], action: "approve" | "deny" | "answer", answer?: string) => {
+    if (!entry.threadId || !entry.interactionId) return;
+    try { await rpc.call("homeRespond", { threadId: entry.threadId, interactionId: entry.interactionId, action, answer }); refresh(); }
+    catch (cause) { setError(errorMessage(cause)); }
+  }, [refresh, rpc]);
   useEffect(() => { refresh(); const onVisible = () => { if (document.visibilityState === "visible") refresh(); }; document.addEventListener("visibilitychange", onVisible); return () => document.removeEventListener("visibilitychange", onVisible); }, [refresh]);
+  useEffect(() => { const timer = setInterval(refresh, 60_000); return () => clearInterval(timer); }, [refresh]);
   useRealtime(STUDIO_REALTIME_CHANNEL, refresh);
   return <PageColumn>
     <div className="flex flex-wrap items-center justify-between gap-3">
@@ -45,13 +65,14 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     {!data && !error ? <p className="text-sm text-muted-foreground">Loading Studio…</p> : null}
     {data && tab === "today" ? <div className="grid gap-6 lg:grid-cols-2">
+      {data.needsYou?.length ? <div className="lg:col-span-2"><Section title="Needs you">{data.needsYou.map((entry) => <NeedRow key={entry.id} entry={entry} onRespond={respond} />)}</Section></div> : null}
       {data.due?.length ? <Section title="Due today and overdue">{data.due.map((task) => <Row key={task.id} title={task.title} detail={task.due ?? undefined} href={`/plugins/studio-tasks/tasks/${task.id}`} />)}</Section> : null}
       {data.review?.length ? <Section title="In review">{data.review.map((task) => <Row key={task.id} title={task.title} href={`/plugins/studio-tasks/tasks/${task.id}`} />)}</Section> : null}
       {data.working.threads.length || data.working.bots?.length ? <Section title="Agents working now">{data.working.threads.map((thread) => <Row key={thread.id} title={thread.title} detail={thread.status} href={`/threads/${thread.id}`} />)}{data.working.bots?.map((bot) => <Row key={bot.id} title={bot.name} detail="Bot" />)}</Section> : null}
       {data.recent.length ? <Section title="Recent items">{data.recent.map((item) => <Row key={`${item.pluginId}:${item.id}`} title={item.title || "Untitled"} detail={item.kind} href={item.href} />)}</Section> : null}
       {data.automations?.length ? <Section title="Today's automations">{data.automations.map((automation) => <Row key={automation.id} title={automation.name} detail={automation.nextRunAt ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(automation.nextRunAt) : undefined} />)}</Section> : null}
       {data.activity.length ? <Section title="Activity">{data.activity.map((event) => <Row key={event.id} title={event.summary || event.verb} detail={new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(event.at)} />)}</Section> : null}
-      {!data.due?.length && !data.review?.length && !data.working.threads.length && !data.working.bots?.length && !data.recent.length && !data.automations?.length && !data.activity.length ? <p className="text-sm text-muted-foreground">Nothing needs attention today.</p> : null}
+      {!data.needsYou?.length && !data.due?.length && !data.review?.length && !data.working.threads.length && !data.working.bots?.length && !data.recent.length && !data.automations?.length && !data.activity.length ? <p className="text-sm text-muted-foreground">Nothing needs attention today.</p> : null}
     </div> : null}
     {data && tab === "activity" ? <div className="space-y-6">
       <label className="flex items-center gap-2 text-sm">Period <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="rounded-md border border-border bg-background px-2 py-1"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select></label>
