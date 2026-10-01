@@ -66,13 +66,17 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   renders, so show HTML *source* as ` ```html source ` (how HTML code blocks
   read back) or with another fence language (` ```xml `).
 - **Embeds:** a fenced ` ```embed ` block:
-  `{"kind":"bookmark|thread|page|drawing|artifact|recording|task|item","target":"https://… or an id","title":"…"}`.
+  `{"kind":"bookmark|thread|page|drawing|artifact|recording|task|table|item","target":"https://… or an id","title":"…"}`.
   Bookmarks may also carry `description` and `image`; leave them out and the
   editor fetches the link's preview when the page opens. `drawing`,
-  `artifact`, `recording`, and `task` take the item's id in Excalidraw,
-  Artifacts, Talk, or Studio Tasks. `item` embeds anything in Studio, with
-  `plugin:id` as the target (`studio_list_items` lists ids). A drawing shows
-  its picture, an artifact its content, and the rest a card.
+  `artifact`, `recording`, `task`, and `table` take the item's id in
+  Excalidraw, Artifacts, Talk, Studio Tasks, or Studio Tables; a table may
+  name a view as `<table id>/view/<view id>`. `item` embeds anything in
+  Studio, with `plugin:id` as the target (`studio_list_items` lists ids). A
+  drawing shows its picture, an artifact its content, a table its live grid,
+  a task an editable card, a recording its player and transcript, and the
+  rest a card. To give a page a database, make it with `tables_create` and
+  embed it as a `table`.
 - **Mentions:** `@[Name](bot:bot_id)`, `@[Title](page:pg_id)`,
   `@[Title](thread:thr_id)`, `@[Title](item:plugin:id)`,
   `@[2026-10-01](date:2026-10-01)`.

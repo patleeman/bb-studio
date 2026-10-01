@@ -224,6 +224,14 @@ export default async function plugin(bb: BbPluginApi) {
     linkPreview: ({ url }) => fetchPreview(url),
     studioItems: async () => ({ items: await embeds.items() }),
     artifactView: async ({ id }) => ({ view: await embeds.artifactView(id) }),
+    studioCreate: async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
+    tableGet: ({ id }) => embeds.table("get", { id }),
+    tableUpdate: (input) => embeds.table("update", input),
+    tablePatchRows: (input) => embeds.table("patchRows", input),
+    tableCreate: ({ pageId, ...input }) => embeds.createTable({ ...input, projectId: requireMeta(pageId).project_id }),
+    taskView: ({ id }) => embeds.task(id),
+    taskUpdate: (input) => embeds.updateTask(input),
+    recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
     markdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc) };

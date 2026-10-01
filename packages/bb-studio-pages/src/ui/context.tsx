@@ -1,5 +1,7 @@
 import { createContext, useContext } from "react";
-import type { BotView, PageMetaView, StudioEmbedItem } from "../contract";
+import type { Column, Table, Values } from "@bb-studio/kit/tables";
+import type { TableApi } from "@bb-studio/kit/table-grid";
+import type { BotView, PageMetaView, RecordingCard, StudioEmbedItem, TaskCard, TaskColumn } from "../contract";
 
 export interface ArtifactView {
   type: "image" | "html" | "markdown" | "code" | "text" | "pdf" | "other";
@@ -21,7 +23,18 @@ export interface PagesUi {
   /** Items from the other Studio add-ons (drawings, artifacts, recordings, tasks…). */
   studioItems(): Promise<StudioEmbedItem[]>;
   artifactView(id: string): Promise<ArtifactView | null>;
+  /** A live table embed's table, read and edited through Pages. */
+  table(id: string): Promise<Table | null>;
+  tableApi(id: string): TableApi;
+  task(id: string): Promise<{ task: TaskCard | null; columns: TaskColumn[] }>;
+  updateTask(input: { id: string; title?: string; status?: string; due?: string | null }): Promise<unknown>;
+  recording(id: string): Promise<RecordingCard | null>;
+  /** Makes an item in another add-on, in the page's project. */
+  createItem(pageId: string, pluginId: string, kind: string): Promise<StudioEmbedItem>;
+  createTable(input: { pageId: string; title: string; columns: Column[]; rows: Values[] }): Promise<Table>;
 }
+
+const unavailable = () => Promise.reject(new Error("Not available here."));
 
 export const PagesUiContext = createContext<PagesUi>({
   pages: [],
@@ -33,6 +46,13 @@ export const PagesUiContext = createContext<PagesUi>({
   linkPreview: () => Promise.reject(new Error("No link previews here.")),
   studioItems: () => Promise.resolve([]),
   artifactView: () => Promise.resolve(null),
+  table: unavailable,
+  tableApi: () => ({ update: unavailable, patchRows: unavailable }),
+  task: unavailable,
+  updateTask: unavailable,
+  recording: unavailable,
+  createItem: unavailable,
+  createTable: unavailable,
 });
 
 export const usePagesUi = () => useContext(PagesUiContext);

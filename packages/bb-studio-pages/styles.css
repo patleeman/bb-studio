@@ -167,6 +167,12 @@
   width: 16px;
   height: 16px;
 }
+/* Embeds hold Studio components that size icons from their parent, which
+   BlockNote's reset for unsized icons would override. */
+.pages-editor .pages-embed svg:not([class*="size-"]) {
+  width: revert-layer;
+  height: revert-layer;
+}
 /* Comment threads: a compact card that matches BB's popovers rather than
    BlockNote's roomier default. */
 .pages-editor .bn-thread {

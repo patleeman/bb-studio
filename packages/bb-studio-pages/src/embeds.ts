@@ -1,16 +1,50 @@
+// Items from the other Studio add-ons, for embeds and mentions, and what
+// their live embeds show and edit: an artifact's content, a table, a task, a
+// recording. A plugin's UI can only call its own RPCs, so Pages asks each
+// add-on on its behalf.
 import { untitled } from "@bb-studio/kit/format";
-// Items from the other Studio add-ons, for embeds and mentions. Pages asks
-// each add-on through its Studio contract, so a new add-on shows up without
-// changes here.
 import type { StudioSchemas } from "@bb-studio/kit/contract";
-import { discoverProviders, fanOutProviders } from "@bb-studio/kit/server";
+import { indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/server";
+import { TABLES_PLUGIN_ID, tablesContract } from "@bb-studio/kit/tables";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { PLUGIN_ID, type StudioEmbedItem } from "./contract";
+import { PLUGIN_ID, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
 
-const SUITE = ["excalidraw", "artifacts", "talk", "studio-tasks"];
-const FRESH_MS = 5_000;
 const MAX_TEXT = 20_000;
+const TASKS_PLUGIN_ID = "studio-tasks";
+const TALK_PLUGIN_ID = "talk";
+
+const taskSchema = z.object({
+  task: z
+    .object({
+      id: z.string(),
+      title: z.string(),
+      status: z.string(),
+      statusLabel: z.string(),
+      projectId: z.string().nullable(),
+      due: z.string().nullable(),
+      assignee: z.string().nullable(),
+      priority: z.string(),
+      labels: z.array(z.string()),
+      subtasks: z.object({ total: z.number(), done: z.number() }),
+      archived: z.boolean(),
+    })
+    .nullable(),
+});
+const columnsSchema = z.object({ columns: z.array(z.object({ id: z.string(), label: z.string() })) });
+const okSchema = z.object({ ok: z.boolean() });
+
+const recordingSchema = z.object({
+  recording: z.object({
+    id: z.string(),
+    title: z.string(),
+    status: z.string(),
+    durationMs: z.number(),
+    createdAt: z.number(),
+    meetingNotes: z.object({ summary: z.string(), decisions: z.array(z.string()) }).nullable().optional(),
+  }),
+  segments: z.array(z.object({ id: z.string(), offsetMs: z.number(), durationMs: z.number(), status: z.string(), text: z.string().nullable() })),
+});
 
 const artifactSchema = z.object({
   artifact: z
@@ -28,58 +62,63 @@ const artifactSchema = z.object({
 type Sdk = BbPluginApi["sdk"];
 
 export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
-  let cached: { at: number; items: Promise<StudioEmbedItem[]> } | null = null;
-
-  async function providers(): Promise<string[]> {
-    const found = await discoverProviders(sdk, { method: "studio_list", known: SUITE, exclude: [PLUGIN_ID, "studio"] });
-    return found.map((plugin) => plugin.id);
-  }
-
-  async function load(): Promise<StudioEmbedItem[]> {
-    const lists = await fanOutProviders(
-      await providers(),
-      async (pluginId) => {
-          const [{ items }, info] = await Promise.all([
-            sdk.plugins.callRpc({ pluginId, method: "studio_list", input: null as never, outputSchema: studio.provider.studio_list.output }),
-            sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null as never, outputSchema: studio.info }),
-          ]);
-          return items
-            .filter((item) => !item.archived)
-            .map((item): StudioEmbedItem => {
-              const kind = info.kinds.find((each) => each.id === item.kind);
-              return {
-                pluginId,
-                id: item.id,
-                kind: item.kind,
-                kindLabel: kind?.label ?? item.kind,
-                kindIcon: kind?.icon ?? "File",
-                title: untitled(item.title),
-                icon: item.icon,
-                preview: item.preview,
-                facts: item.facts.map((fact) => fact.value).filter(Boolean),
-                badge: item.badge?.label ?? null,
-                thumbnailUrl: item.thumbnailUrl,
-                href: item.href,
-                updatedAt: item.updatedAt,
-              };
-            });
-      },
-      () => [],
-    );
-    return lists
-      .flat()
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 500);
-  }
+  const index = studioIndex(sdk, studio, { exclude: [PLUGIN_ID] });
+  const call = <T extends z.ZodType>(pluginId: string, method: string, input: unknown, outputSchema: T): Promise<z.infer<T>> =>
+    sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema }) as Promise<z.infer<T>>;
+  type Tables = typeof tablesContract;
+  /** Calls Studio Tables with its own contract's schemas. */
+  const table = <M extends keyof Tables>(method: M, input: z.input<Tables[M]["input"]>) =>
+    call(TABLES_PLUGIN_ID, method, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
 
   return {
-    items(): Promise<StudioEmbedItem[]> {
-      if (!cached || Date.now() - cached.at > FRESH_MS) {
-        const items = load();
-        cached = { at: Date.now(), items };
-        items.catch(() => (cached = null));
-      }
-      return cached.items;
+    items: index.items,
+    /** A new item from an add-on's Studio contract, as the index lists it. */
+    async create(pluginId: string, kind: string, projectId: string | null): Promise<StudioIndexItem> {
+      const [{ item }, info] = await Promise.all([
+        call(pluginId, "studio_create", { kind, projectId }, studio.provider.studio_create.output),
+        call(pluginId, "studio_describe", null, studio.info),
+      ]);
+      index.invalidate();
+      return indexItem(pluginId, item, info);
+    },
+    table,
+    async createTable(input: z.input<Tables["create"]["input"]>) {
+      const result = await table("create", input);
+      index.invalidate();
+      return result;
+    },
+    async task(id: string): Promise<{ task: TaskCard | null; columns: TaskColumn[] }> {
+      const { task } = await call(TASKS_PLUGIN_ID, "get", { id }, taskSchema);
+      if (!task) return { task: null, columns: [] };
+      const { columns } = await call(TASKS_PLUGIN_ID, "statuses", { projectId: task.projectId }, columnsSchema);
+      return { task, columns };
+    },
+    async updateTask({ id, status, ...fields }: { id: string; title?: string; status?: string; due?: string | null }) {
+      if (Object.keys(fields).length) await call(TASKS_PLUGIN_ID, "update", { id, ...fields }, okSchema);
+      if (status) await call(TASKS_PLUGIN_ID, "move", { id, status }, okSchema.extend({ archivedThreads: z.number() }));
+      return { ok: true };
+    },
+    async recording(id: string): Promise<RecordingCard | null> {
+      const result = await call(TALK_PLUGIN_ID, "recording_get", { id }, recordingSchema).catch(() => null);
+      if (!result) return null;
+      const { recording, segments } = result;
+      let budget = MAX_TEXT;
+      return {
+        id: recording.id,
+        title: untitled(recording.title),
+        status: recording.status,
+        durationMs: recording.durationMs,
+        createdAt: recording.createdAt,
+        summary: recording.meetingNotes?.summary || null,
+        decisions: recording.meetingNotes?.decisions ?? [],
+        segments: segments.flatMap((segment) => {
+          const text = segment.status === "done" ? (segment.text ?? "").trim() : "";
+          if (!text || budget <= 0) return [];
+          budget -= text.length;
+          const query = `recording=${encodeURIComponent(recording.id)}&segment=${encodeURIComponent(segment.id)}`;
+          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/talk/http/audio?${query}` }];
+        }),
+      };
     },
     async artifactView(id: string) {
       const { artifact } = await sdk.plugins.callRpc({ pluginId: "artifacts", method: "get", input: { id } as never, outputSchema: artifactSchema });

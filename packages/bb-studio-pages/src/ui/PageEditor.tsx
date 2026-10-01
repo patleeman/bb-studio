@@ -1,4 +1,4 @@
-import { untitled } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu, SyntaxHighlightingExtension } from "@blocknote/core";
 import { CommentsExtension, DefaultThreadStoreAuth } from "@blocknote/core/comments";
 import { withCollaboration, YjsThreadStore } from "@blocknote/core/yjs";
@@ -20,6 +20,8 @@ import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../cons
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed } from "./links";
+import { PageSideMenu, placeEmbed } from "./block-menu";
+import { focusNewTask } from "./live-embeds";
 import { pageSchema } from "./blocks";
 import { createHighlighter } from "./code";
 import type { PageConnection } from "./connection";
@@ -43,8 +45,15 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
   task: "Embed a Studio task",
+  table: "Embed a live Studio table",
 };
-const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", task: "CircleCheck" };
+const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", task: "CircleCheck", table: "Rows2" };
+/** Slash items that make a new item in another add-on and embed it. */
+const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
+  { kind: "task", aliases: ["todo", "to do", "issue"] },
+  { kind: "table", aliases: ["database", "spreadsheet", "sheet", "grid"] },
+  { kind: "drawing", aliases: ["excalidraw", "sketch", "whiteboard", "diagram"] },
+];
 
 export type SidePanel = "comments" | null;
 
@@ -268,16 +277,35 @@ export function PageEditor({
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "thread" } }),
       },
       ...(Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).map((kind) => ({
-        title: STUDIO_EMBEDS[kind].label,
+        // BlockNote's own "Table" is the basic one.
+        title: kind === "table" ? "Live table" : STUDIO_EMBEDS[kind].label,
         subtext: STUDIO_EMBED_SUBTEXT[kind],
         aliases: [kind, STUDIO_EMBEDS[kind].pluginId, "studio", "embed"],
         group: "Studio",
         icon: <Icon name={STUDIO_EMBED_ICONS[kind]} className="size-4" />,
         onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind } }),
       })),
+      ...STUDIO_NEW.map(({ kind, aliases }) => ({
+        title: `New ${STUDIO_EMBEDS[kind].label.toLowerCase()}`,
+        subtext: `Make a ${STUDIO_EMBEDS[kind].label.toLowerCase()} and embed it here`,
+        aliases: [...aliases, "new", "create", "studio"],
+        group: "Studio",
+        icon: <Icon name={STUDIO_EMBED_ICONS[kind]} className="size-4" />,
+        onItemClick: () => {
+          // The block the menu was opened in; the cursor may move while the item is made.
+          const blockId = editor.getTextCursorPosition().block.id;
+          void ui.createItem(page.id, STUDIO_EMBEDS[kind].pluginId, kind).then(
+            (item) => {
+              if (kind === "task") focusNewTask(item.id);
+              placeEmbed(editor, blockId, { kind, target: item.id });
+            },
+            (error) => toast.error(errorMessage(error)),
+          );
+        },
+      })),
     ];
     return mergeGroups(getDefaultReactSlashMenuItems(editor), custom);
-  }, [editor, rpc, page.id]);
+  }, [editor, rpc, ui, page.id]);
 
   const fieldKey = pageFieldKey(page.id);
   const slashMenuItems = useCallback(
@@ -427,6 +455,7 @@ export function PageEditor({
       editor={editor}
       theme={dark ? "dark" : "light"}
       slashMenu={false}
+      sideMenu={false}
       renderEditor={false}
       className="pages-editor flex min-h-0 min-w-0 flex-1"
     >
@@ -466,6 +495,7 @@ export function PageEditor({
           </div>
         </aside>
       ) : null}
+      <PageSideMenu pageId={page.id} pageTitle={page.title} />
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />
       <SuggestionMenuController triggerCharacter="@" getItems={mentionItems} />
     </BlockNoteView>

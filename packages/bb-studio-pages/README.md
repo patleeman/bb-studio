@@ -66,9 +66,21 @@ afterwards.
   empty line to turn it into a card; web links fetch their title,
   description, and preview image.
 - **Studio embeds.** The `/` menu's Studio group embeds a drawing, artifact,
-  recording, or task, picked by search. Drawings show their picture and
-  artifacts their content (images, HTML, PDFs, code, text); click through to
-  open the item. Pasting a link to a Studio item embeds it too.
+  recording, task, or live table, picked by search, or makes a new task,
+  table, or drawing in the page's project and embeds it. Embeds stay live:
+  - a table is the full Studio Tables grid, edited in place, with its views,
+    board and calendar; the view shown is kept with the page;
+  - a task is an editable card: done, title, status, due date, assignee,
+    subtasks and labels;
+  - a recording plays in the page, with its summary, decisions and
+    transcript; click a line to play from there;
+  - a drawing shows its picture and an artifact its content (images, HTML,
+    PDFs, code, text).
+
+  Pasting a link to a Studio item embeds it too, and a link to a table view
+  embeds that view. A basic table's block menu (⋮⋮) has **Turn into
+  database**, which moves its cells into a new Studio table, the first row
+  as column names, and embeds it in its place.
   Charts and stats are edited as JSON, which makes them easy for agents to
   write.
 - **Mentions.** Type `@` to mention a bot, another page, a BB thread, a

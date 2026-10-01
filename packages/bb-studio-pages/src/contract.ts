@@ -1,5 +1,6 @@
 import { defineRpcContract, type NewThreadRequest } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { columnSchema, rowPatchSchema, tableSchema, tableUpdateSchema, valuesSchema } from "@bb-studio/kit/tables";
 import { exploreMethods } from "./explore/contract";
 
 export * from "./constants";
@@ -9,6 +10,7 @@ export * from "./constants";
 
 const pageId = z.string().regex(/^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$/);
 const projectId = z.string().min(1).max(200).nullable();
+const itemId = z.string().min(1).max(100);
 
 export const studioItemSchema = z.object({
   pluginId: z.string(),
@@ -27,6 +29,38 @@ export const studioItemSchema = z.object({
 });
 
 export type StudioEmbedItem = z.infer<typeof studioItemSchema>;
+
+/** What a task embed shows and edits. */
+export const taskCardSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  statusLabel: z.string(),
+  projectId: z.string().nullable(),
+  due: z.string().nullable(),
+  assignee: z.string().nullable(),
+  priority: z.string(),
+  labels: z.array(z.string()),
+  subtasks: z.object({ total: z.number(), done: z.number() }),
+  archived: z.boolean(),
+});
+export type TaskCard = z.infer<typeof taskCardSchema>;
+export const taskColumnSchema = z.object({ id: z.string(), label: z.string() });
+export type TaskColumn = z.infer<typeof taskColumnSchema>;
+
+/** What a recording embed plays and shows. */
+export const recordingCardSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  durationMs: z.number(),
+  createdAt: z.number(),
+  summary: z.string().nullable(),
+  decisions: z.array(z.string()),
+  /** Transcribed segments in order, each with its audio. */
+  segments: z.array(z.object({ id: z.string(), offsetMs: z.number(), durationMs: z.number(), text: z.string(), url: z.string() })),
+});
+export type RecordingCard = z.infer<typeof recordingCardSchema>;
 
 export const refreshSchema = z.object({
   botId: z.string(),
@@ -180,6 +214,46 @@ export const rpcContract = defineRpcContract({
         })
         .nullable(),
     }),
+  },
+  /** A new item of another add-on, such as a task, table or drawing, in the page's project. */
+  studioCreate: {
+    input: z.object({ pageId, pluginId: z.string().min(1).max(100), kind: z.string().min(1).max(100) }),
+    output: z.object({ item: studioItemSchema }),
+  },
+  /** A live table embed reads and edits its table through Studio Tables. */
+  tableGet: {
+    input: z.object({ id: itemId }),
+    output: z.object({ table: tableSchema.nullable() }),
+  },
+  tableUpdate: { input: tableUpdateSchema, output: z.object({ table: tableSchema }) },
+  tablePatchRows: { input: rowPatchSchema.extend({ id: itemId }), output: z.object({ table: tableSchema }) },
+  /** A table made in a page, such as from a basic table block, in the page's project. */
+  tableCreate: {
+    input: z.object({
+      pageId,
+      title: z.string().trim().min(1).max(200),
+      columns: z.array(columnSchema).min(1).max(100),
+      rows: z.array(valuesSchema).max(5000),
+    }),
+    output: z.object({ table: tableSchema }),
+  },
+  /** A task embed's task and its board's columns. */
+  taskView: {
+    input: z.object({ id: itemId }),
+    output: z.object({ task: taskCardSchema.nullable(), columns: z.array(taskColumnSchema) }),
+  },
+  taskUpdate: {
+    input: z.object({
+      id: itemId,
+      title: z.string().trim().min(1).max(300).optional(),
+      status: z.string().min(1).max(60).optional(),
+      due: z.string().nullable().optional(),
+    }),
+    output: z.object({ ok: z.boolean() }),
+  },
+  recordingView: {
+    input: z.object({ id: itemId }),
+    output: z.object({ recording: recordingCardSchema.nullable() }),
   },
   markdown: {
     input: z.object({ id: pageId }),

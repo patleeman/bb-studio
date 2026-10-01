@@ -72,6 +72,25 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
         return studioItems.current.items;
       },
       artifactView: (id) => rpc.call("artifactView", { id }).then((result) => result.view),
+      table: (id) => rpc.call("tableGet", { id }).then((result) => result.table),
+      tableApi: (id) => ({
+        update: (meta) => rpc.call("tableUpdate", { id, ...meta }),
+        patchRows: (patch) => rpc.call("tablePatchRows", { id, ...patch }),
+      }),
+      task: (id) => rpc.call("taskView", { id }),
+      updateTask: (input) => rpc.call("taskUpdate", input),
+      recording: (id) => rpc.call("recordingView", { id }).then((result) => result.recording),
+      // A new item must show in the next embed's lookup.
+      createItem: (pageId, pluginId, kind) =>
+        rpc.call("studioCreate", { pageId, pluginId, kind }).then((result) => {
+          studioItems.current = null;
+          return result.item;
+        }),
+      createTable: (input) =>
+        rpc.call("tableCreate", input).then((result) => {
+          studioItems.current = null;
+          return result.table;
+        }),
     }),
     [pages, bots.bots, openPage, navigate, rpc],
   );

@@ -11,6 +11,14 @@ public enum Pages {
     public static let linkPreview = "linkPreview"
     public static let studioItems = "studioItems"
     public static let artifactView = "artifactView"
+    public static let studioCreate = "studioCreate"
+    public static let tableGet = "tableGet"
+    public static let tableUpdate = "tableUpdate"
+    public static let tablePatchRows = "tablePatchRows"
+    public static let tableCreate = "tableCreate"
+    public static let taskView = "taskView"
+    public static let taskUpdate = "taskUpdate"
+    public static let recordingView = "recordingView"
     public static let markdown = "markdown"
     public static let editableMarkdown = "editableMarkdown"
     public static let taskFromCheckbox = "taskFromCheckbox"
@@ -60,6 +68,22 @@ public enum Pages {
   public typealias StudioItems = StudioItemsOutput
 
   public typealias ArtifactView = ArtifactViewOutput
+
+  public typealias StudioCreate = StudioCreateOutput
+
+  public typealias TableGet = TableGetOutput
+
+  public typealias TableUpdate = TableUpdateOutput
+
+  public typealias TablePatchRows = TablePatchRowsOutput
+
+  public typealias TableCreate = TableCreateOutput
+
+  public typealias TaskView = TaskViewOutput
+
+  public typealias TaskUpdate = TaskUpdateOutput
+
+  public typealias RecordingView = RecordingViewOutput
 
   public typealias Markdown = MarkdownOutput
 
@@ -525,6 +549,1514 @@ public enum Pages {
 
     public init(view: ArtifactViewOutputView? = nil) {
       self.view = view
+    }
+  }
+
+  public struct StudioCreateInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var pluginId: String?
+    public var kind: String?
+
+    public init(pageId: String? = nil, pluginId: String? = nil, kind: String? = nil) {
+      self.pageId = pageId
+      self.pluginId = pluginId
+      self.kind = kind
+    }
+  }
+
+  public struct StudioCreateOutputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var kindLabel: String?
+    public var kindIcon: String?
+    public var title: String?
+    public var icon: String?
+    public var preview: String?
+    public var facts: [String]?
+    public var badge: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, kindLabel: String? = nil, kindIcon: String? = nil, title: String? = nil, icon: String? = nil, preview: String? = nil, facts: [String]? = nil, badge: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.kindLabel = kindLabel
+      self.kindIcon = kindIcon
+      self.title = title
+      self.icon = icon
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct StudioCreateOutput: Sendable, Hashable, Codable {
+    public var item: StudioCreateOutputItem?
+
+    public init(item: StudioCreateOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct TableGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TableGetOutputTableColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableGetOutputTableColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableGetOutputTableColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: TableGetOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public enum TableGetOutputTableViewsItemType: Sendable, Hashable, Codable {
+    case table
+    case board
+    case calendar
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "table": self = .table
+      case "board": self = .board
+      case "calendar": self = .calendar
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .table: try container.encode("table")
+      case .board: try container.encode("board")
+      case .calendar: try container.encode("calendar")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TableGetOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
+    case eq
+    case neq
+    case gt
+    case lt
+    case empty
+    case not_empty
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "contains": self = .contains
+      case "eq": self = .eq
+      case "neq": self = .neq
+      case "gt": self = .gt
+      case "lt": self = .lt
+      case "empty": self = .empty
+      case "not-empty": self = .not_empty
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .contains: try container.encode("contains")
+      case .eq: try container.encode("eq")
+      case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
+      case .empty: try container.encode("empty")
+      case .not_empty: try container.encode("not-empty")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableGetOutputTableViewsItemFiltersItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var op: TableGetOutputTableViewsItemFiltersItemOp?
+    public var value: StudioJSONValue?
+
+    public init(columnId: String? = nil, op: TableGetOutputTableViewsItemFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
+      self.columnId = columnId
+      self.op = op
+      self.value = value
+    }
+  }
+
+  public enum TableGetOutputTableViewsItemSortsItemDirection: Sendable, Hashable, Codable {
+    case asc
+    case desc
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "asc": self = .asc
+      case "desc": self = .desc
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .asc: try container.encode("asc")
+      case .desc: try container.encode("desc")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableGetOutputTableViewsItemSortsItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var direction: TableGetOutputTableViewsItemSortsItemDirection?
+
+    public init(columnId: String? = nil, direction: TableGetOutputTableViewsItemSortsItemDirection? = nil) {
+      self.columnId = columnId
+      self.direction = direction
+    }
+  }
+
+  public struct TableGetOutputTableViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableGetOutputTableViewsItemType?
+    public var groupBy: String?
+    public var dateBy: String?
+    public var filters: [TableGetOutputTableViewsItemFiltersItem]?
+    public var sorts: [TableGetOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
+
+    public init(id: String? = nil, name: String? = nil, type: TableGetOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [TableGetOutputTableViewsItemFiltersItem]? = nil, sorts: [TableGetOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.groupBy = groupBy
+      self.dateBy = dateBy
+      self.filters = filters
+      self.sorts = sorts
+      self.hidden = hidden
+    }
+  }
+
+  public struct TableGetOutputTableRowsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.values = values
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TableGetOutputTable: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TableGetOutputTableColumnsItem]?
+    public var views: [TableGetOutputTableViewsItem]?
+    public var rows: [TableGetOutputTableRowsItem]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TableGetOutputTableColumnsItem]? = nil, views: [TableGetOutputTableViewsItem]? = nil, rows: [TableGetOutputTableRowsItem]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.views = views
+      self.rows = rows
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TableGetOutput: Sendable, Hashable, Codable {
+    public var table: TableGetOutputTable?
+
+    public init(table: TableGetOutputTable? = nil) {
+      self.table = table
+    }
+  }
+
+  public enum TableUpdateInputColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableUpdateInputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableUpdateInputColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: TableUpdateInputColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public enum TableUpdateInputViewsItemType: Sendable, Hashable, Codable {
+    case table
+    case board
+    case calendar
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "table": self = .table
+      case "board": self = .board
+      case "calendar": self = .calendar
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .table: try container.encode("table")
+      case .board: try container.encode("board")
+      case .calendar: try container.encode("calendar")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TableUpdateInputViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
+    case eq
+    case neq
+    case gt
+    case lt
+    case empty
+    case not_empty
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "contains": self = .contains
+      case "eq": self = .eq
+      case "neq": self = .neq
+      case "gt": self = .gt
+      case "lt": self = .lt
+      case "empty": self = .empty
+      case "not-empty": self = .not_empty
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .contains: try container.encode("contains")
+      case .eq: try container.encode("eq")
+      case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
+      case .empty: try container.encode("empty")
+      case .not_empty: try container.encode("not-empty")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableUpdateInputViewsItemFiltersItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var op: TableUpdateInputViewsItemFiltersItemOp?
+    public var value: StudioJSONValue?
+
+    public init(columnId: String? = nil, op: TableUpdateInputViewsItemFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
+      self.columnId = columnId
+      self.op = op
+      self.value = value
+    }
+  }
+
+  public enum TableUpdateInputViewsItemSortsItemDirection: Sendable, Hashable, Codable {
+    case asc
+    case desc
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "asc": self = .asc
+      case "desc": self = .desc
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .asc: try container.encode("asc")
+      case .desc: try container.encode("desc")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableUpdateInputViewsItemSortsItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var direction: TableUpdateInputViewsItemSortsItemDirection?
+
+    public init(columnId: String? = nil, direction: TableUpdateInputViewsItemSortsItemDirection? = nil) {
+      self.columnId = columnId
+      self.direction = direction
+    }
+  }
+
+  public struct TableUpdateInputViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableUpdateInputViewsItemType?
+    public var groupBy: String?
+    public var dateBy: String?
+    public var filters: [TableUpdateInputViewsItemFiltersItem]?
+    public var sorts: [TableUpdateInputViewsItemSortsItem]?
+    public var hidden: [String]?
+
+    public init(id: String? = nil, name: String? = nil, type: TableUpdateInputViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [TableUpdateInputViewsItemFiltersItem]? = nil, sorts: [TableUpdateInputViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.groupBy = groupBy
+      self.dateBy = dateBy
+      self.filters = filters
+      self.sorts = sorts
+      self.hidden = hidden
+    }
+  }
+
+  public struct TableUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TableUpdateInputColumnsItem]?
+    public var views: [TableUpdateInputViewsItem]?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TableUpdateInputColumnsItem]? = nil, views: [TableUpdateInputViewsItem]? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.views = views
+      self.archived = archived
+    }
+  }
+
+  public enum TableUpdateOutputTableColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableUpdateOutputTableColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableUpdateOutputTableColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: TableUpdateOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public enum TableUpdateOutputTableViewsItemType: Sendable, Hashable, Codable {
+    case table
+    case board
+    case calendar
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "table": self = .table
+      case "board": self = .board
+      case "calendar": self = .calendar
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .table: try container.encode("table")
+      case .board: try container.encode("board")
+      case .calendar: try container.encode("calendar")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TableUpdateOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
+    case eq
+    case neq
+    case gt
+    case lt
+    case empty
+    case not_empty
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "contains": self = .contains
+      case "eq": self = .eq
+      case "neq": self = .neq
+      case "gt": self = .gt
+      case "lt": self = .lt
+      case "empty": self = .empty
+      case "not-empty": self = .not_empty
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .contains: try container.encode("contains")
+      case .eq: try container.encode("eq")
+      case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
+      case .empty: try container.encode("empty")
+      case .not_empty: try container.encode("not-empty")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableUpdateOutputTableViewsItemFiltersItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var op: TableUpdateOutputTableViewsItemFiltersItemOp?
+    public var value: StudioJSONValue?
+
+    public init(columnId: String? = nil, op: TableUpdateOutputTableViewsItemFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
+      self.columnId = columnId
+      self.op = op
+      self.value = value
+    }
+  }
+
+  public enum TableUpdateOutputTableViewsItemSortsItemDirection: Sendable, Hashable, Codable {
+    case asc
+    case desc
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "asc": self = .asc
+      case "desc": self = .desc
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .asc: try container.encode("asc")
+      case .desc: try container.encode("desc")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableUpdateOutputTableViewsItemSortsItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var direction: TableUpdateOutputTableViewsItemSortsItemDirection?
+
+    public init(columnId: String? = nil, direction: TableUpdateOutputTableViewsItemSortsItemDirection? = nil) {
+      self.columnId = columnId
+      self.direction = direction
+    }
+  }
+
+  public struct TableUpdateOutputTableViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableUpdateOutputTableViewsItemType?
+    public var groupBy: String?
+    public var dateBy: String?
+    public var filters: [TableUpdateOutputTableViewsItemFiltersItem]?
+    public var sorts: [TableUpdateOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
+
+    public init(id: String? = nil, name: String? = nil, type: TableUpdateOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [TableUpdateOutputTableViewsItemFiltersItem]? = nil, sorts: [TableUpdateOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.groupBy = groupBy
+      self.dateBy = dateBy
+      self.filters = filters
+      self.sorts = sorts
+      self.hidden = hidden
+    }
+  }
+
+  public struct TableUpdateOutputTableRowsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.values = values
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TableUpdateOutputTable: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TableUpdateOutputTableColumnsItem]?
+    public var views: [TableUpdateOutputTableViewsItem]?
+    public var rows: [TableUpdateOutputTableRowsItem]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TableUpdateOutputTableColumnsItem]? = nil, views: [TableUpdateOutputTableViewsItem]? = nil, rows: [TableUpdateOutputTableRowsItem]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.views = views
+      self.rows = rows
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TableUpdateOutput: Sendable, Hashable, Codable {
+    public var table: TableUpdateOutputTable?
+
+    public init(table: TableUpdateOutputTable? = nil) {
+      self.table = table
+    }
+  }
+
+  public struct TablePatchRowsInputUpdateItem: Sendable, Hashable, Codable {
+    public var rowId: String?
+    public var values: [String: StudioJSONValue]?
+
+    public init(rowId: String? = nil, values: [String: StudioJSONValue]? = nil) {
+      self.rowId = rowId
+      self.values = values
+    }
+  }
+
+  public struct TablePatchRowsInputInsertItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var before: String?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, before: String? = nil) {
+      self.id = id
+      self.values = values
+      self.before = before
+    }
+  }
+
+  public struct TablePatchRowsInput: Sendable, Hashable, Codable {
+    public var update: [TablePatchRowsInputUpdateItem]?
+    public var insert: [TablePatchRowsInputInsertItem]?
+    public var remove: [String]?
+    public var id: String?
+
+    public init(update: [TablePatchRowsInputUpdateItem]? = nil, insert: [TablePatchRowsInputInsertItem]? = nil, remove: [String]? = nil, id: String? = nil) {
+      self.update = update
+      self.insert = insert
+      self.remove = remove
+      self.id = id
+    }
+  }
+
+  public enum TablePatchRowsOutputTableColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TablePatchRowsOutputTableColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TablePatchRowsOutputTableColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: TablePatchRowsOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public enum TablePatchRowsOutputTableViewsItemType: Sendable, Hashable, Codable {
+    case table
+    case board
+    case calendar
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "table": self = .table
+      case "board": self = .board
+      case "calendar": self = .calendar
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .table: try container.encode("table")
+      case .board: try container.encode("board")
+      case .calendar: try container.encode("calendar")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TablePatchRowsOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
+    case eq
+    case neq
+    case gt
+    case lt
+    case empty
+    case not_empty
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "contains": self = .contains
+      case "eq": self = .eq
+      case "neq": self = .neq
+      case "gt": self = .gt
+      case "lt": self = .lt
+      case "empty": self = .empty
+      case "not-empty": self = .not_empty
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .contains: try container.encode("contains")
+      case .eq: try container.encode("eq")
+      case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
+      case .empty: try container.encode("empty")
+      case .not_empty: try container.encode("not-empty")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TablePatchRowsOutputTableViewsItemFiltersItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var op: TablePatchRowsOutputTableViewsItemFiltersItemOp?
+    public var value: StudioJSONValue?
+
+    public init(columnId: String? = nil, op: TablePatchRowsOutputTableViewsItemFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
+      self.columnId = columnId
+      self.op = op
+      self.value = value
+    }
+  }
+
+  public enum TablePatchRowsOutputTableViewsItemSortsItemDirection: Sendable, Hashable, Codable {
+    case asc
+    case desc
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "asc": self = .asc
+      case "desc": self = .desc
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .asc: try container.encode("asc")
+      case .desc: try container.encode("desc")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TablePatchRowsOutputTableViewsItemSortsItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var direction: TablePatchRowsOutputTableViewsItemSortsItemDirection?
+
+    public init(columnId: String? = nil, direction: TablePatchRowsOutputTableViewsItemSortsItemDirection? = nil) {
+      self.columnId = columnId
+      self.direction = direction
+    }
+  }
+
+  public struct TablePatchRowsOutputTableViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TablePatchRowsOutputTableViewsItemType?
+    public var groupBy: String?
+    public var dateBy: String?
+    public var filters: [TablePatchRowsOutputTableViewsItemFiltersItem]?
+    public var sorts: [TablePatchRowsOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
+
+    public init(id: String? = nil, name: String? = nil, type: TablePatchRowsOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [TablePatchRowsOutputTableViewsItemFiltersItem]? = nil, sorts: [TablePatchRowsOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.groupBy = groupBy
+      self.dateBy = dateBy
+      self.filters = filters
+      self.sorts = sorts
+      self.hidden = hidden
+    }
+  }
+
+  public struct TablePatchRowsOutputTableRowsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.values = values
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TablePatchRowsOutputTable: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TablePatchRowsOutputTableColumnsItem]?
+    public var views: [TablePatchRowsOutputTableViewsItem]?
+    public var rows: [TablePatchRowsOutputTableRowsItem]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TablePatchRowsOutputTableColumnsItem]? = nil, views: [TablePatchRowsOutputTableViewsItem]? = nil, rows: [TablePatchRowsOutputTableRowsItem]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.views = views
+      self.rows = rows
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TablePatchRowsOutput: Sendable, Hashable, Codable {
+    public var table: TablePatchRowsOutputTable?
+
+    public init(table: TablePatchRowsOutputTable? = nil) {
+      self.table = table
+    }
+  }
+
+  public enum TableCreateInputColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableCreateInputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableCreateInputColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: TableCreateInputColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public struct TableCreateInput: Sendable, Hashable, Codable {
+    public var pageId: String?
+    public var title: String?
+    public var columns: [TableCreateInputColumnsItem]?
+    public var rows: [[String: StudioJSONValue]]?
+
+    public init(pageId: String? = nil, title: String? = nil, columns: [TableCreateInputColumnsItem]? = nil, rows: [[String: StudioJSONValue]]? = nil) {
+      self.pageId = pageId
+      self.title = title
+      self.columns = columns
+      self.rows = rows
+    }
+  }
+
+  public enum TableCreateOutputTableColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableCreateOutputTableColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableCreateOutputTableColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: TableCreateOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public enum TableCreateOutputTableViewsItemType: Sendable, Hashable, Codable {
+    case table
+    case board
+    case calendar
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "table": self = .table
+      case "board": self = .board
+      case "calendar": self = .calendar
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .table: try container.encode("table")
+      case .board: try container.encode("board")
+      case .calendar: try container.encode("calendar")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TableCreateOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
+    case eq
+    case neq
+    case gt
+    case lt
+    case empty
+    case not_empty
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "contains": self = .contains
+      case "eq": self = .eq
+      case "neq": self = .neq
+      case "gt": self = .gt
+      case "lt": self = .lt
+      case "empty": self = .empty
+      case "not-empty": self = .not_empty
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .contains: try container.encode("contains")
+      case .eq: try container.encode("eq")
+      case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
+      case .empty: try container.encode("empty")
+      case .not_empty: try container.encode("not-empty")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableCreateOutputTableViewsItemFiltersItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var op: TableCreateOutputTableViewsItemFiltersItemOp?
+    public var value: StudioJSONValue?
+
+    public init(columnId: String? = nil, op: TableCreateOutputTableViewsItemFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
+      self.columnId = columnId
+      self.op = op
+      self.value = value
+    }
+  }
+
+  public enum TableCreateOutputTableViewsItemSortsItemDirection: Sendable, Hashable, Codable {
+    case asc
+    case desc
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "asc": self = .asc
+      case "desc": self = .desc
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .asc: try container.encode("asc")
+      case .desc: try container.encode("desc")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TableCreateOutputTableViewsItemSortsItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var direction: TableCreateOutputTableViewsItemSortsItemDirection?
+
+    public init(columnId: String? = nil, direction: TableCreateOutputTableViewsItemSortsItemDirection? = nil) {
+      self.columnId = columnId
+      self.direction = direction
+    }
+  }
+
+  public struct TableCreateOutputTableViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: TableCreateOutputTableViewsItemType?
+    public var groupBy: String?
+    public var dateBy: String?
+    public var filters: [TableCreateOutputTableViewsItemFiltersItem]?
+    public var sorts: [TableCreateOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
+
+    public init(id: String? = nil, name: String? = nil, type: TableCreateOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [TableCreateOutputTableViewsItemFiltersItem]? = nil, sorts: [TableCreateOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.groupBy = groupBy
+      self.dateBy = dateBy
+      self.filters = filters
+      self.sorts = sorts
+      self.hidden = hidden
+    }
+  }
+
+  public struct TableCreateOutputTableRowsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.values = values
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TableCreateOutputTable: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TableCreateOutputTableColumnsItem]?
+    public var views: [TableCreateOutputTableViewsItem]?
+    public var rows: [TableCreateOutputTableRowsItem]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TableCreateOutputTableColumnsItem]? = nil, views: [TableCreateOutputTableViewsItem]? = nil, rows: [TableCreateOutputTableRowsItem]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.views = views
+      self.rows = rows
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TableCreateOutput: Sendable, Hashable, Codable {
+    public var table: TableCreateOutputTable?
+
+    public init(table: TableCreateOutputTable? = nil) {
+      self.table = table
+    }
+  }
+
+  public struct TaskViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TaskViewOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public struct TaskViewOutputTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: String?
+    public var labels: [String]?
+    public var subtasks: TaskViewOutputTaskSubtasks?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, statusLabel: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: String? = nil, labels: [String]? = nil, subtasks: TaskViewOutputTaskSubtasks? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.statusLabel = statusLabel
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.subtasks = subtasks
+      self.archived = archived
+    }
+  }
+
+  public struct TaskViewOutputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct TaskViewOutput: Sendable, Hashable, Codable {
+    public var task: TaskViewOutputTask?
+    public var columns: [TaskViewOutputColumnsItem]?
+
+    public init(task: TaskViewOutputTask? = nil, columns: [TaskViewOutputColumnsItem]? = nil) {
+      self.task = task
+      self.columns = columns
+    }
+  }
+
+  public struct TaskUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var due: String?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, due: String? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.due = due
+    }
+  }
+
+  public struct TaskUpdateOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct RecordingViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct RecordingViewOutputRecordingSegmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var offsetMs: Double?
+    public var durationMs: Double?
+    public var text: String?
+    public var url: String?
+
+    public init(id: String? = nil, offsetMs: Double? = nil, durationMs: Double? = nil, text: String? = nil, url: String? = nil) {
+      self.id = id
+      self.offsetMs = offsetMs
+      self.durationMs = durationMs
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct RecordingViewOutputRecording: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var durationMs: Double?
+    public var createdAt: Double?
+    public var summary: String?
+    public var decisions: [String]?
+    public var segments: [RecordingViewOutputRecordingSegmentsItem]?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, durationMs: Double? = nil, createdAt: Double? = nil, summary: String? = nil, decisions: [String]? = nil, segments: [RecordingViewOutputRecordingSegmentsItem]? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.durationMs = durationMs
+      self.createdAt = createdAt
+      self.summary = summary
+      self.decisions = decisions
+      self.segments = segments
+    }
+  }
+
+  public struct RecordingViewOutput: Sendable, Hashable, Codable {
+    public var recording: RecordingViewOutputRecording?
+
+    public init(recording: RecordingViewOutputRecording? = nil) {
+      self.recording = recording
     }
   }
 

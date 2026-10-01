@@ -1,12 +1,14 @@
 // Embeds of other Studio add-ons' items: a drawing shows its picture, an
-// artifact its content, and recordings, tasks and the rest a card. Each opens
-// the item in its own add-on.
+// artifact its content, a table its live grid, a task an editable row, a
+// recording its player and transcript, and the rest a card. Each opens the
+// item in its own add-on.
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import type { StudioEmbedItem } from "../contract";
 import { STUDIO_EMBEDS, studioEmbedFor, studioRef, studioSubtitle, type StudioEmbedKind } from "../schema-config";
 import { usePagesUi, type ArtifactView } from "./context";
+import { RecordingBody, TableEmbed, TaskBody } from "./live-embeds";
 
 export function useStudioItems(enabled = true): StudioEmbedItem[] | null {
   const ui = usePagesUi();
@@ -45,6 +47,7 @@ const FALLBACK_ICONS: Record<StudioEmbedKind | "item", string> = {
   artifact: "File",
   recording: "Mic",
   task: "CircleCheck",
+  table: "Rows2",
   item: "GridView",
 };
 
@@ -117,6 +120,8 @@ function ItemBody({ item }: { item: StudioEmbedItem }) {
   const ui = usePagesUi();
   const [failed, setFailed] = useState(false);
   if (item.pluginId === "artifacts") return <ArtifactBody id={item.id} />;
+  // Every Talk item, dictation or meeting, is a recording.
+  if (item.pluginId === STUDIO_EMBEDS.recording.pluginId) return <RecordingBody id={item.id} />;
   if (item.thumbnailUrl && !failed) {
     return (
       <button type="button" className="block w-full cursor-pointer border-t border-border bg-background" onClick={() => ui.openPath(item.href)}>
@@ -134,8 +139,22 @@ function ItemBody({ item }: { item: StudioEmbedItem }) {
   return item.preview ? <div className="line-clamp-3 border-t border-border px-3 py-2 text-xs text-muted-foreground">{item.preview}</div> : null;
 }
 
-export function StudioEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void }) {
+export function StudioEmbed({ kind, target, onEdit, onTargetChange }: {
+  kind: StudioEmbedKind | "item";
+  target: string;
+  onEdit?: () => void;
+  /** Keeps what a live embed shows, such as a table's view, with the page. */
+  onTargetChange?(target: string): void;
+}) {
+  if (kind === "table") return <TableEmbed target={target} onTargetChange={onTargetChange} />;
+  return <ItemEmbed kind={kind} target={target} onEdit={onEdit} />;
+}
+
+function ItemEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void }) {
+  const ui = usePagesUi();
   const { item, loading } = useStudioItem(kind, target);
+  // A task is its own live row; a header would repeat it and go stale.
+  if (item?.pluginId === STUDIO_EMBEDS.task.pluginId) return <TaskBody id={item.id} onOpen={() => ui.openPath(item.href)} />;
   return (
     <div className="overflow-hidden">
       <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} />

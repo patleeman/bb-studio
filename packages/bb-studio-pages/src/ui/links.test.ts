@@ -19,6 +19,9 @@ describe("linkEmbed", () => {
     expect(linkEmbed(`${ORIGIN}/plugins/artifacts/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
     expect(linkEmbed(`${ORIGIN}/plugins/talk/recordings/rec_1/`, ORIGIN)).toEqual({ kind: "recording", target: "rec_1" });
     expect(linkEmbed(`${ORIGIN}/plugins/studio-tasks/tasks/tsk_1`, ORIGIN)).toEqual({ kind: "task", target: "tsk_1" });
+    expect(linkEmbed(`${ORIGIN}/plugins/studio-tables/tables/tbl_1`, ORIGIN)).toEqual({ kind: "table", target: "tbl_1" });
+    // A table link keeps its view and leaves the row to the embed.
+    expect(linkEmbed(`${ORIGIN}/plugins/studio-tables/tables/tbl_1/view/view_2/row/row_3`, ORIGIN)).toEqual({ kind: "table", target: "tbl_1/view/view_2" });
     // Another app's link, or an unknown panel, stays a bookmark.
     expect(linkEmbed("https://other.dev/plugins/excalidraw/drawings/drw_1", ORIGIN)?.kind).toBe("bookmark");
     expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/settings/x`, ORIGIN)?.kind).toBe("bookmark");
