@@ -9,6 +9,7 @@
 //   - messageDirective `::artifact{id="art_…"}`: a card in a reply.
 //   - mention provider (server): `@artifact` works in every composer.
 import { toast } from "sonner";
+import { FloatPanels } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ArtifactCard } from "./components/artifact-card";
 import { ArtifactsPanel } from "./components/artifacts-panel";
@@ -26,6 +27,8 @@ export default definePluginApp((app) => {
     component: ({ subPath }) => <ArtifactsPanel subPath={subPath ?? ""} />,
   });
 
+  // Shows the panel in Float windows open on its paths.
+  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <ArtifactsPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
     id: PICKER,
     title: "Artifacts",

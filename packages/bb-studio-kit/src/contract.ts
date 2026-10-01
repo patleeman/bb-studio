@@ -17,12 +17,18 @@ export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 /** Studio's RPC that finds the item a path opens, or an item by id. */
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
-/** Studio Chat, the floating chat over Studio items. */
+/** Studio Chat: "Work with this…" on Studio items. */
 export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
-/** Window event that floats a thread in Studio Chat; detail `{ threadId }`. */
+/** Float, the windows along the bottom of the screen. */
+export const FLOAT_PLUGIN_ID = "float";
+/**
+ * Window event that floats a thread; detail `{ threadId }`. Studio Chat's
+ * card took it before Float existed; Float still answers it, so a plugin
+ * built against an older kit keeps working. Use `openFloat` instead.
+ */
 export const STUDIO_CHAT_FLOAT_EVENT = "bb-studio:chat:float";
-/** CSS variable on the root element that moves the chat card left, e.g. past a comments card. */
-export const STUDIO_CHAT_RIGHT_VAR = "--studio-chat-right";
+/** CSS variable on the root element that moves the windows left, e.g. past a comments card. */
+export const FLOAT_RIGHT_VAR = "--studio-float-right";
 
 export type StudioTone = "neutral" | "live" | "progress" | "warning" | "danger" | "success";
 

@@ -122,15 +122,15 @@
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
 @@ -51,0 +52 @@
-+import { StudioChatFloatItem, useStudioChatFloat } from "../studio/StudioChatFloatItem.js";
++import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 @@ -257,0 +259 @@
-+  const studioChat = useStudioChatFloat();
++  const floatAvailable = useFloatAvailable();
 @@ -327 +329,4 @@
 -          {id === "split" && onOpenInSplit ? separator : null}
-+          {id === "split" && studioChat ? (
-+            <StudioChatFloatItem threadId={thread.id} surface={surface} />
++          {id === "split" && floatAvailable ? (
++            <FloatItem threadId={thread.id} surface={surface} />
 +          ) : null}
-+          {id === "split" && (onOpenInSplit || studioChat) ? separator : null}
++          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
 --- a/source/app/rows/ThreadRow.tsx
 +++ b/source/app/rows/ThreadRow.tsx
 @@ -97,0 +98 @@

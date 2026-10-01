@@ -6,6 +6,7 @@
 //   lets other plugins' fields ask for dictation (src/client/fields.ts).
 // - Another watches the hold-to-talk key (src/client/hold-to-talk.ts).
 // - The Recordings nav panel lists recordings and is each recording's page.
+import { FloatPanels } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { PANEL_PATH, TALK_ICON } from "./src/shared/format";
 import { interceptBuiltInMic, findComposer } from "./src/client/composer-dom";
@@ -24,6 +25,8 @@ export default definePluginApp((app) => {
     component: RecordingsPanel,
   });
 
+  // Shows the panel in Float windows open on its paths.
+  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <RecordingsPanel subPath={subPath} />} /> });
   app.slots.experimental_appOverlay({ id: "recorder", component: TalkOverlay });
 
   app.contentScripts.register({

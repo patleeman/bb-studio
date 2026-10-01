@@ -1,5 +1,6 @@
 import { useId, useRef, useState } from "react";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
+import { openFloat, useFloatAvailable } from "@bb-studio/kit/app";
 import type { Room, RoomWork, ThreadStatusView } from "./contract";
 import { handleSidebarLinkClick, useOpenThreadInSplit } from "./thread-split-navigation";
 import { ChannelStatusIcon, useChannelStatus } from "./channel-status-view";
@@ -71,6 +72,7 @@ export function ChannelSidebarRow({
   });
   const rowLink = useRef<HTMLAnchorElement>(null);
   const openThreadInSplit = useOpenThreadInSplit(room.threadId ?? "");
+  const floatAvailable = useFloatAvailable();
   const menuId = useId();
   const hasUnread = room.updatedAt > (room.lastReadAt ?? 0);
   const unread = hasUnread && !selected;
@@ -156,6 +158,12 @@ export function ChannelSidebarRow({
           <Icon name="PanelRight" />
           Open in split
         </ContextMenuItem>
+        {floatAvailable && room.threadId ? (
+          <ContextMenuItem onSelect={() => openFloat({ kind: "thread", threadId: room.threadId!, title: `#${room.name}` })}>
+            <Icon name="AppWindow" />
+            Float
+          </ContextMenuItem>
+        ) : null}
         <ContextMenuItem onSelect={onCopyLink}>
           <Icon name="Copy" />
           Copy channel link

@@ -28,7 +28,7 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/shared/preferences.ts` | Define the synced empty project preference and default. |
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
 | `source/server.test.ts` | Check the new preference default and parsing. |
-| `source/app/rows/ThreadActionsMenu.tsx` | Insert Float in Studio Chat after Open in split. |
+| `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split. |
 | `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, before the title. |
 
 The restored upstream tests have import path changes for the relocated

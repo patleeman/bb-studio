@@ -105,9 +105,10 @@ afterwards.
   and you can minimize it or open it as a full thread. The full thread's
   header shows the page's name, which takes you back to the page with the
   chat open. This works without Studio Teams. With
-  [Studio Chat](../bb-studio-chat) installed, its floating chat takes
-  over the box and card: same composer, same page chats, and it follows you
-  to other Studio items.
+  [Float](../bb-studio-float) installed, page chats open in Float windows
+  instead of the card, so they stay open while you move around. With
+  [Studio Chat](../bb-studio-chat) installed, its "Work with this…" bar
+  takes over the box.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.

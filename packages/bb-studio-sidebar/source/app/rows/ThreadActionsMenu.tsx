@@ -49,7 +49,7 @@ import {
   type ThreadSectionMoveContextValue,
 } from "./ThreadSectionMoveProvider.js";
 import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
-import { StudioChatFloatItem, useStudioChatFloat } from "../studio/StudioChatFloatItem.js";
+import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
 import { useCustomizeThreadRowActions } from "../list/customizeRowActionsContext.js";
 
 interface ThreadActionsMenuBaseProps {
@@ -256,7 +256,7 @@ function ThreadActionsMenuItems({
   const isCompactViewport = useIsCompactViewport();
   const isDrawer = surface === "dropdown" && isCompactViewport;
   const showSeparators = !isDrawer;
-  const studioChat = useStudioChatFloat();
+  const floatAvailable = useFloatAvailable();
 
   if (isDrawer && compactStep === "move") {
     return (
@@ -326,10 +326,10 @@ function ThreadActionsMenuItems({
             onRename={onRename}
             variant={menuVariant}
           />
-          {id === "split" && studioChat ? (
-            <StudioChatFloatItem threadId={thread.id} surface={surface} />
+          {id === "split" && floatAvailable ? (
+            <FloatItem threadId={thread.id} surface={surface} />
           ) : null}
-          {id === "split" && (onOpenInSplit || studioChat) ? separator : null}
+          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
         </Fragment>
       ))}
       <ActionMenuItem

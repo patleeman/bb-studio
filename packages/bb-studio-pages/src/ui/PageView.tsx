@@ -1,7 +1,7 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { ItemHeader, RelatedPanel, useStudioChatPresent } from "@bb-studio/kit/app";
-import { STUDIO_CHAT_FLOAT_EVENT, STUDIO_CHAT_RIGHT_VAR } from "@bb-studio/kit/contract";
+import { ItemHeader, openFloat, RelatedPanel, useFloatAvailable, useInFloat, useStudioChatPresent } from "@bb-studio/kit/app";
+import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
@@ -390,29 +390,31 @@ export function PageView({
     if (titleTimer.current) clearTimeout(titleTimer.current);
     titleTimer.current = setTimeout(() => void rpc.call("update", { id: page.id, title: next.trim() }), 400);
   };
-  // Studio Chat, when installed, holds the page's chats; Pages' own card
-  // steps aside for it.
+  // With Float installed, the page's chats open in windows instead of Pages'
+  // own card; with Studio Chat, its "Work with this…" bar replaces the box.
+  // A page that is itself in a window leaves its chat alone.
+  const floatAvailable = useFloatAvailable();
+  const inFloat = useInFloat();
   const studioChat = useStudioChatPresent();
   const openThread = (threadId: string) => {
-    if (studioChat) {
-      window.dispatchEvent(new CustomEvent(STUDIO_CHAT_FLOAT_EVENT, { detail: { threadId } }));
+    if (floatAvailable && openFloat({ kind: "thread", threadId })) {
+      setChatMode("closed");
       return;
     }
     setChatThread(threadId);
     setChatMode("thread");
   };
   useEffect(() => {
-    if (chatThreadId && studioChat !== null) openThread(chatThreadId);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chatThreadId, studioChat]);
-  // Keeps Studio Chat clear of the comments card.
+    if (chatThreadId && floatAvailable && !inFloat) openFloat({ kind: "thread", threadId: chatThreadId });
+  }, [chatThreadId, floatAvailable, inFloat]);
+  // Keeps the windows clear of the comments card.
   const besideComments = sidePanel === "comments";
   useEffect(() => {
-    if (!studioChat || !besideComments || !window.matchMedia("(min-width: 768px)").matches) return;
+    if (!floatAvailable || inFloat || !besideComments || !window.matchMedia("(min-width: 768px)").matches) return;
     const root = document.documentElement.style;
-    root.setProperty(STUDIO_CHAT_RIGHT_VAR, "344px");
-    return () => void root.removeProperty(STUDIO_CHAT_RIGHT_VAR);
-  }, [studioChat, besideComments]);
+    root.setProperty(FLOAT_RIGHT_VAR, "344px");
+    return () => void root.removeProperty(FLOAT_RIGHT_VAR);
+  }, [floatAvailable, inFloat, besideComments]);
 
   const refreshBot = page.refresh ? bots.bots.find((bot) => bot.id === page.refresh!.botId) : undefined;
   const shown = { ...page, title };

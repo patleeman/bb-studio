@@ -1,3 +1,4 @@
+import { FloatPanels } from "@bb-studio/kit/app";
 import { definePluginApp, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect } from "react";
 import { PagePanel } from "./src/ui/PagePanel";
@@ -24,6 +25,8 @@ function TalkBridge() {
 }
 
 export default definePluginApp((app) => {
+  // Shows the panel in Float windows open on its paths.
+  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} /> });
   app.slots.navPanel({ id: "pages", title: "Pages", icon: "pages/pages", path: "pages", component: PagesPanel });
   app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
   app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });

@@ -5,10 +5,9 @@ import { installTestPluginRuntime } from "@get-bb/plugin-sdk/testing/app";
 import { DropdownMenu, DropdownMenuContent } from "@/components/ui/dropdown-menu";
 import { ContextMenu, ContextMenuContent } from "@/components/ui/context-menu";
 import { TooltipProvider } from "@/components/ui/tooltip";
-import { STUDIO_CHAT_FLOAT_EVENT } from "@bb-studio/kit/contract";
-import { publishThreadBadges } from "@bb-studio/kit/app";
+import { publishThreadBadges, setFloatHost } from "@bb-studio/kit/app";
 import { StudioNewProjectItem } from "./StudioHeaderMenuItems.js";
-import { StudioChatFloatItem } from "./StudioChatFloatItem.js";
+import { FloatItem } from "./FloatItem.js";
 import { StudioThreadBadge } from "./StudioThreadBadge.js";
 
 installTestPluginRuntime();
@@ -22,16 +21,15 @@ describe("Studio sidebar additions", () => {
     expect(onSelect).toHaveBeenCalledOnce();
   });
 
-  it("sends the selected thread to Studio Chat", () => {
-    const received = vi.fn();
-    window.addEventListener(STUDIO_CHAT_FLOAT_EVENT, received);
+  it("floats the selected thread", () => {
+    const open = vi.fn();
+    setFloatHost({ open });
     try {
-      render(<ContextMenu open><ContextMenuContent><StudioChatFloatItem surface="context" threadId="thr_studio" /></ContextMenuContent></ContextMenu>);
-      fireEvent.click(screen.getByRole("menuitem", { name: "Float in Studio Chat" }));
-      expect(received).toHaveBeenCalledOnce();
-      expect((received.mock.calls[0]?.[0] as CustomEvent).detail).toEqual({ threadId: "thr_studio" });
+      render(<ContextMenu open><ContextMenuContent><FloatItem surface="context" threadId="thr_studio" /></ContextMenuContent></ContextMenu>);
+      fireEvent.click(screen.getByRole("menuitem", { name: "Float" }));
+      expect(open).toHaveBeenCalledWith({ kind: "thread", threadId: "thr_studio" }, undefined);
     } finally {
-      window.removeEventListener(STUDIO_CHAT_FLOAT_EVENT, received);
+      setFloatHost(null);
     }
   });
 

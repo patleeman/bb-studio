@@ -15,9 +15,9 @@ list and its organization controls, and adds:
   accepts a folder path, creates the project through BB's Plugin SDK, and
   opens it.
 - **Hide empty projects** in **Filter → Projects** removes project groups with no visible threads. Selected, newly created, and renamed projects remain visible.
-- **Float in Studio Chat** in each thread's menu, after **Open in split**,
-  while [Studio Chat](../bb-studio-chat) is installed. It puts the
-  thread in Studio Chat's floating card.
+- **Float** in each thread's menu, after **Open in split**, while
+  [Float](../bb-studio-float) is installed. It opens the thread in a window
+  along the bottom of the screen.
 
 The bundled Thread List plugin remains installed; selecting Studio Sidebar as
 the thread list provider switches the visible list. Install this package in

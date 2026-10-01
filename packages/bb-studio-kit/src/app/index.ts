@@ -41,6 +41,25 @@ export {
   type Project,
 } from "./pieces";
 export { TagDot } from "./tags";
+export {
+  FloatDockPortal,
+  FloatPanels,
+  FloatThreadLeading,
+  openFloat,
+  useCanFloat,
+  useFloatAvailable,
+  useInFloat,
+} from "./float";
+export {
+  floatPanelFor,
+  floatWindowKey,
+  publishFloatBody,
+  publishFloatDock,
+  publishFloatLeading,
+  setFloatHost,
+  type FloatOpenOptions,
+  type FloatTarget,
+} from "./float-registry";
 export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";
 export {

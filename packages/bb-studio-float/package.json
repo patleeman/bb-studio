@@ -1,24 +1,21 @@
 {
-  "name": "@bb-studio/studio-chat",
+  "name": "@bb-studio/float",
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio. \"Work with this…\" on every page, drawing and other Studio item: start a thread that knows what you're looking at, and bring back the item's last chat in a Float window.",
+  "description": "Part of BB Studio. Float any thread, channel, Studio item or view in a window along the bottom of the screen, and keep several open while you work.",
   "engines": {
     "bb": ">=0.44",
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
-    "name": "Studio Chat",
-    "description": "Part of BB Studio. \"Work with this…\" on every page, drawing and other Studio item: start a thread that knows what you're looking at, and bring back the item's last chat in a Float window.",
+    "name": "Float",
+    "description": "Part of BB Studio. Float any thread, channel, Studio item or view in a window along the bottom of the screen, and keep several open while you work.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
     "server": "./server.ts",
-    "app": "./app.tsx",
-    "skills": [
-      "skills"
-    ]
+    "app": "./app.tsx"
   },
   "scripts": {
     "test": "vitest run --config vitest.config.mts",
@@ -26,8 +23,7 @@
     "build": "bb plugin build ."
   },
   "dependencies": {
-    "@bb-studio/kit": "file:../bb-studio-kit.tgz",
-    "zod": "^4.3.6"
+    "@bb-studio/kit": "file:../bb-studio-kit.tgz"
   },
   "devDependencies": {
     "@get-bb/plugin-sdk": "0.5.29",

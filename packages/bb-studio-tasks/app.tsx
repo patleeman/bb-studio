@@ -8,7 +8,7 @@
 //     thread.
 //   - messageDirective `::task{id="tsk_…"}`: a card in a reply.
 //   - mention provider (server): `@task` works in every composer.
-import { ThreadItemsPanel } from "@bb-studio/kit/app";
+import { FloatPanels, ThreadItemsPanel } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { TaskDirective } from "./components/task-directive";
 import { TasksPanel } from "./components/tasks-panel";
@@ -23,6 +23,8 @@ export default definePluginApp((app) => {
     path: PANEL_PATH,
     component: ({ subPath }) => <TasksPanel subPath={subPath ?? ""} />,
   });
+  // Shows the panel in Float windows open on its paths.
+  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <TasksPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
     id: "tasks",
     title: "Tasks",

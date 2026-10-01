@@ -33,7 +33,7 @@
     {
       "id": "studio-chat",
       "displayName": "Studio Chat",
-      "description": "Part of BB Studio. A chat that floats over your pages, drawings and other Studio items, knows which one you're looking at, and can hold any thread.",
+      "description": "Part of BB Studio. \"Work with this…\" on every page, drawing and other Studio item: start a thread that knows what you're looking at, and bring back the item's last chat in a Float window.",
       "icon": {
         "url": "./packages/bb-studio-chat/assets/icon.svg"
       },
@@ -51,6 +51,30 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-chat",
+          "ref": "main"
+        }
+      }
+    },
+    {
+      "id": "float",
+      "displayName": "Float",
+      "description": "Part of BB Studio. Float any thread, channel, Studio item or view in a window along the bottom of the screen, and keep several open while you work.",
+      "icon": {
+        "url": "./packages/bb-studio-float/assets/icon.svg"
+      },
+      "tags": [
+        "productivity",
+        "collaboration",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-float",
           "ref": "main"
         }
       }

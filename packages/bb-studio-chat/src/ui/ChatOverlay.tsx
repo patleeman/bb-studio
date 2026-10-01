@@ -1,28 +1,26 @@
-// The floating chat. Over a Studio item it offers "Work with this…" and
-// brings back the item's last chat; anywhere else it only shows a thread the
-// user floated, even while that thread's own view is on screen.
+// Studio Chat: over a Studio item, a "Work with this…" bar that starts a
+// thread about it, and the item's last chat brought back. Threads show in
+// Float's windows, which this plugin adds a "Viewing" chip to; the bar sits
+// at the right end of Float's row, or on its own without Float.
 import {
   experimental_NewThreadComposer as NewThreadComposer,
-  ThreadChat,
-  ThreadTitle,
+  useBbNavigate,
   useComposer,
   useRpc,
 } from "@get-bb/plugin-sdk/app";
-import { cn, Icon, usePathname } from "@bb-studio/kit/app";
-import { STUDIO_CHAT_FLOAT_EVENT, STUDIO_CHAT_RIGHT_VAR } from "@bb-studio/kit/contract";
+import { cn, FloatDockPortal, FloatThreadLeading, Icon, openFloat, useFloatAvailable, usePathname } from "@bb-studio/kit/app";
 import { errorMessage, untitled } from "@bb-studio/kit/format";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import type { rpcContract, Viewed } from "../contract";
 import { MENTION_PROVIDER_ID } from "../ids";
 import { itemKey } from "../context";
-import { floatThread, setChat, useChat } from "./store";
-import { useCardSize } from "./size";
 import { HEADER_BUTTON } from "./styles";
-import { ThreadMenu } from "./ThreadMenu";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
 const CARD = "pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl";
+/** Float windows opened for "the item's chat" replace each other while minimized. */
+const ITEM_CHAT_TAG = "studio-chat:item";
 
 /** The Studio item on screen, or null; each path is asked once. */
 function useViewing(rpc: Rpc, path: string): Viewed | null {
@@ -42,17 +40,15 @@ function useViewing(rpc: Rpc, path: string): Viewed | null {
   return viewed?.item ?? null;
 }
 
-/** Brings back the chat last used on the item when it comes on screen. */
-function useItemChat(rpc: Rpc, viewed: Viewed | null) {
+/** Brings back the chat last used on the item, minimized, when it comes on screen. */
+function useItemChat(rpc: Rpc, viewed: Viewed | null, floatAvailable: boolean) {
   const key = viewed ? itemKey(viewed) : null;
   useEffect(() => {
-    if (!viewed) return;
+    if (!viewed || !floatAvailable) return;
     let live = true;
     rpc.call("lastThread", { pluginId: viewed.pluginId, id: viewed.id }).then(
       ({ threadId }) => {
-        if (!live || !threadId) return;
-        // Leave a chat that's being written; otherwise follow the item.
-        setChat(({ mode }) => (mode === "compose" ? {} : { threadId, mode: mode === "closed" ? "minimized" : mode }));
+        if (live && threadId) openFloat({ kind: "thread", threadId }, { minimized: true, tag: ITEM_CHAT_TAG });
       },
       () => {},
     );
@@ -61,24 +57,12 @@ function useItemChat(rpc: Rpc, viewed: Viewed | null) {
     };
     // The item, not its object identity, decides when to look.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rpc, key]);
-}
-
-/** Pages and other add-ons hand a thread over with a window event. */
-function useFloatEvent() {
-  useEffect(() => {
-    const onFloat = (event: Event) => {
-      const threadId = (event as CustomEvent<{ threadId?: unknown }>).detail?.threadId;
-      if (typeof threadId === "string" && threadId) floatThread(threadId);
-    };
-    window.addEventListener(STUDIO_CHAT_FLOAT_EVENT, onFloat);
-    return () => window.removeEventListener(STUDIO_CHAT_FLOAT_EVENT, onFloat);
-  }, []);
+  }, [rpc, key, floatAvailable]);
 }
 
 /**
- * Says what's on screen and adds it to the next message. Rendered inside the
- * thread's chat so the composer it writes to is that thread's; if BB puts the
+ * Says what's on screen and adds it to the next message. Rendered above a
+ * Float thread window's messages so the composer it writes to is that thread's; if BB puts the
  * pill somewhere else, the button isn't offered. On BB's SDK 0.5.29 a
  * plugin's ThreadChat doesn't scope `useComposer()` to its thread, so only
  * the label shows until it does (docs/studio-chat.md, "Limits").
@@ -109,143 +93,82 @@ function ViewingChip({ threadId, viewed }: { threadId: string; viewed: Viewed })
   );
 }
 
+/** The bar or composer: in Float's row, or bottom right on its own. */
+function Corner({ children }: { children: ReactNode }) {
+  const floatAvailable = useFloatAvailable();
+  if (floatAvailable) return <FloatDockPortal>{children}</FloatDockPortal>;
+  return <div className="studio-chat pointer-events-none fixed right-6 bottom-4 z-40 max-md:inset-x-2 max-md:bottom-2">{children}</div>;
+}
+
 export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
   const path = usePathname();
   const viewed = useViewing(rpc, path);
-  const { threadId, mode } = useChat();
+  const floatAvailable = useFloatAvailable();
+  const [composing, setComposing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [focus, setFocus] = useState(0);
-  const { size, grip } = useCardSize();
-  useItemChat(rpc, viewed);
-  useFloatEvent();
+  useItemChat(rpc, viewed, floatAvailable);
 
-  // Remember the thread the user starts or brings up on this item. Moving to
-  // another item with a chat floating doesn't tie that chat to it.
-  const linked = useRef<string | null>(null);
-  useEffect(() => {
-    if (!threadId || threadId === linked.current || mode === "closed") return;
-    linked.current = threadId;
-    if (viewed) rpc.call("link", { pluginId: viewed.pluginId, id: viewed.id, threadId }).catch(() => {});
-    // Only a new thread links; `viewed` is read, not watched.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [rpc, threadId, mode]);
+  const chip = <FloatThreadLeading render={(threadId) => (viewed ? <ViewingChip threadId={threadId} viewed={viewed} /> : null)} />;
+  if (!viewed) return chip;
 
-  const showThread = Boolean(threadId) && (mode === "thread" || mode === "minimized");
-  const showBar = Boolean(viewed) && mode !== "thread" && mode !== "compose";
-  if (!showThread && !showBar && mode !== "compose") return null;
-
-  const kindLabel = viewed?.kindLabel.toLowerCase() ?? "item";
+  const kindLabel = viewed.kindLabel.toLowerCase();
   const compose = () => {
     setFocus((value) => value + 1);
-    setChat({ mode: "compose" });
+    setComposing(true);
   };
 
   return (
-    <div
-      className="studio-chat pointer-events-none fixed bottom-4 z-40 flex max-w-[calc(100vw-2.5rem)] flex-col gap-2 max-md:inset-x-2 max-md:bottom-2 max-md:!w-auto max-md:max-w-none"
-      style={{ right: `var(${STUDIO_CHAT_RIGHT_VAR}, 1.5rem)`, width: size.width }}
-    >
-      {showThread && threadId ? (
-        <section
-          aria-label="Studio chat"
-          className={cn(CARD, "relative", mode === "thread" && "max-h-[calc(100vh-7rem)] max-md:!h-[80vh]")}
-          style={mode === "thread" ? { height: size.height } : undefined}
-        >
-          {mode === "thread" ? (
-            <div
-              role="separator"
-              aria-label="Resize chat"
-              title="Drag to resize. Double-click to reset."
-              className="studio-chat-resize absolute top-0 left-0 z-10 size-3.5 cursor-nwse-resize touch-none rounded-tl-lg hover:bg-state-hover max-md:hidden"
-              {...grip}
+    <>
+      {chip}
+      <Corner>
+        {composing ? (
+          <section aria-label={`Work with this ${kindLabel}`} className={cn(CARD, "w-[min(460px,calc(100vw-1rem))] mb-2")}>
+            <header className="flex items-center gap-2 border-b border-border py-1.5 pr-2 pl-4 text-xs text-muted-foreground">
+              <Icon name={viewed.kindIcon} className="size-3.5 shrink-0" />
+              <span className="min-w-0 flex-1 truncate">
+                An agent works on "{untitled(viewed.title)}" with you. @mention a bot to hand it off.
+              </span>
+              <button type="button" aria-label="Close composer" className={HEADER_BUTTON} onClick={() => setComposing(false)}>
+                <Icon name="X" className="size-4" />
+              </button>
+            </header>
+            {error ? <p className="px-4 pt-1 text-xs text-red-500">{error}</p> : null}
+            <NewThreadComposer
+              key={itemKey(viewed)}
+              className="studio-chat-composer max-h-[60vh] min-h-0"
+              layout="document"
+              placeholder={`Work with this ${kindLabel}…`}
+              draftKey={`studio-chat:${itemKey(viewed)}`}
+              focusRequest={focus}
+              {...(viewed.projectId ? { defaultProjectId: viewed.projectId } : {})}
+              onSubmit={async (request) => {
+                setError(null);
+                try {
+                  const { threadId } = await rpc.call("start", { item: { pluginId: viewed.pluginId, id: viewed.id }, request });
+                  setComposing(false);
+                  // Without Float, the new thread opens in BB's own view.
+                  if (!openFloat({ kind: "thread", threadId }, { tag: ITEM_CHAT_TAG })) navigate.toThread(threadId);
+                } catch (cause) {
+                  setError(errorMessage(cause));
+                  throw cause; // Keeps the draft for another try.
+                }
+              }}
             />
-          ) : null}
-          <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-2">
-            <button
-              type="button"
-              aria-label={mode === "thread" ? "Minimize chat" : "Expand chat"}
-              className={HEADER_BUTTON}
-              onClick={() => setChat({ mode: mode === "thread" ? "minimized" : "thread" })}
-            >
-              <Icon name={mode === "thread" ? "Minus" : "ChevronUp"} className="size-4" />
-            </button>
-            <button
-              type="button"
-              className="studio-chat-title min-w-0 flex-1 truncate text-left text-sm font-medium"
-              onClick={() => mode === "minimized" && setChat({ mode: "thread" })}
-            >
-              <ThreadTitle threadId={threadId} />
-            </button>
-            <ThreadMenu threadId={threadId} onNewChat={compose} />
-            <button type="button" aria-label="Close chat" className={HEADER_BUTTON} onClick={() => setChat({ mode: "closed" })}>
-              <Icon name="X" className="size-4" />
-            </button>
-          </header>
-          {mode === "thread" ? (
-            <ThreadChat
-              key={threadId}
-              threadId={threadId}
-              variant="compact"
-              className="min-h-0 flex-1"
-              leadingContent={viewed ? <ViewingChip threadId={threadId} viewed={viewed} /> : null}
-            />
-          ) : null}
-        </section>
-      ) : null}
-
-      {mode === "compose" ? (
-        <section aria-label={viewed ? `Work with this ${kindLabel}` : "New chat"} className={CARD}>
-          <header className="flex items-center gap-2 border-b border-border py-1.5 pr-2 pl-4 text-xs text-muted-foreground">
-            {viewed ? <Icon name={viewed.kindIcon} className="size-3.5 shrink-0" /> : null}
-            <span className="min-w-0 flex-1 truncate">
-              {viewed
-                ? `An agent works on "${untitled(viewed.title)}" with you. @mention a bot to hand it off.`
-                : "A new thread, kept here while you move around."}
-            </span>
-            <button
-              type="button"
-              aria-label="Close composer"
-              className={HEADER_BUTTON}
-              onClick={() => setChat({ mode: threadId ? "minimized" : "closed" })}
-            >
-              <Icon name="X" className="size-4" />
-            </button>
-          </header>
-          {error ? <p className="px-4 pt-1 text-xs text-red-500">{error}</p> : null}
-          <NewThreadComposer
-            key={viewed ? itemKey(viewed) : "none"}
-            className="studio-chat-composer max-h-[60vh] min-h-0"
-            layout="document"
-            placeholder={viewed ? `Work with this ${kindLabel}…` : "Start a chat…"}
-            draftKey={`studio-chat:${viewed ? itemKey(viewed) : "none"}`}
-            focusRequest={focus}
-            {...(viewed?.projectId ? { defaultProjectId: viewed.projectId } : {})}
-            onSubmit={async (request) => {
-              setError(null);
-              try {
-                const result = await rpc.call("start", {
-                  item: viewed ? { pluginId: viewed.pluginId, id: viewed.id } : null,
-                  request,
-                });
-                floatThread(result.threadId);
-              } catch (cause) {
-                setError(errorMessage(cause));
-                throw cause; // Keeps the draft for another try.
-              }
-            }}
-          />
-        </section>
-      ) : showBar ? (
-        <button
-          type="button"
-          className="studio-chat-bar pointer-events-auto flex h-11 w-full items-center gap-2.5 rounded-lg border border-border bg-background px-4 text-left text-sm text-muted-foreground shadow-xl hover:text-foreground"
-          onClick={compose}
-        >
-          <Icon name="MessageSquarePlus" className="size-4 shrink-0" />
-          <span className="flex-1 truncate">Work with this {kindLabel}…</span>
-        </button>
-      ) : null}
-    </div>
+          </section>
+        ) : (
+          <button
+            type="button"
+            className="studio-chat-bar pointer-events-auto mb-2 flex h-10 w-[min(300px,calc(100vw-1rem))] items-center gap-2.5 rounded-lg border border-border bg-background px-4 text-left text-sm text-muted-foreground shadow-xl hover:text-foreground"
+            onClick={compose}
+          >
+            <Icon name="MessageSquarePlus" className="size-4 shrink-0" />
+            <span className="flex-1 truncate">Work with this {kindLabel}…</span>
+          </button>
+        )}
+      </Corner>
+    </>
   );
 }

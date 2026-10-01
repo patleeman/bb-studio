@@ -1,6 +1,6 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
-// and closing the one on screen opens the next.
+// and closing the one on screen opens the next. Right-click a tab to float it.
 import {
   DropdownMenuItem,
   Icon,
@@ -13,13 +13,16 @@ import {
   SidebarSection,
   cn,
   openAppPath,
+  openFloat,
   studioPath,
+  useCanFloat,
   useSidebarDisplay,
   useSidebarHosted,
   useSidebarNavigated,
   usePathname,
 } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -172,41 +175,64 @@ export function SidebarTabs() {
 }
 
 function TabRow({ tab, selected, onOpen, onClose }: { tab: TabView; selected: boolean; onOpen(): void; onClose(): void }) {
+  const target = { kind: "path" as const, path: tab.href, title: tab.title, icon: tab.kindIcon };
+  const canFloat = useCanFloat(target);
   return (
-    <div className="group/tab relative" data-studio-tab={`${tab.pluginId}:${tab.id}`}>
-      <a
-        href={tab.href}
-        aria-current={selected ? "page" : undefined}
-        className={cn(SIDEBAR_ROW, "pr-8", selected && SIDEBAR_ROW_SELECTED)}
-        onClick={(event) => {
-          if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-          event.preventDefault();
-          onOpen();
-        }}
-        onAuxClick={(event) => {
-          // Middle-click closes, as in a browser.
-          if (event.button !== 1) return;
-          event.preventDefault();
-          onClose();
-        }}
-      >
-        <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
-          {tab.icon ? <span className="text-sm leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon} className="size-4" />}
-        </span>
-        <span className="min-w-0 flex-1 truncate">{tab.title}</span>
-      </a>
-      <button
-        type="button"
-        aria-label={`Close ${tab.title}`}
-        title="Close tab"
-        className={cn(
-          "absolute top-1/2 right-0.5 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle-foreground opacity-0 outline-none hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100",
-          selected && "opacity-100",
-        )}
-        onClick={onClose}
-      >
-        <Icon name="X" className="size-3.5" />
-      </button>
-    </div>
+    <ContextMenu>
+      <ContextMenuTrigger asChild>
+        <div className="group/tab relative" data-studio-tab={`${tab.pluginId}:${tab.id}`}>
+          <a
+            href={tab.href}
+            aria-current={selected ? "page" : undefined}
+            className={cn(SIDEBAR_ROW, "pr-8", selected && SIDEBAR_ROW_SELECTED)}
+            onClick={(event) => {
+              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+              event.preventDefault();
+              onOpen();
+            }}
+            onAuxClick={(event) => {
+              // Middle-click closes, as in a browser.
+              if (event.button !== 1) return;
+              event.preventDefault();
+              onClose();
+            }}
+          >
+            <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
+              {tab.icon ? <span className="text-sm leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon} className="size-4" />}
+            </span>
+            <span className="min-w-0 flex-1 truncate">{tab.title}</span>
+          </a>
+          <button
+            type="button"
+            aria-label={`Close ${tab.title}`}
+            title="Close tab"
+            className={cn(
+              "absolute top-1/2 right-0.5 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle-foreground opacity-0 outline-none hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100",
+              selected && "opacity-100",
+            )}
+            onClick={onClose}
+          >
+            <Icon name="X" className="size-3.5" />
+          </button>
+        </div>
+      </ContextMenuTrigger>
+      <ContextMenuContent aria-label={`${tab.title} options`}>
+        <ContextMenuItem onSelect={onOpen}>
+          <Icon name="ExternalLink" />
+          Open
+        </ContextMenuItem>
+        {canFloat ? (
+          <ContextMenuItem onSelect={() => openFloat(target)}>
+            <Icon name="AppWindow" />
+            Float
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={onClose}>
+          <Icon name="X" />
+          Close tab
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }

@@ -2,19 +2,20 @@
 
 > **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), Studio Chat, and [Studio Teams](../bb-studio-teams).
 
-A chat that floats over your pages, drawings and other Studio items. It
-knows which item you're looking at, and it can hold any thread while you move
-around.
+"Work with this…" on every page, drawing and other Studio item. It starts a
+thread that knows which item you're looking at, and brings the item's last
+chat back when you return to it. Threads open in [Float](../bb-studio-float)
+windows.
 
 ## Staged preview
 
-![Live BB screenshot of Studio Chat floating over a drawing](assets/staged-preview.png)
+![Live BB screenshot of Studio Chat on a drawing](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`): an Excalidraw drawing ("Checkout flow") with the
-seeded "Draft the ORBIT-42 release notes" thread floated into Studio Chat from
-its sidebar menu's **Float in Studio Chat**. The card's header shows the thread, the
-"Viewing: Checkout flow" chip names the drawing on screen, and the thread's
-scheduled message waits in its queue above the reply box.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): an Excalidraw
+drawing ("Checkout flow") with the seeded "Draft the ORBIT-42 release notes"
+thread in a Float window. The window's "Viewing: Checkout flow" chip names the
+drawing on screen, and the "Work with this drawing…" bar sits at the right end
+of Float's row.
 
 ## What you get
 
@@ -22,27 +23,16 @@ scheduled message waits in its queue above the reply box.
   "Work with this page…", "…this drawing…", and so on by kind. It opens BB's
   new-thread composer in the item's project. The message starts with a pill
   for the item, and the agent gets a note saying what it is and which tools
-  read and change it.
-- **Any thread, anywhere.** **Float in Studio Chat** in a sidebar
-  thread's menu, next to **Open in split** (with
-  [Studio Sidebar](../bb-studio-sidebar)), or the palette's "Studio
-  Chat: float this thread" puts that thread in the card.
-  The card shows straight away, even over the thread's own view, and stays
-  with you across Studio items.
-- **Switch threads** from the card's ⋯ menu, which lists your sidebar threads
-  with a filter. It also starts a new chat or opens the current one in full
-  or in a split.
-- **Resize** the card by dragging its top-left corner. Double-click the
-  corner to reset it.
-- **Mod+Shift+J** shows or hides the card. You can rebind it in BB's
-  keyboard settings.
+  read and change it. The new thread opens in a Float window, or in BB's own
+  view without Float.
 - **Chats come back.** Each item remembers the last thread used on it, so
-  reopening it brings its chat back, minimized.
-- **Pages hands over.** With Studio Chat installed, Studio Pages drops its
-  own chat card. Page chats still start through Pages, so they keep showing
-  in the page's Chats menu. The card moves left of the comments panel.
-
-The card's state is per window and survives a reload.
+  reopening it brings its chat back as a minimized Float window. Moving on to
+  another item swaps that window for the next item's chat, unless you opened it.
+- **Viewing chip.** Every Float thread window shows which Studio item is on
+  screen.
+- **Pages hands over.** With Studio Chat installed, Studio Pages drops its own
+  "Work with this page…" box. Page chats still start through Pages, so they
+  keep showing in the page's Chats menu.
 
 ## How it works
 
@@ -64,7 +54,7 @@ The card's state is per window and survives a reload.
   A plugin's `ThreadChat` doesn't scope `useComposer()` to its thread on BB's
   SDK 0.5.29, so the button stays hidden. Type `@` in the chat to mention a
   Studio item instead. A new chat always carries the item.
-- BB doesn't tell plugins the current route. The card follows the Navigation
+- BB doesn't tell plugins the current route. The bar follows the Navigation
   API and polls every 400ms as a fallback.
 
 More in [docs/studio-chat.md](../../docs/studio-chat.md).
