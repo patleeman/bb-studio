@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   Icon,
+  OUTLINE_BUTTON,
   itemKey,
   PageColumn,
   openAppPath,
@@ -34,7 +35,7 @@ import { applyItemChanges } from "../partial";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { NeedsYou } from "./HomePanel";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
-import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
+import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
 type SpaceDialogState = { type: "edit" | "items" | "delete"; space: SpaceView } | { type: "threads"; space: SpaceView; kind: ThreadKind } | null;
@@ -381,8 +382,22 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     } })),
   ];
 
+  // Filtering to a space links to its page, where its threads, channels and projects are.
+  const filteredSpaces = (data?.spaces ?? []).filter((each) =>
+    query.filters.some((filter) => filter.field === "space" && !filter.negate && filter.value.toLowerCase() === each.name.toLowerCase()),
+  );
   const notice = (
     <>
+      {filteredSpaces.map((each) => (
+        <div key={each.id} className="mb-3 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
+          <SpaceGlyph space={each} className="text-sm leading-none" />
+          <span className="min-w-0 truncate font-medium">{each.name}</span>
+          <span className="min-w-0 flex-1 truncate text-muted-foreground">{each.description || "Showing this space's items"}</span>
+          <button type="button" className={OUTLINE_BUTTON} onClick={() => openSpace(each.id)}>
+            Open space page <Icon name="ArrowRight" />
+          </button>
+        </div>
+      ))}
       <NeedsYou />
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -484,9 +499,11 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     ? `Nothing is called ${compiled.unknown.map((filter) => `${filter.field}:${filter.value}`).join(", ")}.`
     : compiled.archived
       ? "Nothing archived matches."
-      : searchText || query.filters.length
-        ? "Nothing matches."
-        : "No items yet.";
+      : filteredSpaces.length && !searchText && query.filters.length === filteredSpaces.length
+        ? "No items in this space yet. Open its page to add items, projects, threads and channels."
+        : searchText || query.filters.length
+          ? "Nothing matches."
+          : "No items yet.";
 
   const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
   const deleteSpace = async (target: SpaceView) => {

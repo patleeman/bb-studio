@@ -358,6 +358,7 @@ function FacetSection({
   query,
   onChange,
   glyph,
+  keepEmpty = false,
 }: {
   title: string;
   field: FilterField;
@@ -366,6 +367,8 @@ function FacetSection({
   query: Query;
   onChange(query: Query): void;
   glyph?(value: FieldValue): ReactNode;
+  /** List values with no items too, as spaces just made. */
+  keepEmpty?: boolean;
 }) {
   const [expanded, setExpanded] = useState(false);
   const stateOf = (value: FieldValue) => {
@@ -375,7 +378,7 @@ function FacetSection({
   // Values in use first, then the most items; empty ones only when in use.
   const ranked = values
     .map((value) => ({ value, count: countOf(value), state: stateOf(value) }))
-    .filter((each) => each.count > 0 || each.state)
+    .filter((each) => keepEmpty || each.count > 0 || each.state)
     .sort((a, b) => Number(!!b.state) - Number(!!a.state) || b.count - a.count);
   if (!ranked.length) return null;
   const shown = expanded ? ranked : ranked.slice(0, SHOWN_VALUES);
@@ -461,6 +464,7 @@ export function FacetRail({
         countOf={(value) => counts.space.get(idOf(value) ?? "") ?? 0}
         query={query}
         onChange={onChange}
+        keepEmpty
         glyph={(value) => {
           const space = spaceByName.get(value.value.toLowerCase());
           return space ? <SpaceGlyph space={space} className="w-3.5 shrink-0 text-center text-xs" /> : null;
