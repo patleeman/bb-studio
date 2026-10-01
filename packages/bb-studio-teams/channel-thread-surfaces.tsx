@@ -1,5 +1,6 @@
 import { affects } from "./realtime";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   experimental_Icon as Icon,
   useBbNavigate,
@@ -22,9 +23,10 @@ import { channelHandoffDraft, takeChannelThreadHandoff } from "./handoff-draft";
 
 /**
  * A channel is a BB thread. These surfaces add what a channel has that a
- * thread does not: its members in the header and its live work above the
- * composer. The chat mode and bot permissions sit beside the composer (see
- * channel-settings.tsx). Each renders nothing on ordinary threads.
+ * thread does not: its members in the header, its live work at the end of
+ * the transcript, and its requests for you above the composer. The chat mode
+ * and bot permissions sit beside the composer (see channel-settings.tsx).
+ * Each renders nothing on ordinary threads.
  */
 type Surface = NonNullable<z.output<typeof rpcContract.channelSurface.output>>;
 
@@ -75,10 +77,48 @@ export function ChannelThreadHeader({ threadId }: PluginThreadHeaderActionProps)
 }
 
 /**
- * Above the composer, like a thread's follow-ups: requests a bot raised for
- * you (acknowledge or snooze them here, or reply in the channel), and who is
- * working on what, with Stop. A channel with no bots yet says how to add one.
- * Renders nothing otherwise.
+ * The end of the transcript in the pane that holds `anchor`. BB has no slot
+ * after the last timeline row, so this appends a node to the timeline, the
+ * first child of the content column beside the composer footer, and puts it
+ * back at the end whenever BB re-renders either. The timeline stretches to
+ * the pane's height, so a node after it would sit by the composer instead.
+ * BB's bottom anchoring keeps it in view as it grows.
+ */
+function useTranscriptEnd(anchor: HTMLElement | null) {
+  const [node, setNode] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const scroll = anchor?.closest("[data-scroll-footer]")?.parentElement;
+    if (!scroll) return;
+    const end = document.createElement("div");
+    end.className = "channel-transcript-end";
+    const observer = new MutationObserver(() => place());
+    const place = () => {
+      const column = scroll.firstElementChild;
+      if (!column || column.hasAttribute("data-scroll-footer")) return;
+      observer.observe(column, { childList: true });
+      const timeline = column.firstElementChild;
+      if (!timeline || timeline === end) return;
+      observer.observe(timeline, { childList: true });
+      if (timeline.lastElementChild !== end) timeline.append(end);
+    };
+    observer.observe(scroll, { childList: true });
+    place();
+    setNode(end);
+    return () => {
+      observer.disconnect();
+      end.remove();
+      setNode(null);
+    };
+  }, [anchor]);
+  return node;
+}
+
+/**
+ * Who is working on what, with Stop, at the end of the transcript like the
+ * thread's own working indicator; above the composer, like a thread's
+ * follow-ups, requests a bot raised for you (acknowledge or snooze them
+ * here, or reply in the channel). A channel with no bots yet says how to add
+ * one. Renders nothing otherwise.
  */
 export function ChannelComposerBanner() {
   const view = useComposerView();
@@ -88,6 +128,9 @@ export function ChannelComposerBanner() {
   const navigate = useBbNavigate();
   const [stopping, setStopping] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const transcriptEnd = useTranscriptEnd(surface ? anchor : null);
+  const marker = <span hidden ref={setAnchor} />;
   if (!surface) return null;
   if (!surface.room.memberIds.length)
     return (
@@ -98,7 +141,6 @@ export function ChannelComposerBanner() {
   const live = railLive(surface.jobs);
   const routing = railRoutingCount(surface.runs);
   const requests = surface.attention;
-  if (!live.length && !routing && !requests.length) return null;
   const answer = async (id: string, action: "acknowledge" | "snooze") => {
     setError(null);
     try {
@@ -120,28 +162,8 @@ export function ChannelComposerBanner() {
       setStopping(null);
     }
   };
-  return (
-    <div className="channel-banner" role="status" aria-label="Channel work">
-      {requests.map((request) => {
-        const bot = surface.bots.find((b) => b.id === request.message.botId);
-        return (
-          <div className="channel-banner-request" key={request.id}>
-            <span className="channel-banner-avatar" aria-hidden><Icon name="BellDot" /></span>
-            <span className="channel-banner-request-text" title={request.message.text}>
-              <strong>{attentionReasons[request.reason]}</strong>
-              {bot ? ` from ${bot.name}` : ""}: {request.message.text.replace(/\s+/gu, " ")}
-            </span>
-            <span className="channel-banner-request-actions">
-              <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "acknowledge")}>
-                Acknowledge
-              </Button>
-              <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "snooze")}>
-                Snooze 1 hour
-              </Button>
-            </span>
-          </div>
-        );
-      })}
+  const work = (live.length > 0 || routing > 0) && (
+    <div className="channel-banner channel-transcript-work" role="status" aria-label="Channel work">
       {routing > 0 && !live.length && (
         <div className="channel-banner-row">
           <span className="channel-banner-avatar"><Icon name="Loading" /></span>
@@ -185,8 +207,39 @@ export function ChannelComposerBanner() {
           </div>
         );
       })}
-      {error && <p role="alert" className="channel-banner-error">{error}</p>}
     </div>
+  );
+  return (
+    <>
+      {marker}
+      {/* Until the transcript is found, the work shows here instead. */}
+      {transcriptEnd ? work && createPortal(work, transcriptEnd) : work}
+      {(requests.length > 0 || error) && (
+        <div className="channel-banner" role="status" aria-label="Channel requests">
+          {requests.map((request) => {
+            const bot = surface.bots.find((b) => b.id === request.message.botId);
+            return (
+              <div className="channel-banner-request" key={request.id}>
+                <span className="channel-banner-avatar" aria-hidden><Icon name="BellDot" /></span>
+                <span className="channel-banner-request-text" title={request.message.text}>
+                  <strong>{attentionReasons[request.reason]}</strong>
+                  {bot ? ` from ${bot.name}` : ""}: {request.message.text.replace(/\s+/gu, " ")}
+                </span>
+                <span className="channel-banner-request-actions">
+                  <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "acknowledge")}>
+                    Acknowledge
+                  </Button>
+                  <Button variant="ghost" size="sm" onClick={() => void answer(request.id, "snooze")}>
+                    Snooze 1 hour
+                  </Button>
+                </span>
+              </div>
+            );
+          })}
+          {error && <p role="alert" className="channel-banner-error">{error}</p>}
+        </div>
+      )}
+    </>
   );
 }
 
