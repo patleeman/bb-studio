@@ -56,6 +56,9 @@ export function view(row: PostRow | ListedRow, storyPosts?: number): PostView {
     domains: sourceDomains(row.body),
     image: bodyImage(row.body),
     avatar: null,
+    link: null,
+    threadTitle: row.channel_name ? `#${row.channel_name}` : null,
+    read: row.read_at !== null,
     topic: row.topic,
     story: row.story,
     storyPosts: "story_posts" in row ? row.story_posts : (storyPosts ?? 1),
@@ -165,6 +168,13 @@ export class FeedService {
     const removed = this.deps.store.remove(id);
     if (removed) this.deps.publish({ type: "removed", postId: id });
     return removed;
+  }
+
+  markRead(id: string, read: boolean): PostRow | null {
+    const row = this.deps.store.markRead(id, read, this.now());
+    // "seen": the reader keeps its list; counts update.
+    if (row) this.deps.publish({ type: "seen" });
+    return row;
   }
 
   seen(at?: number): number {

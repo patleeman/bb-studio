@@ -27,6 +27,8 @@ export type PostRow = {
   updated_at: number;
   edited_by: string | null;
   resolved_at: number | null;
+  /** When you read it; null while it's unread. */
+  read_at: number | null;
 };
 
 /** A listed post, with how many posts its story has. */
@@ -60,7 +62,19 @@ export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS feed_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
   // A linked page's preview picture; image is "" when it has none.
   `CREATE TABLE IF NOT EXISTS feed_link_images (url TEXT PRIMARY KEY, image TEXT NOT NULL, fetched_at INTEGER NOT NULL);`,
+  // Read state per post. Everything before the old read mark is read.
+  `ALTER TABLE feed_posts ADD COLUMN read_at INTEGER;
+   UPDATE feed_posts SET read_at = created_at
+     WHERE created_at <= CAST(COALESCE((SELECT value FROM feed_meta WHERE key = 'last_seen_at'), '0') AS INTEGER);
+   CREATE INDEX IF NOT EXISTS feed_posts_unread ON feed_posts (read_at, created_at);`,
+  // Link previews keep the page's title and description too; look them up again.
+  `DELETE FROM feed_link_images;
+   ALTER TABLE feed_link_images ADD COLUMN title TEXT NOT NULL DEFAULT '';
+   ALTER TABLE feed_link_images ADD COLUMN description TEXT NOT NULL DEFAULT '';`,
 ];
+
+/** A linked page's preview; empty strings when it has none. */
+export type LinkPreviewRow = { title: string; description: string; image: string };
 
 /** The same reply arriving again within this long (from the bot's thread and its channel) is one post. */
 export const DUPLICATE_WINDOW_MS = 24 * 60 * 60_000;
@@ -146,13 +160,14 @@ export class FeedStore {
       updated_at: at,
       edited_by: null,
       resolved_at: null,
+      read_at: null,
     };
     this.db
       .prepare(
         `INSERT INTO feed_posts (id, title, body, topic, story, priority, author, bot_id, thread_id, project_id, channel_id, channel_name,
-           content_key, directive_key, created_at, updated_at, edited_by, resolved_at)
+           content_key, directive_key, created_at, updated_at, edited_by, resolved_at, read_at)
          VALUES (@id, @title, @body, @topic, @story, @priority, @author, @bot_id, @thread_id, @project_id, @channel_id, @channel_name,
-           @content_key, @directive_key, @created_at, @updated_at, @edited_by, @resolved_at)`,
+           @content_key, @directive_key, @created_at, @updated_at, @edited_by, @resolved_at, @read_at)`,
       )
       .run(row);
     return row;
@@ -215,7 +230,9 @@ export class FeedStore {
    * Newest first. With `stories`, a story is listed once, by its newest post,
    * with its post count; otherwise every post is listed.
    */
-  list(options: { limit?: number; cursor?: string; topic?: string | null; since?: number; query?: string; stories?: boolean } = {}): { rows: ListedRow[]; nextCursor: string | null } {
+  list(
+    options: { limit?: number; cursor?: string; topic?: string | null; since?: number; until?: number; query?: string; stories?: boolean; unread?: boolean } = {},
+  ): { rows: ListedRow[]; nextCursor: string | null } {
     const limit = Math.min(Math.max(options.limit ?? 30, 1), 200);
     const where: string[] = [];
     const params: Record<string, unknown> = { limit: limit + 1 };
@@ -229,6 +246,11 @@ export class FeedStore {
       where.push("p.created_at > @since");
       params.since = options.since;
     }
+    if (options.until) {
+      where.push("p.created_at <= @until");
+      params.until = options.until;
+    }
+    if (options.unread) where.push("p.read_at IS NULL");
     const query = options.query?.trim();
     if (query) {
       where.push("(p.title LIKE @query ESCAPE '\\' OR p.body LIKE @query ESCAPE '\\' OR p.author LIKE @query ESCAPE '\\')");
@@ -272,24 +294,43 @@ export class FeedStore {
     this.db.prepare("INSERT INTO feed_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
   }
 
-  /** When you last read the feed; 0 before the first time. */
-  /** The cached preview picture for a link: "" for none, undefined when it hasn't been looked up. */
-  linkImage(url: string): string | undefined {
-    return (this.db.prepare("SELECT image FROM feed_link_images WHERE url = ?").get(url) as { image: string } | undefined)?.image;
+  /** A link's cached preview; undefined when it hasn't been looked up. */
+  linkPreview(url: string): LinkPreviewRow | undefined {
+    return this.db.prepare("SELECT title, description, image FROM feed_link_images WHERE url = ?").get(url) as LinkPreviewRow | undefined;
   }
 
-  setLinkImage(url: string, image: string, now = Date.now()): void {
+  setLinkPreview(url: string, preview: LinkPreviewRow, now = Date.now()): void {
     this.db
-      .prepare("INSERT INTO feed_link_images (url, image, fetched_at) VALUES (?, ?, ?) ON CONFLICT(url) DO UPDATE SET image = excluded.image, fetched_at = excluded.fetched_at")
-      .run(url, image, now);
+      .prepare(
+        `INSERT INTO feed_link_images (url, image, title, description, fetched_at) VALUES (@url, @image, @title, @description, @now)
+         ON CONFLICT(url) DO UPDATE SET image = excluded.image, title = excluded.title, description = excluded.description, fetched_at = excluded.fetched_at`,
+      )
+      .run({ url, ...preview, now });
   }
 
+  /** Marks a post read or unread, with the rest of its story. */
+  markRead(id: string, read: boolean, now = Date.now()): PostRow | null {
+    const row = this.get(id);
+    if (!row) return null;
+    const readAt = read ? now : null;
+    if (row.story) this.db.prepare("UPDATE feed_posts SET read_at = CASE WHEN @readAt IS NULL THEN NULL ELSE COALESCE(read_at, @readAt) END WHERE story = @story").run({ readAt, story: row.story });
+    else this.db.prepare("UPDATE feed_posts SET read_at = CASE WHEN @readAt IS NULL THEN NULL ELSE COALESCE(read_at, @readAt) END WHERE id = @id").run({ readAt, id });
+    return this.get(id);
+  }
+
+  /** Stories (or loose posts) with an unread post. */
+  unreadCount(): number {
+    return (this.db.prepare("SELECT COUNT(DISTINCT COALESCE(story, id)) AS count FROM feed_posts WHERE read_at IS NULL").get() as { count: number }).count;
+  }
+
+  /** When you last marked everything read; 0 before the first time. */
   lastSeenAt(): number {
     return Number(this.meta("last_seen_at") ?? 0) || 0;
   }
 
-  /** Moves the read mark forward, never back. */
+  /** Marks everything posted up to then read, and moves the read mark forward, never back. */
   markSeen(at: number): number {
+    this.db.prepare("UPDATE feed_posts SET read_at = @at WHERE read_at IS NULL AND created_at <= @at").run({ at });
     const next = Math.max(this.lastSeenAt(), at);
     this.setMeta("last_seen_at", String(next));
     return next;

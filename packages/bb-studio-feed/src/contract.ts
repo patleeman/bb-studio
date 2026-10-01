@@ -20,6 +20,11 @@ export const postSchema = z.object({
   image: z.string().nullable(),
   /** The posting bot's avatar (an emoji), when a bot posted it. */
   avatar: z.string().nullable(),
+  /** The page the body links to first, with its preview when it has one. */
+  link: z.object({ url: z.string(), domain: z.string(), title: z.string(), description: z.string(), image: z.string() }).nullable(),
+  /** What the thread it came from is called: "#channel", or the thread's title. */
+  threadTitle: z.string().nullable(),
+  read: z.boolean(),
   topic: z.string().nullable(),
   story: z.string().nullable(),
   /** Posts in the story; 1 for a post on its own. */
@@ -49,8 +54,17 @@ export const rpcContract = defineRpcContract({
       limit: z.number().int().min(1).max(100).optional(),
       topic: z.string().max(MAX_TOPIC).nullable().optional(),
       query: z.string().max(200).optional(),
+      unread: z.boolean().optional(),
+      /** A time window, for one day's edition. */
+      since: z.number().optional(),
+      until: z.number().optional(),
     }),
     output: z.object({ posts: z.array(postSchema), nextCursor: z.string().nullable(), lastSeenAt: z.number() }),
+  },
+  /** Marks a post read or unread, with the rest of its story. */
+  read: {
+    input: z.object({ postId, read: z.boolean() }),
+    output: z.object({ post: postSchema.nullable() }),
   },
   post: {
     input: z.object({ postId }),
@@ -85,12 +99,12 @@ export const rpcContract = defineRpcContract({
     input: z.object({ postId }),
     output: z.object({ removed: z.boolean() }),
   },
-  /** Everything up to now is read. */
+  /** Marks everything up to now read. */
   seen: {
     input: z.object({ at: z.number().optional() }),
     output: z.object({ lastSeenAt: z.number() }),
   },
-  /** Stories with a post since you last read the feed. */
+  /** Stories with an unread post. */
   unread: {
     input: z.object({}),
     output: z.object({ count: z.number(), lastSeenAt: z.number() }),

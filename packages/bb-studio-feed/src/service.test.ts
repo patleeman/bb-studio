@@ -136,6 +136,23 @@ describe("FeedService", () => {
     expect(store.countSince(store.lastSeenAt())).toBe(2);
   });
 
+  it("reads a story at once, and marks everything read", async () => {
+    const { service, store, events } = setup();
+    const first = await service.ingest("thr_plain", REPLY);
+    const update = await service.ingest("thr_plain", 'b\n::post{title="Update" story="harlem-line"}');
+    await service.ingest("thr_plain", 'c\n::post{title="Other"}');
+    expect(store.unreadCount()).toBe(2);
+    expect(service.markRead(update!.id, true)?.read_at).not.toBeNull();
+    expect(store.get(first!.id)?.read_at).not.toBeNull();
+    expect(events.at(-1)).toEqual({ type: "seen" });
+    expect(store.unreadCount()).toBe(1);
+    expect(store.list({ unread: true }).rows.map((row) => row.title)).toEqual(["Other"]);
+    service.markRead(first!.id, false);
+    expect(store.unreadCount()).toBe(2);
+    service.seen();
+    expect(store.unreadCount()).toBe(0);
+  });
+
   it("filters by topic and words", async () => {
     const { service, store } = setup();
     await service.ingest("thr_plain", REPLY);

@@ -1,6 +1,7 @@
-// Studio Feed's front page, seeded with posts through `bb feed post`: a
-// commute story with two earlier updates, an urgent alert, and posts with
-// and without pictures, enough to fill the top stories.
+// Studio Feed's reader, seeded with posts through `bb feed post`: a commute
+// story with two earlier updates, an urgent alert, and posts with and
+// without pictures. Two are marked read, and the commute story is open in
+// place.
 const picture = (path) => `![](https://upload.wikimedia.org/wikipedia/commons/thumb/${path}/960px-${path.split("/").pop()})`;
 const POSTS = [
   ["--title", "Metro-North running about 10 minutes late on the Harlem Line", "--topic", "Commute", "--story", "harlem-line", "--author", "Commute Bot",
@@ -39,30 +40,33 @@ export default ({ bbCli, sleep }) => [
           await sleep(50);
         }
         await client.navigate("/plugins/feed/feed");
-        await client.waitForText("Top stories");
+        await client.waitForText("Mark all read");
+        await client.waitForText("Today");
         await client.waitForText("Payments API error rate above 2% for 15 minutes");
         await client.waitForText("Needs you");
         await client.waitForText("Developing");
         await client.waitForText("3 updates");
         await client.waitForText("Dentist at 3:00 PM · Reply to the landlord about the lease renewal");
         await client.waitForText("Weekly research digest: 4 papers on agent memory");
+        const row = (title) => `[...document.querySelectorAll("main article")].find((each) => each.querySelector("button[aria-expanded]")?.innerText.includes(${JSON.stringify(title)}))`;
         await client.evaluate(`(() => {
           const topics = document.querySelector('nav[aria-label="Topics"]').innerText;
           for (const topic of ["All", "Commute", "Research", "Launch", "Ops"]) if (!topics.includes(topic)) throw new Error("Missing topic " + topic + ": " + topics);
           if (!document.body.innerText.includes("Urgent")) throw new Error("The urgent post has no Urgent badge");
           // The commute story is listed once, by its newest post.
           if (document.body.innerText.includes("Harlem Line delays growing to 20 minutes")) throw new Error("A story's older update is listed on its own");
-          [...document.querySelectorAll("article h3 button")].find((each) => each.textContent === "Harlem Line delays cleared").click();
+          for (const title of ["Weekly research digest", "GPU spend down 18%"]) ${row("TITLE")}.querySelector('button[aria-label="Mark read"]').click();
           return true;
-        })()`);
+        })()`.replace('"TITLE"', "title"));
+        await client.waitForText("5 unread");
+        await client.evaluate(`(${row("Harlem Line delays cleared")}).querySelector("button[aria-expanded]").click()`);
         await client.waitForText("Earlier updates");
         await client.waitForText("Harlem Line delays growing to 20 minutes");
         await client.waitForText("Inbound trains are on time");
-        await client.waitForText("Discuss");
-        await client.waitForText("Resolve");
-        // Back to the front page for the preview, once its pictures load.
-        await client.navigate("/plugins/feed/feed");
-        await client.waitForText("Top stories");
+        await client.waitForText("New thread");
+        await client.waitForText("Mark unread");
+        await client.waitForText("4 unread");
+        await client.evaluate(`document.querySelector("main").scrollIntoView()`);
         for (let tries = 0; ; tries += 1) {
           const loaded = await client.evaluate(`[...document.querySelectorAll("main img")].filter((img) => img.complete && img.naturalWidth > 0).length`);
           if (loaded >= 4) break;

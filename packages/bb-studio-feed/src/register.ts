@@ -118,45 +118,71 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     if (!row) throw new Error(`Post ${id} not found.`);
     return row;
   };
-  // Pictures for posts without one of their own, from the page each links to.
-  // A lookup runs once per link; the reader reloads when it lands.
+  // The page a post links to first: its title and picture make the post's
+  // link card, and the picture stands in for a post without one. A lookup runs
+  // once per link; the reader reloads when it lands.
   const looking = new Set<string>();
-  function linkImage(row: PostRow): string | null {
+  function link(row: PostRow): PostView["link"] {
     const url = firstLink(row.body);
     if (!url) return null;
-    const cached = store.linkImage(url);
-    if (cached !== undefined) return cached || null;
+    let domain = "";
+    try {
+      domain = new URL(url).hostname.replace(/^www\./, "");
+    } catch {
+      return null;
+    }
+    const cached = store.linkPreview(url);
+    if (cached) return { url, domain, ...cached };
     if (!looking.has(url)) {
       looking.add(url);
       fetchPreview(url)
-        .then(
-          (preview) => preview.image,
-          () => "",
-        )
-        .then((image) => {
-          store.setLinkImage(url, image);
-          if (image) bb.realtime.publish(REALTIME_CHANNEL, { type: "post", postId: row.id, story: row.story } satisfies RealtimeEvent);
+        .catch(() => ({ title: "", description: "", image: "" }))
+        .then((preview) => {
+          store.setLinkPreview(url, preview);
+          if (preview.title || preview.image) bb.realtime.publish(REALTIME_CHANNEL, { type: "post", postId: row.id, story: row.story } satisfies RealtimeEvent);
         })
         .finally(() => looking.delete(url));
     }
-    return null;
+    return { url, domain, title: "", description: "", image: "" };
   }
 
-  /** Posts for the reader: with a picture and the bot's avatar. */
+  // Thread titles, for "open the thread it came from".
+  const titles = new Map<string, { at: number; title: Promise<string | null> }>();
+  function threadTitle(threadId: string): Promise<string | null> {
+    const cached = titles.get(threadId);
+    if (cached && Date.now() - cached.at < TEAMS_CACHE_MS) return cached.title;
+    const title = bb.sdk.threads
+      .get({ threadId })
+      .then((thread) => thread.title?.trim() || thread.titleFallback?.trim() || null)
+      .catch(() => null);
+    titles.set(threadId, { at: Date.now(), title });
+    return title;
+  }
+
+  /** Posts for the reader: with a picture, link card, the bot's avatar and the thread's title. */
   async function views(rows: PostRow[]): Promise<PostView[]> {
     const directory = rows.some((row) => row.bot_id) ? await teamsDirectory() : null;
-    return rows.map((row) => {
-      const post = service.view(row);
-      return { ...post, image: post.image ?? linkImage(row), avatar: (row.bot_id && directory?.avatars.get(row.bot_id)) || null };
-    });
+    return Promise.all(
+      rows.map(async (row) => {
+        const post = service.view(row);
+        const linked = link(row);
+        return {
+          ...post,
+          image: post.image ?? (linked?.image || null),
+          link: linked,
+          avatar: (row.bot_id && directory?.avatars.get(row.bot_id)) || null,
+          threadTitle: post.threadTitle ?? (row.thread_id ? await threadTitle(row.thread_id) : null),
+        };
+      }),
+    );
   }
   const one = async (row: PostRow | null) => (row ? ((await views([row]))[0] ?? null) : null);
 
   // RPC ------------------------------------------------------------------------
 
   const rpc = {
-    list: async ({ cursor, limit, topic, query }: { cursor?: string; limit?: number; topic?: string | null; query?: string }) => {
-      const page = store.list({ cursor, limit: limit ?? 30, topic, query });
+    list: async ({ cursor, limit, topic, query, unread, since, until }: { cursor?: string; limit?: number; topic?: string | null; query?: string; unread?: boolean; since?: number; until?: number }) => {
+      const page = store.list({ cursor, limit: limit ?? 30, topic, query, unread, since, until });
       return { posts: await views(page.rows), nextCursor: page.nextCursor, lastSeenAt: store.lastSeenAt() };
     },
     post: async ({ postId }: { postId: string }) => ({ post: await one(store.get(postId)) }),
@@ -170,11 +196,12 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       const row = service.edit(postId, { ...patch, ...(patch.topic === "" ? { topic: null } : {}), resolved }, "you");
       return { post: await one(row) };
     },
+    read: async ({ postId, read }: { postId: string; read: boolean }) => ({ post: await one(service.markRead(postId, read)) }),
     remove: ({ postId }: { postId: string }) => ({ removed: service.remove(postId) }),
     seen: ({ at }: { at?: number }) => ({ lastSeenAt: service.seen(at) }),
     unread: () => {
       const lastSeenAt = store.lastSeenAt();
-      return { count: store.countSince(lastSeenAt), lastSeenAt };
+      return { count: store.unreadCount(), lastSeenAt };
     },
   };
 
