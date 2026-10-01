@@ -34,6 +34,15 @@ Other interactions (plugin forms) get no category and open the thread. The
 app resolves the interaction through BB's API. If that fails, it posts a
 local notification.
 
+## Clearing read notifications
+
+The relay remembers which threads it notified the app about. Every minute,
+and shortly after a thread resumes, is archived, or is deleted, it checks
+them. A thread that is read with no open question, archived, or deleted gets a
+silent background push (`clearThreadIds`), and the app removes that thread's
+delivered notifications. Opening a thread in the app clears its notifications
+directly. Threads are tracked for three days.
+
 ## Commands
 
 - `bb mobile status [--json]` — whether APNs is configured, and the last delivery result.

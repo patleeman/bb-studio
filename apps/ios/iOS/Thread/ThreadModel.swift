@@ -170,6 +170,7 @@ final class ThreadModel: ObservableObject {
             await loadInteractions()
             await loadPlanReview()
             try? await client.markRead(threadId)
+            await NotificationActions.clear(threadIds: [threadId])
             await ThreadTitles.fetchUnknown(in: rows.compactMap(\.text), client: client)
         } catch where BBClient.isCancellation(error) {
         } catch {

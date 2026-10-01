@@ -40,7 +40,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?
     ) -> Bool {
         PhoneRelay.shared.activate()
-        // Also runs when iOS wakes the app to hand over a push-started activity's token.
+        // Also runs when iOS wakes the app for a silent push.
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         NotificationActions.register()
@@ -65,6 +65,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let configuration = UISceneConfiguration(name: nil, sessionRole: connectingSceneSession.role)
         configuration.delegateClass = SceneDelegate.self
         return configuration
+    }
+
+    /// The relay's silent push when threads were read or answered elsewhere.
+    func application(
+        _ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
+        fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
+    ) {
+        guard let threadIds = userInfo["clearThreadIds"] as? [String] else { return completionHandler(.noData) }
+        Task {
+            await NotificationActions.clear(threadIds: Set(threadIds))
+            completionHandler(.newData)
+        }
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {

@@ -134,8 +134,8 @@ const GONE_REASONS = new Set(["BadDeviceToken", "Unregistered", "DeviceTokenNotF
 export type ApnsPush = {
   deviceToken: string;
   payload: string;
-  /** `alert` pushes use the bundle ID; Live Activity pushes use `<bundle>.push-type.liveactivity`. */
-  pushType: "alert" | "liveactivity";
+  /** `alert` and `background` pushes use the bundle ID; Live Activity pushes use `<bundle>.push-type.liveactivity`. */
+  pushType: "alert" | "background" | "liveactivity";
   priority: 5 | 10;
 };
 

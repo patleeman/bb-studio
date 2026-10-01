@@ -94,6 +94,16 @@ enum NotificationActions {
         return true
     }
 
+    /// Removes delivered notifications for threads that were read or answered,
+    /// here or (by the relay's silent push) on another device.
+    static func clear(threadIds: Set<String>) async {
+        let center = UNUserNotificationCenter.current()
+        let identifiers = await center.deliveredNotifications()
+            .filter { ($0.request.content.userInfo["threadId"] as? String).map(threadIds.contains) ?? false }
+            .map(\.request.identifier)
+        if !identifiers.isEmpty { center.removeDeliveredNotifications(withIdentifiers: identifiers) }
+    }
+
     /// A quiet follow-up notification when an action fails.
     private static func confirm(_ threadId: String, _ body: String) async {
         let content = UNMutableNotificationContent()

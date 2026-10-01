@@ -7,6 +7,9 @@
 //
 // Plugins without BB's shared notification queue send through `notify`, which
 // reaches the devices this relay has delivered to before.
+//
+// Once a notified thread is read or answered anywhere, a silent push tells the
+// app to remove its notifications (see clear.ts).
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
@@ -23,6 +26,7 @@ import {
   type ExpoMessage,
   type ExpoTicket,
 } from "./apns.js";
+import { CLEAR_BATCH, clearPayload, noteNotified, partition, type Notified, type ThreadReadState } from "./clear.js";
 
 const messageSchema = z.object({ to: z.string().min(1) }).passthrough();
 const batchSchema = z.union([z.array(messageSchema).max(100), messageSchema.transform((message) => [message])]);
@@ -38,6 +42,12 @@ const MUTED_KEY = "muted-threads";
 const MAX_MUTED = 500;
 /** APNs recipients seen on the relay, with when each was last seen. */
 const DEVICES_KEY = "devices";
+/** Threads the app has notifications for; see clear.ts. */
+const NOTIFIED_KEY = "notified-threads";
+/** Reading a thread has no event, so notified threads are checked this often. */
+const CLEAR_INTERVAL_MS = 60_000;
+/** Coalesces thread events into one check. */
+const CLEAR_DELAY_MS = 3_000;
 
 export const mobileContract = defineRpcContract({
   mute_list: {
@@ -238,6 +248,10 @@ export default async function plugin(bb: BbPluginApi) {
     }
 
     await rememberDevices(messages, tickets);
+    await rememberNotified(apnsIndexes.flatMap((index) => {
+      const threadId = messages[index]!.data?.threadId;
+      return tickets[index]?.status === "ok" && typeof threadId === "string" ? [threadId] : [];
+    }));
     const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
     for (const error of new Set(errors)) bb.log.warn(`push delivery failed: ${error}`);
     await bb.storage.kv.set(LAST_DELIVERY_KEY, {
@@ -254,6 +268,79 @@ export default async function plugin(bb: BbPluginApi) {
     const devices = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
     await bb.storage.kv.set(DEVICES_KEY, rememberedDevices(devices, messages, tickets, Date.now()));
   }
+
+  // --- Clearing read notifications -------------------------------------------
+
+  /** Serializes read-modify-write of the notified threads. */
+  let notifiedQueue: Promise<void> = Promise.resolve();
+  function withNotified(fn: (notified: Notified) => Promise<Notified>): Promise<void> {
+    notifiedQueue = notifiedQueue
+      .then(async () => {
+        const notified = (await bb.storage.kv.get<Notified>(NOTIFIED_KEY)) ?? {};
+        await bb.storage.kv.set(NOTIFIED_KEY, await fn(notified));
+      })
+      .catch((error: unknown) => {
+        bb.log.warn(`clearing notifications: ${error instanceof Error ? error.message : String(error)}`);
+      });
+    return notifiedQueue;
+  }
+
+  function rememberNotified(threadIds: string[]): Promise<void> {
+    if (threadIds.length === 0) return Promise.resolve();
+    return withNotified(async (notified) => noteNotified(notified, threadIds, Date.now()));
+  }
+
+  async function readState(threadId: string): Promise<ThreadReadState | null> {
+    try {
+      const [thread, interactions] = await Promise.all([
+        bb.sdk.threads.get({ threadId }),
+        bb.sdk.threads.interactions.list({ threadId }),
+      ]);
+      return { ...thread, hasPendingInteraction: interactions.some((interaction) => interaction.status === "pending") };
+    } catch {
+      return null;
+    }
+  }
+
+  function clearReadNotifications(): Promise<void> {
+    return withNotified(async (notified) => {
+      const threadIds = Object.keys(notified);
+      if (threadIds.length === 0) return notified;
+      const apns = await apnsConfig();
+      if ("missing" in apns) return notified;
+      const states = Object.fromEntries(await Promise.all(threadIds.map(async (id) => [id, await readState(id)] as const)));
+      const { clear, keep } = partition(notified, states, Date.now());
+      const devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {})
+        .filter((to) => to.startsWith(APNS_TOKEN_PREFIX))
+        .map((to) => to.slice(APNS_TOKEN_PREFIX.length));
+      for (let start = 0; start < clear.length; start += CLEAR_BATCH) {
+        const payload = clearPayload(clear.slice(start, start + CLEAR_BATCH));
+        for (const deviceToken of devices) {
+          const result = await sendApns({ deviceToken, payload, pushType: "background", priority: 5 }, apns.config, apns.token, sender.send);
+          if (result.status !== 200) bb.log.warn(`clear push failed: ${result.reason ?? result.status}`);
+        }
+      }
+      return keep;
+    });
+  }
+
+  let clearTimer: ReturnType<typeof setTimeout> | null = null;
+  function scheduleClear() {
+    if (clearTimer) return;
+    clearTimer = setTimeout(() => {
+      clearTimer = null;
+      void clearReadNotifications();
+    }, CLEAR_DELAY_MS);
+  }
+  // Answering a question resumes the thread; archiving or deleting removes it.
+  bb.events.on("thread.active", () => scheduleClear());
+  bb.events.on("thread.archived", () => scheduleClear());
+  bb.events.on("thread.deleted", () => scheduleClear());
+  const clearEvery = setInterval(() => void clearReadNotifications(), CLEAR_INTERVAL_MS);
+  bb.onDispose(() => {
+    clearInterval(clearEvery);
+    if (clearTimer) clearTimeout(clearTimer);
+  });
 
   // Token auth: only the push-notifications sender (given the tokened URL) may post here.
   bb.http.route(
