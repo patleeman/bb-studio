@@ -23,6 +23,22 @@ export type LiveState = {
   updatedAt: number;
 };
 
+/** Mirrors `BBThreadAttributes.ContentState` in the iOS app. */
+export type ThreadActivityState = {
+  title: string;
+  status: string;
+  needsYou: boolean;
+  updatedAt: number;
+};
+
+export function threadActivityState(thread: LiveThread, now: number): ThreadActivityState {
+  return { title: threadTitle(thread), status: thread.status, needsYou: needsYou(thread), updatedAt: Math.floor(now / 1000) };
+}
+
+export function threadActivityPayload(state: ThreadActivityState, end: boolean, now: number): string {
+  return JSON.stringify({ aps: { timestamp: Math.floor(now / 1000), event: end ? "end" : "update", "content-state": state } });
+}
+
 export type LiveRecord = {
   pushToStartToken: string | null;
   activity: { id: string; token: string; startedAt: number } | null;

@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { readFileSync } from "node:fs";
 import {
   ACTIVITY_MAX_AGE_MS,
   EMPTY_RECORD,
@@ -6,6 +7,8 @@ import {
   decide,
   livePayload,
   summarize,
+  threadActivityPayload,
+  threadActivityState,
   type LiveRecord,
   type LiveState,
   type LiveThread,
@@ -75,6 +78,21 @@ describe("summarize", () => {
   it("falls back to the title fallback and then the id", () => {
     const result = summarize([thread({ id: "thr_abcdefgh123", title: null, status: "active" })], null, now);
     expect(result.headline).toBe("Thread abcdefgh");
+  });
+});
+
+describe("thread Live Activity", () => {
+  it("sends the Swift content keys and ends a completed thread", () => {
+    const swift = readFileSync(new URL("../../apps/ios/LiveActivity/BBThreadAttributes.swift", import.meta.url), "utf8");
+    const fields = swift.match(/struct BBThreadAttributes[\s\S]*?struct ContentState: Codable, Hashable \{([^}]+)/)?.[1] ?? "";
+    const swiftKeys = [...fields.matchAll(/var (\w+):/g)].map((match) => match[1]);
+    const running = threadActivityState(thread({ id: "thr_a", title: "Build", status: "active" }), now);
+    expect(Object.keys(running)).toEqual(swiftKeys);
+    expect(JSON.parse(threadActivityPayload(running, false, now)).aps).toMatchObject({
+      event: "update", "content-state": running,
+    });
+    const finished = threadActivityState(thread({ id: "thr_a", status: "idle" }), now);
+    expect(JSON.parse(threadActivityPayload(finished, true, now)).aps.event).toBe("end");
   });
 });
 

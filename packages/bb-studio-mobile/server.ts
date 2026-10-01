@@ -23,7 +23,7 @@ import {
   type ExpoMessage,
   type ExpoTicket,
 } from "./apns.js";
-import { decide, EMPTY_RECORD, livePayload, summarize, threadTitle, type LiveAction, type LiveRecord } from "./live.js";
+import { decide, EMPTY_RECORD, livePayload, summarize, threadTitle, threadActivityPayload, threadActivityState, type LiveAction, type LiveRecord, type ThreadActivityState } from "./live.js";
 
 const messageSchema = z.object({ to: z.string().min(1) }).passthrough();
 const batchSchema = z.union([z.array(messageSchema).max(100), messageSchema.transform((message) => [message])]);
@@ -33,6 +33,8 @@ const LAST_DELIVERY_KEY = "last-delivery";
 /** Option buttons on a question notification; iOS shows about this many before it gets cramped. */
 const MAX_CHOICES = 6;
 const LIVE_KEY = "live";
+const LIVE_THREADS_KEY = "live-threads";
+type ThreadActivityRecord = { id: string; token: string; startedAt: number; state?: Omit<ThreadActivityState, "updatedAt"> };
 /** Thread ids whose notifications BB Studio shouldn't get. */
 const MUTED_KEY = "muted-threads";
 const MAX_MUTED = 500;
@@ -49,6 +51,7 @@ export const liveContract = defineRpcContract({
       pushToStartToken: hexToken.optional(),
       activityId: z.string().min(1).max(200).optional(),
       activityToken: hexToken.optional(),
+      threadId: z.string().regex(/^thr_[A-Za-z0-9]+$/).optional(),
       endedActivityId: z.string().min(1).max(200).optional(),
     }),
     output: z.object({ ok: z.literal(true) }),
@@ -298,6 +301,34 @@ export default async function plugin(bb: BbPluginApi) {
     return sendApns({ deviceToken, payload, pushType: "liveactivity", priority }, apns.config, apns.token, sender.send);
   }
 
+  async function reconcileThreadActivities() {
+    const records = (await bb.storage.kv.get<Record<string, ThreadActivityRecord>>(LIVE_THREADS_KEY)) ?? {};
+    if (!Object.keys(records).length) return;
+    const apns = await apnsConfig();
+    if ("missing" in apns) return;
+    const now = Date.now();
+    let changed = false;
+    for (const [threadId, activity] of Object.entries(records)) {
+      const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
+      const state = threadActivityState(thread ?? {
+        id: threadId, title: null, titleFallback: null, status: "idle", hasPendingInteraction: false,
+        lastReadAt: now, latestAttentionAt: now, parentThreadId: null,
+      }, now);
+      const end = !thread || thread.archivedAt !== null || ((thread.status === "idle" || thread.status === "error") && !state.needsYou);
+      const current = { title: state.title, status: state.status, needsYou: state.needsYou };
+      if (!end && activity.state && activity.state.title === current.title && activity.state.status === current.status && activity.state.needsYou === current.needsYou) continue;
+      const result = await sendApns({ deviceToken: activity.token, payload: threadActivityPayload(state, end, now), pushType: "liveactivity", priority: end ? 10 : 5 }, apns.config, apns.token, sender.send);
+      if (end || result.status === 400 || result.status === 410) {
+        delete records[threadId];
+        changed = true;
+      } else if (result.status === 200) {
+        activity.state = current;
+        changed = true;
+      }
+    }
+    if (changed) await bb.storage.kv.set(LIVE_THREADS_KEY, records);
+  }
+
   function reconcile(): Promise<void> {
     return withLive(async (record) => {
       if (!record.pushToStartToken && !record.activity) return;
@@ -335,7 +366,7 @@ export default async function plugin(bb: BbPluginApi) {
           return { ...record, activity: null, startRequestedAt: now, state };
         }
       }
-    });
+    }).then(reconcileThreadActivities);
   }
 
   function scheduleReconcile(latest?: string) {
@@ -368,6 +399,15 @@ export default async function plugin(bb: BbPluginApi) {
   bb.rpc.register(liveContract, {
     async live_register(input) {
       await withLive(async (record) => {
+        if (input.threadId) {
+          const activities = (await bb.storage.kv.get<Record<string, ThreadActivityRecord>>(LIVE_THREADS_KEY)) ?? {};
+          if (input.activityId && input.activityToken) {
+            activities[input.threadId] = { id: input.activityId, token: input.activityToken, startedAt: Date.now() };
+          }
+          if (input.endedActivityId && activities[input.threadId]?.id === input.endedActivityId) delete activities[input.threadId];
+          await bb.storage.kv.set(LIVE_THREADS_KEY, activities);
+          return record;
+        }
         const next = { ...record };
         if (input.pushToStartToken) next.pushToStartToken = input.pushToStartToken;
         if (input.activityId && input.activityToken) {
