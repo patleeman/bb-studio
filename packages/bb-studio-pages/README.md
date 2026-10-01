@@ -7,8 +7,6 @@ Pages gives you a Notion-style block editor with live multiplayer editing,
 comments, charts, and embeds. It also connects to
 [Studio Teams](../bb-studio-teams): @mention a bot in a page to hand it
 work, or give a page an owner bot that keeps it up to date on a schedule.
-With **Explore**, what an agent noticed along the way while answering
-becomes a page that explains it.
 
 ## Staged preview
 
@@ -61,7 +59,7 @@ afterwards.
   (the ones made in it, and the page it was started from), then the project's
   recent ones. **New** makes a page in the thread's project and links it to
   the thread in Studio. A page opens in its live editor, with a link to the
-  full page. Explore explainers open there too.
+  full page.
 - **Custom blocks.** Callouts, charts (bar, line, area, pie), stat rows, and
   embed cards for links, BB threads, and other pages. Paste a link on an
   empty line to turn it into a card; web links fetch their title,
@@ -114,44 +112,6 @@ afterwards.
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.
 
-## Explore
-
-Explore turns what an agent noticed while answering into pages you can read
-later.
-
-- **"Along the way" at the bottom of a reply.** When an answer involved
-  reading code, the agent may end it with 1 to 4 findings, each an emoji and
-  a label that says what you'd find: 🐛 suspicious, 🏗️ foundational, 🔗
-  connected, 🕐 recently changed. They show as full-width rows, each with its
-  state: **Explore**, **Generating · 45%** with a progress bar, **Open ·
-  generated 2h ago** with a regenerate button, or **Retry**. Rows reflect
-  what's saved, so they survive a reload. A muted **Turn off in settings**
-  link in the header opens the Pages settings, where the **Explore** toggle
-  stops agents from adding them in new sessions.
-- **An explainer page per finding.** Clicking one starts a hidden copy of
-  the thread at that reply, which investigates the finding in the repository
-  and writes a page: what it is, why it matters for what you were doing, how
-  it works (Mermaid diagrams, callouts, and sandboxed HTML visuals), key
-  files as `path:line`, and the interesting thing. Explainers live under an
-  **Explore** page in each project's Pages tree, with the finding's emoji as
-  their icon, and are tagged **Explore** in [Studio](../bb-studio)
-  when it's installed.
-- **In the side panel.** The **Pages** tab shows progress while an explainer
-  is written (stage, percent, time so far, **Stop**), the error with
-  **Retry** if it failed, and then the page's live editor with when it was
-  generated, **Regenerate**, **Open in Pages**, and its own follow-up
-  findings below it. Clicking a follow-up keeps exploring from the original
-  thread.
-- **Regenerate** writes the explainer again in place. The old version is
-  kept in the page's version history ("Before regenerate …").
-- **Setting:** *Explore: suggest things to explore* (on by default) turns
-  the agent instructions off; findings already in replies keep working.
-
-The same finding in the same reply is one explainer: a second click opens
-it, or follows the job already writing it. A job that runs for 20 minutes
-fails, and jobs cut off by a BB restart show as interrupted. Stopping or
-failing a job stops and archives its hidden thread.
-
 ## Dictation with Talk
 
 With the [Talk](../bb-studio-talk) plugin installed, you can dictate into a
@@ -203,10 +163,9 @@ in between.
 
 ## For agents
 
-Agents get nine tools: `pages_list`, `pages_read`, `pages_create`,
-`pages_edit`, `pages_comments`, `pages_comment`, `pages_comment_reply`,
-`pages_comment_resolve`, and `pages_explore`, which writes or finds an Explore
-explainer (`label`, optional `messageId` and `wait`) and returns its page. `pages_read` returns Markdown with a block id after
+Agents get eight tools: `pages_list`, `pages_read`, `pages_create`,
+`pages_edit`, `pages_comments`, `pages_comment`, `pages_comment_reply`, and
+`pages_comment_resolve`. `pages_read` returns Markdown with a block id after
 each block, and `pages_edit` applies small operations against those ids. An
 agent can then change one checklist item or paragraph without overwriting
 what you are typing.
@@ -218,9 +177,6 @@ bb pages list [--all]
 bb pages show <page-id|title> [--ids]
 bb pages create <title> [--global] [--markdown <text>]
 bb pages append <page-id|title> <markdown…>
-bb pages explore list [--thread <thread id>]
-bb pages explore open <explainer id>
-bb pages explore regenerate <explainer id> [--wait]
 ```
 
 [skills/pages/SKILL.md](skills/pages/SKILL.md) documents the tools, the
@@ -229,8 +185,8 @@ workflows.
 
 ## Storage
 
-Pages, versions, uploads, bot requests, and Explore explainers and their
-jobs live in the plugin's SQLite database in the BB data directory. Uploads are limited to 15 MB each and are
+Pages, versions, uploads, and bot requests live in the plugin's SQLite
+database in the BB data directory. Uploads are limited to 15 MB each and are
 served back through the plugin's HTTP route.
 
 ## Development

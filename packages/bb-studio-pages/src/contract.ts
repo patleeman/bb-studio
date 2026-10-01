@@ -1,7 +1,6 @@
 import { defineRpcContract, type NewThreadRequest } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { columnSchema, rowPatchSchema, tableSchema, tableUpdateSchema, valuesSchema } from "@bb-studio/kit/tables";
-import { exploreMethods } from "./explore/contract";
 
 export * from "./constants";
 
@@ -426,6 +425,4 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId, thread: z.string().min(1).max(100), resolved: z.boolean() }),
     output: z.object({ ok: z.boolean() }),
   },
-  // Explore: explainer pages for what agents noticed along the way.
-  ...exploreMethods,
 });

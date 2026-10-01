@@ -5,16 +5,11 @@ import { ThreadItemsPanel } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
-import { explainerIdFrom } from "./explore";
-import { ExplainerPanel } from "./explore-panel";
 import { OpenInPages, PanelMessage, PanelShell, usePanelPage } from "./PanelShell";
 import { relativeTime } from "./shared";
 
-/**
- * What the `page` thread panel tab is opened with: a page, or an Explore
- * explainer (its progress while it's written, then its page).
- */
-export type PagePanelParams = { pageId: string } | { explainerId: string };
+/** What the `page` thread panel tab is opened with: a page. */
+export type PagePanelParams = { pageId: string };
 
 function pageIdFrom(params: PluginThreadPanelProps["params"]): string | null {
   if (!params || typeof params !== "object" || Array.isArray(params)) return null;
@@ -28,8 +23,6 @@ function pageIdFrom(params: PluginThreadPanelProps["params"]): string | null {
  * the thread's pages and recent ones, and New makes one linked to the thread.
  */
 export function PagePanel({ threadId, params }: PluginThreadPanelProps) {
-  const explainerId = explainerIdFrom(params);
-  if (explainerId) return <ExplainerPanel key={explainerId} explainerId={explainerId} />;
   const pageId = pageIdFrom(params);
   if (pageId) return <PageTab key={pageId} pageId={pageId} />;
   return <ThreadPages threadId={threadId} />;

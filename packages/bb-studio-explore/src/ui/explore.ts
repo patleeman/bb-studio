@@ -1,14 +1,14 @@
 // Explore in the app: an explainer's state, realtime events about it, and
-// opening it in Pages' side-panel tab.
+// opening it in Explore's side-panel tab.
 import type { BbNavigate } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { RealtimeEvent } from "../constants";
-import type { ExplainerView } from "../explore/contract";
-import { isActiveJob, PAGE_PANEL_ACTION } from "../explore/shared";
+import type { ExplainerView } from "../contract";
+import { isActiveJob, PANEL_ACTION } from "../shared";
 
 export type { ExplainerView };
 
-export const EXPLORE_ICON = "pages/explore";
+export const EXPLORE_ICON = "explore/explore";
 
 /** What a finding's row shows. */
 export type RowState = "idle" | "running" | "ready" | "error";
@@ -21,7 +21,7 @@ export function rowState(explainer: ExplainerView | null | undefined): RowState 
   return "idle";
 }
 
-export type ExplainerEvent = Extract<RealtimeEvent, { type: "explainer" }>;
+export type ExplainerEvent = RealtimeEvent;
 
 export function explainerEvent(payload: unknown): ExplainerEvent | null {
   const event = payload as Partial<ExplainerEvent> | null;
@@ -29,7 +29,7 @@ export function explainerEvent(payload: unknown): ExplainerEvent | null {
   return { type: "explainer", explainerId: event.explainerId, threadId: event.threadId, messageId: event.messageId, parentId: event.parentId ?? null };
 }
 
-/** The `page` panel tab's params for an explainer. */
+/** The `explainer` panel tab's params. */
 export function explainerIdFrom(params: unknown): string | null {
   if (!params || typeof params !== "object" || Array.isArray(params)) return null;
   const { explainerId } = params as Record<string, unknown>;
@@ -38,7 +38,7 @@ export function explainerIdFrom(params: unknown): string | null {
 
 /** Opens an explainer (its progress, or its page once written) in the thread's side panel. */
 export function openExplainer(navigate: BbNavigate, explainer: Pick<ExplainerView, "id" | "label">): boolean {
-  return navigate.openThreadPanel({ actionId: PAGE_PANEL_ACTION, title: explainer.label, params: { explainerId: explainer.id } });
+  return navigate.openThreadPanel({ actionId: PANEL_ACTION, title: explainer.label, params: { explainerId: explainer.id } });
 }
 
 /** Re-renders every minute so "2m ago" stays true. */

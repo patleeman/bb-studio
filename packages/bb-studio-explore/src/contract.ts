@@ -1,5 +1,6 @@
-// Explore's RPC methods, merged into Pages' contract (../contract.ts). Zod
-// only, so the app can import the types without server code.
+// Explore's RPC surface for its app. Zod only, so the app can import the
+// types without server code.
+import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { JOB_STATUSES, MAX_LABEL_LENGTH } from "./shared";
 
@@ -52,7 +53,7 @@ export const explainerSchema = z.object({
 export type ExplainerView = z.infer<typeof explainerSchema>;
 export type JobView = z.infer<typeof jobSchema>;
 
-export const exploreMethods = {
+export const rpcContract = defineRpcContract({
   /** Opens, attaches to, or starts the explainer for a finding. */
   explore: {
     input: z.object({
@@ -92,4 +93,4 @@ export const exploreMethods = {
     input: z.object({ threadId: threadId.optional(), limit: z.number().int().min(1).max(200).optional() }),
     output: z.object({ explainers: z.array(explainerSchema) }),
   },
-};
+});

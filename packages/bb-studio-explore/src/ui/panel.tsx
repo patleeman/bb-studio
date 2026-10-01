@@ -1,27 +1,25 @@
-// An Explore explainer in the Page side-panel tab (`{ explainerId }`
-// params): live progress (with Stop) while it's written, the error with
-// Retry when it failed, and once it's ready the explainer's HTML document (or,
-// for an older Markdown explainer, the page's live editor) under a header
+// An explainer in Explore's side-panel tab (`{ explainerId }` params): live
+// progress (with Stop) while it's written, the error with Retry when it
+// failed, and once it's ready the explainer's HTML document under a header
 // (when it was written, Regenerate, Open in Pages) with its follow-up
-// findings below.
+// findings below. A Markdown explainer opens in Pages instead.
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
-import { REALTIME_CHANNEL } from "../constants";
+import { relativeTime } from "@bb-studio/kit/format";
+import { PAGES_PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
-import { EXPLORE_ICON, explainerEvent, rowState, useMinuteTick, type ExplainerView, type RowState } from "./explore";
-import { ExploreRows } from "./explore-rows";
+import { EXPLORE_ICON, explainerEvent, explainerIdFrom, openExplainer, rowState, useMinuteTick, type ExplainerView, type RowState } from "./explore";
 import { HtmlFrame } from "./html";
-import { OpenInPages, PanelMessage, PanelShell, usePanelPage } from "./PanelShell";
-import { relativeTime } from "./shared";
+import { ExploreRows } from "./rows";
 
 const POLL_MS = 2_000;
 /** An explainer is one document, so let its frame grow well past an HTML block's cap. */
 const MAX_DOCUMENT_HEIGHT = 40_000;
 
-/** The explainer's HTML document, refetched when its page changes: undefined while loading, null for Markdown. */
+/** The explainer's HTML document, refetched when it's rewritten: undefined while loading, null for Markdown. */
 function useExplainerHtml(explainerId: string, version: string | null): string | null | undefined {
   const rpc = useRpc<typeof rpcContract>();
   const [html, setHtml] = useState<{ version: string; html: string | null } | null>(null);
@@ -41,7 +39,53 @@ function useExplainerHtml(explainerId: string, version: string | null): string |
   return html ? html.html : undefined;
 }
 
-export function ExplainerPanel({ explainerId }: { explainerId: string }) {
+/** Explore's side-panel tab: an explainer, or from the launcher, the thread's explainers. */
+export function ExplainerTab({ threadId, params }: PluginThreadPanelProps) {
+  const explainerId = explainerIdFrom(params);
+  if (explainerId) return <ExplainerPanel key={explainerId} explainerId={explainerId} />;
+  return <ThreadExplainers threadId={threadId} />;
+}
+
+function ThreadExplainers({ threadId }: { threadId: string }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
+  useMinuteTick();
+  const [explainers, setExplainers] = useState<ExplainerView[] | null>(null);
+  const load = useCallback(() => {
+    rpc.call("explainers", { threadId, limit: 100 }).then(
+      (result) => setExplainers(result.explainers),
+      () => setExplainers((current) => current ?? []),
+    );
+  }, [rpc, threadId]);
+  useEffect(load, [load]);
+  useRealtime(REALTIME_CHANNEL, (payload) => {
+    if (explainerEvent(payload)?.threadId === threadId) load();
+  });
+  if (explainers === null) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
+  if (!explainers.length) {
+    return <PanelMessage title="Nothing explored in this thread yet" detail="Click a finding under an answer to write a page explaining it." />;
+  }
+  return (
+    <ul className="divide-y divide-border/60 overflow-auto">
+      {explainers.map((explainer) => {
+        const state = rowState(explainer);
+        return (
+          <li key={explainer.id}>
+            <button type="button" onClick={() => openExplainer(navigate, explainer)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-state-hover">
+              <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
+                {explainer.emoji}
+              </span>
+              <span className="min-w-0 flex-1 truncate text-sm">{explainer.label}</span>
+              <span className={cn("shrink-0 text-xs text-muted-foreground", state === "error" && "text-destructive")}>{writtenLine(explainer, state)}</span>
+            </button>
+          </li>
+        );
+      })}
+    </ul>
+  );
+}
+
+function ExplainerPanel({ explainerId }: { explainerId: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   useMinuteTick();
@@ -71,8 +115,8 @@ export function ExplainerPanel({ explainerId }: { explainerId: string }) {
     return () => clearInterval(timer);
   }, [state, load]);
 
-  const page = usePanelPage(explainer?.pageId ?? null);
-  const html = useExplainerHtml(explainerId, page ? `${page.id}:${page.updatedAt}` : null);
+  const html = useExplainerHtml(explainerId, explainer?.pageId ? `${explainer.pageId}:${explainer.updatedAt}` : null);
+  const openPage = explainer?.pageId ? () => navigate.toPluginPanel(PAGES_PLUGIN_ID, { subPath: explainer.pageId! }) : null;
 
   async function run(method: "exploreRegenerate" | "exploreStop") {
     setActing(true);
@@ -89,6 +133,7 @@ export function ExplainerPanel({ explainerId }: { explainerId: string }) {
 
   if (explainer === undefined) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
   if (explainer === null) return <PanelMessage title="Explainer not found" detail={actionError ?? "It may have been removed."} />;
+  const title = explainer.label;
 
   const job = explainer.job;
   const error =
@@ -99,12 +144,12 @@ export function ExplainerPanel({ explainerId }: { explainerId: string }) {
     <>
       <ExplainerHeader
         explainer={explainer}
-        title={page?.title || explainer.label}
+        title={title}
         state={state}
         acting={acting}
         onRegenerate={() => void run("exploreRegenerate")}
         onStop={() => void run("exploreStop")}
-        onOpenPage={explainer.pageId && page ? () => navigate.toPluginPanel("pages", { subPath: explainer.pageId! }) : null}
+        onOpenPage={openPage}
       />
       {state === "running" && job ? (
         <Progress label={job.kind === "regenerate" ? `Regenerating · ${job.label}` : job.label} detail={job.detail} progress={job.progress} startedAt={job.createdAt} />
@@ -128,26 +173,28 @@ export function ExplainerPanel({ explainerId }: { explainerId: string }) {
     />
   ) : null;
 
-  if (explainer.pageId && page && html) {
+  if (explainer.pageId && html) {
     return (
-      <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
+      <div className="relative flex h-full min-h-0 flex-col bg-background text-foreground">
         {header}
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="pt-2">
-            <HtmlFrame source={html} title={page.title || explainer.label} maxHeight={MAX_DOCUMENT_HEIGHT} />
+            <HtmlFrame source={html} title={title} maxHeight={MAX_DOCUMENT_HEIGHT} />
           </div>
           {followUps ? <div className="px-4 pb-24">{followUps}</div> : <div className="pb-20" />}
         </div>
       </div>
     );
   }
-  if (explainer.pageId && page && html === null) return <PanelShell page={page} header={header} footer={followUps} />;
-
   return (
-    <div className="pages-doc relative flex h-full min-h-0 flex-col overflow-auto bg-background text-foreground">
+    <div className="relative flex h-full min-h-0 flex-col overflow-auto bg-background text-foreground">
       {header}
-      {explainer.pageId && (page === undefined || (page && html === undefined)) ? (
+      {explainer.pageId && html === undefined ? (
         <p className="p-4 text-sm text-muted-foreground">Loading…</p>
+      ) : explainer.pageId && html === null && openPage ? (
+        <PanelMessage title="This explainer is a Markdown page" detail="Read it in Pages.">
+          <OpenInPages onOpen={openPage} />
+        </PanelMessage>
       ) : state === "idle" ? (
         <p className="p-4 text-sm text-muted-foreground">{explainer.pageId ? "Its page was deleted. Generate it again to write a new one." : "Not written yet."}</p>
       ) : null}
@@ -238,4 +285,29 @@ function Progress({ label, detail, progress, startedAt }: { label: string; detai
 function elapsed(ms: number): string {
   const seconds = Math.max(0, Math.floor(ms / 1000));
   return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${String(seconds % 60).padStart(2, "0")}s`;
+}
+
+function OpenInPages({ onOpen }: { onOpen(): void }) {
+  return (
+    <button
+      type="button"
+      title="Open the full page in Pages"
+      className="flex h-7 shrink-0 items-center gap-1 rounded-md px-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground"
+      onClick={onOpen}
+    >
+      Open in Pages
+      <Icon name="ArrowUpRight" className="size-3.5" />
+    </button>
+  );
+}
+
+function PanelMessage({ title, detail, children }: { title: string; detail?: string; children?: React.ReactNode }) {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
+      <Icon name={EXPLORE_ICON} fallback="Compass" className="size-6 text-muted-foreground" />
+      <p className="text-sm font-medium">{title}</p>
+      {detail ? <p className="max-w-xs text-xs text-muted-foreground">{detail}</p> : null}
+      {children}
+    </div>
+  );
 }

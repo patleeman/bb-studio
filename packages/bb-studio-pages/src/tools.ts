@@ -235,17 +235,9 @@ export function registerTools(bb: BbPluginApi, service: PagesService): void {
   });
 }
 
-/**
- * What `bb.agents.configure` gives a thread: Pages' tools and instructions,
- * plus Explore's part (null for an Explore worker, which gets none of it).
- * Instructions past 4,096 characters are cut, so both have to fit.
- */
-export function agentConfiguration(explore: { tools: string[]; instructions: string | null } | null) {
-  return {
-    tools: [...TOOL_NAMES, ...(explore?.tools ?? [])],
-    skills: [],
-    instructions: explore?.instructions ? `${AGENT_INSTRUCTIONS}\n\n${explore.instructions}` : AGENT_INSTRUCTIONS,
-  };
+/** What `bb.agents.configure` gives a thread: Pages' tools and instructions. */
+export function agentConfiguration() {
+  return { tools: [...TOOL_NAMES], skills: [], instructions: AGENT_INSTRUCTIONS };
 }
 
 function threadSummary(thread: ThreadView): string {

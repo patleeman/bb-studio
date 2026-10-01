@@ -135,6 +135,26 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
 }
 
 /**
+ * A thread that reads a small retry helper in Orbit with Explore on, so its
+ * reply ends with an ::explore line of things noticed along the way.
+ */
+async function seedExploreThread(project, machine, orbitDir) {
+  await bb("plugin", "config", "explore", "set", "explore", "true");
+  const thread = await bb(
+    "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
+    "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
+    "--title", "How does Orbit retry uploads?",
+    "--prompt", "Read src/retry.ts and explain in two short sentences how Orbit retries a failed upload.",
+  );
+  await bb("thread", "wait", thread.id, "--timeout", "5m");
+  const events = await bb("thread", "messages", thread.id);
+  const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
+  if (!/::explore\{items="[^"]+"\}/.test(reply)) throw new Error(`The retry reply has no ::explore line: ${reply}`);
+  await bb("thread", "read", thread.id);
+  return thread;
+}
+
+/**
  * Studio Teams' README fixture (packages/bb-studio-teams/docs/QA.md): four
  * bots, a Launch room where Atlas and Scribe give the fixed replies their
  * missions spell out, a Design review channel, a paused automation, and
@@ -209,8 +229,11 @@ async function start() {
   const orbitDir = join(stagedDir, "orbit");
   await mkdir(orbitDir);
   await writeFile(join(orbitDir, "README.md"), "# Orbit\n\nThe ORBIT-42 release.\n");
+  // Code for the Explore thread to read: its retry delay and cap disagree.
+  await mkdir(join(orbitDir, "src"));
+  await cp(join(fixturesDir, "orbit/retry.ts"), join(orbitDir, "src/retry.ts"));
   await run("git", ["init", "-q"], { cwd: orbitDir });
-  await run("git", ["add", "README.md"], { cwd: orbitDir });
+  await run("git", ["add", "README.md", "src"], { cwd: orbitDir });
   await run("git", ["-c", "user.name=Staged", "-c", "user.email=staged@example.com", "commit", "-qm", "Start Orbit"], { cwd: orbitDir });
   const [machine] = await bb("machine", "list");
   const project = await bb("project", "create", "--name", "Orbit", "--root", orbitDir, "--machine", machine.id);
@@ -223,6 +246,7 @@ async function start() {
   await bb("smart-decisions", "fallback", "codex", "gpt-6-luna", "low");
   process.stdout.write("Seeding agent replies\n");
   const smartReactionsThread = await seedSmartReactionsThread(project, machine, orbitDir);
+  const exploreThread = await seedExploreThread(project, machine, orbitDir);
   await seedTeams(machine);
 
   const envFile = join(stagedDir, "capture.env");
@@ -235,6 +259,7 @@ async function start() {
       `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
       `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
       `export BB_CAPTURE_WORKSPACE_THREAD_ID=${smartReactionsThread.id}`,
+      `export BB_CAPTURE_EXPLORE_THREAD_ID=${exploreThread.id}`,
       `export BB_CAPTURE_CDP_PORT=${port + 2}`,
       `export PATH="${binDir}:$PATH"`,
       "unset BB_CLI BB_HOST_DAEMON_PORT BB_THREAD_ID BB_PROJECT_ID BB_ENVIRONMENT_ID BB_THREAD_STORAGE",

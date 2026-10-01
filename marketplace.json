@@ -58,7 +58,7 @@
     {
       "id": "pages",
       "displayName": "Studio Pages",
-      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, let one keep a page up to date, or explore what an agent noticed along the way.",
+      "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, or let one keep a page up to date.",
       "icon": {
         "url": "./packages/bb-studio-pages/icons/pages.svg"
       },
@@ -78,6 +78,32 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-pages",
+          "ref": "main"
+        }
+      }
+    },
+    {
+      "id": "explore",
+      "displayName": "Studio Explore",
+      "description": "Experimental. Part of BB Studio. Agents end answers that read code with a few things they noticed along the way; click one and a Studio Page explaining it is written in the background. Needs Studio Pages.",
+      "icon": {
+        "url": "./packages/bb-studio-explore/icons/explore.svg"
+      },
+      "tags": [
+        "experimental",
+        "agents",
+        "documents",
+        "developer-tools",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-explore",
           "ref": "main"
         }
       }

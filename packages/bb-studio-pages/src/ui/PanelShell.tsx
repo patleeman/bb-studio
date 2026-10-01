@@ -1,6 +1,5 @@
-// The Page side-panel tab's frame, shared by a page and an Explore
-// explainer: a page's metadata kept current, and its live editor under a
-// header.
+// The Page side-panel tab's frame: a page's metadata kept current, and its
+// live editor under a header.
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";

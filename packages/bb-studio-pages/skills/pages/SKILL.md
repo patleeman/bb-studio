@@ -1,6 +1,6 @@
 ---
 name: pages
-description: Use when the user refers to a BB Page — a /plugins/pages/pages/<id> link, a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, about Explore findings ("Along the way", explainer pages), or how Pages and its Studio Teams integration work.
+description: Use when the user refers to a BB Page — a /plugins/pages/pages/<id> link, a page mention, "the launch page", a doc they want written or kept up to date — or asks you to read, write, comment on, or restructure a page, or how Pages and its Studio Teams integration work.
 ---
 
 # Pages
@@ -25,7 +25,6 @@ Pages belong to a project or are global, and nest into a tree. Link to one as
 | `pages_comment` | Start a comment thread on a block, optionally on an exact quote from it. |
 | `pages_comment_reply` | Reply in a comment thread. |
 | `pages_comment_resolve` | Resolve or reopen a thread. |
-| `pages_explore` | Write (or find) an Explore explainer page for a finding, e.g. `label: "🏗️ How the job queue works"`. Waits for the page unless `wait` is false. |
 
 Pages can be referenced by id (`pg_…`) or exact title.
 
@@ -103,19 +102,6 @@ its Markdown with block ids as hidden context. The copy can go stale as the
 user types, so read the page again right before you edit it with
 `pages_edit`. This works without Studio Teams.
 
-## Explore
-
-When Explore is on (the *Explore: suggest things to explore* setting), your
-instructions ask you to end an answer that involved reading code with one
-line of findings you noticed but didn't cover:
-`::explore{items="🐛 Retry backoff disagrees in billing|🏗️ How the job queue works"}`.
-It goes just before a `::reactions` line if there is one, otherwise last.
-The user sees the items as rows; clicking one writes an explainer page under
-the project's **Explore** page, in the background, from a hidden copy of the
-thread. Use `pages_explore` when the user asks you to explore something
-yourself. Explainers are ordinary pages: read and edit them with
-`pages_read` and `pages_edit`.
-
 ## Studio Teams integration
 
 These need the Studio Teams plugin. Each request runs in the bot's own DM thread
@@ -159,9 +145,6 @@ bb pages list [--all]                                   # this project + global;
 bb pages show <page-id|title> [--ids]                   # Markdown; --ids adds block id markers
 bb pages create <title> [--global] [--markdown <text>]  # prints the new page id
 bb pages append <page-id|title> <markdown…>             # "\n" in arguments becomes a newline
-bb pages explore list [--thread <thread id>]            # Explore explainers: id, state, finding, page, thread
-bb pages explore open <explainer id>                    # page link, state and follow-ups
-bb pages explore regenerate <explainer id> [--wait]     # write it again in place (old version kept)
 ```
 
 ## Limits

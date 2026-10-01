@@ -16,6 +16,10 @@
       "source": "./packages/bb-studio-pages"
     },
     {
+      "name": "explore",
+      "source": "./packages/bb-studio-explore"
+    },
+    {
       "name": "talk",
       "source": "./packages/bb-studio-talk"
     },

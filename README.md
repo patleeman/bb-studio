@@ -11,6 +11,7 @@ agent.
 | --- | --- | --- |
 | [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tasks, tables and bots, with search, tags, project filters, templates and tabs. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents. |
+| [Studio Explore](packages/bb-studio-explore/) | `explore` | Experimental. Agents end answers with things they noticed along the way; click one for a page explaining it. Needs Studio Pages. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
@@ -26,7 +27,8 @@ agent.
 
 Every add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
-all. Studio Teams needs Studio Decisions for its channel routing.
+all. Studio Teams needs Studio Decisions for its channel routing, and Studio
+Explore needs Studio Pages.
 
 ## iOS app
 
@@ -51,6 +53,8 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    a one-line description each:
    - studio: the Studio collection; recommended, since the others plug into it
    - pages: collaborative pages
+   - explore: Studio Explore (experimental); pages explaining what an agent
+     noticed along the way; needs pages
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make

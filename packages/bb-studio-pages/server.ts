@@ -16,8 +16,6 @@ import { studioEmbeds } from "./src/embeds";
 import { fetchPreview } from "./src/unfurl";
 import { createThread, listThreads, reply, setResolved } from "./src/comments";
 import { applyEdits, readMarkdown, textBlocks } from "./src/doc";
-import { EXPLORE_USAGE, registerExplore } from "./src/explore/register";
-import { isExploreWorker } from "./src/explore/worker";
 import type { Socket } from "./src/hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate, validateCron } from "./src/service";
 import { MIGRATIONS, PageStore } from "./src/store";
@@ -33,22 +31,6 @@ export default async function plugin(bb: BbPluginApi) {
   const store = new PageStore(db);
   const bots = new BotDirectory(bb);
   const service = new PagesService(bb, store, bots);
-  const explore = registerExplore(bb, service);
-
-  const settings = bb.settings.define({
-    explore: {
-      type: "boolean",
-      label: "Explore: suggest things to explore",
-      description:
-        "Agents end answers that involved reading code with a few things they noticed along the way. Click one to get a page explaining it. Applies to agent sessions started after the change.",
-      default: true,
-    },
-  });
-  // `bb.agents.configure` is synchronous, so keep the latest value in memory.
-  let exploreEnabled = (await settings.get()).explore !== false;
-  settings.onChange((next) => {
-    exploreEnabled = next.explore !== false;
-  });
 
   // Live sync -----------------------------------------------------------------
 
@@ -404,7 +386,6 @@ export default async function plugin(bb: BbPluginApi) {
       setResolved(service.hub.open(id).doc, HUMAN_USER_ID, thread, resolved, CLIENT_ORIGIN);
       return { ok: true };
     },
-    ...explore.rpc,
   });
 
   // Studio --------------------------------------------------------------------
@@ -425,8 +406,6 @@ export default async function plugin(bb: BbPluginApi) {
     void services.replaceLinks(ref, PLUGIN_ID, outgoingStudioLinks(id, markdown)).catch(() => { /* Studio is optional. */ });
   };
   service.onPublish = (event) => {
-    if (event.type === "deleted") explore.pagesDeleted(event.pageIds);
-    // Explainer progress isn't a change to anything Studio lists.
     if (event.type === "page") {
       studioNotifier.changed(event.pageId); syncLinks(event.pageId);
       const markdown = readMarkdown(service.hub.open(event.pageId).doc, { ids: true });
@@ -443,16 +422,13 @@ export default async function plugin(bb: BbPluginApi) {
       }).catch(() => { /* Studio is optional. */ });
     }
     else if (event.type === "deleted") for (const id of event.pageIds) { studioNotifier.changed(id); syncLinks(id); }
-    else if (event.type !== "explainer") studioNotifier.changed();
+    else studioNotifier.changed();
   };
 
   // Agents --------------------------------------------------------------------
 
   registerTools(bb, service);
-  // Explore workers write a page as their reply: no findings line, no explore tool.
-  bb.agents.configure((context) =>
-    agentConfiguration(isExploreWorker(context.pluginMetadata) ? null : explore.configure(exploreEnabled)),
-  );
+  bb.agents.configure(() => agentConfiguration());
 
   bb.ui.registerMentionProvider(defineItemMention({
     id: "page",
@@ -489,7 +465,6 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "show", summary: "Print a page (id or title) as Markdown", usage: "bb pages show <page-id> [--ids]" },
       { name: "create", summary: "Create a page from a title and optional Markdown", usage: "bb pages create <title> [--global] [--markdown <text>]" },
       { name: "append", summary: "Append Markdown to a page", usage: "bb pages append <page-id> <markdown…>" },
-      { name: "explore", summary: "Explore explainers: list, open (link, state, follow-ups), regenerate in place", usage: EXPLORE_USAGE },
     ],
     async run(argv, ctx) {
       const { command, rest } = subcommand(argv);
@@ -533,10 +508,8 @@ export default async function plugin(bb: BbPluginApi) {
             applyEdits(service.hub.open(meta.id).doc, [{ op: "append", markdown }], origin);
             return { exitCode: 0, stdout: `Appended to ${meta.id}.\n` };
           }
-          case "explore":
-            return await explore.cli(rest, ctx);
           default:
-            return usage("bb pages <list|show|create|append|explore> …");
+            return usage("bb pages <list|show|create|append> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

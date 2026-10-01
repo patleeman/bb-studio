@@ -1,40 +1,51 @@
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
-// Explore, wired into Pages: agents end answers with what they noticed along
-// the way (`::explore{items="…"}`); a click writes a page explaining it.
+// Explore's server: agents end answers with what they noticed along the way
+// (`::explore{items="…"}`); a click writes a page explaining it.
 //
 //   - ExploreService (service.ts) runs each explainer's job; workers are
-//     hidden forks of the thread (worker.ts); pages are written in process
-//     under the project's "Explore" page and tagged in Studio (pages.ts).
-//   - This file adds the RPC handlers (merged into Pages' contract), the
-//     `pages_explore` tool, the instructions for `bb.agents.configure`, and
-//     `bb pages explore …`.
+//     hidden forks of the thread (worker.ts); pages are written in Pages over
+//     RPC, under the project's "Explore" page, and tagged in Studio (pages.ts).
+//   - This file adds the RPC handlers, the `explore_explain` tool, the
+//     instructions for `bb.agents.configure`, and `bb explore …`.
 import type { BbPluginApi, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import type { PagesService } from "../service";
 import { explainerHtml } from "./markdown";
 import { explorePages } from "./pages";
 import { exploreInstructions } from "./prompt";
 import { ExploreService } from "./service";
+import { REALTIME_CHANNEL, type RealtimeEvent } from "./constants";
 import { MAX_LABEL_LENGTH, STAGES } from "./shared";
-import { ExploreStore, type ExplainerRow } from "./store";
+import { ExploreStore, MIGRATIONS, type ExplainerRow } from "./store";
 import { walk } from "./timeline";
 import { exploreWorkers } from "./worker";
 
-export const EXPLORE_TOOL = "pages_explore";
+export const EXPLORE_TOOL = "explore_explain";
 
 const USAGE = {
-  list: "bb pages explore list [--thread <thread id>]",
-  open: "bb pages explore open <explainer id>",
-  regenerate: "bb pages explore regenerate <explainer id> [--wait]",
+  list: "bb explore list [--thread <thread id>]",
+  open: "bb explore open <explainer id>",
+  regenerate: "bb explore regenerate <explainer id> [--wait]",
 };
-export const EXPLORE_USAGE = `bb pages explore <list|open|regenerate> …`;
+export const EXPLORE_USAGE = `bb explore <list|open|regenerate> …`;
 
 type CliResult = PluginCliResult;
 
-export function registerExplore(bb: BbPluginApi, pages: PagesService) {
-  const store = new ExploreStore(bb.storage.database());
+export function registerExplore(bb: BbPluginApi) {
+  const db = bb.storage.database();
+  bb.storage.migrate(db, MIGRATIONS);
+  const store = new ExploreStore(db);
   const workers = exploreWorkers(bb);
-  const explainerPages = explorePages(pages, bb.sdk.plugins);
+  const explainerPages = explorePages(bb.sdk.plugins);
+  const publish = (explainer: ExplainerRow) => {
+    const event: RealtimeEvent = {
+      type: "explainer",
+      explainerId: explainer.id,
+      threadId: explainer.thread_id,
+      messageId: explainer.message_id,
+      parentId: explainer.parent_id,
+    };
+    bb.realtime.publish(REALTIME_CHANNEL, event);
+  };
   const service = new ExploreService({
     store,
     pages: explainerPages,
@@ -42,15 +53,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
     startWorker: (explainer, prompt, context) => workers.startWorker(explainer, prompt, context),
     awaitWorker: workers.awaitWorker,
     disposeWorker: workers.disposeWorker,
-    changed(explainer) {
-      pages.publish({
-        type: "explainer",
-        explainerId: explainer.id,
-        threadId: explainer.thread_id,
-        messageId: explainer.message_id,
-        parentId: explainer.parent_id,
-      });
-    },
+    changed: publish,
     log: bb.log,
   });
   const interrupted = service.recover();
@@ -63,7 +66,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
     return row;
   };
 
-  // RPC (merged into Pages' `bb.rpc.register`) ---------------------------------
+  // RPC ------------------------------------------------------------------------
 
   const rpc = {
     explore: ({ threadId, messageId, turnId, emoji, label, parentId }: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string; parentId?: string | null }) => {
@@ -72,7 +75,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
     },
     exploreRegenerate: ({ explainerId }: { explainerId: string }) => ({ explainer: service.view(service.regenerate(explainerId)) }),
     exploreStop: ({ explainerId }: { explainerId: string }) => ({ explainer: view(service.stop(explainerId)) }),
-    explainer: ({ explainerId }: { explainerId: string }) => ({ explainer: view(store.explainer(explainerId)) }),
+    explainer: async ({ explainerId }: { explainerId: string }) => ({ explainer: view(await service.checkPage(explainerId)) }),
     explainerDocument: async ({ explainerId }: { explainerId: string }) => {
       const pageId = store.explainer(explainerId)?.page_id;
       const markdown = pageId ? await explainerPages.markdown(pageId).catch(() => null) : null;
@@ -134,7 +137,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
 
   const instructions = exploreInstructions();
 
-  // CLI: `bb pages explore …` ----------------------------------------------------
+  // CLI: `bb explore …` -----------------------------------------------------------
 
   const line = (row: ExplainerRow) => {
     const explainer = service.view(row);
@@ -155,7 +158,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
         return { exitCode: 0, stdout: rows.length ? `${rows.map(line).join("\n")}\n` : "No explainers.\n" };
       }
       case "open": {
-        const row = store.explainer(positional[0] ?? "");
+        const row = await service.checkPage(positional[0] ?? "");
         if (!row) return fail(`usage: ${USAGE.open}`);
         return { exitCode: 0, stdout: `${describe(row)}\n` };
       }
@@ -181,14 +184,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
     service,
     rpc,
     cli,
-    /** Explore's part of `bb.agents.configure`: the tool, and the instructions when the setting is on. */
-    configure: (enabled: boolean) => ({ tools: [EXPLORE_TOOL], instructions: enabled ? instructions : null }),
-    /** Pages were deleted: their explainers write a new page next time. */
-    pagesDeleted(pageIds: readonly string[]) {
-      for (const id of store.forgetPages(pageIds)) {
-        const row = store.explainer(id);
-        if (row) pages.publish({ type: "explainer", explainerId: row.id, threadId: row.thread_id, messageId: row.message_id, parentId: row.parent_id });
-      }
-    },
+    /** What `bb.agents.configure` gives a thread: the tool, and the instructions when the setting is on. */
+    configure: (enabled: boolean) => ({ tools: [EXPLORE_TOOL], skills: [], ...(enabled ? { instructions } : {}) }),
   };
 }

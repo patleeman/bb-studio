@@ -121,6 +121,22 @@ export class ExploreService {
     };
   }
 
+  /**
+   * The explainer, after forgetting its page if it was deleted in Pages, so
+   * the next click writes a new one. Pages doesn't tell other plugins about
+   * deletions, so this is checked when an explainer is opened.
+   */
+  async checkPage(explainerId: string): Promise<ExplainerRow | null> {
+    const row = this.store.explainer(explainerId);
+    if (!row?.page_id || this.isRunning(row.id)) return row ?? null;
+    const page = await this.deps.pages.get(row.page_id).catch(() => undefined);
+    if (page !== null) return row;
+    this.store.forgetPages([row.page_id]);
+    const forgotten = this.store.explainer(row.id)!;
+    this.deps.changed(forgotten);
+    return forgotten;
+  }
+
   isRunning(explainerId: string): boolean {
     // A stopped job may still be unwinding; it no longer blocks a new one.
     for (const job of this.active.values()) if (job.explainerId === explainerId && !job.controller.signal.aborted) return true;

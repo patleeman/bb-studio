@@ -1,15 +1,13 @@
-// Explore: names, directive parsing and job stages the server and the app
-// share. Runtime-free (only constants), so it's bundled into both.
-import { PLUGIN_ID } from "../constants";
+// Names, directive parsing and job stages the server and the app share.
+// Runtime-free (only constants), so it's bundled into both.
+import { PAGES_PLUGIN_ID } from "./constants";
 
 /** The directive: `::explore{items="🐛 Retry backoff disagrees in billing|🏗️ How the job queue works"}`. */
 export const DIRECTIVE = "explore";
-/** Pages' thread panel tab; `{ explainerId }` params open an explainer in it. */
-export const PAGE_PANEL_ACTION = "page";
+/** Explore's thread panel tab; `{ explainerId }` params open an explainer in it. */
+export const PANEL_ACTION = "explainer";
 /** The Studio tag every explainer page gets. */
 export const EXPLORE_TAG = "Explore";
-/** Who explainer pages are written by: an agent-style key, shown as "an agent". */
-export const EXPLORE_ACTOR = "agent:explore";
 /**
  * `pluginMetadata` key on an Explore worker thread (a hidden fork of the
  * thread): it gets neither the Explore instructions nor the tool.
@@ -105,7 +103,7 @@ export const STAGES: Record<JobStatus, { label: string; progress: number }> = {
 export type RowState = "idle" | "running" | "ready" | "error";
 
 export function explainerHref(pageId: string): string {
-  return `/plugins/${PLUGIN_ID}/pages/${pageId}`;
+  return `/plugins/${PAGES_PLUGIN_ID}/pages/${pageId}`;
 }
 
 export function threadHref(threadId: string): string {

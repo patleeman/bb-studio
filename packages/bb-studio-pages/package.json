@@ -9,12 +9,11 @@
   },
   "bb": {
     "name": "Studio Pages",
-    "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, let one keep a page up to date, or explore what an agent noticed along the way.",
+    "description": "Part of BB Studio. Collaborative pages you write with your agents. Mention a Studio Teams bot to hand it work, or let one keep a page up to date.",
     "branding": {
       "icon": "./icons/pages.svg",
       "experimental_icons": {
-        "pages": "./icons/pages.svg",
-        "explore": "./icons/explore.svg"
+        "pages": "./icons/pages.svg"
       }
     },
     "server": "./server.ts",

@@ -19,6 +19,4 @@ export type RealtimeEvent =
   | { type: "tree"; projectId: string | null }
   | { type: "page"; pageId: string }
   | { type: "requests"; pageId: string }
-  | { type: "deleted"; pageIds: string[] }
-  /** An Explore explainer or its job changed. */
-  | { type: "explainer"; explainerId: string; threadId: string; messageId: string; parentId: string | null };
+  | { type: "deleted"; pageIds: string[] };

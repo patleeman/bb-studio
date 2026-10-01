@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { agentConfiguration, TOOL_NAMES } from "../tools";
 import { INSTRUCTIONS_LIMIT, exploreInstructions, workerPrompt } from "./prompt";
 import { EXPLORE_TOOL } from "./register";
 import { parseExploreItems } from "./shared";
@@ -8,16 +7,12 @@ import { isExploreWorker, workerOutput } from "./worker";
 describe("the instructions", () => {
   const text = exploreInstructions();
 
-  it("fit in what bb.agents.configure keeps, with Pages' own", () => {
-    const config = agentConfiguration({ tools: [EXPLORE_TOOL], instructions: text });
-    expect(config.instructions.length).toBeLessThan(INSTRUCTIONS_LIMIT);
-    expect(config.instructions).toContain(text);
-    expect(config.tools).toEqual([...TOOL_NAMES, EXPLORE_TOOL]);
+  it("fit in what bb.agents.configure keeps", () => {
+    expect(text.length).toBeLessThan(INSTRUCTIONS_LIMIT);
+    expect(EXPLORE_TOOL).toBe("explore_explain");
   });
 
-  it("are left out for Explore workers and when the setting is off", () => {
-    expect(agentConfiguration(null)).toEqual({ tools: [...TOOL_NAMES], skills: [], instructions: agentConfiguration({ tools: [], instructions: null }).instructions });
-    expect(agentConfiguration(null).instructions).not.toContain("::explore");
+  it("are left out for Explore workers", () => {
     expect(isExploreWorker({ exploreExplainerId: "exp_1" })).toBe(true);
     // Pages' other threads (page chats, bots) are plugin-started too, without the marker.
     expect(isExploreWorker({})).toBe(false);

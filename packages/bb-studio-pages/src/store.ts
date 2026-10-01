@@ -69,7 +69,7 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS chats_page ON chats (page_id, created_at)`,
-  // Explore: explainers written from what agents noticed along the way (explore/store.ts).
+  // Explore's old tables. Explore is its own plugin now (bb-studio-explore); kept so the list stays append-only.
   `CREATE TABLE IF NOT EXISTS explore_explainers (
      id TEXT PRIMARY KEY,
      key TEXT NOT NULL UNIQUE,

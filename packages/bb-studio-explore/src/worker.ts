@@ -19,7 +19,7 @@ function isSessionUnavailable(error: unknown): boolean {
   return typeof error === "object" && error !== null && (error as { code?: unknown }).code === "fork_source_session_unavailable";
 }
 
-/** Whether a thread's `pluginMetadata` (Pages' namespace) marks it as an Explore worker. */
+/** Whether a thread's `pluginMetadata` (Explore's namespace) marks it as an Explore worker. */
 export function isExploreWorker(metadata: Readonly<Record<string, unknown>>): boolean {
   return typeof metadata[WORKER_METADATA_KEY] === "string";
 }

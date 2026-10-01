@@ -1,23 +1,21 @@
-// Where explainers are saved: Pages itself, in process (create, read,
-// replace with a version), and tagged Explore in Studio over cross-plugin
-// RPC. Studio is optional, so tagging is best effort.
+// Where explainers are saved: Pages, over cross-plugin RPC (create, read,
+// replace with a version), tagged Explore in Studio. Studio is optional, so
+// tagging is best effort.
 import type { JsonValue } from "@get-bb/plugin-sdk";
 import { STUDIO_PLUGIN_ID, studioTagSchemas } from "@bb-studio/kit/contract";
 import { z } from "zod";
-import { actorColor } from "../bots";
-import { PLUGIN_ID } from "../constants";
-import { readMarkdown } from "../doc";
-import type { Actor } from "../hub";
-import type { PagesService } from "../service";
-import { EXPLORE_ACTOR, EXPLORE_TAG } from "./shared";
+import { PAGES_PLUGIN_ID } from "./constants";
+import { EXPLORE_TAG } from "./shared";
 
 const MAX_TITLE = 200;
 const MAX_SNAPSHOT_NAME = 120;
+const TIMEOUT_MS = 30_000;
 
 export interface ExplorePages {
   create(input: { projectId: string | null; parentId: string | null; title: string; icon?: string; markdown: string }): Promise<{ id: string }>;
   /** Saves the current content as a version named `snapshotName` first. */
   replaceMarkdown(id: string, markdown: string, snapshotName: string): Promise<{ id: string }>;
+  /** Null when the page is gone; throws when Pages can't be reached. */
   get(id: string): Promise<{ id: string; archived: boolean } | null>;
   markdown(id: string): Promise<string>;
   /** Tags a page `Explore` in Studio; false when that didn't work. */
@@ -29,27 +27,26 @@ export interface CallRpc {
 }
 
 const tagSchemas = studioTagSchemas(z);
+// The part of Pages' contract (bb-studio-pages/src/contract.ts) Explore reads.
+const page = z.object({ id: z.string(), archived: z.boolean() });
+const pageOutput = z.object({ page });
 
-/** Explore writes pages like an agent does, so Pages shows its edits as "an agent". */
-export const EXPLORE_AUTHOR: Actor = { key: EXPLORE_ACTOR, name: "Explore", color: actorColor(EXPLORE_ACTOR) };
-
-export function explorePages(pages: PagesService, plugins: CallRpc): ExplorePages {
+export function explorePages(plugins: CallRpc): ExplorePages {
+  const pages = <T>(method: string, input: JsonValue, outputSchema: z.ZodType<T>) =>
+    plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input, outputSchema, signal: AbortSignal.timeout(TIMEOUT_MS) });
   return {
     async create({ projectId, parentId, title, icon, markdown }) {
-      const meta = pages.createPage({ projectId, parentId, title: title.slice(0, MAX_TITLE), icon, markdown, actor: EXPLORE_ACTOR });
-      return { id: meta.id };
+      const input = { projectId, parentId, title: title.slice(0, MAX_TITLE), markdown, ...(icon ? { icon } : {}) };
+      return (await pages("create", input, pageOutput)).page;
     },
     async replaceMarkdown(id, markdown, snapshotName) {
-      const meta = pages.replaceMarkdown(id, markdown, snapshotName.slice(0, MAX_SNAPSHOT_NAME), EXPLORE_AUTHOR);
-      return { id: meta.id };
+      return (await pages("replaceMarkdown", { id, markdown, snapshotName: snapshotName.slice(0, MAX_SNAPSHOT_NAME) }, pageOutput)).page;
     },
     async get(id) {
-      const meta = pages.store.meta(id);
-      return meta ? { id: meta.id, archived: meta.archived_at !== null } : null;
+      return (await pages("get", { id }, z.object({ page: page.nullable() }))).page;
     },
     async markdown(id) {
-      if (!pages.store.meta(id)) throw new Error("Page not found.");
-      return readMarkdown(pages.hub.open(id).doc);
+      return (await pages("markdown", { id }, z.object({ markdown: z.string() }))).markdown;
     },
     async tag(pageId) {
       try {
@@ -57,7 +54,7 @@ export function explorePages(pages: PagesService, plugins: CallRpc): ExplorePage
         await plugins.callRpc({
           pluginId: STUDIO_PLUGIN_ID,
           method: "tagItems",
-          input: { items: [{ pluginId: PLUGIN_ID, id: pageId }], add: [tag.id], remove: [] },
+          input: { items: [{ pluginId: PAGES_PLUGIN_ID, id: pageId }], add: [tag.id], remove: [] },
           outputSchema: tagSchemas.tagItems.output,
         });
         return true;

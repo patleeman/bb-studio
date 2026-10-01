@@ -2,17 +2,17 @@
 // reply (the `::explore{items="🐛 …|🏗️ …"}` directive), and "Explore next"
 // under an explainer. A row shows its explainer's state (Explore →
 // Generating · 45% → Open · generated 2h ago, or Retry) from what's saved,
-// so it survives a reload. Clicking one opens it in Pages' side-panel tab.
+// so it survives a reload. Clicking one opens it in Explore's side-panel tab.
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
+import { relativeTime } from "@bb-studio/kit/format";
 import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
-import { labelKey, parseExploreItems, type ExploreItem } from "../explore/shared";
+import { labelKey, parseExploreItems, type ExploreItem } from "../shared";
 import { EXPLORE_ICON, explainerEvent, openExplainer, rowState, useMinuteTick, type ExplainerView } from "./explore";
-import { relativeTime } from "./shared";
 
 const POLL_MS = 2_500;
 /** Where the Explore setting lives: this plugin's page in Settings. */
