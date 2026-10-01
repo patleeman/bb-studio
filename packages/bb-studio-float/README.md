@@ -8,12 +8,14 @@ right, or drag it anywhere.
 
 ## Staged preview
 
-![Live BB screenshot of Float windows along the bottom of the screen](assets/staged-preview.png)
+![Live BB screenshot of Float's tab panel dragged over Studio](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded
-"Draft the ORBIT-42 release notes" thread, a Studio Teams channel, and a
-Studio page each floated from their sidebar menus. They sit side by side along
-the bottom of the screen, while the main view shows something else.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): a Studio
+page ("Offline mode launch"), the seeded "Draft the ORBIT-42 release notes"
+thread and the "#Launch room" channel, each floated from its menu, as three
+tabs in one panel. The panel was pulled off the bottom and dropped over the
+Studio list, the channel's tab dragged to the front, and the page's tab
+picked, so Pages renders the page inside it.
 
 ## What you get
 
@@ -49,7 +51,7 @@ into the panel through a portal. The shared kit's `FloatPanels` does this
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 
-[Studio Chat](../bb-studio-chat) puts its "Work with this…" bar in Float's
+[Studio Chat](../bb-studio-chat) puts its New thread and Open thread buttons in Float's
 bottom-right corner, and adds a "Viewing" chip to thread tabs.
 
 More in [docs/float.md](../../docs/float.md).
