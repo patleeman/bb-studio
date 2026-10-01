@@ -18,18 +18,17 @@ import { message } from "./bot-ui";
 const attentionReasons = { decision: "Decision needed", blocker: "Blocked", update: "Important update" };
 import { ChannelSearch } from "./channel-search";
 import { ChannelAutomationsView } from "./channel-automations-view";
-import { channelHandoffText, takeChannelThreadHandoff } from "./handoff-draft";
+import { channelHandoffDraft, takeChannelThreadHandoff } from "./handoff-draft";
 
 /**
  * A channel is a BB thread. These surfaces add what a channel has that a
  * thread does not: its members in the header and its live work above the
- * composer. The chat mode and bot permissions are the composer's own
- * model picker (see channel-provider.ts). Each renders nothing on ordinary
- * threads.
+ * composer. The chat mode and bot permissions sit beside the composer (see
+ * channel-settings.tsx). Each renders nothing on ordinary threads.
  */
 type Surface = NonNullable<z.output<typeof rpcContract.channelSurface.output>>;
 
-function useChannelSurface(threadId: string | null) {
+export function useChannelSurface(threadId: string | null) {
   const rpc = useRpc<typeof rpcContract>();
   const [surface, setSurface] = useState<Surface | null>(null);
   const request = useRef(0);
@@ -196,9 +195,9 @@ export function ChannelHandoffPrefill() {
   const composer = useComposer();
   const threadId = composer.scope.kind === "thread" ? composer.scope.threadId : null;
   useEffect(() => {
-    const source = threadId && takeChannelThreadHandoff(threadId);
-    if (!source) return;
-    composer.setText(`${channelHandoffText(source)}\n\n${composer.text}`.trimEnd() + "\n\n");
+    const handoff = threadId && takeChannelThreadHandoff(threadId);
+    if (!handoff) return;
+    composer.setText(channelHandoffDraft(handoff, composer.text));
     // Runs once per thread: the saved handoff is consumed on first read.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [threadId]);

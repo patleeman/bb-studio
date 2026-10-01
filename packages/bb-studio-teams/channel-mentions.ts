@@ -67,7 +67,7 @@ export function registerChannelMentions(
       return {
         context: [
           `@${bot.handle} is the Studio Teams bot ${bot.name}: ${bot.description}.`,
-          "In a channel, mention it to ask it. Elsewhere, reach it with the bots skill (`bb bots channel send` or its direct messages).",
+          "In a channel, mention it to ask it. Elsewhere, reach it with the bots skill (`bb bots channel send`), or attach its profile to a thread.",
         ].join("\n"),
       };
     },
@@ -111,7 +111,7 @@ export function registerChannelMentions(
 
   bb.ui.registerMentionProvider({
     id: mentionProviders.directMessages,
-    label: "Direct messages",
+    label: "Bot threads",
     async search({ query, threadId }) {
       const direct = store
         .all()
@@ -140,7 +140,7 @@ export function registerChannelMentions(
         .map(({ bot, conversation, title }) => ({
           id: conversation.threadId,
           title: /^direct message$/iu.test(title) ? `${bot.avatar} ${bot.name}` : title,
-          subtitle: `Direct message with ${bot.name}`,
+          subtitle: `Works as ${bot.name}`,
           icon: "MessageSquare",
         }));
     },
@@ -148,11 +148,11 @@ export function registerChannelMentions(
       const conversation = store.byThread(threadId);
       const bot = conversation && store.all().find((candidate) => candidate.id === conversation.botId);
       const thread = await bb.sdk.threads.get({ threadId });
-      const title = thread.title?.trim() || thread.titleFallback?.trim() || "Direct message";
+      const title = thread.title?.trim() || thread.titleFallback?.trim() || "Bot thread";
       const latest = (await bb.sdk.threads.output({ threadId }).catch(() => null))?.output;
       return {
         context: [
-          `Direct message thread "${title}"${bot ? ` with the Studio Teams bot ${bot.name} (@${bot.handle})` : ""}: [${title}](/threads/${threadId}) (thread ${threadId}).`,
+          `Thread "${title}"${bot ? ` with the profile of the Studio Teams bot ${bot.name} (@${bot.handle})` : ""}: [${title}](/threads/${threadId}) (thread ${threadId}).`,
           latest?.trim() ? `Latest reply: ${excerpt(latest)}` : "No replies yet.",
           `Read the whole thread with \`bb thread log ${threadId}\`.`,
         ].join("\n"),

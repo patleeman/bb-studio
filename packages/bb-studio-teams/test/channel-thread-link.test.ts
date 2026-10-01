@@ -8,8 +8,6 @@ import { Store } from "../store";
 import { botSchema, roomSchema, type RoomMessage } from "../contract";
 import { ChannelThreads } from "../channel-thread-link";
 import {
-  levelForPermission,
-  permissionForLevel,
   channelDeliverPrefix,
   channelDeliverySchema,
   channelProviderId,
@@ -218,23 +216,15 @@ test("a bot reply leads with the bot's name, since assistant messages have no au
   );
 });
 
-test("the composer's picker carries the chat mode and bot permissions", async () => {
-  for (const permission of [null, "accept-edits", "auto", "full"] as const)
-    assert.equal(permissionForLevel(levelForPermission(permission)), permission);
+test("channel threads use the single channel model, whatever the room's settings", async () => {
   const x = setup();
   x.store.putRoom({ ...x.room, responseBehavior: "directed", permissionMode: "auto" });
   await x.links.ensure(x.store.room(x.room.id));
   const spawn = x.spawned[0] as { model: string; reasoningLevel: string };
-  assert.deepEqual([spawn.model, spawn.reasoningLevel], ["directed", "medium"]);
-  // A change made outside the thread (the CLI, agent tools) reaches the picker once.
+  assert.deepEqual([spawn.model, spawn.reasoningLevel], ["channel", "none"]);
+  // Older threads carried the chat mode as their model; they move once.
+  await x.links.sync(x.room.id);
   x.store.putRoom({ ...x.store.room(x.room.id), responseBehavior: "smart", permissionMode: null });
   await x.links.sync(x.room.id);
-  await x.links.sync(x.room.id);
-  assert.deepEqual(x.selections.slice(-1), ["smart:none"]);
-  // A selection the thread just applied is not pushed back to it.
-  x.store.putRoom({ ...x.store.room(x.room.id), responseBehavior: "everyone" });
-  x.links.noteSelection(x.store.room(x.room.id));
-  const before = x.selections.length;
-  await x.links.sync(x.room.id);
-  assert.equal(x.selections.length, before);
+  assert.deepEqual(x.selections, ["channel:none"]);
 });

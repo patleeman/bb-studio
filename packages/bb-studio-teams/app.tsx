@@ -36,6 +36,9 @@ import {
 } from "./channels";
 import { Modal } from "./channel-controls";
 import { setThreadDraft } from "./channel-drafts";
+import { ChannelSettings } from "./channel-settings";
+import { ProfilePicker } from "./profile-picker";
+import { ProfileThreads } from "./profile-threads";
 import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
 import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID } from "./studio-provider";
@@ -66,7 +69,7 @@ import {
   ChannelHandoffPrefill,
   ChannelThreadHeader,
 } from "./channel-thread-surfaces";
-const tabs = ["profile", "mission", "memory", "activity", "usage"] as const;
+const tabs = ["profile", "mission", "memory", "threads", "activity", "usage"] as const;
 const STATUS_TONES = {
   ready: "success",
   working: "live",
@@ -277,6 +280,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
               file={tab === "mission" ? "MISSION.md" : "MEMORY.md"}
             />
           )}
+          {tab === "threads" && <ProfileThreads id={id} />}
           {tab === "usage" && <UsagePanel id={id} kind="bot" />}
           {tab === "activity" && (
             <>
@@ -425,10 +429,16 @@ export default definePluginApp((app) => {
     component: ChannelThreadHeader,
   });
   app.composer.customize({
+    id: "thread-profile",
+    scopes: ["thread", "new-thread"],
+    actions: [{ id: "profile", component: ProfilePicker }],
+  });
+  app.composer.customize({
     id: "channel-thread",
     scopes: ["thread"],
     actions: [
       { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
+      { id: "channel-settings", component: ChannelSettings },
     ],
     banners: [{ id: "channel-work", component: ChannelComposerBanner }],
     richText: {
@@ -453,7 +463,7 @@ export default definePluginApp((app) => {
     path: "channels",
     component: ChannelsPage,
   });
-  // Channels and Direct messages, as sections of the Studio Sidebar.
+  // Channels, as a section of the Studio Sidebar.
   app.slots.experimental_appOverlay({ id: "sidebar-sections", component: TeamsSidebar });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
 });

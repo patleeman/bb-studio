@@ -6797,6 +6797,368 @@
         "additionalProperties": false
       }
     },
+    "profiles": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "limits": {
+              "type": "object",
+              "properties": {
+                "turnsPerHour": {
+                  "default": 100,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000
+                },
+                "turnsPerDay": {
+                  "default": 1000,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 10000
+                },
+                "minutesPerTurn": {
+                  "default": 20,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 180
+                },
+                "concurrentForks": {
+                  "default": 2,
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              },
+              "required": [
+                "turnsPerHour",
+                "turnsPerDay",
+                "minutesPerTurn",
+                "concurrentForks"
+              ],
+              "additionalProperties": false
+            },
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 80
+            },
+            "description": {
+              "default": "",
+              "type": "string",
+              "maxLength": 500
+            },
+            "avatar": {
+              "default": "🤖",
+              "type": "string",
+              "maxLength": 16
+            },
+            "providerId": {
+              "default": "codex",
+              "type": "string",
+              "maxLength": 100
+            },
+            "model": {
+              "default": "",
+              "type": "string",
+              "maxLength": 200
+            },
+            "fallbackProviderId": {
+              "default": "",
+              "type": "string",
+              "maxLength": 100
+            },
+            "fallbackModel": {
+              "default": "",
+              "type": "string",
+              "maxLength": 200
+            },
+            "fallbackReasoningLevel": {
+              "default": "medium",
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+                "ultra",
+                "ultracode"
+              ]
+            },
+            "reasoningLevel": {
+              "default": "medium",
+              "type": "string",
+              "enum": [
+                "none",
+                "low",
+                "medium",
+                "high",
+                "xhigh",
+                "max",
+                "ultra",
+                "ultracode"
+              ]
+            },
+            "permissionMode": {
+              "default": "auto",
+              "type": "string",
+              "enum": [
+                "accept-edits",
+                "auto",
+                "full"
+              ]
+            },
+            "intervalMinutes": {
+              "default": 0,
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10080
+            },
+            "id": {
+              "type": "string",
+              "pattern": "^bot_[a-f0-9]{16}$"
+            },
+            "handle": {
+              "type": "string"
+            },
+            "home": {
+              "type": "string"
+            },
+            "projectId": {
+              "type": "string"
+            },
+            "hostId": {
+              "type": "string"
+            },
+            "retired": {
+              "type": "boolean"
+            },
+            "createdAt": {
+              "type": "number"
+            },
+            "updatedAt": {
+              "type": "number"
+            },
+            "lastWakeAt": {
+              "type": "number"
+            },
+            "error": {
+              "type": [
+                "string",
+                "null"
+              ]
+            }
+          },
+          "required": [
+            "name",
+            "description",
+            "avatar",
+            "providerId",
+            "model",
+            "fallbackProviderId",
+            "fallbackModel",
+            "fallbackReasoningLevel",
+            "reasoningLevel",
+            "permissionMode",
+            "intervalMinutes",
+            "id",
+            "handle",
+            "home",
+            "projectId",
+            "hostId",
+            "createdAt",
+            "updatedAt",
+            "lastWakeAt",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
+    "threadProfile": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "botId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "pattern": "^bot_[a-f0-9]{16}$"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "botId"
+            ],
+            "additionalProperties": false
+          },
+          {
+            "type": "null"
+          }
+        ]
+      }
+    },
+    "setThreadProfile": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "botId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^bot_[a-f0-9]{16}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "botId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "botId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^bot_[a-f0-9]{16}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "botId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "pendingThreadProfile": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "botId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^bot_[a-f0-9]{16}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "botId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "profileThreads": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^bot_[a-f0-9]{16}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "archived": {
+              "type": "boolean"
+            },
+            "updatedAt": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "threadId",
+            "title",
+            "archived",
+            "updatedAt"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
     "createRoom": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -15,11 +15,8 @@ import {
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
 import {
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
-  DropdownMenuTrigger,
   SidebarDisplayMenuItems,
   SidebarGroupHeading,
   SidebarNote,
@@ -33,11 +30,8 @@ import {
 } from "@bb-studio/kit/app";
 import type {
   Bot,
-  Conversation,
-  DirectThreadInfo,
   Room,
   rpcContract,
-  DirectThreadView,
   RoomWork,
   ThreadStatusView,
 } from "./contract";
@@ -46,7 +40,6 @@ import { Input } from "@bb-studio/kit/ui";
 import { sharedReads } from "./shared-read";
 import { ErrorMessage, message } from "./bot-ui";
 import { ChannelSidebarRow } from "./channel-sidebar-row";
-import { DirectSidebarThread } from "./direct-sidebar-row";
 import { channelLinkDestination } from "./channel-links";
 import { mentionBotId } from "./mentions";
 import { Modal } from "./channel-controls";
@@ -65,9 +58,6 @@ function useRoster(reconcile = false) {
     bots: Bot[];
     rooms: Room[];
     activeRoomIds: string[];
-    directThreads: Record<string, DirectThreadView>;
-    directConversations: Record<string, Conversation[]>;
-    directThreadInfo: Record<string, DirectThreadInfo>;
     roomThreads: Record<string, ThreadStatusView[]>;
     roomWork: Record<string, RoomWork>;
     attentionCounts: Record<string, number>;
@@ -76,9 +66,6 @@ function useRoster(reconcile = false) {
     bots: [],
     rooms: [],
     activeRoomIds: [],
-    directThreads: {},
-    directConversations: {},
-    directThreadInfo: {},
     roomThreads: {},
     roomWork: {},
     attentionCounts: {},
@@ -120,10 +107,6 @@ function useRoster(reconcile = false) {
     if (reconcile && connectionState === "connected") load();
   }, [reconcile, connectionState, load]);
   const hasActiveWork = data.activeRoomIds.length > 0 ||
-    Object.values(data.directThreads).some((thread) =>
-      ["starting", "active", "stopping"].includes(thread.status) ||
-      ["runtime", "workflow", "background-agent", "background-command", "plan-mode", "goal"]
-        .includes(thread.indicator)) ||
     Object.values(data.roomThreads).flat().some((thread) =>
       ["runtime", "workflow", "background-agent", "background-command", "plan-mode", "goal"]
         .includes(thread.indicator));
@@ -223,8 +206,8 @@ export function ChannelRedirect({ subPath }: { subPath?: string }) {
   return null;
 }
 /**
- * Channels and Direct messages, as two sections of the Studio Sidebar above
- * the threads. Without Studio Sidebar as the thread list they don't show; the
+ * Channels, as a section of the Studio Sidebar above
+ * the threads. Without Studio Sidebar as the thread list it doesn't show; the
  * Channels and Bots panels still reach everything.
  */
 export function TeamsSidebar() {
@@ -262,25 +245,19 @@ export function ChannelsSidebar({
   onNavigate,
   activeThreadId,
 }: Pick<PluginThreadListProps, "activeThreadId" | "onNavigate">) {
-  const { bots, rooms, activeRoomIds, directThreads, directConversations, directThreadInfo, roomThreads, roomWork,
-    attentionCounts, approvalCounts, error, load } =
+  const { rooms, activeRoomIds, roomThreads, roomWork, attentionCounts, approvalCounts, error } =
       useRoster(true),
     rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
   const [channelSearch, setChannelSearch] = useState(""),
-    [directSearch, setDirectSearch] = useState(""),
     [channelSearching, setChannelSearching] = useState(false),
-    [directSearching, setDirectSearching] = useState(false),
     [archived, setArchived] = useState(false),
-    [showArchivedBots, setShowArchivedBots] = useState(false),
-    [showArchivedDirectThreads, setShowArchivedDirectThreads] = useState(false),
     [display, updateDisplay] = useSidebarDisplay(channelDisplayKey, defaultChannelDisplay, channelDisplayOptions),
     [renaming, setRenaming] = useState<Room | null>(null),
     [deleting, setDeleting] = useState<Room | null>(null),
     [failure, setFailure] = useState<string | null>(null),
     [pending, setPending] = useState(false);
   const expandChannels = useExpandSidebarSection("channels");
-  const expandDirect = useExpandSidebarSection("direct-messages");
   const archive = async (room: Room) => {
     setPending(true);
     setFailure(null);
@@ -336,31 +313,6 @@ export function ChannelsSidebar({
     );
   };
   const channelQuery = channelSearch.trim().toLowerCase();
-  const directQuery = directSearch.trim().toLowerCase();
-  // One flat list: every visible direct thread, newest activity first, with its bot on the row.
-  const directRows = bots
-    .filter((bot) => showArchivedBots || !bot.retired)
-    .flatMap((bot) => (directConversations[bot.id] ?? []).flatMap((conversation) => {
-      const info = directThreadInfo[conversation.threadId];
-      if (!info || (!showArchivedDirectThreads && info.archivedAt)) return [];
-      const haystack = `${info.title} ${bot.name} @${bot.handle}`.toLowerCase();
-      return haystack.includes(directQuery) ? [{ bot, conversation, info }] : [];
-    }))
-    .sort((a, b) => b.info.updatedAt - a.info.updatedAt ||
-      a.info.title.localeCompare(b.info.title));
-  const startDirectThread = async (bot: Bot) => {
-    setPending(true);
-    setFailure(null);
-    try {
-      const conversation = await rpc.call("newConversation", { id: bot.id });
-      navigate.toThread(conversation.threadId);
-      onNavigate();
-    } catch (cause) {
-      setFailure(message(cause));
-    } finally {
-      setPending(false);
-    }
-  };
   const list = rooms
     .filter(
       (r) =>
@@ -503,83 +455,6 @@ export function ChannelsSidebar({
                     : "No active channels"}
               </SidebarNote>
             )}
-          </div>
-        </SidebarSection>
-      </SidebarPortal>
-      <SidebarPortal id="direct-messages" title="Direct messages" order={20}>
-        <SidebarSection
-          title="Direct messages"
-          menuLabel="Direct message list options"
-          actions={[
-            {
-              label: "Search direct messages",
-              icon: "Search",
-              pressed: directSearching,
-              onClick: () => {
-                setDirectSearching(!directSearching);
-                setDirectSearch("");
-                expandDirect();
-              },
-            },
-          ]}
-          trailing={
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className="teams-sidebar-control" aria-label="New direct message" title="New direct message">
-                  <Icon name="Plus" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" aria-label="Choose a bot">
-                {bots.filter((bot) => !bot.retired).sort((a, b) =>
-                  a.name.localeCompare(b.name)).map((bot) => (
-                  <DropdownMenuItem key={bot.id} disabled={pending}
-                    onSelect={() => void startDirectThread(bot)}>
-                    {bot.name}
-                  </DropdownMenuItem>
-                ))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-          }
-          menu={
-            <>
-              <DropdownMenuItem
-                aria-label={showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
-                onSelect={() => {
-                  setShowArchivedDirectThreads(!showArchivedDirectThreads);
-                  expandDirect();
-                }}>
-                <Icon name="Archive" />
-                {showArchivedDirectThreads ? "Hide archived threads" : "Show archived threads"}
-              </DropdownMenuItem>
-              <DropdownMenuItem
-                aria-label={showArchivedBots ? "Hide archived bots" : "Show archived bots"}
-                onSelect={() => {
-                  setShowArchivedBots(!showArchivedBots);
-                  expandDirect();
-                }}>
-                <Icon name={showArchivedBots ? "ListView" : "Archive"} />
-                {showArchivedBots ? "Hide archived bots" : "Show archived bots"}
-              </DropdownMenuItem>
-            </>
-          }
-        >
-          <div className="channels-sidebar-body">
-            {directSearching && (
-              <Input autoFocus aria-label="Search direct messages"
-                placeholder="Search direct messages…" value={directSearch}
-                onChange={(event) => setDirectSearch(event.target.value)} />
-            )}
-            {directRows.map(({ bot, conversation, info }) => (
-              <DirectSidebarThread key={conversation.threadId} bot={bot}
-                conversation={conversation} info={info}
-                status={directThreads[bot.id]?.threadId === conversation.threadId
-                  ? directThreads[bot.id] : undefined}
-                onNavigate={onNavigate} onNewThread={() => void startDirectThread(bot)}
-                onChanged={load} selected={activeThreadId === conversation.threadId} />
-            ))}
-            {!directRows.length && <SidebarNote>
-              {directQuery ? "No matching direct messages" : "No direct messages yet"}
-            </SidebarNote>}
           </div>
         </SidebarSection>
       </SidebarPortal>

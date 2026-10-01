@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import {
   channelDeliverPrefix,
-  levelForPermission,
+  channelModelId,
   channelProviderId,
   channelStartPrefix,
   type ChannelDelivery,
@@ -16,10 +16,6 @@ import { missingThread } from "./runtime";
 
 /** A channel with history opens its thread on this many recent messages. */
 const replayLimit = 50;
-
-function selectionKey(room: Room) {
-  return `${room.responseBehavior ?? "everyone"}:${levelForPermission(room.permissionMode)}`;
-}
 
 function deliveryText(delivery: ChannelDelivery) {
   return `${channelDeliverPrefix}${JSON.stringify(delivery)}`;
@@ -45,8 +41,8 @@ interface Link {
  */
 export class ChannelThreads {
   private readonly creating = new Map<string, Promise<string>>();
-  /** The chat mode and permission level each thread's picker last showed. */
-  private readonly selections = new Map<string, string>();
+  /** Threads already on the single channel model; older ones carried the chat mode as their model. */
+  private readonly onChannelModel = new Set<string>();
   private readonly delivering = new Map<string, Promise<void>>();
   private rerun = new Set<string>();
 
@@ -88,11 +84,6 @@ export class ChannelThreads {
     }
   }
 
-  /** The picker already shows this room's selection: a message just applied it. */
-  noteSelection(room: Room) {
-    this.selections.set(room.id, selectionKey(room));
-  }
-
   /** A message posted from the channel thread is already visible there. */
   markOrigin(messageId: string) {
     this.store.db.prepare("INSERT OR IGNORE INTO channel_thread_origins VALUES (?)").run(messageId);
@@ -127,8 +118,8 @@ export class ChannelThreads {
       title: room.name,
       visibility: "hidden",
       providerId: channelProviderId,
-      model: room.responseBehavior ?? "everyone",
-      reasoningLevel: levelForPermission(room.permissionMode),
+      model: channelModelId,
+      reasoningLevel: "none",
       executionInputSources: { providerId: "explicit", model: "explicit", reasoningLevel: "explicit" },
       pluginMetadata: { channelRoomId: room.id },
     });
@@ -261,16 +252,9 @@ export class ChannelThreads {
     const link = this.link(roomId);
     const room = this.store.findRoom(roomId);
     if (!link || !room) return;
-    // The picker shows the channel's mode and permissions; follow changes made
-    // elsewhere (the CLI, agent tools).
-    const selection = selectionKey(room);
-    if (this.selections.get(roomId) !== selection) {
-      await this.bb.sdk.threads.update({
-        threadId: link.threadId,
-        model: room.responseBehavior ?? "everyone",
-        reasoningLevel: levelForPermission(room.permissionMode),
-      });
-      this.selections.set(roomId, selection);
+    if (!this.onChannelModel.has(roomId)) {
+      await this.bb.sdk.threads.update({ threadId: link.threadId, model: channelModelId, reasoningLevel: "none" });
+      this.onChannelModel.add(roomId);
     }
     if (link.title !== room.name) {
       await this.bb.sdk.threads.update({ threadId: link.threadId, title: room.name });

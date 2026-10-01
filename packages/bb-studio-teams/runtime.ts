@@ -61,8 +61,9 @@ export const missingThread = (cause: unknown) =>
 export const promptSpeaker = (message: Pick<RoomMessage, "botId" | "speaker">) =>
   !message.botId && message.speaker === "You" ? "the owner" : message.speaker;
 /** Primary work is serial within a conversation, but separate channels have separate lanes. */
+// Channel conversations and attached threads each run on their own lane.
 export const primaryLane = (botId: string, conversationKey: string) =>
-  conversationKey.startsWith("group:")
+  conversationKey.startsWith("group:") || conversationKey.startsWith("thread:")
     ? `${botId}:${conversationKey}`
     : botId;
 export function recipients(text: string, members: Bot[]) {
@@ -240,7 +241,7 @@ export class Runtime {
       .conversations(bot.id)
       .find((c) => c.key === key);
     if (existing) return existing;
-    const emptyDirectMessage = kind === "admin" && key === "admin" && !prompt && !attachments.length;
+    const emptyDirectMessage = kind === "admin" && !prompt && !attachments.length;
     const thread = await this.bb.sdk.threads.spawn({
       projectId: bot.projectId,
       environment: {
@@ -274,7 +275,8 @@ export class Runtime {
       ...(kind === "admin" ? {} : {
         title: kind === "group" ? `${bot.name} work · #${title}` : `${bot.name} · ${title}`,
       }),
-      visibility: "hidden",
+      // A thread with a profile is an ordinary thread; bot work stays hidden.
+      visibility: kind === "admin" ? "visible" : "hidden",
       providerId: bot.providerId,
       ...(bot.model ? { model: bot.model } : {}),
       reasoningLevel: bot.reasoningLevel,

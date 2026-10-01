@@ -421,6 +421,23 @@ public struct Bot: Codable, Identifiable, Hashable, Sendable {
     public var avatar: String?
     public var description: String?
     public var retired: Bool?
+    public var handle: String?
+    /// The bot's own selection, applied to a new thread that takes its profile.
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: String?
+    public var permissionMode: String?
+}
+
+/// A thread that works as a bot: an ordinary thread with the bot's profile
+/// attached. Listed on the bot's page.
+public struct ProfileThread: Codable, Identifiable, Hashable, Sendable {
+    public var threadId: String
+    public var title: String
+    public var archived: Bool
+    public var updatedAt: Double
+
+    public var id: String { threadId }
 }
 
 public struct Room: Codable, Identifiable, Hashable, Sendable {
@@ -449,24 +466,11 @@ public struct Room: Codable, Identifiable, Hashable, Sendable {
     ]
 }
 
+/// A bot's latest thread with its profile, which the Watch messages.
 public struct DirectThread: Codable, Hashable, Sendable {
     public var threadId: String
     public var indicator: String?
     public var status: String?
-}
-
-public struct DirectConversation: Codable, Hashable, Sendable {
-    public var botId: String
-    public var threadId: String
-    public var title: String?
-}
-
-public struct DirectThreadInfo: Codable, Hashable, Sendable {
-    public var title: String?
-    public var archivedAt: Double?
-    public var pinned: Bool?
-    public var unread: Bool?
-    public var updatedAt: Double?
 }
 
 /// A bot's MISSION.md or MEMORY.md. `version` is a hash of the text.
@@ -480,26 +484,11 @@ public struct BotDocument: Codable, Sendable, Hashable {
 public struct BotTeamsList: Codable, Sendable {
     public var bots: [Bot]
     public var rooms: [Room]
+    /// Each bot's latest thread with its profile.
     public var directThreads: [String: DirectThread]
-    public var directConversations: [String: [DirectConversation]]?
-    public var directThreadInfo: [String: DirectThreadInfo]?
     /// Open attention items and pending approvals per channel id.
     public var attentionCounts: [String: Int]?
     public var approvalCounts: [String: Int]?
-
-    /// The sidebar's Direct messages: each current bot's conversations that are
-    /// not archived, newest first. Retired bots are left out.
-    public var directMessages: [(bot: Bot, threadId: String, info: DirectThreadInfo?)] {
-        let info = directThreadInfo ?? [:]
-        var rows: [(bot: Bot, threadId: String, info: DirectThreadInfo?)] = []
-        for bot in bots where bot.retired != true {
-            let threadIds = directConversations?[bot.id]?.map(\.threadId) ?? directThreads[bot.id].map { [$0.threadId] } ?? []
-            for id in threadIds where info[id]?.archivedAt == nil {
-                rows.append((bot, id, info[id]))
-            }
-        }
-        return rows.sorted { ($0.info?.updatedAt ?? 0) > ($1.info?.updatedAt ?? 0) }
-    }
 }
 
 public struct RoomMessage: Decodable, Identifiable, Hashable, Sendable {

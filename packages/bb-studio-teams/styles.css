@@ -40,13 +40,6 @@
   line-height: 1.6;
 }
 
-.bot-direct-chat {
-  display: flex;
-  flex-direction: column;
-  flex: 1;
-  min-height: 0;
-}
-
 .bot-thread-status-icon {
   display: inline-flex;
   align-items: center;
@@ -68,82 +61,6 @@
 @media (prefers-reduced-motion: reduce) {
   .bot-thread-status-icon[data-motion] [data-icon-root] { animation: none; }
 }
-.direct-messages-sidebar { margin-top: 0; }
-
-.direct-thread-nav-row {
-  display: flex;
-  align-items: center;
-  position: relative;
-  min-width: 0;
-}
-.direct-thread-nav-row {
-  width: 100%;
-  border-radius: calc(var(--radius, 8px) - 2px);
-}
-.direct-thread-nav-row .channel-nav-row {
-  min-width: 0;
-  flex: 1;
-}
-/* The avatar sits where a channel row shows its #, so both lists line up. */
-.direct-thread-avatar {
-  display: inline-flex;
-  justify-content: center;
-  flex: 0 0 16px;
-  font-size: 13px;
-  line-height: 1;
-}
-.direct-thread-bot {
-  flex: 0 0 auto;
-  margin-left: auto;
-  max-width: 40%;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-}
-.direct-thread-nav-row:where(:hover, :focus-within) .direct-thread-bot { display: none; }
-.direct-thread-nav-row:where(:hover, :focus-within, :has([aria-current])) {
-  background: var(--sidebar-accent);
-}
-.direct-thread-nav-row .channel-nav-row:hover,
-.direct-thread-nav-row .channel-nav-row[aria-current] {
-  background: transparent;
-}
-.direct-thread-nav-row:where(:hover, :focus-within) .channel-nav-row {
-  padding-right: 64px;
-}
-.direct-thread-options {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: 0 0 20px;
-  width: 20px;
-  height: 20px;
-  border-radius: calc(var(--radius, 8px) - 2px);
-  color: var(--muted-foreground);
-}
-.direct-thread-nav-row .direct-thread-options {
-  position: absolute;
-  right: 0;
-  flex-basis: 28px;
-  width: 28px;
-  height: 28px;
-  pointer-events: none;
-}
-.direct-thread-nav-row .direct-thread-archive { right: 28px; }
-.direct-thread-nav-row:where(:hover, :focus-within) .direct-thread-options {
-  pointer-events: auto;
-}
-.direct-thread-nav-row .direct-thread-options [data-icon-root] {
-  width: 16px;
-  height: 16px;
-}
-.direct-thread-options { opacity: 0; }
-.direct-thread-nav-row:hover .direct-thread-options,
-.direct-thread-nav-row:focus-within .direct-thread-options { opacity: 1; }
-.direct-thread-options:hover { background: var(--state-hover); }
-.direct-thread-options:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
 .sidebar-inline-rename {
   position: relative;
   z-index: 50;
@@ -156,8 +73,7 @@
   overflow: visible;
   white-space: normal;
 }
-.channel-sidebar-rename-row,
-.direct-thread-nav-row:has(.sidebar-inline-rename) {
+.channel-sidebar-rename-row {
   outline: 1px solid var(--ring);
   outline-offset: -1px;
   cursor: text;
@@ -185,30 +101,6 @@
   color: var(--destructive);
   font-size: var(--text-xs);
   white-space: normal;
-}
-/* Touch has no hover, so the options button stays visible and the row always
-   leaves room for it. Archive lives in that menu, so its button is dropped. */
-@media (hover: none), (pointer: coarse) {
-  .direct-thread-options { opacity: 1; }
-  .direct-thread-nav-row .direct-thread-options {
-    width: 36px;
-    height: 36px;
-    pointer-events: auto;
-  }
-  .direct-thread-nav-row .direct-thread-archive { display: none; }
-  .direct-thread-nav-row .channel-nav-row {
-    height: var(--bb-sidebar-row-height-coarse, 36px);
-    padding-right: 40px;
-  }
-  .direct-thread-nav-row .direct-thread-bot { display: block; }
-}
-.bot-direct-chat [data-bot-direct-native-picker] {
-  display: none;
-}
-.bot-direct-chat [data-app-composer] {
-  width: 100%;
-  max-width: 728px;
-  margin-inline: auto;
 }
 
 .profile-picker-control {
@@ -607,37 +499,6 @@
 .channels-sidebar-body input {
   margin: 4px 0;
   height: 28px;
-}
-/* The New direct message button, as the section's own header buttons. */
-.teams-sidebar-control {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  width: 28px;
-  height: 28px;
-  flex-shrink: 0;
-  border-radius: calc(var(--radius, 8px) - 2px);
-  color: var(--subtle-foreground, var(--muted-foreground));
-  cursor: pointer;
-  outline: none;
-}
-.teams-sidebar-control:hover,
-.teams-sidebar-control[data-state="open"] {
-  background: var(--state-hover, var(--sidebar-accent));
-  color: var(--muted-foreground);
-}
-.teams-sidebar-control:focus-visible {
-  box-shadow: 0 0 0 2px var(--sidebar-ring, var(--ring));
-}
-.teams-sidebar-control [data-icon-root] {
-  width: 16px;
-  height: 16px;
-}
-@media (max-width: 767px) and (pointer: coarse) {
-  .teams-sidebar-control {
-    width: 36px;
-    height: 36px;
-  }
 }
 .channel-header {
   display: flex;
@@ -1310,4 +1171,35 @@
 
 .channel-automation-editor textarea {
   min-height: 96px;
+}
+/* Channel mode and bot permissions, beside the composer like the model picker. */
+.channel-settings-trigger {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+  white-space: nowrap;
+}
+.channel-settings-trigger:hover,
+.channel-settings-trigger[data-state="open"] {
+  background: var(--accent);
+  color: var(--foreground);
+}
+.channel-settings-trigger svg {
+  width: 14px;
+  height: 14px;
+}
+.channel-settings-check {
+  display: inline-flex;
+  width: 16px;
+  flex: none;
+  padding-top: 2px;
+}
+.channel-settings-check svg {
+  width: 14px;
+  height: 14px;
 }

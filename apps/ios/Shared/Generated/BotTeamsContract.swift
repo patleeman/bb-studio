@@ -31,6 +31,11 @@ public enum BotTeams {
     public static let wake = "wake"
     public static let conversation = "conversation"
     public static let newConversation = "newConversation"
+    public static let profiles = "profiles"
+    public static let threadProfile = "threadProfile"
+    public static let setThreadProfile = "setThreadProfile"
+    public static let pendingThreadProfile = "pendingThreadProfile"
+    public static let profileThreads = "profileThreads"
     public static let createRoom = "createRoom"
     public static let handoffSource = "handoffSource"
     public static let updateRoom = "updateRoom"
@@ -108,6 +113,20 @@ public enum BotTeams {
   public typealias Conversation = ConversationOutput
 
   public typealias NewConversation = NewConversationOutput
+
+  public typealias ProfilesOutput = [ProfilesOutputItem]
+
+  public typealias Profiles = ProfilesOutput
+
+  public typealias ThreadProfile = ThreadProfileOutput
+
+  public typealias SetThreadProfile = SetThreadProfileOutput
+
+  public typealias PendingThreadProfile = PendingThreadProfileOutput
+
+  public typealias ProfileThreadsOutput = [ProfileThreadsOutputItem]
+
+  public typealias ProfileThreads = ProfileThreadsOutput
 
   public typealias CreateRoom = CreateRoomOutput
 
@@ -6561,6 +6580,261 @@ public enum BotTeams {
       self.originalKey = originalKey
       self.providerId = providerId
       self.model = model
+    }
+  }
+
+  public struct ProfilesInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct ProfilesOutputItemLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum ProfilesOutputItemFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ProfilesOutputItemReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ProfilesOutputItemPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ProfilesOutputItem: Sendable, Hashable, Codable {
+    public var limits: ProfilesOutputItemLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: ProfilesOutputItemFallbackReasoningLevel?
+    public var reasoningLevel: ProfilesOutputItemReasoningLevel?
+    public var permissionMode: ProfilesOutputItemPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: ProfilesOutputItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: ProfilesOutputItemFallbackReasoningLevel? = nil, reasoningLevel: ProfilesOutputItemReasoningLevel? = nil, permissionMode: ProfilesOutputItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public struct ThreadProfileInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct ThreadProfileOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct SetThreadProfileInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+    }
+  }
+
+  public struct SetThreadProfileOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct PendingThreadProfileInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var botId: String?
+
+    public init(projectId: String? = nil, botId: String? = nil) {
+      self.projectId = projectId
+      self.botId = botId
+    }
+  }
+
+  public struct PendingThreadProfileOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ProfileThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ProfileThreadsOutputItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var archived: Bool?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, archived: Bool? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.archived = archived
+      self.updatedAt = updatedAt
     }
   }
 

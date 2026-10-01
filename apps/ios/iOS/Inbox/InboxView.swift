@@ -242,10 +242,6 @@ final class InboxModel: ObservableObject {
         }
     }
 
-    var directMessages: [(bot: Bot, threadId: String, info: DirectThreadInfo?)] {
-        botTeams?.directMessages ?? []
-    }
-
     var channels: [Room] {
         (botTeams?.rooms ?? []).filter { $0.archived != true }.sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
     }
@@ -258,8 +254,6 @@ struct InboxView: View {
     @State private var renaming: ThreadEntry?
     @State private var renamingRoom: Room?
     @State private var creatingChannel = false
-    /// A direct message's thread id.
-    @State private var renamingDirect: String?
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
     /// The server's running plugins, comma-separated; remembered so plugin rows show offline.
@@ -306,22 +300,6 @@ struct InboxView: View {
                         .foregroundStyle(.secondary)
                     }
                 }
-                if query.isEmpty, !model.directMessages.isEmpty {
-                    collapsible("direct", "Direct messages") {
-                        ForEach(model.directMessages, id: \.threadId) { dm in
-                            NavigationLink(value: Route.thread(id: dm.threadId)) {
-                                BotRow(bot: dm.bot, title: dm.info?.title, unread: dm.info?.unread == true,
-                                    working: model.botTeams?.directThreads[dm.bot.id]?.status == "active")
-                            }
-                            .contextMenu {
-                                Button {
-                                    newTitle = dm.info?.title ?? ""
-                                    renamingDirect = dm.threadId
-                                } label: { Label("Rename", systemImage: "pencil") }
-                            }
-                        }
-                    }
-                }
                 ForEach(model.groups) { group in threadSection(group) }
             }
         }
@@ -362,22 +340,6 @@ struct InboxView: View {
                 Task {
                     do {
                         try await app.client.renameRoom(room.id, name: name)
-                        await model.load(app.client)
-                    } catch {
-                        model.error = BBClient.describe(error, server: app.client.baseURL)
-                    }
-                }
-            }
-        }
-        .alert("Rename conversation", isPresented: Binding(get: { renamingDirect != nil }, set: { if !$0 { renamingDirect = nil } })) {
-            TextField("Title", text: $newTitle)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") {
-                guard let id = renamingDirect else { return }
-                let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                Task {
-                    do {
-                        try await app.client.rename(id, title: title.isEmpty ? nil : title)
                         await model.load(app.client)
                     } catch {
                         model.error = BBClient.describe(error, server: app.client.baseURL)
@@ -668,27 +630,12 @@ struct StatusDot: View {
 
 struct BotRow: View {
     let bot: Bot
-    var title: String?
-    var unread = false
-    var working = false
 
     var body: some View {
         HStack(spacing: 10) {
             Text(bot.avatar ?? "🤖").font(.title3)
-            VStack(alignment: .leading, spacing: 2) {
-                Text(title.flatMap { $0 == "Direct message" ? nil : $0 } ?? bot.name)
-                    .font(.body.weight(unread ? .semibold : .regular))
-                    .lineLimit(1)
-                if title != nil, title != "Direct message" {
-                    Text(bot.name).font(.caption).foregroundStyle(.secondary).lineLimit(1)
-                }
-            }
+            Text(bot.name).lineLimit(1)
             Spacer()
-            if working {
-                ProgressView().controlSize(.small)
-            } else if unread {
-                Circle().fill(Color.accentColor).frame(width: 8, height: 8)
-            }
         }
     }
 }

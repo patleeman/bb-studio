@@ -6,8 +6,18 @@ import { saveChannelThreadHandoff } from "./handoff-draft";
 
 const eventName = "bb:bots:handoff-to-channel";
 
-export function requestChannelHandoff(threadId: string) {
-  window.dispatchEvent(new CustomEvent(eventName, { detail: threadId }));
+type ChannelHandoffRequest = {
+  /** The thread the channel continues from, linked at the top of its draft. */
+  threadId: string | null;
+  /** Bots invited to the new channel. */
+  memberIds: string[];
+  /** Text typed in the composer that started the handoff. */
+  draft: string;
+};
+
+export function requestChannelHandoff(threadId: string | null, memberIds: string[] = [], draft = "") {
+  const detail: ChannelHandoffRequest = { threadId, memberIds, draft };
+  window.dispatchEvent(new CustomEvent(eventName, { detail }));
 }
 
 export function ChannelHandoffController() {
@@ -17,15 +27,17 @@ export function ChannelHandoffController() {
 
   useEffect(() => {
     const handoff = async (event: Event) => {
-      const threadId = (event as CustomEvent<unknown>).detail;
-      if (typeof threadId !== "string" || !threadId || pending.current) return;
+      const request = (event as CustomEvent<ChannelHandoffRequest | undefined>).detail;
+      if (!request || (!request.threadId && !request.memberIds.length) || pending.current) return;
       pending.current = true;
       try {
-        const source = await rpc.call("handoffSource", { threadId });
-        const room = await rpc.call("createRoom", { memberIds: [] });
+        const source = request.threadId
+          ? await rpc.call("handoffSource", { threadId: request.threadId })
+          : null;
+        const room = await rpc.call("createRoom", { memberIds: request.memberIds });
         const channel = await rpc.call("openChannelThread", { id: room.id });
         // The new channel thread's composer picks this up and pre-fills its draft.
-        saveChannelThreadHandoff(channel.threadId, source);
+        saveChannelThreadHandoff(channel.threadId, { source, draft: request.draft });
         navigate.toThread(channel.threadId);
       } catch (error) {
         toast.error(

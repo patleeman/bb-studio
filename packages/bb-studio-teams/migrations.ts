@@ -60,6 +60,15 @@ export const MIGRATIONS = [
   `CREATE TABLE IF NOT EXISTS delegations(id TEXT PRIMARY KEY,room_id TEXT NOT NULL,run_id TEXT NOT NULL,status TEXT NOT NULL,json TEXT NOT NULL);
       CREATE INDEX IF NOT EXISTS delegations_by_room ON delegations(room_id,status);
       CREATE INDEX IF NOT EXISTS delegations_by_run ON delegations(run_id,status);`,
+
+  // thread-profiles.ts: direct messages became ordinary threads with a profile.
+  // Each keeps its own key, leaves bot history, and is unhidden once at startup.
+  `CREATE TABLE IF NOT EXISTS profile_threads_to_show (thread_id TEXT PRIMARY KEY);
+      INSERT OR IGNORE INTO profile_threads_to_show
+        SELECT thread_id FROM conversations WHERE json_extract(json,'$.kind')='admin';
+      UPDATE conversations SET key='thread:'||thread_id,
+        json=json_remove(json_set(json,'$.key','thread:'||thread_id),'$.archivedAt','$.originalKey')
+        WHERE json_extract(json,'$.kind')='admin';`,
 ];
 
 /** Used by isolated store tests; production uses bb.storage.migrate. */

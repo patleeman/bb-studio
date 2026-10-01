@@ -1,11 +1,13 @@
 import SwiftUI
 
-/// A Bot Teams bot, opened from Studio: who it is, its direct messages and
-/// the channels it's in.
+/// A Bot Teams bot, opened from Studio: who it is, the threads that work as
+/// it, and the channels it's in.
 struct BotView: View {
     @EnvironmentObject private var app: AppModel
     let id: String
     @State private var teams: BotTeamsList?
+    @State private var threads: [ProfileThread] = []
+    @State private var starting = false
     @State private var error: String?
 
     var body: some View {
@@ -35,15 +37,28 @@ struct BotView: View {
                         Label("Memory", systemImage: "brain")
                     }
                 }
-                let dms = teams?.directMessages.filter { $0.bot.id == id } ?? []
-                if !dms.isEmpty {
-                    Section("Direct messages") {
-                        ForEach(dms, id: \.threadId) { dm in
-                            NavigationLink(value: Route.thread(id: dm.threadId)) {
-                                BotRow(bot: bot, title: dm.info?.title, unread: dm.info?.unread == true)
+                Section {
+                    if bot.retired != true {
+                        Button { Task { await message() } } label: {
+                            Label("Message", systemImage: "bubble.left.and.text.bubble.right")
+                        }
+                        .disabled(starting)
+                    }
+                    ForEach(threads) { thread in
+                        NavigationLink(value: Route.thread(id: thread.threadId)) {
+                            HStack {
+                                Text(thread.title).lineLimit(1)
+                                Spacer()
+                                if thread.archived {
+                                    Text("Archived").font(.caption).foregroundStyle(.secondary)
+                                }
                             }
                         }
                     }
+                } header: {
+                    Text("Threads")
+                } footer: {
+                    Text("Threads that work as \(bot.name). Add a profile from a thread's menu.")
                 }
                 let rooms = teams?.rooms.filter { $0.archived != true && $0.memberIds.contains(id) } ?? []
                 if !rooms.isEmpty {
@@ -67,8 +82,21 @@ struct BotView: View {
 
     private func load() async {
         do {
-            teams = try await app.client.botTeams()
+            async let list = app.client.botTeams()
+            async let profileThreads = app.client.profileThreads(id)
+            (teams, threads) = try await (list, profileThreads)
             error = nil
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+    }
+
+    /// Starts a new thread with this bot's profile, like Message on the web.
+    private func message() async {
+        starting = true
+        defer { starting = false }
+        do {
+            app.push(.thread(id: try await app.client.newProfileThread(id)))
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }

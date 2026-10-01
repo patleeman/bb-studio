@@ -241,18 +241,15 @@ export async function retire(this: Runtime, id: string, retired: boolean): Promi
           if (retired) {
             for (const job of this.store.work(id))
               await this.cancel(job, "Bot archived by the owner.", true);
+            // Threads with this profile are the owner's; their messages stay.
+            // Releasing an idle session drops the profile from the next turn.
             for (const c of this.store
               .conversations(id)
-              .filter((c) => c.kind === "admin" && !c.archivedAt)) {
+              .filter((c) => c.kind === "admin")) {
               try {
-                for (const q of await this.bb.sdk.threads.queuedMessages.list({
-                  threadId: c.threadId,
-                }))
-                  await this.bb.sdk.threads.queuedMessages.delete({
-                    threadId: c.threadId,
-                    queuedMessageId: q.id,
-                  });
-                await this.bb.sdk.threads.stop({ threadId: c.threadId });
+                const thread = await this.bb.sdk.threads.get({ threadId: c.threadId });
+                if (thread.status === "idle")
+                  await this.bb.sdk.threads.stop({ threadId: c.threadId });
               } catch (cause) {
                 if (!missingThread(cause)) throw cause;
               }

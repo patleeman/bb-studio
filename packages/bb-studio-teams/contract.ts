@@ -590,6 +590,33 @@ export const rpcContract = {
     input: z.object({ id: idSchema }),
     output: conversationSchema,
   },
+  // Threads with a profile: the composer's profile picker and the bot page.
+  profiles: {
+    input: z.object({}),
+    output: z.array(botSchema),
+  },
+  threadProfile: {
+    input: z.object({ threadId: z.string().min(1) }),
+    // Null when the thread can't take a profile, such as a channel thread.
+    output: z.object({ botId: idSchema.nullable() }).nullable(),
+  },
+  setThreadProfile: {
+    input: z.object({ threadId: z.string().min(1), botId: idSchema.nullable() }),
+    output: z.object({ botId: idSchema.nullable() }),
+  },
+  pendingThreadProfile: {
+    input: z.object({ projectId: z.string().min(1), botId: idSchema.nullable() }),
+    output: z.object({ ok: z.literal(true) }),
+  },
+  profileThreads: {
+    input: z.object({ id: idSchema }),
+    output: z.array(z.object({
+      threadId: z.string(),
+      title: z.string(),
+      archived: z.boolean(),
+      updatedAt: z.number(),
+    })),
+  },
   createRoom: {
     input: roomInput.extend({
       name: roomInput.shape.name.optional(),

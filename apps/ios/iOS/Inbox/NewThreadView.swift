@@ -22,6 +22,13 @@ struct NewThreadView: View {
     @State private var reasoning = ""
     @State private var permissionMode = ""
 
+    // A bot profile to work as. Picking one applies the bot's selection above,
+    // which can still be changed; the profile attaches with the first message.
+    @State private var bots: [Bot] = []
+    @State private var profileBotId = ""
+    /// A picked bot whose model waits for its provider's options to load.
+    @State private var applyingProfile: Bot?
+
     init(text: String = "") {
         _text = State(initialValue: text)
     }
@@ -57,6 +64,18 @@ struct NewThreadView: View {
                         AttachmentMenu(items: $attachments)
                     }
                     .buttonStyle(.borderless)
+                }
+                if !bots.isEmpty {
+                    Section {
+                        Picker("Work as", selection: $profileBotId) {
+                            Text("No profile").tag("")
+                            ForEach(bots) { Text("\($0.avatar ?? "🤖") \($0.name)").tag($0.id) }
+                        }
+                    } footer: {
+                        if !profileBotId.isEmpty {
+                            Text("Works in this project with the bot's mission and memory. Its model is a starting point.")
+                        }
+                    }
                 }
                 Section("Agent") {
                     Picker("Provider", selection: $providerId) {
@@ -95,6 +114,7 @@ struct NewThreadView: View {
                 DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
             }
             .task {
+                bots = (try? await app.client.profiles()) ?? []
                 projects = (try? await app.client.projects()) ?? []
                 if !projects.contains(where: { $0.id == projectId }) { projectId = projects.first?.id ?? "" }
             }
@@ -108,7 +128,25 @@ struct NewThreadView: View {
             .task(id: providerId) {
                 modelId = ""
                 reasoning = ""
+                if let bot = applyingProfile, (bot.providerId ?? "") == providerId {
+                    applyingProfile = nil
+                    modelId = bot.model ?? ""
+                    reasoning = bot.reasoningLevel ?? ""
+                }
                 await loadOptions()
+                matchModelOption()
+            }
+            .onChange(of: profileBotId) { _, id in
+                guard let bot = bots.first(where: { $0.id == id }) else { return }
+                if let mode = bot.permissionMode { permissionMode = mode }
+                if (bot.providerId ?? "") == providerId {
+                    modelId = bot.model ?? ""
+                    reasoning = bot.reasoningLevel ?? ""
+                    matchModelOption()
+                } else {
+                    applyingProfile = bot
+                    providerId = bot.providerId ?? ""
+                }
             }
         }
     }
@@ -116,6 +154,13 @@ struct NewThreadView: View {
     private func loadOptions() async {
         let provider = providerId.isEmpty ? defaults?.providerId : providerId
         options = try? await app.client.executionOptions(providerId: provider)
+    }
+
+    /// A bot names its model by model id; the picker tags options by option id.
+    private func matchModelOption() {
+        guard !modelId.isEmpty, let option = options?.models.first(where: { $0.id == modelId || $0.model == modelId })
+        else { return }
+        modelId = option.id
     }
 
     private var selectedModel: ExecutionOptions.Model? {
@@ -160,9 +205,20 @@ struct NewThreadView: View {
                 model: modelId.isEmpty ? nil : modelId,
                 reasoningLevel: reasoning.isEmpty ? nil : reasoning,
                 permissionMode: permissionMode.isEmpty ? nil : permissionMode)
-            let thread = try await app.client.createThread(
-                projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
-                options: choice, workspace: selectedWorkspace)
+            // The server attaches the profile when this project's next new thread
+            // dispatches its first message, then forgets it.
+            if !profileBotId.isEmpty {
+                try await app.client.pendingThreadProfile(projectId: projectId, botId: profileBotId)
+            }
+            let thread: ThreadEntry
+            do {
+                thread = try await app.client.createThread(
+                    projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
+                    options: choice, workspace: selectedWorkspace)
+            } catch {
+                if !profileBotId.isEmpty { try? await app.client.pendingThreadProfile(projectId: projectId, botId: nil) }
+                throw error
+            }
             dismiss()
             app.openThread(thread.id)
         } catch {

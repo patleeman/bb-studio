@@ -106,11 +106,19 @@ export class Store {
         .all(id) as { json: string }[]
     ).map((r) => JSON.parse(r.json));
   }
+  /** The bot's most recently attached thread. */
   currentDirectConversation(botId: string): Conversation | null {
     const row = this.db
-      .prepare("SELECT json FROM conversations WHERE bot_id=? AND key='admin'")
+      .prepare("SELECT json FROM conversations WHERE bot_id=? AND json_extract(json,'$.kind')='admin' ORDER BY rowid DESC LIMIT 1")
       .get(botId) as { json: string } | undefined;
     return row ? JSON.parse(row.json) : null;
+  }
+  profileThreadsToShow(): string[] {
+    return (this.db.prepare("SELECT thread_id FROM profile_threads_to_show").all() as { thread_id: string }[])
+      .map((row) => row.thread_id);
+  }
+  shownProfileThread(threadId: string) {
+    this.db.prepare("DELETE FROM profile_threads_to_show WHERE thread_id=?").run(threadId);
   }
   activeGroupThreadRooms(): { threadId: string; roomId: string }[] {
     const rows = this.db.prepare(

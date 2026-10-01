@@ -446,10 +446,10 @@ test("CLI updates reasoning and starts fresh threads when a model changes", asyn
     x.store.putConversation({
       id: "conversation",
       botId: bot.id,
-      key: "admin",
+      key: "mission",
       threadId: "thr_existing",
-      title: "Bot chat",
-      kind: "admin",
+      title: "Mission",
+      kind: "mission",
       createdAt: 1,
     });
     await x.ok(["update", bot.id, "--reasoning", "high"]);
@@ -458,13 +458,9 @@ test("CLI updates reasoning and starts fresh threads when a model changes", asyn
       { threadId: "thr_existing", reasoningLevel: "high" },
     );
     await x.ok(["update", bot.id, "--model", "model-b"]);
-    const second = x.store.conversations(bot.id).find((c) => c.key === "admin")!;
-    assert.notEqual(second.threadId, "thr_existing");
-    assert.equal(x.store.byThread("thr_existing")?.originalKey, "admin");
+    assert.equal(x.store.byThread("thr_existing")?.originalKey, "mission");
+    assert.equal(x.store.conversations(bot.id).some((c) => c.key === "mission"), false);
     await x.ok(["update", bot.id, "--model", ""]);
-    const third = x.store.conversations(bot.id).find((c) => c.key === "admin")!;
-    assert.notEqual(third.threadId, second.threadId);
-    assert.equal(x.store.byThread(second.threadId)?.originalKey, "admin");
     assert.equal(x.store.get(bot.id).model, "");
   } finally {
     await x.close();
@@ -478,10 +474,10 @@ test("CLI profile updates prune conversations whose threads were deleted", async
     x.store.putConversation({
       id: "deleted-conversation",
       botId: bot.id,
-      key: "admin",
+      key: "mission",
       threadId: "thr_deleted",
       title: "Deleted",
-      kind: "admin",
+      kind: "mission",
       createdAt: 1,
     });
     x.harness.inspection.sdk.stub("threads.update", async ({ threadId }) => {

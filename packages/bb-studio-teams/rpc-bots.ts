@@ -1,7 +1,8 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import type { Bot, Conversation, rpcContract } from "./contract";
+import type { rpcContract } from "./contract";
 import type { Runtime } from "./runtime";
 import { document, saveDocument, type Store } from "./store";
+import type { ThreadProfiles } from "./thread-profiles";
 
 type BotMethod = "documentHistory" | "history" | "get" | "document" | "saveDocument" | "wake" | "conversation" | "newConversation" | "handoffSource";
 
@@ -9,8 +10,7 @@ export function botHandlers(
   bb: BbPluginApi,
   store: Store,
   runtime: Runtime,
-  ensureDirectConversation: (bot: Bot) => Promise<Conversation>,
-  newDirectConversation: (bot: Bot) => Promise<Conversation>,
+  profiles: ThreadProfiles,
 ): Pick<PluginRpcHandlers<typeof rpcContract>, BotMethod> {
   return {
     documentHistory: async ({ id, file, before }) => {
@@ -44,9 +44,9 @@ export function botHandlers(
     wake: ({ id }) =>
       runtime.locked(id, async () => ({ queued: runtime.wake(store.get(id)) })),
     conversation: ({ id }) =>
-      runtime.locked(id, () => ensureDirectConversation(store.get(id))),
+      runtime.locked(id, () => profiles.latestThread(store.get(id))),
     newConversation: ({ id }) =>
-      runtime.locked(id, () => newDirectConversation(store.get(id))),
+      runtime.locked(id, () => profiles.newThread(store.get(id))),
     handoffSource: async ({ threadId }) => {
       const thread = await bb.sdk.threads.get({ threadId });
       return {

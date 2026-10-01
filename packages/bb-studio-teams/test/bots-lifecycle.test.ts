@@ -199,7 +199,7 @@ test("a deleted admin conversation does not block future bot work", async () => 
   }
 });
 
-test("a bot keeps one current direct thread and earlier threads remain usable", async () => {
+test("Message starts a visible thread with the bot's profile, and earlier ones stay attached", async () => {
   const x = setup();
   await plugin(x.bb);
   try {
@@ -217,6 +217,7 @@ test("a bot keeps one current direct thread and earlier threads remain usable", 
       assert.deepEqual(spawn.input, [{ type: "text", text: "", mentions: [] }]);
       assert.ok(spawn.sendAt! > Date.now());
       assert.equal(spawn.title, undefined);
+      assert.equal((spawn as { visibility?: string }).visibility, "visible");
     }
     assert.equal(x.harness.inspection.sdk.callsTo("threads.queuedMessages.delete").length, 2);
     // The deleted start message held BB's resolved model, so the thread must keep it.
@@ -229,10 +230,13 @@ test("a bot keeps one current direct thread and earlier threads remain usable", 
       })),
     );
     const history = await x.harness.behavior.callRpc("get", { id: x.a.id }) as { conversations: Conversation[] };
-    assert.equal(history.conversations.filter((c: { key: string }) => c.key === "admin").length, 1);
-    assert.equal(history.conversations.find((c: { threadId: string }) => c.threadId === first.threadId)?.originalKey, "admin");
-    assert.ok(history.conversations.find((c: { threadId: string }) => c.threadId === first.threadId)?.archivedAt);
-    assert.equal(createTestStore(x.store.db).conversations(x.a.id).length, 2);
+    assert.deepEqual(
+      history.conversations.map((c) => [c.kind, c.key.startsWith("thread:"), c.archivedAt]),
+      [["admin", true, undefined], ["admin", true, undefined]],
+    );
+    // The latest attached thread is the bot's current one.
+    const latest = await x.harness.behavior.callRpc("conversation", { id: x.a.id }) as Conversation;
+    assert.equal(latest.threadId, second.threadId);
     const roster = await x.harness.behavior.callRpc("list", null) as {
       directConversations: Record<string, Conversation[]>;
       directThreadInfo: Record<string, { title: string; archivedAt: number | null }>;
@@ -242,18 +246,18 @@ test("a bot keeps one current direct thread and earlier threads remain usable", 
     assert.ok(roster.directThreadInfo[second.threadId]);
 
     const hook = x.harness.inspection.registrations.hooks["message.dispatch"]!;
-    const archived = await hook(makeMessageDispatchHookContext({
+    const earlier = await hook(makeMessageDispatchHookContext({
       thread: { id: first.threadId },
       origin: "plugin",
       originPluginId: "bot-teams",
     }));
-    assert.equal(archived.action, "proceed");
+    assert.equal(earlier.action, "proceed");
   } finally {
     await x.close();
   }
 });
 
-test("changing a model or provider starts new bot sessions and retains their history", async () => {
+test("changing a model or provider starts new bot sessions, retains their history, and leaves attached threads alone", async () => {
   const x = setup();
   await plugin(x.bb);
   try {
@@ -268,11 +272,9 @@ test("changing a model or provider starts new bot sessions and retains their his
     }) as Bot;
     assert.equal(updated.providerId, "pi");
     const after = x.store.conversations(x.a.id);
-    const current = after.find((c) => c.key === "admin")!;
-    assert.notEqual(current.threadId, direct.threadId);
-    assert.equal(current.providerId, "pi");
-    assert.equal(current.model, "other-model");
-    assert.equal(after.find((c) => c.threadId === direct.threadId)?.originalKey, "admin");
+    // A thread with the profile keeps its own model, picked in its composer.
+    assert.equal(x.store.currentDirectConversation(x.a.id)?.threadId, direct.threadId);
+    assert.equal(after.find((c) => c.threadId === direct.threadId)?.archivedAt, undefined);
     assert.equal(after.find((c) => c.threadId === group.threadId)?.originalKey, `group:${x.room.id}`);
     assert.equal(after.some((c) => c.key === `group:${x.room.id}`), false);
     assert.equal(
@@ -305,8 +307,8 @@ test("swapping models exchanges both selections and starts fresh sessions", asyn
     assert.equal(swapped.fallbackProviderId, "codex");
     assert.equal(swapped.fallbackModel, "");
     assert.equal(swapped.fallbackReasoningLevel, "medium");
-    assert.notEqual(x.store.currentDirectConversation(x.a.id)?.threadId, direct.threadId);
-    assert.equal(x.store.byThread(direct.threadId)?.originalKey, "admin");
+    assert.equal(x.store.currentDirectConversation(x.a.id)?.threadId, direct.threadId);
+    assert.equal(x.store.byThread(direct.threadId)?.archivedAt, undefined);
     await x.harness.behavior.callRpc("swapModel", { id: x.a.id });
     assert.equal(x.store.get(x.a.id).providerId, "codex");
   } finally {
@@ -357,23 +359,21 @@ test("a provider failure retries one managed response on the fallback model", as
   }
 });
 
-test("new direct threads and model changes wait for active work", async () => {
+test("model changes wait for the bot's active sessions, but not for threads with its profile", async () => {
   const x = setup();
   await plugin(x.bb);
   try {
     await x.harness.behavior.callRpc("conversation", { id: x.a.id });
     x.harness.inspection.sdk.stub("threads.get", async () =>
       makeThreadResponse({ status: "active" }));
+    await x.harness.behavior.callRpc("update", { id: x.a.id, model: "new-model" });
+    assert.equal(x.store.get(x.a.id).model, "new-model");
+    await x.runtime.conversation(x.store.get(x.a.id), `group:${x.room.id}`, "group", x.room.name, "Review");
     await assert.rejects(
-      x.harness.behavior.callRpc("newConversation", { id: x.a.id }),
+      x.harness.behavior.callRpc("update", { id: x.a.id, model: "newer-model" }),
       /current response/,
     );
-    await assert.rejects(
-      x.harness.behavior.callRpc("update", { id: x.a.id, model: "new-model" }),
-      /current response/,
-    );
-    assert.equal(x.store.conversations(x.a.id).filter((c) => c.key === "admin").length, 1);
-    assert.equal(x.store.get(x.a.id).model, "");
+    assert.equal(x.store.get(x.a.id).model, "new-model");
   } finally {
     await x.close();
   }

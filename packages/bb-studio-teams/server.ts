@@ -35,8 +35,6 @@ import { ChannelThreads } from "./channel-thread-link";
 import { registerChannelMentions } from "./channel-mentions";
 import {
   channelModels,
-  channelPermissionLevels,
-  permissionForLevel,
   channelPostInput,
   channelPostTool,
   channelProviderId,
@@ -54,6 +52,7 @@ import { directThreadIndicator } from "./direct-status";
 import { ChannelAutomations } from "./channel-automations";
 import { imageMime } from "./image-format";
 import { isForkConversation } from "./send-mode";
+import { ThreadProfiles } from "./thread-profiles";
 import {
   selectBots,
   runClassifier,
@@ -76,9 +75,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const store = new Store(db);
   const runtime = new Runtime(bb, store);
+  // The bot's own sessions. Threads with its profile keep their own model.
   const activeConversations = (id: string) =>
     store.conversations(id).filter((c) =>
-      !c.archivedAt && !isForkConversation(c.key));
+      c.kind !== "admin" && !c.archivedAt && !isForkConversation(c.key));
   const assertConversationIdle = async (conversation: Conversation) => {
     try {
       const thread = await bb.sdk.threads.get({ threadId: conversation.threadId });
@@ -92,33 +92,6 @@ export default async function plugin(bb: BbPluginApi) {
     } catch (cause) {
       if (!missingThread(cause)) throw cause;
       store.deleteConversation(conversation.threadId);
-    }
-  };
-  const ensureDirectConversation = async (bot: Bot) => {
-    const current = activeConversations(bot.id).find((c) => c.key === "admin");
-    if (current) {
-      try {
-        await bb.sdk.threads.get({ threadId: current.threadId });
-        return current;
-      } catch (cause) {
-        if (!missingThread(cause)) throw cause;
-        store.deleteConversation(current.threadId);
-      }
-    }
-    return runtime.conversation(bot, "admin", "admin", "Direct message");
-  };
-  const newDirectConversation = async (bot: Bot) => {
-    const current = activeConversations(bot.id).find((c) => c.key === "admin");
-    if (!current) return ensureDirectConversation(bot);
-    await assertConversationIdle(current);
-    // A deleted BB thread is removed by assertConversationIdle.
-    if (!store.byThread(current.threadId)) return ensureDirectConversation(bot);
-    store.archiveConversation(current);
-    try {
-      return await ensureDirectConversation(bot);
-    } catch (cause) {
-      store.restoreConversation(current);
-      throw cause;
     }
   };
   const notifications = new ChannelNotifications(bb, store);
@@ -262,6 +235,8 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const project = () => personalProjectId(bb);
   const channelThreads = new ChannelThreads(bb, store, project);
+  const profiles = new ThreadProfiles(bb, store, runtime, (threadId) =>
+    !channelThreads.roomForThread(threadId) && !store.routingSession(threadId));
   runtime.onChanged.add(() => channelThreads.syncAll());
   async function create(
     input: z.infer<typeof profileInput> & { mission: string; roomId?: string },
@@ -596,17 +571,6 @@ export default async function plugin(bb: BbPluginApi) {
         for (const conversation of present) store.archiveConversation(conversation);
         store.put(bot);
       })();
-      try {
-        if (present.some((c) => c.key === "admin"))
-          await ensureDirectConversation(bot);
-      } catch (cause) {
-        store.db.transaction(() => {
-          store.put(previous);
-          for (const conversation of present)
-            store.restoreConversation(conversation);
-        })();
-        throw cause;
-      }
     } else {
       if (bot.reasoningLevel !== previous.reasoningLevel)
         for (const c of activeConversations(id)) {
@@ -701,7 +665,36 @@ export default async function plugin(bb: BbPluginApi) {
           fallbackReasoningLevel: bot.reasoningLevel,
         });
       }),
-    ...botHandlers(bb, store, runtime, ensureDirectConversation, newDirectConversation),
+    ...botHandlers(bb, store, runtime, profiles),
+    profiles: () =>
+      store.all().filter((bot) => !bot.retired)
+        .sort((a, b) => a.name.localeCompare(b.name)),
+    threadProfile: ({ threadId }) => profiles.profile(threadId),
+    setThreadProfile: ({ threadId, botId }) =>
+      runtime.locked(`thread:${threadId}`, () => profiles.set(threadId, botId)),
+    pendingThreadProfile: ({ projectId, botId }) => {
+      profiles.setPending(projectId, botId);
+      return { ok: true as const };
+    },
+    profileThreads: async ({ id }) => {
+      const threads = await Promise.all(store.conversations(id)
+        .filter((c) => c.kind === "admin")
+        .map(async (c) => {
+          try {
+            const thread = await bb.sdk.threads.get({ threadId: c.threadId });
+            return [{
+              threadId: thread.id,
+              title: thread.title?.trim() || thread.titleFallback?.trim() || c.title,
+              archived: thread.archivedAt !== null,
+              updatedAt: thread.updatedAt,
+            }];
+          } catch (cause) {
+            if (!missingThread(cause)) throw cause;
+            return [];
+          }
+        }));
+      return threads.flat().sort((a, b) => b.updatedAt - a.updatedAt);
+    },
     createRoom: ({ name, memberIds, requestId, responseBehavior: behavior }) =>
       runtime.locked("rooms", async () => {
         const existing =
@@ -1064,21 +1057,9 @@ export default async function plugin(bb: BbPluginApi) {
       icon: { glyph: "Send" },
       suppress: true,
     },
-    async execute({ text, attachments, mode, permissionLevel }, context) {
+    async execute({ text, attachments }, context) {
       const room = channelThreads.roomForThread(context.threadId);
       if (!room) throw new Error("This thread is not linked to a channel.");
-      // The composer's picker chose this message's chat mode and bot permissions;
-      // keep the channel in step so the CLI and agent tools agree.
-      const permission = permissionLevel === undefined ? undefined : permissionForLevel(permissionLevel);
-      const modeChanged = mode !== undefined && mode !== (room.responseBehavior ?? "everyone");
-      const permissionChanged = permission !== undefined && permission !== (room.permissionMode ?? null);
-      if (modeChanged || permissionChanged)
-        await handlers.channelState({
-          id: room.id,
-          ...(modeChanged ? { responseBehavior: mode, rememberDefault: true } : {}),
-          ...(permissionChanged ? { permissionMode: permission } : {}),
-        });
-      channelThreads.noteSelection(store.room(room.id));
       const projectId = await project();
       const attachmentIds: string[] = [];
       for (const file of attachments) {
@@ -1125,10 +1106,9 @@ export default async function plugin(bb: BbPluginApi) {
       supportsThreadArchive: false,
       supportsThreadRename: false,
       permissionModes: ["full"],
-      reasoningLevels: channelPermissionLevels.map((level) => level.id),
+      // BB requires one; the channel's single model offers no reasoning choice.
+      reasoningLevels: ["none"],
     },
-    // The picker's "reasoning" is who may do what: bot permissions.
-    reasoningLevels: channelPermissionLevels.map(({ id, label, description }) => ({ id, label, description })),
     completedTurnDisplay: "flat",
     composerActions: [],
     models: { scope: "host", fallback: channelModels },
@@ -1152,6 +1132,20 @@ export default async function plugin(bb: BbPluginApi) {
     const c = store.byThread(context.thread.id);
     if (!c) return { tools: channelTools, skills: ["bots"] };
     const bot = store.get(c.botId);
+    // An archived bot's profile stays on its threads but stops applying.
+    if (c.kind === "admin" && bot.retired) return { tools: channelTools, skills: ["bots"] };
+    if (c.kind === "admin")
+      return {
+        tools: channelTools,
+        skills: ["bots"],
+        instructions: [
+          `This thread has the profile of the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Work as this bot. Your persistent bot home is ${JSON.stringify(bot.home)}. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md, using that absolute path. Do the work itself in this thread's initial working directory: it is the thread's project, not your bot home.`,
+          "Read MISSION.md and MEMORY.md at the beginning of every turn, including follow-ups. Keep durable memory up to date.",
+          "MISSION.md belongs to the owner. Change it only on an explicit owner request.",
+          "Private information stays in its conversation. Shared MEMORY.md should contain only information suitable for all rooms this bot joins.",
+          `Profile: ${JSON.stringify(bot.description)}`,
+        ].join("\n"),
+      };
     return {
       tools: [
         ...channelTools,
@@ -1188,7 +1182,13 @@ export default async function plugin(bb: BbPluginApi) {
             message: "This routing request is no longer active.",
           };
     }
-    const c = store.byThread(context.thread.id);
+    // A profile picked in the new-thread composer attaches with the first message.
+    const c = store.byThread(context.thread.id) ??
+      (context.thread.status === "pending" && context.initiator === "user" &&
+        context.senderThreadId === null && !context.originPluginId &&
+        !context.thread.originPluginId
+        ? profiles.attachPending(context.project.id, context.thread.id)
+        : null);
     if (!c)
       return context.thread.originPluginId === "bot-teams"
         ? {
@@ -1222,11 +1222,7 @@ export default async function plugin(bb: BbPluginApi) {
       };
     }
     const bot = store.get(c.botId);
-    if (bot.retired && c.kind === "admin")
-      return {
-        action: "reject",
-        message: "This bot is archived. Restore it from the Studio Teams page.",
-      };
+    if (bot.retired && c.kind === "admin") return { action: "proceed" };
     // Native owner replies to setup and mission threads remain direct.
     if (context.initiator === "user" && context.originPluginId !== "bot-teams")
       return { action: "proceed" };
@@ -1396,6 +1392,15 @@ export default async function plugin(bb: BbPluginApi) {
         } catch {
           break;
         }
+      }
+    },
+  });
+  bb.background.service("profile-threads", {
+    async start() {
+      try {
+        await profiles.showMigrated();
+      } catch (cause) {
+        bb.log.warn(`Could not show former direct messages: ${String(cause)}`);
       }
     },
   });

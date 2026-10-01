@@ -82,6 +82,8 @@ struct ChannelView: View {
             }
         }
         .task {
+            // A channel opened from a thread's profile starts with a link back to it.
+            if draft.isEmpty, let handoff = ChannelHandoff.take(room.id) { draft = handoff + "\n\n" }
             listener = app.realtime.listen { event in
                 if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" {
                     Task { await load() }

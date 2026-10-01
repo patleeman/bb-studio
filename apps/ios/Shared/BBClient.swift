@@ -477,6 +477,13 @@ extension BBClient {
         try await rpc("bot-teams", "updateRoom", ["id": .string(id), "name": .string(String(name.prefix(80)))])
     }
 
+    /// A new channel with these bots, named "New channel" until renamed.
+    public func createRoom(memberIds: [String]) async throws -> Room {
+        try await rpc(
+            "bot-teams", "createRoom",
+            ["memberIds": .array(memberIds.map { .string($0) }), "requestId": .string(UUID().uuidString.lowercased())])
+    }
+
     public func createRoom(name: String, memberIds: [String]) async throws -> Room {
         try await rpc(
             "bot-teams", "createRoom",
@@ -524,6 +531,46 @@ extension BBClient {
         try await rpc(
             "bot-teams", "saveDocument",
             ["id": .string(id), "file": .string(file), "text": .string(text), "version": .string(version)])
+    }
+
+    // MARK: Threads with a profile
+
+    /// The active bots a thread can work as, by name.
+    public func profiles() async throws -> [Bot] {
+        try await rpc("bot-teams", "profiles", [:])
+    }
+
+    /// The bot this thread works as: `.some(nil)` for none, `nil` when the
+    /// thread can't take a profile (channels and bot work threads).
+    public func threadProfile(_ threadId: String) async throws -> String?? {
+        struct Profile: Decodable { var botId: String? }
+        let profile: Profile? = try await rpcIfPresent("bot-teams", "threadProfile", ["threadId": .string(threadId)])
+        return profile.map(\.botId)
+    }
+
+    /// Attaches a bot's profile to an idle thread, or removes it with `nil`.
+    public func setThreadProfile(_ threadId: String, botId: String?) async throws {
+        let _: JSONValue = try await rpc(
+            "bot-teams", "setThreadProfile", ["threadId": .string(threadId), "botId": botId.map { .string($0) } ?? .null])
+    }
+
+    /// The profile the next new thread in this project takes with its first message.
+    public func pendingThreadProfile(projectId: String, botId: String?) async throws {
+        let _: JSONValue = try await rpc(
+            "bot-teams", "pendingThreadProfile",
+            ["projectId": .string(projectId), "botId": botId.map { .string($0) } ?? .null])
+    }
+
+    /// Every thread with this bot's profile, newest first.
+    public func profileThreads(_ botId: String) async throws -> [ProfileThread] {
+        try await rpc("bot-teams", "profileThreads", ["id": .string(botId)])
+    }
+
+    /// A new empty thread with this bot's profile; returns its id.
+    public func newProfileThread(_ botId: String) async throws -> String {
+        struct Conversation: Decodable { var threadId: String }
+        let conversation: Conversation = try await rpc("bot-teams", "newConversation", ["id": .string(botId)])
+        return conversation.threadId
     }
 
     @discardableResult
