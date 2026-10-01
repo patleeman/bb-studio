@@ -12,10 +12,10 @@ you return to it. Threads open as [Float](../bb-studio-float) tabs.
 ![Live BB screenshot of Studio Chat on a drawing](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): an Excalidraw
-drawing ("Checkout flow") with the seeded "Draft the ORBIT-42 release notes"
-thread in a Float window. The window's "Viewing: Checkout flow" chip names the
-drawing on screen, and the "Work with this drawing…" bar sits at the right end
-of Float's row.
+drawing ("Checkout flow") with New in Float and Open in Float in the
+bottom-right corner. The seeded "Draft the ORBIT-42 release notes" thread was
+picked from Open in Float and shows as a docked Float tab, whose "Viewing:
+Checkout flow" chip names the drawing on screen.
 
 ## What you get
 
