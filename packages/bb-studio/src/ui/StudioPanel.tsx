@@ -34,6 +34,22 @@ type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagV
 const TIP_DISMISSED_KEY = "studio:sidebar-tip-dismissed";
 const REFETCH_DEBOUNCE_MS = 300;
 
+function downloadFile(file: { name: string; mime: string; data: string }): void {
+  const bytes = Uint8Array.from(atob(file.data), (char) => char.charCodeAt(0));
+  const url = URL.createObjectURL(new Blob([bytes], { type: file.mime }));
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = file.name;
+  link.click();
+  setTimeout(() => URL.revokeObjectURL(url), 30_000);
+}
+
+function defaultExportFormat(kind: string): string {
+  if (kind === "drawing") return "png";
+  if (kind === "artifact") return "original";
+  return "markdown";
+}
+
 function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
   const [data, setData] = useState<Overview | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -141,6 +157,12 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const projects = useProjects();
   const { data, error, refetch, setData } = useOverview(rpc);
   const { sidebar, setVisible } = useSidebar(rpc);
+  const [templates, setTemplates] = useState<{ pluginId: string; id: string; title: string }[]>([]);
+  const [playbooks, setPlaybooks] = useState<{ id: string; name: string }[]>([]);
+  useEffect(() => {
+    rpc.call("templates", null).then(({ items }) => setTemplates(items), () => setTemplates([]));
+    rpc.call("playbooks", null).then(({ playbooks: rows }) => setPlaybooks(rows), () => setPlaybooks([]));
+  }, [rpc, data?.items]);
   const [tipDismissed, setTipDismissed] = useState(() => {
     try {
       return localStorage.getItem(TIP_DISMISSED_KEY) === "1";
@@ -179,6 +201,32 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         }
       },
       onNewThread: (items) => navigate.toCompose({ initialPrompt: mentionPrompt(items), focusPrompt: true }),
+      onDuplicate: async (item) => {
+        try {
+          const { item: created } = await rpc.call("duplicate", { pluginId: item.pluginId, id: item.id, projectId: item.projectId, includeChildren: item.kind === "page" });
+          refetch(); openAppPath(created.href);
+        } catch (cause) { toast.error(`Couldn't duplicate: ${errorMessage(cause)}`); }
+      },
+      onSetTemplate: async (item, template) => {
+        try { await rpc.call("setTemplate", { pluginId: item.pluginId, id: item.id, template }); refetch(); toast.success(template ? "Saved as template" : "Template removed"); }
+        catch (cause) { toast.error(`Couldn't change template: ${errorMessage(cause)}`); }
+      },
+      exportFormats: (item) => item.kind === "page" ? [{ format: "markdown", label: "Markdown and assets" }, { format: "html", label: "HTML and assets" }, { format: "pdf", label: "PDF" }]
+        : item.kind === "drawing" ? [{ format: "png", label: "PNG" }, { format: "svg", label: "SVG" }, { format: "excalidraw", label: "Excalidraw JSON" }]
+          : item.kind === "task" ? [{ format: "markdown", label: "Markdown" }, { format: "csv", label: "CSV" }]
+            : item.kind === "recording" || item.kind === "dictation" ? [{ format: "markdown", label: "Transcript Markdown" }, { format: "audio", label: "Audio segments" }, { format: "bundle", label: "Transcript and audio" }]
+              : [{ format: "original", label: "Original file" }],
+      onExport: async (item, format) => {
+        try {
+          const { files } = await rpc.call("exportItem", { pluginId: item.pluginId, id: item.id, format });
+          if (files.length === 1) downloadFile(files[0]!);
+          else downloadFile(await rpc.call("exportBulk", { items: [{ pluginId: item.pluginId, id: item.id, format }] }));
+        } catch (cause) { toast.error(`Couldn't export: ${errorMessage(cause)}`); }
+      },
+      onExportBulk: async (items) => {
+        try { downloadFile(await rpc.call("exportBulk", { items: items.map((item) => ({ pluginId: item.pluginId, id: item.id, format: defaultExportFormat(item.kind) })) })); }
+        catch (cause) { toast.error(`Couldn't export ZIP: ${errorMessage(cause)}`); }
+      },
       onMove: async (items, projectId) => {
         const result = await perPlugin(items, (pluginId, ids) => rpc.call("move", { pluginId, ids, projectId }));
         refetch();
@@ -250,6 +298,19 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     }
   };
   const unavailable = providers.filter((provider) => provider.state !== "ready");
+  const extraCreateItems = [
+    ...templates.map((item) => ({ id: `template:${item.pluginId}:${item.id}`, label: `From template: ${item.title || "Untitled"}`, icon: "Copy", onSelect: (projectId: string | null) => {
+      const name = window.prompt("Name for this template (optional)", "");
+      if (name === null) return;
+      void rpc.call("instantiateTemplate", { pluginId: item.pluginId, id: item.id, projectId, variables: { name } }).then(({ item: created }) => { refetch(); openAppPath(created.href); }, (cause: unknown) => toast.error(`Couldn't use template: ${errorMessage(cause)}`));
+    } })),
+    ...playbooks.map((book) => ({ id: `playbook:${book.id}`, label: `Playbook: ${book.name}`, icon: "BookOpen", onSelect: (projectId: string | null) => {
+      if (!projectId) { toast.error("Pick a project to run a playbook."); return; }
+      const name = window.prompt("Name for this playbook (optional)", "");
+      if (name === null) return;
+      void rpc.call("runPlaybook", { id: book.id, projectId, variables: { name }, startHandoffs: false }).then(({ items }) => { refetch(); toast.success(`Created ${items.length} items`); }, (cause: unknown) => toast.error(`Couldn't run playbook: ${errorMessage(cause)}`));
+    } })),
+  ];
 
   const notice = (
     <>
@@ -332,6 +393,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       defaultProjectId={context.projectId ?? null}
       storageKey="studio:collection"
       tags={data?.tags ?? []}
+      extraCreateItems={extraCreateItems}
       kind={kind}
       onKindChange={setKind}
       notice={notice}

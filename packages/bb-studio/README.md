@@ -108,3 +108,9 @@ bb plugin build .
 `@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
 `package-lock.json` current (regenerate it in a clean clone, not the pnpm
 workspace), because BB's Git install runs `npm install` from it.
+
+## Templates, playbooks, and export
+
+Pages, drawings, and tasks can be saved as templates from an item's menu. The New menu lists those templates and three built-in playbooks: Launch review, Bug triage, and Weekly review. A playbook creates pages and tasks in the selected project. `bb studio playbooks` lists them; `bb studio playbook-run <id> --project <id> [--name <value>]` runs one. Agents can call `studio_playbook_run`. Custom playbooks can be saved through `savePlaybook` and run through `runPlaybook`; `startHandoffs` starts threads for tasks with handoff prompts.
+
+The hub offers `duplicate`, `setTemplate`, `instantiateTemplate`, `templates`, `exportItem`, and `exportBulk` RPCs. `exportBulk` returns a base64 ZIP containing the provider's files. Individual exports use the item's menu. Template fields use `{{name}}` style variables; unknown variables remain visible.

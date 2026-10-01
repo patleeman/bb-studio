@@ -766,6 +766,9 @@
                           },
                           "links": {
                             "type": "boolean"
+                          },
+                          "templates": {
+                            "type": "boolean"
                           }
                         },
                         "required": [
@@ -947,6 +950,9 @@
                   "type": "string"
                 },
                 "archived": {
+                  "type": "boolean"
+                },
+                "template": {
                   "type": "boolean"
                 },
                 "pluginId": {
@@ -1168,6 +1174,9 @@
                   "type": "string"
                 },
                 "archived": {
+                  "type": "boolean"
+                },
+                "template": {
                   "type": "boolean"
                 },
                 "pluginId": {
@@ -1621,6 +1630,9 @@
               },
               "archived": {
                 "type": "boolean"
+              },
+              "template": {
+                "type": "boolean"
               }
             },
             "required": [
@@ -1645,6 +1657,1254 @@
         },
         "required": [
           "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "duplicate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "includeChildren": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pluginId",
+          "id",
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "agent"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "preview": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "facts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "sort": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "value",
+                    "sort"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "badge": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "tone": {
+                        "type": "string",
+                        "enum": [
+                          "neutral",
+                          "live",
+                          "progress",
+                          "warning",
+                          "danger",
+                          "success"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "tone"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "thumbnailUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "template": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon",
+              "projectId",
+              "parentId",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "preview",
+              "facts",
+              "badge",
+              "thumbnailUrl",
+              "href",
+              "archived"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "setTemplate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "template": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pluginId",
+          "id",
+          "template"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "agent"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "preview": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "facts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "sort": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "value",
+                    "sort"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "badge": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "tone": {
+                        "type": "string",
+                        "enum": [
+                          "neutral",
+                          "live",
+                          "progress",
+                          "warning",
+                          "danger",
+                          "success"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "tone"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "thumbnailUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "template": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon",
+              "projectId",
+              "parentId",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "preview",
+              "facts",
+              "badge",
+              "thumbnailUrl",
+              "href",
+              "archived"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "instantiateTemplate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "variables": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "pluginId",
+          "id",
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "kind": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "updatedBy": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "user",
+                      "agent"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "preview": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "facts": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "value": {
+                      "type": "string"
+                    },
+                    "sort": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "value",
+                    "sort"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "badge": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "label": {
+                        "type": "string"
+                      },
+                      "tone": {
+                        "type": "string",
+                        "enum": [
+                          "neutral",
+                          "live",
+                          "progress",
+                          "warning",
+                          "danger",
+                          "success"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "label",
+                      "tone"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "thumbnailUrl": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "template": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "kind",
+              "title",
+              "icon",
+              "projectId",
+              "parentId",
+              "createdAt",
+              "updatedAt",
+              "updatedBy",
+              "preview",
+              "facts",
+              "badge",
+              "thumbnailUrl",
+              "href",
+              "archived"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "templates": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "updatedBy": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "agent"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preview": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "facts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "sort": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "value",
+                      "sort"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "badge": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "tone": {
+                          "type": "string",
+                          "enum": [
+                            "neutral",
+                            "live",
+                            "progress",
+                            "warning",
+                            "danger",
+                            "success"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "tone"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "template": {
+                  "type": "boolean"
+                },
+                "pluginId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "title",
+                "icon",
+                "projectId",
+                "parentId",
+                "createdAt",
+                "updatedAt",
+                "updatedBy",
+                "preview",
+                "facts",
+                "badge",
+                "thumbnailUrl",
+                "href",
+                "archived",
+                "pluginId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exportItem": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "format": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 30
+          }
+        },
+        "required": [
+          "pluginId",
+          "id",
+          "format"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "files": {
+            "minItems": 1,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string"
+                },
+                "mime": {
+                  "type": "string"
+                },
+                "data": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "name",
+                "mime",
+                "data"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "files"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "exportBulk": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "minItems": 1,
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "format": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 30
+                }
+              },
+              "required": [
+                "pluginId",
+                "id",
+                "format"
+              ]
+            }
+          }
+        },
+        "required": [
+          "items"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string"
+          },
+          "mime": {
+            "type": "string"
+          },
+          "data": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "name",
+          "mime",
+          "data"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "playbooks": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "playbooks": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "pages": {
+                  "maxItems": 30,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 200
+                      },
+                      "markdown": {
+                        "type": "string",
+                        "maxLength": 200000
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "markdown"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "tasks": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "title": {
+                        "type": "string",
+                        "maxLength": 300
+                      },
+                      "description": {
+                        "type": "string",
+                        "maxLength": 20000
+                      },
+                      "assignee": {
+                        "type": "string"
+                      },
+                      "handoffPrompt": {
+                        "type": "string",
+                        "maxLength": 10000
+                      }
+                    },
+                    "required": [
+                      "title",
+                      "description"
+                    ],
+                    "additionalProperties": false
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "description",
+                "pages",
+                "tasks"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "playbooks"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "savePlaybook": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "pages": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 200
+                },
+                "markdown": {
+                  "type": "string",
+                  "maxLength": 200000
+                }
+              },
+              "required": [
+                "title",
+                "markdown"
+              ]
+            }
+          },
+          "tasks": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "title": {
+                  "type": "string",
+                  "maxLength": 300
+                },
+                "description": {
+                  "type": "string",
+                  "maxLength": 20000
+                },
+                "assignee": {
+                  "type": "string"
+                },
+                "handoffPrompt": {
+                  "type": "string",
+                  "maxLength": 10000
+                }
+              },
+              "required": [
+                "title",
+                "description"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "name",
+          "description",
+          "pages",
+          "tasks"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "playbook": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "name": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "description": {
+                "type": "string",
+                "maxLength": 1000
+              },
+              "pages": {
+                "maxItems": 30,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "maxLength": 200
+                    },
+                    "markdown": {
+                      "type": "string",
+                      "maxLength": 200000
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "markdown"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "tasks": {
+                "maxItems": 100,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "title": {
+                      "type": "string",
+                      "maxLength": 300
+                    },
+                    "description": {
+                      "type": "string",
+                      "maxLength": 20000
+                    },
+                    "assignee": {
+                      "type": "string"
+                    },
+                    "handoffPrompt": {
+                      "type": "string",
+                      "maxLength": 10000
+                    }
+                  },
+                  "required": [
+                    "title",
+                    "description"
+                  ],
+                  "additionalProperties": false
+                }
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "description",
+              "pages",
+              "tasks"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "playbook"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "deletePlaybook": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "runPlaybook": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "variables": {
+            "default": {},
+            "type": "object",
+            "propertyNames": {
+              "type": "string"
+            },
+            "additionalProperties": {
+              "type": "string"
+            }
+          },
+          "startHandoffs": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                }
+              },
+              "required": [
+                "pluginId",
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "threadIds": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "items",
+          "threadIds"
         ],
         "additionalProperties": false
       }
@@ -2578,6 +3838,9 @@
                   "archived": {
                     "type": "boolean"
                   },
+                  "template": {
+                    "type": "boolean"
+                  },
                   "pluginId": {
                     "type": "string"
                   }
@@ -2749,6 +4012,9 @@
                         "type": "boolean"
                       },
                       "links": {
+                        "type": "boolean"
+                      },
+                      "templates": {
                         "type": "boolean"
                       }
                     },
@@ -4373,6 +5639,9 @@
         "type": "string"
       },
       "archived": {
+        "type": "boolean"
+      },
+      "template": {
         "type": "boolean"
       }
     },

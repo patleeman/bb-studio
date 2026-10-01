@@ -11,6 +11,16 @@ public enum Studio {
     public static let search = "search"
     public static let searchAll = "searchAll"
     public static let create = "create"
+    public static let duplicate = "duplicate"
+    public static let setTemplate = "setTemplate"
+    public static let instantiateTemplate = "instantiateTemplate"
+    public static let templates = "templates"
+    public static let exportItem = "exportItem"
+    public static let exportBulk = "exportBulk"
+    public static let playbooks = "playbooks"
+    public static let savePlaybook = "savePlaybook"
+    public static let deletePlaybook = "deletePlaybook"
+    public static let runPlaybook = "runPlaybook"
     public static let move = "move"
     public static let archive = "archive"
     public static let remove = "remove"
@@ -60,6 +70,30 @@ public enum Studio {
   public typealias SearchAll = SearchAllOutput
 
   public typealias Create = CreateOutput
+
+  public typealias Duplicate = DuplicateOutput
+
+  public typealias SetTemplate = SetTemplateOutput
+
+  public typealias InstantiateTemplate = InstantiateTemplateOutput
+
+  public typealias TemplatesInput = StudioJSONValue
+
+  public typealias Templates = TemplatesOutput
+
+  public typealias ExportItem = ExportItemOutput
+
+  public typealias ExportBulk = ExportBulkOutput
+
+  public typealias PlaybooksInput = StudioJSONValue
+
+  public typealias Playbooks = PlaybooksOutput
+
+  public typealias SavePlaybook = SavePlaybookOutput
+
+  public typealias DeletePlaybook = DeletePlaybookOutput
+
+  public typealias RunPlaybook = RunPlaybookOutput
 
   public typealias Move = MoveOutput
 
@@ -627,8 +661,9 @@ public enum Studio {
     public var comments: Bool?
     public var versions: Bool?
     public var links: Bool?
+    public var templates: Bool?
 
-    public init(create: Bool? = nil, move: Bool? = nil, archive: Bool? = nil, delete: Bool? = nil, rename: Bool? = nil, duplicate: Bool? = nil, export: Bool? = nil, comments: Bool? = nil, versions: Bool? = nil, links: Bool? = nil) {
+    public init(create: Bool? = nil, move: Bool? = nil, archive: Bool? = nil, delete: Bool? = nil, rename: Bool? = nil, duplicate: Bool? = nil, export: Bool? = nil, comments: Bool? = nil, versions: Bool? = nil, links: Bool? = nil, templates: Bool? = nil) {
       self.create = create
       self.move = move
       self.archive = archive
@@ -639,6 +674,7 @@ public enum Studio {
       self.comments = comments
       self.versions = versions
       self.links = links
+      self.templates = templates
     }
   }
 
@@ -788,10 +824,11 @@ public enum Studio {
     public var thumbnailUrl: String?
     public var href: String?
     public var archived: Bool?
+    public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -807,6 +844,7 @@ public enum Studio {
       self.thumbnailUrl = thumbnailUrl
       self.href = href
       self.archived = archived
+      self.template = template
       self.pluginId = pluginId
       self.tags = tags
     }
@@ -944,10 +982,11 @@ public enum Studio {
     public var thumbnailUrl: String?
     public var href: String?
     public var archived: Bool?
+    public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -963,6 +1002,7 @@ public enum Studio {
       self.thumbnailUrl = thumbnailUrl
       self.href = href
       self.archived = archived
+      self.template = template
       self.pluginId = pluginId
       self.tags = tags
     }
@@ -1206,8 +1246,9 @@ public enum Studio {
     public var thumbnailUrl: String?
     public var href: String?
     public var archived: Bool?
+    public var template: Bool?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: CreateOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [CreateOutputItemFactsItem]? = nil, badge: CreateOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: CreateOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [CreateOutputItemFactsItem]? = nil, badge: CreateOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -1223,6 +1264,7 @@ public enum Studio {
       self.thumbnailUrl = thumbnailUrl
       self.href = href
       self.archived = archived
+      self.template = template
     }
   }
 
@@ -1231,6 +1273,810 @@ public enum Studio {
 
     public init(item: CreateOutputItem? = nil) {
       self.item = item
+    }
+  }
+
+  public struct DuplicateInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var projectId: String?
+    public var includeChildren: Bool?
+
+    public init(pluginId: String? = nil, id: String? = nil, projectId: String? = nil, includeChildren: Bool? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.projectId = projectId
+      self.includeChildren = includeChildren
+    }
+  }
+
+  public enum DuplicateOutputItemUpdatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DuplicateOutputItemFactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var value: String?
+    public var sort: Double?
+
+    public init(id: String? = nil, value: String? = nil, sort: Double? = nil) {
+      self.id = id
+      self.value = value
+      self.sort = sort
+    }
+  }
+
+  public enum DuplicateOutputItemBadgeTone: Sendable, Hashable, Codable {
+    case neutral
+    case live
+    case progress
+    case warning
+    case danger
+    case success
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "neutral": self = .neutral
+      case "live": self = .live
+      case "progress": self = .progress
+      case "warning": self = .warning
+      case "danger": self = .danger
+      case "success": self = .success
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .neutral: try container.encode("neutral")
+      case .live: try container.encode("live")
+      case .progress: try container.encode("progress")
+      case .warning: try container.encode("warning")
+      case .danger: try container.encode("danger")
+      case .success: try container.encode("success")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DuplicateOutputItemBadge: Sendable, Hashable, Codable {
+    public var label: String?
+    public var tone: DuplicateOutputItemBadgeTone?
+
+    public init(label: String? = nil, tone: DuplicateOutputItemBadgeTone? = nil) {
+      self.label = label
+      self.tone = tone
+    }
+  }
+
+  public struct DuplicateOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: DuplicateOutputItemUpdatedBy?
+    public var preview: String?
+    public var facts: [DuplicateOutputItemFactsItem]?
+    public var badge: DuplicateOutputItemBadge?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: DuplicateOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [DuplicateOutputItemFactsItem]? = nil, badge: DuplicateOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.projectId = projectId
+      self.parentId = parentId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct DuplicateOutput: Sendable, Hashable, Codable {
+    public var item: DuplicateOutputItem?
+
+    public init(item: DuplicateOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct SetTemplateInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var template: Bool?
+
+    public init(pluginId: String? = nil, id: String? = nil, template: Bool? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.template = template
+    }
+  }
+
+  public enum SetTemplateOutputItemUpdatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SetTemplateOutputItemFactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var value: String?
+    public var sort: Double?
+
+    public init(id: String? = nil, value: String? = nil, sort: Double? = nil) {
+      self.id = id
+      self.value = value
+      self.sort = sort
+    }
+  }
+
+  public enum SetTemplateOutputItemBadgeTone: Sendable, Hashable, Codable {
+    case neutral
+    case live
+    case progress
+    case warning
+    case danger
+    case success
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "neutral": self = .neutral
+      case "live": self = .live
+      case "progress": self = .progress
+      case "warning": self = .warning
+      case "danger": self = .danger
+      case "success": self = .success
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .neutral: try container.encode("neutral")
+      case .live: try container.encode("live")
+      case .progress: try container.encode("progress")
+      case .warning: try container.encode("warning")
+      case .danger: try container.encode("danger")
+      case .success: try container.encode("success")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SetTemplateOutputItemBadge: Sendable, Hashable, Codable {
+    public var label: String?
+    public var tone: SetTemplateOutputItemBadgeTone?
+
+    public init(label: String? = nil, tone: SetTemplateOutputItemBadgeTone? = nil) {
+      self.label = label
+      self.tone = tone
+    }
+  }
+
+  public struct SetTemplateOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: SetTemplateOutputItemUpdatedBy?
+    public var preview: String?
+    public var facts: [SetTemplateOutputItemFactsItem]?
+    public var badge: SetTemplateOutputItemBadge?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: SetTemplateOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [SetTemplateOutputItemFactsItem]? = nil, badge: SetTemplateOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.projectId = projectId
+      self.parentId = parentId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct SetTemplateOutput: Sendable, Hashable, Codable {
+    public var item: SetTemplateOutputItem?
+
+    public init(item: SetTemplateOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct InstantiateTemplateInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var projectId: String?
+    public var variables: [String: String]?
+
+    public init(pluginId: String? = nil, id: String? = nil, projectId: String? = nil, variables: [String: String]? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.projectId = projectId
+      self.variables = variables
+    }
+  }
+
+  public enum InstantiateTemplateOutputItemUpdatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct InstantiateTemplateOutputItemFactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var value: String?
+    public var sort: Double?
+
+    public init(id: String? = nil, value: String? = nil, sort: Double? = nil) {
+      self.id = id
+      self.value = value
+      self.sort = sort
+    }
+  }
+
+  public enum InstantiateTemplateOutputItemBadgeTone: Sendable, Hashable, Codable {
+    case neutral
+    case live
+    case progress
+    case warning
+    case danger
+    case success
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "neutral": self = .neutral
+      case "live": self = .live
+      case "progress": self = .progress
+      case "warning": self = .warning
+      case "danger": self = .danger
+      case "success": self = .success
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .neutral: try container.encode("neutral")
+      case .live: try container.encode("live")
+      case .progress: try container.encode("progress")
+      case .warning: try container.encode("warning")
+      case .danger: try container.encode("danger")
+      case .success: try container.encode("success")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct InstantiateTemplateOutputItemBadge: Sendable, Hashable, Codable {
+    public var label: String?
+    public var tone: InstantiateTemplateOutputItemBadgeTone?
+
+    public init(label: String? = nil, tone: InstantiateTemplateOutputItemBadgeTone? = nil) {
+      self.label = label
+      self.tone = tone
+    }
+  }
+
+  public struct InstantiateTemplateOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: InstantiateTemplateOutputItemUpdatedBy?
+    public var preview: String?
+    public var facts: [InstantiateTemplateOutputItemFactsItem]?
+    public var badge: InstantiateTemplateOutputItemBadge?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: InstantiateTemplateOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [InstantiateTemplateOutputItemFactsItem]? = nil, badge: InstantiateTemplateOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.projectId = projectId
+      self.parentId = parentId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct InstantiateTemplateOutput: Sendable, Hashable, Codable {
+    public var item: InstantiateTemplateOutputItem?
+
+    public init(item: InstantiateTemplateOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public enum TemplatesOutputItemsItemUpdatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TemplatesOutputItemsItemFactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var value: String?
+    public var sort: Double?
+
+    public init(id: String? = nil, value: String? = nil, sort: Double? = nil) {
+      self.id = id
+      self.value = value
+      self.sort = sort
+    }
+  }
+
+  public enum TemplatesOutputItemsItemBadgeTone: Sendable, Hashable, Codable {
+    case neutral
+    case live
+    case progress
+    case warning
+    case danger
+    case success
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "neutral": self = .neutral
+      case "live": self = .live
+      case "progress": self = .progress
+      case "warning": self = .warning
+      case "danger": self = .danger
+      case "success": self = .success
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .neutral: try container.encode("neutral")
+      case .live: try container.encode("live")
+      case .progress: try container.encode("progress")
+      case .warning: try container.encode("warning")
+      case .danger: try container.encode("danger")
+      case .success: try container.encode("success")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TemplatesOutputItemsItemBadge: Sendable, Hashable, Codable {
+    public var label: String?
+    public var tone: TemplatesOutputItemsItemBadgeTone?
+
+    public init(label: String? = nil, tone: TemplatesOutputItemsItemBadgeTone? = nil) {
+      self.label = label
+      self.tone = tone
+    }
+  }
+
+  public struct TemplatesOutputItemsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: TemplatesOutputItemsItemUpdatedBy?
+    public var preview: String?
+    public var facts: [TemplatesOutputItemsItemFactsItem]?
+    public var badge: TemplatesOutputItemsItemBadge?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var archived: Bool?
+    public var template: Bool?
+    public var pluginId: String?
+
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: TemplatesOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [TemplatesOutputItemsItemFactsItem]? = nil, badge: TemplatesOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.projectId = projectId
+      self.parentId = parentId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.archived = archived
+      self.template = template
+      self.pluginId = pluginId
+    }
+  }
+
+  public struct TemplatesOutput: Sendable, Hashable, Codable {
+    public var items: [TemplatesOutputItemsItem]?
+
+    public init(items: [TemplatesOutputItemsItem]? = nil) {
+      self.items = items
+    }
+  }
+
+  public struct ExportItemInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var format: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, format: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.format = format
+    }
+  }
+
+  public struct ExportItemOutputFilesItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var mime: String?
+    public var data: String?
+
+    public init(name: String? = nil, mime: String? = nil, data: String? = nil) {
+      self.name = name
+      self.mime = mime
+      self.data = data
+    }
+  }
+
+  public struct ExportItemOutput: Sendable, Hashable, Codable {
+    public var files: [ExportItemOutputFilesItem]?
+
+    public init(files: [ExportItemOutputFilesItem]? = nil) {
+      self.files = files
+    }
+  }
+
+  public struct ExportBulkInputItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var format: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, format: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.format = format
+    }
+  }
+
+  public struct ExportBulkInput: Sendable, Hashable, Codable {
+    public var items: [ExportBulkInputItemsItem]?
+
+    public init(items: [ExportBulkInputItemsItem]? = nil) {
+      self.items = items
+    }
+  }
+
+  public struct ExportBulkOutput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var mime: String?
+    public var data: String?
+
+    public init(name: String? = nil, mime: String? = nil, data: String? = nil) {
+      self.name = name
+      self.mime = mime
+      self.data = data
+    }
+  }
+
+  public struct PlaybooksOutputPlaybooksItemPagesItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var markdown: String?
+
+    public init(title: String? = nil, markdown: String? = nil) {
+      self.title = title
+      self.markdown = markdown
+    }
+  }
+
+  public struct PlaybooksOutputPlaybooksItemTasksItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var description: String?
+    public var assignee: String?
+    public var handoffPrompt: String?
+
+    public init(title: String? = nil, description: String? = nil, assignee: String? = nil, handoffPrompt: String? = nil) {
+      self.title = title
+      self.description = description
+      self.assignee = assignee
+      self.handoffPrompt = handoffPrompt
+    }
+  }
+
+  public struct PlaybooksOutputPlaybooksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var pages: [PlaybooksOutputPlaybooksItemPagesItem]?
+    public var tasks: [PlaybooksOutputPlaybooksItemTasksItem]?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, pages: [PlaybooksOutputPlaybooksItemPagesItem]? = nil, tasks: [PlaybooksOutputPlaybooksItemTasksItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.pages = pages
+      self.tasks = tasks
+    }
+  }
+
+  public struct PlaybooksOutput: Sendable, Hashable, Codable {
+    public var playbooks: [PlaybooksOutputPlaybooksItem]?
+
+    public init(playbooks: [PlaybooksOutputPlaybooksItem]? = nil) {
+      self.playbooks = playbooks
+    }
+  }
+
+  public struct SavePlaybookInputPagesItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var markdown: String?
+
+    public init(title: String? = nil, markdown: String? = nil) {
+      self.title = title
+      self.markdown = markdown
+    }
+  }
+
+  public struct SavePlaybookInputTasksItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var description: String?
+    public var assignee: String?
+    public var handoffPrompt: String?
+
+    public init(title: String? = nil, description: String? = nil, assignee: String? = nil, handoffPrompt: String? = nil) {
+      self.title = title
+      self.description = description
+      self.assignee = assignee
+      self.handoffPrompt = handoffPrompt
+    }
+  }
+
+  public struct SavePlaybookInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var pages: [SavePlaybookInputPagesItem]?
+    public var tasks: [SavePlaybookInputTasksItem]?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, pages: [SavePlaybookInputPagesItem]? = nil, tasks: [SavePlaybookInputTasksItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.pages = pages
+      self.tasks = tasks
+    }
+  }
+
+  public struct SavePlaybookOutputPlaybookPagesItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var markdown: String?
+
+    public init(title: String? = nil, markdown: String? = nil) {
+      self.title = title
+      self.markdown = markdown
+    }
+  }
+
+  public struct SavePlaybookOutputPlaybookTasksItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var description: String?
+    public var assignee: String?
+    public var handoffPrompt: String?
+
+    public init(title: String? = nil, description: String? = nil, assignee: String? = nil, handoffPrompt: String? = nil) {
+      self.title = title
+      self.description = description
+      self.assignee = assignee
+      self.handoffPrompt = handoffPrompt
+    }
+  }
+
+  public struct SavePlaybookOutputPlaybook: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var description: String?
+    public var pages: [SavePlaybookOutputPlaybookPagesItem]?
+    public var tasks: [SavePlaybookOutputPlaybookTasksItem]?
+
+    public init(id: String? = nil, name: String? = nil, description: String? = nil, pages: [SavePlaybookOutputPlaybookPagesItem]? = nil, tasks: [SavePlaybookOutputPlaybookTasksItem]? = nil) {
+      self.id = id
+      self.name = name
+      self.description = description
+      self.pages = pages
+      self.tasks = tasks
+    }
+  }
+
+  public struct SavePlaybookOutput: Sendable, Hashable, Codable {
+    public var playbook: SavePlaybookOutputPlaybook?
+
+    public init(playbook: SavePlaybookOutputPlaybook? = nil) {
+      self.playbook = playbook
+    }
+  }
+
+  public struct DeletePlaybookInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DeletePlaybookOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct RunPlaybookInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var variables: [String: String]?
+    public var startHandoffs: Bool?
+
+    public init(id: String? = nil, projectId: String? = nil, variables: [String: String]? = nil, startHandoffs: Bool? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.variables = variables
+      self.startHandoffs = startHandoffs
+    }
+  }
+
+  public struct RunPlaybookOutputItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct RunPlaybookOutput: Sendable, Hashable, Codable {
+    public var items: [RunPlaybookOutputItemsItem]?
+    public var threadIds: [String]?
+
+    public init(items: [RunPlaybookOutputItemsItem]? = nil, threadIds: [String]? = nil) {
+      self.items = items
+      self.threadIds = threadIds
     }
   }
 
@@ -1706,9 +2552,10 @@ public enum Studio {
     public var thumbnailUrl: String?
     public var href: String?
     public var archived: Bool?
+    public var template: Bool?
     public var pluginId: String?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemAtOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemAtOutputItemFactsItem]? = nil, badge: ItemAtOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, pluginId: String? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemAtOutputItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemAtOutputItemFactsItem]? = nil, badge: ItemAtOutputItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -1724,6 +2571,7 @@ public enum Studio {
       self.thumbnailUrl = thumbnailUrl
       self.href = href
       self.archived = archived
+      self.template = template
       self.pluginId = pluginId
     }
   }
@@ -1787,8 +2635,9 @@ public enum Studio {
     public var comments: Bool?
     public var versions: Bool?
     public var links: Bool?
+    public var templates: Bool?
 
-    public init(create: Bool? = nil, move: Bool? = nil, archive: Bool? = nil, delete: Bool? = nil, rename: Bool? = nil, duplicate: Bool? = nil, export: Bool? = nil, comments: Bool? = nil, versions: Bool? = nil, links: Bool? = nil) {
+    public init(create: Bool? = nil, move: Bool? = nil, archive: Bool? = nil, delete: Bool? = nil, rename: Bool? = nil, duplicate: Bool? = nil, export: Bool? = nil, comments: Bool? = nil, versions: Bool? = nil, links: Bool? = nil, templates: Bool? = nil) {
       self.create = create
       self.move = move
       self.archive = archive
@@ -1799,6 +2648,7 @@ public enum Studio {
       self.comments = comments
       self.versions = versions
       self.links = links
+      self.templates = templates
     }
   }
 
@@ -3124,8 +3974,9 @@ public enum Studio {
     public var thumbnailUrl: String?
     public var href: String?
     public var archived: Bool?
+    public var template: Bool?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: StudioItemUpdatedBy? = nil, preview: String? = nil, facts: [StudioItemFactsItem]? = nil, badge: StudioItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: StudioItemUpdatedBy? = nil, preview: String? = nil, facts: [StudioItemFactsItem]? = nil, badge: StudioItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -3141,6 +3992,7 @@ public enum Studio {
       self.thumbnailUrl = thumbnailUrl
       self.href = href
       self.archived = archived
+      self.template = template
     }
   }
 }

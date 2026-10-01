@@ -29,6 +29,8 @@ import { routeCommentMentions } from "./src/comment-routing";
 import { homeData } from "./src/home";
 import { firstThreadItemRefs } from "./src/thread-item-refs";
 import { respondToNeed } from "./src/needs-you";
+import { zipFiles } from "./src/export-zip";
+import { PlaybookStore, renderPlaybook } from "./src/playbooks";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -41,6 +43,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
   const tabs = new TabStore(db);
+  const playbooks = new PlaybookStore(db);
   const searchIndex = new SearchIndex(db, hub);
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();
@@ -190,6 +193,37 @@ export default async function plugin(bb: BbPluginApi) {
     return { panels: panels.map((panel) => ({ ...panel, visible: isPanelVisible(order, visible, panel.id) })) };
   };
 
+  const runPlaybook = async (id: string, projectId: string, variables: Record<string, string>, startHandoffs: boolean) => {
+    const source = playbooks.get(id);
+    if (!source) throw new Error("Playbook not found.");
+    const book = renderPlaybook(source, { ...variables, name: variables.name?.trim() || source.name });
+    const ready = await hub.providers();
+    for (const [needed, count] of [["pages", book.pages.length], ["studio-tasks", book.tasks.length]] as const) {
+      if (count && !ready.some((provider) => provider.pluginId === needed && provider.state === "ready")) throw new Error(`${needed} is unavailable.`);
+    }
+    const items: ItemRef[] = [], threadIds: string[] = [];
+    for (const page of book.pages) {
+      const result = await bb.sdk.plugins.callRpc({ pluginId: "pages", method: "create", input: { ...page, projectId, parentId: null }, outputSchema: z.object({ page: z.object({ id: z.string() }) }) });
+      items.push({ pluginId: "pages", id: result.page.id });
+    }
+    for (const task of book.tasks) {
+      const result = await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "create", input: { title: task.title, description: task.description, projectId, ...(task.assignee ? { assignee: task.assignee } : {}) }, outputSchema: z.object({ task: z.object({ id: z.string() }) }) });
+      const ref = { pluginId: "studio-tasks", id: result.task.id };
+      items.push(ref);
+      if (startHandoffs && task.handoffPrompt) {
+        if (task.assignee?.startsWith("bot:")) {
+          await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "handOffBot", input: { id: ref.id, note: task.handoffPrompt }, outputSchema: z.object({ roomId: z.string() }) });
+        } else {
+          const handoff = await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "handOff", input: {
+            id: ref.id, projectId, providerId: null, model: null, reasoningLevel: null, note: task.handoffPrompt, workspace: "folder",
+          }, outputSchema: z.object({ threadId: z.string() }) });
+          threadIds.push(handoff.threadId);
+        }
+      }
+    }
+    return { items, threadIds };
+  };
+
   bb.rpc.register(rpcContract, {
     home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
     homeRespond: async (input) => {
@@ -220,6 +254,29 @@ export default async function plugin(bb: BbPluginApi) {
       return [...studio, ...legacy, ...others].sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt).slice(0, limit);
     },
     create: ({ pluginId, kind, projectId }) => hub.call(pluginId, "studio_create", { kind, projectId }),
+    duplicate: ({ pluginId, id, projectId, includeChildren }) => hub.call(pluginId, "studio_duplicate", { id, projectId, includeChildren }),
+    setTemplate: ({ pluginId, id, template }) => hub.call(pluginId, "studio_template", { id, template }),
+    instantiateTemplate: ({ pluginId, id, projectId, variables }) => hub.call(pluginId, "studio_instantiate", { id, projectId, variables }),
+    templates: async () => ({ items: (await hub.overview()).items.filter((item) => item.template) }),
+    exportItem: ({ pluginId, id, format }) => hub.call(pluginId, "studio_export", { id, format }),
+    exportBulk: async ({ items }) => {
+      const files: { name: string; bytes: Buffer }[] = [];
+      let size = 0;
+      for (const { pluginId, id, format } of items) {
+        const result = await hub.call(pluginId, "studio_export", { id, format });
+        for (const file of result.files) {
+          const bytes = Buffer.from(file.data, "base64");
+          size += bytes.length;
+          if (size > 100 * 1024 * 1024) throw new Error("Selection exceeds the 100 MB ZIP export limit.");
+          files.push({ name: `${pluginId}/${id}/${file.name}`, bytes });
+        }
+      }
+      return { name: "studio-export.zip", mime: "application/zip", data: zipFiles(files).toString("base64") };
+    },
+    playbooks: () => ({ playbooks: playbooks.list() }),
+    savePlaybook: (playbook) => { playbooks.save(playbook); return { playbook }; },
+    deletePlaybook: ({ id }) => { playbooks.remove(id); return { ok: true }; },
+    runPlaybook: ({ id, projectId, variables, startHandoffs }) => runPlaybook(id, projectId, variables, startHandoffs),
     move: ({ pluginId, ids, projectId }) => hub.call(pluginId, "studio_move", { ids, projectId }),
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
     remove: async ({ pluginId, ids }) => {
@@ -470,6 +527,16 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
+  bb.agents.registerTool({
+    name: "studio_playbook_run",
+    description: "Create a playbook's pages and tasks in a project. Use bb studio playbooks to see available playbooks. Handoffs start agent threads only when requested.",
+    parameters: z.object({ id: z.string().min(1).max(100), projectId: z.string().min(1).max(200), variables: z.record(z.string(), z.string()).optional(), startHandoffs: z.boolean().optional() }),
+    async execute({ id, projectId, variables, startHandoffs }) {
+      const result = await runPlaybook(id, projectId, variables ?? {}, startHandoffs ?? false);
+      return `Created ${result.items.length} items${result.threadIds.length ? ` and started ${result.threadIds.length} handoffs` : ""}.`;
+    },
+  });
+
   bb.cli.register({
     name: "studio",
     summary: "List BB Studio items across Pages, Talk, Draw and other add-ons",
@@ -478,6 +545,8 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
       { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
+      { name: "playbooks", summary: "List available playbooks", usage: "bb studio playbooks" },
+      { name: "playbook-run", summary: "Create a playbook in a project", usage: "bb studio playbook-run <id> --project <id> [--name <value>]" },
     ],
     async run(argv, ctx) {
       const { command, rest } = subcommand(argv);
@@ -516,8 +585,17 @@ export default async function plugin(bb: BbPluginApi) {
             const count = await searchIndex.rebuild();
             return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
           }
+          case "playbooks": return { exitCode: 0, stdout: `${playbooks.list().map((book) => `${book.id}\t${book.name}\t${book.description}`).join("\n")}\n` };
+          case "playbook-run": {
+            const id = rest.shift();
+            const projectId = option("--project") ?? ctx.projectId;
+            if (!id || !projectId) return usage("bb studio playbook-run <id> --project <id> [--name <value>]");
+            const name = option("--name");
+            const result = await runPlaybook(id, projectId, name ? { name } : {}, false);
+            return { exitCode: 0, stdout: `Created ${result.items.length} items.\n` };
+          }
           default:
-            return usage("bb studio <list|tags|providers|reindex> …");
+            return usage("bb studio <list|tags|providers|reindex|playbooks|playbook-run> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
