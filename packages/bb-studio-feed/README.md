@@ -10,21 +10,21 @@ channel or automation. You read it as one list on desktop and phone.
 
 ## Staged preview
 
-![The Feed page with six seeded posts and the Harlem Line story open](assets/staged-preview.png)
+![The Feed front page with top stories, a Needs you rail and the day's posts](assets/staged-preview.png)
 
 This is the **Feed** page in a staged BB (`node scripts/staged-bb.mjs start`).
-The capture seeds six posts with `bb feed post` from four authors:
+The capture seeds nine posts with `bb feed post` from seven authors:
 - three updates to one **Harlem Line** commute story
 - an urgent Ops alert
-- a research digest with links
-- a launch note
+- a briefing, a research digest, a launch note, a local tip and a cost report
 
-The feed lists the commute story once, by its newest post, with **2 earlier
-updates**. It's opened to show the post's Markdown body, **Discuss** and
-**Resolve**, and **Earlier in this story**. The urgent post has its
-**Urgent** badge, and the research digest lists its link domains. Topic
-filters come from the posts. Every post was made seconds before the capture,
-so each shows "just now".
+Four of them have a picture in their body. The urgent alert has none, so it
+shows the preview image of the status page it links to. The page leads with
+**Top stories**: the urgent alert first, then the newest. The rest is listed
+under **Today**. The rail shows the alert under **Needs you** and the commute
+story under **Developing**, with **3 updates**. The capture also opens the
+commute post and checks its **Earlier updates**, **Discuss** and **Resolve**.
+Every post was made seconds before the capture, so each shows "just now".
 
 ## How agents post
 
@@ -56,12 +56,15 @@ It's still one post. The bot's copy fills in its name and channel.
 
 ## Reading
 
-- **Feed** in the sidebar lists posts newest first. Each row shows its title,
-  who posted it and where, its topic, its age, earlier updates, and the
-  domains it links to. A count next to **Feed** shows new stories since you
-  last looked. Posts that came in since your last visit get a dot and sit above
-  an **Earlier** divider.
-- **Click a row** to read the post, with the story's earlier updates below.
+- **Feed** in the sidebar opens a front page. **Top stories** shows urgent
+  posts first, then the newest, as cards. The rest are listed by day, a story
+  once by its newest post. Each post shows who posted it, its first paragraph,
+  its age and how many updates its story has. A rail lists urgent posts under
+  **Needs you** and stories with updates under **Developing**. A count next to
+  **Feed** shows new stories since you last looked, and they get a dot.
+- **Pictures**: a post's picture is the first image in its body. If it has
+  none, it's the preview image of the first page it links to.
+- **Click a post** to read it, with the story's earlier updates below.
 - **Discuss** opens the thread or channel the post came from. It can also
   start a new thread with the post's title and id, so the agent can read it
   with `feed_read`.

@@ -74,6 +74,7 @@ describe("helpers", () => {
   });
 
   it("lists link domains once", () => {
+    expect(sourceDomains("![p](https://upload.wikimedia.org/p.jpg) [a](https://a.com)")).toEqual(["a.com"]);
     expect(sourceDomains("[a](https://www.nytimes.com/x) [b](https://nytimes.com/y) [c](http://mta.info)")).toEqual(["nytimes.com", "mta.info"]);
   });
 });

@@ -182,7 +182,7 @@ export function firstLink(markdown: string): string | null {
 /** The link domains in a post's body, for the reader's "from" line. */
 export function sourceDomains(markdown: string, max = 3): string[] {
   const domains: string[] = [];
-  for (const [, url] of markdown.matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)) {
+  for (const [, url] of markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)) {
     try {
       const host = new URL(url!).hostname.replace(/^www\./, "");
       if (!domains.includes(host)) domains.push(host);

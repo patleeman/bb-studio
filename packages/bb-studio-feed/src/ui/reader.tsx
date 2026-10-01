@@ -108,7 +108,7 @@ function FeedFront() {
           <span className="text-muted-foreground">{new Intl.DateTimeFormat(undefined, { month: "long", day: "numeric" }).format(new Date())}</span>
         </h1>
         {topics.length ? (
-          <nav className="mt-4 flex gap-5 overflow-x-auto border-b border-border/70" aria-label="Topics">
+          <nav className="mt-4 flex gap-5 overflow-x-auto border-b border-border/70 [scrollbar-width:none]" aria-label="Topics">
             <TopicTab active={topic === null} onClick={() => setTopic(null)}>
               All
             </TopicTab>
@@ -243,11 +243,6 @@ function Kicker({ post, showTopic, unread }: { post: PostView; showTopic: boolea
   );
 }
 
-/** "3 updates · nytimes.com" */
-function extras(post: PostView): string[] {
-  return [post.storyPosts > 1 ? `${post.storyPosts} updates` : null, post.domains[0] ?? null].filter((each): each is string => Boolean(each));
-}
-
 function Lead({ post, unread }: { post: PostView; unread: boolean }) {
   const discuss = useDiscuss();
   return (
@@ -324,11 +319,8 @@ function Footer({ post, className, withSource }: { post: PostView; className?: s
       <time dateTime={new Date(post.createdAt).toISOString()} title={shortDateTime(post.createdAt)} className="shrink-0">
         {relativeTime(post.createdAt)}
       </time>
-      {extras(post).map((each) => (
-        <span key={each} className="truncate">
-          · {each}
-        </span>
-      ))}
+      {post.storyPosts > 1 ? <span className="shrink-0">· {post.storyPosts} updates</span> : null}
+      {post.domains[0] ? <span className="truncate">· {post.domains[0]}</span> : null}
       <PostMenu post={post} className="relative z-10 ml-auto opacity-0 group-focus-within:opacity-100 group-hover:opacity-100 data-[state=open]:opacity-100" />
     </div>
   );
