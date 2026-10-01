@@ -21,6 +21,9 @@ struct ThreadView: View {
     /// Follow new output only while the reader is at the bottom.
     @State private var atBottom = true
     @State private var atTop = false
+    /// How far the timeline is scrolled past its last row, or negative short of it.
+    @State private var pastEnd: CGFloat = 0
+    @State private var scrollPhase = ScrollPhase.idle
     @State private var selecting: SelectionText?
     @State private var selectedExcerpt = ""
     @State private var reactionSettings = ReactionSettings.defaults
@@ -419,6 +422,22 @@ struct ThreadView: View {
         } action: { _, isAtBottom in
             atBottom = isAtBottom
         }
+        // Following a streaming reply scrolls to the bottom the lazy stack
+        // estimates; when rows above measure shorter than estimated, or the
+        // bottom shrinks (the working indicator goes, steps fold into a group),
+        // the timeline is left past its end, showing nothing. Bring it back
+        // once nothing is scrolling, so a bounce at the bottom isn't fought.
+        .onScrollGeometryChange(for: CGFloat.self) { geometry in
+            let end = max(geometry.contentSize.height + geometry.contentInsets.bottom - geometry.containerSize.height, -geometry.contentInsets.top)
+            return geometry.contentOffset.y - end
+        } action: { _, distance in
+            pastEnd = distance
+            if scrollPhase == .idle { settlePastEnd() }
+        }
+        .onScrollPhaseChange { _, phase in
+            scrollPhase = phase
+            if phase == .idle { settlePastEnd() }
+        }
         // The first page lands at the bottom through `defaultScrollAnchor`;
         // scrolling by hand while lazy rows are still measuring can overshoot.
         .onChange(of: model.rows.last?.id) { old, _ in
@@ -501,6 +520,13 @@ struct ThreadView: View {
         guard let first = TimelineItem.group(model.rows).first?.id, await model.loadOlder() else { return false }
         position.scrollTo(id: first, anchor: .top)
         return true
+    }
+
+    /// Past this, the timeline is past its last row rather than bouncing.
+    private static let pastEndSlack: CGFloat = 40
+
+    private func settlePastEnd() {
+        if pastEnd > Self.pastEndSlack { scrollToBottom(animated: false) }
     }
 
     private func scrollToBottom(animated: Bool = true) {
