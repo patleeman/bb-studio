@@ -33,7 +33,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
-import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
+import { backgroundKinds, compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { NeedsYou } from "./HomePanel";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
 import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
@@ -200,6 +200,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     rpc.call("templates", null).then(({ items }) => setTemplates(items), () => setTemplates([]));
   }, [rpc, data?.items]);
   const providers = useMemo(() => data?.providers ?? [], [data]);
+  const background = useMemo(() => backgroundKinds(providers), [providers]);
   const kinds = useMemo<CollectionKind[]>(
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
     [providers],
@@ -556,7 +557,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         <SpaceHome
           rpc={rpc}
           space={space}
-          items={data?.items.filter((item) => !item.archived && item.spaces?.includes(space.id)) ?? []}
+          items={data?.items.filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && item.spaces?.includes(space.id)) ?? []}
           threads={spaceThreads}
           kinds={kinds}
           projects={projects}

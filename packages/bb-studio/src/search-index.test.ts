@@ -38,6 +38,8 @@ describe("Studio search index", () => {
     content.b = "Only shipping notes remain";
     await index.changed("pages", ["b"]);
     expect(index.search("offline sync").map((hit) => hit.ref.id)).toEqual(["c"]);
+    expect(index.recent(12, { skip: ["pages:page"] })).toEqual([]);
+    expect(index.recent(12, { skip: ["talk:page"] }).map((hit) => hit.ref.id)).toEqual(["c", "b"]);
     db.close();
   });
 });

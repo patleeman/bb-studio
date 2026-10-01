@@ -27,7 +27,7 @@ import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
 import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
-import { compileQuery, parseQuery, type Filter, type Query } from "./src/query";
+import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
 import { externalResults } from "./src/search-external";
@@ -405,7 +405,9 @@ export default async function plugin(bb: BbPluginApi) {
     search: ({ query }) => contentSearch(query),
     searchAll: async ({ query, kinds, projectId, limit }) => {
       await searchIndex.ensure();
-      const studio = query.trim() ? searchIndex.search(query, { kinds, projectId, limit }) : searchIndex.recent(limit, { kinds, projectId });
+      // Recent items leave out background kinds unless they're asked for; a search still finds them.
+      const skip = query.trim() || kinds?.length ? [] : [...backgroundKinds(await hub.providers())];
+      const studio = query.trim() ? searchIndex.search(query, { kinds, projectId, limit }) : searchIndex.recent(limit, { kinds, projectId, skip });
       const others = query.trim() ? await externalResults(bb, query, { kinds, projectId, limit }) : [];
       const fallback = query.trim() ? await hub.search(query, true) : { keys: [], snippets: {} };
       const groups = new Map<string, string[]>();
@@ -507,8 +509,9 @@ export default async function plugin(bb: BbPluginApi) {
       if (!space) throw new Error("That space no longer exists.");
       const [{ items, providers }, threads, projects] = await Promise.all([hub.overview(), spaceThreads(space), bb.sdk.projects.list().catch(() => [])]);
       const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
+      const background = backgroundKinds(providers);
       const held = items
-        .filter((item) => !item.archived && inSpace(space, item) && !(item.pluginId === PAGES_PLUGIN_ID && item.id === space.pageId))
+        .filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item) && !(item.pluginId === PAGES_PLUGIN_ID && item.id === space.pageId))
         .sort((a, b) => b.updatedAt - a.updatedAt);
       return {
         space: { id: space.id, name: space.name, icon: space.icon, defaultProjectId: space.defaultProjectId },
@@ -809,10 +812,11 @@ export default async function plugin(bb: BbPluginApi) {
 
   const formatSpaces = async (all: readonly Space[], current: readonly Space[]) => {
     if (!all.length) return "No spaces yet. The user makes them in Studio.";
-    const { items } = await hub.overview();
+    const { items, providers } = await hub.overview();
+    const background = backgroundKinds(providers);
     const projectNames = new Map((await bb.sdk.projects.list().catch(() => [])).map((project) => [project.id, project.name]));
     return all.map((space) => {
-      const count = items.filter((item) => !item.archived && inSpace(space, item)).length;
+      const count = items.filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item)).length;
       const projects = space.projectIds.map((id) => projectNames.get(id) ?? id);
       return `- ${space.icon ? `${space.icon} ` : ""}${space.name}${current.some((each) => each.id === space.id) ? " (this thread)" : ""} — ${count} item${count === 1 ? "" : "s"}${
         projects.length ? `, projects: ${projects.join(", ")}` : ""

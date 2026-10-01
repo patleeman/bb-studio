@@ -121,9 +121,11 @@ export class SearchIndex {
     }));
   }
 
-  recent(limit = 12, options: { kinds?: string[]; projectId?: string | null } = {}): SearchHit[] {
+  /** The latest items; `skip` leaves out kinds, as `pluginId:kind`. */
+  recent(limit = 12, options: { kinds?: string[]; projectId?: string | null; skip?: string[] } = {}): SearchHit[] {
     const clauses: string[] = [];
     const args: unknown[] = [];
+    if (options.skip?.length) { clauses.push(`plugin_id || ':' || kind NOT IN (${options.skip.map(() => "?").join(",")})`); args.push(...options.skip); }
     if (options.kinds?.length) { clauses.push(`kind IN (${options.kinds.map(() => "?").join(",")})`); args.push(...options.kinds); }
     if (options.projectId !== undefined) { clauses.push("project_id IS ?"); args.push(options.projectId); }
     const rows = this.db.prepare(`SELECT plugin_id,item_id,kind,project_id,href,updated_at,title,body,0 AS rank FROM studio_search_fts ${clauses.length ? `WHERE ${clauses.join(" AND ")}` : ""} ORDER BY updated_at DESC LIMIT ?`).all(...args, limit) as Row[];

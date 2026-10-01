@@ -176,6 +176,14 @@ export function compileQuery(query: Query, vocabulary: QueryVocabulary): Compile
   };
 }
 
+/**
+ * Kinds that run in the background, as `pluginId:kind`. Lists that show what's
+ * recent or what a space holds skip their items, as the All view does.
+ */
+export function backgroundKinds(providers: readonly { pluginId: string; kinds: readonly { id: string; background?: boolean }[] }[]): Set<string> {
+  return new Set(providers.flatMap((provider) => provider.kinds.filter((kind) => kind.background).map((kind) => `${provider.pluginId}:${kind.id}`)));
+}
+
 export interface FacetCounts {
   kind: Map<string, number>;
   /** By project id, with "" for global items. */
