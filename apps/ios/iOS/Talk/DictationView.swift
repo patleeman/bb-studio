@@ -1,8 +1,8 @@
 import SwiftUI
 
 /// Records into Talk and hands back the transcript. With `onInsert` the text
-/// goes into the caller's composer; otherwise it can be sent, turned into a
-/// thread, or copied. The recording stays in Talk either way.
+/// goes straight into the caller's field when you finish; otherwise it can be
+/// sent, turned into a thread, or copied. The recording stays in Talk either way.
 struct DictationView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -59,7 +59,7 @@ struct DictationView: View {
                             recorder.cancel()
                             dismiss()
                         } label: { circle("xmark", .gray) }
-                        Button { Task { text = await recorder.finish() ?? "" } } label: { circle("checkmark", .green) }
+                        Button { Task { await finish() } } label: { circle("checkmark", .green) }
                     }
                 case .finishing:
                     Spacer()
@@ -95,6 +95,18 @@ struct DictationView: View {
         .interactiveDismissDisabled(recorder.phase == .recording)
         .task {
             if autoStart { await recorder.start(kind: kind, threadId: threadId) }
+        }
+    }
+
+    /// A field that asked for dictation gets the text right away and is where
+    /// it gets edited, so only standalone dictation stops to review.
+    private func finish() async {
+        let spoken = (await recorder.finish() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        if let onInsert, !spoken.isEmpty {
+            onInsert(spoken)
+            dismiss()
+        } else {
+            text = spoken
         }
     }
 
