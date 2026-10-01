@@ -1,5 +1,23 @@
 # Agent instructions
 
+## Way of working
+
+Work directly on `main`. Don't create branches or pull requests.
+
+- Commit small, self-contained changes and push them to `origin main` as soon
+  as they're verified.
+- Other agents work in this checkout at the same time. Before you start, run
+  `git status` and `bb status`, and don't touch files you didn't change. Stage
+  your own paths explicitly (`git add <path>`), never `git add -A` or
+  `git commit -a`.
+- Don't revert, stash, reset, or reformat someone else's uncommitted work. If
+  another agent's change is in the way, coordinate with that thread first
+  (`bb thread ...`).
+- Pull with `git pull --rebase` before pushing. If the push is rejected,
+  rebase again and push again; never force-push `main`.
+- Resolve conflicts by keeping both sides' intent. If you can't tell what the
+  other change meant, ask its thread or the user instead of guessing.
+
 ## Marketplace maintenance
 
 Keep the root `marketplace.json` current in the same change as the plugins it
