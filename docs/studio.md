@@ -25,6 +25,14 @@ Studio's existing `overview`, `search`, tag and bulk RPCs retain their input and
 
 Tag schemas live in the kit's `studioTagSchemas`. A kind's `mentionProviderId` identifies the prefix for BB item mentions; consumers should read it from `studio_describe` instead of maintaining plugin maps.
 
+## Shared item services
+
+The Studio hub stores links, item threads, activity, comments, and content versions. Add-ons call it through `studioServices(bb.sdk)` from `@bb-studio/kit/server`; they remain usable when Studio is absent. `RelatedPanel` in the kit shows backlinks, outgoing links, threads, comments, and versions from item headers.
+
+`replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links; Tasks sends its `task_links` while keeping that table authoritative. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats, Tasks handoffs, and Studio Chat links are imported without deleting their original records.
+
+`recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio and send explicit `@bot` mentions to Studio Teams. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing and task blobs by SHA-256. Pages snapshots and artifact versions stay in their owner stores and are read through adapters.
+
 ## Collection and installation
 
 `CollectionPage` in the kit renders the shared list, grid, filters, selection and action menus. An add-on uses `AddOnCollection` for its standalone panel and hands its collection view to Studio when Studio is available. Item views remain with their owning plugin. Studio can hide add-on sidebar entries while keeping their routes available.

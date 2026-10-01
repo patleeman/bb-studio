@@ -6,8 +6,9 @@ import { mentionPrompt } from "../contract";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
 import { FLOATING, FLOATING_BUTTON } from "./pieces";
+import { RelatedPanel, type RelatedRef } from "./related-panel";
 
-export type ItemThread = { title: string; href: string };
+export type ItemThread = { title: string; href: string; ref?: RelatedRef };
 
 export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, item: ItemThread) {
   navigate.toCompose({ initialPrompt: mentionPrompt([item]), focusPrompt: true });
@@ -40,6 +41,10 @@ export function ItemHeader({
   className?: string;
 }) {
   const newThread = useNewItemThread(thread);
+  const path = thread?.href.split(/[?#]/)[0]?.split("/") ?? [];
+  const relatedRef = thread?.ref ?? (path[1] === "plugins" && path[2] && path[4]
+    ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
+    : null);
   return (
     <div
       className={cn(
@@ -61,6 +66,7 @@ export function ItemHeader({
         {leading}
       </div>
       {trailing || thread ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+        {relatedRef ? <RelatedPanel ref={relatedRef} /> : null}
         {thread ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
           <Icon name="MessageSquarePlus" /> New thread
         </button> : null}

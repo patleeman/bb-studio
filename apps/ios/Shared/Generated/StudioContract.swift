@@ -24,6 +24,19 @@ public enum Studio {
     public static let closeTabs = "closeTabs"
     public static let setSidebar = "setSidebar"
     public static let itemAt = "itemAt"
+    public static let links = "links"
+    public static let replaceLinks = "replaceLinks"
+    public static let itemThreads = "itemThreads"
+    public static let linkItemThread = "linkItemThread"
+    public static let spawnForItem = "spawnForItem"
+    public static let activity = "activity"
+    public static let recordActivity = "recordActivity"
+    public static let comments = "comments"
+    public static let commentCreate = "commentCreate"
+    public static let commentResolve = "commentResolve"
+    public static let versions = "versions"
+    public static let versionCreate = "versionCreate"
+    public static let versionRead = "versionRead"
   }
 
   public typealias OverviewInput = StudioJSONValue
@@ -77,6 +90,32 @@ public enum Studio {
   public typealias ItemAtInput = StudioJSONValue
 
   public typealias ItemAt = ItemAtOutput
+
+  public typealias Links = LinksOutput
+
+  public typealias ReplaceLinks = ReplaceLinksOutput
+
+  public typealias ItemThreads = ItemThreadsOutput
+
+  public typealias LinkItemThread = LinkItemThreadOutput
+
+  public typealias SpawnForItem = SpawnForItemOutput
+
+  public typealias Activity = ActivityOutput
+
+  public typealias RecordActivity = RecordActivityOutput
+
+  public typealias Comments = CommentsOutput
+
+  public typealias CommentCreate = CommentCreateOutput
+
+  public typealias CommentResolve = CommentResolveOutput
+
+  public typealias Versions = VersionsOutput
+
+  public typealias VersionCreate = VersionCreateOutput
+
+  public typealias VersionRead = VersionReadOutput
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready
@@ -1376,6 +1415,1190 @@ public enum Studio {
     public init(item: ItemAtOutputItem? = nil, kind: ItemAtOutputKind? = nil) {
       self.item = item
       self.kind = kind
+    }
+  }
+
+  public struct LinksInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct LinksInput: Sendable, Hashable, Codable {
+    public var ref: LinksInputRef?
+
+    public init(ref: LinksInputRef? = nil) {
+      self.ref = ref
+    }
+  }
+
+  public struct LinksOutputOutgoingItemFrom: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct LinksOutputOutgoingItemTo: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum LinksOutputOutgoingItemKind: Sendable, Hashable, Codable {
+    case mention
+    case embed
+    case task_link
+    case related
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "mention": self = .mention
+      case "embed": self = .embed
+      case "task-link": self = .task_link
+      case "related": self = .related
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .mention: try container.encode("mention")
+      case .embed: try container.encode("embed")
+      case .task_link: try container.encode("task-link")
+      case .related: try container.encode("related")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LinksOutputOutgoingItem: Sendable, Hashable, Codable {
+    public var from: LinksOutputOutgoingItemFrom?
+    public var to: LinksOutputOutgoingItemTo?
+    public var kind: LinksOutputOutgoingItemKind?
+    public var source: String?
+
+    public init(from: LinksOutputOutgoingItemFrom? = nil, to: LinksOutputOutgoingItemTo? = nil, kind: LinksOutputOutgoingItemKind? = nil, source: String? = nil) {
+      self.from = from
+      self.to = to
+      self.kind = kind
+      self.source = source
+    }
+  }
+
+  public struct LinksOutputBacklinksItemFrom: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct LinksOutputBacklinksItemTo: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum LinksOutputBacklinksItemKind: Sendable, Hashable, Codable {
+    case mention
+    case embed
+    case task_link
+    case related
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "mention": self = .mention
+      case "embed": self = .embed
+      case "task-link": self = .task_link
+      case "related": self = .related
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .mention: try container.encode("mention")
+      case .embed: try container.encode("embed")
+      case .task_link: try container.encode("task-link")
+      case .related: try container.encode("related")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LinksOutputBacklinksItem: Sendable, Hashable, Codable {
+    public var from: LinksOutputBacklinksItemFrom?
+    public var to: LinksOutputBacklinksItemTo?
+    public var kind: LinksOutputBacklinksItemKind?
+    public var source: String?
+
+    public init(from: LinksOutputBacklinksItemFrom? = nil, to: LinksOutputBacklinksItemTo? = nil, kind: LinksOutputBacklinksItemKind? = nil, source: String? = nil) {
+      self.from = from
+      self.to = to
+      self.kind = kind
+      self.source = source
+    }
+  }
+
+  public struct LinksOutput: Sendable, Hashable, Codable {
+    public var outgoing: [LinksOutputOutgoingItem]?
+    public var backlinks: [LinksOutputBacklinksItem]?
+
+    public init(outgoing: [LinksOutputOutgoingItem]? = nil, backlinks: [LinksOutputBacklinksItem]? = nil) {
+      self.outgoing = outgoing
+      self.backlinks = backlinks
+    }
+  }
+
+  public struct ReplaceLinksInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ReplaceLinksInputLinksItemFrom: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ReplaceLinksInputLinksItemTo: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum ReplaceLinksInputLinksItemKind: Sendable, Hashable, Codable {
+    case mention
+    case embed
+    case task_link
+    case related
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "mention": self = .mention
+      case "embed": self = .embed
+      case "task-link": self = .task_link
+      case "related": self = .related
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .mention: try container.encode("mention")
+      case .embed: try container.encode("embed")
+      case .task_link: try container.encode("task-link")
+      case .related: try container.encode("related")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ReplaceLinksInputLinksItem: Sendable, Hashable, Codable {
+    public var from: ReplaceLinksInputLinksItemFrom?
+    public var to: ReplaceLinksInputLinksItemTo?
+    public var kind: ReplaceLinksInputLinksItemKind?
+    public var source: String?
+
+    public init(from: ReplaceLinksInputLinksItemFrom? = nil, to: ReplaceLinksInputLinksItemTo? = nil, kind: ReplaceLinksInputLinksItemKind? = nil, source: String? = nil) {
+      self.from = from
+      self.to = to
+      self.kind = kind
+      self.source = source
+    }
+  }
+
+  public struct ReplaceLinksInput: Sendable, Hashable, Codable {
+    public var ref: ReplaceLinksInputRef?
+    public var source: String?
+    public var links: [ReplaceLinksInputLinksItem]?
+
+    public init(ref: ReplaceLinksInputRef? = nil, source: String? = nil, links: [ReplaceLinksInputLinksItem]? = nil) {
+      self.ref = ref
+      self.source = source
+      self.links = links
+    }
+  }
+
+  public struct ReplaceLinksOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ItemThreadsInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ItemThreadsInput: Sendable, Hashable, Codable {
+    public var ref: ItemThreadsInputRef?
+
+    public init(ref: ItemThreadsInputRef? = nil) {
+      self.ref = ref
+    }
+  }
+
+  public struct ItemThreadsOutputThreadsItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ItemThreadsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var ref: ItemThreadsOutputThreadsItemRef?
+    public var role: String?
+    public var state: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var metadata: [String: String]?
+
+    public init(threadId: String? = nil, ref: ItemThreadsOutputThreadsItemRef? = nil, role: String? = nil, state: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, metadata: [String: String]? = nil) {
+      self.threadId = threadId
+      self.ref = ref
+      self.role = role
+      self.state = state
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.metadata = metadata
+    }
+  }
+
+  public struct ItemThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [ItemThreadsOutputThreadsItem]?
+
+    public init(threads: [ItemThreadsOutputThreadsItem]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public struct LinkItemThreadInputThreadRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct LinkItemThreadInputThread: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var ref: LinkItemThreadInputThreadRef?
+    public var role: String?
+    public var state: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var metadata: [String: String]?
+
+    public init(threadId: String? = nil, ref: LinkItemThreadInputThreadRef? = nil, role: String? = nil, state: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, metadata: [String: String]? = nil) {
+      self.threadId = threadId
+      self.ref = ref
+      self.role = role
+      self.state = state
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.metadata = metadata
+    }
+  }
+
+  public struct LinkItemThreadInput: Sendable, Hashable, Codable {
+    public var thread: LinkItemThreadInputThread?
+
+    public init(thread: LinkItemThreadInputThread? = nil) {
+      self.thread = thread
+    }
+  }
+
+  public struct LinkItemThreadOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct SpawnForItemInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum SpawnForItemInputVisibility: Sendable, Hashable, Codable {
+    case user
+    case agent_only
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent-only": self = .agent_only
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent_only: try container.encode("agent-only")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpawnForItemInput: Sendable, Hashable, Codable {
+    public var ref: SpawnForItemInputRef?
+    public var prompt: String?
+    public var role: String?
+    public var metadata: [String: String]?
+    public var projectId: String?
+    public var visibility: SpawnForItemInputVisibility?
+
+    public init(ref: SpawnForItemInputRef? = nil, prompt: String? = nil, role: String? = nil, metadata: [String: String]? = nil, projectId: String? = nil, visibility: SpawnForItemInputVisibility? = nil) {
+      self.ref = ref
+      self.prompt = prompt
+      self.role = role
+      self.metadata = metadata
+      self.projectId = projectId
+      self.visibility = visibility
+    }
+  }
+
+  public struct SpawnForItemOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct ActivityInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ActivityInput: Sendable, Hashable, Codable {
+    public var ref: ActivityInputRef?
+    public var since: Int?
+    public var limit: Int?
+
+    public init(ref: ActivityInputRef? = nil, since: Int? = nil, limit: Int? = nil) {
+      self.ref = ref
+      self.since = since
+      self.limit = limit
+    }
+  }
+
+  public enum ActivityOutputEventsItemActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ActivityOutputEventsItemActor: Sendable, Hashable, Codable {
+    public var kind: ActivityOutputEventsItemActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: ActivityOutputEventsItemActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct ActivityOutputEventsItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ActivityOutputEventsItem: Sendable, Hashable, Codable {
+    public var `actor`: ActivityOutputEventsItemActor?
+    public var verb: String?
+    public var ref: ActivityOutputEventsItemRef?
+    public var at: Double?
+    public var summary: String?
+    public var id: Double?
+
+    public init(`actor`: ActivityOutputEventsItemActor? = nil, verb: String? = nil, ref: ActivityOutputEventsItemRef? = nil, at: Double? = nil, summary: String? = nil, id: Double? = nil) {
+      self.`actor` = `actor`
+      self.verb = verb
+      self.ref = ref
+      self.at = at
+      self.summary = summary
+      self.id = id
+    }
+  }
+
+  public struct ActivityOutput: Sendable, Hashable, Codable {
+    public var events: [ActivityOutputEventsItem]?
+
+    public init(events: [ActivityOutputEventsItem]? = nil) {
+      self.events = events
+    }
+  }
+
+  public enum RecordActivityInputActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordActivityInputActor: Sendable, Hashable, Codable {
+    public var kind: RecordActivityInputActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: RecordActivityInputActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct RecordActivityInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct RecordActivityInput: Sendable, Hashable, Codable {
+    public var `actor`: RecordActivityInputActor?
+    public var verb: String?
+    public var ref: RecordActivityInputRef?
+    public var at: Double?
+    public var summary: String?
+
+    public init(`actor`: RecordActivityInputActor? = nil, verb: String? = nil, ref: RecordActivityInputRef? = nil, at: Double? = nil, summary: String? = nil) {
+      self.`actor` = `actor`
+      self.verb = verb
+      self.ref = ref
+      self.at = at
+      self.summary = summary
+    }
+  }
+
+  public struct RecordActivityOutput: Sendable, Hashable, Codable {
+    public var id: Double?
+
+    public init(id: Double? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct CommentsInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct CommentsInput: Sendable, Hashable, Codable {
+    public var ref: CommentsInputRef?
+
+    public init(ref: CommentsInputRef? = nil) {
+      self.ref = ref
+    }
+  }
+
+  public struct CommentsOutputCommentsItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum CommentsOutputCommentsItemActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommentsOutputCommentsItemActor: Sendable, Hashable, Codable {
+    public var kind: CommentsOutputCommentsItemActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: CommentsOutputCommentsItemActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct CommentsOutputCommentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var ref: CommentsOutputCommentsItemRef?
+    public var parentId: String?
+    public var anchor: String?
+    public var `actor`: CommentsOutputCommentsItemActor?
+    public var body: String?
+    public var createdAt: Double?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, ref: CommentsOutputCommentsItemRef? = nil, parentId: String? = nil, anchor: String? = nil, `actor`: CommentsOutputCommentsItemActor? = nil, body: String? = nil, createdAt: Double? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.ref = ref
+      self.parentId = parentId
+      self.anchor = anchor
+      self.`actor` = `actor`
+      self.body = body
+      self.createdAt = createdAt
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct CommentsOutput: Sendable, Hashable, Codable {
+    public var comments: [CommentsOutputCommentsItem]?
+
+    public init(comments: [CommentsOutputCommentsItem]? = nil) {
+      self.comments = comments
+    }
+  }
+
+  public struct CommentCreateInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum CommentCreateInputActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommentCreateInputActor: Sendable, Hashable, Codable {
+    public var kind: CommentCreateInputActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: CommentCreateInputActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct CommentCreateInput: Sendable, Hashable, Codable {
+    public var ref: CommentCreateInputRef?
+    public var parentId: String?
+    public var anchor: String?
+    public var `actor`: CommentCreateInputActor?
+    public var body: String?
+
+    public init(ref: CommentCreateInputRef? = nil, parentId: String? = nil, anchor: String? = nil, `actor`: CommentCreateInputActor? = nil, body: String? = nil) {
+      self.ref = ref
+      self.parentId = parentId
+      self.anchor = anchor
+      self.`actor` = `actor`
+      self.body = body
+    }
+  }
+
+  public struct CommentCreateOutputCommentRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum CommentCreateOutputCommentActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct CommentCreateOutputCommentActor: Sendable, Hashable, Codable {
+    public var kind: CommentCreateOutputCommentActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: CommentCreateOutputCommentActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct CommentCreateOutputComment: Sendable, Hashable, Codable {
+    public var id: String?
+    public var ref: CommentCreateOutputCommentRef?
+    public var parentId: String?
+    public var anchor: String?
+    public var `actor`: CommentCreateOutputCommentActor?
+    public var body: String?
+    public var createdAt: Double?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, ref: CommentCreateOutputCommentRef? = nil, parentId: String? = nil, anchor: String? = nil, `actor`: CommentCreateOutputCommentActor? = nil, body: String? = nil, createdAt: Double? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.ref = ref
+      self.parentId = parentId
+      self.anchor = anchor
+      self.`actor` = `actor`
+      self.body = body
+      self.createdAt = createdAt
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct CommentCreateOutput: Sendable, Hashable, Codable {
+    public var comment: CommentCreateOutputComment?
+
+    public init(comment: CommentCreateOutputComment? = nil) {
+      self.comment = comment
+    }
+  }
+
+  public struct CommentResolveInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct CommentResolveInput: Sendable, Hashable, Codable {
+    public var ref: CommentResolveInputRef?
+    public var id: String?
+    public var resolved: Bool?
+
+    public init(ref: CommentResolveInputRef? = nil, id: String? = nil, resolved: Bool? = nil) {
+      self.ref = ref
+      self.id = id
+      self.resolved = resolved
+    }
+  }
+
+  public struct CommentResolveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct VersionsInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct VersionsInput: Sendable, Hashable, Codable {
+    public var ref: VersionsInputRef?
+
+    public init(ref: VersionsInputRef? = nil) {
+      self.ref = ref
+    }
+  }
+
+  public struct VersionsOutputVersionsItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum VersionsOutputVersionsItemActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VersionsOutputVersionsItemActor: Sendable, Hashable, Codable {
+    public var kind: VersionsOutputVersionsItemActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: VersionsOutputVersionsItemActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct VersionsOutputVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var ref: VersionsOutputVersionsItemRef?
+    public var sha256: String?
+    public var label: String?
+    public var `actor`: VersionsOutputVersionsItemActor?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, ref: VersionsOutputVersionsItemRef? = nil, sha256: String? = nil, label: String? = nil, `actor`: VersionsOutputVersionsItemActor? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.ref = ref
+      self.sha256 = sha256
+      self.label = label
+      self.`actor` = `actor`
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct VersionsOutput: Sendable, Hashable, Codable {
+    public var versions: [VersionsOutputVersionsItem]?
+
+    public init(versions: [VersionsOutputVersionsItem]? = nil) {
+      self.versions = versions
+    }
+  }
+
+  public struct VersionCreateInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum VersionCreateInputActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VersionCreateInputActor: Sendable, Hashable, Codable {
+    public var kind: VersionCreateInputActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: VersionCreateInputActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct VersionCreateInput: Sendable, Hashable, Codable {
+    public var ref: VersionCreateInputRef?
+    public var bytes: String?
+    public var label: String?
+    public var `actor`: VersionCreateInputActor?
+
+    public init(ref: VersionCreateInputRef? = nil, bytes: String? = nil, label: String? = nil, `actor`: VersionCreateInputActor? = nil) {
+      self.ref = ref
+      self.bytes = bytes
+      self.label = label
+      self.`actor` = `actor`
+    }
+  }
+
+  public struct VersionCreateOutputVersionRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public enum VersionCreateOutputVersionActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct VersionCreateOutputVersionActor: Sendable, Hashable, Codable {
+    public var kind: VersionCreateOutputVersionActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: VersionCreateOutputVersionActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct VersionCreateOutputVersion: Sendable, Hashable, Codable {
+    public var id: String?
+    public var ref: VersionCreateOutputVersionRef?
+    public var sha256: String?
+    public var label: String?
+    public var `actor`: VersionCreateOutputVersionActor?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, ref: VersionCreateOutputVersionRef? = nil, sha256: String? = nil, label: String? = nil, `actor`: VersionCreateOutputVersionActor? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.ref = ref
+      self.sha256 = sha256
+      self.label = label
+      self.`actor` = `actor`
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct VersionCreateOutput: Sendable, Hashable, Codable {
+    public var version: VersionCreateOutputVersion?
+
+    public init(version: VersionCreateOutputVersion? = nil) {
+      self.version = version
+    }
+  }
+
+  public struct VersionReadInputRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct VersionReadInput: Sendable, Hashable, Codable {
+    public var ref: VersionReadInputRef?
+    public var id: String?
+
+    public init(ref: VersionReadInputRef? = nil, id: String? = nil) {
+      self.ref = ref
+      self.id = id
+    }
+  }
+
+  public struct VersionReadOutput: Sendable, Hashable, Codable {
+    public var bytes: String?
+
+    public init(bytes: String? = nil) {
+      self.bytes = bytes
     }
   }
 

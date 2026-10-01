@@ -14,6 +14,7 @@ export {
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
 export { EditableTitle, ItemHeader, openNewItemThread, useNewItemThread, type ItemThread } from "./item-header";
+export { RelatedPanel, type RelatedRef } from "./related-panel";
 export { ItemDeleteConfirm, ItemMenu } from "./item-menu";
 export { ItemDirectiveCard } from "./directive-card";
 export { openAppPath, studioPath } from "./nav";

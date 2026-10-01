@@ -33,4 +33,34 @@ export const MIGRATIONS = [
        project_id UNINDEXED, href UNINDEXED, updated_at UNINDEXED,
        title, body, tokenize='unicode61 remove_diacritics 2'
      );`,
+  `CREATE TABLE IF NOT EXISTS item_links (
+       from_plugin TEXT NOT NULL, from_id TEXT NOT NULL,
+       to_plugin TEXT NOT NULL, to_id TEXT NOT NULL,
+       kind TEXT NOT NULL, source TEXT NOT NULL,
+       PRIMARY KEY (from_plugin, from_id, to_plugin, to_id, kind, source)
+     );
+   CREATE INDEX IF NOT EXISTS item_links_to ON item_links (to_plugin, to_id);
+   CREATE TABLE IF NOT EXISTS item_threads (
+       thread_id TEXT PRIMARY KEY, plugin_id TEXT NOT NULL, item_id TEXT NOT NULL,
+       role TEXT NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL, metadata TEXT NOT NULL
+     );
+   CREATE INDEX IF NOT EXISTS item_threads_item ON item_threads (plugin_id, item_id, created_at);
+   CREATE TABLE IF NOT EXISTS item_activity (
+       id INTEGER PRIMARY KEY AUTOINCREMENT, plugin_id TEXT NOT NULL, item_id TEXT NOT NULL,
+       actor TEXT NOT NULL, verb TEXT NOT NULL, at INTEGER NOT NULL, summary TEXT NOT NULL
+     );
+   CREATE INDEX IF NOT EXISTS item_activity_item ON item_activity (plugin_id, item_id, id);
+   CREATE TABLE IF NOT EXISTS item_comments (
+       id TEXT PRIMARY KEY, plugin_id TEXT NOT NULL, item_id TEXT NOT NULL,
+       parent_id TEXT, anchor TEXT, actor TEXT NOT NULL, body TEXT NOT NULL,
+       created_at INTEGER NOT NULL, resolved_at INTEGER
+     );
+   CREATE INDEX IF NOT EXISTS item_comments_item ON item_comments (plugin_id, item_id, created_at);
+   CREATE TABLE IF NOT EXISTS item_blobs (sha256 TEXT PRIMARY KEY, bytes BLOB NOT NULL);
+   CREATE TABLE IF NOT EXISTS item_versions (
+       id TEXT PRIMARY KEY, plugin_id TEXT NOT NULL, item_id TEXT NOT NULL,
+       sha256 TEXT NOT NULL, label TEXT NOT NULL, actor TEXT NOT NULL, created_at INTEGER NOT NULL
+     );
+   CREATE INDEX IF NOT EXISTS item_versions_item ON item_versions (plugin_id, item_id, created_at);`,
 ];

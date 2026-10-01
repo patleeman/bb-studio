@@ -22,6 +22,10 @@ import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { SearchIndex } from "./src/search-index";
 import { externalResults } from "./src/search-external";
+import { StudioServices } from "./src/services";
+import { ProviderHistory } from "./src/provider-history";
+import { ProviderComments } from "./src/provider-comments";
+import { routeCommentMentions } from "./src/comment-routing";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -44,6 +48,29 @@ export default async function plugin(bb: BbPluginApi) {
       snippets: { ...fallback.snippets, ...Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])) },
     };
   };
+  const services = new StudioServices(db);
+  const providerHistory = new ProviderHistory(bb.sdk);
+  const providerComments = new ProviderComments(bb.sdk);
+  const threadState = async (threadId: string) => {
+    try {
+      const thread = await bb.sdk.threads.get({ threadId });
+      return thread.archivedAt ? "archived" : "idle";
+    } catch { return "deleted"; }
+  };
+  for (const thread of services.activeThreads()) {
+    const state = await threadState(thread.threadId);
+    services.linkThread({ ...thread, state, updatedAt: Date.now() });
+  }
+  const updateThread = (threadId: string, state: string) => {
+    const found = services.thread(threadId);
+    if (found) services.linkThread({ ...found, state, updatedAt: Date.now() });
+  };
+  bb.events.on("thread.active", ({ thread }) => updateThread(thread.id, "working"));
+  bb.events.on("thread.idle", ({ thread }) => updateThread(thread.id, "idle"));
+  bb.events.on("thread.failed", ({ thread }) => updateThread(thread.id, "failed"));
+  bb.events.on("thread.archived", ({ thread }) => updateThread(thread.id, "archived"));
+  bb.events.on("thread.deleted", ({ thread }) => updateThread(thread.id, "deleted"));
+  bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
   /** Every window's sidebar refetches its tabs. */
   const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 
@@ -237,6 +264,42 @@ export default async function plugin(bb: BbPluginApi) {
       const kind = providers.find((provider) => provider.pluginId === item.pluginId)?.kinds.find((each) => each.id === item.kind) ?? null;
       return { item, kind };
     },
+    links: ({ ref }) => services.links(ref),
+    replaceLinks: ({ ref, source, links }) => { services.replaceLinks(ref, source, links); return { ok: true }; },
+    itemThreads: ({ ref }) => ({ threads: services.threads(ref) }),
+    linkItemThread: ({ thread }) => { services.linkThread(thread); return { ok: true }; },
+    spawnForItem: async ({ ref, prompt, role, metadata, projectId, visibility }) => {
+      const item = (await hub.get(ref.pluginId, [ref.id]))[0];
+      if (!item) throw new Error("Item not found.");
+      const selectedProject = projectId ?? item.projectId;
+      if (!selectedProject) throw new Error("Pick a project for this thread.");
+      const thread = await bb.sdk.threads.spawn({
+        projectId: selectedProject,
+        title: item.title || undefined,
+        input: [{ type: "text", text: `${prompt}\n\nItem: ${item.href}`, mentions: [], ...(visibility === "agent-only" ? { visibility } : {}) }],
+        environment: { type: "host", workspace: { type: "unmanaged", path: null } },
+        pluginMetadata: { studioItem: { pluginId: ref.pluginId, id: ref.id, role, ...metadata } },
+      });
+      const at = Date.now();
+      services.linkThread({ threadId: thread.id, ref, role, state: "working", createdAt: at, updatedAt: at, metadata: metadata ?? {} });
+      return { threadId: thread.id };
+    },
+    activity: ({ ref, since, limit }) => ({ events: services.activity(ref ?? null, since ?? 0, limit ?? 50) }),
+    recordActivity: (event) => ({ id: services.recordActivity(event) }),
+    comments: async ({ ref }) => ({ comments: (await providerComments.list(ref)) ?? services.comments(ref) }),
+    commentCreate: async (input) => {
+      const delegated = await providerComments.create(input);
+      const comment = delegated ?? services.addComment(input);
+      if (!delegated) {
+        const item = (await hub.get(input.ref.pluginId, [input.ref.id]))[0];
+        void routeCommentMentions(bb.sdk, input.ref, input.body, item?.href ?? `${input.ref.pluginId}:${input.ref.id}`).catch(() => { /* Teams is optional. */ });
+      }
+      return { comment };
+    },
+    commentResolve: async ({ ref, id, resolved }) => ({ ok: (await providerComments.resolve(ref, id, resolved)) ?? services.resolveComment(ref, id, resolved) }),
+    versions: async ({ ref }) => ({ versions: (await providerHistory.versions(ref)) ?? services.versions(ref) }),
+    versionCreate: ({ ref, bytes, label, actor }) => ({ version: services.addVersion(ref, Buffer.from(bytes, "base64"), label, actor) }),
+    versionRead: async ({ ref, id }) => { const bytes = (await providerHistory.read(ref, id)) ?? services.versionBytes(ref, id); return { bytes: bytes ? Buffer.from(bytes).toString("base64") : null }; },
   });
 
   // Agents --------------------------------------------------------------------
