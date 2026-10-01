@@ -33,7 +33,7 @@ function sources(dir: string): string[] {
 }
 
 describe("kit imports", () => {
-  it("value-imports only modules BB provides at runtime", () => {
+  it("value-imports only declared dependencies or host modules", () => {
     const offenders: string[] = [];
     for (const file of sources(import.meta.dirname)) {
       const text = readFileSync(file, "utf8");
