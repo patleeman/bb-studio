@@ -90,6 +90,10 @@ export default async function plugin(bb: BbPluginApi) {
       for (const ref of refs) {
         services.linkThread({ threadId: thread.id, ref, role: "new-thread", state: thread.status, createdAt: thread.createdAt, updatedAt: Date.now(), metadata: {} });
       }
+      if (refs.length) {
+        changes.append(null);
+        bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+      }
       checkedThreads.add(thread.id);
     } finally {
       checkingThreads.delete(thread.id);
