@@ -1,6 +1,6 @@
-// The floating chat's state, shared by the overlay, the thread header's
-// Float icon and the commands. It lives per window: sessionStorage keeps
-// it across reloads without one window's chat following you into another.
+// The floating chat's state, shared by the overlay and the commands. It
+// lives per window: sessionStorage keeps it across reloads without one
+// window's chat following you into another.
 import { useSyncExternalStore } from "react";
 
 /**

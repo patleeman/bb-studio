@@ -13,7 +13,7 @@ export function StudioChatFloatItem({ threadId, surface }: {
   return (
     <ActionMenuItem
       surface={surface}
-      icon="PictureInPicture2"
+      icon="SideChat"
       onSelect={() => window.dispatchEvent(
         new CustomEvent(STUDIO_CHAT_FLOAT_EVENT, { detail: { threadId } }),
       )}

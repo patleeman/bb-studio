@@ -16,15 +16,16 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.waitForSelector("canvas.excalidraw__canvas");
         await client.waitForText("Work with this drawing…");
-        // The seeded thread's header floats it into the chat.
+        // The seeded thread's sidebar menu floats it into the chat.
         const title = await client.evaluate(
           `(async () => { const body = await (await fetch("/api/v1/threads/${threadId}")).json(); const thread = body.thread ?? body; return thread.title ?? thread.titleFallback ?? ""; })()`,
           true,
         );
         if (!title) throw new Error("The seeded thread has no title to check the chat header against");
         await client.navigate(`/threads/${threadId}`);
-        await client.waitForSelector(".studio-chat-float");
-        await client.evaluate(`document.querySelector(".studio-chat-float").click()`);
+        await client.openThreadContextMenu();
+        await client.waitForSelector('[role="menuitem"]');
+        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Float in Studio Chat");
         // The card steps aside on the thread's own view and returns over the drawing.
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.waitForSelector('section[aria-label="Studio chat"]');

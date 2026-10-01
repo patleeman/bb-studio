@@ -27,7 +27,7 @@ or find it with `studio_list_items`.
 Chats about pages go through Studio Pages, so they also appear in the page's
 Chats menu.
 
-The user controls the card: Mod+Shift+J shows or hides it, a thread
-header's Float icon puts that thread in the card, and the card's ⋯ menu
-switches threads or opens the current one in full or in a split. There are
-no Studio Chat CLI commands or agent tools.
+The user controls the card: Mod+Shift+J shows or hides it, **Float in
+Studio Chat** in a sidebar thread's menu puts that thread in the card, and
+the card's ⋯ menu switches threads or opens the current one in full or in
+a split. There are no Studio Chat CLI commands or agent tools.
