@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioSchemas } from "../contract";
 import { snippets } from "../format";
-import { registerStudioProvider, type StudioProviderHandlers } from "./index";
+import { registerStudioProvider, type StudioProviderHandlers } from "./core";
 
 export function mustGet<T>(get: (id: string) => T | null | undefined, id: string, message: string): T {
   const item = get(id);

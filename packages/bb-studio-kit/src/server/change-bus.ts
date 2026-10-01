@@ -1,5 +1,5 @@
 import type { StudioSchemas } from "../contract";
-import { createStudioNotifier } from "./index";
+import { createStudioNotifier } from "./core";
 
 type Realtime = { publish(channel: string, data: unknown): void };
 
