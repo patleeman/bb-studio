@@ -473,7 +473,7 @@ export function CollectionPage({
   const showKind = !single;
   // Below 48rem of list width the Kind column goes (the tile shows the kind);
   // below 36rem rows stack into a name and a menu.
-  const template = (kind: boolean) => `28px minmax(0,1fr)${kind ? " 110px" : ""} minmax(0,160px)${columns.map(() => " 90px").join("")} 130px`;
+  const template = (kind: boolean) => `minmax(0,1fr)${kind ? " 110px" : ""} minmax(0,160px)${columns.map(() => " 90px").join("")} 130px`;
   const gridTemplate = { "--cols": template(showKind), "--cols-narrow": template(false) } as CSSProperties;
   const gridColumns = "[grid-template-columns:var(--cols)] @max-3xl/list:[grid-template-columns:var(--cols-narrow)]";
 
@@ -834,15 +834,17 @@ export function CollectionPage({
             {shown.length ? (
               <div role="grid" aria-label={title} aria-multiselectable className={cn("text-sm", view === "grid" && "@3xl/page:hidden")}>
                 <div role="row" className={cn("grid gap-3 border-b border-border px-2 pb-2 text-xs text-muted-foreground @max-xl/list:hidden", gridColumns)} style={gridTemplate}>
-                  <span role="columnheader" className="flex items-center">
-                    <Checkbox
-                      checked={allChecked ? true : chosen.length ? "mixed" : false}
-                      label={allChecked ? "Deselect all" : "Select all"}
-                      disabled={!selectableKeys.length}
-                      onToggle={() => setSelected(allChecked ? new Set() : new Set(selectableKeys))}
-                    />
+                  <span className="flex items-center gap-3">
+                    <span role="columnheader" className="flex w-8 shrink-0 justify-center">
+                      <Checkbox
+                        checked={allChecked ? true : chosen.length ? "mixed" : false}
+                        label={allChecked ? "Deselect all" : "Select all"}
+                        disabled={!selectableKeys.length}
+                        onToggle={() => setSelected(allChecked ? new Set() : new Set(selectableKeys))}
+                      />
+                    </span>
+                    {header("Name", "title")}
                   </span>
-                  {header("Name", "title")}
                   {showKind ? header("Kind", "kind", "@max-3xl/list:hidden") : null}
                   {header("Project", "project")}
                   {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
@@ -877,24 +879,27 @@ export function CollectionPage({
                         }
                       }}
                     >
-                      <div role="gridcell" className="flex items-center @max-xl/list:hidden">
-                        <Checkbox
-                          checked={checked}
-                          label={`Select ${untitled(item.title)}`}
-                          disabled={reason !== undefined}
-                          title={reason}
-                          onToggle={(event) => toggle(item, event.shiftKey)}
-                          className={cn(!checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100")}
-                        />
-                      </div>
                       <div role="gridcell" className="flex min-w-0 items-center gap-3">
-                        {item.thumbnailUrl ? (
-                          <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
-                            <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
+                        {/* The checkbox sits on the avatar: it shows on hover, focus, or while selecting. */}
+                        <span className="group/pick relative flex size-8 shrink-0 items-center justify-center">
+                          <span className={cn("flex", checked || chosen.length ? "invisible" : "group-hover/row:invisible group-focus-within/pick:invisible")}>
+                            {item.thumbnailUrl ? (
+                              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
+                                <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
+                              </span>
+                            ) : (
+                              <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />
+                            )}
                           </span>
-                        ) : (
-                          <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />
-                        )}
+                          <Checkbox
+                            checked={checked}
+                            label={`Select ${untitled(item.title)}`}
+                            disabled={reason !== undefined}
+                            title={reason}
+                            onToggle={(event) => toggle(item, event.shiftKey)}
+                            className={cn("absolute", !checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100")}
+                          />
+                        </span>
                         <div className="min-w-0">
                           <div className={cn("flex min-w-0 items-center gap-1.5 font-medium", !item.title && "text-muted-foreground")}>
                             <span className="truncate">{untitled(item.title)}</span>
