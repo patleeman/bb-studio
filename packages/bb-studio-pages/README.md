@@ -229,3 +229,7 @@ BlockNote's menus and toolbars are styled with Tailwind classes that live in
 `node_modules`, which `bb plugin build` doesn't scan. `blocknote-tailwind.txt`
 lists them so the build generates them. After upgrading `@blocknote/shadcn`,
 run `pnpm tailwind:blocknote` to regenerate it.
+
+## Templates and export
+
+Studio can duplicate a page with its subpages, mark a page as a template, and instantiate it with `{{name}}` variables. The provider exports Markdown with uploaded assets, printable HTML with those assets, or a text PDF. Use Studio's New menu to start from a saved template.

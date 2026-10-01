@@ -64,6 +64,8 @@ export interface StudioItem {
   /** App path that opens the item, e.g. /plugins/pages/pages/pg_x. */
   href: string;
   archived: boolean;
+  /** A reusable source item. */
+  template?: boolean;
 }
 
 export interface StudioColumn {
@@ -83,7 +85,7 @@ export interface StudioAction {
 
 export const STUDIO_CAPABILITIES = ["create", "move", "archive", "delete", "rename", "duplicate", "export", "comments", "versions", "links"] as const;
 export type StudioCapability = (typeof STUDIO_CAPABILITIES)[number];
-export type StudioCapabilities = Record<StudioCapability, boolean>;
+export type StudioCapabilities = Record<StudioCapability, boolean> & { templates?: boolean };
 
 export interface StudioKind {
   id: string;
@@ -171,6 +173,7 @@ export function studioSchemas(z: typeof Zod) {
     thumbnailUrl: z.string().nullable(),
     href: z.string(),
     archived: z.boolean(),
+    template: z.boolean().optional(),
   });
   const kind = z.object({
     id: z.string(),
@@ -188,7 +191,7 @@ export function studioSchemas(z: typeof Zod) {
       ])
       .nullable(),
     canArchive: z.boolean(),
-    capabilities: z.object(Object.fromEntries(STUDIO_CAPABILITIES.map((key) => [key, z.boolean()])) as Record<StudioCapability, ReturnType<typeof z.boolean>>).optional(),
+    capabilities: z.object(Object.fromEntries(STUDIO_CAPABILITIES.map((key) => [key, z.boolean()])) as Record<StudioCapability, ReturnType<typeof z.boolean>>).extend({ templates: z.boolean().optional() }).optional(),
     mentionProviderId: z.string().nullable().optional(),
     blurb: z.string(),
     agentHint: z.string().max(500).optional(),
@@ -236,6 +239,10 @@ export function studioSchemas(z: typeof Zod) {
         input: z.object({ action: z.string(), ids }),
         output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),
       },
+      studio_duplicate: { input: z.object({ id: z.string().min(1).max(200), projectId, includeChildren: z.boolean().optional() }), output: z.object({ item }) },
+      studio_template: { input: z.object({ id: z.string().min(1).max(200), template: z.boolean() }), output: z.object({ item }) },
+      studio_instantiate: { input: z.object({ id: z.string().min(1).max(200), projectId, variables: z.record(z.string(), z.string()).default({}) }), output: z.object({ item }) },
+      studio_export: { input: z.object({ id: z.string().min(1).max(200), format: z.string().min(1).max(30) }), output: z.object({ files: z.array(z.object({ name: z.string(), mime: z.string(), data: z.string() })).min(1) }) },
     },
     /** Studio's method that finds an item and its kind, by the path that opens it or by id. */
     itemAt: {
@@ -286,3 +293,5 @@ export function itemAtPath<T extends { href: string }>(items: readonly T[], path
 export function mentionPrompt(items: readonly { title: string; href: string }[]): string {
   return `${items.map((item) => `[${untitled(item.title).replace(/[[\]]/g, "")}](${item.href})`).join(" ")} `;
 }
+
+export { copyTitle, fillTemplate, fillTemplateJson } from "./template";

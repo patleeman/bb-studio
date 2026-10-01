@@ -110,6 +110,7 @@ export const MIGRATIONS = [
      page_id TEXT NOT NULL,
      created_at INTEGER NOT NULL
    )`,
+  `ALTER TABLE pages ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
 ];
 
 export { newId };
@@ -131,6 +132,7 @@ export interface PageRow {
   refresh_cron: string | null;
   refresh_instructions: string;
   refresh_last_at: number | null;
+  template?: number;
 }
 
 export type PageMeta = Omit<PageRow, "state" | "markdown">;
@@ -162,11 +164,15 @@ export interface SnapshotMeta {
 }
 
 const META_COLUMNS =
-  "id, project_id, parent_id, title, icon, position, created_at, updated_at, updated_by, archived_at, refresh_bot_id, refresh_cron, refresh_instructions, refresh_last_at";
+  "id, project_id, parent_id, title, icon, position, created_at, updated_at, updated_by, archived_at, refresh_bot_id, refresh_cron, refresh_instructions, refresh_last_at, template";
 const SNAPSHOTS_PER_PAGE = 50;
 
 export class PageStore {
   constructor(private readonly db: Database.Database) {}
+
+  setTemplate(id: string, template: boolean): void {
+    this.db.prepare("UPDATE pages SET template = ? WHERE id = ?").run(template ? 1 : 0, id);
+  }
 
   // Pages -------------------------------------------------------------------
 
@@ -337,6 +343,10 @@ export class PageStore {
         | { name: string; mime: string; data: Buffer }
         | undefined) ?? null
     );
+  }
+
+  files(pageId: string): { id: string; name: string; mime: string; data: Buffer }[] {
+    return this.db.prepare("SELECT id, name, mime, data FROM files WHERE page_id = ? ORDER BY created_at, id").all(pageId) as { id: string; name: string; mime: string; data: Buffer }[];
   }
 
   // Bot requests ------------------------------------------------------------

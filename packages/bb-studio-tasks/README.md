@@ -91,3 +91,7 @@ pnpm test
 `@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
 `package-lock.json` current (regenerate it in a clean clone, not the pnpm
 workspace), because BB's Git install runs `npm install` from it.
+
+## Templates and export
+
+Studio can duplicate a task or save it as a template. Instantiation replaces `{{name}}` variables in its title and description. The provider exports one task as Markdown or CSV.

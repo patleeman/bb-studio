@@ -2,7 +2,7 @@ import { studioSchemas } from "@bb-studio/kit/contract";
 import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { element, memoryStore, scene } from "../test/db";
-import { registerStudio, toStudioItem } from "./studio";
+import { drawingText, registerStudio, toStudioItem } from "./studio";
 
 function setup() {
   const { store } = memoryStore();
@@ -15,6 +15,25 @@ function setup() {
 }
 
 describe("the Draw Studio provider", () => {
+  it("duplicates a template and replaces scene variables", async () => {
+    const { store, call } = setup();
+    const row = store.create({ name: "{{name}} map", projectId: "old", by: "app" });
+    store.write(row.id, scene([element("text", { text: "{{name}}" })]), "editor");
+    expect((await call("studio_template", { id: row.id, template: true })).item.template).toBe(true);
+    const { item } = await call("studio_instantiate", { id: row.id, projectId: "new", variables: { name: "Launch" } });
+    expect(item).toMatchObject({ title: "Launch map", projectId: "new", template: false });
+    expect(drawingText(store.get(item.id)!.data)).toEqual(["Launch"]);
+    expect((await call("studio_duplicate", { id: row.id, projectId: null })).item.title).toBe("{{name}} map (copy)");
+  });
+  it("exports SVG and PNG from a stored scene", async () => {
+    const { store, call } = setup();
+    const row = store.create({ name: "Sketch", by: "app" });
+    store.write(row.id, scene([element("rectangle", { width: 60, height: 30 })]), "editor");
+    const svg = await call("studio_export", { id: row.id, format: "svg" });
+    expect(Buffer.from(svg.files[0].data, "base64").toString()).toContain("<svg");
+    const png = await call("studio_export", { id: row.id, format: "png" });
+    expect(Buffer.from(png.files[0].data, "base64").subarray(0, 8).toString("hex")).toBe("89504e470d0a1a0a");
+  });
   it("describes drawings, which Studio can create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);

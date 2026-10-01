@@ -284,7 +284,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  registerStudio(bb, studio, { store, removeAudio: (id) => files.removeRecording(id), changed });
+  registerStudio(bb, studio, { store, removeAudio: (id) => files.removeRecording(id), readAudio: (file) => files.read(file), changed });
 
   // Segment audio for the recording page's player. Same-origin GET only.
   bb.http.route("GET", "/audio", async (context) => {

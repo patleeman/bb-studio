@@ -21,6 +21,7 @@ export const MIGRATIONS = [
   `ALTER TABLE drawings ADD COLUMN project_id TEXT;
    ALTER TABLE drawings ADD COLUMN updated_by TEXT;
    ALTER TABLE drawings ADD COLUMN archived_at INTEGER;`,
+  `ALTER TABLE drawings ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
 ];
 
 export type DrawingRow = {
@@ -33,6 +34,7 @@ export type DrawingRow = {
   /** "user" or "agent"; null for drawings saved before Studio. */
   updated_by: string | null;
   archived_at: number | null;
+  template: number;
 };
 
 /** Who wrote a change. The CLI counts as an agent: agents are its main users. */
@@ -79,6 +81,9 @@ export function emptySceneData(): string {
 }
 
 export class DrawingStore {
+  setTemplate(id: string, template: boolean): void {
+    this.db.prepare("UPDATE drawings SET template = ? WHERE id = ?").run(template ? 1 : 0, id);
+  }
   constructor(
     private readonly db: Database.Database,
     private readonly now: () => number = Date.now,

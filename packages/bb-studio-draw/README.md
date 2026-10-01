@@ -125,3 +125,7 @@ Notes:
 - `@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
   `package-lock.json` current (regenerate it in a clean clone, not the pnpm
   workspace), because BB's Git install runs `npm install` from it.
+
+## Templates and export
+
+Studio can duplicate a drawing or save it as a template. Instantiation replaces `{{name}}` variables in the drawing name and scene. The provider exports PNG, SVG, or the original Excalidraw JSON. Studio's item menu downloads PNG.

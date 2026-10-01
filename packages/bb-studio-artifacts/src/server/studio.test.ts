@@ -17,6 +17,15 @@ function setup() {
 }
 
 describe("the Artifacts Studio provider", () => {
+  it("duplicates the latest file and exports its original bytes", async () => {
+    const { call, save } = setup();
+    const source = save("notes.txt", "hello", { title: "Notes" });
+    const { item } = await call("studio_duplicate", { id: source.id, projectId: "proj_new" });
+    expect(item).toMatchObject({ title: "Notes (copy)", projectId: "proj_new" });
+    expect(item.id).not.toBe(source.id);
+    const { files } = await call("studio_export", { id: item.id, format: "original" });
+    expect(Buffer.from(files[0].data, "base64").toString()).toBe("hello");
+  });
   it("describes artifacts, which Studio can't create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);

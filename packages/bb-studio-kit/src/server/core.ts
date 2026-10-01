@@ -5,14 +5,23 @@ import { STUDIO_CHANGED_METHOD, STUDIO_PLUGIN_ID, type StudioSchemas } from "../
 
 
 export type StudioProviderHandlers = PluginRpcHandlers<StudioSchemas["provider"]>;
+type OptionalMethods = "studio_duplicate" | "studio_template" | "studio_instantiate" | "studio_export";
+export type StudioProviderRegistration = Omit<StudioProviderHandlers, OptionalMethods> & Partial<Pick<StudioProviderHandlers, OptionalMethods>>;
 
 /**
  * Registers this plugin's `studio_*` methods. They're published for
  * discovery, which is how Studio finds its add-ons; publishing doesn't change
  * who may call them.
  */
-export function registerStudioProvider(bb: Pick<BbPluginApi, "rpc">, schemas: StudioSchemas, handlers: StudioProviderHandlers): void {
-  bb.rpc.register(schemas.provider, handlers, {
+export function registerStudioProvider(bb: Pick<BbPluginApi, "rpc">, schemas: StudioSchemas, handlers: StudioProviderRegistration): void {
+  const unsupported = () => { throw new Error("This provider does not support this operation."); };
+  bb.rpc.register(schemas.provider, {
+    studio_duplicate: unsupported,
+    studio_template: unsupported,
+    studio_instantiate: unsupported,
+    studio_export: unsupported,
+    ...handlers,
+  }, {
     experimental_discoverable: true,
     experimental_description: "BB Studio provider: lists and manages this plugin's items in the Studio collection.",
   });

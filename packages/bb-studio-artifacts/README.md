@@ -95,3 +95,7 @@ pnpm test
 `@bb-studio/kit` is a `file:../bb-studio-kit` dependency. Keep
 `package-lock.json` current (regenerate it in a clean clone, not the pnpm
 workspace), because BB's Git install runs `npm install` from it.
+
+## Duplicate and export
+
+Studio can duplicate an artifact as a separate item using its latest file version. The provider exports the original file with its name and MIME type.

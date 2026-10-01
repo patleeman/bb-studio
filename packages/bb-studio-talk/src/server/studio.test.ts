@@ -13,6 +13,7 @@ function setup() {
   registerStudio(bb as never, studioSchemas(z), {
     store,
     removeAudio: async (id) => void removed.push(id),
+    readAudio: async () => Buffer.from("audio"),
     changed: (id) => void changed.push(id),
   });
   const call = async (method: string, input: unknown): Promise<any> => handlers[method]!(input);
@@ -20,6 +21,15 @@ function setup() {
 }
 
 describe("the Talk Studio provider", () => {
+  it("exports transcript and audio segments together", async () => {
+    const { store, call } = setup();
+    store.create({ id: "rec_aaaaaaaa", kind: "recording", projectId: null, threadId: null });
+    addSegment(store, "rec_aaaaaaaa", "s1", 0, 1, 1000);
+    store.markTranscribed("rec_aaaaaaaa", "s1-0", "Hello team");
+    const { files } = await call("studio_export", { id: "rec_aaaaaaaa", format: "bundle" });
+    expect(files.map((file: { mime: string }) => file.mime)).toEqual(["text/markdown", expect.stringMatching(/^audio\//)]);
+    expect(Buffer.from(files[0].data, "base64").toString()).toContain("Hello team");
+  });
   it("describes recordings, which Studio can start, and dictations, which it can't", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);

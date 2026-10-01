@@ -1,7 +1,7 @@
 // Artifacts as a Studio add-on: the `studio_*` methods Studio calls to list
 // and manage artifacts in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { copyTitle, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import { ARTIFACT_ICON, PLUGIN_ID, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { displayTitle, versionType, type ArtifactStore, type ArtifactWithVersion } from "./store";
@@ -20,7 +20,7 @@ export const ARTIFACT_KIND: StudioKind = {
   // Artifacts come from threads: agents save them, or you do from a reply.
   create: null,
   canArchive: true,
-  capabilities: { create: false, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: true, links: true },
+  capabilities: { create: false, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: true, links: true },
   mentionProviderId: "artifact",
 
   blurb: "Files your agents made.",
@@ -132,7 +132,7 @@ export function registerStudio(
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Artifact not found.");
 
-  createStoreProvider(bb, schemas, {
+  createStoreProvider<ArtifactWithVersion>(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "artifacts", kinds: [ARTIFACT_KIND] }),
     studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(store, row)] : []; }) }),
     studio_read: ({ id, format }) => { const row = store.get(id); const content = row ? artifactText(store, row) : null; return { content: content && format === "text" && versionType(row!.version) === "html" ? htmlText(content) : content }; },
@@ -142,6 +142,21 @@ export function registerStudio(
     },
     studio_create: () => {
       throw new Error("Artifacts are saved from threads, not created in Studio.");
+    },
+    studio_duplicate: ({ id, projectId }) => {
+      const source = mustGet(id);
+      const bytes = store.bytes(source.version.sha256);
+      if (!bytes) throw new Error("Artifact content is missing.");
+      const result = store.save({ name: source.version.name, mime: source.version.mime, bytes, title: copyTitle(source.title || source.version.name), description: source.description, projectId, by: "app" });
+      deps.changed(result.artifact.id);
+      return { item: toStudioItem(store, result.artifact) };
+    },
+    studio_export: ({ id, format }) => {
+      if (format !== "original") throw new Error(`Unsupported artifact format: ${format}`);
+      const source = mustGet(id);
+      const bytes = store.bytes(source.version.sha256);
+      if (!bytes) throw new Error("Artifact content is missing.");
+      return { files: [{ name: source.version.name, mime: source.version.mime, data: bytes.toString("base64") }] };
     },
     studio_action: ({ action, ids }) => {
       if (action !== "copy-text") throw new Error(`Unknown action "${action}".`);

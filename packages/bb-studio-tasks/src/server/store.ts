@@ -54,6 +54,7 @@ export const MIGRATIONS = [
    ALTER TABLE tasks ADD COLUMN reminder_at INTEGER;
    CREATE INDEX tasks_parent ON tasks (parent_id);
    CREATE TABLE task_statuses (project_id TEXT NOT NULL, id TEXT NOT NULL, label TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (project_id, id));`,
+  `ALTER TABLE tasks ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
 ];
 
 export type TaskRow = {
@@ -77,6 +78,7 @@ export type TaskRow = {
   updated_by: string | null;
   done_at: number | null;
   archived_at: number | null;
+  template: number;
 };
 
 /** A link to a thread, or to another Studio item (a page, an artifact…). */
@@ -142,6 +144,9 @@ export function newTaskId(): string {
 }
 
 export class TaskStore {
+  setTemplate(id: string, template: boolean): void {
+    this.db.prepare("UPDATE tasks SET template = ? WHERE id = ?").run(template ? 1 : 0, id);
+  }
   constructor(
     private readonly db: Database.Database,
     private readonly now: () => number = Date.now,
@@ -210,6 +215,7 @@ export class TaskStore {
       updated_by: input.by,
       done_at: status === "done" ? at : null,
       archived_at: null,
+      template: 0,
     };
     this.db
       .prepare(

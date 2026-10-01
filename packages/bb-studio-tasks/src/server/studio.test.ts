@@ -23,6 +23,15 @@ function setup() {
 }
 
 describe("the Tasks Studio provider", () => {
+  it("instantiates tasks and exports escaped CSV", async () => {
+    const { store, call } = setup();
+    const source = store.create({ title: "{{name}}", description: 'Say "yes"', by: "user" });
+    await call("studio_template", { id: source.id, template: true });
+    const { item } = await call("studio_instantiate", { id: source.id, projectId: "proj_new", variables: { name: "Review" } });
+    expect(item).toMatchObject({ title: "Review", projectId: "proj_new", template: false });
+    const { files } = await call("studio_export", { id: item.id, format: "csv" });
+    expect(Buffer.from(files[0].data, "base64").toString()).toContain('"Say ""yes"""');
+  });
   it("describes tasks, which Studio can create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);

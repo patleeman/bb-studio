@@ -198,3 +198,7 @@ npm run typecheck
 bb plugin build .
 bb plugin install . --yes
 ```
+
+## Studio export
+
+The Studio provider exports a recording's transcript as Markdown, its audio segments, or both. The `studio_export` formats are `markdown`, `audio`, and `bundle`. Recording duplication is unavailable because copying metadata without its audio would create a misleading recording.

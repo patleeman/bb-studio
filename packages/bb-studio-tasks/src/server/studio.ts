@@ -1,7 +1,7 @@
 // Tasks as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage tasks in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { eachId, type StudioBadge, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { copyTitle, eachId, fillTemplate, type StudioBadge, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import {
   HANDOFF_SHORT,
@@ -35,7 +35,7 @@ export const TASK_KIND: StudioKind = {
   ],
   create: { mode: "rpc" },
   canArchive: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: true },
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: false, links: true, templates: true },
   mentionProviderId: "task",
 
   blurb: "Things to do, for you or an agent.",
@@ -85,6 +85,7 @@ export function toStudioItem(task: TaskRow, handoff: HandoffRow | null): StudioI
     thumbnailUrl: null,
     href: taskHref(task.id),
     archived: task.archived_at !== null,
+    template: Boolean(task.template),
   };
 }
 
@@ -100,6 +101,15 @@ export function registerStudio(
 ): void {
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Task not found.");
+  const duplicate = (id: string, projectId: string | null, variables?: Record<string, string>) => {
+    const source = mustGet(id);
+    const render = (value: string) => variables ? fillTemplate(value, variables) : value;
+    const row = store.create({ title: render(variables ? source.title : copyTitle(source.title)), description: render(source.description),
+      projectId, due: source.due, assignee: source.assignee, priority: source.priority,
+      labels: JSON.parse(source.labels) as string[], by: "user" });
+    deps.changed(row.id);
+    return toStudioItem(row, null);
+  };
 
   createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "tasks", kinds: [TASK_KIND] }),
@@ -113,6 +123,18 @@ export function registerStudio(
       const task = store.create({ title: "", projectId, by: "user" });
       deps.changed(task.id);
       return { item: toStudioItem(task, null) };
+    },
+    studio_duplicate: ({ id, projectId }) => ({ item: duplicate(id, projectId) }),
+    studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(mustGet(id), store.latestHandoff(id)) }; },
+    studio_instantiate: ({ id, projectId, variables }) => { if (!mustGet(id).template) throw new Error("Task is not a template."); return { item: duplicate(id, projectId, variables) }; },
+    studio_export: ({ id, format }) => {
+      const row = mustGet(id);
+      if (format === "markdown") return { files: [{ name: `${row.title || "Untitled task"}.md`, mime: "text/markdown", data: Buffer.from(`# ${row.title}\n\n${row.description}\n`).toString("base64") }] };
+      if (format === "csv") {
+        const csv = ["title,description,status,due,assignee", [row.title, row.description, row.status, row.due ?? "", row.assignee ?? ""].map((cell) => `"${cell.replace(/"/g, '""')}"`).join(",")].join("\r\n");
+        return { files: [{ name: `${row.title || "Untitled task"}.csv`, mime: "text/csv", data: Buffer.from(csv).toString("base64") }] };
+      }
+      throw new Error(`Unsupported task format: ${format}`);
     },
     studio_action: async ({ action, ids }) => {
       if (action !== "mark-done" && action !== "reopen") throw new Error(`Unknown action "${action}".`);

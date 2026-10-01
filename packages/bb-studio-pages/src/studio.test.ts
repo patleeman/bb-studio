@@ -93,6 +93,18 @@ describe("the Studio provider", async () => {
     expect(items).toMatchObject([{ id, archived: true, title: "Plan" }]);
   });
 
+  it("duplicates a page tree and instantiates Markdown variables", async () => {
+    const { store, create, call } = setup();
+    const parent = create("{{name}} plan", "proj_a");
+    const child = create("Next step", "proj_a", parent);
+    await call("studio_template", { id: parent, template: true });
+    const { item } = await call("studio_instantiate", { id: parent, projectId: "proj_b", variables: { name: "Launch" } });
+    expect(item).toMatchObject({ title: "Launch plan", projectId: "proj_b", template: false });
+    expect(store.list({ includeArchived: true }).some((page) => page.parent_id === item.id && page.title === "Next step")).toBe(true);
+    const copy = await call("studio_duplicate", { id: child, projectId: null, includeChildren: false });
+    expect(copy.item.title).toBe("Next step (copy)");
+  });
+
   it("moves sub-pages along, and detaches a page from a parent left behind", async () => {
     const { store, create, call, events } = setup();
     const parent = create("Parent", "proj_a");

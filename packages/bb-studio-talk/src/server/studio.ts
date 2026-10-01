@@ -79,7 +79,7 @@ const LIST_LIMIT = 10_000;
 export function registerStudio(
   bb: BbPluginApi,
   schemas: StudioSchemas,
-  deps: { store: TalkStore; removeAudio(id: string): Promise<void>; changed(id: string): void },
+  deps: { store: TalkStore; removeAudio(id: string): Promise<void>; readAudio?(file: string): Promise<Buffer>; changed(id: string): void },
 ): void {
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.recording(key), id, "Recording not found.");
@@ -102,6 +102,22 @@ export function registerStudio(
     },
     studio_create: () => {
       throw new Error("Start a recording from Talk's microphone.");
+    },
+    studio_export: async ({ id, format }) => {
+      if (format !== "markdown" && format !== "audio" && format !== "bundle") throw new Error(`Unsupported recording format: ${format}`);
+      const row = mustGet(id);
+      const output = format === "audio" ? [] : [{ name: `${row.title || "Untitled recording"}.md`, mime: "text/markdown", data: Buffer.from(`# ${row.title}\n\n${store.transcript(id)}\n`).toString("base64") }];
+      if (format !== "markdown") {
+        if (!deps.readAudio) throw new Error("Audio export is unavailable.");
+        for (const [index, segment] of store.segments(id).entries()) {
+          const entry = store.segmentFile(id, segment.id);
+          if (!entry) continue;
+          const extension = entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : "webm";
+          output.push({ name: `${String(index + 1).padStart(4, "0")}.${extension}`, mime: entry.mimeType, data: (await deps.readAudio(entry.file)).toString("base64") });
+        }
+      }
+      if (!output.length) throw new Error("Recording has no audio segments.");
+      return { files: output };
     },
     studio_action: ({ action, ids }) => {
       if (action !== COPY_TRANSCRIPT.id) throw new Error(`Unknown action "${action}".`);

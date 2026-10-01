@@ -67,6 +67,11 @@ export interface CollectionHandlers {
   onCreateTag?(name: string): Promise<CollectionTag>;
   onRenameTag?(tag: CollectionTag, name: string): Promise<void>;
   onDeleteTag?(tag: CollectionTag): Promise<void>;
+  onDuplicate?(item: CollectionItem): Promise<void>;
+  onSetTemplate?(item: CollectionItem, template: boolean): Promise<void>;
+  exportFormats?(item: CollectionItem): readonly { format: string; label: string }[];
+  onExport?(item: CollectionItem, format: string): Promise<void>;
+  onExportBulk?(items: CollectionItem[]): Promise<void>;
 }
 
 type View = "list" | "grid";
@@ -125,6 +130,7 @@ export function CollectionPage({
   isSelectable,
   notice,
   headerActions,
+  extraCreateItems,
   handlers,
 }: {
   title: string;
@@ -148,6 +154,7 @@ export function CollectionPage({
   notice?: ReactNode;
   /** Extra buttons beside New, e.g. a settings menu. */
   headerActions?: ReactNode;
+  extraCreateItems?: readonly { id: string; label: string; icon: string; onSelect(projectId: string | null): void }[];
   handlers: CollectionHandlers;
 }) {
   const [query, setQuery] = useState("");
@@ -316,7 +323,7 @@ export function CollectionPage({
   const creatable = kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true));
   const createTargets = activeKind ? creatable.filter((kind) => kind.id === activeKind.id) : creatable;
   const newButton = (className = PRIMARY_BUTTON) =>
-    createTargets.length === 0 ? null : createTargets.length === 1 ? (
+    createTargets.length === 0 && !extraCreateItems?.length ? null : createTargets.length === 1 && !extraCreateItems?.length ? (
       <button type="button" className={className} onClick={() => void handlers.onCreate(createTargets[0]!, newProject)}>
         <Icon name="Plus" /> New {createTargets[0]!.label.toLowerCase()}
       </button>
@@ -333,6 +340,10 @@ export function CollectionPage({
               <Icon name={kind.icon} className="size-4" /> {kind.label}
             </DropdownMenuItem>
           ))}
+          {extraCreateItems?.length && createTargets.length ? <DropdownMenuSeparator /> : null}
+          {extraCreateItems?.map((item) => <DropdownMenuItem key={item.id} onSelect={() => item.onSelect(newProject)}>
+            <Icon name={item.icon} className="size-4" /> {item.label}
+          </DropdownMenuItem>)}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -369,6 +380,11 @@ export function CollectionPage({
           <DropdownMenuItem onSelect={() => handlers.onNewThread([item])}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread with this
           </DropdownMenuItem>
+          {handlers.onDuplicate && kind?.capabilities?.duplicate ? <DropdownMenuItem onSelect={() => void handlers.onDuplicate!(item)}><Icon name="Copy" className="size-4" /> Duplicate</DropdownMenuItem> : null}
+          {handlers.onSetTemplate && kind?.capabilities?.templates ? <DropdownMenuItem onSelect={() => void handlers.onSetTemplate!(item, !item.template)}><Icon name="Bookmark" className="size-4" /> {item.template ? "Remove template" : "Save as template"}</DropdownMenuItem> : null}
+          {handlers.onExport && kind?.capabilities?.export ? <DropdownMenuSub><DropdownMenuSubTrigger><Icon name="Download" className="size-4" /> Export</DropdownMenuSubTrigger><DropdownMenuSubContent>
+            {(handlers.exportFormats?.(item) ?? []).map(({ format, label }) => <DropdownMenuItem key={format} onSelect={() => void handlers.onExport!(item, format)}>{label}</DropdownMenuItem>)}
+          </DropdownMenuSubContent></DropdownMenuSub> : null}
           {kind?.actions.map((action) => (
             <DropdownMenuItem key={action.id} onSelect={() => act(kind, action, [item])}>
               <Icon name={action.icon} className="size-4" /> {action.label.replace("{count}", "1")}
@@ -532,6 +548,7 @@ export function CollectionPage({
                 <Icon name={action.icon} /> {action.label.replace("{count}", String(chosen.length))}
               </button>
             ))}
+            {handlers.onExportBulk && chosen.length > 1 && chosen.every((item) => kindOf(item)?.capabilities?.export) ? <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => void handlers.onExportBulk!(chosen)}><Icon name="Download" /> Export ZIP</button> : null}
             {chosen.every((item) => kindOf(item)?.capabilities?.move ?? true) ? <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={OUTLINE_BUTTON} disabled={working}>

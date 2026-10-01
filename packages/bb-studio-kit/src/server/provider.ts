@@ -1,7 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioSchemas } from "../contract";
 import { snippets } from "../format";
-import { registerStudioProvider, type StudioProviderHandlers } from "./core";
+import { registerStudioProvider, type StudioProviderHandlers, type StudioProviderRegistration } from "./core";
 
 export function mustGet<T>(get: (id: string) => T | null | undefined, id: string, message: string): T {
   const item = get(id);
@@ -36,7 +36,7 @@ export function storeSearch<T extends { id: string }>(options: {
 export function createStoreProvider<T extends { id: string }>(
   bb: Pick<BbPluginApi, "rpc">,
   schemas: StudioSchemas,
-  handlers: Omit<StudioProviderHandlers, "studio_move" | "studio_archive" | "studio_delete" | "studio_search">,
+  handlers: Omit<StudioProviderRegistration, "studio_move" | "studio_archive" | "studio_delete" | "studio_search">,
   actions: Parameters<typeof storeActions>[0],
   search: Parameters<typeof storeSearch<T>>[0],
 ): void {

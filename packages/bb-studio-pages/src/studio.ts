@@ -1,13 +1,14 @@
 // Pages as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage pages in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { copyTitle, eachId, fillTemplate, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { untitled } from "@bb-studio/kit/format";
 import { mustGet, registerStudioProvider, storeSearch } from "@bb-studio/kit/server";
 import { HUMAN_USER_ID, PLUGIN_ID } from "./constants";
 import { readMarkdown } from "./doc";
 import type { PagesService } from "./service";
 import type { PageMeta } from "./store";
+import { pageHtml, pagePdf } from "./export-document";
 
 export const PAGE_KIND: StudioKind = {
   id: "page",
@@ -18,7 +19,7 @@ export const PAGE_KIND: StudioKind = {
   actions: [{ id: "copy-markdown", label: "Copy as Markdown", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: true, versions: true, links: true },
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: true, versions: true, links: true, templates: true },
   mentionProviderId: "page",
 
   blurb: "Documents you write with agents.",
@@ -80,12 +81,31 @@ export function toStudioItem(meta: PageMeta, markdown: string | null): StudioIte
     thumbnailUrl: null,
     href: `/plugins/${PLUGIN_ID}/pages/${meta.id}`,
     archived: meta.archived_at !== null,
+    template: Boolean(meta.template),
   };
 }
 
 export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: StudioSchemas): void {
   const { store } = service;
   const requireMeta = (id: string) => mustGet((key) => store.meta(key), id, "Page not found.");
+  const duplicate = (id: string, projectId: string | null, includeChildren: boolean, variables?: Record<string, string>): StudioItem => {
+    const source = requireMeta(id);
+    const render = (value: string) => variables ? fillTemplate(value, variables) : value;
+    const make = (pageId: string, parentId: string | null): StudioItem => {
+      const page = requireMeta(pageId);
+      const created = service.createPage({ projectId, parentId, title: render(variables ? page.title : copyTitle(page.title)), icon: page.icon,
+        markdown: render(store.get(pageId)?.markdown ?? ""), actor: HUMAN_USER_ID });
+      let markdown = store.get(created.id)?.markdown ?? "";
+      for (const file of store.files(pageId)) {
+        const nextId = store.addFile(created.id, file.name, file.mime, file.data);
+        markdown = markdown.replaceAll(`?id=${file.id}`, `?id=${nextId}`);
+      }
+      if (markdown !== (store.get(created.id)?.markdown ?? "")) service.replaceMarkdown(created.id, markdown, "Copied attachments", { key: HUMAN_USER_ID, name: "You", color: "#666666" });
+      if (includeChildren) for (const child of store.list({ includeArchived: false }).filter((entry) => entry.parent_id === pageId)) make(child.id, created.id);
+      return toStudioItem(store.meta(created.id)!, store.get(created.id)?.markdown ?? "");
+    };
+    return make(source.id, null);
+  };
 
   registerStudioProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "pages", kinds: [PAGE_KIND] }),
@@ -102,6 +122,26 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
     studio_create: ({ projectId }) => ({
       item: toStudioItem(service.createPage({ projectId, parentId: null, title: "", actor: HUMAN_USER_ID }), ""),
     }),
+    studio_duplicate: ({ id, projectId, includeChildren }) => ({ item: duplicate(id, projectId, includeChildren === true) }),
+    studio_template: ({ id, template }) => { const page = requireMeta(id); store.setTemplate(id, template); service.publish({ type: "tree", projectId: page.project_id }); return { item: toStudioItem(requireMeta(id), store.get(id)?.markdown ?? "") }; },
+    studio_instantiate: ({ id, projectId, variables }) => { if (!requireMeta(id).template) throw new Error("Page is not a template."); return { item: duplicate(id, projectId, true, variables) }; },
+    studio_export: async ({ id, format }) => {
+      const page = requireMeta(id);
+      let markdown = store.get(id)?.markdown ?? "";
+      const name = page.title.trim() || "Untitled page";
+      const assets = store.files(id).map((file) => {
+        const assetName = `assets/${file.id}-${file.name.replace(/[/\\]/g, "_")}`;
+        markdown = markdown.replaceAll(`/api/v1/plugins/pages/http/files?id=${file.id}`, assetName);
+        return { name: assetName, mime: file.mime, data: file.data.toString("base64") };
+      });
+      if (format === "markdown") return { files: [{ name: `${name}.md`, mime: "text/markdown", data: Buffer.from(markdown).toString("base64") }, ...assets] };
+      if (format === "html") {
+        const html = pageHtml(name, markdown);
+        return { files: [{ name: `${name}.html`, mime: "text/html", data: Buffer.from(html).toString("base64") }, ...assets] };
+      }
+      if (format === "pdf") return { files: [{ name: `${name}.pdf`, mime: "application/pdf", data: Buffer.from(await pagePdf(name, markdown)).toString("base64") }] };
+      throw new Error(`Unsupported page format: ${format}`);
+    },
     studio_move: ({ ids, projectId }) => {
       const touched = new Set<string | null>([projectId]);
       const result = eachId(ids, (id) => {

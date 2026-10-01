@@ -1,11 +1,16 @@
 // Draw as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage drawings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { copyTitle, fillTemplate, fillTemplateJson, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import { getNonDeletedElements, parseSceneData } from "../../lib/merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
 import type { DrawingRow, DrawingStore } from "./store";
+import { sceneThumbnail } from "./thumbnail";
+import { createRequire } from "node:module";
+
+// Resvg ships a native .node binding; BB's server bundler leaves runtime require calls external.
+const { Resvg } = createRequire(import.meta.url)("@resvg/resvg-js") as typeof import("@resvg/resvg-js");
 
 export const DRAWING_KIND: StudioKind = {
   id: "drawing",
@@ -16,7 +21,7 @@ export const DRAWING_KIND: StudioKind = {
   actions: [{ id: "copy-text", label: "Copy text", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
-  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false },
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: false, links: false, templates: true },
   mentionProviderId: "drawing",
 
   blurb: "Diagrams and sketches.",
@@ -69,6 +74,7 @@ export function toStudioItem(row: DrawingRow): StudioItem {
     thumbnailUrl: count ? thumbnailUrl(row.id, row.updated_at) : null,
     href: drawingHref(row.id),
     archived: row.archived_at !== null,
+    template: Boolean(row.template),
   };
 }
 
@@ -82,6 +88,14 @@ export function registerStudio(
 ): void {
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Drawing not found.");
+  const duplicate = (id: string, projectId: string | null, variables?: Record<string, string>) => {
+    const source = mustGet(id);
+    const data = variables ? fillTemplateJson(source.data, variables) : source.data;
+    const row = store.create({ name: variables ? fillTemplate(source.name, variables) : copyTitle(source.name), projectId, by: "app" });
+    store.write(row.id, data, "app");
+    deps.changed(row.id);
+    return toStudioItem(store.get(row.id)!);
+  };
 
   createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "drawings", kinds: [DRAWING_KIND] }),
@@ -96,6 +110,19 @@ export function registerStudio(
       const row = store.create({ name: "", projectId, by: "app" });
       deps.changed(row.id);
       return { item: toStudioItem(row) };
+    },
+    studio_duplicate: ({ id, projectId }) => ({ item: duplicate(id, projectId) }),
+    studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(mustGet(id)) }; },
+    studio_instantiate: ({ id, projectId, variables }) => { if (!mustGet(id).template) throw new Error("Drawing is not a template."); return { item: duplicate(id, projectId, variables) }; },
+    studio_export: ({ id, format }) => {
+      const row = mustGet(id);
+      if (format === "svg" || format === "png") {
+        const svg = sceneThumbnail(parseSceneData(row.data)) ?? '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+        const bytes = format === "png" ? new Resvg(svg).render().asPng() : Buffer.from(svg);
+        return { files: [{ name: `${row.name.trim() || "Untitled drawing"}.${format}`, mime: format === "png" ? "image/png" : "image/svg+xml", data: Buffer.from(bytes).toString("base64") }] };
+      }
+      if (format !== "excalidraw") throw new Error(`Unsupported drawing format: ${format}`);
+      return { files: [{ name: `${row.name.trim() || "Untitled drawing"}.excalidraw`, mime: "application/json", data: Buffer.from(row.data).toString("base64") }] };
     },
     studio_action: ({ action, ids }) => {
       if (action !== "copy-text") throw new Error(`Unknown action "${action}".`);
