@@ -1,7 +1,5 @@
-// Editing the board's columns in place: rename a column by double-clicking
+// Editing a board's columns in place: rename a column by double-clicking
 // its title, reorder or delete it from its menu, and add one at the end.
-// Columns belong to the filtered project, or are the defaults that tasks
-// without a project and projects without their own columns use.
 import { useState } from "react";
 import {
   DropdownMenu,
@@ -13,6 +11,7 @@ import {
   Icon,
   cn,
 } from "@bb-studio/kit/app";
+import { columnId } from "../src/shared";
 
 export interface BoardColumn {
   id: string;
@@ -20,16 +19,7 @@ export interface BoardColumn {
 }
 
 export const MAX_COLUMNS = 12;
-
-/** A status id for a new column, from its name: unique, and the shape the server accepts. */
-export function columnId(label: string, columns: readonly BoardColumn[]): string {
-  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 50);
-  const base = /^[a-z]/.test(slug) ? slug : `column_${slug}`.replace(/_+$/, "");
-  const taken = new Set(columns.map((column) => column.id));
-  let id = base;
-  for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
-  return id;
-}
+export { columnId };
 
 /** New columns go before Done, which stays last. */
 export function withColumn(columns: readonly BoardColumn[], column: BoardColumn): BoardColumn[] {
@@ -76,23 +66,16 @@ export function ColumnMenu({
   column,
   index,
   total,
-  scope,
-  own,
   onRename,
   onMove,
   onDelete,
-  onReset,
 }: {
   column: BoardColumn;
   index: number;
   total: number;
-  /** Whose columns these are, like "Default columns". */
-  scope: string;
-  own: boolean;
   onRename(): void;
   onMove(offset: -1 | 1): void;
   onDelete(): void;
-  onReset(): void;
 }) {
   return (
     <DropdownMenu>
@@ -106,7 +89,7 @@ export function ColumnMenu({
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
-        <DropdownMenuLabel className="text-xs text-muted-foreground">{scope}</DropdownMenuLabel>
+        <DropdownMenuLabel className="text-xs text-muted-foreground">Board columns</DropdownMenuLabel>
         <DropdownMenuItem onSelect={onRename}>
           <Icon name="Edit" className="size-4" /> Rename
         </DropdownMenuItem>
@@ -120,14 +103,6 @@ export function ColumnMenu({
         <DropdownMenuItem variant="destructive" disabled={column.id === "done" || total <= 2} onSelect={onDelete}>
           <Icon name="Trash2" className="size-4" /> Delete column
         </DropdownMenuItem>
-        {own ? (
-          <>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={onReset}>
-              <Icon name="RotateCcw" className="size-4" /> Use default columns
-            </DropdownMenuItem>
-          </>
-        ) : null}
       </DropdownMenuContent>
     </DropdownMenu>
   );

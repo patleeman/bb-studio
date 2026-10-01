@@ -68,12 +68,15 @@ afterwards.
   empty line to turn it into a card; web links fetch their title,
   description, and preview image.
 - **Studio embeds.** The `/` menu's Studio group embeds a drawing, artifact,
-  recording, task, or live table, picked by search, or makes a new task,
-  table, or drawing in the page's project and embeds it. Embeds stay live:
+  recording, task, task board, or live table, picked by search, or makes a
+  new task, board, table, or drawing in the page's project and embeds it.
+  Embeds stay live:
   - a table is the full Studio Tables grid, edited in place, with its views,
     board and calendar; the view shown is kept with the page;
   - a task is an editable card: done, title, status, due date, assignee,
     subtasks and labels;
+  - a board shows its columns, with cards you drag between them or add to,
+    or its tasks as a checklist; the view shown is kept with the page;
   - a recording plays in the page, with its summary, decisions and
     transcript; click a line to play from there;
   - a drawing shows its picture and an artifact its content (images, HTML,

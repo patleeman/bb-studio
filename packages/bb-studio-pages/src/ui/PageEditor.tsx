@@ -45,12 +45,14 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
   task: "Embed a Studio task",
+  board: "Embed a live task board",
   table: "Embed a live Studio table",
 };
-const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", task: "CircleCheck", table: "Rows2" };
+const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", task: "CircleCheck", board: "GridView", table: "Rows2" };
 /** Slash items that make a new item in another add-on and embed it. */
 const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
   { kind: "task", aliases: ["todo", "to do", "issue"] },
+  { kind: "board", aliases: ["kanban", "tasks", "sprint", "backlog"] },
   { kind: "table", aliases: ["database", "spreadsheet", "sheet", "grid"] },
   { kind: "drawing", aliases: ["excalidraw", "sketch", "whiteboard", "diagram"] },
 ];

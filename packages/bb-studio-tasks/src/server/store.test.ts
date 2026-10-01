@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import Database from "better-sqlite3";
-import { MIGRATIONS } from "./store";
+import { MIGRATIONS, TaskStore } from "./store";
 import { memoryStore } from "../test/db";
 
 function clock() {
@@ -141,38 +141,102 @@ describe("the task store", () => {
     expect(next).toMatchObject({ title: "Report", due: "2026-02-28", status: "todo", recurrence: "monthly" });
   });
 
-  it("keeps project columns ordered and maps removed statuses", () => {
+  it("keeps a board's columns ordered and maps removed statuses", () => {
     const { store } = memoryStore(clock());
     const task = store.create({ title: "Review", projectId: "project-1", status: "review", by: "user" });
-    expect(store.statuses("project-1").map((column) => column.id)).toEqual(["todo", "in_progress", "review", "done"]);
-    store.setStatuses("project-1", [{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
-    expect(store.statuses("project-1")).toEqual([{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
+    const board = task.board_id;
+    expect(store.statuses(board).map((column) => column.id)).toEqual(["todo", "in_progress", "review", "done"]);
+    store.setStatuses(board, [{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
+    expect(store.statuses(board)).toEqual([{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
     expect(store.get(task.id)?.status).toBe("backlog");
+    expect(() => store.setStatuses(board, [{ id: "backlog", label: "Backlog" }])).toThrow(/Done/);
   });
 
-  it("edits the default columns for tasks without a project and projects without their own", () => {
+  it("puts tasks on their project's main board unless they name one", () => {
     const { store } = memoryStore(clock());
-    const loose = store.create({ title: "Loose", projectId: null, status: "review", by: "user" });
-    const inherits = store.create({ title: "Inherits", projectId: "project-1", status: "review", by: "user" });
-    const own = store.create({ title: "Own", projectId: "project-2", status: "qa", by: "user" });
-    store.setStatuses("project-2", [{ id: "qa", label: "QA" }, { id: "done", label: "Done" }]);
-    store.setStatuses(null, [{ id: "todo", label: "To do" }, { id: "doing", label: "Doing" }, { id: "done", label: "Done" }]);
-    expect(store.statuses(null).map((column) => column.label)).toEqual(["To do", "Doing", "Done"]);
-    expect(store.statuses("project-1").map((column) => column.id)).toEqual(["todo", "doing", "done"]);
-    expect(store.statuses("project-2").map((column) => column.id)).toEqual(["qa", "done"]);
-    expect([store.get(loose.id)?.status, store.get(inherits.id)?.status, store.get(own.id)?.status]).toEqual(["todo", "todo", "qa"]);
+    const first = store.create({ title: "First", projectId: "project-1", by: "user" });
+    const second = store.create({ title: "Second", projectId: "project-1", by: "user" });
+    const loose = store.create({ title: "Loose", projectId: null, by: "user" });
+    expect(first.board_id).toMatch(/^brd_[0-9a-z]{16}$/);
+    expect(second.board_id).toBe(first.board_id);
+    expect(loose.board_id).not.toBe(first.board_id);
+    expect(store.getBoard(first.board_id)).toMatchObject({ title: "Tasks", project_id: "project-1" });
 
-    store.resetStatuses("project-2");
-    expect(store.hasOwnStatuses("project-2")).toBe(false);
-    expect(store.statuses("project-2").map((column) => column.id)).toEqual(["todo", "doing", "done"]);
-    expect(store.get(own.id)?.status).toBe("todo");
+    const launch = store.createBoard({ title: "Launch", projectId: "project-1", columns: [{ id: "idea", label: "Idea" }, { id: "done", label: "Done" }], by: "user" });
+    const task = store.create({ title: "Announce", boardId: launch.id, by: "agent" });
+    expect(task).toMatchObject({ board_id: launch.id, project_id: "project-1", status: "idea" });
+    expect(store.create({ title: "Draft", parentId: task.id, by: "user" }).board_id).toBe(launch.id);
+    expect(store.findMainBoard("project-1")?.id).toBe(first.board_id);
+    expect(store.list({ boardId: launch.id }).map((each) => each.title)).toEqual(["Draft", "Announce"]);
+    expect(store.boardCounts(launch.id)).toEqual({ open: 2, done: 0, byStatus: { idea: 2 } });
+  });
+
+  it("keeps each board's columns separate", () => {
+    const { store } = memoryStore(clock());
+    const a = store.createBoard({ title: "A", projectId: null, by: "user" });
+    const b = store.createBoard({ title: "B", projectId: null, by: "user" });
+    const onA = store.create({ title: "On A", boardId: a.id, status: "review", by: "user" });
+    const onB = store.create({ title: "On B", boardId: b.id, status: "review", by: "user" });
+    store.setStatuses(a.id, [{ id: "todo", label: "To do" }, { id: "doing", label: "Doing" }, { id: "done", label: "Done" }]);
+    expect(store.statuses(b.id).map((column) => column.id)).toEqual(["todo", "in_progress", "review", "done"]);
+    expect([store.get(onA.id)?.status, store.get(onB.id)?.status]).toEqual(["todo", "review"]);
+  });
+
+  it("moves a task and its subtasks to another board", () => {
+    const { store } = memoryStore(clock());
+    const parent = store.create({ title: "Parent", projectId: "project-1", status: "review", by: "user" });
+    const child = store.create({ title: "Child", parentId: parent.id, status: "in_progress", by: "user" });
+    const other = store.createBoard({ title: "Other", projectId: "project-2", columns: [{ id: "review", label: "QA" }, { id: "done", label: "Done" }], by: "user" });
+    expect(store.moveToBoard(parent.id, other.id, "user").sort()).toEqual([parent.id, child.id].sort());
+    expect(store.get(parent.id)).toMatchObject({ board_id: other.id, project_id: "project-2", status: "review" });
+    expect(store.get(child.id)).toMatchObject({ board_id: other.id, project_id: "project-2", status: "review" });
+  });
+
+  it("moves a board's tasks with it to another project, and deletes them with it", () => {
+    const { store } = memoryStore(clock());
+    const board = store.createBoard({ title: "Launch", projectId: "project-1", by: "user" });
+    const task = store.create({ title: "Announce", boardId: board.id, by: "user" });
+    store.updateBoard(board.id, { projectId: "project-2" }, "user");
+    expect(store.get(task.id)?.project_id).toBe("project-2");
+    expect(store.deleteBoard(board.id)).toEqual([task.id]);
+    expect(store.get(task.id)).toBeNull();
+  });
+
+  it("puts tasks from before boards on main boards with their project's old columns", () => {
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS.slice(0, 3)) db.exec(statement);
+    const insert = db.prepare("INSERT INTO tasks (id, title, status, rank, project_id, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?)");
+    insert.run("tsk_0000000000000001", "Own columns", "qa", 0, "project-1", 1, 1);
+    insert.run("tsk_0000000000000002", "Defaults", "doing", 0, "project-2", 1, 1);
+    insert.run("tsk_0000000000000003", "Loose", "review", 0, null, 1, 1);
+    const column = db.prepare("INSERT INTO task_statuses (project_id, id, label, position) VALUES (?, ?, ?, ?)");
+    column.run("project-1", "qa", "QA", 0);
+    column.run("project-1", "done", "Done", 1);
+    column.run("", "todo", "To do", 0);
+    column.run("", "doing", "Doing", 1);
+    column.run("", "done", "Done", 2);
+    for (const statement of MIGRATIONS.slice(3)) db.exec(statement);
+    const store = new TaskStore(db, clock());
+
+    expect(store.adoptLooseTasks()).toHaveLength(3);
+    expect(store.adoptLooseTasks()).toEqual([]);
+    const own = store.get("tsk_0000000000000001")!;
+    expect(store.statuses(own.board_id).map((each) => each.label)).toEqual(["QA", "Done"]);
+    expect(own.status).toBe("qa");
+    const defaults = store.get("tsk_0000000000000002")!;
+    expect(store.statuses(defaults.board_id).map((each) => each.id)).toEqual(["todo", "doing", "done"]);
+    expect(defaults.status).toBe("doing");
+    // Review isn't a default column any more, so the loose task moves to the first one.
+    expect(store.get("tsk_0000000000000003")?.status).toBe("todo");
+    expect(store.boards().map((board) => [board.title, board.project_id])).toEqual(expect.arrayContaining([["Tasks", "project-1"], ["Tasks", null]]));
+    db.close();
   });
 
   it("names a task's status after its board's column", () => {
     const { store } = memoryStore(clock());
     const task = store.create({ title: "Spec", projectId: "project-1", status: "in_progress", by: "user" });
     expect(store.statusLabel(task)).toBe("In progress");
-    store.setStatuses("project-1", [{ id: "todo", label: "Ideas" }, { id: "in_progress", label: "Drafting" }, { id: "done", label: "Shipped" }]);
+    store.setStatuses(task.board_id, [{ id: "todo", label: "Ideas" }, { id: "in_progress", label: "Drafting" }, { id: "done", label: "Shipped" }]);
     expect(store.statusLabel(task)).toBe("Drafting");
   });
 });

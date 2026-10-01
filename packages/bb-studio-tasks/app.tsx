@@ -1,7 +1,8 @@
 // Studio Tasks — frontend entry.
 //
 // Surfaces:
-//   - navPanel "Tasks": the board, a list view, and one task at tasks/<id>.
+//   - navPanel "Tasks": every board, one board (and its list and calendar
+//     views) at tasks/<board id>, and one task at tasks/<task id>.
 //   - threadPanelAction "Tasks": the thread's tasks and recent ones, and one
 //     task, inside a thread's right panel. New makes a task linked to the
 //     thread.

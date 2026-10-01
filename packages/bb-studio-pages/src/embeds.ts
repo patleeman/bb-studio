@@ -1,6 +1,6 @@
 // Items from the other Studio add-ons, for embeds and mentions, and what
 // their live embeds show and edit: an artifact's content, a table, a task, a
-// recording. A plugin's UI can only call its own RPCs, so Pages asks each
+// board, a recording. A plugin's UI can only call its own RPCs, so Pages asks each
 // add-on on its behalf.
 import { untitled } from "@bb-studio/kit/format";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
@@ -8,30 +8,34 @@ import { indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/ser
 import { TABLES_PLUGIN_ID, tablesContract } from "@bb-studio/kit/tables";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { PLUGIN_ID, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
+import { PLUGIN_ID, type BoardCard, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
 
 const MAX_TEXT = 20_000;
 const TASKS_PLUGIN_ID = "studio-tasks";
 const TALK_PLUGIN_ID = "talk";
 
-const taskSchema = z.object({
-  task: z
-    .object({
-      id: z.string(),
-      title: z.string(),
-      status: z.string(),
-      statusLabel: z.string(),
-      projectId: z.string().nullable(),
-      due: z.string().nullable(),
-      assignee: z.string().nullable(),
-      priority: z.string(),
-      labels: z.array(z.string()),
-      subtasks: z.object({ total: z.number(), done: z.number() }),
-      archived: z.boolean(),
-    })
-    .nullable(),
+const taskFields = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  statusLabel: z.string(),
+  /** Tasks from before boards have none. */
+  boardId: z.string().optional(),
+  projectId: z.string().nullable(),
+  due: z.string().nullable(),
+  assignee: z.string().nullable(),
+  priority: z.string(),
+  labels: z.array(z.string()),
+  subtasks: z.object({ total: z.number(), done: z.number() }),
+  archived: z.boolean(),
 });
-const columnsSchema = z.object({ columns: z.array(z.object({ id: z.string(), label: z.string() })) });
+const taskSchema = z.object({ task: taskFields.nullable() });
+const columnSchema = z.object({ id: z.string(), label: z.string() });
+const columnsSchema = z.object({ columns: z.array(columnSchema) });
+const boardSchema = z.object({
+  board: z.object({ id: z.string(), title: z.string(), projectId: z.string().nullable(), columns: z.array(columnSchema), archived: z.boolean() }).nullable(),
+  tasks: z.array(taskFields),
+});
 const okSchema = z.object({ ok: z.boolean() });
 
 const recordingSchema = z.object({
@@ -90,13 +94,28 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
     async task(id: string): Promise<{ task: TaskCard | null; columns: TaskColumn[] }> {
       const { task } = await call(TASKS_PLUGIN_ID, "get", { id }, taskSchema);
       if (!task) return { task: null, columns: [] };
-      const { columns } = await call(TASKS_PLUGIN_ID, "statuses", { projectId: task.projectId }, columnsSchema);
+      const { columns } = await call(TASKS_PLUGIN_ID, "statuses", task.boardId ? { boardId: task.boardId } : { projectId: task.projectId }, columnsSchema);
       return { task, columns };
     },
-    async updateTask({ id, status, ...fields }: { id: string; title?: string; status?: string; due?: string | null }) {
+    async updateTask({ id, status, index, ...fields }: { id: string; title?: string; status?: string; index?: number; due?: string | null }) {
       if (Object.keys(fields).length) await call(TASKS_PLUGIN_ID, "update", { id, ...fields }, okSchema);
-      if (status) await call(TASKS_PLUGIN_ID, "move", { id, status }, okSchema.extend({ archivedThreads: z.number() }));
+      if (status) await call(TASKS_PLUGIN_ID, "move", { id, status, ...(index !== undefined ? { index } : {}) }, okSchema.extend({ archivedThreads: z.number() }));
       return { ok: true };
+    },
+    /** A board and its open tasks, top-level and subtasks alike, in board order. */
+    async board(id: string): Promise<{ board: BoardCard | null; tasks: TaskCard[] }> {
+      const { board, tasks } = await call(TASKS_PLUGIN_ID, "board", { boardId: id }, boardSchema);
+      return { board, tasks: board ? tasks.filter((task) => !task.archived) : [] };
+    },
+    async renameBoard(id: string, title: string) {
+      await call(TASKS_PLUGIN_ID, "boardUpdate", { id, title }, okSchema);
+      index.invalidate();
+      return { ok: true };
+    },
+    async createBoardTask(boardId: string, title: string, status?: string) {
+      const { task } = await call(TASKS_PLUGIN_ID, "create", { boardId, title, ...(status ? { status } : {}) }, z.object({ task: z.object({ id: z.string() }) }));
+      index.invalidate();
+      return { taskId: task.id };
     },
     async recording(id: string): Promise<RecordingCard | null> {
       const result = await call(TALK_PLUGIN_ID, "recording_get", { id }, recordingSchema).catch(() => null);

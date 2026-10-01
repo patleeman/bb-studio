@@ -35,6 +35,7 @@ import {
   STATUSES,
   STATUS_LABELS,
   TASK_UPDATE_TYPE,
+  BOARD_ICON,
   isOpenHandoff,
   taskHref,
   type Assignee,
@@ -42,13 +43,16 @@ import {
 } from "../src/shared";
 import { HandoffPanel } from "./handoff-panel";
 import { ASSIGNEE_OPTIONS, DueChip, STATUS_ICONS } from "./pieces";
-import { SPIN, useTasksRpc, type Handoff, type Link, type Linkable, type Task, type TaskEvent } from "./types";
+import { SPIN, useTasksRpc, type Board, type Handoff, type Link, type Linkable, type Task, type TaskEvent } from "./types";
 
 type Loaded = { task: Task; links: Link[]; handoffs: Handoff[] };
 
-export function TaskView({ taskId, onBack, compact = false }: {
+export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
   taskId: string;
-  onBack: (replace?: boolean) => void;
+  /** Back to the task's board, when it's known. */
+  onBack: (replace?: boolean, boardId?: string) => void;
+  /** Opens the task's board; without it, the board link opens it in the Tasks panel. */
+  onOpenBoard?(boardId: string): void;
   /** A thread's narrow side panel: Hand off and New thread move into the menu. */
   compact?: boolean;
 }) {
@@ -59,11 +63,14 @@ export function TaskView({ taskId, onBack, compact = false }: {
   const [columns, setColumns] = useState<{ id: string; label: string }[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
   const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
   const [allTasks, setAllTasks] = useState<Task[]>([]);
+  const [boards, setBoards] = useState<Board[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const onBackRef = useRef(onBack);
-  onBackRef.current = onBack;
+  const boardId = useRef<string | undefined>(undefined);
+  const back = (replace?: boolean) => onBack(replace, boardId.current);
+  const onBackRef = useRef(back);
+  onBackRef.current = back;
 
   const load = useCallback(
     () =>
@@ -74,6 +81,7 @@ export function TaskView({ taskId, onBack, compact = false }: {
             onBackRef.current(true);
             return;
           }
+          boardId.current = result.task.boardId;
           setLoaded({ task: result.task, links: result.links, handoffs: result.handoffs });
           setError(null);
         },
@@ -85,10 +93,15 @@ export function TaskView({ taskId, onBack, compact = false }: {
     void load();
   }, [load]);
   useEffect(() => { void rpc.call("bots", null).then(({ bots }) => setBots(bots), () => setBots([])); }, [rpc]);
-  useEffect(() => { void rpc.call("board", {}).then(({ tasks }) => setAllTasks(tasks), () => setAllTasks([])); }, [rpc, loaded?.task.subtasks.total]);
+  const taskBoard = loaded?.task.boardId;
   useEffect(() => {
-    if (loaded?.task) void rpc.call("statuses", { projectId: loaded.task.projectId }).then(({ columns }) => setColumns(columns));
-  }, [rpc, loaded?.task.projectId]);
+    if (!taskBoard) return;
+    void rpc.call("board", { boardId: taskBoard }).then(({ board, tasks }) => {
+      setAllTasks(tasks);
+      if (board) setColumns(board.columns);
+    }, () => setAllTasks([]));
+  }, [rpc, taskBoard, loaded?.task.subtasks.total]);
+  useEffect(() => { void rpc.call("boards", {}).then(({ boards }) => setBoards(boards.filter((board) => !board.template)), () => setBoards([])); }, [rpc, taskBoard]);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as TaskEvent;
     if (event?.type === TASK_UPDATE_TYPE && event.taskId === taskId) void load();
@@ -97,7 +110,7 @@ export function TaskView({ taskId, onBack, compact = false }: {
   if (!loaded) {
     return (
       <div className="studio-root relative flex h-full min-h-0 flex-col bg-background text-foreground">
-        <ItemHeader backLabel="Tasks" onBack={() => onBack()} />
+        <ItemHeader backLabel="Board" onBack={() => back()} />
         <div role="status" className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
           {error ?? (
             <>
@@ -125,7 +138,7 @@ export function TaskView({ taskId, onBack, compact = false }: {
     }
   }
 
-  const update = (patch: { title?: string; description?: string; projectId?: string | null; due?: string | null; assignee?: Assignee; priority?: Task["priority"]; labels?: string[]; parentId?: string | null; recurrence?: Task["recurrence"]; reminderAt?: number | null }) =>
+  const update = (patch: { title?: string; description?: string; boardId?: string; projectId?: string | null; due?: string | null; assignee?: Assignee; priority?: Task["priority"]; labels?: string[]; parentId?: string | null; recurrence?: Task["recurrence"]; reminderAt?: number | null }) =>
     run(rpc.call("update", { id: taskId, ...patch }), "Couldn't save the task");
 
   async function move(status: TaskStatus, archive = false) {
@@ -145,7 +158,7 @@ export function TaskView({ taskId, onBack, compact = false }: {
     try {
       await rpc.call("delete", { id: taskId });
       toast.success("Task deleted");
-      onBack(true);
+      back(true);
     } catch (failure) {
       toast.error(errorMessage(failure));
     }
@@ -163,7 +176,7 @@ export function TaskView({ taskId, onBack, compact = false }: {
           <Icon name="Bot" /> {latest ? "Hand off again" : "Hand off"}
         </button>
       ) : null}
-      <button type="button" className={FLOATING_BUTTON} onClick={() => void move(done ? "todo" : "done")}>
+      <button type="button" className={FLOATING_BUTTON} onClick={() => void move(done ? (columns.find((column) => column.id !== "done")?.id ?? "todo") : "done")}>
         <Icon name={done ? "RotateCcw" : "CircleCheck"} /> {done ? "Reopen" : "Mark done"}
       </button>
       <ItemMenu projects={projects} projectId={task.projectId} onMove={(id) => void update({ projectId: id })} onDelete={() => setConfirmDelete(true)} className="w-60">
@@ -195,7 +208,7 @@ export function TaskView({ taskId, onBack, compact = false }: {
 
   return (
     <div className="relative h-full min-h-0">
-      <ItemHeader backLabel="Tasks" onBack={() => onBack()} thread={confirmDelete || compact ? undefined : thread} trailing={trailing} />
+      <ItemHeader backLabel={untitled(boards.find((board) => board.id === task.boardId)?.title ?? "Board")} onBack={() => back()} thread={confirmDelete || compact ? undefined : thread} trailing={trailing} />
       <PageColumn className="max-w-3xl">
         {task.archived ? (
           <div className="mb-4 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
@@ -252,15 +265,30 @@ export function TaskView({ taskId, onBack, compact = false }: {
             <span>{task.subtasks.done} of {task.subtasks.total} done</span>
             <button type="button" className="ml-2 text-primary hover:underline" onClick={() => {
               const title = window.prompt("New subtask title");
-              if (title?.trim()) void rpc.call("create", { title: title.trim(), parentId: task.id, projectId: task.projectId }).then(() => void load(), (failure) => toast.error(errorMessage(failure)));
+              if (title?.trim()) void rpc.call("create", { title: title.trim(), parentId: task.id, boardId: task.boardId, projectId: task.projectId }).then(() => void load(), (failure) => toast.error(errorMessage(failure)));
             }}>Add subtask</button>
           </Property>
           <Property label="Parent">
             <select aria-label="Parent task" value={task.parentId ?? ""} className="h-8 rounded-md border border-border bg-background px-2 text-sm"
               onChange={(event) => void update({ parentId: event.currentTarget.value || null })}>
               <option value="">None</option>
-              {allTasks.filter((row) => row.id !== task.id && row.projectId === task.projectId).map((row) => <option key={row.id} value={row.id}>{row.title || "Untitled"}</option>)}
+              {allTasks.filter((row) => row.id !== task.id).map((row) => <option key={row.id} value={row.id}>{row.title || "Untitled"}</option>)}
             </select>
+          </Property>
+          <Property label="Board">
+            {boards.some((board) => board.id === task.boardId) ? (
+              <Select
+                label="Board"
+                value={task.boardId}
+                options={boards.map((board) => ({ value: board.id, label: untitled(board.title), icon: BOARD_ICON }))}
+                onChange={(value) => value !== task.boardId && void update({ boardId: value })}
+              />
+            ) : null}
+            {onOpenBoard ? (
+              <button type="button" aria-label="Open board" title="Open board" className={ICON_BUTTON} onClick={() => onOpenBoard(task.boardId)}>
+                <Icon name="ArrowUpRight" className="size-4" />
+              </button>
+            ) : null}
           </Property>
           <Property label="Project">
             <Select

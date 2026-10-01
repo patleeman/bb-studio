@@ -14,7 +14,7 @@ agent.
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
-| [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | A board of tasks you can hand to agents; each follows its thread from working to review. |
+| [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | Boards of tasks you can hand to agents and embed in pages; each task follows its thread from working to review. |
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |

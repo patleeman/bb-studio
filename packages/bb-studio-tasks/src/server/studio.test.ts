@@ -32,11 +32,11 @@ describe("the Tasks Studio provider", () => {
     const { files } = await call("studio_export", { id: item.id, format: "csv" });
     expect(Buffer.from(files[0].data, "base64").toString()).toContain('"Say ""yes"""');
   });
-  it("describes tasks, which Studio can create", async () => {
+  it("describes boards and tasks, which Studio can create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);
     expect(studioSchemas(z).info.parse(info)).toBeTruthy();
-    expect(info).toMatchObject({ pluginId: "studio-tasks", panel: "tasks", kinds: [{ id: "task", create: { mode: "rpc" }, canArchive: true }] });
+    expect(info).toMatchObject({ pluginId: "studio-tasks", panel: "tasks", kinds: [{ id: "board", create: { mode: "rpc" } }, { id: "task", create: { mode: "rpc" }, canArchive: true }] });
     const { item } = await call("studio_create", { kind: "task", projectId: "proj_a" });
     expect(item).toMatchObject({ kind: "task", title: "", projectId: "proj_a", href: `/plugins/studio-tasks/tasks/${item.id}` });
     await expect(call("studio_create", { kind: "page", projectId: null })).rejects.toThrow(/can't make/);
@@ -47,8 +47,9 @@ describe("the Tasks Studio provider", () => {
     const task = store.create({ title: "Launch", description: "# Ship it\nsoon", status: "review", due: "2026-10-01", assignee: "me", by: "agent" });
     const { items } = await call("studio_list", null);
     expect(studioSchemas(z).provider.studio_list.output.parse({ items })).toBeTruthy();
-    expect(items[0]).toMatchObject({
+    expect(items.find((item: { id: string }) => item.id === task.id)).toMatchObject({
       id: task.id,
+      parentId: task.board_id,
       updatedBy: "agent",
       preview: "Ship it",
       facts: [
@@ -89,7 +90,49 @@ describe("the Tasks Studio provider", () => {
     expect(store.get(task.id)?.archived_at).not.toBeNull();
     await call("studio_delete", { ids: [task.id] });
     expect(store.get(task.id)).toBeNull();
-    expect(changed).toEqual([task.id, task.id, task.id]);
+    // Moving to another project takes the task off its board, onto that project's main board.
+    expect(changed).toEqual([task.id, task.board_id, task.id, task.id]);
+  });
+});
+
+describe("boards in Studio", () => {
+  it("lists boards with their columns' counts and makes new ones", async () => {
+    const { store, call } = setup();
+    const task = store.create({ title: "A", projectId: "proj_a", status: "review", by: "user" });
+    const { items } = await call("studio_list", null);
+    expect(items.find((item: { id: string }) => item.id === task.board_id)).toMatchObject({
+      kind: "board",
+      title: "Tasks",
+      projectId: "proj_a",
+      href: `/plugins/studio-tasks/tasks/${task.board_id}`,
+    });
+    const { item } = await call("studio_create", { kind: "board", projectId: "proj_b" });
+    expect(item).toMatchObject({ kind: "board", projectId: "proj_b" });
+    expect(store.getBoard(item.id)).toBeTruthy();
+  });
+
+  it("moves a board's tasks with it, and a task to the new project's main board", async () => {
+    const { store, call } = setup();
+    const board = store.createBoard({ title: "Launch", projectId: "proj_a", by: "user" });
+    const task = store.create({ title: "A", boardId: board.id, by: "user" });
+    await call("studio_move", { ids: [board.id], projectId: "proj_b" });
+    expect(store.get(task.id)).toMatchObject({ board_id: board.id, project_id: "proj_b" });
+    await call("studio_move", { ids: [task.id], projectId: "proj_c" });
+    expect(store.get(task.id)?.board_id).toBe(store.findMainBoard("proj_c")?.id);
+  });
+
+  it("duplicates a board with its tasks, and deletes it with them", async () => {
+    const { store, call } = setup();
+    const board = store.createBoard({ title: "Launch", projectId: null, by: "user" });
+    store.create({ title: "A", boardId: board.id, status: "review", by: "user" });
+    const { item } = await call("studio_duplicate", { id: board.id });
+    expect(item).toMatchObject({ kind: "board" });
+    expect(store.list({ boardId: item.id }).map((task) => [task.title, task.status])).toEqual([["A", "review"]]);
+    const { content } = await call("studio_read", { id: board.id });
+    expect(content).toContain("## Review");
+    await call("studio_delete", { ids: [board.id] });
+    expect(store.getBoard(board.id)).toBeNull();
+    expect(store.list({ boardId: board.id })).toEqual([]);
   });
 });
 

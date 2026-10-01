@@ -1,12 +1,16 @@
 ---
 name: studio-tasks
-description: Use when the user asks to track, add, list or update a task or to-do ("add a task", "what's on my board", "hand this to an agent"), when a thread was handed a task from Studio Tasks (its first message says "Work on this task from Studio Tasks"), or when they refer to a /plugins/studio-tasks/tasks/<id> link or an @task mention.
+description: Use when the user asks to track, add, list or update a task, to-do or task board ("add a task", "what's on my board", "make a board for the launch", "hand this to an agent"), when a thread was handed a task from Studio Tasks (its first message says "Work on this task from Studio Tasks"), or when they refer to a /plugins/studio-tasks/tasks/<id> link or an @task mention.
 ---
 
 # Studio Tasks
 
-Studio Tasks is a board of tasks in four columns: **To do**, **In
-progress**, **Review** and **Done**. A task has a title, a Markdown
+Studio Tasks keeps tasks on boards. Each project has a main board,
+"Tasks", where tasks go when no board is named, and the user can make
+others (for a launch, a sprint). A board's columns are its own; the default
+is **To do**, **In progress**, **Review** and **Done**, and Done is always
+last. Board ids look like `brd_…`; link to one as
+`[Title](/plugins/studio-tasks/tasks/<board-id>)`. A task has a title, a Markdown
 description, a due day, an assignee (the user, an agent, or nobody), a
 project (or none, for global), and links to threads and Studio items (pages,
 artifacts, drawings, recordings). Link to a task as
@@ -42,21 +46,27 @@ back into your thread, which moves the task to In progress again.
 
 | Tool | Use it to |
 | --- | --- |
-| `tasks_list` | List tasks with ids, status, assignee, due day and handoff state. Filter by `status` or `query`. |
+| `tasks_boards` | List boards with ids, project, columns and counts. |
+| `tasks_board_create` | Make a board, in this thread's project unless `global`, with optional `columns` (names before Done). |
+| `tasks_list` | List tasks with ids, board, status, assignee, due day and handoff state. Filter by `boardId`, `status` or `query`. |
 | `tasks_get` | Read a task's description, links and handoffs. Without `id`, the task this thread was handed. |
-| `tasks_create` | Add a task (To do unless you pass `status`) in this thread's project. Only when the user asks to track something, not for your own plan. |
-| `tasks_update` | Change status (not Done), title, description, due, add links, or set your handoff's `note`. Without `id`, this thread's task. |
+| `tasks_create` | Add a task (the board's first column unless you pass `status`) to `boardId`, or this thread's project's main board. Only when the user asks to track something, not for your own plan. |
+| `tasks_update` | Change status (not Done), board, title, description, due, add links, or set your handoff's `note`. Without `id`, this thread's task. |
 
 `tasks_create` returns a line like `::task{id="tsk_…"}`. Put it on its own
-line in your reply and the user sees a card that opens the task.
+line in your reply and the user sees a card that opens the task. To show a
+board in a Studio page, embed it: `{"kind":"board","target":"brd_…"}`, or
+`"brd_…/view/list"` for a checklist.
 
 ## CLI (works in every agent session)
 
 ```sh
-bb studio-tasks list [--status todo|in_progress|review|done]
-bb studio-tasks add <title> [--description <text>] [--due <YYYY-MM-DD>] [--me]
+bb studio-tasks boards
+bb studio-tasks board <title> [--global]                # in this project unless --global
+bb studio-tasks list [--board <id>] [--status <column>]
+bb studio-tasks add <title> [--board <id>] [--description <text>] [--due <YYYY-MM-DD>] [--me]
 bb studio-tasks show <id>
-bb studio-tasks move <id> <todo|in_progress|review|done>
+bb studio-tasks move <id> <column>
 bb studio-tasks hand <id> [--note <text>] [--folder]   # new thread, project's default agent
 bb studio-tasks done <id>
 ```
@@ -64,12 +74,12 @@ bb studio-tasks done <id>
 ## Settings
 
 **Archive threads when a task is done** (off by default): moving a task to
-Done archives the threads it was handed to. With it off, the board offers
+Done archives the threads it was handed to. With it off, Tasks offers
 **Archive threads** after you mark a task done.
 
 ## Studio
 
-Tasks is a BB Studio add-on. With the Studio plugin installed, tasks also
-appear in Studio's collection (kind `task`) with Status, Due and Assignee
-columns and **Mark done** / **Move to To do** actions. The Tasks panel keeps
-its own board either way.
+Tasks is a BB Studio add-on. With the Studio plugin installed, boards (kind
+`board`) and tasks (kind `task`, children of their board) appear in
+Studio's collection; tasks have Status, Due and Assignee columns and **Mark
+done** / **Move to To do** actions. The Tasks panel lists boards either way.

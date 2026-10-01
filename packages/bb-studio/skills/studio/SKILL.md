@@ -14,7 +14,7 @@ the core: one collection that lists every item from every installed add-on.
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Studio Draw | `excalidraw` | Drawings | the `draw` skill and `excalidraw_*` tools |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
-| Studio Tasks | `studio-tasks` | Tasks on a board you can hand to agents | the `studio-tasks` skill and `tasks_*` tools |
+| Studio Tasks | `studio-tasks` | Task boards, and tasks on them you can hand to agents | the `studio-tasks` skill and `tasks_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as

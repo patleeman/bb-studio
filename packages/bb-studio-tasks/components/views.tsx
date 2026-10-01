@@ -1,24 +1,21 @@
-import { useEffect, useMemo, useState } from "react";
+// A board's tasks as a sortable, groupable list, or on a month calendar by due day.
+import { useMemo, useState } from "react";
 import { Icon } from "@bb-studio/kit/app";
-import { errorMessage } from "@bb-studio/kit/format";
-import { useTasksRpc, type Task } from "./types";
+import { useBoard } from "./board";
+import { BoardHeader, BoardMissing } from "./boards";
+import { type Task } from "./types";
 
 type Sort = "due" | "title" | "priority" | "updated";
 type Group = "status" | "priority" | "project" | "none";
 const weight: Record<Task["priority"], number> = { none: 0, low: 1, medium: 2, high: 3, urgent: 4 };
 
-export function TaskViews({ mode, refreshKey, onOpen, headerActions }: { mode: "list" | "calendar"; refreshKey: unknown; onOpen(id: string): void; headerActions: React.ReactNode }) {
-  const rpc = useTasksRpc();
-  const [tasks, setTasks] = useState<Task[]>([]);
-  const [error, setError] = useState<string | null>(null);
+export function TaskViews({ boardId, mode, refreshKey, onOpen, onBack, viewToggle }: { boardId: string; mode: "list" | "calendar"; refreshKey: unknown; onOpen(id: string): void; onBack(replace?: boolean): void; viewToggle: React.ReactNode }) {
+  const loaded = useBoard(boardId, refreshKey);
+  const { board, error, refetch } = loaded;
+  const tasks = useMemo(() => loaded.tasks ?? [], [loaded.tasks]);
   const [sort, setSort] = useState<Sort>("due");
   const [group, setGroup] = useState<Group>("status");
   const [month, setMonth] = useState(() => new Date().toISOString().slice(0, 7));
-  useEffect(() => {
-    let live = true;
-    void rpc.call("board", {}).then(({ tasks }) => { if (live) { setTasks(tasks); setError(null); } }, (failure) => { if (live) setError(errorMessage(failure)); });
-    return () => { live = false; };
-  }, [rpc, refreshKey]);
   const ordered = useMemo(() => [...tasks].sort((a, b) => {
     if (sort === "title") return a.title.localeCompare(b.title);
     if (sort === "priority") return weight[b.priority] - weight[a.priority] || a.title.localeCompare(b.title);
@@ -36,10 +33,9 @@ export function TaskViews({ mode, refreshKey, onOpen, headerActions }: { mode: "
   const first = new Date(`${month}-01T12:00:00Z`);
   const days = new Date(Date.UTC(first.getUTCFullYear(), first.getUTCMonth() + 1, 0)).getUTCDate();
   function shift(offset: number) { const date = new Date(`${month}-01T12:00:00Z`); date.setUTCMonth(date.getUTCMonth() + offset); setMonth(date.toISOString().slice(0, 7)); }
+  if (!board) return <BoardMissing error={error} onBack={() => onBack(true)} />;
   return <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-    <div className="flex flex-wrap items-center gap-3 px-6 pt-10 pb-4 max-md:px-3 max-md:pt-4">
-      <h1 className="mr-auto text-2xl font-semibold">Tasks</h1>{headerActions}
-    </div>
+    <BoardHeader board={board} onBack={onBack} onChanged={refetch}>{viewToggle}</BoardHeader>
     {error ? <p role="alert" className="px-6 text-sm text-destructive">{error}</p> : null}
     {mode === "list" ? <div className="min-h-0 overflow-auto px-6 pb-6 max-md:px-3">
       <div className="mb-4 flex gap-3 text-sm">

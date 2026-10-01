@@ -18,6 +18,9 @@ public enum Pages {
     public static let tableCreate = "tableCreate"
     public static let taskView = "taskView"
     public static let taskUpdate = "taskUpdate"
+    public static let boardView = "boardView"
+    public static let boardRename = "boardRename"
+    public static let boardTaskCreate = "boardTaskCreate"
     public static let recordingView = "recordingView"
     public static let markdown = "markdown"
     public static let editableMarkdown = "editableMarkdown"
@@ -82,6 +85,12 @@ public enum Pages {
   public typealias TaskView = TaskViewOutput
 
   public typealias TaskUpdate = TaskUpdateOutput
+
+  public typealias BoardView = BoardViewOutput
+
+  public typealias BoardRename = BoardRenameOutput
+
+  public typealias BoardTaskCreate = BoardTaskCreateOutput
 
   public typealias RecordingView = RecordingViewOutput
 
@@ -1988,12 +1997,14 @@ public enum Pages {
     public var id: String?
     public var title: String?
     public var status: String?
+    public var index: Int?
     public var due: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, due: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, index: Int? = nil, due: String? = nil) {
       self.id = id
       self.title = title
       self.status = status
+      self.index = index
       self.due = due
     }
   }
@@ -2003,6 +2014,126 @@ public enum Pages {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct BoardViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct BoardViewOutputBoardColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct BoardViewOutputBoard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [BoardViewOutputBoardColumnsItem]?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [BoardViewOutputBoardColumnsItem]? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.archived = archived
+    }
+  }
+
+  public struct BoardViewOutputTasksItemSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public struct BoardViewOutputTasksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: String?
+    public var labels: [String]?
+    public var subtasks: BoardViewOutputTasksItemSubtasks?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, statusLabel: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: String? = nil, labels: [String]? = nil, subtasks: BoardViewOutputTasksItemSubtasks? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.statusLabel = statusLabel
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.subtasks = subtasks
+      self.archived = archived
+    }
+  }
+
+  public struct BoardViewOutput: Sendable, Hashable, Codable {
+    public var board: BoardViewOutputBoard?
+    public var tasks: [BoardViewOutputTasksItem]?
+
+    public init(board: BoardViewOutputBoard? = nil, tasks: [BoardViewOutputTasksItem]? = nil) {
+      self.board = board
+      self.tasks = tasks
+    }
+  }
+
+  public struct BoardRenameInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+
+    public init(id: String? = nil, title: String? = nil) {
+      self.id = id
+      self.title = title
+    }
+  }
+
+  public struct BoardRenameOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BoardTaskCreateInput: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var title: String?
+    public var status: String?
+
+    public init(boardId: String? = nil, title: String? = nil, status: String? = nil) {
+      self.boardId = boardId
+      self.title = title
+      self.status = status
+    }
+  }
+
+  public struct BoardTaskCreateOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+
+    public init(taskId: String? = nil) {
+      self.taskId = taskId
     }
   }
 

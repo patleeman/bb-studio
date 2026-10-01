@@ -3,14 +3,15 @@ export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention } from "@bb-studio/kit/server";
 import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { pageCheckboxes, setPageCheckbox } from "@bb-studio/kit/page-checkbox";
-// Studio Tasks (plugin id `studio-tasks`): a board of tasks you can hand to agents.
+// Studio Tasks (plugin id `studio-tasks`): boards of tasks you can hand to agents.
 //
-// Backend entry. Tasks live in the plugin's SQLite database
-// (src/server/store.ts). Handing a task off spawns a thread with the task as
+// Backend entry. Boards and their tasks live in the plugin's SQLite database
+// (src/server/store.ts). Each project has a main board, where tasks go when
+// no board is named. Handing a task off spawns a thread with the task as
 // its first message (src/server/prompt.ts); BB's thread events then move the
 // handoff and its task between In progress and Review
 // (src/server/handoff.ts). With BB Studio installed, tasks list in Studio's
-// collection (src/server/studio.ts).
+// collection (src/server/studio.ts), boards as well as tasks.
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { createChangeBus } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
@@ -18,8 +19,8 @@ import { z } from "zod";
 import { mentionContext } from "./lib/mention";
 import { firstLine, nextHandoff, type ThreadSignal } from "./src/server/handoff";
 import { handoffInput } from "./src/server/prompt";
-import { assigneeLabel, registerStudio } from "./src/server/studio";
-import { MIGRATIONS, TaskStore, type HandoffRow, type LinkRow, type TaskRow, type Writer } from "./src/server/store";
+import { assigneeLabel, boardSummary, registerStudio } from "./src/server/studio";
+import { MIGRATIONS, TaskStore, type BoardRow, type HandoffRow, type LinkRow, type TaskRow, type Writer } from "./src/server/store";
 import { studioServices } from "@bb-studio/kit/server";
 import {
   HANDOFF_LABELS,
@@ -29,7 +30,10 @@ import {
   PRIORITIES,
   RECURRENCES,
   TASK_UPDATE_TYPE,
+  boardHref,
+  columnId,
   formatDue,
+  isBoardId,
   isDay,
   isOpenHandoff,
   isStatus,
@@ -42,6 +46,7 @@ import {
 const LINKABLE_PLUGINS = ["pages", "talk", "excalidraw", "artifacts"];
 
 const idSchema = z.string().min(1).max(100);
+const boardIdSchema = z.string().refine(isBoardId, "Use a board id, like brd_….");
 const threadIdSchema = z.string().min(1).max(200);
 const projectIdSchema = z.string().min(1).max(200);
 const statusSchema = z.string().min(1).max(60).regex(/^[a-z][a-z0-9_-]*$/);
@@ -74,6 +79,7 @@ const taskSchema = z.object({
   status: statusSchema,
   /** The status's column name on the task's board. */
   statusLabel: z.string(),
+  boardId: z.string(),
   projectId: z.string().nullable(),
   due: z.string().nullable(),
   assignee: assigneeSchema,
@@ -105,17 +111,41 @@ const linkSchema = z.object({
 
 const linkableSchema = linkSchema.extend({ kind: z.string(), icon: z.string().nullable() });
 
+const columnSchema = z.object({ id: statusSchema, label: z.string() });
+const columnsInput = z.array(z.object({ id: statusSchema, label: z.string().trim().min(1).max(60) })).min(2).max(12);
+
+const boardSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  projectId: z.string().nullable(),
+  columns: z.array(columnSchema),
+  open: z.number(),
+  done: z.number(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  archived: z.boolean(),
+  template: z.boolean(),
+});
+
 export const rpcContract = defineRpcContract({
-  board: {
+  boards: {
     input: z.object({ includeArchived: z.boolean().optional() }),
-    output: z.object({ tasks: z.array(taskSchema) }),
+    output: z.object({ boards: z.array(boardSchema) }),
   },
-  /** A project's columns (null: the defaults), and whether the project has its own. */
-  statuses: { input: z.object({ projectId: projectIdSchema.nullable() }), output: z.object({ columns: z.array(z.object({ id: statusSchema, label: z.string() })), own: z.boolean() }) },
-  /** Sets a project's columns, or with a null project the defaults. */
-  setStatuses: { input: z.object({ projectId: projectIdSchema.nullable(), columns: z.array(z.object({ id: statusSchema, label: z.string().trim().min(1).max(60) })).min(2).max(12) }), output: z.object({ ok: z.boolean() }) },
-  /** Puts a project back on the default columns. */
-  resetStatuses: { input: z.object({ projectId: projectIdSchema }), output: z.object({ ok: z.boolean() }) },
+  /** One board and its tasks, or without `boardId` every task. */
+  board: {
+    input: z.object({ boardId: idSchema.optional(), includeArchived: z.boolean().optional() }),
+    output: z.object({ board: boardSchema.nullable(), tasks: z.array(taskSchema) }),
+  },
+  boardCreate: { input: z.object({ title: z.string().trim().max(200), projectId: projectIdSchema.nullable() }), output: z.object({ board: boardSchema }) },
+  /** Renames a board, or moves it and its tasks to another project. */
+  boardUpdate: { input: z.object({ id: idSchema, title: z.string().trim().max(200).optional(), projectId: projectIdSchema.nullable().optional() }), output: z.object({ ok: z.boolean() }) },
+  boardArchive: { input: z.object({ id: idSchema, archived: z.boolean() }), output: z.object({ ok: z.boolean() }) },
+  /** Deletes a board and its tasks. */
+  boardDelete: { input: z.object({ id: idSchema }), output: z.object({ ok: z.boolean() }) },
+  /** A board's columns. Given a project instead, its main board's (or the defaults, when it has none). */
+  statuses: { input: z.object({ boardId: idSchema.optional(), projectId: projectIdSchema.nullable().optional() }), output: z.object({ columns: z.array(columnSchema) }) },
+  setStatuses: { input: z.object({ boardId: idSchema, columns: columnsInput }), output: z.object({ ok: z.boolean() }) },
   get: {
     input: z.object({ id: idSchema }),
     output: z.object({ task: taskSchema.nullable(), links: z.array(linkSchema), handoffs: z.array(handoffSchema) }),
@@ -125,6 +155,8 @@ export const rpcContract = defineRpcContract({
       title: z.string().trim().max(300),
       description: z.string().max(20_000).optional(),
       status: statusSchema.optional(),
+      /** Without one, the project's main board. */
+      boardId: idSchema.optional(),
       projectId: projectIdSchema.nullable().optional(),
       due: daySchema.optional(),
       assignee: assigneeSchema.optional(),
@@ -137,6 +169,8 @@ export const rpcContract = defineRpcContract({
       id: idSchema,
       title: z.string().trim().max(300).optional(),
       description: z.string().max(20_000).optional(),
+      /** Puts the task, and its subtasks, on another board. */
+      boardId: idSchema.optional(),
       projectId: projectIdSchema.nullable().optional(),
       due: daySchema.optional(),
       assignee: assigneeSchema.optional(),
@@ -210,6 +244,7 @@ export const rpcContract = defineRpcContract({
 });
 
 type TaskDto = z.infer<typeof taskSchema>;
+type BoardDto = z.infer<typeof boardSchema>;
 
 function toHandoffDto(handoff: HandoffRow) {
   return {
@@ -235,6 +270,9 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new TaskStore(db);
+  // Tasks from before boards go on their project's main board.
+  const adopted = store.adoptLooseTasks();
+  if (adopted.length) bb.log.info(`put existing tasks on ${adopted.length} new board(s)`);
 
   const settings = bb.settings.define({
     archiveThreadsOnDone: {
@@ -260,7 +298,6 @@ export default async function plugin(bb: BbPluginApi) {
   }
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: TASK_UPDATE_TYPE, taskId: id }) });
 
-  /** Tells open boards, task views and Studio that a task changed. */
   /** Runs a column change, then announces the tasks it moved to another column. */
   function remapping(change: () => void) {
     const before = new Map(store.list({ includeArchived: true }).map((task) => [task.id, task.status]));
@@ -268,10 +305,20 @@ export default async function plugin(bb: BbPluginApi) {
     for (const task of store.list({ includeArchived: true })) if (before.get(task.id) !== task.status) changed(task.id);
   }
 
+  /** Tells open boards, task views and Studio that a task or a board changed. A task's board changes with it. */
   function changed(id: string) {
     changeBus.changed(id);
+    if (isBoardId(id)) {
+      const board = store.getBoard(id);
+      if (board) void services.recordActivity({
+        ref: { pluginId: PLUGIN_ID, id }, actor: { kind: board.updated_by === "agent" ? "agent" : "user" },
+        verb: board.created_at === board.updated_at ? "created" : "updated", at: board.updated_at, summary: board.title || "Untitled board",
+      }).catch(() => { /* The hub is optional. */ });
+      return;
+    }
     void syncLinks(id);
     const task = store.get(id);
+    if (task) changeBus.changed(task.board_id);
     if (task) {
       void services.versionCreate({
         ref: { pluginId: PLUGIN_ID, id }, bytes: Buffer.from(JSON.stringify(task)).toString("base64"),
@@ -290,6 +337,33 @@ export default async function plugin(bb: BbPluginApi) {
     return task;
   }
 
+  function mustGetBoard(id: string): BoardRow {
+    const board = store.getBoard(id);
+    if (!board) throw new Error(`Board ${id} not found.`);
+    return board;
+  }
+
+  function toBoardDto(board: BoardRow): BoardDto {
+    const counts = store.boardCounts(board.id);
+    return {
+      id: board.id,
+      title: board.title,
+      projectId: board.project_id,
+      columns: store.statuses(board.id),
+      open: counts.open,
+      done: counts.done,
+      createdAt: board.created_at,
+      updatedAt: board.updated_at,
+      archived: board.archived_at !== null,
+      template: Boolean(board.template),
+    };
+  }
+
+  /** Whether a board has a column; agents and the CLI can't use one that isn't there. */
+  function hasColumn(boardId: string, status: string): boolean {
+    return store.statuses(boardId).some((column) => column.id === status);
+  }
+
   function toDto(task: TaskRow): TaskDto {
     const handoffs = store.handoffs(task.id);
     return {
@@ -298,6 +372,7 @@ export default async function plugin(bb: BbPluginApi) {
       description: task.description,
       status: task.status,
       statusLabel: store.statusLabel(task),
+      boardId: task.board_id,
       projectId: task.project_id,
       due: task.due,
       assignee: task.assignee,
@@ -455,7 +530,7 @@ export default async function plugin(bb: BbPluginApi) {
     const recorded = store.handoff(thread.id);
     if (recorded) void catchUp(recorded, true);
     store.link(task.id, { target: "thread", plugin_id: null, item_id: thread.id, label: thread.title ?? (task.title || "Thread"), href: `/threads/${thread.id}` });
-    if (task.status !== "in_progress") store.move(task.id, "in_progress", input.by);
+    if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(task.id, "in_progress", input.by);
     store.update(task.id, { assignee: "agent" }, input.by);
     changed(task.id);
     return { threadId: thread.id };
@@ -481,7 +556,7 @@ export default async function plugin(bb: BbPluginApi) {
   /** Moves a task, and archives its threads when it's done and the setting is on. */
   async function move(id: string, status: TaskStatus, by: Writer, index?: number): Promise<{ archivedThreads: number }> {
     const before = mustGet(id);
-    if (!store.statuses(before.project_id).some((column) => column.id === status)) throw new Error("Unknown status for this project.");
+    if (!hasColumn(before.board_id, status)) throw new Error("This board has no such column.");
     store.move(id, status, by, index);
     changed(id);
     if (status === "done" || before.status === "done") {
@@ -512,15 +587,25 @@ export default async function plugin(bb: BbPluginApi) {
     return handoff ? store.get(handoff.task_id) : null;
   }
 
-  /** Board order: by the task's column on its board, then its place in the column. */
+  /** Board order: by board, then the task's column on it, then its place in the column. */
   function byColumn(a: TaskRow, b: TaskRow): number {
-    const at = (task: TaskRow) => store.statuses(task.project_id).findIndex((column) => column.id === task.status);
-    return at(a) - at(b) || a.rank - b.rank;
+    const at = (task: TaskRow) => store.statuses(task.board_id).findIndex((column) => column.id === task.status);
+    return a.board_id.localeCompare(b.board_id) || at(a) - at(b) || a.rank - b.rank;
+  }
+
+  function boardName(id: string): string {
+    return untitled(store.getBoard(id)?.title ?? "");
+  }
+
+  function boardLine(board: BoardRow): string {
+    const counts = store.boardCounts(board.id);
+    const summary = boardSummary(store.statuses(board.id), counts.byStatus);
+    return `${untitled(board.title)} (id ${board.id}${board.project_id ? `, project ${board.project_id}` : ", no project"}): ${summary || "no tasks"}. Columns: ${store.statuses(board.id).map((column) => `${column.label} (${column.id})`).join(", ")}. Link ${boardHref(board.id)}`;
   }
 
   function taskLine(task: TaskRow): string {
     const handoff = store.latestHandoff(task.id);
-    const parts = [store.statusLabel(task), assigneeLabel(task), `priority ${task.priority}`];
+    const parts = [`on ${boardName(task.board_id)}`, store.statusLabel(task), assigneeLabel(task), `priority ${task.priority}`];
     if (task.due) parts.push(`due ${formatDue(task.due)} (${task.due})`);
     if (task.recurrence) parts.push(`repeats ${task.recurrence}`);
     if (JSON.parse(task.labels).length) parts.push(`labels ${(JSON.parse(task.labels) as string[]).join(", ")}`);
@@ -551,24 +636,60 @@ export default async function plugin(bb: BbPluginApi) {
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
-    board({ includeArchived }) {
-      return { tasks: store.list({ includeArchived }).map(toDto) };
+    boards({ includeArchived }) {
+      return { boards: store.boards({ includeArchived }).map(toBoardDto) };
     },
-    statuses({ projectId }) { return { columns: store.statuses(projectId), own: projectId ? store.hasOwnStatuses(projectId) : false }; },
-    setStatuses({ projectId, columns }) { remapping(() => store.setStatuses(projectId, columns)); return { ok: true }; },
-    resetStatuses({ projectId }) { remapping(() => store.resetStatuses(projectId)); return { ok: true }; },
+    board({ boardId, includeArchived }) {
+      const board = boardId ? store.getBoard(boardId) : null;
+      if (boardId && !board) return { board: null, tasks: [] };
+      return { board: board ? toBoardDto(board) : null, tasks: store.list({ includeArchived, boardId }).map(toDto) };
+    },
+    boardCreate({ title, projectId }) {
+      const board = store.createBoard({ title, projectId, by: "user" });
+      changed(board.id);
+      return { board: toBoardDto(board) };
+    },
+    boardUpdate({ id, title, projectId }) {
+      const before = mustGetBoard(id);
+      store.updateBoard(id, { title, projectId }, "user");
+      changed(id);
+      if (projectId !== undefined && projectId !== before.project_id) for (const task of store.list({ boardId: id, includeArchived: true })) changed(task.id);
+      return { ok: true };
+    },
+    boardArchive({ id, archived }) {
+      store.setBoardArchived(id, archived);
+      changed(id);
+      return { ok: true };
+    },
+    boardDelete({ id }) {
+      mustGetBoard(id);
+      for (const task of store.deleteBoard(id)) changeBus.changed(task);
+      changeBus.changed(id);
+      return { ok: true };
+    },
+    statuses({ boardId, projectId }) {
+      if (boardId) return { columns: store.statuses(boardId) };
+      return { columns: store.statuses(store.findMainBoard(projectId ?? null)?.id ?? null) };
+    },
+    setStatuses({ boardId, columns }) { remapping(() => store.setStatuses(boardId, columns)); changed(boardId); return { ok: true }; },
     get({ id }) {
       const task = store.get(id);
       if (!task) return { task: null, links: [], handoffs: [] };
       return { task: toDto(task), links: store.links(id).map(toLinkDto), handoffs: store.handoffs(id).map(toHandoffDto) };
     },
-    create({ title, description, status, projectId, due, assignee, ...fields }) {
-      if (status && !store.statuses(projectId ?? null).some((column) => column.id === status)) throw new Error("Unknown status for this project.");
-      const task = store.create({ title, description, status, projectId, due, assignee: assignee as TaskRow["assignee"], ...fields, by: "user" });
+    create({ title, description, status, boardId, projectId, due, assignee, ...fields }) {
+      const board = boardId ? mustGetBoard(boardId) : store.mainBoard(projectId ?? null);
+      if (status && !hasColumn(board.id, status)) throw new Error("This board has no such column.");
+      const task = store.create({ title, description, status, boardId: board.id, projectId, due, assignee: assignee as TaskRow["assignee"], ...fields, by: "user" });
       changed(task.id);
       return { task: toDto(task) };
     },
-    update({ id, ...patch }) {
+    update({ id, boardId, ...patch }) {
+      const before = mustGet(id);
+      if (boardId && boardId !== before.board_id) {
+        for (const moved of store.moveToBoard(id, boardId, "user")) changed(moved);
+        changed(before.board_id);
+      }
       store.update(id, { ...patch, assignee: patch.assignee as TaskRow["assignee"] }, "user");
       changed(id);
       return { ok: true };
@@ -583,7 +704,11 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     delete({ id }) {
-      if (store.delete(id)) changed(id);
+      const task = store.get(id);
+      if (store.delete(id)) {
+        changeBus.changed(id);
+        if (task) changed(task.board_id);
+      }
       return { ok: true };
     },
     link({ id, link }) {
@@ -674,14 +799,14 @@ export default async function plugin(bb: BbPluginApi) {
         input: { id: room.id, text, attachmentIds: [], replyTo: null, requestId: crypto.randomUUID() } as never,
         outputSchema: z.object({ id: z.string() }) });
       store.link(id, { target: "item", plugin_id: "bot-teams", item_id: room.id, label: `Bot channel: ${task.title || "Task"}`, href: `/plugins/bot-teams/channels/${room.id}` });
-      if (task.status !== "in_progress" && store.statuses(task.project_id).some((column) => column.id === "in_progress")) store.move(id, "in_progress", "user");
+      if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);
       return { roomId: room.id };
     },
     async syncCheckbox({ id, checked }) {
       const task = store.get(id);
       if (!task) return { ok: false };
-      if ((task.status === "done") !== checked) await move(id, checked ? "done" : "todo", "user");
+      if ((task.status === "done") !== checked) await move(id, checked ? "done" : store.statuses(task.board_id).find((column) => column.id !== "done")!.id, "user");
       return { ok: true };
     },
     async sendBack({ id, message }) {
@@ -689,7 +814,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!handoff || !isOpenHandoff(handoff.state)) throw new Error("This task has no thread to send to. Hand it off again.");
       await bb.sdk.threads.send({ threadId: handoff.thread_id, input: [{ type: "text", text: message, mentions: [] }], mode: "auto" });
       const task = mustGet(id);
-      if (task.status !== "in_progress") store.move(id, "in_progress", "user");
+      if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);
       return { threadId: handoff.thread_id };
     },
@@ -719,14 +844,52 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.agents.registerTool({
+    name: "tasks_boards",
+    description:
+      "List the user's Studio Tasks boards: id, title, project, columns, and how many tasks are in each column. " +
+      "Each project has a main board, where tasks go when you don't name one.",
+    parameters: z.object({ query: z.string().max(200).optional() }),
+    execute({ query }) {
+      const needle = query?.trim().toLowerCase();
+      const rows = store.boards().filter((board) => !needle || board.title.toLowerCase().includes(needle));
+      return rows.length ? rows.map((board) => `- ${boardLine(board)}`).join("\n") : "No boards match.";
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "tasks_board_create",
+    description:
+      "Make a Studio Tasks board, in this thread's project unless you pass `global`. Use it when the user asks for a separate board, " +
+      "e.g. for a launch or a sprint. Columns default to To do, In progress, Review and Done; Done is always last.",
+    parameters: z.object({
+      title: z.string().trim().min(1).max(200),
+      global: z.boolean().optional().describe("Make it outside any project."),
+      columns: z.array(z.string().trim().min(1).max(60)).min(1).max(11).optional().describe("Column names before Done, e.g. [\"Backlog\", \"Doing\"]."),
+    }),
+    execute({ title, global, columns }, context) {
+      let statuses: { id: string; label: string }[] | undefined;
+      if (columns) {
+        statuses = [{ id: "done", label: "Done" }];
+        for (const label of columns.filter((each) => each.toLowerCase() !== "done")) statuses.splice(-1, 0, { id: columnId(label, statuses), label });
+        if (statuses.length < 2) return { content: [{ type: "text", text: "Name at least one column before Done." }], isError: true };
+      }
+      const board = store.createBoard({ title, projectId: global ? null : (context.projectId ?? null), columns: statuses, by: "agent" });
+      changed(board.id);
+      return `Made ${boardLine(board)}\n\nTo show it in a page, embed it with kind "board" and target "${board.id}".`;
+    },
+  });
+
+  bb.agents.registerTool({
     name: "tasks_list",
     description:
-      "List tasks on the user's Studio Tasks board: id, title, status (To do, In progress, Review, Done), assignee, due date, and the handed-off thread's state.",
-    parameters: z.object({ status: statusSchema.optional(), query: z.string().max(200).optional() }),
-    execute({ status, query }) {
+      "List tasks on the user's Studio Tasks boards: id, title, board, status, assignee, due date, and the handed-off thread's state. " +
+      "Pass `boardId` for one board (see tasks_boards).",
+    parameters: z.object({ boardId: boardIdSchema.optional(), status: statusSchema.optional(), query: z.string().max(200).optional() }),
+    execute({ boardId, status, query }) {
+      if (boardId && !store.getBoard(boardId)) return { content: [{ type: "text", text: `Board ${boardId} not found.` }], isError: true };
       const needle = query?.trim().toLowerCase();
       const rows = store
-        .list()
+        .list({ boardId })
         .filter((task) => !status || task.status === status)
         .filter((task) => !needle || `${task.title} ${task.description}`.toLowerCase().includes(needle))
         .sort(byColumn)
@@ -749,10 +912,12 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "tasks_create",
     description:
-      "Add a task to the user's Studio Tasks board, in To do unless you pass a status. Use it when the user asks you to track something, " +
+      "Add a task to a Studio Tasks board: the one you name with `boardId`, else this project's main board. It goes in the first column " +
+      "unless you pass a status. Use it when the user asks you to track something, " +
       "not for your own step-by-step plan. The result includes a line to put in your reply so the task shows as a card.",
     parameters: z.object({
       title: z.string().trim().min(1).max(300),
+      boardId: boardIdSchema.optional(),
       description: z.string().max(20_000).optional(),
       status: statusSchema.optional(),
       due: z.string().optional().describe("A day, like 2026-10-01."),
@@ -760,11 +925,13 @@ export default async function plugin(bb: BbPluginApi) {
       priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.optional(),
       recurrence: z.enum(RECURRENCES).optional(), reminderAt: z.number().int().nonnegative().optional(),
     }),
-    execute({ title, description, status, due: rawDue, assignee, priority, labels, parentId, recurrence, reminderAt }, context) {
+    execute({ title, boardId, description, status, due: rawDue, assignee, priority, labels, parentId, recurrence, reminderAt }, context) {
       const due = rawDue?.trim() || undefined;
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
-      if (status && (status === "done" || !store.statuses(context.projectId ?? null).some((column) => column.id === status))) return { content: [{ type: "text", text: "Use an active project status other than Done." }], isError: true };
-      const task = store.create({ title, description, status, due: due ?? null, assignee: assignee ?? null, priority, labels, parentId, recurrence, reminderAt, projectId: context.projectId ?? null, by: "agent" });
+      if (boardId && !store.getBoard(boardId)) return { content: [{ type: "text", text: `Board ${boardId} not found. List boards with tasks_boards.` }], isError: true };
+      const board = boardId ? store.getBoard(boardId)! : store.mainBoard(context.projectId ?? null, "agent");
+      if (status && (status === "done" || !hasColumn(board.id, status))) return { content: [{ type: "text", text: `Use one of the board's columns other than Done: ${store.statuses(board.id).filter((column) => column.id !== "done").map((column) => column.id).join(", ")}.` }], isError: true };
+      const task = store.create({ title, description, status, boardId: board.id, due: due ?? null, assignee: assignee ?? null, priority, labels, parentId, recurrence, reminderAt, ...(boardId ? {} : { projectId: context.projectId ?? null }), by: "agent" });
       changed(task.id);
       return `Added ${taskLine(task)}\n\nTo show it in your reply, put this on its own line:\n${directive(task.id)}`;
     },
@@ -775,9 +942,10 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Update a task. Without an id, updates the task this thread was handed. When the work is ready for the user to review, " +
       'set status "review" with a one-line `note` saying what you did. Link what you made for it with `addLinks` ' +
-      "(Studio items, e.g. an artifact's id with pluginId \"artifacts\"). Only the user marks a task done.",
+      "(Studio items, e.g. an artifact's id with pluginId \"artifacts\"). Move it to another board with `boardId`. Only the user marks a task done.",
     parameters: z.object({
       id: idSchema.optional(),
+      boardId: boardIdSchema.optional(),
       status: statusSchema.optional(),
       note: z.string().max(2000).optional(),
       title: z.string().trim().min(1).max(300).optional(),
@@ -788,13 +956,19 @@ export default async function plugin(bb: BbPluginApi) {
       assignee: assigneeSchema.optional(),
       addLinks: z.array(linkInput).max(20).optional(),
     }),
-    async execute({ id, status, note, title, description, due: rawDue, priority, labels, parentId, recurrence, reminderAt, assignee, addLinks }, context) {
+    async execute({ id, boardId, status, note, title, description, due: rawDue, priority, labels, parentId, recurrence, reminderAt, assignee, addLinks }, context) {
       // An empty day clears the due date.
       const due = rawDue === undefined ? undefined : rawDue?.trim() || null;
       const task = id ? store.get(id) : threadTask(context.threadId);
       if (!task) return { content: [{ type: "text", text: id ? `Task ${id} not found.` : "This thread isn't working on a task. Pass an id." }], isError: true };
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
-      if (status && (status === "done" || !store.statuses(task.project_id).some((column) => column.id === status))) return { content: [{ type: "text", text: "Use an active project status other than Done." }], isError: true };
+      if (boardId && !store.getBoard(boardId)) return { content: [{ type: "text", text: `Board ${boardId} not found. List boards with tasks_boards.` }], isError: true };
+      const targetBoard = boardId ?? task.board_id;
+      if (status && (status === "done" || !hasColumn(targetBoard, status))) return { content: [{ type: "text", text: `Use one of the board's columns other than Done: ${store.statuses(targetBoard).filter((column) => column.id !== "done").map((column) => column.id).join(", ")}.` }], isError: true };
+      if (boardId && boardId !== task.board_id) {
+        for (const moved of store.moveToBoard(task.id, boardId, "agent")) changed(moved);
+        changed(task.board_id);
+      }
       if (title !== undefined || description !== undefined || due !== undefined || priority !== undefined || labels !== undefined || parentId !== undefined || recurrence !== undefined || reminderAt !== undefined || assignee !== undefined) store.update(task.id, { title, description, due, priority, labels, parentId, recurrence, reminderAt, assignee }, "agent");
       for (const link of addLinks ?? []) {
         store.link(task.id, { target: "item", plugin_id: link.pluginId, item_id: link.itemId, label: link.label, href: studioHref(link.pluginId, link.itemId) });
@@ -809,7 +983,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 
-  bb.agents.configure(() => ({ tools: ["tasks_list", "tasks_get", "tasks_create", "tasks_update"], skills: [] }));
+  bb.agents.configure(() => ({ tools: ["tasks_boards", "tasks_board_create", "tasks_list", "tasks_get", "tasks_create", "tasks_update"], skills: [] }));
 
   // `@task` in any composer.
   bb.ui.registerMentionProvider(defineItemMention({
@@ -822,7 +996,7 @@ export default async function plugin(bb: BbPluginApi) {
         .filter((task) => task.status !== "done")
         .filter((task) => !needle || task.title.toLowerCase().includes(needle))
         .slice(0, 50)
-        .map((task) => ({ id: task.id, title: untitled(task.title), subtitle: `${store.statusLabel(task)} · ${assigneeLabel(task)}` }));
+        .map((task) => ({ id: task.id, title: untitled(task.title), subtitle: `${boardName(task.board_id)} · ${store.statusLabel(task)} · ${assigneeLabel(task)}` }));
     },
     resolve(itemId) {
       const task = mustGet(itemId);
@@ -851,8 +1025,10 @@ export default async function plugin(bb: BbPluginApi) {
 
   // CLI: `bb studio-tasks …`
   const usage = {
-    list: "bb studio-tasks list [--status todo|in_progress|review|done]",
-    add: "bb studio-tasks add <title> [--description <text>] [--due <YYYY-MM-DD>] [--priority <level>] [--labels <comma-separated>] [--repeat <frequency>] [--parent <task-id>] [--bot <id>|--me]",
+    boards: "bb studio-tasks boards",
+    board: "bb studio-tasks board <title> [--global]",
+    list: "bb studio-tasks list [--board <id>] [--status todo|in_progress|review|done]",
+    add: "bb studio-tasks add <title> [--board <id>] [--description <text>] [--due <YYYY-MM-DD>] [--priority <level>] [--labels <comma-separated>] [--repeat <frequency>] [--parent <task-id>] [--bot <id>|--me]",
     show: "bb studio-tasks show <id>",
     move: "bb studio-tasks move <id> <status>",
     hand: "bb studio-tasks hand <id> [--note <text>] [--folder]",
@@ -860,10 +1036,12 @@ export default async function plugin(bb: BbPluginApi) {
   };
   bb.cli.register({
     name: "studio-tasks",
-    summary: "Studio Tasks: a board of tasks you can hand to agents",
+    summary: "Studio Tasks: boards of tasks you can hand to agents",
     commands: [
+      { name: "boards", summary: "List boards", usage: usage.boards },
+      { name: "board", summary: "Make a board in this project", usage: usage.board },
       { name: "list", summary: "List tasks", usage: usage.list },
-      { name: "add", summary: "Add a task to To do", usage: usage.add },
+      { name: "add", summary: "Add a task to a board's first column", usage: usage.add },
       { name: "show", summary: "Show a task, its links and handoffs", usage: usage.show },
       { name: "move", summary: "Move a task to another column", usage: usage.move },
       { name: "hand", summary: "Hand a task to an agent in a new thread, with the project's default agent", usage: usage.hand },
@@ -871,20 +1049,34 @@ export default async function plugin(bb: BbPluginApi) {
     ],
     async run(argv, ctx) {
       const { command: cmd, rest } = subcommand(argv);
-      const flags = parseFlags(rest, ["me", "folder"]);
+      const flags = parseFlags(rest, ["me", "folder", "global"]);
       const fail = (message: string) => ({ exitCode: 1, stderr: `${message}\n` });
       try {
         switch (cmd) {
+          case "boards": {
+            const rows = store.boards();
+            if (!rows.length) return { exitCode: 0, stdout: "No boards.\n" };
+            return { exitCode: 0, stdout: `${rows.map((board) => { const counts = store.boardCounts(board.id); return [board.id, untitled(board.title), board.project_id ?? "", `${counts.open} open`, `${counts.done} done`].join("\t"); }).join("\n")}\n` };
+          }
+          case "board": {
+            const title = flags.positional.join(" ").trim();
+            if (!title) return fail(`usage: ${usage.board}`);
+            const board = store.createBoard({ title, projectId: flags.values.global !== undefined ? null : (ctx.projectId ?? null), by: "agent" });
+            changed(board.id);
+            return { exitCode: 0, stdout: `${board.id}\n` };
+          }
           case "list": {
             const status = flags.values.status;
+            const boardId = flags.values.board;
+            if (boardId !== undefined && !store.getBoard(boardId)) return fail(`Board ${boardId} not found.`);
             if (status !== undefined && !store.list().some((task) => task.status === status) && !isStatus(status)) return fail(`usage: ${usage.list}`);
-            const rows = store.list().filter((task) => !status || task.status === status);
+            const rows = store.list({ boardId }).filter((task) => !status || task.status === status);
             if (!rows.length) return { exitCode: 0, stdout: "No tasks.\n" };
             const lines = rows
               .sort(byColumn)
               .map((task) => {
                 const handoff = store.latestHandoff(task.id);
-                return [task.id, store.statusLabel(task), untitled(task.title), task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
+                return [task.id, boardName(task.board_id), store.statusLabel(task), untitled(task.title), task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
               });
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
@@ -897,8 +1089,11 @@ export default async function plugin(bb: BbPluginApi) {
             const recurrence = flags.values.repeat ?? null;
             if (!(PRIORITIES as readonly string[]).includes(priority)) return fail("Unknown priority.");
             if (recurrence && !(RECURRENCES as readonly string[]).includes(recurrence)) return fail("Unknown repeat frequency.");
+            const boardId = flags.values.board;
+            if (boardId !== undefined && !store.getBoard(boardId)) return fail(`Board ${boardId} not found.`);
             const task = store.create({
               title,
+              boardId,
               description: flags.values.description,
               due,
               priority: priority as TaskRow["priority"],
@@ -906,7 +1101,7 @@ export default async function plugin(bb: BbPluginApi) {
               parentId: flags.values.parent,
               recurrence: recurrence as TaskRow["recurrence"],
               assignee: flags.values.bot ? `bot:${flags.values.bot}` : flags.values.me !== undefined ? "me" : null,
-              projectId: ctx.projectId ?? null,
+              ...(boardId ? {} : { projectId: ctx.projectId ?? null }),
               by: "agent",
             });
             changed(task.id);
@@ -921,7 +1116,7 @@ export default async function plugin(bb: BbPluginApi) {
           case "done": {
             const [id, target] = flags.positional;
             const status = cmd === "done" ? "done" : target;
-            if (!id || !store.get(id) || !status || !store.statuses(store.get(id)!.project_id).some((column) => column.id === status)) return fail(`usage: ${usage[cmd]}`);
+            if (!id || !store.get(id) || !status || !hasColumn(store.get(id)!.board_id, status)) return fail(`usage: ${usage[cmd]}`);
             const { archivedThreads } = await move(id, status, "agent");
             return { exitCode: 0, stdout: `${id}\t${store.statusLabel(store.get(id)!)}${archivedThreads ? `\tarchived ${archivedThreads} thread(s)` : ""}\n` };
           }
@@ -932,7 +1127,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `${threadId}\n` };
           }
           default:
-            return fail("unknown command — try: list | add <title> | show <id> | move <id> <status> | hand <id> | done <id>");
+            return fail("unknown command — try: boards | board <title> | list | add <title> | show <id> | move <id> <status> | hand <id> | done <id>");
         }
       } catch (error) {
         return fail(errorMessage(error));

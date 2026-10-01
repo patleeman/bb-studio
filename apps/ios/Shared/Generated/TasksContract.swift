@@ -3,10 +3,14 @@ import Foundation
 
 public enum Tasks {
   public enum Method {
+    public static let boards = "boards"
     public static let board = "board"
+    public static let boardCreate = "boardCreate"
+    public static let boardUpdate = "boardUpdate"
+    public static let boardArchive = "boardArchive"
+    public static let boardDelete = "boardDelete"
     public static let statuses = "statuses"
     public static let setStatuses = "setStatuses"
-    public static let resetStatuses = "resetStatuses"
     public static let get = "get"
     public static let create = "create"
     public static let update = "update"
@@ -26,13 +30,21 @@ public enum Tasks {
     public static let settings = "settings"
   }
 
+  public typealias Boards = BoardsOutput
+
   public typealias Board = BoardOutput
+
+  public typealias BoardCreate = BoardCreateOutput
+
+  public typealias BoardUpdate = BoardUpdateOutput
+
+  public typealias BoardArchive = BoardArchiveOutput
+
+  public typealias BoardDelete = BoardDeleteOutput
 
   public typealias Statuses = StatusesOutput
 
   public typealias SetStatuses = SetStatusesOutput
-
-  public typealias ResetStatuses = ResetStatusesOutput
 
   public typealias Get = GetOutput
 
@@ -72,11 +84,101 @@ public enum Tasks {
 
   public typealias Settings = SettingsOutput
 
-  public struct BoardInput: Sendable, Hashable, Codable {
+  public struct BoardsInput: Sendable, Hashable, Codable {
     public var includeArchived: Bool?
 
     public init(includeArchived: Bool? = nil) {
       self.includeArchived = includeArchived
+    }
+  }
+
+  public struct BoardsOutputBoardsItemColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct BoardsOutputBoardsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [BoardsOutputBoardsItemColumnsItem]?
+    public var `open`: Double?
+    public var done: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [BoardsOutputBoardsItemColumnsItem]? = nil, `open`: Double? = nil, done: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.`open` = `open`
+      self.done = done
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct BoardsOutput: Sendable, Hashable, Codable {
+    public var boards: [BoardsOutputBoardsItem]?
+
+    public init(boards: [BoardsOutputBoardsItem]? = nil) {
+      self.boards = boards
+    }
+  }
+
+  public struct BoardInput: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var includeArchived: Bool?
+
+    public init(boardId: String? = nil, includeArchived: Bool? = nil) {
+      self.boardId = boardId
+      self.includeArchived = includeArchived
+    }
+  }
+
+  public struct BoardOutputBoardColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct BoardOutputBoard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [BoardOutputBoardColumnsItem]?
+    public var `open`: Double?
+    public var done: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [BoardOutputBoardColumnsItem]? = nil, `open`: Double? = nil, done: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.`open` = `open`
+      self.done = done
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.template = template
     }
   }
 
@@ -219,6 +321,7 @@ public enum Tasks {
     public var description: String?
     public var status: String?
     public var statusLabel: String?
+    public var boardId: String?
     public var projectId: String?
     public var due: String?
     public var assignee: String?
@@ -237,12 +340,13 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: BoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: BoardOutputTasksItemSubtasks? = nil, recurrence: BoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: BoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: BoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: BoardOutputTasksItemSubtasks? = nil, recurrence: BoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: BoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
       self.status = status
       self.statusLabel = statusLabel
+      self.boardId = boardId
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
@@ -264,17 +368,129 @@ public enum Tasks {
   }
 
   public struct BoardOutput: Sendable, Hashable, Codable {
+    public var board: BoardOutputBoard?
     public var tasks: [BoardOutputTasksItem]?
 
-    public init(tasks: [BoardOutputTasksItem]? = nil) {
+    public init(board: BoardOutputBoard? = nil, tasks: [BoardOutputTasksItem]? = nil) {
+      self.board = board
       self.tasks = tasks
     }
   }
 
-  public struct StatusesInput: Sendable, Hashable, Codable {
+  public struct BoardCreateInput: Sendable, Hashable, Codable {
+    public var title: String?
     public var projectId: String?
 
-    public init(projectId: String? = nil) {
+    public init(title: String? = nil, projectId: String? = nil) {
+      self.title = title
+      self.projectId = projectId
+    }
+  }
+
+  public struct BoardCreateOutputBoardColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct BoardCreateOutputBoard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [BoardCreateOutputBoardColumnsItem]?
+    public var `open`: Double?
+    public var done: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [BoardCreateOutputBoardColumnsItem]? = nil, `open`: Double? = nil, done: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.`open` = `open`
+      self.done = done
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct BoardCreateOutput: Sendable, Hashable, Codable {
+    public var board: BoardCreateOutputBoard?
+
+    public init(board: BoardCreateOutputBoard? = nil) {
+      self.board = board
+    }
+  }
+
+  public struct BoardUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+    }
+  }
+
+  public struct BoardUpdateOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BoardArchiveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.archived = archived
+    }
+  }
+
+  public struct BoardArchiveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct BoardDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct BoardDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct StatusesInput: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var projectId: String?
+
+    public init(boardId: String? = nil, projectId: String? = nil) {
+      self.boardId = boardId
       self.projectId = projectId
     }
   }
@@ -291,11 +507,9 @@ public enum Tasks {
 
   public struct StatusesOutput: Sendable, Hashable, Codable {
     public var columns: [StatusesOutputColumnsItem]?
-    public var own: Bool?
 
-    public init(columns: [StatusesOutputColumnsItem]? = nil, own: Bool? = nil) {
+    public init(columns: [StatusesOutputColumnsItem]? = nil) {
       self.columns = columns
-      self.own = own
     }
   }
 
@@ -310,32 +524,16 @@ public enum Tasks {
   }
 
   public struct SetStatusesInput: Sendable, Hashable, Codable {
-    public var projectId: String?
+    public var boardId: String?
     public var columns: [SetStatusesInputColumnsItem]?
 
-    public init(projectId: String? = nil, columns: [SetStatusesInputColumnsItem]? = nil) {
-      self.projectId = projectId
+    public init(boardId: String? = nil, columns: [SetStatusesInputColumnsItem]? = nil) {
+      self.boardId = boardId
       self.columns = columns
     }
   }
 
   public struct SetStatusesOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
-  public struct ResetStatusesInput: Sendable, Hashable, Codable {
-    public var projectId: String?
-
-    public init(projectId: String? = nil) {
-      self.projectId = projectId
-    }
-  }
-
-  public struct ResetStatusesOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {
@@ -490,6 +688,7 @@ public enum Tasks {
     public var description: String?
     public var status: String?
     public var statusLabel: String?
+    public var boardId: String?
     public var projectId: String?
     public var due: String?
     public var assignee: String?
@@ -508,12 +707,13 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: GetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: GetOutputTaskSubtasks? = nil, recurrence: GetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: GetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: GetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: GetOutputTaskSubtasks? = nil, recurrence: GetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: GetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
       self.status = status
       self.statusLabel = statusLabel
+      self.boardId = boardId
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
@@ -713,6 +913,7 @@ public enum Tasks {
     public var title: String?
     public var description: String?
     public var status: String?
+    public var boardId: String?
     public var projectId: String?
     public var due: String?
     public var assignee: String?
@@ -722,10 +923,11 @@ public enum Tasks {
     public var recurrence: CreateInputRecurrence?
     public var reminderAt: Int?
 
-    public init(title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: CreateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: CreateInputRecurrence? = nil, reminderAt: Int? = nil) {
+    public init(title: String? = nil, description: String? = nil, status: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: CreateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: CreateInputRecurrence? = nil, reminderAt: Int? = nil) {
       self.title = title
       self.description = description
       self.status = status
+      self.boardId = boardId
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
@@ -876,6 +1078,7 @@ public enum Tasks {
     public var description: String?
     public var status: String?
     public var statusLabel: String?
+    public var boardId: String?
     public var projectId: String?
     public var due: String?
     public var assignee: String?
@@ -894,12 +1097,13 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: CreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: CreateOutputTaskSubtasks? = nil, recurrence: CreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: CreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: CreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: CreateOutputTaskSubtasks? = nil, recurrence: CreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: CreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
       self.status = status
       self.statusLabel = statusLabel
+      self.boardId = boardId
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
@@ -995,6 +1199,7 @@ public enum Tasks {
     public var id: String?
     public var title: String?
     public var description: String?
+    public var boardId: String?
     public var projectId: String?
     public var due: String?
     public var assignee: String?
@@ -1004,10 +1209,11 @@ public enum Tasks {
     public var recurrence: UpdateInputRecurrence?
     public var reminderAt: Int?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: UpdateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: UpdateInputRecurrence? = nil, reminderAt: Int? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: UpdateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: UpdateInputRecurrence? = nil, reminderAt: Int? = nil) {
       self.id = id
       self.title = title
       self.description = description
+      self.boardId = boardId
       self.projectId = projectId
       self.due = due
       self.assignee = assignee

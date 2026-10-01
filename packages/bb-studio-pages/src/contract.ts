@@ -48,6 +48,16 @@ export type TaskCard = z.infer<typeof taskCardSchema>;
 export const taskColumnSchema = z.object({ id: z.string(), label: z.string() });
 export type TaskColumn = z.infer<typeof taskColumnSchema>;
 
+/** What a board embed shows: its columns, and its tasks in board order. */
+export const boardCardSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  projectId: z.string().nullable(),
+  columns: z.array(taskColumnSchema),
+  archived: z.boolean(),
+});
+export type BoardCard = z.infer<typeof boardCardSchema>;
+
 /** What a recording embed plays and shows. */
 export const recordingCardSchema = z.object({
   id: z.string(),
@@ -247,9 +257,22 @@ export const rpcContract = defineRpcContract({
       id: itemId,
       title: z.string().trim().min(1).max(300).optional(),
       status: z.string().min(1).max(60).optional(),
+      /** With a status: the task's place in that column. */
+      index: z.number().int().min(0).optional(),
       due: z.string().nullable().optional(),
     }),
     output: z.object({ ok: z.boolean() }),
+  },
+  /** A board embed's board and its tasks. */
+  boardView: {
+    input: z.object({ id: itemId }),
+    output: z.object({ board: boardCardSchema.nullable(), tasks: z.array(taskCardSchema) }),
+  },
+  boardRename: { input: z.object({ id: itemId, title: z.string().trim().max(200) }), output: z.object({ ok: z.boolean() }) },
+  /** A task added from a board embed, at the top of a column. */
+  boardTaskCreate: {
+    input: z.object({ boardId: itemId, title: z.string().trim().min(1).max(300), status: z.string().min(1).max(60).optional() }),
+    output: z.object({ taskId: z.string() }),
   },
   recordingView: {
     input: z.object({ id: itemId }),

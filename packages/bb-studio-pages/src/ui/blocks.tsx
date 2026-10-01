@@ -292,6 +292,7 @@ const EMBED_ICONS = {
   artifact: "File",
   recording: "Mic",
   task: "CircleCheck",
+  board: "GridView",
   table: "Rows2",
   item: "GridView",
 } as const;

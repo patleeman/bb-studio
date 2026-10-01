@@ -2,7 +2,7 @@
 import type { StudioTone } from "@bb-studio/kit/contract";
 
 export const PLUGIN_ID = "studio-tasks";
-/** The nav panel: /plugins/studio-tasks/tasks, and tasks/<id> for one task. */
+/** The nav panel: /plugins/studio-tasks/tasks lists boards; tasks/<id> is a board or a task. */
 export const PANEL_PATH = "tasks";
 export const TASK_ICON = "studio-tasks/task";
 export const BOARD_ICON = "studio-tasks/board";
@@ -81,6 +81,15 @@ export function taskHref(id: string): string {
   return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}`;
 }
 
+/** The ways a board shows its tasks; the board itself is the default. */
+export const BOARD_VIEWS = ["board", "list", "calendar"] as const;
+export type BoardView = (typeof BOARD_VIEWS)[number];
+
+/** A board, or one of its views: `tasks/<board id>/list`. */
+export function boardHref(id: string, view: BoardView = "board"): string {
+  return `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${id}${view === "board" ? "" : `/${view}`}`;
+}
+
 /** Where each Studio add-on shows an item, for links an agent adds by id. */
 const ITEM_PANELS: Record<string, string> = { pages: "pages", talk: "recordings", excalidraw: "drawings", artifacts: "artifacts" };
 
@@ -90,9 +99,24 @@ export function studioHref(pluginId: string, itemId: string): string | null {
 }
 
 const ID = /^tsk_[0-9a-z]{16}$/;
+const BOARD_ID = /^brd_[0-9a-z]{16}$/;
 
 export function isTaskId(value: string): boolean {
   return ID.test(value);
+}
+
+export function isBoardId(value: string): boolean {
+  return BOARD_ID.test(value);
+}
+
+/** A status id for a new column, from its name: unique, and the shape the server accepts. */
+export function columnId(label: string, columns: readonly { id: string }[]): string {
+  const slug = label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 50);
+  const base = /^[a-z]/.test(slug) ? slug : `column_${slug}`.replace(/_+$/, "");
+  const taken = new Set(columns.map((column) => column.id));
+  let id = base;
+  for (let n = 2; taken.has(id); n++) id = `${base}_${n}`;
+  return id;
 }
 
 /** A due date is a day, "2026-10-01". */

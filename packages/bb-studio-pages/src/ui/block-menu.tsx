@@ -32,7 +32,7 @@ const isEmptyParagraph = (block: Editor["document"][number] | undefined) =>
  * Puts an embed in place of an empty paragraph, or after any other block,
  * and leaves the cursor in a paragraph below it so writing can carry on.
  */
-export function placeEmbed(editor: Editor, blockId: string, props: { kind: "table" | "task" | "drawing" | "artifact" | "recording" | "item"; target: string }) {
+export function placeEmbed(editor: Editor, blockId: string, props: { kind: "table" | "task" | "board" | "drawing" | "artifact" | "recording" | "item"; target: string }) {
   const block = editor.getBlock(blockId);
   const embed = { type: "embed" as const, props };
   const placed = !block

@@ -1,5 +1,5 @@
-// The board: columns you drag tasks between (and edit in place), filtered by
-// project and assignee. Each card shows who acts next when an agent has the task.
+// One board: columns you drag tasks between (and edit in place), filtered by
+// assignee. Each card shows who acts next when an agent has the task.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
@@ -18,16 +18,15 @@ import {
   type Project,
 } from "@bb-studio/kit/app";
 import { errorMessage, plural, untitled } from "@bb-studio/kit/format";
-import { useBbContext } from "@get-bb/plugin-sdk/app";
-import { STATUSES, STATUS_LABELS, type TaskStatus } from "../src/shared";
+import { type TaskStatus } from "../src/shared";
+import { BoardHeader, BoardMissing } from "./boards";
 import { AddColumn, ColumnMenu, ColumnTitle, MAX_COLUMNS, columnId, withColumn, type BoardColumn } from "./columns";
 import { AssigneeChip, DueChip, HandoffBadge, STATUS_ICONS } from "./pieces";
-import { SPIN, useTasksRpc, type Task } from "./types";
+import { SPIN, useTasksRpc, type Board as BoardDto, type Task } from "./types";
 
 /** Done keeps growing; show the newest this many at a time. */
 const DONE_PAGE = 20;
 
-export type ProjectFilter = "all" | "global" | string;
 export type AssigneeFilter = "everyone" | "me" | "agent";
 
 export function useStored<T extends string>(key: string, initial: T): [T, (value: T) => void] {
@@ -52,11 +51,27 @@ export function useStored<T extends string>(key: string, initial: T): [T, (value
   return [value, set];
 }
 
-function matches(task: Task, project: ProjectFilter, assignee: AssigneeFilter): boolean {
-  if (project === "global" && task.projectId !== null) return false;
-  if (project !== "all" && project !== "global" && task.projectId !== project) return false;
-  if (assignee !== "everyone" && task.assignee !== assignee) return false;
-  return true;
+/** A board and its tasks, refetched when `refreshKey` changes. A deleted board comes back null with an error. */
+export function useBoard(boardId: string, refreshKey: unknown) {
+  const rpc = useTasksRpc();
+  const [board, setBoard] = useState<BoardDto | null>(null);
+  const [tasks, setTasks] = useState<Task[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
+  const latest = useRef(0);
+  const refetch = useCallback(() => {
+    const request = ++latest.current;
+    rpc.call("board", { boardId }).then(
+      (result) => {
+        if (request !== latest.current) return;
+        setBoard(result.board);
+        setTasks(result.tasks);
+        setError(result.board ? null : "This board was deleted.");
+      },
+      (failure) => request === latest.current && setError(errorMessage(failure)),
+    );
+  }, [rpc, boardId]);
+  useEffect(refetch, [refetch, refreshKey]);
+  return { board, tasks, setTasks, error, refetch };
 }
 
 /** Tasks in board order; Done shows the most recently finished first. */
@@ -65,66 +80,39 @@ function column(tasks: readonly Task[], status: TaskStatus): Task[] {
 }
 
 export function Board({
+  boardId,
   refreshKey,
   viewToggle,
   onOpen,
+  onBack,
 }: {
+  boardId: string;
   refreshKey: unknown;
   viewToggle: ReactNode;
   onOpen(id: string): void;
+  onBack(replace?: boolean): void;
 }) {
   const rpc = useTasksRpc();
-  const context = useBbContext();
   const projects = useProjects();
-  const [tasks, setTasks] = useState<Task[] | null>(null);
-  const [columns, setColumns] = useState<BoardColumn[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
-  /** Whether the filtered project has its own columns rather than the defaults. */
-  const [ownColumns, setOwnColumns] = useState(false);
+  const { board, tasks, setTasks, error, refetch } = useBoard(boardId, refreshKey);
+  /** Columns as last saved here, until the refetch brings the board's. */
+  const [pendingColumns, setPendingColumns] = useState<BoardColumn[] | null>(null);
+  const columns = pendingColumns ?? board?.columns ?? [];
   const [renaming, setRenaming] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [project, setProject] = useStored<ProjectFilter>("tasks:project", "all");
   const [assignee, setAssignee] = useStored<AssigneeFilter>("tasks:assignee", "everyone");
   const [adding, setAdding] = useState<TaskStatus | null>(null);
   const [doneShown, setDoneShown] = useState(DONE_PAGE);
-  const latest = useRef(0);
 
-  const refetch = useCallback(() => {
-    const request = ++latest.current;
-    rpc.call("board", {}).then(
-      (result) => {
-        if (request !== latest.current) return;
-        setTasks(result.tasks);
-        setError(null);
-      },
-      (failure) => request === latest.current && setError(errorMessage(failure)),
-    );
-  }, [rpc]);
-  useEffect(refetch, [refetch, refreshKey]);
+  const visible = useMemo(() => (tasks ?? []).filter((task) => assignee === "everyone" || task.assignee === assignee), [tasks, assignee]);
+  useEffect(() => setPendingColumns(null), [board]);
 
-  // A project filter for a project that's gone shows everything again.
-  const projectFilter: ProjectFilter =
-    project === "all" || project === "global" || !projects.length || projects.some((each) => each.id === project) ? project : "all";
-  const visible = useMemo(() => (tasks ?? []).filter((task) => matches(task, projectFilter, assignee)), [tasks, projectFilter, assignee]);
-  /** Whose columns the board shows and edits: the filtered project's, or the defaults. */
-  const columnsProject = projectFilter === "all" || projectFilter === "global" ? null : projectFilter;
-  const columnsScope = columnsProject ? `${projectName(projects, columnsProject)} columns${ownColumns ? "" : " (default)"}` : "Default columns";
-  const loadColumns = useCallback(() => {
-    void rpc.call("statuses", { projectId: columnsProject }).then(({ columns, own }) => {
-      setColumns(columns);
-      setOwnColumns(own);
-    });
-  }, [rpc, columnsProject]);
-  useEffect(loadColumns, [loadColumns, refreshKey]);
-
-  async function saveColumns(next: BoardColumn[], reset = false) {
-    setColumns(next);
+  async function saveColumns(next: BoardColumn[]) {
+    setPendingColumns(next);
     try {
-      if (reset && columnsProject) await rpc.call("resetStatuses", { projectId: columnsProject });
-      else await rpc.call("setStatuses", { projectId: columnsProject, columns: next });
+      await rpc.call("setStatuses", { boardId, columns: next });
     } catch (failure) {
       toast.error(`Couldn't change the columns: ${errorMessage(failure)}`);
     }
-    loadColumns();
     refetch();
   }
 
@@ -150,12 +138,9 @@ export function Board({
     void saveColumns(rest);
   }
 
-  /** Where new tasks go: the filtered project, else the one BB has open. */
-  const newProjectId = projectFilter === "global" ? null : projectFilter !== "all" ? projectFilter : (context.projectId ?? null);
-
   async function create(status: TaskStatus, title: string) {
     try {
-      await rpc.call("create", { title, status, projectId: newProjectId, assignee: assignee === "me" ? "me" : null });
+      await rpc.call("create", { title, status, boardId, assignee: assignee === "me" ? "me" : null });
       refetch();
     } catch (failure) {
       toast.error(`Couldn't add the task: ${errorMessage(failure)}`);
@@ -207,17 +192,17 @@ export function Board({
     });
   }
 
+  if (!board) return <BoardMissing error={error} onBack={() => onBack(true)} />;
+
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-      <div className="flex shrink-0 flex-wrap items-center gap-2 px-6 pt-10 pb-4 max-md:px-3 max-md:pt-4">
-        <h1 className="mr-auto text-2xl font-semibold tracking-tight">Tasks</h1>
-        <ProjectPicker projects={projects} value={projectFilter} onChange={setProject} />
+      <BoardHeader board={board} onBack={onBack} onChanged={refetch}>
         <AssigneePicker value={assignee} onChange={setAssignee} />
         {viewToggle}
-        <button type="button" className={OUTLINE_BUTTON} onClick={() => setAdding("todo")}>
+        <button type="button" className={OUTLINE_BUTTON} onClick={() => setAdding(columns.find((each) => each.id !== "done")?.id ?? null)}>
           <Icon name="Plus" /> New task
         </button>
-      </div>
+      </BoardHeader>
       {error && !tasks ? (
         <div role="alert" className="px-6 text-sm text-destructive">
           {error}
@@ -245,18 +230,15 @@ export function Board({
                     column={{ id: status, label }}
                     index={index}
                     total={columns.length}
-                    scope={columnsScope}
-                    own={ownColumns}
                     onRename={() => setRenaming(status)}
                     onMove={(offset) => moveColumn(index, offset)}
                     onDelete={() => deleteColumn(status)}
-                    onReset={() => void saveColumns(columns, true)}
                   />
                 }
                 count={cards.length}
                 tasks={shown}
                 projects={projects}
-                showProject={projectFilter === "all"}
+                boardProjectId={board.projectId}
                 adding={adding === status}
                 onAdd={() => setAdding(status)}
                 onAddDone={(title) => {
@@ -309,7 +291,7 @@ function Column({
   count,
   tasks,
   projects,
-  showProject,
+  boardProjectId,
   adding,
   onAdd,
   onAddDone,
@@ -327,7 +309,7 @@ function Column({
   count: number;
   tasks: Task[];
   projects: Project[];
-  showProject: boolean;
+  boardProjectId: string | null;
   adding: boolean;
   onAdd(): void;
   onAddDone(title: string | null): void;
@@ -399,7 +381,7 @@ function Column({
         {tasks.map((task, index) => (
           <div key={task.id} className="relative">
             {dropAt === index ? <DropLine /> : null}
-            <TaskCard task={task} columns={columns} projects={projects} showProject={showProject} onOpen={onOpen} onMove={onMove} onArchive={onArchive} />
+            <TaskCard task={task} columns={columns} projects={projects} boardProjectId={boardProjectId} onOpen={onOpen} onMove={onMove} onArchive={onArchive} />
           </div>
         ))}
         {dropAt !== null && dropAt >= tasks.length ? <DropLine last /> : null}
@@ -442,7 +424,7 @@ function TaskCard({
   task,
   columns,
   projects,
-  showProject,
+  boardProjectId,
   onOpen,
   onMove,
   onArchive,
@@ -450,7 +432,8 @@ function TaskCard({
   task: Task;
   columns: BoardColumn[];
   projects: Project[];
-  showProject: boolean;
+  /** Cards show a task's project only when it isn't the board's. */
+  boardProjectId: string | null;
   onOpen(id: string): void;
   onMove(task: Task, status: TaskStatus): void;
   onArchive(task: Task): void;
@@ -526,43 +509,14 @@ function TaskCard({
             {task.links}
           </span>
         ) : null}
-        {showProject && task.projectId ? (
+        {task.projectId !== boardProjectId ? (
           <span className="inline-flex min-w-0 items-center gap-1 truncate text-xs text-muted-foreground">
-            <Icon name="Folder" className="size-3.5 shrink-0" />
+            <Icon name={task.projectId ? "Folder" : "Globe"} className="size-3.5 shrink-0" />
             <span className="truncate">{projectName(projects, task.projectId)}</span>
           </span>
         ) : null}
       </div>
     </div>
-  );
-}
-
-function ProjectPicker({ projects, value, onChange }: { projects: Project[]; value: ProjectFilter; onChange(value: ProjectFilter): void }) {
-  const label = value === "all" ? "All projects" : value === "global" ? "Global" : projectName(projects, value);
-  return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" className={OUTLINE_BUTTON}>
-          <Icon name={value === "all" ? "GridView" : value === "global" ? "Globe" : "Folder"} /> {label}
-          <Icon name="ChevronDown" className="text-muted-foreground" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
-        {[{ id: "all", name: "All projects", icon: "GridView" }, { id: "global", name: "Global", icon: "Globe" }].map((each) => (
-          <DropdownMenuItem key={each.id} onSelect={() => onChange(each.id)}>
-            <Icon name={each.icon} className="size-4" /> {each.name}
-            {value === each.id ? <Icon name="Check" className="ml-auto size-4" /> : null}
-          </DropdownMenuItem>
-        ))}
-        {projects.length ? <DropdownMenuSeparator /> : null}
-        {projects.map((each) => (
-          <DropdownMenuItem key={each.id} onSelect={() => onChange(each.id)}>
-            <Icon name="Folder" className="size-4" /> <span className="truncate">{each.name}</span>
-            {value === each.id ? <Icon name="Check" className="ml-auto size-4" /> : null}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
   );
 }
 

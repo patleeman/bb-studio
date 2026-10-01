@@ -231,6 +231,9 @@ export default async function plugin(bb: BbPluginApi) {
     tableCreate: ({ pageId, ...input }) => embeds.createTable({ ...input, projectId: requireMeta(pageId).project_id }),
     taskView: ({ id }) => embeds.task(id),
     taskUpdate: (input) => embeds.updateTask(input),
+    boardView: ({ id }) => embeds.board(id),
+    boardRename: ({ id, title }) => embeds.renameBoard(id, title),
+    boardTaskCreate: ({ boardId, title, status }) => embeds.createBoardTask(boardId, title, status),
     recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
     markdown: ({ id }) => {
       requireMeta(id);

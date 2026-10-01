@@ -1,7 +1,7 @@
 {
   "pluginId": "studio-tasks",
   "methods": {
-    "board": {
+    "boards": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -15,6 +15,182 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "boards": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "columns": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 60,
+                        "pattern": "^[a-z][a-z0-9_-]*$"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "open": {
+                  "type": "number"
+                },
+                "done": {
+                  "type": "number"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "template": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "projectId",
+                "columns",
+                "open",
+                "done",
+                "createdAt",
+                "updatedAt",
+                "archived",
+                "template"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "boards"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "board": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "includeArchived": {
+            "type": "boolean"
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "board": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "columns": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string",
+                          "minLength": 1,
+                          "maxLength": 60,
+                          "pattern": "^[a-z][a-z0-9_-]*$"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "open": {
+                    "type": "number"
+                  },
+                  "done": {
+                    "type": "number"
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  },
+                  "template": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "projectId",
+                  "columns",
+                  "open",
+                  "done",
+                  "createdAt",
+                  "updatedAt",
+                  "archived",
+                  "template"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
           "tasks": {
             "type": "array",
             "items": {
@@ -36,6 +212,9 @@
                   "pattern": "^[a-z][a-z0-9_-]*$"
                 },
                 "statusLabel": {
+                  "type": "string"
+                },
+                "boardId": {
                   "type": "string"
                 },
                 "projectId": {
@@ -208,6 +387,7 @@
                 "description",
                 "status",
                 "statusLabel",
+                "boardId",
                 "projectId",
                 "due",
                 "assignee",
@@ -231,16 +411,21 @@
           }
         },
         "required": [
+          "board",
           "tasks"
         ],
         "additionalProperties": false
       }
     },
-    "statuses": {
+    "boardCreate": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
           "projectId": {
             "anyOf": [
               {
@@ -255,8 +440,221 @@
           }
         },
         "required": [
+          "title",
           "projectId"
         ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "board": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "columns": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60,
+                      "pattern": "^[a-z][a-z0-9_-]*$"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "open": {
+                "type": "number"
+              },
+              "done": {
+                "type": "number"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "template": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "projectId",
+              "columns",
+              "open",
+              "done",
+              "createdAt",
+              "updatedAt",
+              "archived",
+              "template"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "board"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "boardUpdate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "boardArchive": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "archived": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "archived"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "boardDelete": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "statuses": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        }
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -283,14 +681,10 @@
               ],
               "additionalProperties": false
             }
-          },
-          "own": {
-            "type": "boolean"
           }
         },
         "required": [
-          "columns",
-          "own"
+          "columns"
         ],
         "additionalProperties": false
       }
@@ -300,17 +694,10 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "projectId": {
-            "anyOf": [
-              {
-                "type": "string",
-                "minLength": 1,
-                "maxLength": 200
-              },
-              {
-                "type": "null"
-              }
-            ]
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "columns": {
             "minItems": 2,
@@ -339,37 +726,8 @@
           }
         },
         "required": [
-          "projectId",
+          "boardId",
           "columns"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean"
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "resetStatuses": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "projectId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        },
-        "required": [
-          "projectId"
         ]
       },
       "output": {
@@ -426,6 +784,9 @@
                     "pattern": "^[a-z][a-z0-9_-]*$"
                   },
                   "statusLabel": {
+                    "type": "string"
+                  },
+                  "boardId": {
                     "type": "string"
                   },
                   "projectId": {
@@ -598,6 +959,7 @@
                   "description",
                   "status",
                   "statusLabel",
+                  "boardId",
                   "projectId",
                   "due",
                   "assignee",
@@ -743,6 +1105,11 @@
             "maxLength": 60,
             "pattern": "^[a-z][a-z0-9_-]*$"
           },
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
           "projectId": {
             "anyOf": [
               {
@@ -854,6 +1221,9 @@
                 "pattern": "^[a-z][a-z0-9_-]*$"
               },
               "statusLabel": {
+                "type": "string"
+              },
+              "boardId": {
                 "type": "string"
               },
               "projectId": {
@@ -1026,6 +1396,7 @@
               "description",
               "status",
               "statusLabel",
+              "boardId",
               "projectId",
               "due",
               "assignee",
@@ -1070,6 +1441,11 @@
           "description": {
             "type": "string",
             "maxLength": 20000
+          },
+          "boardId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
           },
           "projectId": {
             "anyOf": [
