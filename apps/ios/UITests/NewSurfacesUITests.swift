@@ -4,14 +4,15 @@ final class NewSurfacesUITests: XCTestCase {
     private let projectId = "proj_8ztiq6dkh5"
 
     func testHomeAndCollection() throws {
-        guard rpc("studio", "home", ["projectId": NSNull()]) != nil else { throw XCTSkip("Updated Studio plugin is not installed") }
+        guard rpc("studio", "home", ["periodDays": 7]) != nil else { throw XCTSkip("Updated Studio plugin is not installed") }
         let app = launch()
         app.tabBars.buttons["Studio"].tap()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
         XCTAssertTrue(app.buttons["studioCollection"].waitForExistence(timeout: 10))
         shot(app, "home")
         app.buttons["studioCollection"].tap()
-        XCTAssertTrue(app.searchFields["Search Studio"].waitForExistence(timeout: 10))
+        shot(app, "collection")
+        XCTAssertTrue(studioSearch(app).exists)
     }
 
     func testSearch() throws {
@@ -21,11 +22,24 @@ final class NewSurfacesUITests: XCTestCase {
         let app = launch()
         app.tabBars.buttons["Studio"].tap()
         app.buttons["studioCollection"].tap()
-        let search = app.searchFields["Search Studio"]
-        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        let search = studioSearch(app)
+        XCTAssertTrue(search.exists)
         search.tap()
         search.typeText("QA iOS7")
         shot(app, "search")
+    }
+
+    /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
+    private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
+        let search = app.searchFields["Search Studio"]
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
+        if !search.waitForExistence(timeout: 3) {
+            let window = app.windows.firstMatch
+            window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.35))
+                .press(forDuration: 0.05, thenDragTo: window.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.6)))
+            _ = search.waitForExistence(timeout: 5)
+        }
+        return search
     }
 
     func testTaskFieldsAndRelated() throws {

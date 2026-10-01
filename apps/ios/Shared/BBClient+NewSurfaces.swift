@@ -2,14 +2,14 @@ import Foundation
 
 extension BBClient {
     public func studioHome(projectId: String? = nil) async throws -> Studio.HomeOutput {
-        try await rpc("studio", Studio.Method.home, ["projectId": projectId.map(JSONValue.string) ?? .null])
+        try await rpc("studio", Studio.Method.home, .object(omittingNil: ["projectId": projectId.map(JSONValue.string)]))
     }
 
     public func respondToStudioNeed(threadId: String, interactionId: String, action: String, answer: String? = nil) async throws {
-        let _: Studio.HomeRespondOutput = try await rpc("studio", Studio.Method.homeRespond, [
+        let _: Studio.HomeRespondOutput = try await rpc("studio", Studio.Method.homeRespond, .object(omittingNil: [
             "threadId": .string(threadId), "interactionId": .string(interactionId),
-            "action": .string(action), "answer": answer.map(JSONValue.string) ?? .null,
-        ])
+            "action": .string(action), "answer": answer.map(JSONValue.string),
+        ]))
     }
 
     public func studioSearchAll(_ query: String, projectId: String? = nil) async throws -> Studio.SearchAllOutput {
@@ -96,7 +96,7 @@ extension BBClient {
         let _: Studio.CommentCreateOutput = try await rpc("studio", Studio.Method.commentCreate, [
             "ref": ["pluginId": .string(pluginId), "id": .string(id)],
             "parentId": .string(parentId), "anchor": .null,
-            "actor": ["kind": .string("user"), "id": .null, "name": .null], "body": .string(body),
+            "actor": ["kind": .string("user")], "body": .string(body),
         ])
     }
 

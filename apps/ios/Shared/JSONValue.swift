@@ -75,4 +75,10 @@ extension JSONValue: ExpressibleByNilLiteral, ExpressibleByBooleanLiteral, Expre
 extension JSONValue {
     public static func from(_ string: String?) -> JSONValue { string.map(JSONValue.string) ?? .null }
     public static func from(_ int: Int) -> JSONValue { .number(Double(int)) }
+
+    /// An object without its nil fields. Use it for inputs whose fields are
+    /// `.optional()` but not `.nullable()`: BB rejects an explicit null there.
+    public static func object(omittingNil fields: [String: JSONValue?]) -> JSONValue {
+        .object(fields.compactMapValues { $0 })
+    }
 }
