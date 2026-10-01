@@ -48,25 +48,9 @@
                   ]
                 },
                 "assignee": {
-                  "anyOf": [
-                    {
-                      "anyOf": [
-                        {
-                          "type": "string",
-                          "enum": [
-                            "me",
-                            "agent"
-                          ]
-                        },
-                        {
-                          "type": "string",
-                          "pattern": "^bot:[a-zA-Z0-9_-]+$"
-                        }
-                      ]
-                    },
-                    {
-                      "type": "null"
-                    }
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "priority": {
@@ -410,25 +394,9 @@
                     ]
                   },
                   "assignee": {
-                    "anyOf": [
-                      {
-                        "anyOf": [
-                          {
-                            "type": "string",
-                            "enum": [
-                              "me",
-                              "agent"
-                            ]
-                          },
-                          {
-                            "type": "string",
-                            "pattern": "^bot:[a-zA-Z0-9_-]+$"
-                          }
-                        ]
-                      },
-                      {
-                        "type": "null"
-                      }
+                    "type": [
+                      "string",
+                      "null"
                     ]
                   },
                   "priority": {
@@ -746,25 +714,9 @@
             ]
           },
           "assignee": {
-            "anyOf": [
-              {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "enum": [
-                      "me",
-                      "agent"
-                    ]
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^bot:[a-zA-Z0-9_-]+$"
-                  }
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "priority": {
@@ -866,25 +818,9 @@
                 ]
               },
               "assignee": {
-                "anyOf": [
-                  {
-                    "anyOf": [
-                      {
-                        "type": "string",
-                        "enum": [
-                          "me",
-                          "agent"
-                        ]
-                      },
-                      {
-                        "type": "string",
-                        "pattern": "^bot:[a-zA-Z0-9_-]+$"
-                      }
-                    ]
-                  },
-                  {
-                    "type": "null"
-                  }
+                "type": [
+                  "string",
+                  "null"
                 ]
               },
               "priority": {
@@ -1102,25 +1038,9 @@
             ]
           },
           "assignee": {
-            "anyOf": [
-              {
-                "anyOf": [
-                  {
-                    "type": "string",
-                    "enum": [
-                      "me",
-                      "agent"
-                    ]
-                  },
-                  {
-                    "type": "string",
-                    "pattern": "^bot:[a-zA-Z0-9_-]+$"
-                  }
-                ]
-              },
-              {
-                "type": "null"
-              }
+            "type": [
+              "string",
+              "null"
             ]
           },
           "priority": {

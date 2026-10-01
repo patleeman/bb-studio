@@ -47,7 +47,7 @@ const idSchema = z.string().min(1).max(100);
 const threadIdSchema = z.string().min(1).max(200);
 const projectIdSchema = z.string().min(1).max(200);
 const statusSchema = z.string().min(1).max(60).regex(/^[a-z][a-z0-9_-]*$/);
-const assigneeSchema = z.union([z.enum(["me", "agent"]), z.string().regex(/^bot:[a-zA-Z0-9_-]+$/)]).nullable();
+const assigneeSchema = z.string().refine((value) => value === "me" || value === "agent" || /^bot:[a-zA-Z0-9_-]+$/.test(value), "Use me, agent or bot:<id>.").nullable();
 const daySchema = z.string().refine(isDay, "Use a day like 2026-10-01.").nullable();
 const prioritySchema = z.enum(PRIORITIES);
 const recurrenceSchema = z.enum(RECURRENCES).nullable();

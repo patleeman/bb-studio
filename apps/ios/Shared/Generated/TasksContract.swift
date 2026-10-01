@@ -217,7 +217,7 @@ public enum Tasks {
     public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: StudioJSONValue?
+    public var assignee: String?
     public var priority: BoardOutputTasksItemPriority?
     public var labels: [String]?
     public var parentId: String?
@@ -233,7 +233,7 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: BoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: BoardOutputTasksItemSubtasks? = nil, recurrence: BoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: BoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: BoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: BoardOutputTasksItemSubtasks? = nil, recurrence: BoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: BoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -468,7 +468,7 @@ public enum Tasks {
     public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: StudioJSONValue?
+    public var assignee: String?
     public var priority: GetOutputTaskPriority?
     public var labels: [String]?
     public var parentId: String?
@@ -484,7 +484,7 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: GetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: GetOutputTaskSubtasks? = nil, recurrence: GetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: GetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: GetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: GetOutputTaskSubtasks? = nil, recurrence: GetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: GetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -690,14 +690,14 @@ public enum Tasks {
     public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: StudioJSONValue?
+    public var assignee: String?
     public var priority: CreateInputPriority?
     public var labels: [String]?
     public var parentId: String?
     public var recurrence: CreateInputRecurrence?
     public var reminderAt: Int?
 
-    public init(title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: CreateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: CreateInputRecurrence? = nil, reminderAt: Int? = nil) {
+    public init(title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: CreateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: CreateInputRecurrence? = nil, reminderAt: Int? = nil) {
       self.title = title
       self.description = description
       self.status = status
@@ -852,7 +852,7 @@ public enum Tasks {
     public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: StudioJSONValue?
+    public var assignee: String?
     public var priority: CreateOutputTaskPriority?
     public var labels: [String]?
     public var parentId: String?
@@ -868,7 +868,7 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: CreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: CreateOutputTaskSubtasks? = nil, recurrence: CreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: CreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: CreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: CreateOutputTaskSubtasks? = nil, recurrence: CreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: CreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -970,14 +970,14 @@ public enum Tasks {
     public var description: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: StudioJSONValue?
+    public var assignee: String?
     public var priority: UpdateInputPriority?
     public var labels: [String]?
     public var parentId: String?
     public var recurrence: UpdateInputRecurrence?
     public var reminderAt: Int?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: UpdateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: UpdateInputRecurrence? = nil, reminderAt: Int? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: UpdateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: UpdateInputRecurrence? = nil, reminderAt: Int? = nil) {
       self.id = id
       self.title = title
       self.description = description
