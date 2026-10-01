@@ -21,6 +21,14 @@ The Studio landing page with two seeded tasks: one in review and one due today
 appear in the **Needs you** strip above the collection, with the staged bots
 and the task board below.
 
+![Live BB screenshot of a space's page](assets/space-page.png)
+
+A staged "Launch" space with the Orbit project, opened from Studio: its page in
+Pages, made from the space template. Under the intro are the space's live
+widgets: buttons that make a thread or any add-on's item in the space, its
+three recent Orbit pages, and the project's threads, with channels and
+projects further down.
+
 ![Live BB screenshot of Studio search](assets/search.png)
 
 Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching

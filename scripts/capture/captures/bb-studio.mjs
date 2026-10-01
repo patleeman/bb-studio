@@ -71,6 +71,36 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
     },
   },
   {
+    id: "studio-space",
+    packageDir: "bb-studio",
+    fileName: "space-page.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const pages = await seedPages();
+      let spaceId = null;
+      const cleanup = async () => {
+        if (spaceId) await pluginRpc("studio", "deleteSpace", { id: spaceId }).catch(() => {});
+        await pages.cleanup();
+      };
+      try {
+        const { space } = await pluginRpc("studio", "createSpace", { name: "Launch", icon: "🚀", description: "Everything for the Orbit launch: plans, notes and the people working on it.", defaultProjectId: projectId });
+        spaceId = space.id;
+        if (!space.pageId) throw new Error("The new space didn't get a page");
+        // The space's Studio link opens its page.
+        await client.navigate(`/plugins/studio/studio/space/${space.id}`);
+        await client.waitForSelector('[data-space-widget="actions"]');
+        for (const label of ["Recent", "Channels and messages", "Space settings", "Offline mode launch", "Add or remove projects", "Orbit"]) await client.waitForText(label);
+        const widgets = await client.evaluate(`[...document.querySelectorAll("[data-space-widget]")].map((each) => each.dataset.spaceWidget).join(",")`);
+        if (widgets !== "actions,recent,threads,channels,projects") throw new Error(`The space page showed widgets ${widgets}`);
+        await sleep(1000);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
     id: "studio-search",
     packageDir: "bb-studio",
     fileName: "search.png",
