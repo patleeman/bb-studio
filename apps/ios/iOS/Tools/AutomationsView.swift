@@ -7,6 +7,7 @@ struct AutomationsView: View {
     @State private var loaded = false
     @State private var error: String?
     @State private var running: Automation?
+    @State private var creating = false
     @State private var done = 0
 
     var body: some View {
@@ -42,10 +43,17 @@ struct AutomationsView: View {
                 ProgressView()
             } else if entries.isEmpty, error == nil {
                 ContentUnavailableView("No automations", systemImage: "clock.arrow.circlepath",
-                    description: Text("Ask an agent to schedule one, or add one in BB web."))
+                    description: Text("Add one to run an agent on a schedule."))
             }
         }
         .navigationTitle("Automations")
+        .toolbar {
+            Button { creating = true } label: { Label("New automation", systemImage: "plus") }
+                .accessibilityIdentifier("workflowNewAutomation")
+        }
+        .sheet(isPresented: $creating) {
+            AutomationEditor(automation: nil) { _ in await load() }
+        }
         .refreshable { await load() }
         .task { await load() }
         .sensoryFeedback(.success, trigger: done)
@@ -171,6 +179,7 @@ struct AutomationView: View {
     @State private var loaded = false
     @State private var error: String?
     @State private var confirmingRun = false
+    @State private var editing = false
     @State private var output: AutomationRun?
     @State private var done = 0
 
@@ -238,7 +247,11 @@ struct AutomationView: View {
         .navigationTitle(automation.name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
             Button { confirmingRun = true } label: { Label("Run now", systemImage: "play.fill") }
+        }
+        .sheet(isPresented: $editing) {
+            AutomationEditor(automation: automation) { updated in automation = updated }
         }
         .confirmationDialog("Run \u{201C}\(automation.name)\u{201D} now?", isPresented: $confirmingRun, titleVisibility: .visible) {
             Button("Run now") { Task { await run() } }

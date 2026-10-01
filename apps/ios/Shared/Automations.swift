@@ -134,4 +134,26 @@ extension BBClient {
             "automations", enabled ? "automations_resume" : "automations_pause",
             ["projectId": .string(automation.projectId), "automationId": .string(automation.id)])
     }
+
+    public func createAutomation(projectId: String, name: String, prompt: String, trigger: JSONValue,
+                                 execution: ExecutionChoice) async throws -> Automation {
+        let provider = execution.providerId ?? ""
+        let model = execution.model ?? ""
+        let body: JSONValue = [
+            "projectId": .string(projectId), "name": .string(name), "enabled": true,
+            "trigger": trigger, "origin": "app",
+            "execution": ["mode": "agent", "prompt": .string(prompt), "providerId": .string(provider),
+                          "model": .string(model), "reasoningLevel": .string(execution.reasoningLevel ?? "medium"),
+                          "permissionMode": .string(execution.permissionMode ?? "auto"),
+                          "environment": ["type": "project-default"]],
+        ]
+        return try await rpc("automations", "automations_create", body)
+    }
+
+    public func updateAutomation(_ automation: Automation, name: String, prompt: String?, trigger: JSONValue) async throws -> Automation {
+        var body: [String: JSONValue] = ["projectId": .string(automation.projectId),
+                                          "automationId": .string(automation.id), "name": .string(name), "trigger": trigger]
+        if let prompt { body["agent"] = ["prompt": .string(prompt)] }
+        return try await rpc("automations", "automations_update", .object(body))
+    }
 }
