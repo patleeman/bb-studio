@@ -5,6 +5,7 @@
 // plugin's directory, where the plugin's own zod isn't resolvable, so callers
 // pass their `z` in.
 import type { z as Zod } from "zod";
+import { untitled } from "./format";
 
 export const STUDIO_PLUGIN_ID = "studio";
 /** Studio's nav panel path: the collection lives at /plugins/studio/studio. */
@@ -271,5 +272,5 @@ export function itemAtPath<T extends { href: string }>(items: readonly T[], path
 
 /** A composer prompt that links each item, so the agent can read them. */
 export function mentionPrompt(items: readonly { title: string; href: string }[]): string {
-  return `${items.map((item) => `[${(item.title || "Untitled").replace(/[[\]]/g, "")}](${item.href})`).join(" ")} `;
+  return `${items.map((item) => `[${untitled(item.title).replace(/[[\]]/g, "")}](${item.href})`).join(" ")} `;
 }

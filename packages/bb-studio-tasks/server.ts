@@ -1,7 +1,7 @@
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention } from "@bb-studio/kit/server";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "@bb-studio/kit/format";
 // Studio Tasks (plugin id `studio-tasks`): a board of tasks you can hand to agents.
 //
 // Backend entry. Tasks live in the plugin's SQLite database
@@ -421,7 +421,7 @@ export default async function plugin(bb: BbPluginApi) {
     const parts = [STATUS_LABELS[task.status], assigneeLabel(task)];
     if (task.due) parts.push(`due ${formatDue(task.due)} (${task.due})`);
     if (handoff) parts.push(HANDOFF_LABELS[handoff.state]);
-    return `${task.title || "Untitled"} (id ${task.id}): ${parts.join(", ")}. Link ${taskHref(task.id)}`;
+    return `${untitled(task.title)} (id ${task.id}): ${parts.join(", ")}. Link ${taskHref(task.id)}`;
   }
 
   function taskDetails(task: TaskRow): string {
@@ -500,7 +500,7 @@ export default async function plugin(bb: BbPluginApi) {
                   target: "item" as const,
                   pluginId,
                   itemId: item.id,
-                  label: item.title || "Untitled",
+                  label: untitled(item.title),
                   href: item.href,
                   kind: kind?.label ?? item.kind,
                   icon: item.icon ?? kind?.icon ?? null,
@@ -673,7 +673,7 @@ export default async function plugin(bb: BbPluginApi) {
         .filter((task) => task.status !== "done")
         .filter((task) => !needle || task.title.toLowerCase().includes(needle))
         .slice(0, 50)
-        .map((task) => ({ id: task.id, title: task.title || "Untitled", subtitle: `${STATUS_LABELS[task.status]} · ${assigneeLabel(task)}` }));
+        .map((task) => ({ id: task.id, title: untitled(task.title), subtitle: `${STATUS_LABELS[task.status]} · ${assigneeLabel(task)}` }));
     },
     resolve(itemId) {
       const task = mustGet(itemId);
@@ -728,7 +728,7 @@ export default async function plugin(bb: BbPluginApi) {
               .sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.rank - b.rank)
               .map((task) => {
                 const handoff = store.latestHandoff(task.id);
-                return [task.id, STATUS_LABELS[task.status], task.title || "Untitled", task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
+                return [task.id, STATUS_LABELS[task.status], untitled(task.title), task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
               });
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }

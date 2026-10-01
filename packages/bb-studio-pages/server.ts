@@ -4,6 +4,7 @@ import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { studioSchemas } from "@bb-studio/kit/contract";
+import { untitled } from "@bb-studio/kit/format";
 import { createStudioNotifier } from "@bb-studio/kit/server";
 import * as Y from "yjs";
 import { z } from "zod";
@@ -387,7 +388,7 @@ export default async function plugin(bb: BbPluginApi) {
       const pages = query.trim() ? store.search(query, projectId) : store.list({ projectId }).slice(0, 20);
       return pages.map((page) => ({
         id: page.id,
-        title: `${page.icon ? `${page.icon} ` : ""}${page.title || "Untitled"}`,
+        title: `${page.icon ? `${page.icon} ` : ""}${untitled(page.title)}`,
         subtitle: page.project_id ? "Page" : "Global page",
         icon: "FileText",
       }));
@@ -397,7 +398,7 @@ export default async function plugin(bb: BbPluginApi) {
       const markdown = readMarkdown(service.hub.open(itemId).doc, { ids: true });
       return {
         context: [
-          `The user referenced the BB Page "${meta.title || "Untitled"}" (id ${meta.id}, ${pageUrl(meta.id)}). Current content with block ids:`,
+          `The user referenced the BB Page "${untitled(meta.title)}" (id ${meta.id}, ${pageUrl(meta.id)}). Current content with block ids:`,
           "",
           truncate(markdown, 40_000),
           "",
@@ -427,7 +428,7 @@ export default async function plugin(bb: BbPluginApi) {
             const pages = store.list(flag("--all") ? {} : { projectId: ctx.projectId ?? null });
             if (!pages.length) return { exitCode: 0, stdout: "No pages.\n" };
             const lines = pages.map(
-              (page) => `${page.id}\t${page.title || "Untitled"}\t${page.project_id ?? "global"}\t${new Date(page.updated_at).toISOString()}`,
+              (page) => `${page.id}\t${untitled(page.title)}\t${page.project_id ?? "global"}\t${new Date(page.updated_at).toISOString()}`,
             );
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }

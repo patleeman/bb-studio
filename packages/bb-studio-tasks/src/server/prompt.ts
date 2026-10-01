@@ -45,7 +45,7 @@ export function handoffInput(
     text += part;
   };
   const mention = (label: string, resource: MentionResource) => {
-    const shown = `@${label.replace(/\s+/g, " ").trim() || "Untitled"}`;
+    const shown = `@${untitled(label.replace(/\s+/g, " "))}`;
     mentions.push({ start: text.length, end: text.length + shown.length, resource: { ...resource, label: shown.slice(1) } });
     add(shown);
   };
