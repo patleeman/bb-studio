@@ -4,6 +4,9 @@ settings:
   autoInstallPeers: true
   excludeLinksFromLockfile: false
 
+overrides:
+  '@bb-studio/kit': link:./packages/bb-studio-kit
+
 importers:
 
   .:
@@ -27,7 +30,7 @@ importers:
   packages/bb-studio:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       zod:
         specifier: ^4.3.6
@@ -79,7 +82,7 @@ importers:
   packages/bb-studio-artifacts:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       zod:
         specifier: ^4.3.6
@@ -122,7 +125,7 @@ importers:
   packages/bb-studio-chat:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       zod:
         specifier: ^4.3.6
@@ -168,7 +171,7 @@ importers:
   packages/bb-studio-decisions:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@radix-ui/react-slot':
         specifier: ^1.3.0
@@ -247,7 +250,7 @@ importers:
   packages/bb-studio-draw:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@excalidraw/excalidraw':
         specifier: ^0.18.1
@@ -388,7 +391,7 @@ importers:
   packages/bb-studio-pages:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@blocknote/core':
         specifier: 0.55.0
@@ -539,7 +542,7 @@ importers:
   packages/bb-studio-reactions:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@hugeicons/core-free-icons':
         specifier: ^4.1.3
@@ -600,7 +603,7 @@ importers:
   packages/bb-studio-sidebar:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@dnd-kit/core':
         specifier: ^6.3.1
@@ -688,7 +691,7 @@ importers:
   packages/bb-studio-tables:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       zod:
         specifier: ^4.3.6
@@ -728,7 +731,7 @@ importers:
   packages/bb-studio-talk:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@radix-ui/react-checkbox':
         specifier: ^1.3.7
@@ -831,7 +834,7 @@ importers:
   packages/bb-studio-tasks:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       zod:
         specifier: ^4.3.6
@@ -871,7 +874,7 @@ importers:
   packages/bb-studio-teams:
     dependencies:
       '@bb-studio/kit':
-        specifier: file:../bb-studio-kit
+        specifier: link:../bb-studio-kit
         version: link:../bb-studio-kit
       '@codemirror/commands':
         specifier: ^6.11.1
@@ -891,6 +894,9 @@ importers:
       '@codemirror/view':
         specifier: ^6.43.12
         version: 6.43.13
+      '@get-bb/plugin-sdk':
+        specifier: 0.5.29
+        version: 0.5.29(@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@types/better-sqlite3@7.6.13)(@types/react@19.3.0)(better-sqlite3@12.11.1)(cron-parser@5.10.1)(hono@4.13.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@lezer/highlight':
         specifier: ^1.2.3
         version: 1.2.5
@@ -934,9 +940,6 @@ importers:
         specifier: ^4.3.6
         version: 4.6.5
     devDependencies:
-      '@get-bb/plugin-sdk':
-        specifier: 0.5.29
-        version: 0.5.29(@testing-library/react@16.3.2(@testing-library/dom@10.4.1)(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4))(@types/better-sqlite3@7.6.13)(@types/react@19.3.0)(better-sqlite3@12.11.1)(cron-parser@5.10.1)(hono@4.13.11)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)
       '@radix-ui/react-alert-dialog':
         specifier: ^1.1.19
         version: 1.1.23(@types/react-dom@19.3.0(@types/react@19.3.0))(@types/react@19.3.0)(react-dom@19.2.4(react@19.2.4))(react@19.2.4)

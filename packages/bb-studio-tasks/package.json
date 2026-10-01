@@ -30,7 +30,7 @@
     "build": "bb plugin build ."
   },
   "dependencies": {
-    "@bb-studio/kit": "file:../bb-studio-kit",
+    "@bb-studio/kit": "file:../bb-studio-kit.tgz",
     "zod": "^4.3.6"
   },
   "devDependencies": {

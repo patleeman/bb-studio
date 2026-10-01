@@ -6,3 +6,7 @@ allowBuilds:
 minimumReleaseAgeExclude:
   - '@get-bb/plugin-sdk@0.4.6 || 0.4.21 || 0.5.24'
   - hono@4.13.9
+# Plugins depend on the packed kit so BB's npm installs copy it in; link the
+# live sources in the workspace instead.
+overrides:
+  '@bb-studio/kit': link:./packages/bb-studio-kit

@@ -92,10 +92,14 @@ plugin deletes its settings and secrets, so note them first.
 ## Development
 
 This is a pnpm workspace. [`@bb-studio/kit`](packages/bb-studio-kit/) holds the
-shared contract, UI and helpers; each plugin depends on it with
-`file:../bb-studio-kit`, and BB's Git install clones the whole repository, so it
-resolves without publishing the kit. BB installs Git plugins with npm, so refresh
-each changed plugin lockfile using `scripts/refresh-locks.sh` before committing.
+shared contract, UI and helpers. BB installs a Git plugin by running npm in its
+package directory alone, so each plugin depends on the packed kit,
+`file:../bb-studio-kit.tgz`, which npm copies into the plugin's `node_modules`
+where the kit's own imports resolve. The workspace overrides that with a link to
+the live kit sources. After changing the kit or a plugin's dependencies, run
+`scripts/refresh-locks.sh` for every plugin: it repacks the kit and refreshes
+the npm locks, which pin the tarball's hash. `pnpm check:kit` fails while the
+tarball is stale.
 The Studio plugins use `sonner` 1.x because the BB host shims its installed
 `sonner@1.7.4` instance.
 

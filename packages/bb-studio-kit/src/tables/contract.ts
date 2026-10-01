@@ -1,8 +1,13 @@
 // Studio Tables' RPC contract and links, shared so Pages can proxy a live
 // table embed through the same schemas the Tables add-on serves.
-import { defineRpcContract } from "@get-bb/plugin-sdk";
+import type { PluginRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { columnSchema, filterSchema, sortSchema, valuesSchema, viewSchema } from "./model";
+
+// The SDK's defineRpcContract, inlined: Pages and Tables bundle this file
+// into their frontends, where BB doesn't serve the bare SDK.
+const defineRpcContract = <const Contract extends PluginRpcContract>(contract: Contract): Contract =>
+  contract;
 
 export const TABLES_PLUGIN_ID = "studio-tables";
 export const TABLES_PANEL = "tables";
