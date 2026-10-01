@@ -13,7 +13,7 @@ are unchanged, and old `bbgo://` links still open.
 
 | Feature | Where |
 |---|---|
-| Home: the BB web sidebar on the phone. Automations, Channels (with open attention and approval counts), Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
+| Home: the BB web sidebar on the phone. Automations, Channels (with open attention and approval counts), Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; a thread working as a bot shows its avatar before the title; sections collapse | `iOS/Inbox/InboxView.swift` |
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename (threads, channels and DMs) | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
 | New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app). Work as picks a bot, which applies its model and permissions; they can still be changed, and the thread works as the bot from the first message | `iOS/Inbox/NewThreadView.swift` |

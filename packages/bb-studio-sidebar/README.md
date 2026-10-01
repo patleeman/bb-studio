@@ -27,7 +27,7 @@ Thread list provider**. The package requires BB 0.44 or newer and Plugin SDK
 
 The `source/` directory vendors BB's MIT-licensed Thread List plugin at
 commit `8595b6ea4b8bfa771f84d57e69124e76bacf9eef`. Studio's additions
-are isolated under `source/app/studio/` with small hooks in five upstream
+are isolated under `source/app/studio/` with small hooks in a few upstream
 files. See [UPSTREAM.md](UPSTREAM.md) for the changed files, sync command,
 and vendored UI policy, and [LICENSE](LICENSE) for the upstream license.
 
@@ -60,6 +60,15 @@ A Studio app adds a section from any always-mounted component, such as an
 
 Studio Sidebar renders an empty anchor for each registered section and the app
 portals into it. Without Studio Sidebar, `SidebarPortal` renders nothing.
+
+An app can also put a mark before a thread's title, as Studio Teams does with
+the avatar of the bot a thread works as:
+
+```ts
+const unpublish = publishThreadBadges(pluginId, new Map([[threadId, { glyph: "🦉", label: "Working as Atlas" }]]));
+```
+
+Only threads with a badge show one; other rows keep their usual inset.
 
 ## Development
 

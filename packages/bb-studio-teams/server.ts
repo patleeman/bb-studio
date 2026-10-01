@@ -670,6 +670,10 @@ export default async function plugin(bb: BbPluginApi) {
       store.all().filter((bot) => !bot.retired)
         .sort((a, b) => a.name.localeCompare(b.name)),
     threadProfile: ({ threadId }) => profiles.profile(threadId),
+    threadBots: () => {
+      const active = new Set(store.all().filter((bot) => !bot.retired).map((bot) => bot.id));
+      return store.threadBots().filter((row) => active.has(row.botId));
+    },
     setThreadProfile: ({ threadId, botId }) =>
       runtime.locked(`thread:${threadId}`, () => profiles.set(threadId, botId)),
     pendingThreadProfile: ({ projectId, botId }) => {

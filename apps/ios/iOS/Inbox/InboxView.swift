@@ -8,6 +8,8 @@ final class InboxModel: ObservableObject {
     @Published var sidebar: SidebarBootstrap?
     @Published var preferences: SidebarPreferences?
     @Published var botTeams: BotTeamsList?
+    /// The bot each thread works as, by thread id; most threads have none.
+    @Published var threadBots: [String: String] = [:]
     @Published var projectNames: [String: String] = [:]
     @Published var error: String?
     @Published var loaded = false
@@ -77,6 +79,7 @@ final class InboxModel: ObservableObject {
             async let sidebar = client.sidebar()
             // Every assignment re-renders the inbox, so only on change.
             if bots, let teams = try? await client.botTeams(), !Self.same(teams, botTeams) { botTeams = teams }
+            if bots, let rows = try? await client.threadBots(), rows != threadBots { threadBots = rows }
             if preferences == nil || bots, let prefs = try? await client.sidebarPreferences(), prefs != preferences {
                 preferences = prefs
             }
@@ -240,6 +243,12 @@ final class InboxModel: ObservableObject {
             let b = $1.latestAttentionAt ?? $1.createdAt
             return a != b ? a > b : $0.createdAt > $1.createdAt
         }
+    }
+
+    /// The active bot a thread works as, for its row's avatar.
+    func bot(for threadId: String) -> Bot? {
+        guard let id = threadBots[threadId] else { return nil }
+        return botTeams?.bots.first { $0.id == id && $0.retired != true }
     }
 
     var channels: [Room] {
@@ -427,7 +436,9 @@ struct InboxView: View {
 
     private func threadLink(_ thread: ThreadEntry, showsProject: Bool, depth: Int) -> some View {
         NavigationLink(value: Route.thread(id: thread.id)) {
-            ThreadRow(thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil)
+            ThreadRow(
+                thread: thread, project: showsProject ? model.projectNames[thread.projectId] : nil,
+                bot: model.bot(for: thread.id))
                 .padding(.leading, CGFloat(depth) * 18)
         }
         .swipeActions(edge: .leading) { leadingActions(thread) }
@@ -442,7 +453,9 @@ struct InboxView: View {
                 ForEach(hits) { hit in
                     NavigationLink(value: Route.thread(id: hit.thread.id)) {
                         VStack(alignment: .leading, spacing: 4) {
-                            ThreadRow(thread: hit.thread, project: model.projectNames[hit.thread.projectId])
+                            ThreadRow(
+                                thread: hit.thread, project: model.projectNames[hit.thread.projectId],
+                                bot: model.bot(for: hit.thread.id))
                             if let snippet = hit.snippet {
                                 Text(snippet).font(.caption).foregroundStyle(.secondary).lineLimit(2).padding(.leading, 18)
                             }
@@ -569,13 +582,16 @@ struct ConnectionBanner: View {
 struct ThreadRow: View {
     let thread: ThreadEntry
     var project: String?
+    /// The bot the thread works as; its avatar leads the title.
+    var bot: Bot?
     @ObservedObject private var muted = MutedThreads.shared
     /// Written by the thread screen as the reader types; see `Drafts`.
     @AppStorage private var draft: Data?
 
-    init(thread: ThreadEntry, project: String? = nil) {
+    init(thread: ThreadEntry, project: String? = nil, bot: Bot? = nil) {
         self.thread = thread
         self.project = project
+        self.bot = bot
         _draft = AppStorage("draft.\(thread.id)")
     }
 
@@ -583,9 +599,16 @@ struct ThreadRow: View {
         HStack(alignment: .top, spacing: 10) {
             StatusDot(thread: thread).padding(.top, 6)
             VStack(alignment: .leading, spacing: 2) {
-                Text(ThreadTitles.resolve(thread.displayTitle))
-                    .font(.body.weight(thread.isUnread ? .semibold : .regular))
-                    .lineLimit(2)
+                HStack(alignment: .firstTextBaseline, spacing: 6) {
+                    // Only threads working as a bot get the avatar; others keep their inset.
+                    if let bot {
+                        Text(bot.avatar?.isEmpty == false ? bot.avatar! : "🤖")
+                            .accessibilityLabel("Working as \(bot.name)")
+                    }
+                    Text(ThreadTitles.resolve(thread.displayTitle))
+                        .font(.body.weight(thread.isUnread ? .semibold : .regular))
+                        .lineLimit(2)
+                }
                 HStack(spacing: 4) {
                     if draft != nil {
                         Text("Draft").foregroundStyle(.red)

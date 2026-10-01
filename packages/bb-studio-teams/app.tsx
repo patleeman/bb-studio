@@ -38,6 +38,7 @@ import { Modal } from "./channel-controls";
 import { setThreadDraft } from "./channel-drafts";
 import { ChannelSettings } from "./channel-settings";
 import { ProfilePicker } from "./profile-picker";
+import { ThreadBadges } from "./thread-badges";
 import { ProfileThreads } from "./profile-threads";
 import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
@@ -465,5 +466,6 @@ export default definePluginApp((app) => {
   });
   // Channels, as a section of the Studio Sidebar.
   app.slots.experimental_appOverlay({ id: "sidebar-sections", component: TeamsSidebar });
+  app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
 });

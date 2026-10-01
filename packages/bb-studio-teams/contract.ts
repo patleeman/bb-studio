@@ -608,6 +608,11 @@ export const rpcContract = {
     input: z.object({ projectId: z.string().min(1), botId: idSchema.nullable() }),
     output: z.object({ ok: z.literal(true) }),
   },
+  // Which bot each thread works as, for the sidebar's thread rows.
+  threadBots: {
+    input: z.object({}),
+    output: z.array(z.object({ threadId: z.string(), botId: idSchema })),
+  },
   profileThreads: {
     input: z.object({ id: idSchema }),
     output: z.array(z.object({

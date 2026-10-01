@@ -131,6 +131,12 @@
 +            <StudioChatFloatItem threadId={thread.id} surface={surface} />
 +          ) : null}
 +          {id === "split" && (onOpenInSplit || studioChat) ? separator : null}
+--- a/source/app/rows/ThreadRow.tsx
++++ b/source/app/rows/ThreadRow.tsx
+@@ -97,0 +98 @@
++import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
+@@ -595,0 +597 @@
++              <StudioThreadBadge threadId={thread.id} />
 --- a/source/shared/preferences.ts
 +++ b/source/shared/preferences.ts
 @@ -75,0 +76,6 @@

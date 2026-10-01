@@ -7116,6 +7116,34 @@
         "additionalProperties": false
       }
     },
+    "threadBots": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string"
+            },
+            "botId": {
+              "type": "string",
+              "pattern": "^bot_[a-f0-9]{16}$"
+            }
+          },
+          "required": [
+            "threadId",
+            "botId"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
     "profileThreads": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

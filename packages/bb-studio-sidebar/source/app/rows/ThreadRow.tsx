@@ -95,6 +95,7 @@ import {
   resolveThreadStatus,
   type ThreadStatusGlyphProps,
 } from "./ThreadStatusGlyph.js";
+import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
 
 const SIDEBAR_TITLE_DOUBLE_CLICK_MS = 400;
 
@@ -593,6 +594,7 @@ function ThreadRowComponent({
                   </TooltipContent>
                 </Tooltip>
               ) : null}
+              <StudioThreadBadge threadId={thread.id} />
               <span
                 className={cn(
                   "bb-thread-title",

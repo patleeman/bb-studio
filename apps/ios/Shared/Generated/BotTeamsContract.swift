@@ -35,6 +35,7 @@ public enum BotTeams {
     public static let threadProfile = "threadProfile"
     public static let setThreadProfile = "setThreadProfile"
     public static let pendingThreadProfile = "pendingThreadProfile"
+    public static let threadBots = "threadBots"
     public static let profileThreads = "profileThreads"
     public static let createRoom = "createRoom"
     public static let handoffSource = "handoffSource"
@@ -123,6 +124,10 @@ public enum BotTeams {
   public typealias SetThreadProfile = SetThreadProfileOutput
 
   public typealias PendingThreadProfile = PendingThreadProfileOutput
+
+  public typealias ThreadBotsOutput = [ThreadBotsOutputItem]
+
+  public typealias ThreadBots = ThreadBotsOutput
 
   public typealias ProfileThreadsOutput = [ProfileThreadsOutputItem]
 
@@ -6813,6 +6818,22 @@ public enum BotTeams {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct ThreadBotsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct ThreadBotsOutputItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
     }
   }
 

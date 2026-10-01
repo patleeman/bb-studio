@@ -74,6 +74,7 @@ export class ThreadProfiles {
       model: bot.model,
     };
     this.store.putConversation(conversation);
+    this.runtime.changed("bots", bot.id);
     return conversation;
   }
 
@@ -93,8 +94,10 @@ export class ThreadProfiles {
   }
 
   /** A new empty thread with this profile, in the bot's own project. */
-  newThread(bot: Bot) {
-    return this.runtime.conversation(bot, `thread:${randomUUID()}`, "admin", bot.name);
+  async newThread(bot: Bot) {
+    const conversation = await this.runtime.conversation(bot, `thread:${randomUUID()}`, "admin", bot.name);
+    this.runtime.changed("bots", bot.id);
+    return conversation;
   }
 
   /** The bot's latest attached thread, or a new one. */

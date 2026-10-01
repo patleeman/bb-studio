@@ -31,9 +31,11 @@ test("attaching a profile to a thread makes its agent work as the bot in that th
     assert.match(config.instructions ?? "", /MEMORY\.md/);
     const listed = await x.harness.behavior.callRpc("profileThreads", { id: x.a.id }) as { threadId: string }[];
     assert.deepEqual(listed.map((t) => t.threadId), ["thr_work"]);
+    assert.deepEqual(await x.harness.behavior.callRpc("threadBots", {}), [{ threadId: "thr_work", botId: x.a.id }]);
 
     await x.harness.behavior.callRpc("setThreadProfile", { threadId: "thr_work", botId: null });
     assert.equal(x.store.byThread("thr_work"), null);
+    assert.deepEqual(await x.harness.behavior.callRpc("threadBots", {}), []);
   } finally {
     await x.close();
   }

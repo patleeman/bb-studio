@@ -60,6 +60,7 @@ export {
   type SidebarDisplay,
   type SidebarSectionAction,
 } from "./sidebar";
+export { publishThreadBadges, useThreadBadge, type ThreadBadge } from "./thread-badges";
 export {
   DropdownMenu,
   DropdownMenuContent,

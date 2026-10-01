@@ -106,6 +106,12 @@ export class Store {
         .all(id) as { json: string }[]
     ).map((r) => JSON.parse(r.json));
   }
+  /** Every thread working as a bot, with the bot. */
+  threadBots(): { threadId: string; botId: string }[] {
+    return this.db
+      .prepare("SELECT thread_id AS threadId, bot_id AS botId FROM conversations WHERE json_extract(json,'$.kind')='admin'")
+      .all() as { threadId: string; botId: string }[];
+  }
   /** The bot's most recently attached thread. */
   currentDirectConversation(botId: string): Conversation | null {
     const row = this.db

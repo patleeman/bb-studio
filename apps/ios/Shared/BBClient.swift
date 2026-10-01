@@ -561,6 +561,13 @@ extension BBClient {
             ["projectId": .string(projectId), "botId": botId.map { .string($0) } ?? .null])
     }
 
+    /// The bot each thread works as, by thread id.
+    public func threadBots() async throws -> [String: String] {
+        struct Row: Decodable { var threadId: String; var botId: String }
+        let rows: [Row] = try await rpc("bot-teams", "threadBots", [:])
+        return Dictionary(rows.map { ($0.threadId, $0.botId) }, uniquingKeysWith: { a, _ in a })
+    }
+
     /// Every thread with this bot's profile, newest first.
     public func profileThreads(_ botId: String) async throws -> [ProfileThread] {
         try await rpc("bot-teams", "profileThreads", ["id": .string(botId)])
