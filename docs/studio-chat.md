@@ -1,7 +1,7 @@
 # Studio Chat
 
-Studio Chat takes Pages' "Work with this page…" bar out of Pages and puts it
-on every Studio item. It knows what's on screen: on a page it works on that
+Studio Chat takes Pages' "Work with this page…" bar out of Pages and puts
+New thread and Open thread on every Studio item in its place. It knows what's on screen: on a page it works on that
 page; on a drawing, that drawing. Its threads open in [Float](float.md)
 tabs. Studio Chat used to have its own floating card; that became the
 Float plugin, so anything can float, several things at once.
@@ -15,21 +15,26 @@ All of this is in the stable SDK 0.5.29:
 
 | Need | SDK surface |
 |---|---|
-| The bar on every screen | `app.slots.experimental_appOverlay`, mounted once per window, portalled into Float's bottom-right corner when Float runs |
+| The buttons on every screen | `app.slots.experimental_appOverlay`, mounted once per window, portalled into Float's bottom-right corner when Float runs |
 | A new thread | `experimental_NewThreadComposer` |
+| Recent threads and search for Open thread | `useSdk().threads.list` and `threads.search` |
 | Where threads show | Float's tabs, through the kit's `openFloat` |
 | Tell the agent what's on screen | Our own mention provider (`bb.ui.registerMentionProvider`). BB resolves plugin pills in `threads.spawn` input |
 | Find the item on screen | Studio's new `itemAt` RPC, which matches a path against every add-on's item `href`s |
 
 ## What it looks like
 
-- **Closed:** a slim bar in Float's bottom-right corner, right of a docked
-  Float panel. On a Studio item it
-  reads "Work with this page…" or "…this drawing…", and so on by kind.
-  Anywhere else there's no bar.
-- **Compose:** the new-thread composer. Sending starts a thread in the item's
+- **Closed:** two buttons, New thread and Open thread, in Float's
+  bottom-right corner, right of a docked Float panel. They show on Studio
+  items only.
+- **New thread:** the new-thread composer. Sending starts a thread in the item's
   project, with the item's pill already in the message, and opens it in a
   Float tab (or BB's own thread view without Float).
+- **Open thread:** a picker listing the item's last chat, then your 30 most
+  recent threads. Typing two or more letters searches all active threads.
+  Arrow keys and Enter pick; Escape or clicking away closes it. The pick
+  opens as a plain Float tab, without the item's tag, so moving on doesn't
+  swap it out.
 
 The plugin remembers the last thread used on each item, so reopening a page
 brings its chat back as a tab behind the one showing. Those tabs carry a
@@ -90,8 +95,11 @@ We work around BB's gaps rather than wait on BB features.
 ## Decisions
 
 - **Name.** "Studio Chat" (`studio-chat`), part of the suite.
-- **Where the bar shows.** Only on Studio items.
+- **Where the buttons show.** Only on Studio items.
+- **New and open, not one bar.** One "Work with this…" bar only started
+  threads. New thread and Open thread also bring an existing thread into
+  Float next to the item.
 - **Pages without it.** Pages keeps its own chat bar only while Studio Chat
   isn't installed.
 - **Windows.** Floating moved to the Float plugin; Studio Chat only adds the
-  bar, the item's chat and the Viewing chip.
+  buttons, the item's chat and the Viewing chip.

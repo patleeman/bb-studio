@@ -2,10 +2,10 @@
 
 > **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), Studio Chat, and [Studio Teams](../bb-studio-teams).
 
-"Work with this…" on every page, drawing and other Studio item. It starts a
-thread that knows which item you're looking at, and brings the item's last
-chat back when you return to it. Threads open in [Float](../bb-studio-float)
-windows.
+New thread and Open thread on every page, drawing and other Studio item.
+New thread starts a thread that knows which item you're looking at; Open
+thread brings back one you already have. The item's last chat comes back when
+you return to it. Threads open as [Float](../bb-studio-float) tabs.
 
 ## Staged preview
 
@@ -19,12 +19,14 @@ of Float's row.
 
 ## What you get
 
-- **Work with this…** At the bottom right of every Studio item there's a bar:
-  "Work with this page…", "…this drawing…", and so on by kind. It opens BB's
-  new-thread composer in the item's project. The message starts with a pill
+- **New thread.** At the bottom right of every Studio item, New thread opens
+  BB's new-thread composer in the item's project. The message starts with a pill
   for the item, and the agent gets a note saying what it is and which tools
   read and change it. The new thread opens as a Float tab, or in BB's own
   view without Float.
+- **Open thread.** Next to it, Open thread lists the item's last chat and
+  your recent threads; type to search them all. The one you pick opens as a
+  Float tab.
 - **Chats come back.** Each item remembers the last thread used on it, so
   reopening it brings its chat back as a Float tab behind the one showing.
   Moving on to another item swaps that tab for the next item's chat, unless
@@ -55,8 +57,8 @@ of Float's row.
   A plugin's `ThreadChat` doesn't scope `useComposer()` to its thread on BB's
   SDK 0.5.29, so the button stays hidden. Type `@` in the chat to mention a
   Studio item instead. A new chat always carries the item.
-- BB doesn't tell plugins the current route. The bar follows the Navigation
-  API and polls every 400ms as a fallback.
+- BB doesn't tell plugins the current route. The buttons follow the Navigation
+  API and poll every 400ms as a fallback.
 
 More in [docs/studio-chat.md](../../docs/studio-chat.md).
 
@@ -69,5 +71,5 @@ pnpm --filter @bb-studio/studio-chat typecheck
 bb plugin build packages/bb-studio-chat
 ```
 
-Requires [Studio](../bb-studio). Without it, the bar has no items to
+Requires [Studio](../bb-studio). Without it, the buttons have no items to
 show on.

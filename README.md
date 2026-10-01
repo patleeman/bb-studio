@@ -18,7 +18,7 @@ agent.
 | [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | Boards of tasks you can hand to agents and embed in pages; each task follows its thread from working to review. |
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
-| [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | "Work with this…" on every Studio item: a thread that knows what you're looking at. |
+| [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | New thread and Open thread on every Studio item: a thread that knows what you're looking at, as a Float tab. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
 | [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the Studio rows Studio and Studio Sidebar already open. Rows from BB and other plugins stay. |
@@ -62,7 +62,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - studio-tasks: a task board you hand to agents
    - studio-tables: structured tables with views and CSV import and export
    - bot-teams: persistent bots in channels
-   - studio-chat: "Work with this…" on Studio items
+   - studio-chat: New thread and Open thread on Studio items
    - float: a panel of tabs for threads, channels and Studio items, docked
      or dragged anywhere
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list

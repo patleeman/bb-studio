@@ -33,7 +33,7 @@
     {
       "id": "studio-chat",
       "displayName": "Studio Chat",
-      "description": "Part of BB Studio. \"Work with this…\" on every page, drawing and other Studio item: start a thread that knows what you're looking at, and bring back the item's last chat in a Float window.",
+      "description": "Part of BB Studio. New thread and Open thread on every page, drawing and other Studio item: start a thread that knows what you're looking at, or open one you have, as a Float tab. The item's last chat comes back when you return.",
       "icon": {
         "url": "./packages/bb-studio-chat/assets/icon.svg"
       },

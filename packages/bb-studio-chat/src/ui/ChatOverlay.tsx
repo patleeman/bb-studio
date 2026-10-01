@@ -1,7 +1,8 @@
-// Studio Chat: over a Studio item, a "Work with this…" bar that starts a
-// thread about it, and the item's last chat brought back. Threads show as
-// Float tabs, which this plugin adds a "Viewing" chip to; the bar sits in
-// Float's bottom-right corner, or on its own without Float.
+// Studio Chat: over a Studio item, "New thread" starts a thread about it and
+// "Open thread" brings back one you have, and the item's last chat comes back
+// by itself. Threads show as Float tabs, which this plugin adds a "Viewing"
+// chip to; the buttons sit in Float's bottom-right corner, or on their own
+// without Float.
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   useBbNavigate,
@@ -15,6 +16,7 @@ import type { rpcContract, Viewed } from "../contract";
 import { MENTION_PROVIDER_ID } from "../ids";
 import { itemKey } from "../context";
 import { HEADER_BUTTON } from "./styles";
+import { ThreadPicker } from "./ThreadPicker";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -40,15 +42,21 @@ function useViewing(rpc: Rpc, path: string): Viewed | null {
   return viewed?.item ?? null;
 }
 
-/** Brings back the chat last used on the item, as a background tab, when it comes on screen. */
-function useItemChat(rpc: Rpc, viewed: Viewed | null, floatAvailable: boolean) {
+/**
+ * Brings back the chat last used on the item, as a background tab, when it
+ * comes on screen. Returns that thread, which "Open thread" lists first.
+ */
+function useItemChat(rpc: Rpc, viewed: Viewed | null, floatAvailable: boolean): string | null {
   const key = viewed ? itemKey(viewed) : null;
+  const [last, setLast] = useState<{ key: string; threadId: string | null } | null>(null);
   useEffect(() => {
-    if (!viewed || !floatAvailable) return;
+    if (!viewed) return;
     let live = true;
     rpc.call("lastThread", { pluginId: viewed.pluginId, id: viewed.id }).then(
       ({ threadId }) => {
-        if (live && threadId) openFloat({ kind: "thread", threadId }, { minimized: true, tag: ITEM_CHAT_TAG });
+        if (!live) return;
+        setLast({ key: itemKey(viewed), threadId });
+        if (threadId && floatAvailable) openFloat({ kind: "thread", threadId }, { minimized: true, tag: ITEM_CHAT_TAG });
       },
       () => {},
     );
@@ -58,6 +66,7 @@ function useItemChat(rpc: Rpc, viewed: Viewed | null, floatAvailable: boolean) {
     // The item, not its object identity, decides when to look.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rpc, key, floatAvailable]);
+  return last && last.key === key ? last.threadId : null;
 }
 
 /**
@@ -93,7 +102,7 @@ function ViewingChip({ threadId, viewed }: { threadId: string; viewed: Viewed })
   );
 }
 
-/** The bar or composer: in Float's corner, or bottom right on its own. */
+/** The buttons, composer or picker: in Float's corner, or bottom right on its own. */
 function Corner({ children }: { children: ReactNode }) {
   const floatAvailable = useFloatAvailable();
   if (floatAvailable) return <FloatDockPortal>{children}</FloatDockPortal>;
@@ -106,10 +115,10 @@ export function ChatOverlay() {
   const path = usePathname();
   const viewed = useViewing(rpc, path);
   const floatAvailable = useFloatAvailable();
-  const [composing, setComposing] = useState(false);
+  const [open, setOpen] = useState<"compose" | "pick" | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [focus, setFocus] = useState(0);
-  useItemChat(rpc, viewed, floatAvailable);
+  const lastThreadId = useItemChat(rpc, viewed, floatAvailable);
 
   const chip = <FloatThreadLeading render={(threadId) => (viewed ? <ViewingChip threadId={threadId} viewed={viewed} /> : null)} />;
   if (!viewed) return chip;
@@ -117,21 +126,25 @@ export function ChatOverlay() {
   const kindLabel = viewed.kindLabel.toLowerCase();
   const compose = () => {
     setFocus((value) => value + 1);
-    setComposing(true);
+    setOpen("compose");
+  };
+  // Without Float, threads open in BB's own view.
+  const show = (threadId: string, tag?: string) => {
+    if (!openFloat({ kind: "thread", threadId }, tag ? { tag } : {})) navigate.toThread(threadId);
   };
 
   return (
     <>
       {chip}
       <Corner>
-        {composing ? (
+        {open === "compose" ? (
           <section aria-label={`Work with this ${kindLabel}`} className={cn(CARD, "w-[min(460px,calc(100vw-1rem))] mb-2")}>
             <header className="flex items-center gap-2 border-b border-border py-1.5 pr-2 pl-4 text-xs text-muted-foreground">
               <Icon name={viewed.kindIcon} className="size-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate">
                 An agent works on "{untitled(viewed.title)}" with you. @mention a bot to hand it off.
               </span>
-              <button type="button" aria-label="Close composer" className={HEADER_BUTTON} onClick={() => setComposing(false)}>
+              <button type="button" aria-label="Close composer" className={HEADER_BUTTON} onClick={() => setOpen(null)}>
                 <Icon name="X" className="size-4" />
               </button>
             </header>
@@ -148,9 +161,8 @@ export function ChatOverlay() {
                 setError(null);
                 try {
                   const { threadId } = await rpc.call("start", { item: { pluginId: viewed.pluginId, id: viewed.id }, request });
-                  setComposing(false);
-                  // Without Float, the new thread opens in BB's own view.
-                  if (!openFloat({ kind: "thread", threadId }, { tag: ITEM_CHAT_TAG })) navigate.toThread(threadId);
+                  setOpen(null);
+                  show(threadId, ITEM_CHAT_TAG);
                 } catch (cause) {
                   setError(errorMessage(cause));
                   throw cause; // Keeps the draft for another try.
@@ -158,15 +170,39 @@ export function ChatOverlay() {
               }}
             />
           </section>
+        ) : open === "pick" ? (
+          <section aria-label="Open a thread" className={cn(CARD, "studio-chat-picker w-[min(380px,calc(100vw-1rem))] mb-2")}>
+            <ThreadPicker
+              lastThreadId={lastThreadId}
+              onClose={() => setOpen(null)}
+              onPick={(threadId) => {
+                setOpen(null);
+                show(threadId);
+              }}
+            />
+          </section>
         ) : (
-          <button
-            type="button"
-            className="studio-chat-bar pointer-events-auto mb-2 flex h-10 w-[min(300px,calc(100vw-1rem))] items-center gap-2.5 rounded-lg border border-border bg-background px-4 text-left text-sm text-muted-foreground shadow-xl hover:text-foreground"
-            onClick={compose}
-          >
-            <Icon name="MessageSquarePlus" className="size-4 shrink-0" />
-            <span className="flex-1 truncate">Work with this {kindLabel}…</span>
-          </button>
+          <div className="studio-chat-bar pointer-events-auto mb-2 flex h-10 items-center rounded-lg border border-border bg-background p-1 text-sm shadow-xl">
+            <button
+              type="button"
+              title={`Start a thread about this ${kindLabel}`}
+              className="flex h-full items-center gap-2 rounded-md px-3 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+              onClick={compose}
+            >
+              <Icon name="MessageSquarePlus" className="size-4 shrink-0" />
+              New thread
+            </button>
+            <span aria-hidden className="mx-0.5 h-5 w-px bg-border" />
+            <button
+              type="button"
+              title={floatAvailable ? "Open a thread in Float" : "Open a thread"}
+              className="flex h-full items-center gap-2 rounded-md px-3 text-muted-foreground hover:bg-state-hover hover:text-foreground"
+              onClick={() => setOpen("pick")}
+            >
+              <Icon name="MessagesSquare" className="size-4 shrink-0" />
+              Open thread
+            </button>
+          </div>
         )}
       </Corner>
     </>

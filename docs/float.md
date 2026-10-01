@@ -41,7 +41,7 @@ chat from inside the panel.
 ## Other plugins
 
 - `FloatDockPortal` renders in Float's bottom-right corner; Studio Chat's
-  "Work with this…" bar and composer sit there, and a docked panel sits to
+  New thread and Open thread buttons, composer and thread picker sit there, and a docked panel sits to
   their left.
 - `FloatThreadLeading` renders above a thread tab's messages; Studio Chat's
   "Viewing" chip uses it.
