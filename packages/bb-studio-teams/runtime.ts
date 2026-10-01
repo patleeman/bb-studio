@@ -1,3 +1,7 @@
+import { settleFromEvent, complete, cancel, stopRoom, retire, retryJob, deleteRoom, refreshJobActivity, roomJobsWithActivity } from "./runtime-lifecycle";
+import { enqueue, wake, postSystemMessage, postTimeoutNotice, send } from "./runtime-messages";
+import { sourceJobForMessage, messageAncestors, trackDelegation, startReturns, timeoutDelegate, resolveReturn } from "./runtime-delegation";
+import { forkConversation, driveForks } from "./runtime-forks";
 import { publishChange } from "./realtime-server";
 import { recoverRoomTitles, findTitleWorkers, startRoomTitle, generateRoomTitle, cleanupTitleThread, applyRoomTitle } from "./runtime-title";
 import { dispatchMessage, startSteer, startRouting, retryRouting } from "./runtime-routing";
@@ -109,7 +113,7 @@ type TimelineRowLike = {
   children?: unknown;
 };
 
-function timelineRows(rows: unknown): TimelineRowLike[] {
+export function timelineRows(rows: unknown): TimelineRowLike[] {
   if (!Array.isArray(rows)) return [];
   return rows.flatMap((row) => {
     if (!row || typeof row !== "object") return [];
@@ -337,205 +341,29 @@ export class Runtime {
     job: Job,
     permissionMode: PermissionMode,
   ): Promise<Conversation> {
-    const sourceThreadId = job.forkSourceThreadId!;
-    // The dispatch hook holds the first input until both conversation and job are registered.
-    const thread = await this.bb.sdk.threads.fork({
-      sourceThreadId,
-      visibility: "hidden",
-      title: `${bot.name} work · #${this.store.room(job.roomId!).name} · Fork`,
-      permissionMode,
-      pluginMetadata: { botId: bot.id, conversationKey: job.conversationKey },
-      input: [
-        { type: "text", text: jobPrompt(job), mentions: [] },
-        ...job.attachments.map((a) =>
-          a.type === "localImage"
-            ? { type: "localImage" as const, path: a.path }
-            : {
-                type: "localFile" as const,
-                path: a.path,
-                name: a.name,
-                mimeType: a.mimeType,
-                sizeBytes: a.sizeBytes,
-              },
-        ),
-      ],
-    });
-    const c: Conversation = {
-      id: randomUUID(),
-      botId: bot.id,
-      key: job.conversationKey,
-      threadId: thread.id,
-      title: `${this.store.room(job.roomId!).name} · Fork`,
-      kind: "group",
-      createdAt: Date.now(),
-    };
-    this.store.putConversation(c);
-    return c;
+    return forkConversation.call(this, bot, job, permissionMode);
   }
-
   async driveForks(bot: Bot) {
-    const first = new Map<string, Job>();
-    for (const job of this.store.work(bot.id))
-      if (
-        isForkConversation(job.conversationKey) &&
-        !first.has(job.conversationKey)
-      )
-        first.set(job.conversationKey, job);
-    // Reconcile active forks first, then fill available slots. A blocked dispatch
-    // must not prevent another fork from completing or being cleaned up.
-    let active = [...first.values()].filter(
-      (j) => j.status !== "queued",
-    ).length;
-    const failures: unknown[] = [];
-    const ordered = [...first.values()].sort(
-      (a, b) => Number(a.status === "queued") - Number(b.status === "queued"),
-    );
-    for (const job of ordered) {
-      if (
-        job.status === "queued" &&
-        active >= (bot.limits ?? defaultLimits).concurrentForks
-      )
-        continue;
-      const wasQueued = job.status === "queued";
-      try {
-        await this.drive(bot, job);
-      } catch (cause) {
-        failures.push(cause);
-      }
-      if (!wasQueued && !this.store.work(bot.id).some((j) => j.id === job.id))
-        active--;
-      if (
-        wasQueued &&
-        ["running", "dispatching"].includes(
-          this.store.job(job.id)?.status ?? "",
-        )
-      )
-        active++;
-    }
-    if (failures.length) throw failures[0];
+    return driveForks.call(this, bot);
   }
-
   enqueue(
     bot: Bot,
     args: Partial<Job> & Pick<Job, "id" | "text" | "conversationKey">,
   ) {
-    const now = Date.now();
-    return this.store.enqueue({
-      botId: bot.id,
-      threadId: null,
-      status: "queued",
-      reply: null,
-      error: null,
-      createdAt: now,
-      updatedAt: now,
-      startedAt: null,
-      dispatchStartedAt: null,
-      roomId: null,
-      runId: null,
-      triggerMessageId: null,
-      depth: 0,
-      attachments: [],
-      outputAttachments: [],
-      ...args,
-    });
+    return enqueue.call(this, bot, args);
   }
   wake(bot: Bot) {
-    if (bot.retired) throw new Error("Restore this bot before waking it.");
-    if (this.store.work(bot.id).some((j) => j.conversationKey === "mission"))
-      return false;
-    const queued = this.enqueue(bot, {
-      id: randomUUID(),
-      conversationKey: "mission",
-      text: "Review MISSION.md and MEMORY.md. Take one useful, bounded step toward your mission. Record progress and unfinished work in MEMORY.md. If blocked or there is nothing useful to do, say so and stop.",
-    });
-    this.store.put({ ...bot, lastWakeAt: Date.now() });
-    this.changed();
-    return queued;
+    return wake.call(this, bot);
   }
-  /** Persist a channel notice without creating a bot job or triggering members. */
   postSystemMessage(
     room: Room,
     text: string,
     system: "bot_joined",
   ): RoomMessage {
-    const now = Date.now();
-    const id = `system:${randomUUID()}`;
-    const message: RoomMessage = {
-      id,
-      roomId: room.id,
-      runId: id,
-      botId: null,
-      speaker: "BB",
-      system,
-      text,
-      createdAt: now,
-      attachments: [],
-      replyTo: null,
-    };
-    const current = this.store.room(room.id);
-    this.store.db.transaction(() => {
-      this.store.putMessage(message);
-      this.store.putRoom({
-        ...current,
-        updatedAt: Math.max(current.updatedAt + 1, now),
-      });
-    })();
-    return message;
+    return postSystemMessage.call(this, room, text, system);
   }
   postTimeoutNotice(job: Job) {
-    const currentJob = this.store.job(job.id);
-    if (
-      !currentJob ||
-      currentJob.status !== "cancelled" ||
-      !currentJob.timedOut ||
-      !currentJob.timeoutNoticePending
-    )
-      return;
-    job = currentJob;
-    if (!job.roomId) return;
-    const room = this.store.findRoom(job.roomId);
-    if (!room) return;
-    const id = `system:timeout:${job.id}`;
-    if (this.store.message(id)) {
-      this.store.clearTimeoutNoticePending(job.id);
-      return;
-    }
-    const bot = this.store.get(job.botId);
-    const progress =
-      job.activitySnippet?.trim() || "No activity update was recorded.";
-    const message = messageSchema.parse({
-      id,
-      roomId: room.id,
-      runId: job.runId ?? id,
-      botId: null,
-      speaker: "BB",
-      system: "bot_timeout",
-      sourceThreadId: job.threadId ?? undefined,
-      sourceJobId: job.id,
-      conversationKey: job.conversationKey,
-      text: [
-        `${bot.name}'s response stopped before its final report.`,
-        "The bot work thread and workspace are preserved, and this task is incomplete.",
-        `Last recorded progress: ${progress}`,
-      ].join(" "),
-      createdAt: Date.now(),
-    });
-    this.store.db.transaction(() => {
-      this.store.putMessage(message);
-      this.store.queueNotification(
-        `timeout:${job.id}`,
-        room.id,
-        "timeout",
-        job.id,
-      );
-      this.store.clearTimeoutNoticePending(job.id);
-      const current = this.store.room(room.id);
-      this.store.putRoom({
-        ...current,
-        updatedAt: Math.max(current.updatedAt + 1, message.createdAt),
-      });
-    })();
-    this.changed("channel", room.id);
+    return postTimeoutNotice.call(this, job);
   }
   send(
     room: Room,
@@ -548,290 +376,13 @@ export class Runtime {
     requestedMode: SendMode = "auto",
     directMessages: DirectMessageRequest[] = [],
   ): RoomMessage {
-    const parsed = parseSendMode(text, requestedMode);
-    text = parsed.text;
-    const sendMode = scheduled ? "followup" : parsed.mode;
-    const directReplyTo =
-      author?.botId && directMessages.length
-        ? directMessageId(
-            author.sourceThreadId,
-            directMessages.at(-1)!.requestId,
-          )
-        : null;
-    const existing = this.store.message(requestId);
-    if (existing) {
-      if (
-        existing.roomId !== room.id ||
-        existing.botId !== (author?.botId ?? null) ||
-        existing.sourceThreadId !== author?.sourceThreadId ||
-        existing.automationId !==
-          (scheduled?.automationId ?? author?.automationId) ||
-        (existing.sentText ?? existing.text) !== text ||
-        (existing.sendMode ?? "auto") !== sendMode ||
-        existing.replyTo !== (replyTo ?? directReplyTo) ||
-        JSON.stringify(existing.attachments.map((a) => a.id)) !==
-          JSON.stringify(attachments.map((a) => a.id))
-      )
-        throw new Error(
-          "Message request ID was already used for different content.",
-        );
-      return existing;
-    }
-    if (!text.trim() && !attachments.length)
-      throw new Error("Write a message or attach a file.");
-    if (room.archived)
-      throw new Error("Restore this channel before sending a message.");
-    if (replyTo && this.store.message(replyTo)?.roomId !== room.id)
-      throw new Error("Reply message not found in this group.");
-    if (
-      directReplyTo &&
-      (
-        this.store.db
-          .prepare(
-            "SELECT COUNT(*) AS n FROM room_messages WHERE json_extract(json,'$.replyTo')=?",
-          )
-          .get(directReplyTo) as { n: number }
-      ).n
-    )
-      throw new Error("This DM already has a channel answer.");
-    if (
-      author?.botId &&
-      !directMessages.length &&
-      (
-        this.store.db
-          .prepare(
-            "SELECT COUNT(*) AS n FROM room_messages WHERE json_extract(json,'$.sourceThreadId')=? AND json_extract(json,'$.botId') IS NOT NULL",
-          )
-          .get(author.sourceThreadId) as { n: number }
-      ).n >= 3
-    )
-      throw new Error(
-        "This response has already sent three consultation messages. Summarize the results before requesting more work.",
-      );
-    if (author && author.depth > 2)
-      throw new Error(
-        "Bot consultation handoff limit reached. Return your findings to the requesting channel.",
-      );
-    // Explicit sends may invite new bots. This is committed with the message,
-    // so editing a draft or retrying a lost response cannot change membership.
-    if (
-      !scheduled &&
-      this.store.all().some(
-        (bot) =>
-          bot.retired &&
-          !isBroadcastHandle(bot.handle) &&
-          mentioned(text, bot.handle),
-      )
-    )
-      throw new Error("Restore the archived bot before mentioning it.");
-    const invited = this.store
-      .all()
-      .filter(
-        (bot) =>
-          !scheduled &&
-          !bot.retired &&
-          !isBroadcastHandle(bot.handle) &&
-          !room.memberIds.includes(bot.id) &&
-          mentioned(text, bot.handle),
-      );
-    room = {
-      ...room,
-      memberIds: [...new Set([...room.memberIds, ...invited.map((b) => b.id)])],
-    };
-    if (room.memberIds.length > 16)
-      throw new Error("A channel can have up to 16 bots.");
-    const now = Date.now();
-    const run: RoomRun = {
-      id: requestId,
-      roomId: room.id,
-      status: "running",
-      mode: "concurrent",
-      pendingJobIds: [],
-      settledJobIds: [],
-      round: 1,
-      remaining: [],
-      next: [],
-      jobId: null,
-      createdAt: now,
-      error: null,
-    };
-    const m: RoomMessage = {
-      id: requestId,
-      roomId: room.id,
-      runId: run.id,
-      botId: author?.botId ?? null,
-      speaker: scheduled
-        ? `Automation: ${scheduled.name}`
-        : (author?.speaker ?? "You"),
-      ...((scheduled?.automationId ?? author?.automationId)
-        ? { automationId: scheduled?.automationId ?? author?.automationId }
-        : {}),
-      ...(author
-        ? {
-            sourceThreadId: author.sourceThreadId,
-            ...(author.jobId ? { sourceJobId: author.jobId } : {}),
-          }
-        : {}),
-      text: linkChannelReferences(text, this.store.rooms()),
-      sentText: text,
-      ...(sendMode !== "auto" ? { sendMode } : {}),
-      createdAt: now,
-      attachments,
-      replyTo: replyTo ?? directReplyTo,
-    };
-    const shouldAutoTitle =
-      !isAutomationTrigger(m) &&
-      isAutoTitlePlaceholder(room.name) &&
-      !this.store.firstMessage(room.id);
-    const ancestors = this.messageAncestors(m);
-    const members = room.memberIds
-      .map((id) => this.store.get(id))
-      .filter(
-        (b) => !b.retired && b.id !== author?.botId && !ancestors.has(b.id),
-      );
-    const replyBot = replyTo ? this.store.message(replyTo)?.botId : null;
-    const explicit = members
-      .filter((b) => mentioned(text, b.handle) || b.id === replyBot)
-      .map((b) => b.id);
-    const all = mentionsEveryone(text);
-    const returnOnly =
-      !all &&
-      !explicit.length &&
-      [...ancestors].some(
-        (id) => id === replyBot || mentioned(text, this.store.get(id).handle),
-      );
-    const mode = room.responseBehavior ?? "everyone";
-    let selected = scheduled
-      ? [scheduled.botId]
-      : all
-        ? members.map((b) => b.id)
-        : explicit.length
-          ? explicit
-          : members.length === 1
-            ? [members[0]!.id]
-            : mode === "everyone"
-              ? members.map((b) => b.id)
-              : [];
-    if (returnOnly) selected = [];
-    if (mode === "smart" && all && !author?.botId && selected.length) {
-      const coordinatorId = explicit[0] ?? selected[0]!;
-      run.routingPlan = {
-        coordinatorId,
-        collaboratorIds: selected.filter((id) => id !== coordinatorId),
-        executionMode: "parallel",
-        finalizerId: coordinatorId,
-      };
-      m.classifierPlan = run.routingPlan;
-    }
-    if (
-      !scheduled &&
-      !returnOnly &&
-      members.length &&
-      ((mode === "smart" &&
-        !author?.botId &&
-        (sendMode === "auto" || explicit.length !== 1) &&
-        members.length > 1 &&
-        !all) ||
-        (!author?.botId && sendMode === "auto" && (mode !== "smart" || !all) &&
-          this.routingTasks(m, members).some(
-            (task) => selected.includes(task.botId) && task.busy,
-          )))
-    ) {
-      run.routing = "pending";
-      run.routingDepth = author?.depth ?? 0;
-      run.routingBotIds = selected;
-      selected = [];
-    }
-    if (mode === "smart" && !author?.botId && !run.routing && !run.routingPlan && selected.length === 1) {
-      run.routingPlan = {
-        coordinatorId: selected[0]!, collaboratorIds: [], executionMode: "serialized", finalizerId: selected[0]!,
-      };
-      m.classifierPlan = run.routingPlan;
-    }
-    const steerRequests: SteerRequest[] = [];
-    const appliedActions: NonNullable<RoomMessage["classifierActions"]> = [];
-    this.store.db.transaction(() => {
-      if (author?.botId)
-        for (const direct of directMessages)
-          this.store.putMessage({
-            id: directMessageId(author.sourceThreadId, direct.requestId),
-            roomId: room.id,
-            runId: run.id,
-            botId: null,
-            speaker: "You",
-            system: "bot_dm",
-            sourceThreadId: author.sourceThreadId,
-            text: `You sent a DM to ${author.speaker}.`,
-            createdAt: now,
-            attachments: [],
-            replyTo: null,
-          });
-      this.store.putMessage(m);
-      this.store.claimAttachments(attachments.map((a) => a.id));
-      for (const botId of selected) {
-        if (botId === author?.botId) continue;
-        const action = sendMode === "auto" ? "followup" : sendMode;
-        const dispatch = this.dispatchMessage(
-          room,
-          run,
-          m,
-          botId,
-          author?.depth ?? 0,
-          action,
-        );
-        if (dispatch.steer) steerRequests.push(dispatch.steer);
-        if (dispatch.action !== action)
-          appliedActions.push({ botId, action: dispatch.action, suggestedAction: action });
-      }
-      if (appliedActions.length) this.store.setClassifierActions(m.id, appliedActions);
-      if (run.routingPlan?.coordinatorId) {
-        const jobs = this.store.requestJobs(run.id).filter((job) => job.triggerMessageId === m.id);
-        const coordinator = jobs.find((job) => job.botId === run.routingPlan!.coordinatorId);
-        if (coordinator) {
-          for (const job of jobs) {
-            job.rootTaskId = run.id;
-            job.coordinatorId = coordinator.botId;
-            if (job.id !== coordinator.id) job.parentTaskId = coordinator.id;
-            this.store.putJob(job);
-          }
-          if (run.routingPlan.executionMode === "parallel")
-            this.delegations.trackPlanned(m, run, coordinator, jobs.filter((job) => job.id !== coordinator.id));
-        }
-      }
-      if (!run.pendingJobIds.length && !run.routing) run.status = "done";
-      this.trackDelegation(m, run, author?.sourceThreadId);
-      this.store.putRun(run);
-      if (!isAutomationTrigger(m))
-        this.store.putRoom({ ...room, updatedAt: now });
-    })();
-    for (const bot of invited)
-      this.postSystemMessage(
-        room,
-        `${bot.name} joined the channel.`,
-        "bot_joined",
-      );
-    this.changed("channel", room.id);
-    for (const request of steerRequests) this.startSteer(request);
-    if (shouldAutoTitle) this.startRoomTitle(this.store.room(room.id), m);
-    return m;
+    return send.call(this, room, text, requestId, attachments, replyTo, author, scheduled, requestedMode, directMessages);
   }
-
   sourceJobForMessage(message: RoomMessage) {
-    if (message.sourceJobId) return this.store.job(message.sourceJobId);
-    if (message.botId && message.sourceThreadId)
-      return (
-        this.store
-          .work(message.botId)
-          .find(
-            (job) =>
-              job.threadId === message.sourceThreadId && isExecuting(job),
-          ) ?? null
-      );
-    return this.store.job(message.id);
+    return sourceJobForMessage.call(this, message);
   }
   messageAncestors(message: RoomMessage) {
-    const source = this.sourceJobForMessage(message);
-    return source ? this.delegations.ancestors(source) : new Set<string>();
+    return messageAncestors.call(this, message);
   }
   trackDelegation(
     message: RoomMessage,
@@ -839,205 +390,21 @@ export class Runtime {
     sourceThreadId = message.sourceThreadId,
     sourceJob: Job | null = null,
   ) {
-    if (!message.botId) return;
-    sourceJob ??= message.sourceJobId
-      ? this.store.job(message.sourceJobId)
-      : null;
-    sourceJob ??= sourceThreadId
-      ? (this.store
-          .work(message.botId)
-          .find((job) => job.threadId === sourceThreadId && isExecuting(job)) ??
-        null)
-      : this.store.job(message.id);
-    const ancestors = sourceJob
-      ? this.delegations.ancestors(sourceJob)
-      : new Set<string>();
-    const replyBot = message.replyTo
-      ? this.store.message(message.replyTo)?.botId
-      : null;
-    const jobs = this.store
-      .requestJobs(run.id)
-      .filter(
-        (job) =>
-          job.triggerMessageId === message.id &&
-          job.botId !== message.botId &&
-          !ancestors.has(job.botId) &&
-          (mentioned(
-            message.sentText ?? message.text,
-            this.store.get(job.botId).handle,
-          ) ||
-            job.botId === replyBot ||
-            mentionsEveryone(message.sentText ?? message.text)),
-      );
-    this.delegations.track(message, run, jobs, sourceJob);
+    return trackDelegation.call(this, message, run, sourceThreadId, sourceJob);
   }
   startReturns(room: Room) {
-    for (const group of this.delegations.pending(room.id)) {
-      if (
-        this.returnTasks.has(group.id) ||
-        this.returnTasks.size >= 4 ||
-        group.retryAt > Date.now() ||
-        this.abort.signal.aborted
-      )
-        continue;
-      const task = this.resolveReturn(group)
-        .catch((cause) => {
-          const current = this.delegations.get(group.id);
-          if (current?.status === "waiting" && !this.abort.signal.aborted) {
-            current.retryAt = Date.now() + 30000;
-            current.error = errorText(cause);
-            this.delegations.put(current);
-          }
-        })
-        .finally(() => this.returnTasks.delete(group.id));
-      this.returnTasks.set(group.id, task);
-    }
+    return startReturns.call(this, room);
   }
   async timeoutDelegate(
     job: Job,
     deadlineGroupId: string,
     seen = new Set<string>(),
   ) {
-    if (
-      (this.delegations.get(deadlineGroupId)?.deadlineAt ?? Infinity) >
-      Date.now()
-    )
-      return;
-    if (seen.has(job.id)) return;
-    seen.add(job.id);
-    const nested = this.delegations.get(
-      `job:${this.delegations.rootJob(job).id}`,
-    );
-    if (nested?.status === "waiting") {
-      for (const result of this.delegations
-        .results(nested)
-        .filter((result) => result.status === "pending")) {
-        const child = this.store.job(result.jobId);
-        if (child) await this.timeoutDelegate(child, deadlineGroupId, seen);
-      }
-      if (
-        (this.delegations.get(deadlineGroupId)?.deadlineAt ?? Infinity) >
-        Date.now()
-      )
-        return;
-      this.delegations.put({ ...nested, status: "ignored" });
-    }
-    const reason = "Direct delegation timed out before all delegates settled.";
-    await this.locked(job.botId, async () => {
-      const current = this.store.job(job.id);
-      if (
-        !current ||
-        current.triggerMessageId !== job.triggerMessageId ||
-        (this.delegations.get(deadlineGroupId)?.deadlineAt ?? Infinity) >
-          Date.now()
-      )
-        return;
-      if (current.status === "done" && nested?.status === "waiting")
-        this.store.putJob({
-          ...current,
-          status: "cancelled",
-          timedOut: true,
-          error: reason,
-        });
-      else if (
-        !["done", "error", "cancelled"].includes(current.status) ||
-        current.cancellationPending
-      )
-        await this.cancel(current, reason, false, true);
-    });
+    return timeoutDelegate.call(this, job, deadlineGroupId, seen);
   }
   async resolveReturn(group: Delegation) {
-    const source = group.sourceJobId
-      ? this.delegations.attempt(group.sourceJobId)
-      : null;
-    if (source && ["queued", "dispatching", "running"].includes(source.status))
-      return;
-    let results = this.delegations.results(group);
-    if (results.some((result) => result.status === "pending")) {
-      if (Date.now() < group.deadlineAt) return;
-      for (const result of results.filter(
-        (result) => result.status === "pending",
-      )) {
-        const job = this.store.job(result.jobId);
-        if (job) await this.timeoutDelegate(job, group.id);
-      }
-      results = this.delegations.results(group);
-      if (results.some((result) => result.status === "pending")) return;
-    }
-    if (!this.returnDecision)
-      throw new Error("Delegation classifier is unavailable.");
-    const snapshot = JSON.stringify(results);
-    const shouldReturn =
-      source?.status !== "cancelled" &&
-      (group.planned || await this.returnDecision(group, this.abort.signal));
-    if (this.abort.signal.aborted) return;
-    await this.locked(`room:${group.roomId}`, async () => {
-      const live = this.delegations.get(group.id);
-      if (
-        !live ||
-        live.status !== "waiting" ||
-        JSON.stringify(this.delegations.results(live)) !== snapshot
-      )
-        return;
-      const latestSource = live.sourceJobId
-        ? this.delegations.attempt(live.sourceJobId)
-        : null;
-      if (
-        latestSource?.id !== source?.id ||
-        latestSource?.status !== source?.status ||
-        latestSource?.triggerMessageId !== source?.triggerMessageId
-      )
-        return;
-      const room = this.store.findRoom(live.roomId);
-      const run = room
-        ? this.store
-            .runs(room.id)
-            .find((candidate) => candidate.id === live.runId)
-        : null;
-      const bot = this.store.get(live.requesterBotId);
-      this.store.db.transaction(() => {
-        live.status = "ignored";
-        if (
-          shouldReturn &&
-          latestSource?.status !== "cancelled" &&
-          room &&
-          !room.archived &&
-          room.memberIds.includes(bot.id) &&
-          !bot.retired &&
-          run &&
-          run.status !== "stopped" &&
-          run.pendingJobIds.length + run.settledJobIds.length < 32
-        ) {
-          const id = `return:${live.id}:${bot.id}`;
-          if (
-            this.enqueue(bot, {
-              id,
-              conversationKey: live.conversationKey,
-              roomId: room.id,
-              runId: run.id,
-              triggerMessageId: this.delegations.returnTrigger(live),
-              delegationId: source?.delegationId,
-              returnOf: live.id,
-              ...(source?.rootTaskId ? { rootTaskId: source.rootTaskId } : {}),
-              ...(source ? { parentTaskId: source.id } : {}),
-              ...(source?.coordinatorId ? { coordinatorId: source.coordinatorId } : {}),
-              depth: 2,
-              text: this.delegations.prompt(live),
-              taskTitle: "Synthesize delegate results",
-            })
-          )
-            run.pendingJobIds.push(id);
-          live.status = "returned";
-          live.returnJobId = id;
-          run.status = "running";
-          this.store.putRun(run);
-        }
-        this.delegations.put(live);
-      })();
-      this.changed();
-    });
+    return resolveReturn.call(this, group);
   }
-
   targetKey(message: RoomMessage, botId: string) {
     const primary = `group:${message.roomId}`;
     const parent = message.replyTo ? this.store.message(message.replyTo) : null;
@@ -1435,90 +802,10 @@ export class Runtime {
     error?: string | null,
     acceptJoinedDirectMessage = false,
   ) {
-    const job = this.activeJobForThread(threadId);
-    if (!job) {
-      this.complete(threadId, text, error ?? undefined);
-      return;
-    }
-    try {
-      const thread = await this.bb.sdk.threads.get({ threadId });
-      if (error !== undefined ? thread.status !== "error" : thread.status !== "idle") return;
-      const matches = await this.latestPromptMatches(threadId, jobPrompt(job));
-      if (
-        (matches === false || (job.requiresPromptMatch && matches !== true)) &&
-        !acceptJoinedDirectMessage
-      )
-        return;
-      if (error === undefined && text?.trim()) {
-        const output = (await this.bb.sdk.threads.output({ threadId })).output;
-        if (output?.trim() && output.trim() !== text.trim()) return;
-      }
-    } catch (cause) {
-      if (missingThread(cause)) {
-        this.complete(threadId, null, "The work conversation was deleted.");
-        return;
-      }
-      this.bb.log.debug(
-        `Persistent bot event verification failed: ${errorText(cause)}`,
-      );
-      return;
-    }
-    const current = this.activeJobForThread(threadId);
-    if (
-      current?.id !== job.id ||
-      current.triggerMessageId !== job.triggerMessageId
-    )
-      return;
-    this.complete(
-      threadId,
-      text,
-      error === undefined
-        ? undefined
-        : error?.trim() || (await this.failureFromThread(threadId, job)),
-      error !== undefined && await this.providerFailed(threadId, job),
-    );
+    return settleFromEvent.call(this, threadId, text, error, acceptJoinedDirectMessage);
   }
   complete(threadId: string, text: string | null, error?: string, providerFailure = false) {
-    const c = this.store.byThread(threadId);
-    if (!c) return;
-    const lane = primaryLane(c.botId, c.key);
-    if (this.busy.get(lane)?.threadId === threadId)
-      this.busy.delete(lane);
-    const job = this.activeJobForThread(threadId);
-    if (!job) return;
-    const bot = this.store.get(job.botId);
-    if (providerFailure && !text?.trim() && !job.outputAttachments.length &&
-      bot.fallbackProviderId && !job.fallbackAttempted &&
-      (bot.fallbackProviderId !== bot.providerId || bot.fallbackModel !== bot.model ||
-        bot.fallbackReasoningLevel !== bot.reasoningLevel) &&
-      !job.forkSourceThreadId && c.key === job.conversationKey) {
-      // Reuse the same job and prompt, but start a fresh session on the fallback.
-      // The failed thread remains in history for inspection.
-      this.store.archiveConversation(c);
-      job.fallbackAttempted = true;
-      job.threadId = null;
-      job.status = "queued";
-      job.startedAt = null;
-      job.dispatchStartedAt = null;
-      job.requiresPromptMatch = false;
-      job.error = null;
-      this.store.putJob(job);
-      this.changed();
-      return;
-    }
-    if (error || (!text?.trim() && !job.outputAttachments.length)) {
-      if (providerFailure && job.fallbackAttempted && c.key === job.conversationKey)
-        this.store.archiveConversation(c);
-      job.status = "error";
-      job.error =
-        error ||
-        "The turn finished without an answer. Inspect the conversation.";
-    } else {
-      job.reply = text?.trim() || "[PASS]";
-      job.status = "done";
-    }
-    this.store.putJob(job);
-    this.changed();
+    return complete.call(this, threadId, text, error, providerFailure);
   }
   async cancel(
     job: Job,
@@ -1526,351 +813,25 @@ export class Runtime {
     requireStopped = false,
     timedOut = false,
   ) {
-    const persistedJob = this.store.job(job.id);
-    job.timedOut ||= persistedJob?.timedOut ?? false;
-    job.timeoutNoticePending ||= persistedJob?.timeoutNoticePending ?? false;
-    job.cancellationPending =
-      !!job.threadId ||
-      job.status === "dispatching" ||
-      !!job.cancellationPending;
-    job.status = "cancelled";
-    job.timedOut ||= timedOut;
-    if (timedOut) job.timeoutNoticePending = true;
-    job.error = reason;
-    this.store.putJob(job);
-    const activityRefresh = job.timedOut
-      ? this.refreshJobActivity(job)
-      : Promise.resolve(job);
-    let stopSucceeded = false;
-    let stopFailure: unknown;
-    if (job.threadId) {
-      try {
-        const queued = await this.bb.sdk.threads.queuedMessages.list({
-          threadId: job.threadId,
-        });
-        for (const entry of queued)
-          await this.bb.sdk.threads.queuedMessages.delete({
-            threadId: job.threadId,
-            queuedMessageId: entry.id,
-          });
-        await this.bb.sdk.threads.stop({ threadId: job.threadId });
-        stopSucceeded = true;
-      } catch (cause) {
-        if (missingThread(cause)) stopSucceeded = true;
-        else stopFailure = cause;
-      }
-      if (stopSucceeded) {
-        const current = this.store.job(job.id);
-        if (current?.cancellationPending) {
-          current.cancellationPending = false;
-          this.store.putJob(current);
-        }
-        const lane = primaryLane(job.botId, job.conversationKey);
-        if (this.busy.get(lane)?.threadId === job.threadId)
-          this.busy.delete(lane);
-      }
-    }
-    await activityRefresh;
-    const current = this.store.job(job.id);
-    if (current?.status === "cancelled" && current.timedOut) {
-      try {
-        this.postTimeoutNotice(current);
-      } catch (cause) {
-        this.bb.log.warn(`Posting timeout status failed: ${errorText(cause)}`);
-      }
-    }
-    if (stopFailure) throw stopFailure;
-    if (requireStopped && this.store.job(job.id)?.cancellationPending)
-      throw new Error(
-        "Still locating a cancelled response. Try again after automatic cleanup finishes.",
-      );
-    this.changed();
+    return cancel.call(this, job, reason, requireStopped, timedOut);
   }
   async stopRoom(room: Room) {
-    for (const run of this.store.runs(room.id))
-      this.routingAborts.get(run.id)?.abort();
-    // Publish answers that already finished before archiving/cancelling pending work.
-    await this.driveRoom(room);
-    room = this.store.room(room.id);
-    const next = { ...room, paused: false, updatedAt: Date.now() };
-    this.store.putRoom(next);
-    // Keep the run and roster retryable until host cleanup succeeds.
-    for (const bot of this.store.all())
-      await this.locked(bot.id, async () => {
-        for (const job of this.store.work(bot.id))
-          if (job.roomId === room.id)
-            await this.cancel(job, "Channel archived by the owner.", true);
-      });
-    for (const run of this.store.runs(room.id))
-      if (run.status === "queued" || run.status === "running") {
-        run.status = "stopped";
-        run.remaining = [];
-        run.next = [];
-        this.store.putRun(run);
-      }
-    this.changed("channel", room.id);
-    return next;
+    return stopRoom.call(this, room);
   }
   async retire(id: string, retired: boolean): Promise<Bot> {
-    return this.locked("rooms", async () => {
-      const roomIds = this.store
-        .rooms()
-        .map((r) => r.id)
-        .sort();
-      const lockRooms = async (i: number): Promise<Bot> => {
-        if (i < roomIds.length)
-          return this.locked(`room:${roomIds[i]}`, () => lockRooms(i + 1));
-        return this.locked(id, async () => {
-          const bot = this.store.get(id);
-          if (!!bot.retired === retired) return bot;
-          if (retired) {
-            for (const job of this.store.work(id))
-              await this.cancel(job, "Bot archived by the owner.", true);
-            for (const c of this.store
-              .conversations(id)
-              .filter((c) => c.kind === "admin" && !c.archivedAt)) {
-              try {
-                for (const q of await this.bb.sdk.threads.queuedMessages.list({
-                  threadId: c.threadId,
-                }))
-                  await this.bb.sdk.threads.queuedMessages.delete({
-                    threadId: c.threadId,
-                    queuedMessageId: q.id,
-                  });
-                await this.bb.sdk.threads.stop({ threadId: c.threadId });
-              } catch (cause) {
-                if (!missingThread(cause)) throw cause;
-              }
-            }
-          }
-          const next = {
-            ...bot,
-            retired,
-            // Archiving and restoring both leave the mission schedule off.
-            intervalMinutes: 0,
-            updatedAt: Math.max(Date.now(), bot.updatedAt + 1),
-          };
-          this.store.db.transaction(() => {
-            this.store.put(next);
-            if (retired)
-              for (const room of this.store.rooms())
-                if (room.memberIds.includes(id))
-                  this.store.putRoom({
-                    ...room,
-                    memberIds: room.memberIds.filter((b) => b !== id),
-                    updatedAt: Date.now(),
-                  });
-          })();
-          this.busy.delete(id);
-          this.changed();
-          return next;
-        });
-      };
-      return lockRooms(0);
-    });
+    return retire.call(this, id, retired);
   }
   async retryJob(id: string): Promise<Job> {
-    const original = this.store.job(id);
-    if (!original?.roomId)
-      throw new Error("Only channel responses can be retried.");
-    return this.locked(`room:${original.roomId}`, async () => {
-      const job = this.store.job(id);
-      if (!job?.roomId)
-        throw new Error("This response is no longer available.");
-      const room = this.store.room(job.roomId);
-      if (room.archived)
-        throw new Error("Restore this channel before retrying.");
-      const bot = this.store.get(job.botId);
-      if (bot.retired || !room.memberIds.includes(bot.id))
-        throw new Error("Invite this bot before retrying.");
-      if (
-        !["error", "cancelled"].includes(job.status) ||
-        job.cancellationPending
-      )
-        throw new Error("Wait for this response to stop before retrying.");
-      const retryId = `retry:${createHash("sha256").update(id).digest("hex").slice(0, 32)}`;
-      const existing = this.store.job(retryId);
-      if (existing) return existing;
-      const run = this.store.runs(room.id).find((r) => r.id === job.runId);
-      if (!run) throw new Error("The original discussion was not found.");
-      this.store.db.transaction(() => {
-        this.enqueue(bot, {
-          id: retryId,
-          retryOf: id,
-          delegationId: job.delegationId,
-          returnOf: job.returnOf,
-          rootTaskId: job.rootTaskId,
-          parentTaskId: job.parentTaskId,
-          coordinatorId: job.coordinatorId,
-          dispatchAction: job.dispatchAction,
-          forkSourceThreadId: job.forkSourceThreadId,
-          ...(job.automationId ? { automationId: job.automationId } : {}),
-          text: job.text,
-          conversationKey: job.conversationKey,
-          roomId: room.id,
-          runId: run.id,
-          triggerMessageId: job.triggerMessageId,
-          depth: job.depth,
-          attachments: job.attachments,
-        });
-        if (job.delegationId) {
-          const group = this.delegations.get(job.delegationId);
-          if (group?.status === "waiting") {
-            group.deadlineAt = Math.max(
-              group.deadlineAt,
-              Date.now() + (bot.limits ?? defaultLimits).minutesPerTurn * 60000,
-            );
-            this.delegations.put(group);
-          }
-        }
-        this.store.putRun({
-          ...run,
-          status: "running",
-          pendingJobIds: [...run.pendingJobIds, retryId],
-        });
-      })();
-      this.changed();
-      return this.store.job(retryId)!;
-    });
+    return retryJob.call(this, id);
   }
   async deleteRoom(id: string): Promise<boolean> {
-    return this.locked(`room:${id}`, async () => {
-      if (!this.store.findRoom(id)) return false;
-      for (const run of this.store.runs(id))
-        this.routingAborts.get(run.id)?.abort();
-      // Wait for in-flight dispatches to finish registering their threads. Use
-      // a stable lock order so simultaneous deletions cannot deadlock.
-      const botIds = [
-        ...new Set(this.store.roomJobs(id, -1).map((j) => j.botId)),
-      ].sort();
-      const remove = async (index: number): Promise<boolean> => {
-        if (index < botIds.length)
-          return this.locked(botIds[index]!, () => remove(index + 1));
-        const jobs = this.store.roomJobs(id, -1);
-        if (jobs.some((j) => j.status === "dispatching" && !j.threadId))
-          throw new Error(
-            "A bot response is still being located. Check channel activity and try deleting again.",
-          );
-        for (const job of jobs) {
-          // Retry interrupted cancellation too; don't delete the record until
-          // BB confirms its queued input and active turn have both stopped.
-          if (!["done", "error"].includes(job.status))
-            await this.cancel(job, "Channel deleted by the owner.");
-          if (this.store.job(job.id)?.cancellationPending)
-            throw new Error(
-              "Still locating a cancelled response. Try deleting again after cleanup finishes.",
-            );
-        }
-        const deleted = this.store.db.transaction(() => {
-          this.store.db
-            .prepare("DELETE FROM channel_notifications WHERE room_id=?")
-            .run(id);
-          this.store.db
-            .prepare("DELETE FROM delegations WHERE room_id=?")
-            .run(id);
-          this.store.db
-            .prepare("DELETE FROM channel_context WHERE room_id=?")
-            .run(id);
-          this.store.db
-            .prepare("DELETE FROM document_revisions WHERE scope=?")
-            .run(`channel:${id}`);
-          this.store.db
-            .prepare("DELETE FROM routing_usage WHERE room_id=?")
-            .run(id);
-          return this.store.deleteRoom(id);
-        })();
-        this.changed();
-        return deleted;
-      };
-      return remove(0);
-    });
+    return deleteRoom.call(this, id);
   }
   async refreshJobActivity(job: Job): Promise<Job> {
-    if (!job.threadId) return this.store.job(job.id) ?? job;
-    try {
-      const timeline = await this.bb.sdk.threads.timeline({
-        threadId: job.threadId,
-        includeNestedRows: "true",
-        segmentLimit: "100",
-      });
-      const activitySnippet = activitySnippetFromTimeline(
-        timeline,
-        job.dispatchStartedAt ?? job.startedAt,
-      );
-      if (!activitySnippet || activitySnippet === job.activitySnippet)
-        return this.store.job(job.id) ?? job;
-      return (
-        this.store.updateActivitySnippet(job.id, activitySnippet) ??
-        this.store.job(job.id) ??
-        job
-      );
-    } catch (cause) {
-      if (!missingThread(cause))
-        this.bb.log.debug(
-          `Channel activity refresh failed: ${errorText(cause)}`,
-        );
-      return this.store.job(job.id) ?? job;
-    }
+    return refreshJobActivity.call(this, job);
   }
   async roomJobsWithActivity(roomId: string): Promise<Job[]> {
-    const jobs = this.store.roomJobs(roomId).map((job) => {
-      const title =
-        job.taskTitle ??
-        (job.triggerMessageId
-          ? this.store.message(job.triggerMessageId)?.text.slice(0, 240)
-          : undefined);
-      if (job.status !== "queued") return { ...job, taskTitle: title };
-      const pending = this.store
-        .work(job.botId)
-        .filter(
-          (j) =>
-            isForkConversation(job.conversationKey)
-              ? isForkConversation(j.conversationKey)
-              : j.conversationKey === job.conversationKey,
-        );
-      return {
-        ...job,
-        taskTitle: title,
-        queuePosition: pending.findIndex((j) => j.id === job.id) + 1,
-        queueReason:
-          this.store.get(job.botId).error ??
-          (isForkConversation(job.conversationKey)
-            ? "Waiting for a fork slot"
-            : "Waiting for this bot's earlier work"),
-      };
-    });
-    return Promise.all(
-      jobs.map(async (job) => {
-        if (
-          job.status === "error" &&
-          job.error === "Agent turn failed." &&
-          job.threadId
-        ) {
-          let lookup = this.failureLookups.get(job.id);
-          if (!lookup) {
-            lookup = this.failureFromThread(
-              job.threadId,
-              job,
-              job.updatedAt + 1000,
-            );
-            this.failureLookups.set(job.id, lookup);
-          }
-          const detail = await lookup;
-          if (detail !== job.error) {
-            const updated = this.store.replaceGenericJobError(job.id, detail);
-            if (updated) {
-              this.failureLookups.delete(job.id);
-              this.changed();
-              return { ...updated, taskTitle: job.taskTitle };
-            }
-          }
-        }
-        if (!job.threadId || !["dispatching", "running"].includes(job.status))
-          return job;
-        const current = await this.refreshJobActivity(job);
-        return { ...current, taskTitle: job.taskTitle };
-      }),
-    );
+    return roomJobsWithActivity.call(this, roomId);
   }
   async driveRoom(room: Room) {
     return driveRoom.call(this, room);
