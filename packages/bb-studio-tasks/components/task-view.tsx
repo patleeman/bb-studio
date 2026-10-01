@@ -163,7 +163,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
               <Icon name="Bot" className="size-4" /> Hand off
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onSelect={() => openNewItemThread(navigate, thread)}>
+          <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread about this
           </DropdownMenuItem>
           {openThreads ? (

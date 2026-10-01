@@ -134,9 +134,9 @@ bundles it in.
 BB installs a Git plugin by cloning the repository and running
 `npm install --omit=dev` in the plugin's directory, so the `file:` link
 resolves inside the clone. Each plugin's `package-lock.json` must include the
-kit; regenerate locks in a clean clone rather than the pnpm workspace, which
-leaks `.pnpm` paths. The kit ships `clsx` and `tailwind-merge` as
-dependencies; React, Radix, sonner and the SDK are host shims.
+kit; run `scripts/refresh-locks.sh <package>` to regenerate a lock in a clean
+clone. The kit declares the runtime dependencies of its UI primitives. React,
+sonner, and the SDK are host shims.
 
 - **Tokens:** BB theme variables only (`--background`, `--foreground`,
   `--muted-foreground`, `--border`, `bg-state-hover`, `bg-state-active`).
@@ -147,13 +147,19 @@ dependencies; React, Radix, sonner and the SDK are host shims.
 - **Standalone collection:** `AddOnCollection` wraps `CollectionPage` for an
   add-on's own panel, backed by the add-on's own `studio_*` methods, and hands
   over to Studio when it's present.
+- **Add-on panel:** `AddOnPanel` combines the provider RPC, realtime refresh,
+  collection, item route, and back navigation for add-on nav panels.
 - **Item chrome:** `ItemHeader` is the top bar every item view uses: back
-  pill, title or breadcrumb, status, and the view's own buttons. It floats
+  pill, title or breadcrumb, status, and the view's own buttons. Its `thread`
+  prop adds the shared New thread action. `ItemMenu`, `ItemDeleteConfirm`, and
+  `ItemDirectiveCard` share item actions and directive states. The header floats
   over content by default; Draw pins it above the canvas with `relative`.
 - **Pieces:** button classes (`PRIMARY_BUTTON`, `FLOATING_BUTTON`,
   `ICON_BUTTON`, …), `ItemTile`, `Badge`, `EmptyState`, `Checkbox`,
-  `useProjects`, `relativeTime`, `mentionPrompt`, and the vendored menu
-  primitives.
+  `useProjects`, `relativeTime`, `formatBytes`, and `mentionPrompt`.
+- **UI primitives:** `@bb-studio/kit/ui` exports the shared button, form,
+  menu, dialog, overlay, icon, and viewport primitives. Each plugin's build
+  scans `bb.pluginTailwindContent` from the kit for their classes.
 
 ## What changes in each plugin
 

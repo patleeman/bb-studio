@@ -25,6 +25,7 @@ export function ItemMenu({
   onMove,
   onDelete,
   deleteDisabled,
+  busy = false,
   className,
 }: {
   children?: ReactNode;
@@ -33,13 +34,14 @@ export function ItemMenu({
   onMove?(projectId: string | null): void;
   onDelete?(): void;
   deleteDisabled?: boolean;
+  busy?: boolean;
   className?: string;
 }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button type="button" aria-label="More" className={ICON_BUTTON}>
-          <Icon name="MoreHorizontal" className="size-4" />
+          <Icon name={busy ? "Loading" : "MoreHorizontal"} className={cn("size-4", busy && "animate-spin motion-reduce:animate-none")} />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className={cn("w-56", className)}>
