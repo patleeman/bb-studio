@@ -1,7 +1,14 @@
 // Server helpers for Studio add-ons. Pure functions over the SDK objects the
 // caller passes in; no runtime imports, for the reason in contract.ts.
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
-import { STUDIO_CHANGED_METHOD, STUDIO_PLUGIN_ID, type StudioSchemas } from "./contract";
+import { STUDIO_CHANGED_METHOD, STUDIO_PLUGIN_ID, type StudioSchemas } from "../contract";
+
+export { createChangeBus } from "./change-bus";
+export { createStoreProvider, mustGet, storeActions, storeSearch } from "./provider";
+export { defineItemMention } from "./mention";
+export { serveBytes } from "./bytes";
+export { discoverProviders, fanOutProviders } from "./discovery";
+export { actorName, type Actor } from "./actor";
 
 export type StudioProviderHandlers = PluginRpcHandlers<StudioSchemas["provider"]>;
 

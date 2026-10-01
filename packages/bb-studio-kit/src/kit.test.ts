@@ -19,6 +19,7 @@ const RUNTIME = new Set([
   "class-variance-authority",
   "@radix-ui/react-dropdown-menu",
   "@get-bb/plugin-sdk/app",
+  "node:crypto",
 ]);
 
 function sources(dir: string): string[] {

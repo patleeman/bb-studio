@@ -124,6 +124,25 @@ export interface StudioCreateEventDetail {
 
 export type StudioItemsByPlugin = Record<string, StudioItem[]>;
 
+/** The tag RPC schemas shared by Studio and optional tag clients. */
+export function studioTagSchemas(z: typeof Zod) {
+  const tag = z.object({ id: z.string(), name: z.string(), color: z.string() });
+  const tagId = z.string().min(1).max(100);
+  const tagName = z.string().min(1).max(100);
+  const itemRef = z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) });
+  return {
+    tag,
+    tagId,
+    tagName,
+    itemRef,
+    createTag: { input: z.object({ name: tagName }), output: z.object({ tag }) },
+    tagItems: {
+      input: z.object({ items: z.array(itemRef).min(1).max(500), add: z.array(tagId).max(50), remove: z.array(tagId).max(50) }),
+      output: z.object({ ok: z.boolean() }),
+    },
+  };
+}
+
 /** Zod schemas for the contract, built from the caller's zod. */
 export function studioSchemas(z: typeof Zod) {
   const tone = z.enum(["neutral", "live", "progress", "warning", "danger", "success"]);
