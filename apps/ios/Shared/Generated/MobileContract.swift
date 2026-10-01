@@ -5,12 +5,15 @@ public enum Mobile {
   public enum Method {
     public static let live_register = "live_register"
     public static let mute_list = "mute_list"
+    public static let notify = "notify"
     public static let mute_set = "mute_set"
   }
 
   public typealias LiveRegister = LiveRegisterOutput
 
   public typealias MuteList = MuteListOutput
+
+  public typealias Notify = NotifyOutput
 
   public typealias MuteSet = MuteSetOutput
 
@@ -49,6 +52,63 @@ public enum Mobile {
 
     public init(threadIds: [String]? = nil) {
       self.threadIds = threadIds
+    }
+  }
+
+  public enum NotifyInputKind: Sendable, Hashable, Codable {
+    case turn_finished
+    case thread_error
+    case pending_interaction
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "turn-finished": self = .turn_finished
+      case "thread-error": self = .thread_error
+      case "pending-interaction": self = .pending_interaction
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .turn_finished: try container.encode("turn-finished")
+      case .thread_error: try container.encode("thread-error")
+      case .pending_interaction: try container.encode("pending-interaction")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct NotifyInput: Sendable, Hashable, Codable {
+    public var title: String?
+    public var body: String?
+    public var kind: NotifyInputKind?
+    public var threadId: String?
+    public var projectId: String?
+    public var path: String?
+    public var coalesceKey: String?
+
+    public init(title: String? = nil, body: String? = nil, kind: NotifyInputKind? = nil, threadId: String? = nil, projectId: String? = nil, path: String? = nil, coalesceKey: String? = nil) {
+      self.title = title
+      self.body = body
+      self.kind = kind
+      self.threadId = threadId
+      self.projectId = projectId
+      self.path = path
+      self.coalesceKey = coalesceKey
+    }
+  }
+
+  public struct NotifyOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var sent: Double?
+
+    public init(ok: Bool? = nil, sent: Double? = nil) {
+      self.ok = ok
+      self.sent = sent
     }
   }
 

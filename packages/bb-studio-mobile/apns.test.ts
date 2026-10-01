@@ -1,6 +1,6 @@
 import { createPublicKey, generateKeyPairSync, verify } from "node:crypto";
 import { describe, expect, it } from "vitest";
-import { apnsPayload, deliverApns, normalizePem, notificationCategory, ProviderToken, type ApnsConfig, type ApnsSend } from "./apns.js";
+import { apnsPayload, deliverApns, normalizePem, notificationCategory, ProviderToken, rememberedDevices, DEVICE_TTL_MS, type ApnsConfig, type ApnsSend } from "./apns.js";
 
 const { privateKey } = generateKeyPairSync("ec", { namedCurve: "prime256v1" });
 const pem = privateKey.export({ type: "pkcs8", format: "pem" }).toString();
@@ -144,5 +144,23 @@ describe("deliverApns", () => {
     const ticket = await deliverApns({ to: "apns:not-hex" }, config, provider, send);
     expect(ticket.status).toBe("error");
     expect(calls).toHaveLength(0);
+  });
+});
+
+describe("rememberedDevices", () => {
+  it("keeps delivered APNs tokens, drops rejected and stale ones, and ignores Expo", () => {
+    const now = DEVICE_TTL_MS * 2;
+    const devices = rememberedDevices(
+      { "apns:gone": 1, "apns:stale": 1, "apns:recent": now - 1000 },
+      [{ to: "apns:new" }, { to: "apns:gone" }, { to: "ExponentPushToken[x]" }, { to: "apns:failed" }],
+      [
+        { status: "ok" },
+        { status: "error", details: { error: "DeviceNotRegistered" } },
+        { status: "ok" },
+        { status: "error", message: "APNs key is not set" },
+      ],
+      now,
+    );
+    expect(devices).toEqual({ "apns:new": now, "apns:recent": now - 1000 });
   });
 });

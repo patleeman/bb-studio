@@ -231,6 +231,35 @@ test("outbox survives a sender outage and retries only undispatched events", asy
   }
 });
 
+test("falls back to the mobile relay when BB has no shared notification queue", async () => {
+  const x = setup();
+  try {
+    x.store.putMessage(x.message);
+    const calls: { pluginId: string; method: string; input?: unknown }[] = [];
+    x.harness.inspection.sdk.stub(
+      "plugins.callRpc",
+      async <T>(args: { pluginId: string; method: string; input?: unknown; outputSchema: z.ZodType<T> }) => {
+        calls.push({ pluginId: args.pluginId, method: args.method, input: args.input });
+        if (args.pluginId === "push-notifications")
+          throw new Error('HTTP 404: plugin "push-notifications" has no rpc method "notifications.enqueue"');
+        return args.outputSchema.parse({ ok: true });
+      },
+    );
+    await x.notifications.flush();
+    await x.notifications.flush();
+    assert.deepEqual(
+      calls.map((call) => `${call.pluginId} ${call.method}`),
+      ["push-notifications notifications.enqueue", "mobile notify"],
+    );
+    assert.equal(
+      z.object({ title: z.string() }).parse(calls[1]!.input).title,
+      "#Research · Atlas",
+    );
+  } finally {
+    await x.harness.lifecycle.dispose();
+  }
+});
+
 test("pending input targets its work thread and is suppressed when read or answered", async () => {
   const x = setup();
   try {

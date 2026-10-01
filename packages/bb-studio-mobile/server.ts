@@ -5,6 +5,9 @@
 // `expoPushUrl` at this plugin's /push route, which sends those to APNs and
 // forwards every other token to Expo unchanged.
 //
+// Plugins without BB's shared notification queue send through `notify`, which
+// reaches the devices this relay has delivered to before.
+//
 // It also drives the app's one status Live Activity (see live.ts): thread
 // events recompute "needs you / running" and push start, update, or end.
 import { readFile } from "node:fs/promises";
@@ -18,6 +21,7 @@ import {
   isHexToken,
   notificationCategory,
   ProviderToken,
+  rememberedDevices,
   sendApns,
   type ApnsConfig,
   type ExpoMessage,
@@ -38,6 +42,8 @@ type ThreadActivityRecord = { id: string; token: string; startedAt: number; stat
 /** Thread ids whose notifications BB Studio shouldn't get. */
 const MUTED_KEY = "muted-threads";
 const MAX_MUTED = 500;
+/** APNs recipients seen on the relay, with when each was last seen. */
+const DEVICES_KEY = "devices";
 
 const hexToken = z
   .string()
@@ -60,6 +66,19 @@ export const liveContract = defineRpcContract({
     experimental_description: "Threads muted in BB Studio.",
     input: z.object({}).optional(),
     output: z.object({ threadIds: z.array(z.string()) }),
+  },
+  notify: {
+    experimental_description: "Another plugin sends a notification to the phones BB Studio has delivered to.",
+    input: z.object({
+      title: z.string().max(200),
+      body: z.string().max(4000),
+      kind: z.enum(["turn-finished", "thread-error", "pending-interaction"]),
+      threadId: z.string().min(1).nullable(),
+      projectId: z.string().min(1),
+      path: z.string().max(500).optional(),
+      coalesceKey: z.string().max(300).optional(),
+    }),
+    output: z.object({ ok: z.literal(true), sent: z.number() }),
   },
   mute_set: {
     experimental_description: "BB Studio mutes or unmutes a thread's notifications on this phone.",
@@ -243,6 +262,7 @@ export default async function plugin(bb: BbPluginApi) {
       });
     }
 
+    await rememberDevices(messages, tickets);
     const errors = tickets.flatMap((ticket) => (ticket.status === "error" ? [ticket.message ?? "unknown"] : []));
     for (const error of new Set(errors)) bb.log.warn(`push delivery failed: ${error}`);
     await bb.storage.kv.set(LAST_DELIVERY_KEY, {
@@ -253,6 +273,11 @@ export default async function plugin(bb: BbPluginApi) {
       categories: apnsIndexes.map((index) => notificationCategory(messages[index]!.data ?? {}) ?? "none"),
     } satisfies LastDelivery);
     return tickets;
+  }
+
+  async function rememberDevices(messages: ExpoMessage[], tickets: ExpoTicket[]) {
+    const devices = (await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {};
+    await bb.storage.kv.set(DEVICES_KEY, rememberedDevices(devices, messages, tickets, Date.now()));
   }
 
   // Token auth: only the push-notifications sender (given the tokened URL) may post here.
@@ -424,6 +449,17 @@ export default async function plugin(bb: BbPluginApi) {
       });
       scheduleReconcile();
       return { ok: true as const };
+    },
+    async notify(input) {
+      const devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {});
+      // Without a thread there is nothing to reply to, so leave out the kind that adds a reply box.
+      const data = input.threadId
+        ? { kind: input.kind, threadId: input.threadId, projectId: input.projectId, ...(input.path ? { path: input.path } : {}) }
+        : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}) };
+      if (devices.length > 0) {
+        await deliver(devices.map((to) => ({ to, title: input.title, body: input.body, sound: "default", data })));
+      }
+      return { ok: true as const, sent: devices.length };
     },
     async mute_list() {
       return { threadIds: (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [] };

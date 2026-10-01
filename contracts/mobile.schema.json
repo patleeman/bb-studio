@@ -66,6 +66,78 @@
         "additionalProperties": false
       }
     },
+    "notify": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "title": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "body": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "turn-finished",
+              "thread-error",
+              "pending-interaction"
+            ]
+          },
+          "threadId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "projectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "path": {
+            "type": "string",
+            "maxLength": 500
+          },
+          "coalesceKey": {
+            "type": "string",
+            "maxLength": 300
+          }
+        },
+        "required": [
+          "title",
+          "body",
+          "kind",
+          "threadId",
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          },
+          "sent": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "ok",
+          "sent"
+        ],
+        "additionalProperties": false
+      }
+    },
     "mute_set": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

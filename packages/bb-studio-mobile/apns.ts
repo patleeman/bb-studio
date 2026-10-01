@@ -255,3 +255,27 @@ export class Http2ApnsSender {
     this.sessions.clear();
   }
 }
+
+/** Recipients forgotten after this long without a successful push. */
+export const DEVICE_TTL_MS = 30 * 86_400_000;
+
+/**
+ * The relay's APNs recipients after a delivery: delivered tokens are refreshed,
+ * tokens Apple rejects for good are dropped, and stale ones expire.
+ */
+export function rememberedDevices(
+  devices: Record<string, number>,
+  messages: ExpoMessage[],
+  tickets: ExpoTicket[],
+  now: number,
+): Record<string, number> {
+  const next = { ...devices };
+  messages.forEach((message, index) => {
+    if (!message.to.startsWith(APNS_TOKEN_PREFIX)) return;
+    const ticket = tickets[index];
+    if (ticket?.status === "ok") next[message.to] = now;
+    else if (ticket?.details?.error === "DeviceNotRegistered") delete next[message.to];
+  });
+  for (const [to, seen] of Object.entries(next)) if (now - seen > DEVICE_TTL_MS) delete next[to];
+  return next;
+}

@@ -202,6 +202,35 @@ export class ChannelNotifications {
       projectId: thread.projectId,
     };
   }
+  /**
+   * BB's shared notification queue when this BB build has it; otherwise BB
+   * Studio's own APNs relay in the mobile plugin.
+   */
+  private async send(
+    id: string,
+    notification: NonNullable<z.infer<typeof notificationSchema>>,
+    signal: AbortSignal,
+  ) {
+    const ok = z.object({ ok: z.literal(true) });
+    try {
+      await this.bb.sdk.plugins.callRpc({
+        signal,
+        pluginId: "push-notifications",
+        method: "notifications.enqueue",
+        input: { pluginId: "bot-teams", eventId: id },
+        outputSchema: ok,
+      });
+    } catch (cause) {
+      if (!/has no rpc method/.test(String(cause))) throw cause;
+      await this.bb.sdk.plugins.callRpc({
+        signal,
+        pluginId: "mobile",
+        method: "notify",
+        input: notification,
+        outputSchema: ok,
+      });
+    }
+  }
   async flush(signal?: AbortSignal) {
     if (Date.now() < this.retryAt) return;
     const rows = this.store.db
@@ -216,14 +245,8 @@ export class ChannelNotifications {
           ? AbortSignal.any([signal, deadline])
           : deadline;
         // Attention requests use the same native notification delivery as replies.
-        if (await this.resolve(id, requestSignal))
-          await this.bb.sdk.plugins.callRpc({
-            signal: requestSignal,
-            pluginId: "push-notifications",
-            method: "notifications.enqueue",
-            input: { pluginId: "bot-teams", eventId: id },
-            outputSchema: z.object({ ok: z.literal(true) }),
-          });
+        const notification = await this.resolve(id, requestSignal);
+        if (notification) await this.send(id, notification, requestSignal);
         this.store.db
           .prepare(
             "UPDATE channel_notifications SET dispatched_at=? WHERE id=?",
