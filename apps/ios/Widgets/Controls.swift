@@ -2,6 +2,17 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+struct CaptureControl: ControlWidget {
+    var body: some ControlWidgetConfiguration {
+        StaticControlConfiguration(kind: "nyc.plee.bbgo.capture") {
+            ControlWidgetButton(action: OpenURLIntent(URL(string: "bbstudio://capture")!)) {
+                Label("Capture to BB", systemImage: "square.and.arrow.down")
+            }
+        }
+        .displayName("Capture to BB")
+    }
+}
+
 /// Control Center, lock screen, and Action button controls that jump straight into BB Studio.
 struct DictateControl: ControlWidget {
     var body: some ControlWidgetConfiguration {

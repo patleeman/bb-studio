@@ -30,6 +30,8 @@ struct RootView: View {
         .tabViewStyle(.sidebarAdaptable)
         .sheet(item: $model.sheet) { sheet in
             switch sheet {
+            case .capture:
+                CaptureSheet()
             case .dictation(let threadId, let autoStart):
                 DictationView(threadId: threadId, autoStart: autoStart)
             case .recording:

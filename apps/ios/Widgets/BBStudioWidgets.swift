@@ -10,6 +10,7 @@ struct BBStudioWidgets: WidgetBundle {
         RecordingLiveActivity()
         StatusWidget()
         WorkWidget()
+        CaptureControl()
         DictateControl()
         VoiceControl()
         NewThreadControl()

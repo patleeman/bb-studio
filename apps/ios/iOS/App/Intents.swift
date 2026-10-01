@@ -129,6 +129,18 @@ struct NewThreadIntent: AppIntent {
     }
 }
 
+struct CaptureIntent: AppIntent {
+    static let title: LocalizedStringResource = "Capture to BB"
+    static let description = IntentDescription("Choose what to save in BB Studio.")
+    static let openAppWhenRun = true
+
+    @MainActor
+    func perform() async throws -> some IntentResult {
+        AppModel.shared.sheet = .capture
+        return .result()
+    }
+}
+
 struct WriteIntent: AppIntent {
     static let title: LocalizedStringResource = "Write in BB Studio"
     static let description = IntentDescription("Open a blank note to save as a page, task or thread.")
@@ -155,6 +167,7 @@ struct NewTaskIntent: AppIntent {
 
 struct BBShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
         AppShortcut(intent: AddTaskIntent(), phrases: ["Add a task in \(.applicationName)"], shortTitle: "Add task", systemImageName: "checkmark.circle")
         AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.text")
         AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
@@ -168,9 +181,6 @@ struct BBShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: VoiceChatIntent(), phrases: ["Voice chat with \(.applicationName)"], shortTitle: "Voice chat",
             systemImageName: "waveform")
-        AppShortcut(
-            intent: OpenThreadIntent(), phrases: ["Open a \(.applicationName) thread"], shortTitle: "Open thread",
-            systemImageName: "bubble.left.and.bubble.right")
         AppShortcut(
             intent: NewThreadIntent(), phrases: ["New \(.applicationName) thread"], shortTitle: "New thread",
             systemImageName: "bubble.left.and.text.bubble.right")
