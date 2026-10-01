@@ -3,41 +3,37 @@
 // Surfaces:
 //   - navPanel "Drawings": Studio's collection of drawings, and the editor
 //     at drawings/<id>. With Studio installed, Studio's page takes over.
-//   - threadPanelAction "Drawings": a gallery and editor inside a thread's
-//     right panel, where "Attach" adds the rendered drawing to that
-//     conversation.
+//   - threadPanelAction "Drawings": the thread's drawings and recent ones,
+//     and the editor, inside a thread's right panel. New makes a drawing
+//     linked to the thread; "Attach" adds the rendered drawing to it.
 //   - composer `+` menu → "Drawing": pick a drawing (host picker)
 //     and upload it as a rendered image attachment for the current conversation.
 //   - mention provider (server): `@drawing` works in every composer.
-import { useState } from "react";
 import { toast } from "sonner";
 import { errorMessage } from "@bb-studio/kit/format";
 import {
   definePluginApp,
   type PluginComposerScope,
 } from "@get-bb/plugin-sdk/app";
-import { DrawingGallery } from "./components/drawing-gallery";
 import { DrawingEditor } from "./components/drawing-editor";
 import { DrawingsPanel } from "./components/drawings-panel";
 import { ExcalidrawPicker } from "./components/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./lib/composer-registration";
 import { blobToBase64, parseScene, renderSceneToPng } from "./lib/scene";
 import { callRpc } from "./lib/rpc";
-import { DRAW_ICON, PANEL_PATH } from "./src/shared";
+import { ThreadItemsPanel } from "@bb-studio/kit/app";
+import { DRAW_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL } from "./src/shared";
 
 function DrawingsSurface({ threadId }: { threadId: string }) {
-  const [openId, setOpenId] = useState<string | null>(null);
-  if (openId) {
-    return (
-      <DrawingEditor
-        drawingId={openId}
-        threadId={threadId}
-        backLabel="Drawings"
-        onBack={() => setOpenId(null)}
-      />
-    );
-  }
-  return <DrawingGallery threadId={threadId} onOpen={setOpenId} />;
+  return (
+    <ThreadItemsPanel
+      threadId={threadId}
+      pluginId={PLUGIN_ID}
+      kind="drawing"
+      channel={REALTIME_CHANNEL}
+      renderItem={(id, { backLabel, onBack }) => <DrawingEditor key={id} drawingId={id} threadId={threadId} backLabel={backLabel} onBack={onBack} />}
+    />
+  );
 }
 
 /** `+` menu flow: pick a drawing, render it to a PNG, and attach it. */

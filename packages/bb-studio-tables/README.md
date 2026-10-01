@@ -4,6 +4,8 @@ Structured tables for BB Studio. Each table has typed columns, rows, and saved t
 
 Pages embeds tables live, so edits in a page show in Tables and the other way round. Agents can create tables, inspect schemas, query rows, insert rows, and update cells. CSV import matches headers to columns by name.
 
+In a thread's side panel, the **Tables** tab lists the tables made in that thread, then the project's recent ones. **New** makes a table in the thread's project and links it to the thread in Studio.
+
 ## Commands
 
 `bb tables list`, `create <title>`, `schema <id>`, `query <id>`, `insert <id> <json>`, `update <id> <row-id> <json>`, `export <id>`, and `import <id> --csv <text>` (headers match columns by name).

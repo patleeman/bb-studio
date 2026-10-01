@@ -95,7 +95,7 @@ export async function renderSceneToPng(scene: StoredScene | null): Promise<Blob>
   });
 }
 
-/** Render a stored scene to an SVG element (used for gallery thumbnails). */
+/** Render a stored scene to an SVG element (used for thumbnails). */
 export async function renderSceneToSvg(
   scene: StoredScene | null,
 ): Promise<SVGSVGElement> {

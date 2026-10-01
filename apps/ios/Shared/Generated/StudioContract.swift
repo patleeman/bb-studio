@@ -36,6 +36,7 @@ public enum Studio {
     public static let replaceLinks = "replaceLinks"
     public static let itemThreads = "itemThreads"
     public static let linkItemThread = "linkItemThread"
+    public static let threadItems = "threadItems"
     public static let spawnForItem = "spawnForItem"
     public static let activity = "activity"
     public static let recordActivity = "recordActivity"
@@ -124,6 +125,8 @@ public enum Studio {
   public typealias ItemThreads = ItemThreadsOutput
 
   public typealias LinkItemThread = LinkItemThreadOutput
+
+  public typealias ThreadItems = ThreadItemsOutput
 
   public typealias SpawnForItem = SpawnForItemOutput
 
@@ -2843,6 +2846,52 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct ThreadItemsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct ThreadItemsOutputThreadsItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct ThreadItemsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var ref: ThreadItemsOutputThreadsItemRef?
+    public var role: String?
+    public var state: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var metadata: [String: String]?
+
+    public init(threadId: String? = nil, ref: ThreadItemsOutputThreadsItemRef? = nil, role: String? = nil, state: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, metadata: [String: String]? = nil) {
+      self.threadId = threadId
+      self.ref = ref
+      self.role = role
+      self.state = state
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.metadata = metadata
+    }
+  }
+
+  public struct ThreadItemsOutput: Sendable, Hashable, Codable {
+    public var threads: [ThreadItemsOutputThreadsItem]?
+
+    public init(threads: [ThreadItemsOutputThreadsItem]? = nil) {
+      self.threads = threads
     }
   }
 

@@ -1,6 +1,6 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { AddOnCollection, FLOATING_BUTTON, Icon, ItemHeader, openAppPath, useAddOnPanel } from "@bb-studio/kit/app";
+import { AddOnCollection, FLOATING_BUTTON, ICON_BUTTON, Icon, ItemHeader, openAppPath, ThreadItemsPanel, useAddOnPanel } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type Table, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
 import { TableView, type TableApi, type TableHost, type TableItem } from "@bb-studio/kit/table-grid";
@@ -15,9 +15,16 @@ function download(name: string, text: string) {
   setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-function Editor({ target, backLabel, onBack }: { target: TableTarget; backLabel: string; onBack(): void }) {
+function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: {
+  target: TableTarget;
+  /** The view or row the grid moved to. */
+  onTargetChange(target: TableTarget): void;
+  backLabel: string;
+  onBack(): void;
+  /** A thread's narrow side panel: icon buttons, and no New thread. */
+  compact?: boolean;
+}) {
   const rpc = useRpc<TablesContract>();
-  const navigate = useBbNavigate();
   const { tableId } = target;
   const [table, setTable] = useState<Table | null>(null);
   const [items, setItems] = useState<TableItem[]>([]);
@@ -45,10 +52,7 @@ function Editor({ target, backLabel, onBack }: { target: TableTarget; backLabel:
     }),
     [rpc, tableId],
   );
-  const go = useCallback(
-    (next: Partial<TableTarget>) => navigate.toPluginPanel(TABLES_PANEL, { subPath: tableSubPath({ ...target, ...next }), replace: true }),
-    [navigate, target],
-  );
+  const go = (next: Partial<TableTarget>) => onTargetChange({ ...target, ...next });
   const host = useMemo<TableHost>(
     () => ({
       openUrl: (url) => window.open(url, "_blank", "noopener"),
@@ -126,7 +130,7 @@ function Editor({ target, backLabel, onBack }: { target: TableTarget; backLabel:
             }}
           />
         }
-        thread={{ title: table.title, href: tableHref({ tableId }) }}
+        thread={compact ? undefined : { title: table.title, href: tableHref({ tableId }) }}
         trailing={
           <>
             <input
@@ -140,11 +144,25 @@ function Editor({ target, backLabel, onBack }: { target: TableTarget; backLabel:
                 if (picked) void importCsv(picked);
               }}
             />
-            <button type="button" className={FLOATING_BUTTON} title="Add rows from a CSV, matching its headers to columns" onClick={() => file.current?.click()}>
-              <Icon name="PackageReceive" /> Import
+            <button
+              type="button"
+              className={compact ? ICON_BUTTON : FLOATING_BUTTON}
+              title="Add rows from a CSV, matching its headers to columns"
+              aria-label={compact ? "Import CSV" : undefined}
+              onClick={() => file.current?.click()}
+            >
+              <Icon name="PackageReceive" className={compact ? "size-4" : undefined} />
+              {compact ? null : " Import"}
             </button>
-            <button type="button" className={FLOATING_BUTTON} title="Download this view as CSV" onClick={() => void exportCsv()}>
-              <Icon name="Download" /> Export
+            <button
+              type="button"
+              className={compact ? ICON_BUTTON : FLOATING_BUTTON}
+              title="Download this view as CSV"
+              aria-label={compact ? "Export CSV" : undefined}
+              onClick={() => void exportCsv()}
+            >
+              <Icon name="Download" className={compact ? "size-4" : undefined} />
+              {compact ? null : " Export"}
             </button>
           </>
         }
@@ -165,8 +183,35 @@ function Editor({ target, backLabel, onBack }: { target: TableTarget; backLabel:
 
 export function TablesPanel({ subPath }: { subPath: string }) {
   const { call, refreshKey, studio, toCollection } = useAddOnPanel(TABLES_CHANNEL, TABLES_PANEL, "table");
+  const navigate = useBbNavigate();
   const target = parseTableSubPath(subPath);
   if (target)
-    return <Editor key={target.tableId} target={target} backLabel={studio ? "Studio" : "Tables"} onBack={toCollection} />;
+    return (
+      <Editor
+        key={target.tableId}
+        target={target}
+        onTargetChange={(next) => navigate.toPluginPanel(TABLES_PANEL, { subPath: tableSubPath(next), replace: true })}
+        backLabel={studio ? "Studio" : "Tables"}
+        onBack={toCollection}
+      />
+    );
   return <AddOnCollection pluginId={TABLES_PLUGIN_ID} title="Tables" kind="table" call={call} refreshKey={refreshKey} />;
+}
+
+/** Tables in a thread's side panel: the thread's tables and recent ones, and the grid. */
+export function ThreadTablesPanel({ threadId }: { threadId: string }) {
+  return (
+    <ThreadItemsPanel
+      threadId={threadId}
+      pluginId={TABLES_PLUGIN_ID}
+      kind="table"
+      channel={TABLES_CHANNEL}
+      renderItem={(id, { backLabel, onBack }) => <ThreadTable key={id} tableId={id} backLabel={backLabel} onBack={onBack} />}
+    />
+  );
+}
+
+function ThreadTable({ tableId, backLabel, onBack }: { tableId: string; backLabel: string; onBack(): void }) {
+  const [target, setTarget] = useState<TableTarget>({ tableId });
+  return <Editor target={target} onTargetChange={setTarget} backLabel={backLabel} onBack={onBack} compact />;
 }

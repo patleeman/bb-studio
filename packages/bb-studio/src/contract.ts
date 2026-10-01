@@ -134,6 +134,8 @@ export const rpcContract = defineRpcContract({
   replaceLinks: { input: z.object({ ref: itemRef, source: pluginId, links: z.array(link).max(500) }), output: z.object({ ok: z.boolean() }) },
   itemThreads: { input: z.object({ ref: itemRef }), output: z.object({ threads: z.array(thread) }) },
   linkItemThread: { input: z.object({ thread }), output: z.object({ ok: z.boolean() }) },
+  /** The items linked to a thread: made in it, mentioned when it started, or handed off to it. */
+  threadItems: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ threads: z.array(thread) }) },
   spawnForItem: { input: z.object({ ref: itemRef, prompt: z.string().min(1).max(100000), role: z.string().min(1).max(100), metadata: z.record(z.string(), z.string()).optional(), projectId: projectId.optional(), visibility: z.enum(["user", "agent-only"]).optional() }), output: z.object({ threadId: z.string() }) },
   activity: { input: z.object({ ref: itemRef.optional(), since: z.number().int().min(0).optional(), limit: z.number().int().min(1).max(100).optional() }), output: z.object({ events: z.array(activityEvent.extend({ id: z.number() })) }) },
   recordActivity: { input: activityEvent, output: z.object({ id: z.number() }) },

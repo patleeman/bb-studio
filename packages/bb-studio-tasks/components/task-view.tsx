@@ -46,7 +46,12 @@ import { SPIN, useTasksRpc, type Handoff, type Link, type Linkable, type Task, t
 
 type Loaded = { task: Task; links: Link[]; handoffs: Handoff[] };
 
-export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?: boolean) => void }) {
+export function TaskView({ taskId, onBack, compact = false }: {
+  taskId: string;
+  onBack: (replace?: boolean) => void;
+  /** A thread's narrow side panel: Hand off and New thread move into the menu. */
+  compact?: boolean;
+}) {
   const rpc = useTasksRpc();
   const navigate = useBbNavigate();
   const projects = useProjects();
@@ -153,7 +158,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
     <ItemDeleteConfirm label="Delete this task?" onDelete={() => void remove()} onCancel={() => setConfirmDelete(false)} />
   ) : (
     <>
-      {!done ? (
+      {!done && !compact ? (
         <button type="button" className={cn(FLOATING_BUTTON, "max-sm:hidden")} onClick={() => setHandingOff(true)}>
           <Icon name="Bot" /> {latest ? "Hand off again" : "Hand off"}
         </button>
@@ -169,11 +174,11 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
             </DropdownMenuItem>
           ) : null}
           {!done ? (
-            <DropdownMenuItem className="sm:hidden" onSelect={() => setHandingOff(true)}>
+            <DropdownMenuItem className={compact ? undefined : "sm:hidden"} onSelect={() => setHandingOff(true)}>
               <Icon name="Bot" className="size-4" /> Hand off
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
+          <DropdownMenuItem className={compact ? undefined : "md:hidden"} onSelect={() => openNewItemThread(navigate, thread)}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread about this
           </DropdownMenuItem>
           {openThreads ? (
@@ -190,7 +195,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
 
   return (
     <div className="relative h-full min-h-0">
-      <ItemHeader backLabel="Tasks" onBack={() => onBack()} thread={confirmDelete ? undefined : thread} trailing={trailing} />
+      <ItemHeader backLabel="Tasks" onBack={() => onBack()} thread={confirmDelete || compact ? undefined : thread} trailing={trailing} />
       <PageColumn className="max-w-3xl">
         {task.archived ? (
           <div className="mb-4 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">

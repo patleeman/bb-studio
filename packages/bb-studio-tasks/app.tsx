@@ -2,12 +2,17 @@
 //
 // Surfaces:
 //   - navPanel "Tasks": the board, a list view, and one task at tasks/<id>.
+//   - threadPanelAction "Tasks": the thread's tasks and recent ones, and one
+//     task, inside a thread's right panel. New makes a task linked to the
+//     thread.
 //   - messageDirective `::task{id="tsk_…"}`: a card in a reply.
 //   - mention provider (server): `@task` works in every composer.
+import { ThreadItemsPanel } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { TaskDirective } from "./components/task-directive";
 import { TasksPanel } from "./components/tasks-panel";
-import { BOARD_ICON, PANEL_PATH } from "./src/shared";
+import { TaskView } from "./components/task-view";
+import { BOARD_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL } from "./src/shared";
 
 export default definePluginApp((app) => {
   app.slots.navPanel({
@@ -16,6 +21,21 @@ export default definePluginApp((app) => {
     icon: BOARD_ICON,
     path: PANEL_PATH,
     component: ({ subPath }) => <TasksPanel subPath={subPath ?? ""} />,
+  });
+  app.slots.threadPanelAction({
+    id: "tasks",
+    title: "Tasks",
+    icon: BOARD_ICON,
+    layout: "flush",
+    component: ({ threadId }) => (
+      <ThreadItemsPanel
+        threadId={threadId}
+        pluginId={PLUGIN_ID}
+        kind="task"
+        channel={REALTIME_CHANNEL}
+        renderItem={(id, { onBack }) => <TaskView key={id} taskId={id} onBack={() => onBack()} compact />}
+      />
+    ),
   });
 
   app.slots.messageDirective({ id: "task", component: TaskDirective });

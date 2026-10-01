@@ -29,8 +29,9 @@ export default definePluginApp((app) => {
   app.slots.navPanel({ id: "pages", title: "Pages", icon: "pages/pages", path: "pages", component: PagesPanel });
   app.slots.experimental_appOverlay({ id: "talk-bridge", component: TalkBridge });
   app.slots.experimental_threadHeaderAction({ id: "page-link", title: "Page", component: ThreadPageLink });
-  // A page next to a thread: `{ pageId }`, or an Explore explainer with `{ explainerId }`.
-  app.slots.threadPanelAction({ id: PAGE_PANEL_ACTION, title: "Page", icon: "pages/pages", layout: "flush", component: PagePanel });
+  // Pages next to a thread: its pages and recent ones, a page with `{ pageId }`,
+  // or an Explore explainer with `{ explainerId }`.
+  app.slots.threadPanelAction({ id: PAGE_PANEL_ACTION, title: "Pages", icon: "pages/pages", layout: "flush", component: PagePanel });
   // Explore: "Along the way" findings at the end of a reply.
   app.slots.messageDirective({ id: DIRECTIVE, component: ExploreDirective });
 });

@@ -24,9 +24,11 @@ under Studio's shared item header, with staged shapes and labels.
   Its header matches every Studio item: back, an editable name, live sync
   status, **New thread** (starts a conversation that links the drawing), copy
   image, and a menu with Download PNG and Delete.
-- **Attach from a thread.** In a conversation, open the right panel →
-  **Drawings** and attach any drawing as an image, or use the composer's `+`
-  menu → **Drawing**. Neither sends a message.
+- **In a thread's side panel.** The **Drawings** tab lists the drawings made
+  in that thread, then the project's recent ones. **New** makes a drawing in
+  the thread's project and links it to the thread in Studio. In the editor,
+  **Attach** adds the drawing to the conversation as an image; so does the
+  composer's `+` menu → **Drawing**. Neither sends a message.
 - **`@drawing` mentions.** The agent receives the drawing's scene as context.
 - **Collaborative editing.** Keep a drawing open and ask an agent to change
   it: your editor applies its edits live, and its next read sees yours.

@@ -343,6 +343,7 @@ export default async function plugin(bb: BbPluginApi) {
     replaceLinks: ({ ref, source, links }) => { services.replaceLinks(ref, source, links); return { ok: true }; },
     itemThreads: ({ ref }) => ({ threads: services.threads(ref) }),
     linkItemThread: ({ thread }) => { services.linkThread(thread); return { ok: true }; },
+    threadItems: ({ threadId }) => ({ threads: services.threadsForThread(threadId) }),
     spawnForItem: async ({ ref, prompt, role, metadata, projectId, visibility }) => {
       const item = (await hub.get(ref.pluginId, [ref.id]))[0];
       if (!item) throw new Error("Item not found.");

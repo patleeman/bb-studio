@@ -58,9 +58,11 @@ afterwards.
 - **HTML blocks.** An `html` block runs its HTML, CSS, and scripts in a
   sandboxed frame (no access to BB, its cookies, or storage) that grows to
   fit its content. Click its label to edit the source.
-- **In a thread's side panel.** The **Page** tab shows a page's live editor
-  next to a thread, with a link to the full page. Explore explainers open
-  there too.
+- **In a thread's side panel.** The **Pages** tab lists the thread's pages
+  (the ones made in it, and the page it was started from), then the project's
+  recent ones. **New** makes a page in the thread's project and links it to
+  the thread in Studio. A page opens in its live editor, with a link to the
+  full page. Explore explainers open there too.
 - **Custom blocks.** Callouts, charts (bar, line, area, pie), stat rows, and
   embed cards for links, BB threads, and other pages. Paste a link on an
   empty line to turn it into a card; web links fetch their title,
@@ -130,7 +132,7 @@ later.
   **Explore** page in each project's Pages tree, with the finding's emoji as
   their icon, and are tagged **Explore** in [Studio](../bb-studio)
   when it's installed.
-- **In the side panel.** The **Page** tab shows progress while an explainer
+- **In the side panel.** The **Pages** tab shows progress while an explainer
   is written (stage, percent, time so far, **Stop**), the error with
   **Retry** if it failed, and then the page's live editor with when it was
   generated, **Regenerate**, **Open in Pages**, and its own follow-up

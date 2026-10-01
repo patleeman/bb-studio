@@ -30,6 +30,10 @@ subtask. The header shows the Board, List and Calendar views.
   header has **Hand off**, **Mark done** / **Reopen**, and a menu with Mark
   done and archive threads, New thread about this, Archive threads, Move to
   project, Archive task and Delete.
+- **In a thread's side panel** the **Tasks** tab lists the tasks made in that
+  thread, then the project's recent ones. **New** makes a task in the
+  thread's project and links it to the thread in Studio. In the narrow panel,
+  Hand off and New thread about this move into the task's menu.
 - **Hand off to an agent.** Pick the project, the agent and model (the
   project's default is preselected), a new worktree or the project folder,
   and an optional note. BB starts a thread with the task, its description and

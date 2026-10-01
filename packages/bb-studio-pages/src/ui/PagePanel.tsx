@@ -1,7 +1,9 @@
 import { untitled } from "@bb-studio/kit/format";
 import { useBbNavigate, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
+import { ThreadItemsPanel } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
+import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
 import { explainerIdFrom } from "./explore";
 import { ExplainerPanel } from "./explore-panel";
@@ -21,52 +23,67 @@ function pageIdFrom(params: PluginThreadPanelProps["params"]): string | null {
 }
 
 /**
- * A page in a thread's side panel: the same live editor as the Pages view,
- * under a compact header. Opened without params (from the panel's launcher),
- * it shows the page the thread was started from, if any.
+ * Pages in a thread's side panel. Opened with a page, it shows that page in
+ * the same live editor as the Pages view; from the panel's launcher, it lists
+ * the thread's pages and recent ones, and New makes one linked to the thread.
  */
 export function PagePanel({ threadId, params }: PluginThreadPanelProps) {
   const explainerId = explainerIdFrom(params);
   if (explainerId) return <ExplainerPanel key={explainerId} explainerId={explainerId} />;
-  return <PageTab threadId={threadId} params={params} />;
+  const pageId = pageIdFrom(params);
+  if (pageId) return <PageTab key={pageId} pageId={pageId} />;
+  return <ThreadPages threadId={threadId} />;
 }
 
-function PageTab({ threadId, params }: PluginThreadPanelProps) {
+function ThreadPages({ threadId }: { threadId: string }) {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
-  const [pageId, setPageId] = useState<string | null | undefined>(() => pageIdFrom(params) ?? undefined);
+  const [chatPageId, setChatPageId] = useState<string | null>(null);
   useEffect(() => {
-    const fromParams = pageIdFrom(params);
-    if (fromParams) {
-      setPageId(fromParams);
-      return;
-    }
     let live = true;
     rpc.call("chatPage", { threadId }).then(
-      (result) => live && setPageId(result.page?.id ?? null),
-      () => live && setPageId(null),
+      (result) => live && setChatPageId(result.page?.id ?? null),
+      () => {},
     );
     return () => {
       live = false;
     };
-  }, [rpc, params, threadId]);
-  const page = usePanelPage(pageId ?? null);
+  }, [rpc, threadId]);
+  const linkedIds = useMemo(() => (chatPageId ? [chatPageId] : []), [chatPageId]);
+  return (
+    <ThreadItemsPanel
+      threadId={threadId}
+      pluginId={PLUGIN_ID}
+      kind="page"
+      channel={REALTIME_CHANNEL}
+      linkedIds={linkedIds}
+      renderItem={(id, { backLabel, onBack }) => <PageTab key={id} pageId={id} backLabel={backLabel} onBack={onBack} />}
+    />
+  );
+}
 
-  if (pageId === null || page === null) {
-    return (
-      <PanelMessage
-        title={pageId ? "Page not found" : "No page to show"}
-        detail={pageId ? "It may have been deleted." : "Open a page from Pages to see it here."}
-      />
-    );
-  }
-  if (!pageId || !page) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
+function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
+  const navigate = useBbNavigate();
+  const page = usePanelPage(pageId);
+
+  if (page === null) return <PanelMessage title="Page not found" detail="It may have been deleted." />;
+  if (!page) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
 
   return (
     <PanelShell
       page={page}
       header={
         <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
+          {onBack ? (
+            <button
+              type="button"
+              className="-ml-1 flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
+              title={`Back to ${backLabel}`}
+              aria-label={`Back to ${backLabel}`}
+              onClick={onBack}
+            >
+              <Icon name="ArrowLeft" className="size-4" />
+            </button>
+          ) : null}
           {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="FileText" className="size-4 shrink-0 text-muted-foreground" />}
           <div className="min-w-0 flex-1">
             <div className="truncate text-sm font-medium">{untitled(page.title)}</div>

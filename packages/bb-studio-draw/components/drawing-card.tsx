@@ -1,6 +1,5 @@
-// A drawing's card in the thread panel and the composer picker: the server's
+// A drawing's card in the composer picker: the server's
 // thumbnail over its name, in Studio's card style.
-import type { ReactNode } from "react";
 import { Icon, THUMBNAIL, cn } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { DRAW_ICON, thumbnailUrl } from "../src/shared";
@@ -21,14 +20,11 @@ export function DrawingCard({
   drawing,
   onOpen,
   openLabel,
-  actions,
 }: {
   drawing: DrawingMeta;
   onOpen(): void;
   /** Accessible name for the card's button, e.g. "Open Plan". */
   openLabel: string;
-  /** Icon buttons at the end of the caption. */
-  actions?: ReactNode;
 }) {
   return (
     <div className="group flex flex-col overflow-hidden rounded-xl border border-border bg-background transition-colors hover:border-foreground/20">
@@ -57,12 +53,7 @@ export function DrawingCard({
           </div>
           <div className="truncate text-xs text-muted-foreground">{relativeTime(drawing.updatedAt)}</div>
         </div>
-        {actions}
       </div>
     </div>
   );
 }
-
-/** A small icon button for card captions. */
-export const CARD_ACTION =
-  "flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-40 [&_svg]:size-4";

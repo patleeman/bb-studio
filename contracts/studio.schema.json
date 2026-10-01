@@ -4187,6 +4187,94 @@
         "additionalProperties": false
       }
     },
+    "threadItems": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "ref": {
+                  "type": "object",
+                  "properties": {
+                    "pluginId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "pluginId",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "role": {
+                  "type": "string"
+                },
+                "state": {
+                  "type": "string"
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "metadata": {
+                  "type": "object",
+                  "propertyNames": {
+                    "type": "string"
+                  },
+                  "additionalProperties": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "threadId",
+                "ref",
+                "role",
+                "state",
+                "createdAt",
+                "updatedAt",
+                "metadata"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "threads"
+        ],
+        "additionalProperties": false
+      }
+    },
     "spawnForItem": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

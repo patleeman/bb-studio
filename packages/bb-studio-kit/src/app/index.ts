@@ -13,6 +13,7 @@ export {
 } from "./collection";
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
+export { ThreadItemsPanel } from "./thread-items";
 export { EditableTitle, ItemHeader, openNewItemThread, useNewItemThread, type ItemThread } from "./item-header";
 export { RelatedPanel, type RelatedRef } from "./related-panel";
 export { ItemDeleteConfirm, ItemMenu } from "./item-menu";
