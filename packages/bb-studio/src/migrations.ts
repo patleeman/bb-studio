@@ -63,4 +63,15 @@ export const MIGRATIONS = [
        sha256 TEXT NOT NULL, label TEXT NOT NULL, actor TEXT NOT NULL, created_at INTEGER NOT NULL
      );
    CREATE INDEX IF NOT EXISTS item_versions_item ON item_versions (plugin_id, item_id, created_at);`,
+  `CREATE TABLE item_threads_next (
+       thread_id TEXT NOT NULL, plugin_id TEXT NOT NULL, item_id TEXT NOT NULL,
+       role TEXT NOT NULL, state TEXT NOT NULL, created_at INTEGER NOT NULL,
+       updated_at INTEGER NOT NULL, metadata TEXT NOT NULL,
+       PRIMARY KEY (thread_id, plugin_id, item_id)
+     );
+   INSERT INTO item_threads_next SELECT * FROM item_threads;
+   DROP TABLE item_threads;
+   ALTER TABLE item_threads_next RENAME TO item_threads;
+   CREATE INDEX item_threads_item ON item_threads (plugin_id, item_id, created_at);
+   CREATE INDEX item_threads_thread ON item_threads (thread_id);`,
 ];

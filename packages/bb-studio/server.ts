@@ -27,6 +27,7 @@ import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { routeCommentMentions } from "./src/comment-routing";
 import { homeData } from "./src/home";
+import { firstThreadItemRefs } from "./src/thread-item-refs";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -63,8 +64,7 @@ export default async function plugin(bb: BbPluginApi) {
     services.linkThread({ ...thread, state, updatedAt: Date.now() });
   }
   const updateThread = (threadId: string, state: string) => {
-    const found = services.thread(threadId);
-    if (found) services.linkThread({ ...found, state, updatedAt: Date.now() });
+    for (const found of services.threadsForThread(threadId)) services.linkThread({ ...found, state, updatedAt: Date.now() });
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
@@ -74,6 +74,42 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.archived", ({ thread }) => updateThread(thread.id, "archived"));
   bb.events.on("thread.deleted", ({ thread }) => updateThread(thread.id, "deleted"));
   bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
+  // The composer does not expose a thread id to add-ons. Its first accepted
+  // input still contains the item's link or mention, so link it when saved.
+  const checkedThreads = new Set<string>();
+  const checkingThreads = new Set<string>();
+  const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
+  const linkComposerThread = async (thread: { id: string; createdAt: number; status: string }) => {
+    if (checkedThreads.has(thread.id) || services.threadsForThread(thread.id).length) return;
+    if (checkingThreads.has(thread.id)) { pendingThreads.set(thread.id, thread); return; }
+    checkingThreads.add(thread.id);
+    try {
+      const events = await bb.sdk.threads.events.list({ threadId: thread.id, order: "asc", limit: "50", types: ["client/turn/requested", "client/turn/start"] });
+      const refs = firstThreadItemRefs(events);
+      if (refs === null) return;
+      for (const ref of refs) {
+        services.linkThread({ threadId: thread.id, ref, role: "new-thread", state: thread.status, createdAt: thread.createdAt, updatedAt: Date.now(), metadata: {} });
+      }
+      checkedThreads.add(thread.id);
+    } finally {
+      checkingThreads.delete(thread.id);
+      const pending = pendingThreads.get(thread.id);
+      if (pending) {
+        pendingThreads.delete(thread.id);
+        queueMicrotask(() => { void linkComposerThread(pending).catch(() => {}); });
+      }
+    }
+  };
+  const tryLinkComposerThread = (thread: { id: string; createdAt: number; status: string }) => {
+    void linkComposerThread(thread).catch(() => { /* The first input may not be saved yet. */ });
+  };
+  bb.events.on("thread.created", ({ thread }) => tryLinkComposerThread(thread));
+  bb.events.on("experimental_thread.events", ({ thread }) => tryLinkComposerThread(thread));
+  bb.events.on("thread.active", ({ thread }) => tryLinkComposerThread(thread));
+  bb.events.on("thread.idle", ({ thread }) => tryLinkComposerThread(thread));
+  void bb.sdk.threads.list({ limit: 200 }).then((threads) => {
+    for (const thread of threads) tryLinkComposerThread(thread);
+  }).catch(() => {});
   /** Every window's sidebar refetches its tabs. */
   const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 

@@ -38,7 +38,7 @@ export class StudioServices {
 
   linkThread(thread: ItemThread): void {
     this.db.prepare(`INSERT INTO item_threads VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-      ON CONFLICT(thread_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`)
+      ON CONFLICT(thread_id, plugin_id, item_id) DO UPDATE SET state = excluded.state, updated_at = excluded.updated_at`)
       .run(thread.threadId, thread.ref.pluginId, thread.ref.id, thread.role, thread.state, thread.createdAt, thread.updatedAt, JSON.stringify(thread.metadata));
   }
 
@@ -48,9 +48,9 @@ export class StudioServices {
       .map((row) => ({ threadId: row.thread_id, ref, role: row.role, state: row.state, createdAt: row.created_at, updatedAt: row.updated_at, metadata: JSON.parse(row.metadata) as Record<string, string> }));
   }
 
-  thread(threadId: string): ItemThread | null {
-    const row = this.db.prepare("SELECT plugin_id, item_id FROM item_threads WHERE thread_id = ?").get(threadId) as { plugin_id: string; item_id: string } | undefined;
-    return row ? this.threads(readRef(row.plugin_id, row.item_id)).find((thread) => thread.threadId === threadId) ?? null : null;
+  threadsForThread(threadId: string): ItemThread[] {
+    const rows = this.db.prepare("SELECT plugin_id, item_id FROM item_threads WHERE thread_id = ?").all(threadId) as { plugin_id: string; item_id: string }[];
+    return rows.flatMap((row) => this.threads(readRef(row.plugin_id, row.item_id)).filter((thread) => thread.threadId === threadId));
   }
 
   activeThreads(): ItemThread[] {
