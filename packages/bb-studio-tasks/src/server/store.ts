@@ -143,6 +143,11 @@ export function newTaskId(): string {
   return newId("tsk");
 }
 
+/** The `task_statuses` key for the default columns. */
+const DEFAULT_COLUMNS = "";
+/** Tasks that use the default columns: no project, or a project without its own. */
+const DEFAULTS_USERS = "project_id IS NULL OR project_id NOT IN (SELECT project_id FROM task_statuses WHERE project_id != '')";
+
 export class TaskStore {
   setTemplate(id: string, template: boolean): void {
     this.db.prepare("UPDATE tasks SET template = ? WHERE id = ?").run(template ? 1 : 0, id);
@@ -163,25 +168,52 @@ export class TaskStore {
       .get(id) as { total: number; done: number };
   }
 
-  statuses(projectId: string | null): { id: string; label: string }[] {
-    if (!projectId) return STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! }));
-    const rows = this.db.prepare("SELECT id, label FROM task_statuses WHERE project_id = ? ORDER BY position").all(projectId) as { id: string; label: string }[];
-    return rows.length ? rows : STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! }));
+  /** A project's own columns, or the defaults (key ""), or [] when not customized. */
+  private columnsFor(key: string): { id: string; label: string }[] {
+    return this.db.prepare("SELECT id, label FROM task_statuses WHERE project_id = ? ORDER BY position").all(key) as { id: string; label: string }[];
   }
 
-  setStatuses(projectId: string, columns: { id: string; label: string }[]): void {
+  /** The board's columns: the project's own, else the defaults, which tasks without a project use too. */
+  statuses(projectId: string | null): { id: string; label: string }[] {
+    const own = projectId ? this.columnsFor(projectId) : [];
+    if (own.length) return own;
+    const defaults = this.columnsFor(DEFAULT_COLUMNS);
+    return defaults.length ? defaults : STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! }));
+  }
+
+  hasOwnStatuses(projectId: string): boolean {
+    return this.columnsFor(projectId).length > 0;
+  }
+
+  /**
+   * Sets a project's columns, or with null the defaults. Tasks in a removed
+   * column move to the first one.
+   */
+  setStatuses(projectId: string | null, columns: { id: string; label: string }[]): void {
     if (!columns.some((column) => column.id === "done")) throw new Error("A Done column is required.");
     if (new Set(columns.map((column) => column.id)).size !== columns.length) throw new Error("Column ids must be unique.");
     if (!columns.some((column) => column.id !== "done")) throw new Error("Add a column before Done.");
+    const key = projectId ?? DEFAULT_COLUMNS;
     this.db.transaction(() => {
-      const used = new Set(columns.map((column) => column.id));
-      const replacement = columns.find((column) => column.id !== "done")!.id;
-      const stale = this.db.prepare("SELECT DISTINCT status FROM tasks WHERE project_id = ?").all(projectId) as { status: string }[];
-      for (const row of stale) if (!used.has(row.status)) this.db.prepare("UPDATE tasks SET status = ? WHERE project_id = ? AND status = ?").run(replacement, projectId, row.status);
-      this.db.prepare("DELETE FROM task_statuses WHERE project_id = ?").run(projectId);
+      this.db.prepare("DELETE FROM task_statuses WHERE project_id = ?").run(key);
       const insert = this.db.prepare("INSERT INTO task_statuses (project_id, id, label, position) VALUES (?, ?, ?, ?)");
-      columns.forEach((column, index) => insert.run(projectId, column.id, column.label, index));
+      columns.forEach((column, index) => insert.run(key, column.id, column.label, index));
+      this.remapStatuses(projectId === null ? DEFAULTS_USERS : "project_id = ?", projectId === null ? [] : [projectId], columns);
     })();
+  }
+
+  /** A project goes back to the default columns; its tasks in columns those don't have move to the first one. */
+  resetStatuses(projectId: string): void {
+    this.db.transaction(() => {
+      this.db.prepare("DELETE FROM task_statuses WHERE project_id = ?").run(projectId);
+      this.remapStatuses("project_id = ?", [projectId], this.statuses(projectId));
+    })();
+  }
+
+  private remapStatuses(where: string, params: string[], columns: { id: string }[]): void {
+    const ids = columns.map((column) => column.id);
+    const first = columns.find((column) => column.id !== "done")!.id;
+    this.db.prepare(`UPDATE tasks SET status = ? WHERE (${where}) AND status NOT IN (${ids.map(() => "?").join(", ")})`).run(first, ...params, ...ids);
   }
 
   /** Board order: by status, then rank. */

@@ -279,10 +279,14 @@
               ],
               "additionalProperties": false
             }
+          },
+          "own": {
+            "type": "boolean"
           }
         },
         "required": [
-          "columns"
+          "columns",
+          "own"
         ],
         "additionalProperties": false
       }
@@ -293,9 +297,16 @@
         "type": "object",
         "properties": {
           "projectId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "columns": {
             "minItems": 2,
@@ -326,6 +337,35 @@
         "required": [
           "projectId",
           "columns"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "resetStatuses": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "projectId"
         ]
       },
       "output": {

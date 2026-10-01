@@ -1,5 +1,5 @@
-// The board: four columns you drag tasks between, filtered by project and
-// assignee. Each card shows who acts next when an agent has the task.
+// The board: columns you drag tasks between (and edit in place), filtered by
+// project and assignee. Each card shows who acts next when an agent has the task.
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
@@ -20,6 +20,7 @@ import {
 import { errorMessage, plural, untitled } from "@bb-studio/kit/format";
 import { useBbContext } from "@get-bb/plugin-sdk/app";
 import { STATUSES, STATUS_LABELS, type TaskStatus } from "../src/shared";
+import { AddColumn, ColumnMenu, ColumnTitle, MAX_COLUMNS, columnId, withColumn, type BoardColumn } from "./columns";
 import { AssigneeChip, DueChip, HandoffBadge, STATUS_ICONS } from "./pieces";
 import { SPIN, useTasksRpc, type Task } from "./types";
 
@@ -76,7 +77,10 @@ export function Board({
   const context = useBbContext();
   const projects = useProjects();
   const [tasks, setTasks] = useState<Task[] | null>(null);
-  const [columns, setColumns] = useState<{ id: string; label: string }[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
+  const [columns, setColumns] = useState<BoardColumn[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
+  /** Whether the filtered project has its own columns rather than the defaults. */
+  const [ownColumns, setOwnColumns] = useState(false);
+  const [renaming, setRenaming] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useStored<ProjectFilter>("tasks:project", "all");
   const [assignee, setAssignee] = useStored<AssigneeFilter>("tasks:assignee", "everyone");
@@ -101,22 +105,49 @@ export function Board({
   const projectFilter: ProjectFilter =
     project === "all" || project === "global" || !projects.length || projects.some((each) => each.id === project) ? project : "all";
   const visible = useMemo(() => (tasks ?? []).filter((task) => matches(task, projectFilter, assignee)), [tasks, projectFilter, assignee]);
-  useEffect(() => {
-    void rpc.call("statuses", { projectId: projectFilter === "all" || projectFilter === "global" ? null : projectFilter }).then(({ columns }) => setColumns(columns));
-  }, [rpc, projectFilter, refreshKey]);
+  /** Whose columns the board shows and edits: the filtered project's, or the defaults. */
+  const columnsProject = projectFilter === "all" || projectFilter === "global" ? null : projectFilter;
+  const columnsScope = columnsProject ? `${projectName(projects, columnsProject)} columns${ownColumns ? "" : " (default)"}` : "Default columns";
+  const loadColumns = useCallback(() => {
+    void rpc.call("statuses", { projectId: columnsProject }).then(({ columns, own }) => {
+      setColumns(columns);
+      setOwnColumns(own);
+    });
+  }, [rpc, columnsProject]);
+  useEffect(loadColumns, [loadColumns, refreshKey]);
 
-  async function editColumns() {
-    if (projectFilter === "all" || projectFilter === "global") return;
-    const answer = window.prompt("Columns (comma separated, in order)", columns.map((column) => column.label).join(", "));
-    if (!answer) return;
-    const names = answer.split(",").map((name) => name.trim()).filter(Boolean);
-    if (names.length < 2 || names.length > 12 || !names.some((name) => name.toLowerCase() === "done")) {
-      toast.error("Use 2 to 12 columns and include Done."); return;
+  async function saveColumns(next: BoardColumn[], reset = false) {
+    setColumns(next);
+    try {
+      if (reset && columnsProject) await rpc.call("resetStatuses", { projectId: columnsProject });
+      else await rpc.call("setStatuses", { projectId: columnsProject, columns: next });
+    } catch (failure) {
+      toast.error(`Couldn't change the columns: ${errorMessage(failure)}`);
     }
-    const next = names.map((label) => ({ label, id: label.toLowerCase() === "done" ? "done" : label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") }));
-    if (new Set(next.map((column) => column.id)).size !== next.length || next.some((column) => !column.id)) { toast.error("Column names must be unique."); return; }
-    try { await rpc.call("setStatuses", { projectId: projectFilter, columns: next }); setColumns(next); refetch(); }
-    catch (failure) { toast.error(errorMessage(failure)); }
+    loadColumns();
+    refetch();
+  }
+
+  function renameColumn(id: string, name: string | null) {
+    setRenaming(null);
+    const current = columns.find((each) => each.id === id);
+    if (name && current && name !== current.label) void saveColumns(columns.map((each) => (each.id === id ? { ...each, label: name } : each)));
+  }
+
+  function moveColumn(index: number, offset: -1 | 1) {
+    const next = [...columns];
+    const [moved] = next.splice(index, 1);
+    next.splice(index + offset, 0, moved!);
+    void saveColumns(next);
+  }
+
+  function deleteColumn(id: string) {
+    const rest = columns.filter((each) => each.id !== id);
+    const count = column(tasks ?? [], id).length;
+    const target = rest.find((each) => each.id !== "done");
+    const label = columns.find((each) => each.id === id)?.label ?? "this column";
+    if (count && !window.confirm(`Delete "${label}"? Its ${plural(count, "task")} move to "${target?.label}".`)) return;
+    void saveColumns(rest);
   }
 
   /** Where new tasks go: the filtered project, else the one BB has open. */
@@ -182,7 +213,6 @@ export function Board({
         <h1 className="mr-auto text-2xl font-semibold tracking-tight">Tasks</h1>
         <ProjectPicker projects={projects} value={projectFilter} onChange={setProject} />
         <AssigneePicker value={assignee} onChange={setAssignee} />
-        {projectFilter !== "all" && projectFilter !== "global" ? <button type="button" className={GHOST_BUTTON} onClick={() => void editColumns()}>Edit columns</button> : null}
         {viewToggle}
         <button type="button" className={OUTLINE_BUTTON} onClick={() => setAdding("todo")}>
           <Icon name="Plus" /> New task
@@ -198,7 +228,7 @@ export function Board({
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-6 pb-6 max-md:px-3">
-          {columns.map(({ id: status, label }) => {
+          {columns.map(({ id: status, label }, index) => {
             const cards = column(visible, status);
             const shown = status === "done" ? cards.slice(0, doneShown) : cards;
             return (
@@ -207,6 +237,22 @@ export function Board({
                 status={status}
                 label={label}
                 columns={columns}
+                title={
+                  <ColumnTitle label={label} renaming={renaming === status} onStartRename={() => setRenaming(status)} onRename={(name) => renameColumn(status, name)} />
+                }
+                menu={
+                  <ColumnMenu
+                    column={{ id: status, label }}
+                    index={index}
+                    total={columns.length}
+                    scope={columnsScope}
+                    own={ownColumns}
+                    onRename={() => setRenaming(status)}
+                    onMove={(offset) => moveColumn(index, offset)}
+                    onDelete={() => deleteColumn(status)}
+                    onReset={() => void saveColumns(columns, true)}
+                  />
+                }
                 count={cards.length}
                 tasks={shown}
                 projects={projects}
@@ -244,6 +290,10 @@ export function Board({
               />
             );
           })}
+          <AddColumn
+            disabled={columns.length >= MAX_COLUMNS}
+            onAdd={(name) => void saveColumns(withColumn(columns, { id: columnId(name, columns), label: name }))}
+          />
         </div>
       )}
     </div>
@@ -254,6 +304,8 @@ function Column({
   status,
   label,
   columns,
+  title,
+  menu,
   count,
   tasks,
   projects,
@@ -269,7 +321,9 @@ function Column({
 }: {
   status: TaskStatus;
   label: string;
-  columns: { id: string; label: string }[];
+  columns: BoardColumn[];
+  title: ReactNode;
+  menu: ReactNode;
   count: number;
   tasks: Task[];
   projects: Project[];
@@ -300,7 +354,7 @@ function Column({
     <section
       aria-label={label}
       className={cn(
-        "flex w-72 min-w-64 shrink-0 flex-col rounded-lg bg-muted/40 max-md:w-64",
+        "group/column flex w-72 min-w-64 shrink-0 flex-col rounded-lg bg-muted/40 max-md:w-64",
         dropAt !== null && "bg-state-hover ring-1 ring-border",
       )}
       onDragOver={(event) => {
@@ -324,15 +378,17 @@ function Column({
         }
       }}
     >
-      <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <Icon name={STATUS_ICONS[status] ?? "Circle"} className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">{label}</h2>
+      <div className="flex min-h-12 items-center gap-2 px-3 pt-3 pb-2">
+        <Icon name={STATUS_ICONS[status] ?? "Circle"} className="size-4 shrink-0 text-muted-foreground" />
+        {title}
         <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
+        <span className="ml-auto" />
+        {menu}
         <button
           type="button"
           aria-label={`Add to ${label}`}
           title="Add a task"
-          className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
+          className="flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
           onClick={onAdd}
         >
           <Icon name="Plus" className="size-4" />
@@ -392,7 +448,7 @@ function TaskCard({
   onArchive,
 }: {
   task: Task;
-  columns: { id: string; label: string }[];
+  columns: BoardColumn[];
   projects: Project[];
   showProject: boolean;
   onOpen(id: string): void;

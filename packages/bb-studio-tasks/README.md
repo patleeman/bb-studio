@@ -42,8 +42,14 @@ subtask. The header shows the Board, List and Calendar views.
   create a dedicated channel and post the task there.
 - **Subtasks and recurrence.** A task includes its parent and flat subtask
   counts. Daily, weekly, monthly and weekday tasks create their next instance
-  when completed. Project boards can have ordered custom columns; removing a
-  column moves its tasks to the first remaining active column.
+  when completed.
+- **Your own columns.** Double-click a column's name to rename it; its
+  **⋯** menu moves it left or right or deletes it, and **Add column** at the
+  end of the board adds one before Done. Under All projects you edit the
+  default columns, which tasks without a project and projects without their
+  own use. Filtered to a project, edits give that project its own columns
+  until you choose **Use default columns**. Deleting a column moves its tasks
+  to the first one.
 - **Pages checkboxes.** In a Pages checkbox, use the **Task from checkbox**
   slash action. It creates a linked task and keeps Done and the checkbox in
   step in both directions.

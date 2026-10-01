@@ -110,8 +110,12 @@ export const rpcContract = defineRpcContract({
     input: z.object({ includeArchived: z.boolean().optional() }),
     output: z.object({ tasks: z.array(taskSchema) }),
   },
-  statuses: { input: z.object({ projectId: projectIdSchema.nullable() }), output: z.object({ columns: z.array(z.object({ id: statusSchema, label: z.string() })) }) },
-  setStatuses: { input: z.object({ projectId: projectIdSchema, columns: z.array(z.object({ id: statusSchema, label: z.string().trim().min(1).max(60) })).min(2).max(12) }), output: z.object({ ok: z.boolean() }) },
+  /** A project's columns (null: the defaults), and whether the project has its own. */
+  statuses: { input: z.object({ projectId: projectIdSchema.nullable() }), output: z.object({ columns: z.array(z.object({ id: statusSchema, label: z.string() })), own: z.boolean() }) },
+  /** Sets a project's columns, or with a null project the defaults. */
+  setStatuses: { input: z.object({ projectId: projectIdSchema.nullable(), columns: z.array(z.object({ id: statusSchema, label: z.string().trim().min(1).max(60) })).min(2).max(12) }), output: z.object({ ok: z.boolean() }) },
+  /** Puts a project back on the default columns. */
+  resetStatuses: { input: z.object({ projectId: projectIdSchema }), output: z.object({ ok: z.boolean() }) },
   get: {
     input: z.object({ id: idSchema }),
     output: z.object({ task: taskSchema.nullable(), links: z.array(linkSchema), handoffs: z.array(handoffSchema) }),
@@ -257,6 +261,13 @@ export default async function plugin(bb: BbPluginApi) {
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: TASK_UPDATE_TYPE, taskId: id }) });
 
   /** Tells open boards, task views and Studio that a task changed. */
+  /** Runs a column change, then announces the tasks it moved to another column. */
+  function remapping(change: () => void) {
+    const before = new Map(store.list({ includeArchived: true }).map((task) => [task.id, task.status]));
+    change();
+    for (const task of store.list({ includeArchived: true })) if (before.get(task.id) !== task.status) changed(task.id);
+  }
+
   function changed(id: string) {
     changeBus.changed(id);
     void syncLinks(id);
@@ -536,8 +547,9 @@ export default async function plugin(bb: BbPluginApi) {
     board({ includeArchived }) {
       return { tasks: store.list({ includeArchived }).map(toDto) };
     },
-    statuses({ projectId }) { return { columns: store.statuses(projectId) }; },
-    setStatuses({ projectId, columns }) { store.setStatuses(projectId, columns); for (const task of store.list().filter((row) => row.project_id === projectId)) changed(task.id); return { ok: true }; },
+    statuses({ projectId }) { return { columns: store.statuses(projectId), own: projectId ? store.hasOwnStatuses(projectId) : false }; },
+    setStatuses({ projectId, columns }) { remapping(() => store.setStatuses(projectId, columns)); return { ok: true }; },
+    resetStatuses({ projectId }) { remapping(() => store.resetStatuses(projectId)); return { ok: true }; },
     get({ id }) {
       const task = store.get(id);
       if (!task) return { task: null, links: [], handoffs: [] };

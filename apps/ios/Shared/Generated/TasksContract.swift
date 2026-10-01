@@ -6,6 +6,7 @@ public enum Tasks {
     public static let board = "board"
     public static let statuses = "statuses"
     public static let setStatuses = "setStatuses"
+    public static let resetStatuses = "resetStatuses"
     public static let get = "get"
     public static let create = "create"
     public static let update = "update"
@@ -30,6 +31,8 @@ public enum Tasks {
   public typealias Statuses = StatusesOutput
 
   public typealias SetStatuses = SetStatusesOutput
+
+  public typealias ResetStatuses = ResetStatusesOutput
 
   public typealias Get = GetOutput
 
@@ -286,9 +289,11 @@ public enum Tasks {
 
   public struct StatusesOutput: Sendable, Hashable, Codable {
     public var columns: [StatusesOutputColumnsItem]?
+    public var own: Bool?
 
-    public init(columns: [StatusesOutputColumnsItem]? = nil) {
+    public init(columns: [StatusesOutputColumnsItem]? = nil, own: Bool? = nil) {
       self.columns = columns
+      self.own = own
     }
   }
 
@@ -313,6 +318,22 @@ public enum Tasks {
   }
 
   public struct SetStatusesOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ResetStatusesInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
+    }
+  }
+
+  public struct ResetStatusesOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {

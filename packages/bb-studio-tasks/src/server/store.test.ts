@@ -149,4 +149,22 @@ describe("the task store", () => {
     expect(store.statuses("project-1")).toEqual([{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
     expect(store.get(task.id)?.status).toBe("backlog");
   });
+
+  it("edits the default columns for tasks without a project and projects without their own", () => {
+    const { store } = memoryStore(clock());
+    const loose = store.create({ title: "Loose", projectId: null, status: "review", by: "user" });
+    const inherits = store.create({ title: "Inherits", projectId: "project-1", status: "review", by: "user" });
+    const own = store.create({ title: "Own", projectId: "project-2", status: "qa", by: "user" });
+    store.setStatuses("project-2", [{ id: "qa", label: "QA" }, { id: "done", label: "Done" }]);
+    store.setStatuses(null, [{ id: "todo", label: "To do" }, { id: "doing", label: "Doing" }, { id: "done", label: "Done" }]);
+    expect(store.statuses(null).map((column) => column.label)).toEqual(["To do", "Doing", "Done"]);
+    expect(store.statuses("project-1").map((column) => column.id)).toEqual(["todo", "doing", "done"]);
+    expect(store.statuses("project-2").map((column) => column.id)).toEqual(["qa", "done"]);
+    expect([store.get(loose.id)?.status, store.get(inherits.id)?.status, store.get(own.id)?.status]).toEqual(["todo", "todo", "qa"]);
+
+    store.resetStatuses("project-2");
+    expect(store.hasOwnStatuses("project-2")).toBe(false);
+    expect(store.statuses("project-2").map((column) => column.id)).toEqual(["todo", "doing", "done"]);
+    expect(store.get(own.id)?.status).toBe("todo");
+  });
 });
