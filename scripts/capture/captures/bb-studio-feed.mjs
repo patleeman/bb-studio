@@ -46,7 +46,7 @@ export default ({ bbCli, sleep }) => [
           title.closest("button").click();
           return true;
         })()`);
-        await client.waitForText("Earlier in this story");
+        await client.waitForText("EARLIER IN THIS STORY"); // Uppercased by CSS.
         await client.waitForText("Harlem Line delays growing to 20 minutes");
         await client.waitForText("Inbound trains are on time");
         await client.waitForText("Discuss");
