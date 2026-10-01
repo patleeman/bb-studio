@@ -5,3 +5,5 @@ export { defineItemMention } from "./mention";
 export { serveBytes } from "./bytes";
 export { discoverProviders, fanOutProviders } from "./discovery";
 export { actorName, type Actor } from "./actor";
+
+export { personalProjectId, primaryHostId } from "./project";

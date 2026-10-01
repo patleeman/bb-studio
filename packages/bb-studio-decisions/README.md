@@ -151,6 +151,10 @@ logs.
   `requestId`, `hostId`, `prompt`, and `providerId`, the caller's provider for
   when the fallback follows it.
 
+Studio Teams uses these methods for routing and channel titles. Studio Talk
+uses the fallback model for recording titles. Callers share the typed
+`@bb-studio/kit/decisions` client, including its `askTitle` helper.
+
 Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }`.
 `unavailable` means nothing is configured to answer. Studio Teams shows it as a
 setup hint and offers Retry routing.

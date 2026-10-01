@@ -1,5 +1,6 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { personalProjectId } from "@bb-studio/kit/server";
 import { z } from "zod";
 import {
   askJev,
@@ -187,11 +188,6 @@ export default async function plugin(bb: BbPluginApi) {
     }
     return null;
   }
-  async function personalProjectId() {
-    const personal = (await bb.sdk.projects.list({ includePersonal: true })).find((project) => project.kind === "personal");
-    if (!personal) throw new Error("BB's Personal project is unavailable.");
-    return personal.id;
-  }
   /** A result other plugins can read without depending on error classes crossing the RPC boundary. */
   async function answer<T>(caller: string, what: string, run: () => Promise<T>) {
     const started = Date.now();
@@ -212,7 +208,7 @@ export default async function plugin(bb: BbPluginApi) {
         runModel(
           bb,
           await fallback(),
-          { projectId: await personalProjectId(), hostId, requestId: `${caller} ${requestId}`, defaultProviderId: providerId },
+          { projectId: await personalProjectId(bb), hostId, requestId: `${caller} ${requestId}`, defaultProviderId: providerId },
           prompt,
           AbortSignal.timeout(60_000),
           sessions,
@@ -246,7 +242,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (!thread.environmentId) throw new Error("The thread has no environment to run the fallback model on.");
     const [environment, projectId] = await Promise.all([
       bb.sdk.environments.get({ environmentId: thread.environmentId }),
-      personalProjectId(),
+      personalProjectId(bb),
     ]);
     return { projectId, hostId: environment.hostId, requestId: queuedMessageId, defaultProviderId: thread.providerId };
   }

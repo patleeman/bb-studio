@@ -2,14 +2,14 @@ import { z } from "zod";
 import type { Bot, RoomMessage } from "./contract";
 import type { RoutingPlan, RoutingTask, DispatchAction, RoutingDecision } from "./send-mode";
 import { mentioned, mentionsEveryone } from "./mentions";
-import type { JevAsk, JevQuestion } from "./decisions";
+import type { JevAsk, Question } from "@bb-studio/kit/decisions";
 
 export type JevSettings = {
   /** Studio Decisions' System One call. */
   ask: JevAsk;
   jevActionConfidence?: number;
 };
-type Question = JevQuestion;
+
 const confidenceSchema = z.number().min(0).max(1).catch(0.7);
 const minimumConfidence = (settings: JevSettings) =>
   confidenceSchema.parse(settings.jevActionConfidence ?? 0.7);
@@ -37,17 +37,6 @@ export async function askJev(
 ) {
   signal.throwIfAborted();
   const answers = await settings.ask(state, questions, signal);
-  for (const [id, question] of Object.entries(questions)) {
-    const answer = answers[id];
-    if (!answer || answer.type !== question.type)
-      throw new Error("Jev omitted a required decision.");
-    if (
-      question.type === "choice" &&
-      answer.type === "choice" &&
-      !Object.hasOwn(question.criteria, answer.choice)
-    )
-      throw new Error("Jev returned an unknown decision option.");
-  }
   signal.throwIfAborted();
   return answers;
 }

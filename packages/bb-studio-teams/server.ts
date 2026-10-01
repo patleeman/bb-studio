@@ -1,5 +1,5 @@
 import { classifyJevReturn } from "./jev";
-import { decisionsClient } from "./decisions";
+import { decisionsClient } from "@bb-studio/kit/decisions";
 import { ChannelNotifications, notificationSchema } from "./notifications";
 import { AttentionReplies, StaleAttentionReplyError } from "./attention-replies";
 import { ChannelApprovals } from "./approvals";
@@ -30,7 +30,7 @@ import { botHandlers } from "./rpc-bots";
 import { roomHandlers } from "./rpc-rooms";
 import { attachmentHandlers } from "./rpc-attachments";
 import { rosterHandlers } from "./rpc-roster";
-import { personalProjectId } from "./bot-project";
+import { personalProjectId } from "@bb-studio/kit/server";
 import { ChannelThreads } from "./channel-thread-link";
 import { registerChannelMentions } from "./channel-mentions";
 import {

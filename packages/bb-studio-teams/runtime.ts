@@ -6,7 +6,7 @@ import { publishChange } from "./realtime-server";
 import { recoverRoomTitles, findTitleWorkers, startRoomTitle, generateRoomTitle, cleanupTitleThread, applyRoomTitle } from "./runtime-title";
 import { dispatchMessage, startSteer, startRouting, retryRouting } from "./runtime-routing";
 import { driveRoom, driveJob, tick } from "./runtime-drive";
-import { fallbackRoomTitle, isAutoTitlePlaceholder, maxRoomTitleLength, requestRoomTitle, roomTitleThreadPrefix, sanitizeRoomTitle, titleWorkerPriority, type TitleWorker, type TitleTask } from "./room-titles";
+import { fallbackRoomTitle, isAutoTitlePlaceholder, maxRoomTitleLength, roomTitleThreadPrefix, sanitizeRoomTitle, titleWorkerPriority, type TitleWorker, type TitleTask } from "./room-titles";
 export { fallbackRoomTitle, isAutoTitlePlaceholder, roomTitleThreadPrefix, sanitizeRoomTitle } from "./room-titles";
 import { attachmentsForProject } from "./project-attachments";
 import { linkChannelReferences } from "./channel-references";

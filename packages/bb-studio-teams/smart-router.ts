@@ -4,7 +4,7 @@ import type { Bot, RoomMessage } from "./contract";
 import type { Store } from "./store";
 import type { RoutingDecision, RoutingPlan, RoutingSelection, RoutingTask } from "./send-mode";
 import { selectJevActions, selectJevBots, type JevSettings } from "./jev";
-import type { ModelAsk } from "./decisions";
+import type { ModelAsk } from "@bb-studio/kit/decisions";
 
 export const routerPrefix = "Bots routing · ";
 export const routerInstructions =

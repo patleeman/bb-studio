@@ -1,4 +1,4 @@
-import { fallbackRoomTitle, isAutoTitlePlaceholder, maxRoomTitleLength, requestRoomTitle, roomTitleThreadPrefix, sanitizeRoomTitle, titleWorkerPriority, type TitleWorker, type TitleTask } from "./room-titles";
+import { fallbackRoomTitle, isAutoTitlePlaceholder, maxRoomTitleLength, roomTitleThreadPrefix, sanitizeRoomTitle, titleWorkerPriority, type TitleWorker, type TitleTask } from "./room-titles";
 export { fallbackRoomTitle, isAutoTitlePlaceholder, roomTitleThreadPrefix, sanitizeRoomTitle } from "./room-titles";
 import { attachmentsForProject } from "./project-attachments";
 import { linkChannelReferences } from "./channel-references";

@@ -8,7 +8,7 @@ import {
 } from "../jev";
 import { botSchema, messageSchema } from "../contract";
 import { selectBots } from "../smart-router";
-import { DecisionsUnavailableError, decisionsClient, type JevAsk } from "../decisions";
+import { DecisionsUnavailableError, decisionsClient, type JevAsk } from "@bb-studio/kit/decisions";
 
 const bots = ["Atlas", "Scribe"].map((name, index) =>
   botSchema.parse({
@@ -177,25 +177,15 @@ test("explicit mentions become candidates and idle bots cannot be steered", asyn
     question.type === "choice" && Object.keys(question.criteria),
     ["skip", "followup"],
   );
-  const { config } = jev(() => ({
-    coordinator: choice(bots[1]!.id),
-    execution: choice("serialized"),
-    [`collaborator:${bots[1]!.id}`]: choice("no"),
-    [`action:${bots[1]!.id}`]: choice("steer"),
-  }));
-  await assert.rejects(
-    selectJevBots(config, message, [], bots, new AbortController().signal, [], [bots[1]!.id]),
-    /unknown decision option/,
-  );
 });
 
-test("Jev validates missing answers and answer types", async () => {
+test("routing refuses missing answers and answer types", async () => {
   const replies = [{}, { coordinator: { type: "noul", noul: 0.9 } }];
   const { config } = jev(() => replies.shift());
   for (let i = 0; i < 2; i++)
     await assert.rejects(
       selectJevBots(config, message, [], [bots[0]!], new AbortController().signal),
-      /omitted a required decision/,
+      /invalid routing decision/,
     );
 });
 

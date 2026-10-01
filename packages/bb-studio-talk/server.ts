@@ -49,20 +49,8 @@ export default async function plugin(bb: BbPluginApi) {
     autoTitle: {
       type: "boolean",
       label: "Auto-title recordings",
-      description: "Ask one of your agent providers for a short title once a recording has some text.",
+      description: "Ask Studio Decisions for a short title once a recording has some text.",
       default: true,
-    },
-    titleProvider: {
-      type: "string",
-      label: "Title provider",
-      description: "Provider id for titling, e.g. codex or claude-code. Leave empty to pick automatically.",
-      default: "",
-    },
-    titleModel: {
-      type: "string",
-      label: "Title model",
-      description: "Model for titling. Leave empty for the provider's default.",
-      default: "",
     },
   });
   let config = await settings.get();
@@ -109,8 +97,8 @@ export default async function plugin(bb: BbPluginApi) {
       bb,
       {
         transcript: store.transcript(id),
-        providerId: config.titleProvider.trim(),
-        model: config.titleModel,
+        recordingId: id,
+        createdAt: store.recording(id)!.createdAt,
       },
       lifetime.signal,
     )

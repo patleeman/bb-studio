@@ -12,6 +12,7 @@ const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, "../packag
 };
 const RUNTIME = new Set([
   ...Object.keys(packageJson.dependencies),
+  "@get-bb/plugin-sdk",
   "react",
   "react/jsx-runtime",
   "react-dom",

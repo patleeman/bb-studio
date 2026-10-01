@@ -1,5 +1,8 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { z } from "zod";
+import { answerSchema, type Questions, type Answers } from "@bb-studio/kit/decisions-contract";
+export { questionSchema, questionsSchema, answerSchema } from "@bb-studio/kit/decisions-contract";
+export type { Question, Questions, Answer, Answers } from "@bb-studio/kit/decisions-contract";
 import { describeHttpFailure, jevRoutes, type JevProviderSettings, type JevRoute } from "./jev-providers";
 import { commandToken, forgetCommandToken, hasCommandToken } from "./key-command";
 
@@ -8,41 +11,6 @@ import { commandToken, forgetCommandToken, hasCommandToken } from "./key-command
  * questions, and Jev answers each one. A `noul` question returns a
  * probability; a `choice` question picks one of its criteria's keys.
  */
-const probability = z.number().min(0).max(1);
-const questionId = z.string().trim().min(1).max(120);
-export const questionSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("noul"), instructions: z.string().min(1).max(4000) }).strict(),
-  z
-    .object({
-      type: z.literal("choice"),
-      instructions: z.string().min(1).max(4000),
-      criteria: z
-        .record(questionId, z.string().min(1).max(2000))
-        .refine((criteria) => Object.keys(criteria).length >= 2 && Object.keys(criteria).length <= 32, {
-          message: "A choice needs between 2 and 32 options.",
-        }),
-    })
-    .strict(),
-]);
-export const questionsSchema = z
-  .record(questionId, questionSchema)
-  .refine((questions) => Object.keys(questions).length >= 1 && Object.keys(questions).length <= 64, {
-    message: "Ask between 1 and 64 questions.",
-  });
-export const answerSchema = z.discriminatedUnion("type", [
-  z.object({ type: z.literal("noul"), noul: probability }),
-  z.object({
-    type: z.literal("choice"),
-    choice: z.string(),
-    confidence: probability,
-    probabilities: z.record(z.string(), probability),
-  }),
-]);
-export type Question = z.infer<typeof questionSchema>;
-export type Questions = Record<string, Question>;
-export type Answer = z.infer<typeof answerSchema>;
-export type Answers = Record<string, Answer>;
-
 const responseSchema = z.object({ answers: z.record(z.string(), answerSchema) });
 
 export type SystemOneSettings = JevProviderSettings & { jevTimeoutMs?: number };

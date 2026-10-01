@@ -1,7 +1,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { personalProjectId } from "../bot-project";
+import { personalProjectId } from "@bb-studio/kit/server";
 
 const withProjects = (list: () => Promise<unknown[]>) =>
   ({ sdk: { projects: { list } } }) as unknown as BbPluginApi;

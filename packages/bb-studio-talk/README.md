@@ -62,9 +62,11 @@ afterwards.
   `/plugins/talk/recordings/<id>`. It shows up in the composer's @ menu, and
   mentioning it gives the agent its transcript. **New thread** starts a thread
   that links to it.
-- **Auto titles.** A short-lived hidden agent thread titles each recording
-  from its transcript. It retitles the recording as the transcript grows, and
-  never replaces a title you typed.
+- **Auto titles.** Studio Decisions uses its configured fallback model to
+  title each recording from its transcript. If Decisions is missing or reports
+  that no model is available, Talk uses the transcript's first words and the
+  recording date. Titles update as the transcript grows and never replace a
+  title you typed.
 - **Mobile layout.** The pill, Recordings page, and composer mic all work in
   the BB mobile app, with larger touch targets on small screens.
 
