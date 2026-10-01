@@ -158,6 +158,8 @@ export const rpcContract = defineRpcContract({
   deleteTag: { input: z.object({ id: tagId }), output: z.object({ ok: z.boolean() }) },
   /** Adds and removes tags on items from any add-on. */
   tagItems: tagSchemas.tagItems,
+  /** Every space, for the sidebar. */
+  spaces: { input: z.null(), output: z.object({ spaces: z.array(space) }) },
   /** Spaces are made, renamed and deleted by the user only. */
   createSpace: { input: spaceFields.extend({ name: tagName }), output: z.object({ space }) },
   updateSpace: { input: spaceFields.extend({ id: spaceId, name: tagName.optional() }), output: z.object({ space }) },

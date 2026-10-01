@@ -1,7 +1,9 @@
 // bb-studio frontend: the Studio collection, one nav panel whose
-// sub-path filters it to a kind, the sidebar's Studio tabs, and Studio search.
+// sub-path filters it to a kind or opens a space, the sidebar's Studio tabs
+// and spaces, and Studio search.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
+import { SidebarSpaces } from "./src/ui/SidebarSpaces";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { StudioPanel } from "./src/ui/StudioPanel";
 import { ActivityPanel } from "./src/ui/HomePanel";
@@ -14,8 +16,9 @@ function StudioRoot({ subPath }: { subPath: string }) {
 
 export default definePluginApp((app) => {
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: StudioRoot });
-  // Renders nothing itself; portals the tabs section into the Studio Sidebar.
+  // Render nothing themselves; portal the tabs and spaces sections into the Studio Sidebar.
   app.slots.experimental_appOverlay({ id: "sidebar-tabs", component: SidebarTabs });
+  app.slots.experimental_appOverlay({ id: "sidebar-spaces", component: SidebarSpaces });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   app.commands.register({
     id: "search",

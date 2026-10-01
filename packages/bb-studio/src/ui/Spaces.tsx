@@ -1,6 +1,6 @@
-// Spaces in Studio: an open space's home, with tabs for its overview, items,
-// threads and projects, and the dialogs that make a space and fill it. Spaces
-// are protected tags (src/spaces.ts); only the user makes one here.
+// Spaces in Studio: an open space's home page, with its items, threads and
+// projects, and the dialogs that make a space and fill it. Spaces are
+// protected tags (src/spaces.ts); only the user makes one here.
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -50,21 +50,7 @@ export function SpaceGlyph({ space, className }: { space: SpaceView; className?:
   );
 }
 
-export type SpaceTab = "overview" | "items" | "threads" | "projects";
-const SPACE_TABS: readonly { id: SpaceTab; label: string }[] = [
-  { id: "overview", label: "Overview" },
-  { id: "items", label: "Items" },
-  { id: "threads", label: "Threads" },
-  { id: "projects", label: "Projects" },
-];
 const SHOWN_ITEMS = 8;
-
-/** The tab a space's sub-path names; any other segment is a kind in Items. */
-export function spaceTab(segment: string | undefined): { tab: SpaceTab; kind: string } {
-  if (!segment) return { tab: "overview", kind: "all" };
-  if (SPACE_TABS.some((each) => each.id === segment)) return { tab: segment as SpaceTab, kind: "all" };
-  return { tab: "items", kind: segment };
-}
 
 export function useSpaceThreads(rpc: Rpc, space: SpaceView | null) {
   const [threads, setThreads] = useState<SpaceThreadView[] | null>(null);
@@ -95,67 +81,6 @@ function useMembers(rpc: Rpc, space: SpaceView, onChanged: () => void) {
       toast.error(`Couldn't change the space: ${errorMessage(cause)}`);
     }
   };
-}
-
-/** What the space is for and its tabs, under its title; the same on every tab. */
-export function SpaceSubheader({
-  space,
-  tab,
-  counts,
-  onTab,
-  onEdit,
-  onDelete,
-}: {
-  space: SpaceView;
-  tab: SpaceTab;
-  counts: { items: number; threads: number | null; projects: number };
-  onTab(tab: SpaceTab): void;
-  onEdit(): void;
-  onDelete(): void;
-}) {
-  const navigate = useBbNavigate();
-  const count = (id: SpaceTab) => (id === "items" ? counts.items : id === "threads" ? counts.threads : id === "projects" ? counts.projects : null);
-  return (
-    <>
-      {space.description ? <p className="mt-1 text-sm text-muted-foreground">{space.description}</p> : null}
-      <div className="mt-4 flex items-end gap-2 border-b border-border">
-        <nav aria-label={`${space.name} sections`} className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
-          {SPACE_TABS.map((each) => {
-            const n = count(each.id);
-            return (
-              <button
-                key={each.id}
-                type="button"
-                aria-current={tab === each.id ? "page" : undefined}
-                className="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2.5 pt-1 pb-2 text-sm text-muted-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:font-medium aria-[current=page]:text-foreground"
-                onClick={() => onTab(each.id)}
-              >
-                {each.label}
-                {n ? <span className="text-xs text-muted-foreground tabular-nums">{n}</span> : null}
-              </button>
-            );
-          })}
-        </nav>
-        <div className="flex shrink-0 items-center gap-1 pb-1.5">
-          <button type="button" className={GHOST_BUTTON} onClick={() => navigate.toCompose({ initialPrompt: spacePrompt(space), focusPrompt: true })}>
-            <Icon name="MessageSquarePlus" /> New thread
-          </button>
-          <SpaceMenu onEdit={onEdit} onDelete={onDelete} />
-        </div>
-      </div>
-    </>
-  );
-}
-
-/** A space's tab that isn't its item list: the title, the subheader, then the tab. */
-export function SpacePage({ title, subheader, children }: { title: string; subheader: ReactNode; children: ReactNode }) {
-  return (
-    <PageColumn className="max-w-6xl">
-      <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
-      {subheader}
-      <div className="mt-6">{children}</div>
-    </PageColumn>
-  );
 }
 
 function Section({ title, actions, footer, children }: { title: string; actions?: ReactNode; footer?: ReactNode; children: ReactNode }) {
@@ -293,17 +218,19 @@ function ProjectRows({
   );
 }
 
-/** The space's home: its latest items and threads, and its projects. */
-export function SpaceOverview({
+/** A space's home page: what it's for, then its items, threads and projects. */
+export function SpaceHome({
   rpc,
   space,
   items,
   threads,
   kinds,
   projects,
-  onTab,
+  onEdit,
+  onDelete,
   onAddItems,
   onAddThreads,
+  onShowItems,
   onChanged,
 }: {
   rpc: Rpc;
@@ -313,30 +240,49 @@ export function SpaceOverview({
   threads: readonly SpaceThreadView[] | null;
   kinds: readonly CollectionKind[];
   projects: readonly Project[];
-  onTab(tab: SpaceTab): void;
+  onEdit(): void;
+  onDelete(): void;
   onAddItems(): void;
   onAddThreads(): void;
+  /** Opens the Studio collection filtered to the space. */
+  onShowItems(): void;
   onChanged(): void;
 }) {
   const members = useMembers(rpc, space, onChanged);
+  const [allThreads, setAllThreads] = useState(false);
   const recent = useMemo(() => items.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, SHOWN_ITEMS), [items]);
-  const viewAll = (tab: SpaceTab, total: number, shown: number) =>
-    total > shown ? (
-      <button type="button" className={`${GHOST_BUTTON} self-start`} onClick={() => onTab(tab)}>
-        View all {total}
-      </button>
-    ) : null;
+  const shownThreads = allThreads ? threads : threads?.slice(0, SHOWN_THREADS);
   return (
-    <div className="flex flex-col gap-8">
-      <div className="grid gap-8 lg:grid-cols-2">
+    <PageColumn>
+      <div className="flex items-start gap-3">
+        <h1 className="min-w-0 flex-1 text-[28px] leading-tight font-semibold tracking-tight">
+          {space.icon ? `${space.icon} ` : ""}
+          {space.name}
+        </h1>
+        <SpaceMenu onEdit={onEdit} onDelete={onDelete} />
+      </div>
+      {space.description ? (
+        <p className="mt-2 text-muted-foreground">{space.description}</p>
+      ) : (
+        <button type="button" className={`${GHOST_BUTTON} mt-1 -ml-2.5 text-muted-foreground`} onClick={onEdit}>
+          Say what this space is for
+        </button>
+      )}
+      <div className="mt-8 flex flex-col gap-8">
         <Section
-          title="Recent items"
+          title="Items"
           actions={
             <button type="button" className={OUTLINE_BUTTON} onClick={onAddItems}>
               <Icon name="Plus" /> Add items
             </button>
           }
-          footer={viewAll("items", items.length, recent.length)}
+          footer={
+            items.length > recent.length ? (
+              <button type="button" className={`${GHOST_BUTTON} self-start`} onClick={onShowItems}>
+                Show all {items.length} in Studio
+              </button>
+            ) : null
+          }
         >
           {recent.map((item) => (
             <ItemRow key={`${item.pluginId}:${item.id}`} item={item} kinds={kinds} projects={projects} />
@@ -346,10 +292,16 @@ export function SpaceOverview({
         <Section
           title="Threads"
           actions={<AddThreadActions space={space} onAddThreads={onAddThreads} />}
-          footer={threads ? viewAll("threads", threads.length, Math.min(threads.length, SHOWN_THREADS)) : null}
+          footer={
+            threads && threads.length > SHOWN_THREADS ? (
+              <button type="button" className={`${GHOST_BUTTON} self-start`} onClick={() => setAllThreads(!allThreads)}>
+                {allThreads ? "Show fewer" : `Show all ${threads.length}`}
+              </button>
+            ) : null
+          }
         >
           {threads === null ? <Empty>Loading threads…</Empty> : null}
-          {threads?.slice(0, SHOWN_THREADS).map((thread) => (
+          {shownThreads?.map((thread) => (
             <ThreadRow
               key={thread.id}
               thread={thread}
@@ -359,75 +311,18 @@ export function SpaceOverview({
           ))}
           {threads?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
         </Section>
+        <Section
+          title="Projects"
+          actions={<AddProjectMenu space={space} projects={projects} onAdd={(id) => void members([{ pluginId: PROJECT_REF, id }], [])} />}
+        >
+          <ProjectRows space={space} projects={projects} items={items} threads={threads} onRemove={(id) => void members([], [{ pluginId: PROJECT_REF, id }])} />
+        </Section>
       </div>
-      <Section
-        title="Projects"
-        actions={<AddProjectMenu space={space} projects={projects} onAdd={(id) => void members([{ pluginId: PROJECT_REF, id }], [])} />}
-      >
-        <ProjectRows space={space} projects={projects} items={items} threads={threads} onRemove={(id) => void members([], [{ pluginId: PROJECT_REF, id }])} />
-      </Section>
-    </div>
+    </PageColumn>
   );
 }
 
-/** Every thread in the space. */
-export function SpaceThreads({
-  rpc,
-  space,
-  threads,
-  projects,
-  onAddThreads,
-  onChanged,
-}: {
-  rpc: Rpc;
-  space: SpaceView;
-  threads: readonly SpaceThreadView[] | null;
-  projects: readonly Project[];
-  onAddThreads(): void;
-  onChanged(): void;
-}) {
-  const members = useMembers(rpc, space, onChanged);
-  return (
-    <Section title="Threads" actions={<AddThreadActions space={space} onAddThreads={onAddThreads} />}>
-      {threads === null ? <Empty>Loading threads…</Empty> : null}
-      {threads?.map((thread) => (
-        <ThreadRow
-          key={thread.id}
-          thread={thread}
-          projects={projects}
-          onRemove={thread.direct ? () => void members([], [{ pluginId: THREAD_REF, id: thread.id }]) : undefined}
-        />
-      ))}
-      {threads?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
-    </Section>
-  );
-}
-
-/** The space's projects; everything in one is in the space. */
-export function SpaceProjects({
-  rpc,
-  space,
-  items,
-  threads,
-  projects,
-  onChanged,
-}: {
-  rpc: Rpc;
-  space: SpaceView;
-  items: readonly CollectionItem[];
-  threads: readonly SpaceThreadView[] | null;
-  projects: readonly Project[];
-  onChanged(): void;
-}) {
-  const members = useMembers(rpc, space, onChanged);
-  return (
-    <Section title="Projects" actions={<AddProjectMenu space={space} projects={projects} onAdd={(id) => void members([{ pluginId: PROJECT_REF, id }], [])} />}>
-      <ProjectRows space={space} projects={projects} items={items} threads={threads} onRemove={(id) => void members([], [{ pluginId: PROJECT_REF, id }])} />
-    </Section>
-  );
-}
-
-/** The space's options menu, beside its tabs. */
+/** The space's options menu, beside its title. */
 export function SpaceMenu({ onEdit, onDelete }: { onEdit(): void; onDelete(): void }) {
   return (
     <DropdownMenu>

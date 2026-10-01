@@ -409,10 +409,6 @@ export function FacetRail({
   counts,
   onChange,
   spaces,
-  spaceCounts,
-  currentSpace,
-  onOpenSpace,
-  onNewSpace,
   views,
   onSaveView,
   onDeleteView,
@@ -423,11 +419,6 @@ export function FacetRail({
   counts: FacetCounts;
   onChange(query: Query): void;
   spaces: readonly SpaceView[];
-  /** Live items per space id, and in all. */
-  spaceCounts: { all: number; bySpace: ReadonlyMap<string, number> };
-  currentSpace: string | null;
-  onOpenSpace(id: string | null): void;
-  onNewSpace(): void;
   views: readonly SavedViewView[];
   onSaveView(): void;
   onDeleteView(view: SavedViewView): void;
@@ -463,27 +454,18 @@ export function FacetRail({
       ))}
       {!views.length ? <p className="px-2 text-xs text-muted-foreground">{current ? "Save this search with +." : "Filter, then save it here."}</p> : null}
 
-      <RailHeading
-        action={
-          <button type="button" aria-label="New space" title="New space" className="rounded p-0.5 hover:bg-state-hover hover:text-foreground" onClick={onNewSpace}>
-            <Icon name="Plus" className="size-3.5" />
-          </button>
-        }
-      >
-        Spaces
-      </RailHeading>
-      <RailRow label="All items" count={spaceCounts.all} active={currentSpace === null} glyph={<Icon name="Layers" className="size-3.5 shrink-0" />} onClick={() => onOpenSpace(null)} />
-      {spaces.map((space) => (
-        <RailRow
-          key={space.id}
-          label={space.name}
-          count={spaceCounts.bySpace.get(space.id) ?? 0}
-          active={currentSpace === space.id}
-          glyph={<SpaceGlyph space={space} className="w-3.5 shrink-0 text-center text-xs" />}
-          onClick={() => onOpenSpace(space.id)}
-        />
-      ))}
-
+      <FacetSection
+        title="Space"
+        field="space"
+        values={fieldValues("space", vocabulary)}
+        countOf={(value) => counts.space.get(idOf(value) ?? "") ?? 0}
+        query={query}
+        onChange={onChange}
+        glyph={(value) => {
+          const space = spaceByName.get(value.value.toLowerCase());
+          return space ? <SpaceGlyph space={space} className="w-3.5 shrink-0 text-center text-xs" /> : null;
+        }}
+      />
       <FacetSection title="Kind" field="kind" values={fieldValues("kind", vocabulary)} countOf={(value) => counts.kind.get(value.value) ?? 0} query={query} onChange={onChange} />
       <FacetSection
         title="Project"
@@ -502,20 +484,6 @@ export function FacetRail({
         onChange={onChange}
         glyph={(value) => (value.value === UNTAGGED ? null : <TagDot color={tagColor.get(value.value.toLowerCase()) ?? "currentColor"} />)}
       />
-      {currentSpace === null ? (
-        <FacetSection
-          title="In space"
-          field="space"
-          values={fieldValues("space", vocabulary)}
-          countOf={(value) => counts.space.get(idOf(value) ?? "") ?? 0}
-          query={query}
-          onChange={onChange}
-          glyph={(value) => {
-            const space = spaceByName.get(value.value.toLowerCase());
-            return space ? <SpaceGlyph space={space} className="w-3.5 shrink-0 text-center text-xs" /> : null;
-          }}
-        />
-      ) : null}
 
       <RailHeading>Status</RailHeading>
       <RailRow

@@ -319,6 +319,7 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { ok: true };
     },
+    spaces: () => ({ spaces: spaces.list() }),
     createSpace: (input) => {
       const space = spaces.create(input);
       tagsChanged();

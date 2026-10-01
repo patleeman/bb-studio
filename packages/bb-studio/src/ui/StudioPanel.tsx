@@ -2,7 +2,8 @@
 // query (src/query.ts) from the bar above it and the rail beside it. The
 // panel's sub-path can start the query on a kind, so
 // /plugins/studio/studio/recording links to recordings; space/<id> opens a
-// space's overview, and space/<id>/<tab or kind> its other tabs.
+// space's home instead (Spaces.tsx), which lists the space's items here by
+// filtering on it.
 import {
   CollectionPage,
   DropdownMenu,
@@ -13,7 +14,6 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   Icon,
-  OUTLINE_BUTTON,
   itemKey,
   PageColumn,
   openAppPath,
@@ -34,29 +34,15 @@ import { applyItemChanges } from "../partial";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { NeedsYou } from "./HomePanel";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
-import {
-  AddItemsDialog,
-  AddThreadsDialog,
-  DeleteSpaceDialog,
-  SpaceDialog,
-  SpaceOverview,
-  SpacePage,
-  SpaceProjects,
-  spacePrompt,
-  SpaceSubheader,
-  spaceTab,
-  SpaceThreads,
-  useSpaceThreads,
-  type SpaceTab,
-} from "./Spaces";
+import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceHome, useSpaceThreads } from "./Spaces";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
-type SpaceDialogState = { type: "new" } | { type: "edit" | "items" | "threads" | "delete"; space: SpaceView } | null;
+type SpaceDialogState = { type: "edit" | "items" | "threads" | "delete"; space: SpaceView } | null;
 const REFETCH_DEBOUNCE_MS = 300;
 const SEARCH_DEBOUNCE_MS = 200;
 const EMPTY_QUERY: Query = { filters: [], text: "" };
 
-/** The query, remembered per space and for all items. */
+/** The query, remembered across visits. */
 function useStoredQuery(key: string): [Query, (query: Query) => void] {
   const read = useCallback(() => {
     try {
@@ -219,17 +205,9 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const segments = subPath.split("/").filter(Boolean);
   const spaceId = segments[0] === "space" ? decodeSegment(segments[1] ?? "") || null : null;
   const space = spaceId ? (data?.spaces.find((each) => each.id === spaceId) ?? null) : null;
-  const { tab, kind: spaceKind } = spaceTab(decodeSegment(segments[2] ?? "") || undefined);
-  const requested = (spaceId ? spaceKind : decodeSegment(segments[0] ?? "")) || "all";
-  const spacePath = useCallback((id: string | null, next = "all") =>
-    [id ? `space/${encodeURIComponent(id)}` : "", next === "all" ? "" : encodeURIComponent(next)].filter(Boolean).join("/"), []);
-  // In a space, every kind is under Items; with none, the space opens on its overview.
-  const setKind = useCallback(
-    (next: string) => navigate.toPluginPanel("studio", { subPath: spacePath(spaceId, spaceId && next === "all" ? "items" : next) }),
-    [navigate, spacePath, spaceId],
-  );
-  const setTab = useCallback((next: SpaceTab) => navigate.toPluginPanel("studio", { subPath: spacePath(spaceId, next === "overview" ? "all" : next) }), [navigate, spacePath, spaceId]);
-  const openSpace = useCallback((id: string | null) => navigate.toPluginPanel("studio", { subPath: spacePath(id) }), [navigate, spacePath]);
+  const requested = (spaceId ? "" : decodeSegment(segments[0] ?? "")) || "all";
+  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
+  const openSpace = useCallback((id: string | null) => navigate.toPluginPanel("studio", { subPath: id ? `space/${encodeURIComponent(id)}` : "" }), [navigate]);
   const spaceThreads = useSpaceThreads(rpc, space);
   const [spaceDialog, setSpaceDialog] = useState<SpaceDialogState>(null);
   // A space deleted elsewhere falls back to everything.
@@ -237,7 +215,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     if (data && spaceId && !space) openSpace(null);
   }, [data, spaceId, space, openSpace]);
 
-  const [query, setQuery] = useStoredQuery(`studio:query:${spaceId ?? "all"}`);
+  const [query, setQuery] = useStoredQuery("studio:query:all");
   // A link to a kind starts the query on it.
   const seededKind = useRef<string | null>(null);
   useEffect(() => {
@@ -274,15 +252,8 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     (item: CollectionItem) => !searchText || untitled(item.title).toLowerCase().includes(searchText.toLowerCase()) || snippets.has(itemKey(item)),
     [searchText, snippets],
   );
-  const scoped = useMemo(() => (data ? (space ? data.items.filter((item) => item.spaces?.includes(space.id)) : data.items) : null), [data, space]);
-  const shownItems = useMemo(() => scoped?.filter((item) => compiled.test(item) && matchesText(item)) ?? null, [scoped, compiled, matchesText]);
-  const counts = useMemo(() => facetCounts(scoped ?? [], compiled, (item) => matchesText(item as CollectionItem)), [scoped, compiled, matchesText]);
-  const spaceCounts = useMemo(() => {
-    const live = data?.items.filter((item) => !item.archived) ?? [];
-    const bySpace = new Map<string, number>();
-    for (const item of live) for (const id of item.spaces ?? []) bySpace.set(id, (bySpace.get(id) ?? 0) + 1);
-    return { all: live.length, bySpace };
-  }, [data]);
+  const shownItems = useMemo(() => data?.items.filter((item) => compiled.test(item) && matchesText(item)) ?? null, [data, compiled, matchesText]);
+  const counts = useMemo(() => facetCounts(data?.items ?? [], compiled, (item) => matchesText(item as CollectionItem)), [data, compiled, matchesText]);
   // One kind or project in the query picks the columns and where new items go.
   const only = (field: "kind" | "project") => {
     const ids = [...new Set(query.filters.filter((filter) => filter.field === field && !filter.negate).map((filter) => resolveValue(filter, vocabulary)))];
@@ -307,14 +278,12 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         }
         try {
           const { item } = await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId });
-          // Made in a space: file it there, whichever project it went to.
-          if (space) await rpc.call("spaceMembers", { id: space.id, add: [{ pluginId: target.pluginId, id: item.id }], remove: [] }).catch(() => {});
           openAppPath(item.href);
         } catch (cause) {
           toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
         }
       },
-      onNewThread: (items) => navigate.toCompose({ initialPrompt: space ? spacePrompt(space, mentionPrompt(items).trimEnd()) : mentionPrompt(items), focusPrompt: true }),
+      onNewThread: (items) => navigate.toCompose({ initialPrompt: mentionPrompt(items), focusPrompt: true }),
       onDuplicate: async (item) => {
         try {
           const { item: created } = await rpc.call("duplicate", { pluginId: item.pluginId, id: item.id, projectId: item.projectId, includeChildren: item.kind === "page" });
@@ -399,7 +368,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         refetch();
       },
     }),
-    [nameOf, navigate, refetch, rpc, setData, space],
+    [nameOf, navigate, refetch, rpc, setData],
   );
 
   const shownPanels = sidebar?.panels.filter((panel) => panel.visible) ?? [];
@@ -414,7 +383,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const notice = (
     <>
-      {space ? null : <NeedsYou />}
+      <NeedsYou />
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name={provider.state === "outdated" ? "Info" : "AlertTriangle"} className="size-4 shrink-0" />
@@ -505,16 +474,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       counts={counts}
       onChange={setQuery}
       spaces={data.spaces}
-      spaceCounts={spaceCounts}
-      currentSpace={space?.id ?? null}
-      onOpenSpace={(id) => {
-        setFiltersOpen(false);
-        openSpace(id);
-      }}
-      onNewSpace={() => {
-        setFiltersOpen(false);
-        setSpaceDialog({ type: "new" });
-      }}
       views={data.views}
       onSaveView={() => void saveView()}
       onDeleteView={(view) => void deleteView(view)}
@@ -527,9 +486,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       ? "Nothing archived matches."
       : searchText || query.filters.length
         ? "Nothing matches."
-        : space
-          ? "Nothing in this space yet. Add items or a project."
-          : "No items yet.";
+        : "No items yet.";
 
   const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
   const deleteSpace = async (target: SpaceView) => {
@@ -544,68 +501,41 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     }
   };
 
-  const title = space ? `${space.icon ? `${space.icon} ` : ""}${space.name}` : "Studio";
-  const spaceItems = scoped?.filter((item) => !item.archived) ?? [];
-  const subheader = space ? (
-    <SpaceSubheader
-      space={space}
-      tab={tab}
-      counts={{ items: spaceItems.length, threads: spaceThreads?.length ?? null, projects: space.projectIds.length }}
-      onTab={setTab}
-      onEdit={() => setSpaceDialog({ type: "edit", space })}
-      onDelete={() => setSpaceDialog({ type: "delete", space })}
-    />
-  ) : null;
-  const spaceBody =
-    space && tab === "overview" ? (
-      <SpaceOverview
-        rpc={rpc}
-        space={space}
-        items={spaceItems}
-        threads={spaceThreads}
-        kinds={kinds}
-        projects={projects}
-        onTab={setTab}
-        onAddItems={() => setSpaceDialog({ type: "items", space })}
-        onAddThreads={() => setSpaceDialog({ type: "threads", space })}
-        onChanged={refetch}
-      />
-    ) : space && tab === "threads" ? (
-      <SpaceThreads rpc={rpc} space={space} threads={spaceThreads} projects={projects} onAddThreads={() => setSpaceDialog({ type: "threads", space })} onChanged={refetch} />
-    ) : space && tab === "projects" ? (
-      <SpaceProjects rpc={rpc} space={space} items={spaceItems} threads={spaceThreads} projects={projects} onChanged={refetch} />
-    ) : null;
-
   return (
     <>
-      {spaceBody ? (
-        <SpacePage title={title} subheader={subheader}>
-          {spaceBody}
-        </SpacePage>
+      {space ? (
+        <SpaceHome
+          rpc={rpc}
+          space={space}
+          items={data?.items.filter((item) => !item.archived && item.spaces?.includes(space.id)) ?? []}
+          threads={spaceThreads}
+          kinds={kinds}
+          projects={projects}
+          onEdit={() => setSpaceDialog({ type: "edit", space })}
+          onDelete={() => setSpaceDialog({ type: "delete", space })}
+          onAddItems={() => setSpaceDialog({ type: "items", space })}
+          onAddThreads={() => setSpaceDialog({ type: "threads", space })}
+          onShowItems={() => {
+            setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
+            openSpace(null);
+          }}
+          onChanged={refetch}
+        />
       ) : (
         <CollectionPage
-          title={title}
+          title="Studio"
           kinds={kinds}
           items={shownItems}
           error={error && !data ? error : null}
           projects={projects}
-          defaultProjectId={onlyProject ? onlyProject.id : space ? space.defaultProjectId : (context.projectId ?? null)}
-          storageKey={space ? "studio:space" : "studio:collection"}
+          defaultProjectId={onlyProject ? onlyProject.id : (context.projectId ?? null)}
+          storageKey="studio:collection"
           tags={data?.tags ?? []}
           extraCreateItems={extraCreateItems}
           kind={onlyKind?.id ?? "all"}
           onKindChange={setKind}
           notice={notice}
-          subheader={subheader}
-          headerActions={
-            space ? (
-              <button type="button" className={OUTLINE_BUTTON} onClick={() => setSpaceDialog({ type: "items", space })}>
-                <Icon name="Plus" /> Add items
-              </button>
-            ) : (
-              headerActions
-            )
-          }
+          headerActions={headerActions}
           handlers={handlers}
           filter={{
             bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} />,
@@ -620,10 +550,10 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       <FiltersDialog open={filtersOpen} onClose={() => setFiltersOpen(false)}>
         {rail}
       </FiltersDialog>
-      {spaceDialog?.type === "new" || spaceDialog?.type === "edit" ? (
+      {spaceDialog?.type === "edit" ? (
         <SpaceDialog
           rpc={rpc}
-          space={spaceDialog.type === "edit" ? spaceDialog.space : null}
+          space={spaceDialog.space}
           projects={projects}
           defaultProjectId={context.projectId ?? null}
           onClose={() => setSpaceDialog(null)}

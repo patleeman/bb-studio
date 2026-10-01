@@ -71,8 +71,9 @@ and later. A thread is in a space when it was added to it or its project is.
 
 ## In the app
 
-The Studio panel is the collection, with a row of spaces above it; opening a
-space shows its projects and threads and filters the collection to it. Search, kind, project and tag filters, list or
+Spaces are listed in the sidebar under Studio; each opens a home page with
+the space's description, recent items, threads and projects. The Studio panel
+is the collection. Search, space, kind, project and tag filters, list or
 grid, archive, move to project, delete, **New ▾** for any kind, and
 **New thread** to start a conversation that mentions the selected items. With
 Studio installed, each add-on's own collection hands over to Studio filtered
