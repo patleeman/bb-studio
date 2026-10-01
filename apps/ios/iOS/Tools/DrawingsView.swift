@@ -7,6 +7,7 @@ struct DrawingsView: View {
     @State private var loaded = false
     @State private var error: String?
     @State private var deleting: DrawingSummary?
+    @State private var creating = false
 
     var body: some View {
         List {
@@ -43,6 +44,11 @@ struct DrawingsView: View {
             }
         }
         .navigationTitle("Drawings")
+        .toolbar {
+            Button { Task { await create() } } label: { Image(systemName: "plus") }
+                .accessibilityLabel("New drawing")
+                .disabled(creating)
+        }
         .refreshable { await load() }
         .task { await load() }
         .confirmationDialog(
@@ -78,6 +84,18 @@ struct DrawingsView: View {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
     }
+
+    private func create() async {
+        creating = true
+        defer { creating = false }
+        do {
+            let drawing = try await app.client.createDrawing()
+            app.push(.drawing(id: drawing.id))
+            await load()
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+    }
 }
 
 /// One drawing, rendered natively. Pinch to zoom, drag to pan, double-tap to
@@ -97,6 +115,8 @@ struct DrawingView: View {
     @State private var renaming = false
     @State private var newName = ""
     @State private var chatting = false
+    @State private var editing = false
+    @State private var openedEmptyEditor = false
 
     var body: some View {
         Group {
@@ -135,6 +155,9 @@ struct DrawingView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            Button { editing = true } label: { Image(systemName: "pencil.tip.crop.circle") }
+                .accessibilityLabel("Edit drawing")
+                .disabled(scene == nil)
             if let snapshot {
                 ShareLink(item: snapshot, preview: SharePreview(name, image: snapshot))
             }
@@ -151,6 +174,15 @@ struct DrawingView: View {
             }
         }
         .studioChat(isPresented: $chatting, pluginId: "excalidraw", itemId: id, title: name, projectId: nil)
+        .sheet(isPresented: $editing, onDismiss: { Task { await refresh() } }) {
+            NavigationStack {
+                WebView(url: app.client.webURL(forDrawing: id))
+                    .ignoresSafeArea(edges: .bottom)
+                    .navigationTitle("Edit drawing")
+                    .navigationBarTitleDisplayMode(.inline)
+                    .toolbar { Button("Done") { editing = false } }
+            }
+        }
         .alert("Rename drawing", isPresented: $renaming) {
             TextField("Name", text: $newName)
             Button("Cancel", role: .cancel) {}
@@ -186,6 +218,10 @@ struct DrawingView: View {
             name = drawing.name
             updatedAt = drawing.updatedAt
             scene = drawing.scene
+            if drawing.scene.elements.isEmpty && !openedEmptyEditor {
+                openedEmptyEditor = true
+                editing = true
+            }
             error = nil
             snapshot = render(drawing.scene)
         } catch where BBClient.isCancellation(error) {

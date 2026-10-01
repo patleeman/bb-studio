@@ -143,6 +143,9 @@ struct PageView: View {
     @State private var confirmingArchive = false
     @State private var notice: String?
     @State private var showingComments = false
+    @State private var showingEditor = false
+    @State private var showingActivity = false
+    @State private var openedEmptyEditor = false
 
     init(pageId: String) {
         _model = StateObject(wrappedValue: PageModel(pageId: pageId))
@@ -173,6 +176,12 @@ struct PageView: View {
         .navigationTitle(meta?.displayTitle ?? "Page")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            if !gone {
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { showingEditor = true } label: { Image(systemName: "square.and.pencil") }
+                        .accessibilityLabel("Edit page")
+                }
+            }
             if model.comments != nil, !gone {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingComments = true } label: {
@@ -199,6 +208,7 @@ struct PageView: View {
                         }
                     }
                     Section {
+                        Button { showingActivity = true } label: { Label("Activity", systemImage: "clock") }
                         Button {
                             newTitle = meta?.title ?? ""
                             renaming = true
@@ -246,6 +256,10 @@ struct PageView: View {
             Text("It leaves the page list. Restore it from BB web.")
         }
         .sheet(isPresented: $showingHistory) { PageHistorySheet(pageId: model.pageId) }
+        .sheet(isPresented: $showingEditor) {
+            PageEditor(pageId: model.pageId) { await model.load(app.client) }
+        }
+        .sheet(isPresented: $showingActivity) { PageActivity(pageId: model.pageId, refresh: meta?.refresh) }
         .sheet(isPresented: $showingComments) { PageCommentsSheet(model: model) }
         .sheet(isPresented: $showingWeb) {
             NavigationStack {
@@ -263,6 +277,12 @@ struct PageView: View {
             await model.load(app.client)
         }
         .onDisappear { model.detach() }
+        .onChange(of: model.markdown) { _, markdown in
+            if markdown?.isEmpty == true && !openedEmptyEditor {
+                openedEmptyEditor = true
+                showingEditor = true
+            }
+        }
     }
 
     private func loadChats() async {
@@ -328,6 +348,10 @@ struct PageView: View {
                 }
                 .font(.caption)
                 .foregroundStyle(.secondary)
+            }
+            if let refresh = meta?.refresh {
+                Label("Keep updated · \(refresh.cron)", systemImage: "arrow.triangle.2.circlepath")
+                    .font(.caption).foregroundStyle(.secondary)
             }
         }
     }

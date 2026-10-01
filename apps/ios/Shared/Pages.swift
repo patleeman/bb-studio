@@ -14,6 +14,7 @@ public struct PageMeta: Codable, Identifiable, Hashable, Sendable {
     public var updatedAt: Double?
     public var updatedBy: String?
     public var archived: Bool?
+    public var refresh: PageRefresh?
 
     public var displayTitle: String {
         let title = title?.trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
@@ -21,6 +22,25 @@ public struct PageMeta: Codable, Identifiable, Hashable, Sendable {
     }
 
     public var emoji: String? { icon.flatMap { $0.isEmpty ? nil : $0 } }
+}
+
+public struct PageRefresh: Codable, Hashable, Sendable {
+    public var botId: String
+    public var cron: String
+    public var instructions: String
+    public var lastAt: Double?
+    public var nextAt: Double?
+}
+
+public struct PageRequest: Decodable, Identifiable, Sendable {
+    public var id: String
+    public var botName: String
+    public var kind: String
+    public var summary: String
+    public var status: String
+    public var result: String?
+    public var error: String?
+    public var updatedAt: Double
 }
 
 /// A saved version of a page.
