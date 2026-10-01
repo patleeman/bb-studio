@@ -10,6 +10,7 @@ import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
+import { ComposerTrim } from "./src/ui/ComposerTrim";
 import { ActivityPanel } from "./src/ui/HomePanel";
 
 function StudioRoot({ subPath }: { subPath: string }) {
@@ -29,6 +30,7 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   // Links a thread, channel or direct message back to its spaces, and picks
   // the spaces a new thread joins.
+  app.slots.experimental_appOverlay({ id: "composer-trim", component: ComposerTrim });
   app.composer.customize({ id: "thread-spaces", scopes: ["thread", "new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
   app.commands.register({
     id: "search",
