@@ -2,6 +2,7 @@ import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention } from "@bb-studio/kit/server";
 import { errorMessage, untitled } from "@bb-studio/kit/format";
+import { pageCheckboxes, setPageCheckbox } from "@bb-studio/kit/page-checkbox";
 // Studio Tasks (plugin id `studio-tasks`): a board of tasks you can hand to agents.
 //
 // Backend entry. Tasks live in the plugin's SQLite database
@@ -25,6 +26,8 @@ import {
   HANDOFF_STATES,
   PLUGIN_ID,
   REALTIME_CHANNEL,
+  PRIORITIES,
+  RECURRENCES,
   STATUSES,
   STATUS_LABELS,
   TASK_UPDATE_TYPE,
@@ -43,9 +46,16 @@ const LINKABLE_PLUGINS = ["pages", "talk", "excalidraw", "artifacts"];
 const idSchema = z.string().min(1).max(100);
 const threadIdSchema = z.string().min(1).max(200);
 const projectIdSchema = z.string().min(1).max(200);
-const statusSchema = z.enum(STATUSES);
-const assigneeSchema = z.enum(["me", "agent"]).nullable();
+const statusSchema = z.string().min(1).max(60).regex(/^[a-z][a-z0-9_-]*$/);
+const assigneeSchema = z.union([z.enum(["me", "agent"]), z.string().regex(/^bot:[a-zA-Z0-9_-]+$/)]).nullable();
 const daySchema = z.string().refine(isDay, "Use a day like 2026-10-01.").nullable();
+const prioritySchema = z.enum(PRIORITIES);
+const recurrenceSchema = z.enum(RECURRENCES).nullable();
+const labelsSchema = z.array(z.string().trim().min(1).max(60)).max(20);
+const fieldsSchema = {
+  priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.nullable().optional(),
+  recurrence: recurrenceSchema.optional(), reminderAt: z.number().int().nonnegative().nullable().optional(),
+};
 
 /** A new worktree keeps the agent's changes apart; "folder" works in the project's folder. */
 const workspaceSchema = z.enum(["worktree", "folder"]);
@@ -67,6 +77,12 @@ const taskSchema = z.object({
   projectId: z.string().nullable(),
   due: z.string().nullable(),
   assignee: assigneeSchema,
+  priority: prioritySchema,
+  labels: labelsSchema,
+  parentId: z.string().nullable(),
+  subtasks: z.object({ total: z.number(), done: z.number() }),
+  recurrence: recurrenceSchema,
+  reminderAt: z.number().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
   updatedBy: z.string().nullable(),
@@ -94,6 +110,8 @@ export const rpcContract = defineRpcContract({
     input: z.object({ includeArchived: z.boolean().optional() }),
     output: z.object({ tasks: z.array(taskSchema) }),
   },
+  statuses: { input: z.object({ projectId: projectIdSchema.nullable() }), output: z.object({ columns: z.array(z.object({ id: statusSchema, label: z.string() })) }) },
+  setStatuses: { input: z.object({ projectId: projectIdSchema, columns: z.array(z.object({ id: statusSchema, label: z.string().trim().min(1).max(60) })).min(2).max(12) }), output: z.object({ ok: z.boolean() }) },
   get: {
     input: z.object({ id: idSchema }),
     output: z.object({ task: taskSchema.nullable(), links: z.array(linkSchema), handoffs: z.array(handoffSchema) }),
@@ -106,6 +124,7 @@ export const rpcContract = defineRpcContract({
       projectId: projectIdSchema.nullable().optional(),
       due: daySchema.optional(),
       assignee: assigneeSchema.optional(),
+      ...fieldsSchema,
     }),
     output: z.object({ task: taskSchema }),
   },
@@ -117,6 +136,7 @@ export const rpcContract = defineRpcContract({
       projectId: projectIdSchema.nullable().optional(),
       due: daySchema.optional(),
       assignee: assigneeSchema.optional(),
+      ...fieldsSchema,
     }),
     output: z.object({ ok: z.boolean() }),
   },
@@ -167,6 +187,9 @@ export const rpcContract = defineRpcContract({
     }),
     output: z.object({ threadId: z.string() }),
   },
+  bots: { input: z.null(), output: z.object({ bots: z.array(z.object({ id: z.string(), name: z.string() })) }) },
+  handOffBot: { input: z.object({ id: idSchema, note: z.string().max(20_000).nullable() }), output: z.object({ roomId: z.string() }) },
+  syncCheckbox: { input: z.object({ id: idSchema, checked: z.boolean() }), output: z.object({ ok: z.boolean() }) },
   /** Sends the latest handoff's thread a follow-up, e.g. review feedback. */
   sendBack: {
     input: z.object({ id: idSchema, message: z.string().trim().min(1).max(20_000) }),
@@ -266,6 +289,12 @@ export default async function plugin(bb: BbPluginApi) {
       projectId: task.project_id,
       due: task.due,
       assignee: task.assignee,
+      priority: task.priority,
+      labels: JSON.parse(task.labels) as string[],
+      parentId: task.parent_id,
+      subtasks: store.subtasks(task.id),
+      recurrence: task.recurrence,
+      reminderAt: task.reminder_at,
       createdAt: task.created_at,
       updatedAt: task.updated_at,
       updatedBy: task.updated_by,
@@ -440,8 +469,27 @@ export default async function plugin(bb: BbPluginApi) {
   /** Moves a task, and archives its threads when it's done and the setting is on. */
   async function move(id: string, status: TaskStatus, by: Writer, index?: number): Promise<{ archivedThreads: number }> {
     const before = mustGet(id);
+    if (!store.statuses(before.project_id).some((column) => column.id === status)) throw new Error("Unknown status for this project.");
     store.move(id, status, by, index);
     changed(id);
+    if (status === "done" || before.status === "done") {
+      for (const link of store.links(id).filter((row) => row.plugin_id === "pages" && row.href?.includes("#"))) {
+        try {
+          const markdown = await bb.sdk.plugins.callRpc({ pluginId: "pages", method: "editableMarkdown", input: { id: link.item_id } as never,
+            outputSchema: z.object({ markdown: z.string() }) });
+          const blockId = link.href!.split("#").at(-1)!;
+          const checkbox = pageCheckboxes(markdown.markdown).find((row) => row.blockId === blockId && row.taskId === id);
+          if (!checkbox || checkbox.checked === (status === "done")) continue;
+          await bb.sdk.plugins.callRpc({ pluginId: "pages", method: "editBlock",
+            input: { id: link.item_id, expected: markdown.markdown, block: blockId, markdown: setPageCheckbox(checkbox.line, status === "done") } as never,
+            outputSchema: z.object({ markdown: z.string() }) });
+        } catch (error) { bb.log.warn(`couldn't sync page checkbox for ${id}: ${String(error)}`); }
+      }
+    }
+    if (status === "done" && before.status !== "done") {
+      const next = store.completeRecurring(before, by);
+      if (next) changed(next.id);
+    }
     if (status !== "done" || before.status === "done" || !(await settings.get()).archiveThreadsOnDone) return { archivedThreads: 0 };
     return { archivedThreads: (await archiveThreads(id)).archived };
   }
@@ -454,8 +502,10 @@ export default async function plugin(bb: BbPluginApi) {
 
   function taskLine(task: TaskRow): string {
     const handoff = store.latestHandoff(task.id);
-    const parts = [STATUS_LABELS[task.status], assigneeLabel(task)];
+    const parts = [STATUS_LABELS[task.status] ?? task.status, assigneeLabel(task), `priority ${task.priority}`];
     if (task.due) parts.push(`due ${formatDue(task.due)} (${task.due})`);
+    if (task.recurrence) parts.push(`repeats ${task.recurrence}`);
+    if (JSON.parse(task.labels).length) parts.push(`labels ${(JSON.parse(task.labels) as string[]).join(", ")}`);
     if (handoff) parts.push(HANDOFF_LABELS[handoff.state]);
     return `${untitled(task.title)} (id ${task.id}): ${parts.join(", ")}. Link ${taskHref(task.id)}`;
   }
@@ -482,18 +532,21 @@ export default async function plugin(bb: BbPluginApi) {
     board({ includeArchived }) {
       return { tasks: store.list({ includeArchived }).map(toDto) };
     },
+    statuses({ projectId }) { return { columns: store.statuses(projectId) }; },
+    setStatuses({ projectId, columns }) { store.setStatuses(projectId, columns); for (const task of store.list().filter((row) => row.project_id === projectId)) changed(task.id); return { ok: true }; },
     get({ id }) {
       const task = store.get(id);
       if (!task) return { task: null, links: [], handoffs: [] };
       return { task: toDto(task), links: store.links(id).map(toLinkDto), handoffs: store.handoffs(id).map(toHandoffDto) };
     },
-    create({ title, description, status, projectId, due, assignee }) {
-      const task = store.create({ title, description, status, projectId, due, assignee, by: "user" });
+    create({ title, description, status, projectId, due, assignee, ...fields }) {
+      if (status && !store.statuses(projectId ?? null).some((column) => column.id === status)) throw new Error("Unknown status for this project.");
+      const task = store.create({ title, description, status, projectId, due, assignee: assignee as TaskRow["assignee"], ...fields, by: "user" });
       changed(task.id);
       return { task: toDto(task) };
     },
     update({ id, ...patch }) {
-      store.update(id, patch, "user");
+      store.update(id, { ...patch, assignee: patch.assignee as TaskRow["assignee"] }, "user");
       changed(id);
       return { ok: true };
     },
@@ -578,6 +631,36 @@ export default async function plugin(bb: BbPluginApi) {
     handOff(input) {
       return handOff({ ...input, by: "user" });
     },
+    async bots() {
+      const result = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "list", input: null as never,
+        outputSchema: z.object({ bots: z.array(z.object({ id: z.string(), name: z.string(), retired: z.boolean().optional() })) }) });
+      return { bots: result.bots.filter((bot) => !bot.retired).map(({ id, name }) => ({ id, name })) };
+    },
+    async handOffBot({ id, note }) {
+      const task = mustGet(id);
+      const botId = task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null;
+      if (!botId) throw new Error("Assign a Studio Teams bot first.");
+      const { bot } = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "get", input: { id: botId } as never,
+        outputSchema: z.object({ bot: z.object({ handle: z.string() }) }) });
+      const existing = store.links(id).find((link) => link.plugin_id === "bot-teams");
+      const room = existing ? { id: existing.item_id } : await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "createRoom",
+        input: { name: task.title.slice(0, 80) || "Task", memberIds: [botId], responseBehavior: "directed", requestId: crypto.randomUUID() } as never,
+        outputSchema: z.object({ id: z.string() }) });
+      const text = [`@${bot.handle} Work on this Studio task: ${task.title || "Untitled"}`, task.description, `Task: ${taskHref(id)}`, note].filter(Boolean).join("\n\n");
+      await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "send",
+        input: { id: room.id, text, attachmentIds: [], replyTo: null, requestId: crypto.randomUUID() } as never,
+        outputSchema: z.object({ id: z.string() }) });
+      store.link(id, { target: "item", plugin_id: "bot-teams", item_id: room.id, label: `Bot channel: ${task.title || "Task"}`, href: `/plugins/bot-teams/channels/${room.id}` });
+      if (task.status !== "in_progress" && store.statuses(task.project_id).some((column) => column.id === "in_progress")) store.move(id, "in_progress", "user");
+      changed(id);
+      return { roomId: room.id };
+    },
+    async syncCheckbox({ id, checked }) {
+      const task = store.get(id);
+      if (!task) return { ok: false };
+      if ((task.status === "done") !== checked) await move(id, checked ? "done" : "todo", "user");
+      return { ok: true };
+    },
     async sendBack({ id, message }) {
       const handoff = store.latestHandoff(id);
       if (!handoff || !isOpenHandoff(handoff.state)) throw new Error("This task has no thread to send to. Hand it off again.");
@@ -623,7 +706,7 @@ export default async function plugin(bb: BbPluginApi) {
         .list()
         .filter((task) => !status || task.status === status)
         .filter((task) => !needle || `${task.title} ${task.description}`.toLowerCase().includes(needle))
-        .sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.rank - b.rank)
+        .sort((a, b) => (STATUSES as readonly string[]).indexOf(a.status) - (STATUSES as readonly string[]).indexOf(b.status) || a.rank - b.rank)
         .slice(0, 100);
       return rows.length ? rows.map((task) => `- ${taskLine(task)}`).join("\n") : "No tasks match.";
     },
@@ -650,12 +733,14 @@ export default async function plugin(bb: BbPluginApi) {
       description: z.string().max(20_000).optional(),
       status: z.enum(["todo", "in_progress", "review"]).optional(),
       due: z.string().optional().describe("A day, like 2026-10-01."),
-      assignee: z.enum(["me", "agent"]).optional().describe('"me" is the user.'),
+      assignee: assigneeSchema.optional().describe('"me", "agent", or "bot:<id>".'),
+      priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.optional(),
+      recurrence: z.enum(RECURRENCES).optional(), reminderAt: z.number().int().nonnegative().optional(),
     }),
-    execute({ title, description, status, due: rawDue, assignee }, context) {
+    execute({ title, description, status, due: rawDue, assignee, priority, labels, parentId, recurrence, reminderAt }, context) {
       const due = rawDue?.trim() || undefined;
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
-      const task = store.create({ title, description, status, due: due ?? null, assignee: assignee ?? null, projectId: context.projectId ?? null, by: "agent" });
+      const task = store.create({ title, description, status, due: due ?? null, assignee: assignee ?? null, priority, labels, parentId, recurrence, reminderAt, projectId: context.projectId ?? null, by: "agent" });
       changed(task.id);
       return `Added ${taskLine(task)}\n\nTo show it in your reply, put this on its own line:\n${directive(task.id)}`;
     },
@@ -674,15 +759,18 @@ export default async function plugin(bb: BbPluginApi) {
       title: z.string().trim().min(1).max(300).optional(),
       description: z.string().max(20_000).optional(),
       due: z.string().nullable().optional(),
+      priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.nullable().optional(),
+      recurrence: recurrenceSchema.optional(), reminderAt: z.number().int().nonnegative().nullable().optional(),
+      assignee: assigneeSchema.optional(),
       addLinks: z.array(linkInput).max(20).optional(),
     }),
-    async execute({ id, status, note, title, description, due: rawDue, addLinks }, context) {
+    async execute({ id, status, note, title, description, due: rawDue, priority, labels, parentId, recurrence, reminderAt, assignee, addLinks }, context) {
       // An empty day clears the due date.
       const due = rawDue === undefined ? undefined : rawDue?.trim() || null;
       const task = id ? store.get(id) : threadTask(context.threadId);
       if (!task) return { content: [{ type: "text", text: id ? `Task ${id} not found.` : "This thread isn't working on a task. Pass an id." }], isError: true };
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
-      if (title !== undefined || description !== undefined || due !== undefined) store.update(task.id, { title, description, due }, "agent");
+      if (title !== undefined || description !== undefined || due !== undefined || priority !== undefined || labels !== undefined || parentId !== undefined || recurrence !== undefined || reminderAt !== undefined || assignee !== undefined) store.update(task.id, { title, description, due, priority, labels, parentId, recurrence, reminderAt, assignee }, "agent");
       for (const link of addLinks ?? []) {
         store.link(task.id, { target: "item", plugin_id: link.pluginId, item_id: link.itemId, label: link.label, href: studioHref(link.pluginId, link.itemId) });
       }
@@ -722,6 +810,9 @@ export default async function plugin(bb: BbPluginApi) {
           status: task.status,
           due: task.due,
           assignee: task.assignee,
+          priority: task.priority,
+          labels: JSON.parse(task.labels) as string[],
+          recurrence: task.recurrence,
           handoff: handoff ? { state: handoff.state, note: handoff.note } : null,
           links: store.links(task.id).map((link) => link.label),
         }),
@@ -732,9 +823,9 @@ export default async function plugin(bb: BbPluginApi) {
   // CLI: `bb studio-tasks …`
   const usage = {
     list: "bb studio-tasks list [--status todo|in_progress|review|done]",
-    add: "bb studio-tasks add <title> [--description <text>] [--due <YYYY-MM-DD>] [--me]",
+    add: "bb studio-tasks add <title> [--description <text>] [--due <YYYY-MM-DD>] [--priority <level>] [--labels <comma-separated>] [--repeat <frequency>] [--parent <task-id>] [--bot <id>|--me]",
     show: "bb studio-tasks show <id>",
-    move: "bb studio-tasks move <id> <todo|in_progress|review|done>",
+    move: "bb studio-tasks move <id> <status>",
     hand: "bb studio-tasks hand <id> [--note <text>] [--folder]",
     done: "bb studio-tasks done <id>",
   };
@@ -757,11 +848,11 @@ export default async function plugin(bb: BbPluginApi) {
         switch (cmd) {
           case "list": {
             const status = flags.values.status;
-            if (status !== undefined && !isStatus(status)) return fail(`usage: ${usage.list}`);
+            if (status !== undefined && !store.list().some((task) => task.status === status) && !isStatus(status)) return fail(`usage: ${usage.list}`);
             const rows = store.list().filter((task) => !status || task.status === status);
             if (!rows.length) return { exitCode: 0, stdout: "No tasks.\n" };
             const lines = rows
-              .sort((a, b) => STATUSES.indexOf(a.status) - STATUSES.indexOf(b.status) || a.rank - b.rank)
+              .sort((a, b) => (STATUSES as readonly string[]).indexOf(a.status) - (STATUSES as readonly string[]).indexOf(b.status) || a.rank - b.rank)
               .map((task) => {
                 const handoff = store.latestHandoff(task.id);
                 return [task.id, STATUS_LABELS[task.status], untitled(task.title), task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
@@ -773,11 +864,19 @@ export default async function plugin(bb: BbPluginApi) {
             const due = flags.values.due || null;
             if (!title) return fail(`usage: ${usage.add}`);
             if (due && !isDay(due)) return fail("Give --due as a day, like 2026-10-01.");
+            const priority = flags.values.priority ?? "none";
+            const recurrence = flags.values.repeat ?? null;
+            if (!(PRIORITIES as readonly string[]).includes(priority)) return fail("Unknown priority.");
+            if (recurrence && !(RECURRENCES as readonly string[]).includes(recurrence)) return fail("Unknown repeat frequency.");
             const task = store.create({
               title,
               description: flags.values.description,
               due,
-              assignee: flags.values.me !== undefined ? "me" : null,
+              priority: priority as TaskRow["priority"],
+              labels: flags.values.labels?.split(",").map((label) => label.trim()).filter(Boolean),
+              parentId: flags.values.parent,
+              recurrence: recurrence as TaskRow["recurrence"],
+              assignee: flags.values.bot ? `bot:${flags.values.bot}` : flags.values.me !== undefined ? "me" : null,
               projectId: ctx.projectId ?? null,
               by: "agent",
             });
@@ -793,7 +892,7 @@ export default async function plugin(bb: BbPluginApi) {
           case "done": {
             const [id, target] = flags.positional;
             const status = cmd === "done" ? "done" : target;
-            if (!id || !store.get(id) || !isStatus(status)) return fail(`usage: ${usage[cmd]}`);
+            if (!id || !store.get(id) || !status || !store.statuses(store.get(id)!.project_id).some((column) => column.id === status)) return fail(`usage: ${usage[cmd]}`);
             const { archivedThreads } = await move(id, status, "agent");
             return { exitCode: 0, stdout: `${id}\t${STATUS_LABELS[status]}${archivedThreads ? `\tarchived ${archivedThreads} thread(s)` : ""}\n` };
           }

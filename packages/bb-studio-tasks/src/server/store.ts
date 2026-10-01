@@ -3,7 +3,7 @@ import type { Actor } from "@bb-studio/kit/server";
 // the threads they were handed to.
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
-import type { Assignee, HandoffState, TaskStatus } from "../shared";
+import { nextDue, STATUSES, STATUS_LABELS, type Assignee, type HandoffState, type Priority, type Recurrence, type TaskStatus } from "../shared";
 
 /**
  * Append-only: statement index is the migration id, and BB checks each
@@ -47,6 +47,13 @@ export const MIGRATIONS = [
        updated_at INTEGER NOT NULL
      );
    CREATE INDEX IF NOT EXISTS task_handoffs_task ON task_handoffs (task_id, created_at);`,
+  `ALTER TABLE tasks ADD COLUMN priority TEXT NOT NULL DEFAULT 'none';
+   ALTER TABLE tasks ADD COLUMN labels TEXT NOT NULL DEFAULT '[]';
+   ALTER TABLE tasks ADD COLUMN parent_id TEXT REFERENCES tasks (id) ON DELETE SET NULL;
+   ALTER TABLE tasks ADD COLUMN recurrence TEXT;
+   ALTER TABLE tasks ADD COLUMN reminder_at INTEGER;
+   CREATE INDEX tasks_parent ON tasks (parent_id);
+   CREATE TABLE task_statuses (project_id TEXT NOT NULL, id TEXT NOT NULL, label TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (project_id, id));`,
 ];
 
 export type TaskRow = {
@@ -59,6 +66,11 @@ export type TaskRow = {
   /** A day, "2026-10-01". */
   due: string | null;
   assignee: Assignee;
+  priority: Priority;
+  labels: string;
+  parent_id: string | null;
+  recurrence: Recurrence | null;
+  reminder_at: number | null;
   created_at: number;
   updated_at: number;
   /** "user" or "agent". */
@@ -101,6 +113,11 @@ export interface NewTask {
   projectId?: string | null;
   due?: string | null;
   assignee?: Assignee;
+  priority?: Priority;
+  labels?: string[];
+  parentId?: string | null;
+  recurrence?: Recurrence | null;
+  reminderAt?: number | null;
   by: Writer;
 }
 
@@ -110,6 +127,11 @@ export interface TaskPatch {
   projectId?: string | null;
   due?: string | null;
   assignee?: Assignee;
+  priority?: Priority;
+  labels?: string[];
+  parentId?: string | null;
+  recurrence?: Recurrence | null;
+  reminderAt?: number | null;
 }
 
 /** Ranks closer than this are spread out again. */
@@ -131,6 +153,32 @@ export class TaskStore {
     return (this.db.prepare("SELECT * FROM tasks WHERE id = ?").get(id) as TaskRow | undefined) ?? null;
   }
 
+  subtasks(id: string): { total: number; done: number } {
+    return this.db.prepare("SELECT count(*) AS total, coalesce(sum(CASE WHEN status = 'done' THEN 1 ELSE 0 END), 0) AS done FROM tasks WHERE parent_id = ? AND archived_at IS NULL")
+      .get(id) as { total: number; done: number };
+  }
+
+  statuses(projectId: string | null): { id: string; label: string }[] {
+    if (!projectId) return STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! }));
+    const rows = this.db.prepare("SELECT id, label FROM task_statuses WHERE project_id = ? ORDER BY position").all(projectId) as { id: string; label: string }[];
+    return rows.length ? rows : STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! }));
+  }
+
+  setStatuses(projectId: string, columns: { id: string; label: string }[]): void {
+    if (!columns.some((column) => column.id === "done")) throw new Error("A Done column is required.");
+    if (new Set(columns.map((column) => column.id)).size !== columns.length) throw new Error("Column ids must be unique.");
+    if (!columns.some((column) => column.id !== "done")) throw new Error("Add a column before Done.");
+    this.db.transaction(() => {
+      const used = new Set(columns.map((column) => column.id));
+      const replacement = columns.find((column) => column.id !== "done")!.id;
+      const stale = this.db.prepare("SELECT DISTINCT status FROM tasks WHERE project_id = ?").all(projectId) as { status: string }[];
+      for (const row of stale) if (!used.has(row.status)) this.db.prepare("UPDATE tasks SET status = ? WHERE project_id = ? AND status = ?").run(replacement, projectId, row.status);
+      this.db.prepare("DELETE FROM task_statuses WHERE project_id = ?").run(projectId);
+      const insert = this.db.prepare("INSERT INTO task_statuses (project_id, id, label, position) VALUES (?, ?, ?, ?)");
+      columns.forEach((column, index) => insert.run(projectId, column.id, column.label, index));
+    })();
+  }
+
   /** Board order: by status, then rank. */
   list(options: { includeArchived?: boolean } = {}): TaskRow[] {
     return this.db
@@ -140,6 +188,7 @@ export class TaskStore {
 
   /** New tasks go to the top of their column. */
   create(input: NewTask): TaskRow {
+    if (input.parentId) this.mustGet(input.parentId);
     const at = this.now();
     const status = input.status ?? "todo";
     const task: TaskRow = {
@@ -151,6 +200,11 @@ export class TaskStore {
       project_id: input.projectId ?? null,
       due: input.due ?? null,
       assignee: input.assignee ?? null,
+      priority: input.priority ?? "none",
+      labels: JSON.stringify(input.labels ?? []),
+      parent_id: input.parentId ?? null,
+      recurrence: input.recurrence ?? null,
+      reminder_at: input.reminderAt ?? null,
       created_at: at,
       updated_at: at,
       updated_by: input.by,
@@ -159,8 +213,8 @@ export class TaskStore {
     };
     this.db
       .prepare(
-        `INSERT INTO tasks (id, title, description, status, rank, project_id, due, assignee, created_at, updated_at, updated_by, done_at, archived_at)
-         VALUES (@id, @title, @description, @status, @rank, @project_id, @due, @assignee, @created_at, @updated_at, @updated_by, @done_at, @archived_at)`,
+        `INSERT INTO tasks (id, title, description, status, rank, project_id, due, assignee, priority, labels, parent_id, recurrence, reminder_at, created_at, updated_at, updated_by, done_at, archived_at)
+         VALUES (@id, @title, @description, @status, @rank, @project_id, @due, @assignee, @priority, @labels, @parent_id, @recurrence, @reminder_at, @created_at, @updated_at, @updated_by, @done_at, @archived_at)`,
       )
       .run(task);
     return task;
@@ -168,17 +222,30 @@ export class TaskStore {
 
   update(id: string, patch: TaskPatch, by: Writer): TaskRow {
     const task = this.mustGet(id);
+    if (patch.parentId) {
+      let parent: TaskRow | null = this.mustGet(patch.parentId);
+      while (parent) {
+        if (parent.id === id) throw new Error("A task cannot be its own subtask.");
+        parent = parent.parent_id ? this.get(parent.parent_id) : null;
+      }
+    }
     const next = {
       title: patch.title !== undefined ? patch.title.trim() : task.title,
       description: patch.description !== undefined ? patch.description.trim() : task.description,
       project_id: patch.projectId !== undefined ? patch.projectId : task.project_id,
       due: patch.due !== undefined ? patch.due : task.due,
       assignee: patch.assignee !== undefined ? patch.assignee : task.assignee,
+      priority: patch.priority ?? task.priority,
+      labels: patch.labels !== undefined ? JSON.stringify(patch.labels) : task.labels,
+      parent_id: patch.parentId !== undefined ? patch.parentId : task.parent_id,
+      recurrence: patch.recurrence !== undefined ? patch.recurrence : task.recurrence,
+      reminder_at: patch.reminderAt !== undefined ? patch.reminderAt : task.reminder_at,
     };
     this.db
       .prepare(
         `UPDATE tasks SET title = @title, description = @description, project_id = @project_id, due = @due,
-           assignee = @assignee, updated_at = @at, updated_by = @by WHERE id = @id`,
+           assignee = @assignee, priority = @priority, labels = @labels, parent_id = @parent_id,
+           recurrence = @recurrence, reminder_at = @reminder_at, updated_at = @at, updated_by = @by WHERE id = @id`,
       )
       .run({ ...next, id, at: this.now(), by });
     return this.mustGet(id);
@@ -201,6 +268,15 @@ export class TaskStore {
         .run(status, rank, doneAt, this.now(), by, id);
       return this.mustGet(id);
     })();
+  }
+
+  /** Completion creates the next instance once, with its own due day. */
+  completeRecurring(task: TaskRow, by: Writer): TaskRow | null {
+    if (!task.recurrence || !task.due) return null;
+    return this.create({ title: task.title, description: task.description, projectId: task.project_id,
+      due: nextDue(task.due, task.recurrence), assignee: task.assignee, priority: task.priority,
+      labels: JSON.parse(task.labels) as string[], parentId: task.parent_id,
+      recurrence: task.recurrence, reminderAt: null, by });
   }
 
   setArchived(id: string, archived: boolean): void {

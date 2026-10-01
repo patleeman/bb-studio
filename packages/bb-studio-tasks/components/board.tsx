@@ -76,6 +76,7 @@ export function Board({
   const context = useBbContext();
   const projects = useProjects();
   const [tasks, setTasks] = useState<Task[] | null>(null);
+  const [columns, setColumns] = useState<{ id: string; label: string }[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
   const [error, setError] = useState<string | null>(null);
   const [project, setProject] = useStored<ProjectFilter>("tasks:project", "all");
   const [assignee, setAssignee] = useStored<AssigneeFilter>("tasks:assignee", "everyone");
@@ -100,6 +101,23 @@ export function Board({
   const projectFilter: ProjectFilter =
     project === "all" || project === "global" || !projects.length || projects.some((each) => each.id === project) ? project : "all";
   const visible = useMemo(() => (tasks ?? []).filter((task) => matches(task, projectFilter, assignee)), [tasks, projectFilter, assignee]);
+  useEffect(() => {
+    void rpc.call("statuses", { projectId: projectFilter === "all" || projectFilter === "global" ? null : projectFilter }).then(({ columns }) => setColumns(columns));
+  }, [rpc, projectFilter, refreshKey]);
+
+  async function editColumns() {
+    if (projectFilter === "all" || projectFilter === "global") return;
+    const answer = window.prompt("Columns (comma separated, in order)", columns.map((column) => column.label).join(", "));
+    if (!answer) return;
+    const names = answer.split(",").map((name) => name.trim()).filter(Boolean);
+    if (names.length < 2 || names.length > 12 || !names.some((name) => name.toLowerCase() === "done")) {
+      toast.error("Use 2 to 12 columns and include Done."); return;
+    }
+    const next = names.map((label) => ({ label, id: label.toLowerCase() === "done" ? "done" : label.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_|_$/g, "") }));
+    if (new Set(next.map((column) => column.id)).size !== next.length || next.some((column) => !column.id)) { toast.error("Column names must be unique."); return; }
+    try { await rpc.call("setStatuses", { projectId: projectFilter, columns: next }); setColumns(next); refetch(); }
+    catch (failure) { toast.error(errorMessage(failure)); }
+  }
 
   /** Where new tasks go: the filtered project, else the one BB has open. */
   const newProjectId = projectFilter === "global" ? null : projectFilter !== "all" ? projectFilter : (context.projectId ?? null);
@@ -164,6 +182,7 @@ export function Board({
         <h1 className="mr-auto text-2xl font-semibold tracking-tight">Tasks</h1>
         <ProjectPicker projects={projects} value={projectFilter} onChange={setProject} />
         <AssigneePicker value={assignee} onChange={setAssignee} />
+        {projectFilter !== "all" && projectFilter !== "global" ? <button type="button" className={GHOST_BUTTON} onClick={() => void editColumns()}>Edit columns</button> : null}
         {viewToggle}
         <button type="button" className={OUTLINE_BUTTON} onClick={() => setAdding("todo")}>
           <Icon name="Plus" /> New task
@@ -179,13 +198,15 @@ export function Board({
         </div>
       ) : (
         <div className="flex min-h-0 flex-1 gap-3 overflow-x-auto px-6 pb-6 max-md:px-3">
-          {STATUSES.map((status) => {
+          {columns.map(({ id: status, label }) => {
             const cards = column(visible, status);
             const shown = status === "done" ? cards.slice(0, doneShown) : cards;
             return (
               <Column
                 key={status}
                 status={status}
+                label={label}
+                columns={columns}
                 count={cards.length}
                 tasks={shown}
                 projects={projects}
@@ -231,6 +252,8 @@ export function Board({
 
 function Column({
   status,
+  label,
+  columns,
   count,
   tasks,
   projects,
@@ -245,6 +268,8 @@ function Column({
   footer,
 }: {
   status: TaskStatus;
+  label: string;
+  columns: { id: string; label: string }[];
   count: number;
   tasks: Task[];
   projects: Project[];
@@ -273,7 +298,7 @@ function Column({
 
   return (
     <section
-      aria-label={STATUS_LABELS[status]}
+      aria-label={label}
       className={cn(
         "flex w-72 min-w-64 shrink-0 flex-col rounded-lg bg-muted/40 max-md:w-64",
         dropAt !== null && "bg-state-hover ring-1 ring-border",
@@ -300,12 +325,12 @@ function Column({
       }}
     >
       <div className="flex items-center gap-2 px-3 pt-3 pb-2">
-        <Icon name={STATUS_ICONS[status]} className="size-4 text-muted-foreground" />
-        <h2 className="text-sm font-medium">{STATUS_LABELS[status]}</h2>
+        <Icon name={STATUS_ICONS[status] ?? "Circle"} className="size-4 text-muted-foreground" />
+        <h2 className="text-sm font-medium">{label}</h2>
         <span className="text-xs text-muted-foreground tabular-nums">{count}</span>
         <button
           type="button"
-          aria-label={`Add to ${STATUS_LABELS[status]}`}
+          aria-label={`Add to ${label}`}
           title="Add a task"
           className="ml-auto flex size-7 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground"
           onClick={onAdd}
@@ -318,7 +343,7 @@ function Column({
         {tasks.map((task, index) => (
           <div key={task.id} className="relative">
             {dropAt === index ? <DropLine /> : null}
-            <TaskCard task={task} projects={projects} showProject={showProject} onOpen={onOpen} onMove={onMove} onArchive={onArchive} />
+            <TaskCard task={task} columns={columns} projects={projects} showProject={showProject} onOpen={onOpen} onMove={onMove} onArchive={onArchive} />
           </div>
         ))}
         {dropAt !== null && dropAt >= tasks.length ? <DropLine last /> : null}
@@ -359,6 +384,7 @@ function NewCard({ onDone }: { onDone(title: string | null): void }) {
 
 function TaskCard({
   task,
+  columns,
   projects,
   showProject,
   onOpen,
@@ -366,6 +392,7 @@ function TaskCard({
   onArchive,
 }: {
   task: Task;
+  columns: { id: string; label: string }[];
   projects: Project[];
   showProject: boolean;
   onOpen(id: string): void;
@@ -416,9 +443,9 @@ function TaskCard({
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-48" onClick={(event) => event.stopPropagation()}>
             <DropdownMenuLabel className="text-xs text-muted-foreground">Move to</DropdownMenuLabel>
-            {STATUSES.map((status) => (
+            {columns.map(({ id: status, label }) => (
               <DropdownMenuItem key={status} disabled={status === task.status} onSelect={() => onMove(task, status)}>
-                <Icon name={STATUS_ICONS[status]} className="size-4" /> {STATUS_LABELS[status]}
+                <Icon name={STATUS_ICONS[status] ?? "Circle"} className="size-4" /> {label}
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
@@ -435,6 +462,8 @@ function TaskCard({
         <HandoffBadge handoff={task.handoff} status={task.status} />
         <DueChip due={task.due} status={task.status} />
         <AssigneeChip assignee={task.assignee} />
+        {task.priority !== "none" ? <span className="text-xs text-muted-foreground">{task.priority}</span> : null}
+        {task.subtasks.total ? <span className="text-xs text-muted-foreground">{task.subtasks.done}/{task.subtasks.total}</span> : null}
         {task.links ? (
           <span className="inline-flex items-center gap-1 text-xs text-muted-foreground" title={plural(task.links, "link")}>
             <Icon name="Paperclip" className="size-3.5" />

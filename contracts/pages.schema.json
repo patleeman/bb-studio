@@ -869,6 +869,40 @@
         "additionalProperties": false
       }
     },
+    "taskFromCheckbox": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$"
+          },
+          "blockId": {
+            "type": "string",
+            "minLength": 8,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "blockId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
+        ],
+        "additionalProperties": false
+      }
+    },
     "editBlock": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

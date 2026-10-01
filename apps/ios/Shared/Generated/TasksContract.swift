@@ -4,6 +4,8 @@ import Foundation
 public enum Tasks {
   public enum Method {
     public static let board = "board"
+    public static let statuses = "statuses"
+    public static let setStatuses = "setStatuses"
     public static let get = "get"
     public static let create = "create"
     public static let update = "update"
@@ -15,12 +17,19 @@ public enum Tasks {
     public static let linkables = "linkables"
     public static let handoffDefaults = "handoffDefaults"
     public static let handOff = "handOff"
+    public static let bots = "bots"
+    public static let handOffBot = "handOffBot"
+    public static let syncCheckbox = "syncCheckbox"
     public static let sendBack = "sendBack"
     public static let archiveThreads = "archiveThreads"
     public static let settings = "settings"
   }
 
   public typealias Board = BoardOutput
+
+  public typealias Statuses = StatusesOutput
+
+  public typealias SetStatuses = SetStatusesOutput
 
   public typealias Get = GetOutput
 
@@ -44,6 +53,14 @@ public enum Tasks {
 
   public typealias HandOff = HandOffOutput
 
+  public typealias BotsInput = StudioJSONValue
+
+  public typealias Bots = BotsOutput
+
+  public typealias HandOffBot = HandOffBotOutput
+
+  public typealias SyncCheckbox = SyncCheckboxOutput
+
   public typealias SendBack = SendBackOutput
 
   public typealias ArchiveThreads = ArchiveThreadsOutput
@@ -60,20 +77,22 @@ public enum Tasks {
     }
   }
 
-  public enum BoardOutputTasksItemStatus: Sendable, Hashable, Codable {
-    case todo
-    case in_progress
-    case review
-    case done
+  public enum BoardOutputTasksItemPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "todo": self = .todo
-      case "in_progress": self = .in_progress
-      case "review": self = .review
-      case "done": self = .done
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
       default: self = .unknown(value)
       }
     }
@@ -81,25 +100,40 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .todo: try container.encode("todo")
-      case .in_progress: try container.encode("in_progress")
-      case .review: try container.encode("review")
-      case .done: try container.encode("done")
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
       case .unknown(let value): try container.encode(value)
       }
     }
   }
 
-  public enum BoardOutputTasksItemAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
+  public struct BoardOutputTasksItemSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum BoardOutputTasksItemRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "me": self = .me
-      case "agent": self = .agent
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
       default: self = .unknown(value)
       }
     }
@@ -107,8 +141,10 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -178,10 +214,16 @@ public enum Tasks {
     public var id: String?
     public var title: String?
     public var description: String?
-    public var status: BoardOutputTasksItemStatus?
+    public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: BoardOutputTasksItemAssignee?
+    public var assignee: StudioJSONValue?
+    public var priority: BoardOutputTasksItemPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: BoardOutputTasksItemSubtasks?
+    public var recurrence: BoardOutputTasksItemRecurrence?
+    public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var updatedBy: String?
@@ -191,7 +233,7 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: BoardOutputTasksItemStatus? = nil, projectId: String? = nil, due: String? = nil, assignee: BoardOutputTasksItemAssignee? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: BoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: BoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: BoardOutputTasksItemSubtasks? = nil, recurrence: BoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: BoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -199,6 +241,12 @@ public enum Tasks {
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
@@ -218,6 +266,60 @@ public enum Tasks {
     }
   }
 
+  public struct StatusesInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
+    }
+  }
+
+  public struct StatusesOutputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct StatusesOutput: Sendable, Hashable, Codable {
+    public var columns: [StatusesOutputColumnsItem]?
+
+    public init(columns: [StatusesOutputColumnsItem]? = nil) {
+      self.columns = columns
+    }
+  }
+
+  public struct SetStatusesInputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct SetStatusesInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var columns: [SetStatusesInputColumnsItem]?
+
+    public init(projectId: String? = nil, columns: [SetStatusesInputColumnsItem]? = nil) {
+      self.projectId = projectId
+      self.columns = columns
+    }
+  }
+
+  public struct SetStatusesOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
   public struct GetInput: Sendable, Hashable, Codable {
     public var id: String?
 
@@ -226,20 +328,22 @@ public enum Tasks {
     }
   }
 
-  public enum GetOutputTaskStatus: Sendable, Hashable, Codable {
-    case todo
-    case in_progress
-    case review
-    case done
+  public enum GetOutputTaskPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "todo": self = .todo
-      case "in_progress": self = .in_progress
-      case "review": self = .review
-      case "done": self = .done
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
       default: self = .unknown(value)
       }
     }
@@ -247,25 +351,40 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .todo: try container.encode("todo")
-      case .in_progress: try container.encode("in_progress")
-      case .review: try container.encode("review")
-      case .done: try container.encode("done")
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
       case .unknown(let value): try container.encode(value)
       }
     }
   }
 
-  public enum GetOutputTaskAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
+  public struct GetOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum GetOutputTaskRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "me": self = .me
-      case "agent": self = .agent
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
       default: self = .unknown(value)
       }
     }
@@ -273,8 +392,10 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -344,10 +465,16 @@ public enum Tasks {
     public var id: String?
     public var title: String?
     public var description: String?
-    public var status: GetOutputTaskStatus?
+    public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: GetOutputTaskAssignee?
+    public var assignee: StudioJSONValue?
+    public var priority: GetOutputTaskPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: GetOutputTaskSubtasks?
+    public var recurrence: GetOutputTaskRecurrence?
+    public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var updatedBy: String?
@@ -357,7 +484,7 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: GetOutputTaskStatus? = nil, projectId: String? = nil, due: String? = nil, assignee: GetOutputTaskAssignee? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: GetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: GetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: GetOutputTaskSubtasks? = nil, recurrence: GetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: GetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -365,6 +492,12 @@ public enum Tasks {
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
@@ -488,20 +621,22 @@ public enum Tasks {
     }
   }
 
-  public enum CreateInputStatus: Sendable, Hashable, Codable {
-    case todo
-    case in_progress
-    case review
-    case done
+  public enum CreateInputPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "todo": self = .todo
-      case "in_progress": self = .in_progress
-      case "review": self = .review
-      case "done": self = .done
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
       default: self = .unknown(value)
       }
     }
@@ -509,25 +644,30 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .todo: try container.encode("todo")
-      case .in_progress: try container.encode("in_progress")
-      case .review: try container.encode("review")
-      case .done: try container.encode("done")
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
       case .unknown(let value): try container.encode(value)
       }
     }
   }
 
-  public enum CreateInputAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
+  public enum CreateInputRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "me": self = .me
-      case "agent": self = .agent
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
       default: self = .unknown(value)
       }
     }
@@ -535,8 +675,10 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -545,35 +687,47 @@ public enum Tasks {
   public struct CreateInput: Sendable, Hashable, Codable {
     public var title: String?
     public var description: String?
-    public var status: CreateInputStatus?
+    public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: CreateInputAssignee?
+    public var assignee: StudioJSONValue?
+    public var priority: CreateInputPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var recurrence: CreateInputRecurrence?
+    public var reminderAt: Int?
 
-    public init(title: String? = nil, description: String? = nil, status: CreateInputStatus? = nil, projectId: String? = nil, due: String? = nil, assignee: CreateInputAssignee? = nil) {
+    public init(title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: CreateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: CreateInputRecurrence? = nil, reminderAt: Int? = nil) {
       self.title = title
       self.description = description
       self.status = status
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
     }
   }
 
-  public enum CreateOutputTaskStatus: Sendable, Hashable, Codable {
-    case todo
-    case in_progress
-    case review
-    case done
+  public enum CreateOutputTaskPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "todo": self = .todo
-      case "in_progress": self = .in_progress
-      case "review": self = .review
-      case "done": self = .done
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
       default: self = .unknown(value)
       }
     }
@@ -581,25 +735,40 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .todo: try container.encode("todo")
-      case .in_progress: try container.encode("in_progress")
-      case .review: try container.encode("review")
-      case .done: try container.encode("done")
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
       case .unknown(let value): try container.encode(value)
       }
     }
   }
 
-  public enum CreateOutputTaskAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
+  public struct CreateOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum CreateOutputTaskRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "me": self = .me
-      case "agent": self = .agent
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
       default: self = .unknown(value)
       }
     }
@@ -607,8 +776,10 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -678,10 +849,16 @@ public enum Tasks {
     public var id: String?
     public var title: String?
     public var description: String?
-    public var status: CreateOutputTaskStatus?
+    public var status: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: CreateOutputTaskAssignee?
+    public var assignee: StudioJSONValue?
+    public var priority: CreateOutputTaskPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: CreateOutputTaskSubtasks?
+    public var recurrence: CreateOutputTaskRecurrence?
+    public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var updatedBy: String?
@@ -691,7 +868,7 @@ public enum Tasks {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: CreateOutputTaskStatus? = nil, projectId: String? = nil, due: String? = nil, assignee: CreateOutputTaskAssignee? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: CreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: CreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: CreateOutputTaskSubtasks? = nil, recurrence: CreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: CreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -699,6 +876,12 @@ public enum Tasks {
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.updatedBy = updatedBy
@@ -718,16 +901,22 @@ public enum Tasks {
     }
   }
 
-  public enum UpdateInputAssignee: Sendable, Hashable, Codable {
-    case me
-    case agent
+  public enum UpdateInputPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
     case unknown(String)
 
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
-      case "me": self = .me
-      case "agent": self = .agent
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
       default: self = .unknown(value)
       }
     }
@@ -735,8 +924,41 @@ public enum Tasks {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
-      case .me: try container.encode("me")
-      case .agent: try container.encode("agent")
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum UpdateInputRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
       case .unknown(let value): try container.encode(value)
       }
     }
@@ -748,15 +970,25 @@ public enum Tasks {
     public var description: String?
     public var projectId: String?
     public var due: String?
-    public var assignee: UpdateInputAssignee?
+    public var assignee: StudioJSONValue?
+    public var priority: UpdateInputPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var recurrence: UpdateInputRecurrence?
+    public var reminderAt: Int?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, due: String? = nil, assignee: UpdateInputAssignee? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, due: String? = nil, assignee: StudioJSONValue? = nil, priority: UpdateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: UpdateInputRecurrence? = nil, reminderAt: Int? = nil) {
       self.id = id
       self.title = title
       self.description = description
       self.projectId = projectId
       self.due = due
       self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
     }
   }
 
@@ -768,42 +1000,12 @@ public enum Tasks {
     }
   }
 
-  public enum MoveInputStatus: Sendable, Hashable, Codable {
-    case todo
-    case in_progress
-    case review
-    case done
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "todo": self = .todo
-      case "in_progress": self = .in_progress
-      case "review": self = .review
-      case "done": self = .done
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .todo: try container.encode("todo")
-      case .in_progress: try container.encode("in_progress")
-      case .review: try container.encode("review")
-      case .done: try container.encode("done")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct MoveInput: Sendable, Hashable, Codable {
     public var id: String?
-    public var status: MoveInputStatus?
+    public var status: String?
     public var index: Int?
 
-    public init(id: String? = nil, status: MoveInputStatus? = nil, index: Int? = nil) {
+    public init(id: String? = nil, status: String? = nil, index: Int? = nil) {
       self.id = id
       self.status = status
       self.index = index
@@ -1087,6 +1289,60 @@ public enum Tasks {
 
     public init(threadId: String? = nil) {
       self.threadId = threadId
+    }
+  }
+
+  public struct BotsOutputBotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct BotsOutput: Sendable, Hashable, Codable {
+    public var bots: [BotsOutputBotsItem]?
+
+    public init(bots: [BotsOutputBotsItem]? = nil) {
+      self.bots = bots
+    }
+  }
+
+  public struct HandOffBotInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var note: String?
+
+    public init(id: String? = nil, note: String? = nil) {
+      self.id = id
+      self.note = note
+    }
+  }
+
+  public struct HandOffBotOutput: Sendable, Hashable, Codable {
+    public var roomId: String?
+
+    public init(roomId: String? = nil) {
+      self.roomId = roomId
+    }
+  }
+
+  public struct SyncCheckboxInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var checked: Bool?
+
+    public init(id: String? = nil, checked: Bool? = nil) {
+      self.id = id
+      self.checked = checked
+    }
+  }
+
+  public struct SyncCheckboxOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

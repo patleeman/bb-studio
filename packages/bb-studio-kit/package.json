@@ -13,6 +13,7 @@
     "./ids": "./src/ids.ts",
     "./cli": "./src/cli.ts",
     "./format": "./src/format.ts",
+    "./page-checkbox": "./src/page-checkbox.ts",
     "./app": "./src/app/index.ts",
     "./ui": "./src/ui/index.ts",
     "./ui/huge-icon": "./src/ui/huge-icon.tsx"

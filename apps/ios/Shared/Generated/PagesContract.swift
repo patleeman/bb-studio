@@ -13,6 +13,7 @@ public enum Pages {
     public static let artifactView = "artifactView"
     public static let markdown = "markdown"
     public static let editableMarkdown = "editableMarkdown"
+    public static let taskFromCheckbox = "taskFromCheckbox"
     public static let editBlock = "editBlock"
     public static let replaceMarkdown = "replaceMarkdown"
     public static let search = "search"
@@ -61,6 +62,8 @@ public enum Pages {
   public typealias Markdown = MarkdownOutput
 
   public typealias EditableMarkdown = EditableMarkdownOutput
+
+  public typealias TaskFromCheckbox = TaskFromCheckboxOutput
 
   public typealias EditBlock = EditBlockOutput
 
@@ -548,6 +551,24 @@ public enum Pages {
 
     public init(markdown: String? = nil) {
       self.markdown = markdown
+    }
+  }
+
+  public struct TaskFromCheckboxInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var blockId: String?
+
+    public init(id: String? = nil, blockId: String? = nil) {
+      self.id = id
+      self.blockId = blockId
+    }
+  }
+
+  public struct TaskFromCheckboxOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+
+    public init(taskId: String? = nil) {
+      self.taskId = taskId
     }
   }
 

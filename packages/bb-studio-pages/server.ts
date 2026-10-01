@@ -5,6 +5,7 @@ import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { untitled } from "@bb-studio/kit/format";
+import { pageCheckboxes } from "@bb-studio/kit/page-checkbox";
 import { createStudioNotifier } from "@bb-studio/kit/server";
 import * as Y from "yjs";
 import { z } from "zod";
@@ -231,6 +232,27 @@ export default async function plugin(bb: BbPluginApi) {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc, { ids: true }) };
     },
+    taskFromCheckbox: async ({ id, blockId }) => {
+      const meta = store.meta(id);
+      if (!meta) throw new Error("Page not found.");
+      const expected = readMarkdown(service.hub.open(id).doc, { ids: true });
+      const checkbox = pageCheckboxes(expected).find((row) => row.blockId === blockId.replace(/-/g, "").slice(0, 8));
+      if (!checkbox) throw new Error("Select a checkbox block first.");
+      if (checkbox.taskId) throw new Error("This checkbox already has a task.");
+      const result = await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "create",
+        input: { title: checkbox.title, projectId: meta.project_id, status: checkbox.checked ? "done" : "todo" } as never,
+        outputSchema: z.object({ task: z.object({ id: z.string() }) }) });
+      try {
+        await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "link",
+          input: { id: result.task.id, link: { target: "item", pluginId: "pages", itemId: id, label: meta.title || "Page", href: `${pageUrl(id)}#${checkbox.blockId}` } } as never,
+          outputSchema: z.object({ ok: z.boolean() }) });
+        service.editClientBlock(id, expected, checkbox.blockId, `${checkbox.line} [Task](item:studio-tasks:${result.task.id})`);
+      } catch (error) {
+        await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "delete", input: { id: result.task.id } as never, outputSchema: z.object({ ok: z.boolean() }) }).catch(() => {});
+        throw error;
+      }
+      return { taskId: result.task.id };
+    },
     editBlock: ({ id, expected, block, markdown }) => {
       return { markdown: service.editClientBlock(id, expected, block, markdown) };
     },
@@ -393,6 +415,12 @@ export default async function plugin(bb: BbPluginApi) {
     // Explainer progress isn't a change to anything Studio lists.
     if (event.type === "page") {
       studioNotifier.changed(event.pageId); syncLinks(event.pageId);
+      const markdown = readMarkdown(service.hub.open(event.pageId).doc, { ids: true });
+      for (const checkbox of pageCheckboxes(markdown).filter((row) => row.taskId).slice(0, 100)) {
+        void bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "syncCheckbox",
+          input: { id: checkbox.taskId!, checked: checkbox.checked } as never,
+          outputSchema: z.object({ ok: z.boolean() }) }).catch(() => { /* Tasks may not be installed. */ });
+      }
       const meta = store.meta(event.pageId);
       if (meta) void services.recordActivity({
         ref: { pluginId: PLUGIN_ID, id: event.pageId },

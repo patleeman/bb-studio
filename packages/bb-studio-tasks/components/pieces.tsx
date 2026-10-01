@@ -26,9 +26,9 @@ export function DueChip({ due, status, className }: { due: string | null; status
 export function AssigneeChip({ assignee, className }: { assignee: Assignee; className?: string }) {
   if (!assignee) return null;
   return (
-    <span className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", className)} title={assignee === "me" ? "Assigned to you" : "Assigned to an agent"}>
+    <span className={cn("inline-flex items-center gap-1 text-xs text-muted-foreground", className)} title={assignee === "me" ? "Assigned to you" : assignee.startsWith("bot:") ? "Assigned to a Studio Teams bot" : "Assigned to an agent"}>
       <Icon name={assignee === "me" ? "UserRound" : "Bot"} className="size-3.5" />
-      {assignee === "me" ? "Me" : "Agent"}
+      {assignee === "me" ? "Me" : assignee.startsWith("bot:") ? "Bot" : "Agent"}
     </span>
   );
 }
@@ -39,7 +39,7 @@ export const ASSIGNEE_OPTIONS: { value: Assignee; label: string; icon: string }[
   { value: "agent", label: "Agent", icon: "Bot" },
 ];
 
-export const STATUS_ICONS: Record<TaskStatus, string> = {
+export const STATUS_ICONS: Record<string, string> = {
   todo: "Circle",
   in_progress: "Clock",
   review: "Eye",

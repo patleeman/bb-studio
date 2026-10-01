@@ -12,11 +12,12 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
-import { useSdk } from "@get-bb/plugin-sdk/app";
+import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
+import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
-import type { BotView, PageMetaView } from "../contract";
+import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed } from "./links";
 import { pageSchema } from "./blocks";
@@ -121,6 +122,7 @@ export function PageEditor({
   onCloseSidePanel(): void;
 }) {
   const sdk = useSdk();
+  const rpc = useRpc<typeof rpcContract>();
   const ui = usePagesUi();
   const dark = useDarkMode();
   const botsRef = useRef(bots);
@@ -189,6 +191,18 @@ export function PageEditor({
 
   const slashItems = useMemo(() => {
     const custom: DefaultReactSuggestionItem[] = [
+      {
+        title: "Task from checkbox",
+        subtext: "Create a linked Studio task from this checkbox",
+        aliases: ["task", "checkbox", "to do"],
+        group: "Studio",
+        icon: <Icon name="CircleCheck" className="size-4" />,
+        onItemClick: () => {
+          const block = editor.getTextCursorPosition().block;
+          if (block.type !== "checkListItem") { toast.error("Select a checkbox first."); return; }
+          void rpc.call("taskFromCheckbox", { id: page.id, blockId: block.id }).then(() => toast.success("Task created"), (error) => toast.error(String(error)));
+        },
+      },
       {
         title: "Callout",
         subtext: "Highlight a note, tip or warning",
@@ -263,7 +277,7 @@ export function PageEditor({
       })),
     ];
     return mergeGroups(getDefaultReactSlashMenuItems(editor), custom);
-  }, [editor]);
+  }, [editor, rpc, page.id]);
 
   const fieldKey = pageFieldKey(page.id);
   const slashMenuItems = useCallback(

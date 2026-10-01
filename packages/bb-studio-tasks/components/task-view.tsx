@@ -30,6 +30,8 @@ import {
   HANDOFF_LABELS,
   HANDOFF_TONES,
   REALTIME_CHANNEL,
+  PRIORITIES,
+  RECURRENCES,
   STATUSES,
   STATUS_LABELS,
   TASK_UPDATE_TYPE,
@@ -49,6 +51,9 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
   const navigate = useBbNavigate();
   const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
+  const [columns, setColumns] = useState<{ id: string; label: string }[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
+  const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
+  const [allTasks, setAllTasks] = useState<Task[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -74,6 +79,11 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
   useEffect(() => {
     void load();
   }, [load]);
+  useEffect(() => { void rpc.call("bots", null).then(({ bots }) => setBots(bots), () => setBots([])); }, [rpc]);
+  useEffect(() => { void rpc.call("board", {}).then(({ tasks }) => setAllTasks(tasks), () => setAllTasks([])); }, [rpc, loaded?.task.subtasks.total]);
+  useEffect(() => {
+    if (loaded?.task) void rpc.call("statuses", { projectId: loaded.task.projectId }).then(({ columns }) => setColumns(columns));
+  }, [rpc, loaded?.task.projectId]);
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as TaskEvent;
     if (event?.type === TASK_UPDATE_TYPE && event.taskId === taskId) void load();
@@ -110,7 +120,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
     }
   }
 
-  const update = (patch: { title?: string; description?: string; projectId?: string | null; due?: string | null; assignee?: Assignee }) =>
+  const update = (patch: { title?: string; description?: string; projectId?: string | null; due?: string | null; assignee?: Assignee; priority?: Task["priority"]; labels?: string[]; parentId?: string | null; recurrence?: Task["recurrence"]; reminderAt?: number | null }) =>
     run(rpc.call("update", { id: taskId, ...patch }), "Couldn't save the task");
 
   async function move(status: TaskStatus, archive = false) {
@@ -194,7 +204,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
             <Select
               label="Status"
               value={task.status}
-              options={STATUSES.map((status) => ({ value: status, label: STATUS_LABELS[status], icon: STATUS_ICONS[status] }))}
+              options={columns.map(({ id, label }) => ({ value: id, label, icon: STATUS_ICONS[id] ?? "Circle" }))}
               onChange={(status) => void move(status as TaskStatus)}
             />
           </Property>
@@ -202,7 +212,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
             <Select
               label="Assignee"
               value={task.assignee ?? ""}
-              options={ASSIGNEE_OPTIONS.map((option) => ({ value: option.value ?? "", label: option.label, icon: option.icon }))}
+              options={[...ASSIGNEE_OPTIONS.map((option) => ({ value: option.value ?? "", label: option.label, icon: option.icon })), ...bots.map((bot) => ({ value: `bot:${bot.id}`, label: bot.name, icon: "Bot" }))]}
               onChange={(value) => void update({ assignee: (value || null) as Assignee })}
             />
           </Property>
@@ -218,6 +228,35 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
               <DueChip due={task.due} status={task.status} />
             </div>
           </Property>
+          <Property label="Priority">
+            <Select label="Priority" value={task.priority} options={PRIORITIES.map((value) => ({ value, label: value[0]!.toUpperCase() + value.slice(1), icon: "Flag" }))} onChange={(priority) => void update({ priority: priority as Task["priority"] })} />
+          </Property>
+          <Property label="Labels">
+            <input aria-label="Labels" defaultValue={task.labels.join(", ")} key={task.labels.join(",")}
+              placeholder="Comma separated" className="h-8 w-full rounded-md bg-transparent px-2 text-sm hover:border hover:border-border"
+              onBlur={(event) => { const labels = event.currentTarget.value.split(",").map((label) => label.trim()).filter(Boolean); if (labels.join(",") !== task.labels.join(",")) void update({ labels }); }} />
+          </Property>
+          <Property label="Repeat">
+            <Select label="Repeat" value={task.recurrence ?? ""} options={[{ value: "", label: "Never", icon: "Circle" }, ...RECURRENCES.map((value) => ({ value, label: value[0]!.toUpperCase() + value.slice(1), icon: "Repeat" }))]} onChange={(value) => void update({ recurrence: value ? value as Task["recurrence"] : null })} />
+          </Property>
+          <Property label="Reminder">
+            <input type="datetime-local" aria-label="Reminder" value={task.reminderAt ? new Date(task.reminderAt).toISOString().slice(0, 16) : ""}
+              className="h-8 rounded-md bg-transparent px-2 text-sm" onChange={(event) => void update({ reminderAt: event.currentTarget.value ? new Date(event.currentTarget.value).getTime() : null })} />
+          </Property>
+          <Property label="Subtasks">
+            <span>{task.subtasks.done} of {task.subtasks.total} done</span>
+            <button type="button" className="ml-2 text-primary hover:underline" onClick={() => {
+              const title = window.prompt("New subtask title");
+              if (title?.trim()) void rpc.call("create", { title: title.trim(), parentId: task.id, projectId: task.projectId }).then(() => void load(), (failure) => toast.error(errorMessage(failure)));
+            }}>Add subtask</button>
+          </Property>
+          <Property label="Parent">
+            <select aria-label="Parent task" value={task.parentId ?? ""} className="h-8 rounded-md border border-border bg-background px-2 text-sm"
+              onChange={(event) => void update({ parentId: event.currentTarget.value || null })}>
+              <option value="">None</option>
+              {allTasks.filter((row) => row.id !== task.id && row.projectId === task.projectId).map((row) => <option key={row.id} value={row.id}>{row.title || "Untitled"}</option>)}
+            </select>
+          </Property>
           <Property label="Project">
             <Select
               label="Project"
@@ -229,6 +268,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
         </dl>
 
         <Section title="Agent">
+          {task.assignee?.startsWith("bot:") && !done ? <button type="button" className={OUTLINE_BUTTON} onClick={() => void rpc.call("handOffBot", { id: taskId, note: null }).then(({ roomId }) => openAppPath(`/plugins/bot-teams/channels/${roomId}`), (failure) => toast.error(errorMessage(failure)))}><Icon name="Bot" /> Send to bot</button> : null}
           {handingOff ? <HandoffPanel task={task} projects={projects} onClose={() => setHandingOff(false)} /> : null}
           {latest ? (
             <LatestHandoff handoff={latest} task={task} onSendBack={(message) => run(rpc.call("sendBack", { id: taskId, message }), "Couldn't send it")} />

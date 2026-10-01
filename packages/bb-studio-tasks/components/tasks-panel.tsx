@@ -2,16 +2,18 @@
 // list at `list`, and one task at `<task id>`. Tasks keeps its own board
 // even with Studio installed; Studio lists tasks alongside everything else.
 import { useCallback, useState } from "react";
-import { AddOnCollection, cn, Icon, useAddOnPanel } from "@bb-studio/kit/app";
+import { cn, Icon, useAddOnPanel } from "@bb-studio/kit/app";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL, isTaskId } from "../src/shared";
+import { PANEL_PATH, REALTIME_CHANNEL, isTaskId } from "../src/shared";
 import { Board } from "./board";
 import { TaskView } from "./task-view";
+import { TaskViews } from "./views";
 
 const LIST = "list";
+const CALENDAR = "calendar";
 
 export function TasksPanel({ subPath }: { subPath: string }) {
-  const { call: callStudio, refreshKey: version } = useAddOnPanel(REALTIME_CHANNEL, PANEL_PATH, "task");
+  const { refreshKey: version } = useAddOnPanel(REALTIME_CHANNEL, PANEL_PATH, "task");
   const navigate = useBbNavigate();
   const [first = ""] = subPath.split("/").filter(Boolean);
 
@@ -22,13 +24,14 @@ export function TasksPanel({ subPath }: { subPath: string }) {
     return <TaskView key={first} taskId={first} onBack={(replace) => go(lastView, replace)} />;
   }
 
-  const view = first === LIST ? LIST : "";
+  const view = first === LIST || first === CALENDAR ? first : "";
   const toggle = (
     <div role="group" aria-label="View" className="flex h-8 items-center rounded-md border border-border p-0.5">
       {(
         [
           ["", "Board", "GridView"],
           [LIST, "List", "ListView"],
+          [CALENDAR, "Calendar", "CalendarDays"],
         ] as const
       ).map(([to, label, icon]) => (
         <button
@@ -49,10 +52,6 @@ export function TasksPanel({ subPath }: { subPath: string }) {
     </div>
   );
 
-  if (view === LIST) {
-    return (
-      <AddOnCollection pluginId={PLUGIN_ID} title="Tasks" kind="task" call={callStudio} refreshKey={version} handOver={false} headerActions={toggle} />
-    );
-  }
+  if (first === LIST || first === CALENDAR) return <TaskViews mode={first} refreshKey={version} onOpen={(id) => go(id)} headerActions={toggle} />;
   return <Board refreshKey={version} viewToggle={toggle} onOpen={(id) => go(id)} />;
 }

@@ -42,7 +42,7 @@ export const TASK_KIND: StudioKind = {
   agentHint: "Read it with tasks_get and change it with tasks_update.",
 };
 
-const STATUS_TONES: Record<TaskStatus, StudioBadge["tone"]> = {
+const STATUS_TONES: Record<string, StudioBadge["tone"]> = {
   todo: "neutral",
   in_progress: "progress",
   review: "warning",
@@ -53,7 +53,7 @@ const STATUS_TONES: Record<TaskStatus, StudioBadge["tone"]> = {
 const LOUD = new Set(["working", "needs-input", "failed"]);
 
 export function assigneeLabel(task: Pick<TaskRow, "assignee">): string {
-  return task.assignee === "me" ? "Me" : task.assignee === "agent" ? "Agent" : "Unassigned";
+  return task.assignee === "me" ? "Me" : task.assignee === "agent" ? "Agent" : task.assignee?.startsWith("bot:") ? "Bot" : "Unassigned";
 }
 
 export function taskBadge(task: TaskRow, handoff: HandoffRow | null): StudioBadge {
@@ -61,7 +61,7 @@ export function taskBadge(task: TaskRow, handoff: HandoffRow | null): StudioBadg
     return { label: HANDOFF_SHORT[handoff.state], tone: HANDOFF_TONES[handoff.state] };
   }
   if (task.due && isOverdue(task.due, task.status)) return { label: "Overdue", tone: "danger" };
-  return { label: STATUS_LABELS[task.status], tone: STATUS_TONES[task.status] };
+  return { label: STATUS_LABELS[task.status] ?? task.status, tone: STATUS_TONES[task.status] ?? "neutral" };
 }
 
 export function toStudioItem(task: TaskRow, handoff: HandoffRow | null): StudioItem {
@@ -77,7 +77,7 @@ export function toStudioItem(task: TaskRow, handoff: HandoffRow | null): StudioI
     updatedBy: task.updated_by === "user" || task.updated_by === "agent" ? task.updated_by : null,
     preview: firstLine(task.description) ?? handoff?.note ?? null,
     facts: [
-      { id: "status", value: STATUS_LABELS[task.status], sort: STATUSES.indexOf(task.status) },
+      { id: "status", value: STATUS_LABELS[task.status] ?? task.status, sort: (STATUSES as readonly string[]).indexOf(task.status) },
       { id: "due", value: task.due ? formatDue(task.due) : "", sort: task.due ? Date.parse(`${task.due}T00:00:00Z`) : null },
       { id: "assignee", value: assigneeLabel(task), sort: task.assignee === "me" ? 0 : task.assignee === "agent" ? 1 : null },
     ],

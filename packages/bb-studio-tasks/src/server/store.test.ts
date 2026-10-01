@@ -1,4 +1,6 @@
 import { describe, expect, it } from "vitest";
+import Database from "better-sqlite3";
+import { MIGRATIONS } from "./store";
 import { memoryStore } from "../test/db";
 
 function clock() {
@@ -13,6 +15,16 @@ const column = (store: ReturnType<typeof memoryStore>["store"], status: string) 
     .map((task) => task.title);
 
 describe("the task store", () => {
+  it("upgrades existing task rows without changing their status", () => {
+    const db = new Database(":memory:");
+    db.exec(MIGRATIONS[0]!);
+    db.prepare("INSERT INTO tasks (id, title, status, rank, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?)")
+      .run("tsk_existing", "Old task", "review", 0, 1, 1);
+    db.exec(MIGRATIONS[1]!);
+    expect(db.prepare("SELECT status, priority, labels FROM tasks WHERE id = ?").get("tsk_existing"))
+      .toEqual({ status: "review", priority: "none", labels: "[]" });
+    db.close();
+  });
   it("adds tasks to the top of their column", () => {
     const { store } = memoryStore(clock());
     store.create({ title: "First", by: "user" });
@@ -106,5 +118,35 @@ describe("the task store", () => {
     store.delete(task.id);
     expect(db.prepare("SELECT count(*) AS n FROM task_handoffs").get()).toEqual({ n: 0 });
     expect(db.prepare("SELECT count(*) AS n FROM task_links").get()).toEqual({ n: 0 });
+  });
+
+  it("migrates old rows and stores flat task fields", () => {
+    const { db, store } = memoryStore(clock());
+    const parent = store.create({ title: "Parent", by: "user", priority: "high", labels: ["launch"], recurrence: "weekly", due: "2026-10-01" });
+    const child = store.create({ title: "Child", by: "user", parentId: parent.id, assignee: "bot:bot_1", reminderAt: 1234 });
+    expect(store.get(parent.id)).toMatchObject({ priority: "high", labels: '["launch"]', recurrence: "weekly" });
+    expect(store.get(child.id)).toMatchObject({ parent_id: parent.id, assignee: "bot:bot_1", reminder_at: 1234 });
+    expect(store.subtasks(parent.id)).toEqual({ total: 1, done: 0 });
+    store.move(child.id, "done", "user");
+    expect(store.subtasks(parent.id)).toEqual({ total: 1, done: 1 });
+    expect(() => store.update(parent.id, { parentId: child.id }, "user")).toThrow(/own subtask/);
+    expect(db.prepare("PRAGMA table_info(tasks)").all()).toEqual(expect.arrayContaining([expect.objectContaining({ name: "priority" })]));
+  });
+
+  it("creates the next recurring task once when completed", () => {
+    const { store } = memoryStore(clock());
+    const task = store.create({ title: "Report", due: "2026-01-31", recurrence: "monthly", by: "user" });
+    store.move(task.id, "done", "user");
+    const next = store.completeRecurring(task, "user");
+    expect(next).toMatchObject({ title: "Report", due: "2026-02-28", status: "todo", recurrence: "monthly" });
+  });
+
+  it("keeps project columns ordered and maps removed statuses", () => {
+    const { store } = memoryStore(clock());
+    const task = store.create({ title: "Review", projectId: "project-1", status: "review", by: "user" });
+    expect(store.statuses("project-1").map((column) => column.id)).toEqual(["todo", "in_progress", "review", "done"]);
+    store.setStatuses("project-1", [{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
+    expect(store.statuses("project-1")).toEqual([{ id: "backlog", label: "Backlog" }, { id: "done", label: "Done" }]);
+    expect(store.get(task.id)?.status).toBe("backlog");
   });
 });

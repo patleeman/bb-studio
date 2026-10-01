@@ -11,21 +11,25 @@ export const REALTIME_CHANNEL = "tasks";
 export const TASK_UPDATE_TYPE = "task:updated";
 
 export const STATUSES = ["todo", "in_progress", "review", "done"] as const;
-export type TaskStatus = (typeof STATUSES)[number];
+export type TaskStatus = (typeof STATUSES)[number] | (string & {});
+export const PRIORITIES = ["none", "low", "medium", "high", "urgent"] as const;
+export type Priority = (typeof PRIORITIES)[number];
+export const RECURRENCES = ["daily", "weekly", "monthly", "weekdays"] as const;
+export type Recurrence = (typeof RECURRENCES)[number];
 
-export const STATUS_LABELS: Record<TaskStatus, string> = {
+export const STATUS_LABELS: Record<string, string> = {
   todo: "To do",
   in_progress: "In progress",
   review: "Review",
   done: "Done",
 };
 
-export function isStatus(value: unknown): value is TaskStatus {
+export function isStatus(value: unknown): value is (typeof STATUSES)[number] {
   return typeof value === "string" && (STATUSES as readonly string[]).includes(value);
 }
 
 /** Who a task is for: you, an agent (through a handoff), or nobody yet. */
-export type Assignee = "me" | "agent" | null;
+export type Assignee = "me" | "agent" | string | null;
 
 /**
  * Where a handed-off thread stands. The task's status follows it, and the
@@ -125,4 +129,21 @@ export function isOverdue(day: string | null, status: TaskStatus, now = new Date
 
 function dayNumber(day: string): number {
   return Math.round(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
+}
+
+/** Advance from the previous due day, skipping weekends for weekday tasks. */
+export function nextDue(day: string, recurrence: Recurrence): string {
+  const date = new Date(`${day}T12:00:00Z`);
+  if (recurrence === "monthly") {
+    const dayOfMonth = date.getUTCDate();
+    date.setUTCDate(1);
+    date.setUTCMonth(date.getUTCMonth() + 1);
+    const last = new Date(Date.UTC(date.getUTCFullYear(), date.getUTCMonth() + 1, 0)).getUTCDate();
+    date.setUTCDate(Math.min(dayOfMonth, last));
+  }
+  else {
+    date.setUTCDate(date.getUTCDate() + (recurrence === "weekly" ? 7 : 1));
+    if (recurrence === "weekdays") while (date.getUTCDay() === 0 || date.getUTCDay() === 6) date.setUTCDate(date.getUTCDate() + 1);
+  }
+  return date.toISOString().slice(0, 10);
 }

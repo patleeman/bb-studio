@@ -31,12 +31,9 @@
                 },
                 "status": {
                   "type": "string",
-                  "enum": [
-                    "todo",
-                    "in_progress",
-                    "review",
-                    "done"
-                  ]
+                  "minLength": 1,
+                  "maxLength": 60,
+                  "pattern": "^[a-z][a-z0-9_-]*$"
                 },
                 "projectId": {
                   "type": [
@@ -53,15 +50,86 @@
                 "assignee": {
                   "anyOf": [
                     {
-                      "type": "string",
-                      "enum": [
-                        "me",
-                        "agent"
+                      "anyOf": [
+                        {
+                          "type": "string",
+                          "enum": [
+                            "me",
+                            "agent"
+                          ]
+                        },
+                        {
+                          "type": "string",
+                          "pattern": "^bot:[a-zA-Z0-9_-]+$"
+                        }
                       ]
                     },
                     {
                       "type": "null"
                     }
+                  ]
+                },
+                "priority": {
+                  "type": "string",
+                  "enum": [
+                    "none",
+                    "low",
+                    "medium",
+                    "high",
+                    "urgent"
+                  ]
+                },
+                "labels": {
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60
+                  }
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "subtasks": {
+                  "type": "object",
+                  "properties": {
+                    "total": {
+                      "type": "number"
+                    },
+                    "done": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "total",
+                    "done"
+                  ],
+                  "additionalProperties": false
+                },
+                "recurrence": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "daily",
+                        "weekly",
+                        "monthly",
+                        "weekdays"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "reminderAt": {
+                  "type": [
+                    "number",
+                    "null"
                   ]
                 },
                 "createdAt": {
@@ -155,6 +223,12 @@
                 "projectId",
                 "due",
                 "assignee",
+                "priority",
+                "labels",
+                "parentId",
+                "subtasks",
+                "recurrence",
+                "reminderAt",
                 "createdAt",
                 "updatedAt",
                 "updatedBy",
@@ -170,6 +244,116 @@
         },
         "required": [
           "tasks"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "statuses": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "columns": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60,
+                  "pattern": "^[a-z][a-z0-9_-]*$"
+                },
+                "label": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "columns"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "setStatuses": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "columns": {
+            "minItems": 2,
+            "maxItems": 12,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60,
+                  "pattern": "^[a-z][a-z0-9_-]*$"
+                },
+                "label": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                }
+              },
+              "required": [
+                "id",
+                "label"
+              ]
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "columns"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
         ],
         "additionalProperties": false
       }
@@ -209,12 +393,9 @@
                   },
                   "status": {
                     "type": "string",
-                    "enum": [
-                      "todo",
-                      "in_progress",
-                      "review",
-                      "done"
-                    ]
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "pattern": "^[a-z][a-z0-9_-]*$"
                   },
                   "projectId": {
                     "type": [
@@ -231,15 +412,86 @@
                   "assignee": {
                     "anyOf": [
                       {
-                        "type": "string",
-                        "enum": [
-                          "me",
-                          "agent"
+                        "anyOf": [
+                          {
+                            "type": "string",
+                            "enum": [
+                              "me",
+                              "agent"
+                            ]
+                          },
+                          {
+                            "type": "string",
+                            "pattern": "^bot:[a-zA-Z0-9_-]+$"
+                          }
                         ]
                       },
                       {
                         "type": "null"
                       }
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "urgent"
+                    ]
+                  },
+                  "labels": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    }
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "subtasks": {
+                    "type": "object",
+                    "properties": {
+                      "total": {
+                        "type": "number"
+                      },
+                      "done": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "total",
+                      "done"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "recurrence": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "daily",
+                          "weekly",
+                          "monthly",
+                          "weekdays"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "reminderAt": {
+                    "type": [
+                      "number",
+                      "null"
                     ]
                   },
                   "createdAt": {
@@ -333,6 +585,12 @@
                   "projectId",
                   "due",
                   "assignee",
+                  "priority",
+                  "labels",
+                  "parentId",
+                  "subtasks",
+                  "recurrence",
+                  "reminderAt",
                   "createdAt",
                   "updatedAt",
                   "updatedBy",
@@ -465,12 +723,9 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "todo",
-              "in_progress",
-              "review",
-              "done"
-            ]
+            "minLength": 1,
+            "maxLength": 60,
+            "pattern": "^[a-z][a-z0-9_-]*$"
           },
           "projectId": {
             "anyOf": [
@@ -493,11 +748,78 @@
           "assignee": {
             "anyOf": [
               {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "me",
+                      "agent"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^bot:[a-zA-Z0-9_-]+$"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "labels": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recurrence": {
+            "anyOf": [
+              {
                 "type": "string",
                 "enum": [
-                  "me",
-                  "agent"
+                  "daily",
+                  "weekly",
+                  "monthly",
+                  "weekdays"
                 ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reminderAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
               },
               {
                 "type": "null"
@@ -527,12 +849,9 @@
               },
               "status": {
                 "type": "string",
-                "enum": [
-                  "todo",
-                  "in_progress",
-                  "review",
-                  "done"
-                ]
+                "minLength": 1,
+                "maxLength": 60,
+                "pattern": "^[a-z][a-z0-9_-]*$"
               },
               "projectId": {
                 "type": [
@@ -549,15 +868,86 @@
               "assignee": {
                 "anyOf": [
                   {
-                    "type": "string",
-                    "enum": [
-                      "me",
-                      "agent"
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "me",
+                          "agent"
+                        ]
+                      },
+                      {
+                        "type": "string",
+                        "pattern": "^bot:[a-zA-Z0-9_-]+$"
+                      }
                     ]
                   },
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "priority": {
+                "type": "string",
+                "enum": [
+                  "none",
+                  "low",
+                  "medium",
+                  "high",
+                  "urgent"
+                ]
+              },
+              "labels": {
+                "maxItems": 20,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 60
+                }
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "subtasks": {
+                "type": "object",
+                "properties": {
+                  "total": {
+                    "type": "number"
+                  },
+                  "done": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "total",
+                  "done"
+                ],
+                "additionalProperties": false
+              },
+              "recurrence": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "daily",
+                      "weekly",
+                      "monthly",
+                      "weekdays"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "reminderAt": {
+                "type": [
+                  "number",
+                  "null"
                 ]
               },
               "createdAt": {
@@ -651,6 +1041,12 @@
               "projectId",
               "due",
               "assignee",
+              "priority",
+              "labels",
+              "parentId",
+              "subtasks",
+              "recurrence",
+              "reminderAt",
               "createdAt",
               "updatedAt",
               "updatedBy",
@@ -708,11 +1104,78 @@
           "assignee": {
             "anyOf": [
               {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "me",
+                      "agent"
+                    ]
+                  },
+                  {
+                    "type": "string",
+                    "pattern": "^bot:[a-zA-Z0-9_-]+$"
+                  }
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "priority": {
+            "type": "string",
+            "enum": [
+              "none",
+              "low",
+              "medium",
+              "high",
+              "urgent"
+            ]
+          },
+          "labels": {
+            "maxItems": 20,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 60
+            }
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "recurrence": {
+            "anyOf": [
+              {
                 "type": "string",
                 "enum": [
-                  "me",
-                  "agent"
+                  "daily",
+                  "weekly",
+                  "monthly",
+                  "weekdays"
                 ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "reminderAt": {
+            "anyOf": [
+              {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
               },
               {
                 "type": "null"
@@ -750,12 +1213,9 @@
           },
           "status": {
             "type": "string",
-            "enum": [
-              "todo",
-              "in_progress",
-              "review",
-              "done"
-            ]
+            "minLength": 1,
+            "maxLength": 60,
+            "pattern": "^[a-z][a-z0-9_-]*$"
           },
           "index": {
             "type": "integer",
@@ -1193,6 +1653,115 @@
         },
         "required": [
           "threadId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "bots": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bots": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "name"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "bots"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "handOffBot": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "note": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 20000
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "note"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "roomId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "roomId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "syncCheckbox": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "checked": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "id",
+          "checked"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
         ],
         "additionalProperties": false
       }

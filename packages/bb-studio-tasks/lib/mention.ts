@@ -10,6 +10,9 @@ export interface MentionTask {
   status: TaskStatus;
   due: string | null;
   assignee: Assignee;
+  priority?: string;
+  labels?: string[];
+  recurrence?: string | null;
   handoff: { state: HandoffState; note: string | null } | null;
   /** Labels of what the task links to. */
   links: string[];
@@ -20,6 +23,9 @@ export function mentionContext(task: MentionTask, now = new Date()): string {
   const facts = [STATUS_LABELS[task.status]];
   if (task.assignee) facts.push(task.assignee === "me" ? "assigned to the user" : "assigned to an agent");
   if (task.due) facts.push(`due ${formatDue(task.due, now)} (${task.due})`);
+  if (task.priority && task.priority !== "none") facts.push(`${task.priority} priority`);
+  if (task.labels?.length) facts.push(`labels ${task.labels.join(", ")}`);
+  if (task.recurrence) facts.push(`repeats ${task.recurrence}`);
   const lines = [
     `Studio task "${title}" (id ${task.id}): ${facts.join(", ")}.`,
     `Link to it in replies as [${title.replace(/[[\]]/g, "")}](${taskHref(task.id)}).`,

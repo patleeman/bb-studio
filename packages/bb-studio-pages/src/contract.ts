@@ -190,6 +190,10 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ markdown: z.string() }),
   },
+  taskFromCheckbox: {
+    input: z.object({ id: pageId, blockId: z.string().min(8).max(100) }),
+    output: z.object({ taskId: z.string() }),
+  },
   /** Compare the loaded document before applying one targeted human edit. */
   editBlock: {
     input: z.object({

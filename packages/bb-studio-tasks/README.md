@@ -2,7 +2,7 @@
 
 > **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
 
-A board of tasks you can do yourself or hand to an agent. A handed-off task
+A board, list and calendar of tasks you can do yourself or hand to an agent. A handed-off task
 follows its thread: it moves to In progress while the agent works and to
 Review when the agent replies or says it's ready. Its card says who acts
 next, such as "Needs your input" or "Ready for review". You mark it done.
@@ -11,10 +11,9 @@ next, such as "Needs your input" or "Ready for review". You mark it done.
 
 ![Live BB screenshot of the Studio Tasks board](assets/staged-preview.png)
 
-The Tasks board in a staged BB with five seeded tasks in the "Acme app"
-project: two in To do (one of them yours, due Oct 6), one each in In progress
-and Review assigned to an agent, and a finished one in Done. The header has
-the project and assignee filters, the Board/List toggle and New task.
+The Tasks board in an isolated staged BB application shows six seeded tasks in
+the "Acme app" project, including a high-priority recurring task and its
+subtask. The header shows the Board, List and Calendar views.
 
 ## What you get
 
@@ -23,9 +22,10 @@ the project and assignee filters, the Board/List toggle and New task.
   top of a column, and filter by project and assignee (both remembered).
   Cards show the handoff's state, the agent's last note, the due day (red
   when overdue), the assignee, links and project. Done shows 20 at a time.
-  **List** switches to the same tasks as a sortable Studio collection.
+  **List** sorts by due date, title, priority or recent activity and groups by
+  status, priority or project. **Calendar** places tasks on their due dates.
 - **A task** (`/plugins/studio-tasks/tasks/<id>`): editable title, status,
-  assignee, due day and project; a Markdown description; links to threads,
+  assignee, due day, priority, labels, recurrence, reminder and project; a Markdown description; links to threads,
   pages, artifacts, drawings and recordings; and the agent section. The
   header has **Hand off**, **Mark done** / **Reopen**, and a menu with Mark
   done and archive threads, New thread about this, Archive threads, Move to
@@ -38,6 +38,15 @@ the project and assignee filters, the Board/List toggle and New task.
   review"), its last note, **Open thread**, and **Send back** to reply with
   feedback, which moves the task back to In progress. Earlier handoffs are
   listed below it.
+- **Studio Teams bots.** Assign a task to a bot and use **Send to bot** to
+  create a dedicated channel and post the task there.
+- **Subtasks and recurrence.** A task includes its parent and flat subtask
+  counts. Daily, weekly, monthly and weekday tasks create their next instance
+  when completed. Project boards can have ordered custom columns; removing a
+  column moves its tasks to the first remaining active column.
+- **Pages checkboxes.** In a Pages checkbox, use the **Task from checkbox**
+  slash action. It creates a linked task and keeps Done and the checkbox in
+  step in both directions.
 - **Archive on done**, an option in the plugin's settings, off by
   default. When it's off, marking a task done offers **Archive threads** in
   the toast.
@@ -54,7 +63,7 @@ the project and assignee filters, the Board/List toggle and New task.
 
 ## How it works
 
-- Tasks, links and handoffs live in the plugin's SQLite database
+- Tasks, links, custom statuses and handoffs live in the plugin's SQLite database
   (`src/server/store.ts`). Board order is a fractional rank per column.
 - BB's thread events (`thread.active`, `thread.idle`, `thread.failed`,
   archive and delete, and `interaction.pending`) become signals that
