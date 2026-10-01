@@ -314,6 +314,21 @@ export class CdpClient {
     await sleep(700);
   }
 
+  /** Right-clicks the first element matching `selector`, opening its context menu. */
+  async openContextMenu(selector) {
+    const point = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element) throw new Error("Element not found: " + ${JSON.stringify(selector)});
+      element.scrollIntoView({ block: "center" });
+      const rect = element.getBoundingClientRect();
+      return { x: rect.left + Math.min(rect.width / 2, 80), y: rect.top + rect.height / 2 };
+    })()`);
+    for (const type of ["mousePressed", "mouseReleased"]) {
+      await this.command("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: "right", clickCount: 1 });
+    }
+    await sleep(700);
+  }
+
   async capture(outputPath, clip) {
     const screenshot = await this.command("Page.captureScreenshot", {
       format: "png",

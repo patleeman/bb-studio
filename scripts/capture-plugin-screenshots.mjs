@@ -10,6 +10,7 @@ import bb_studio_sidebar from "./capture/captures/bb-studio-sidebar.mjs";
 import bb_studio_teams from "./capture/captures/bb-studio-teams.mjs";
 import bb_studio_draw from "./capture/captures/bb-studio-draw.mjs";
 import bb_studio_chat from "./capture/captures/bb-studio-chat.mjs";
+import bb_studio_float from "./capture/captures/bb-studio-float.mjs";
 import bb_studio_talk from "./capture/captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./capture/captures/bb-studio-pages.mjs";
 import bb_studio from "./capture/captures/bb-studio.mjs";
@@ -39,6 +40,7 @@ const captures = [
   ...bb_studio_teams(context),
   ...bb_studio_draw(context),
   ...bb_studio_chat(context),
+  ...bb_studio_float(context),
   ...bb_studio_talk(context),
   ...bb_studio_pages(context),
   ...bb_studio(context),
