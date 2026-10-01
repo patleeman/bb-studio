@@ -1,4 +1,5 @@
-// Studio's own tables: tags (src/tags.ts) and sidebar tabs (src/tabs.ts).
+// Studio's own tables: tags (src/tags.ts), spaces (src/spaces.ts) and sidebar
+// tabs (src/tabs.ts).
 
 /**
  * Append-only: statement index is the migration id, and BB checks each
@@ -77,4 +78,12 @@ export const MIGRATIONS = [
   `CREATE TABLE studio_playbooks (id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL)`,
   // Playbooks were removed.
   `DROP TABLE IF EXISTS studio_playbooks`,
+  // Spaces are protected tags (src/spaces.ts): members stay in item_tags.
+  `ALTER TABLE tags ADD COLUMN kind TEXT NOT NULL DEFAULT 'tag';
+   CREATE TABLE spaces (
+       tag_id TEXT PRIMARY KEY,
+       icon TEXT,
+       description TEXT NOT NULL DEFAULT '',
+       default_project_id TEXT
+     );`,
 ];

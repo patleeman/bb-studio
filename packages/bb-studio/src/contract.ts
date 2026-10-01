@@ -41,6 +41,41 @@ const comment = z.object({ id: z.string(), ref: itemRef, parentId: z.string().nu
 const version = z.object({ id: z.string(), ref: itemRef, sha256: z.string(), label: z.string(), actor, createdAt: z.number() });
 export type TagView = z.infer<typeof tag>;
 
+const space = z.object({
+  id: z.string(),
+  name: z.string(),
+  color: z.string(),
+  icon: z.string().nullable(),
+  description: z.string(),
+  /** Where the space's new items and threads go; null for global. */
+  defaultProjectId: z.string().nullable(),
+  /** BB projects whose items and threads all belong to the space. */
+  projectIds: z.array(z.string()),
+  threadIds: z.array(z.string()),
+  /** Items added one by one, as `<plugin>:<id>`. */
+  itemKeys: z.array(z.string()),
+});
+export type SpaceView = z.infer<typeof space>;
+const spaceId = z.string().min(1).max(100);
+const spaceFields = z.object({
+  icon: z.string().max(16).nullable().optional(),
+  description: z.string().max(500).optional(),
+  defaultProjectId: z.string().min(1).max(200).nullable().optional(),
+});
+/** An item, or `bb-project:<id>` for a whole project, or `bb-thread:<id>` for a thread. */
+const spaceMember = itemRef;
+const spaceThread = z.object({
+  id: z.string(),
+  title: z.string(),
+  status: z.string(),
+  projectId: z.string().nullable(),
+  updatedAt: z.number(),
+  /** Added to the space itself, not through one of its projects. */
+  direct: z.boolean(),
+});
+export type SpaceThreadView = z.infer<typeof spaceThread>;
+const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), spaces: z.array(z.string()) });
+
 export { TABS_CHANNEL } from "./ids";
 
 const tab = z.object({
@@ -73,12 +108,13 @@ export const rpcContract = defineRpcContract({
     input: z.null(),
     output: z.object({
       providers: z.array(provider),
-      /** Tag ids per item, in tag-name order. */
-      items: z.array(schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()) })),
+      /** Tag ids per item, in tag-name order, and the spaces each is in. */
+      items: z.array(listedItem),
       tags: z.array(tag),
+      spaces: z.array(space),
     }),
   },
-  items: { input: z.object({ pluginId, ids }), output: z.object({ items: z.array(schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()) })) }) },
+  items: { input: z.object({ pluginId, ids }), output: z.object({ items: z.array(listedItem) }) },
   changes: {
     input: z.object({ since: z.number().int().min(0) }),
     output: z.object({ cursor: z.number().int(), reset: z.boolean(), changes: z.array(z.object({ pluginId, id: z.string(), kind: z.string(), removed: z.boolean(), at: z.number() })) }),
@@ -119,6 +155,18 @@ export const rpcContract = defineRpcContract({
   deleteTag: { input: z.object({ id: tagId }), output: z.object({ ok: z.boolean() }) },
   /** Adds and removes tags on items from any add-on. */
   tagItems: tagSchemas.tagItems,
+  /** Spaces are made, renamed and deleted by the user only. */
+  createSpace: { input: spaceFields.extend({ name: tagName }), output: z.object({ space }) },
+  updateSpace: { input: spaceFields.extend({ id: spaceId, name: tagName.optional() }), output: z.object({ space }) },
+  deleteSpace: { input: z.object({ id: spaceId }), output: z.object({ ok: z.boolean() }) },
+  spaceMembers: {
+    input: z.object({ id: spaceId, add: z.array(spaceMember).max(500).default([]), remove: z.array(spaceMember).max(500).default([]) }),
+    output: z.object({ space }),
+  },
+  /** Threads added to a space and its projects' open threads, newest first. */
+  spaceThreads: { input: z.object({ id: spaceId }), output: z.object({ threads: z.array(spaceThread) }) },
+  /** Open threads to pick from when adding one to a space. */
+  recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },

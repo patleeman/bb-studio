@@ -1,6 +1,6 @@
 // The Studio collection: every add-on's items in one list. The panel's
 // sub-path is the kind filter, so /plugins/studio/studio/recording is a
-// linkable "Recordings" view.
+// linkable "Recordings" view; space/<id>[/<kind>] opens a space.
 import {
   CollectionPage,
   DropdownMenu,
@@ -27,11 +27,13 @@ import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ProviderView, rpcContract, SidebarView, TagView } from "../contract";
+import type { ProviderView, rpcContract, SidebarView, SpaceView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
 import { NeedsYou } from "./HomePanel";
+import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceBar, SpaceDialog, SpaceHeader, SpaceMenu, spacePrompt } from "./Spaces";
 
-type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] };
+type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[] };
+type SpaceDialogState = { type: "new" } | { type: "edit" | "items" | "threads" | "delete"; space: SpaceView } | null;
 const TIP_DISMISSED_KEY = "studio:sidebar-tip-dismissed";
 const REFETCH_DEBOUNCE_MS = 300;
 
@@ -175,9 +177,24 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
     [providers],
   );
-  const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
+  const segments = subPath.split("/").filter(Boolean);
+  const spaceId = segments[0] === "space" ? decodeSegment(segments[1] ?? "") || null : null;
+  const space = spaceId ? (data?.spaces.find((each) => each.id === spaceId) ?? null) : null;
+  const requested = decodeSegment((spaceId ? segments[2] : segments[0]) ?? "") || "all";
   const kind = requested === "all" || !data || kinds.some((candidate) => candidate.id === requested) ? requested : "all";
-  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
+  const spacePath = useCallback((id: string | null, nextKind = "all") =>
+    [id ? `space/${encodeURIComponent(id)}` : "", nextKind === "all" ? "" : encodeURIComponent(nextKind)].filter(Boolean).join("/"), []);
+  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: spacePath(spaceId, next) }), [navigate, spacePath, spaceId]);
+  const openSpace = useCallback((id: string | null) => navigate.toPluginPanel("studio", { subPath: spacePath(id) }), [navigate, spacePath]);
+  const [spaceDialog, setSpaceDialog] = useState<SpaceDialogState>(null);
+  // A space deleted elsewhere falls back to everything.
+  useEffect(() => {
+    if (data && spaceId && !space) openSpace(null);
+  }, [data, spaceId, space, openSpace]);
+  const shownItems = useMemo(
+    () => (data ? (space ? data.items.filter((item) => item.spaces?.includes(space.id)) : data.items) : null),
+    [data, space],
+  );
   const nameOf = useCallback((pluginId: string) => providers.find((provider) => provider.pluginId === pluginId)?.name ?? pluginId, [providers]);
 
   const handlers = useMemo<CollectionHandlers>(
@@ -194,12 +211,14 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         }
         try {
           const { item } = await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId });
+          // Made in a space: file it there, whichever project it went to.
+          if (space) await rpc.call("spaceMembers", { id: space.id, add: [{ pluginId: target.pluginId, id: item.id }], remove: [] }).catch(() => {});
           openAppPath(item.href);
         } catch (cause) {
           toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
         }
       },
-      onNewThread: (items) => navigate.toCompose({ initialPrompt: mentionPrompt(items), focusPrompt: true }),
+      onNewThread: (items) => navigate.toCompose({ initialPrompt: space ? spacePrompt(space, mentionPrompt(items).trimEnd()) : mentionPrompt(items), focusPrompt: true }),
       onDuplicate: async (item) => {
         try {
           const { item: created } = await rpc.call("duplicate", { pluginId: item.pluginId, id: item.id, projectId: item.projectId, includeChildren: item.kind === "page" });
@@ -284,7 +303,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         refetch();
       },
     }),
-    [nameOf, navigate, refetch, rpc, setData],
+    [nameOf, navigate, refetch, rpc, setData, space],
   );
 
   const shownPanels = sidebar?.panels.filter((panel) => panel.visible) ?? [];
@@ -307,7 +326,19 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const notice = (
     <>
-      <NeedsYou />
+      {data ? <SpaceBar spaces={data.spaces} current={space?.id ?? null} onPick={openSpace} onNew={() => setSpaceDialog({ type: "new" })} /> : null}
+      {space ? (
+        <SpaceHeader
+          rpc={rpc}
+          space={space}
+          projects={projects}
+          onEdit={() => setSpaceDialog({ type: "edit", space })}
+          onAddItems={() => setSpaceDialog({ type: "items", space })}
+          onAddThreads={() => setSpaceDialog({ type: "threads", space })}
+          onChanged={refetch}
+        />
+      ) : null}
+      {space ? null : <NeedsYou />}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name={provider.state === "outdated" ? "Info" : "AlertTriangle"} className="size-4 shrink-0" />
@@ -385,23 +416,61 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     );
   }
 
+  const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
+  const deleteSpace = async (target: SpaceView) => {
+    setSpaceDialog(null);
+    try {
+      await rpc.call("deleteSpace", { id: target.id });
+      toast.success(`Deleted the space ${target.name}`);
+      openSpace(null);
+      refetch();
+    } catch (cause) {
+      toast.error(`Couldn't delete the space: ${errorMessage(cause)}`);
+    }
+  };
+
   return (
-    <CollectionPage
-      title="Studio"
-      kinds={kinds}
-      items={data?.items ?? null}
-      error={error && !data ? error : null}
-      projects={projects}
-      defaultProjectId={context.projectId ?? null}
-      storageKey="studio:collection"
-      tags={data?.tags ?? []}
-      extraCreateItems={extraCreateItems}
-      kind={kind}
-      onKindChange={setKind}
-      notice={notice}
-      headerActions={headerActions}
-      handlers={handlers}
-    />
+    <>
+      <CollectionPage
+        title={space ? `${space.icon ? `${space.icon} ` : ""}${space.name}` : "Studio"}
+        kinds={kinds}
+        items={shownItems}
+        error={error && !data ? error : null}
+        projects={projects}
+        defaultProjectId={space ? space.defaultProjectId : (context.projectId ?? null)}
+        storageKey={space ? "studio:space" : "studio:collection"}
+        tags={data?.tags ?? []}
+        extraCreateItems={extraCreateItems}
+        kind={kind}
+        onKindChange={setKind}
+        notice={notice}
+        headerActions={space ? <SpaceMenu onEdit={() => setSpaceDialog({ type: "edit", space })} onDelete={() => setSpaceDialog({ type: "delete", space })} /> : headerActions}
+        handlers={handlers}
+      />
+      {spaceDialog?.type === "new" || spaceDialog?.type === "edit" ? (
+        <SpaceDialog
+          rpc={rpc}
+          space={spaceDialog.type === "edit" ? spaceDialog.space : null}
+          projects={projects}
+          defaultProjectId={context.projectId ?? null}
+          onClose={() => setSpaceDialog(null)}
+          onSaved={(saved) => {
+            setSpaceDialog(null);
+            refetch();
+            openSpace(saved.id);
+          }}
+        />
+      ) : null}
+      {spaceDialog?.type === "items" ? (
+        <AddItemsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} items={data?.items ?? []} kinds={kinds} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
+      ) : null}
+      {spaceDialog?.type === "threads" ? (
+        <AddThreadsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
+      ) : null}
+      {spaceDialog?.type === "delete" ? (
+        <DeleteSpaceDialog space={spaceDialog.space} onClose={() => setSpaceDialog(null)} onConfirm={() => void deleteSpace(spaceDialog.space)} />
+      ) : null}
+    </>
   );
 }
 

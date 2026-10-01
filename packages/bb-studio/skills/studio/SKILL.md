@@ -22,15 +22,18 @@ Items belong to a BB project or are global. Every item has a link
 
 ## Finding items
 
-- Agent tool `studio_list_items`: this project's and global items, newest
-  first, each with its kind and link. Pass `query` to match titles and
+- Agent tool `studio_list_items`: newest first, each with its kind and link.
+  In a thread that belongs to a space it lists that space's items (the first
+  line names the space); otherwise this project's and global items. Pass `query` to match titles and
   content, `kind` (`page`, `recording`, `dictation`, `drawing`, `artifact`, `task`) to narrow, and
-  `allProjects: true` to look everywhere, and `tag` to list one tag's items.
+  `allProjects: true` to look everywhere, `space` to list one space's items,
+  and `tag` to list one tag's items.
   Archived items are left out. Each line shows the item's `#tags`; an item
   that matched `query` on its content has the matching text on a `>` line
   below it (`snippet` in `--json`).
-- CLI: `bb studio list [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]`;
-  `bb studio tags` lists the tags and how many items each has.
+- CLI: `bb studio list [--all] [--space <name>] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]`;
+  `bb studio tags` lists the tags and how many items each has, and
+  `bb studio spaces` lists the spaces.
 - `bb studio providers` shows which add-ons are installed and whether each is
   ready; an add-on that's stopped contributes nothing to the list.
 
@@ -45,9 +48,27 @@ a task. Studio keeps them; add-ons don't. Use `studio_tag_items` with
 names). Adding a name that doesn't exist yet creates the tag. Tag when the
 user asks to group, file or label items; don't invent tags on your own.
 
+## Spaces
+
+A space gathers Studio items, whole BB projects and threads into one place,
+like a "Q4 launch" space with two repos, a few pages and a board. A BB
+project is where code lives and threads run; a space is how the user groups
+work. A project in a space brings in all of its items and open threads, now
+and later. A thread is in a space when it was added to it or its project is.
+
+- `studio_list_spaces` lists the spaces and marks the ones this thread is in.
+- `studio_space_items` with `space` (a name), `add` and `remove` (item links)
+  and `thisThread` (`add` or `remove`) files items or this thread in a space.
+- Only the user makes, renames or deletes spaces. Spaces aren't tags:
+  `studio_tag_items` can't touch them. File things in a space when the user
+  asks to.
+- A new thread whose first message links a space
+  (`/plugins/studio/studio/space/<id>`) joins it.
+
 ## In the app
 
-The Studio panel is the collection: search, kind, project and tag filters, list or
+The Studio panel is the collection, with a row of spaces above it; opening a
+space shows its projects and threads and filters the collection to it. Search, kind, project and tag filters, list or
 grid, archive, move to project, delete, **New ▾** for any kind, and
 **New thread** to start a conversation that mentions the selected items. With
 Studio installed, each add-on's own collection hands over to Studio filtered
