@@ -8,6 +8,7 @@ struct ArtifactView: View {
     @Environment(\.dismiss) private var dismiss
     let id: String
     @State private var chatting = false
+    @State private var showingRelated = false
     @State private var artifact: Artifact?
     @State private var versions: [ArtifactVersion] = []
     /// nil for the newest.
@@ -57,6 +58,8 @@ struct ArtifactView: View {
         .navigationTitle(artifact?.displayTitle ?? "Artifact")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
+        .toolbar { Button { showingRelated = true } label: { Label("Related", systemImage: "link") } }
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "artifacts", itemId: id) }
         .studioChat(
             isPresented: $chatting, pluginId: "artifacts", itemId: id, title: artifact?.displayTitle ?? "Artifact",
             projectId: artifact?.projectId)

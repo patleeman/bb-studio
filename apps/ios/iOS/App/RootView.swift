@@ -10,7 +10,7 @@ struct RootView: View {
             .tag(Tab.inbox)
 
             NavigationStack(path: $model.studioPath) {
-                StudioView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                StudioHomeView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
             .tabItem { Label("Studio", systemImage: "square.stack") }
             .tag(Tab.studio)
@@ -92,6 +92,7 @@ struct RouteDestination: View {
         case .artifact(let id): ArtifactView(id: id)
         case .tasks: TasksView()
         case .task(let id): TaskView(id: id).id(id)
+        case .table(let id): StudioTableView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
         case .machines: MachinesView()
         case .bot(let id): BotView(id: id)

@@ -18,6 +18,7 @@ enum Route: Hashable {
     case artifact(id: String)
     case tasks
     case task(id: String)
+    case table(id: String)
     case terminals(scope: TerminalScope, title: String)
     case machines
     case bot(id: String)
@@ -35,6 +36,7 @@ extension Route {
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
         case ("studio-tasks", "tasks"): self = .task(id: id)
+        case ("studio-tables", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"): self = .bot(id: id)
         default: return nil
         }

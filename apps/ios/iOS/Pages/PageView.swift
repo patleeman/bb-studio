@@ -145,6 +145,7 @@ struct PageView: View {
     @State private var showingComments = false
     @State private var showingEditor = false
     @State private var showingActivity = false
+    @State private var showingRelated = false
     @State private var openedEmptyEditor = false
 
     init(pageId: String) {
@@ -209,6 +210,7 @@ struct PageView: View {
                     }
                     Section {
                         Button { showingActivity = true } label: { Label("Activity", systemImage: "clock") }
+                        Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
                         Button {
                             newTitle = meta?.title ?? ""
                             renaming = true
@@ -260,6 +262,7 @@ struct PageView: View {
             PageEditor(pageId: model.pageId) { await model.load(app.client) }
         }
         .sheet(isPresented: $showingActivity) { PageActivity(pageId: model.pageId, refresh: meta?.refresh) }
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "pages", itemId: model.pageId) }
         .sheet(isPresented: $showingComments) { PageCommentsSheet(model: model) }
         .sheet(isPresented: $showingWeb) {
             NavigationStack {

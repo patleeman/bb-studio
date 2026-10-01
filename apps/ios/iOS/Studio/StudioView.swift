@@ -6,7 +6,7 @@ import SwiftUI
 @MainActor
 final class StudioStore: ObservableObject {
     static let shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks", "bot-teams"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks", "studio-tables", "bot-teams"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -284,6 +284,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
+        StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
         StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
     ]
 
@@ -301,6 +302,7 @@ struct StudioView: View {
     @State private var query = ""
     /// Content matches, keyed like items, with the matching text.
     @State private var contentMatches: [String: String] = [:]
+    @State private var externalMatches: [Studio.SearchAllOutputItem] = []
     @State private var recordingKind: String?
     @State private var dictatingPage = false
     @State private var deleting: StudioItem?
@@ -324,6 +326,29 @@ struct StudioView: View {
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(app.client) } }
             }
+            if !query.isEmpty {
+                ForEach(["thread", "channel"], id: \.self) { kind in
+                    let matches = externalMatches.filter { $0.kind == kind }
+                    if !matches.isEmpty {
+                        Section(kind == "thread" ? "Threads" : "Channels and messages") {
+                            ForEach(Array(matches.enumerated()), id: \.offset) { _, match in
+                                if let id = match.ref?.id, kind == "thread" {
+                                    NavigationLink(value: Route.thread(id: id)) {
+                                        Label(match.title ?? "Thread", systemImage: "bubble.left")
+                                    }
+                                } else if let href = match.href, let url = URL(string: href, relativeTo: app.client.baseURL) {
+                                    Link(destination: url) {
+                                        VStack(alignment: .leading) {
+                                            Text(match.title ?? "Channel")
+                                            Text(match.snippet?.text ?? "").font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
             if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages", "studio-tasks"]) {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
@@ -346,7 +371,7 @@ struct StudioView: View {
         .overlay {
             if !store.loaded {
                 ProgressView()
-            } else if !query.isEmpty, visible.isEmpty {
+            } else if !query.isEmpty, visible.isEmpty, externalMatches.isEmpty {
                 ContentUnavailableView.search(text: query)
             } else if visible.isEmpty, showArchived {
                 ContentUnavailableView("Nothing archived", systemImage: "archivebox")
@@ -704,6 +729,7 @@ struct StudioView: View {
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
         case "studio-tasks": .task(id: item.itemId)
+        case "studio-tables": .table(id: item.itemId)
         case "bot-teams": .bot(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
@@ -789,12 +815,23 @@ struct StudioView: View {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         guard trimmed.count >= 2 else {
             contentMatches = [:]
+            externalMatches = []
             return
         }
         try? await Task.sleep(for: .milliseconds(300))
         guard !Task.isCancelled else { return }
-        let matches = await store.search(trimmed, client: app.client)
-        if !Task.isCancelled { contentMatches = matches }
+        if let results = try? await app.client.studioSearchAll(trimmed) {
+            if !Task.isCancelled {
+                externalMatches = results.filter { $0.kind == "thread" || $0.kind == "channel" }
+                contentMatches = Dictionary(results.compactMap { result in
+                    guard let ref = result.ref, let pluginId = ref.pluginId, let id = ref.id else { return nil }
+                    return ("\(pluginId):\(id)", result.snippet?.text ?? "")
+                }, uniquingKeysWith: { first, _ in first })
+            }
+        } else {
+            let matches = await store.search(trimmed, client: app.client)
+            if !Task.isCancelled { contentMatches = matches; externalMatches = [] }
+        }
     }
 
     private func createPage(_ text: String) async {

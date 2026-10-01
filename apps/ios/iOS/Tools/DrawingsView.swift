@@ -116,6 +116,7 @@ struct DrawingView: View {
     @State private var newName = ""
     @State private var chatting = false
     @State private var editing = false
+    @State private var showingRelated = false
     @State private var openedEmptyEditor = false
 
     var body: some View {
@@ -155,6 +156,7 @@ struct DrawingView: View {
         .navigationTitle(name)
         .navigationBarTitleDisplayMode(.inline)
         .toolbar {
+            Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
             Button { editing = true } label: { Image(systemName: "pencil.tip.crop.circle") }
                 .accessibilityLabel("Edit drawing")
                 .disabled(scene == nil)
@@ -174,6 +176,7 @@ struct DrawingView: View {
             }
         }
         .studioChat(isPresented: $chatting, pluginId: "excalidraw", itemId: id, title: name, projectId: nil)
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "excalidraw", itemId: id) }
         .sheet(isPresented: $editing, onDismiss: { Task { await refresh() } }) {
             NavigationStack {
                 WebView(url: app.client.webURL(forDrawing: id))

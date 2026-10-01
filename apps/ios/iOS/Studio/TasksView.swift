@@ -6,6 +6,7 @@ struct TasksView: View {
     @EnvironmentObject private var app: AppModel
     @AppStorage("tasksColumn") private var column = "todo"
     @State private var tasks: [StudioTask] = []
+    @State private var columns: [Tasks.StatusesOutputColumnsItem] = []
     @State private var loaded = false
     @State private var error: String?
     @State private var creating = false
@@ -21,9 +22,9 @@ struct TasksView: View {
         List {
             Section {
                 Picker("Column", selection: $column) {
-                    ForEach(StudioTask.statuses, id: \.self) { status in
-                        let count = tasks.filter { $0.status == status && $0.archived == showArchived }.count
-                        Text(count > 0 ? "\(StudioTask.statusLabel(status)) \(count)" : StudioTask.statusLabel(status)).tag(status)
+                    ForEach(columns, id: \.id) { status in
+                        let count = tasks.filter { $0.status == status.id && $0.archived == showArchived }.count
+                        Text(count > 0 ? "\(status.label ?? status.id ?? "Status") \(count)" : status.label ?? status.id ?? "Status").tag(status.id ?? "")
                     }
                 }
                 .pickerStyle(.segmented)
@@ -94,8 +95,8 @@ struct TasksView: View {
     @ViewBuilder
     private func menu(_ task: StudioTask) -> some View {
         Menu {
-            ForEach(StudioTask.statuses.filter { $0 != task.status }, id: \.self) { status in
-                Button(StudioTask.statusLabel(status)) { Task { await move(task, to: status) } }
+            ForEach(columns.filter { $0.id != task.status }, id: \.id) { status in
+                Button(status.label ?? status.id ?? "Status") { if let id = status.id { Task { await move(task, to: id) } } }
             }
         } label: { Label("Move to", systemImage: "arrow.right.square") }
         Button { Task { await archive(task) } } label: {
@@ -104,12 +105,8 @@ struct TasksView: View {
     }
 
     private func next(_ status: String) -> String? {
-        switch status {
-        case "todo": "in_progress"
-        case "in_progress": "review"
-        case "review": "done"
-        default: nil
-        }
+        guard let index = columns.firstIndex(where: { $0.id == status }), columns.indices.contains(index + 1) else { return nil }
+        return columns[index + 1].id
     }
 
     private func scheduleReload() {
@@ -124,6 +121,10 @@ struct TasksView: View {
     private func load() async {
         do {
             tasks = try await app.client.tasksBoard(includeArchived: showArchived)
+            let project = UserDefaults.standard.string(forKey: "studioProject")
+            columns = (try? await app.client.taskStatuses(projectId: project == "none" || project == "" ? nil : project)) ?? []
+            if columns.isEmpty { columns = StudioTask.statuses.map { .init(id: $0, label: StudioTask.statusLabel($0)) } }
+            if !columns.contains(where: { $0.id == column }) { column = columns.first?.id ?? "todo" }
             error = nil
         } catch where !BBClient.isCancellation(error) {
             self.error = BBClient.describe(error, server: app.client.baseURL)
@@ -213,6 +214,9 @@ struct TaskView: View {
     @State private var error: String?
     @State private var chatting = false
     @State private var editing = false
+    @State private var editingFields = false
+    @State private var generatedTask: Tasks.GetOutputTask?
+    @State private var columns: [Tasks.StatusesOutputColumnsItem] = []
     @State private var handingOff = false
     @State private var addingLink = false
     @State private var sendingBack = false
@@ -257,6 +261,9 @@ struct TaskView: View {
             projectId: detail?.task?.projectId)
         .sheet(isPresented: $editing) {
             if let task = detail?.task { TaskEditor(task: task, status: task.status) { _ in Task { await load() } } }
+        }
+        .sheet(isPresented: $editingFields) {
+            TaskFieldsView(id: id, projectId: detail?.task?.projectId) { Task { await load() } }
         }
         .sheet(isPresented: $handingOff) {
             if let task = detail?.task {
@@ -307,12 +314,12 @@ struct TaskView: View {
                 }
                 .padding(.vertical, 4)
                 Menu {
-                    ForEach(StudioTask.statuses, id: \.self) { status in
-                        Button { Task { await move(to: status) } } label: {
-                            if status == task.status {
-                                Label(StudioTask.statusLabel(status), systemImage: "checkmark")
+                    ForEach(columns, id: \.id) { status in
+                        Button { if let id = status.id { Task { await move(to: id) } } } label: {
+                            if status.id == task.status {
+                                Label(status.label ?? task.status, systemImage: "checkmark")
                             } else {
-                                Text(StudioTask.statusLabel(status))
+                                Text(status.label ?? status.id ?? "Status")
                             }
                         }
                     }
@@ -327,6 +334,17 @@ struct TaskView: View {
                 }
                 LabeledContent("For", value: task.assignee == "me" ? "You" : task.assignee == "agent" ? "An agent" : "Nobody yet")
                 LabeledContent("Project", value: task.projectId.map { StudioStore.shared.projectNames[$0] ?? $0 } ?? "None")
+                if let generatedTask {
+                    LabeledContent("Priority", value: generatedTask.priority.map { String(describing: $0).capitalized } ?? "None")
+                    if let labels = generatedTask.labels, !labels.isEmpty { LabeledContent("Labels", value: labels.joined(separator: ", ")) }
+                    if let recurrence = generatedTask.recurrence { LabeledContent("Repeat", value: String(describing: recurrence).capitalized) }
+                    if let reminder = generatedTask.reminderAt {
+                        LabeledContent("Reminder", value: Date(timeIntervalSince1970: reminder / 1000).formatted())
+                    }
+                    if let subtasks = generatedTask.subtasks, (subtasks.total ?? 0) > 0 {
+                        LabeledContent("Subtasks", value: "\(Int(subtasks.done ?? 0)) of \(Int(subtasks.total ?? 0)) done")
+                    }
+                }
             }
             if !task.description.isEmpty {
                 Section("Description") {
@@ -339,6 +357,9 @@ struct TaskView: View {
                 }
                 Button { handingOff = true } label: {
                     Label(task.handoff == nil ? "Hand to an Agent" : "Hand to Another Agent", systemImage: "sparkles")
+                }
+                if task.assignee?.hasPrefix("bot:") == true {
+                    Button { Task { await sendToBot() } } label: { Label("Send to bot", systemImage: "person.crop.square") }
                 }
                 if task.status != "done" {
                     Button { Task { await move(to: "done") } } label: { Label("Mark Done", systemImage: "checkmark.circle") }
@@ -378,6 +399,7 @@ struct TaskView: View {
                 Button { addingLink = true } label: { Label("Add Link…", systemImage: "link.badge.plus") }
                     .accessibilityIdentifier("addTaskLink")
             }
+            RelatedSection(pluginId: "studio-tasks", itemId: id)
         }
     }
 
@@ -409,6 +431,7 @@ struct TaskView: View {
     private func menu(_ task: StudioTask) -> some View {
         Menu {
             Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
+            Button { editingFields = true } label: { Label("Priority, labels and reminders", systemImage: "slider.horizontal.3") }
             StudioChatMenuButton(isPresented: $chatting)
             ShareLink(item: app.client.baseURL.appending(path: "plugins/studio-tasks/tasks/\(task.id)")) {
                 Label("Share Link", systemImage: "square.and.arrow.up")
@@ -425,6 +448,9 @@ struct TaskView: View {
     private func load() async {
         do {
             detail = try await app.client.task(id)
+            generatedTask = try? await app.client.taskGenerated(id).task
+            columns = (try? await app.client.taskStatuses(projectId: detail?.task?.projectId)) ?? []
+            if columns.isEmpty { columns = StudioTask.statuses.map { .init(id: $0, label: StudioTask.statusLabel($0)) } }
             error = nil
         } catch where !BBClient.isCancellation(error) {
             self.error = BBClient.describe(error, server: app.client.baseURL)
@@ -476,6 +502,14 @@ struct TaskView: View {
         feedback = ""
         guard !message.isEmpty else { return }
         await run("Sent to the agent") { _ = try await app.client.sendBackTask(id, message: message) }
+    }
+
+    private func sendToBot() async {
+        do {
+            _ = try await app.client.sendTaskToBot(id)
+            await load()
+            flash("Sent to bot")
+        } catch { flash(BBClient.describe(error, server: app.client.baseURL)) }
     }
 
     private func delete() async {

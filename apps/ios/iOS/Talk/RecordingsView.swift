@@ -20,6 +20,9 @@ struct RecordingDetailView: View {
     @State private var confirmingDelete = false
     @State private var renaming = false
     @State private var newTitle = ""
+    @State private var showingRelated = false
+    @State private var meetingNotes: Talk.RecordingGetOutputRecordingMeetingNotes?
+    @State private var generatingNotes = false
 
     var body: some View {
         ScrollView {
@@ -38,6 +41,37 @@ struct RecordingDetailView: View {
                     .foregroundStyle(.secondary)
                 }
                 if let error { Text(error).font(.footnote).foregroundStyle(.red) }
+                if let meetingNotes {
+                    VStack(alignment: .leading, spacing: 12) {
+                        HStack {
+                            Text("Meeting notes").font(.headline)
+                            Spacer()
+                            Button("Regenerate") { Task { await regenerateNotes() } }
+                                .disabled(generatingNotes)
+                        }
+                        if let summary = meetingNotes.summary, !summary.isEmpty { Text(summary).textSelection(.enabled) }
+                        if let decisions = meetingNotes.decisions, !decisions.isEmpty {
+                            Text("Decisions").font(.subheadline.weight(.semibold))
+                            ForEach(decisions, id: \.self) { Text("• \($0)").textSelection(.enabled) }
+                        }
+                        if let actions = meetingNotes.actionItems, !actions.isEmpty {
+                            Text("Action items").font(.subheadline.weight(.semibold))
+                            ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
+                                HStack {
+                                    Text(action.title ?? "Action item")
+                                    Spacer()
+                                    Button("Create task") { Task { await createTask(index) } }
+                                }
+                            }
+                        }
+                    }
+                    .padding(12)
+                    .background(.fill.quaternary, in: .rect(cornerRadius: 12))
+                    .accessibilityIdentifier("recordingMeetingNotes")
+                } else if recording?.status == "complete" {
+                    Button("Generate meeting notes") { Task { await regenerateNotes() } }
+                        .disabled(generatingNotes)
+                }
                 if segments.contains(where: { $0.offsetMs != nil }) {
                     RecordingTranscript(segments: segments, player: player)
                 } else {
@@ -61,6 +95,7 @@ struct RecordingDetailView: View {
                 Menu {
                     Button { creatingThread = true } label: { Label("New Thread", systemImage: "square.and.pencil") }
                     StudioChatMenuButton(isPresented: $chatting)
+                    Button { showingRelated = true } label: { Label("Related", systemImage: "link") }
                     Button { UIPasteboard.general.string = transcript } label: { Label("Copy Transcript", systemImage: "doc.on.doc") }
                     Button {
                         newTitle = recording?.title ?? ""
@@ -79,6 +114,7 @@ struct RecordingDetailView: View {
             }
         }
         .sheet(isPresented: $creatingThread) { NewThreadView(text: transcript) }
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "talk", itemId: id) }
         .studioChat(isPresented: $chatting, pluginId: "talk", itemId: id, title: recording?.title ?? "Recording", projectId: recording?.projectId)
         .confirmationDialog("Delete this recording?", isPresented: $confirmingDelete, titleVisibility: .visible) {
             Button("Delete", role: .destructive) { Task { await delete() } }
@@ -112,6 +148,7 @@ struct RecordingDetailView: View {
             recording = detail.recording
             segments = detail.segments
             transcript = detail.transcript
+            meetingNotes = try? await app.client.recordingNotes(id)
             player.configure(client: app.client, recordingId: id, title: detail.recording.title, segments: detail.segments)
             error = nil
         } catch where BBClient.isCancellation(error) {
@@ -119,6 +156,26 @@ struct RecordingDetailView: View {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
         loaded = true
+    }
+
+    private func regenerateNotes() async {
+        generatingNotes = true
+        defer { generatingNotes = false }
+        do {
+            try await app.client.regenerateRecordingNotes(id)
+            await load()
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+    }
+
+    private func createTask(_ index: Int) async {
+        do {
+            let taskId = try await app.client.createTaskFromRecording(id, index: index)
+            app.studioPath.append(.task(id: taskId))
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
     }
 
     private func delete() async {
