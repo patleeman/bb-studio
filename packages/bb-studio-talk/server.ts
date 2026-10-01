@@ -72,7 +72,7 @@ export default async function plugin(bb: BbPluginApi) {
       label: "Keep dictation audio (days)",
       description:
         "Delete a finished dictation's audio after this many days and keep its transcript. Recordings keep their audio. 0 keeps it forever.",
-      default: 30,
+      default: 1,
     },
   });
   let config = await settings.get();

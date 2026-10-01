@@ -65,7 +65,7 @@ afterwards.
   the dictation's page does the same. It moves the dictation out of the
   background and gives it a title and meeting notes. The text is still
   inserted.
-- **Dictation audio expires.** After 30 days, a dictation's audio is
+- **Dictation audio expires.** After a day, a dictation's audio is
   deleted and its transcript is kept. Recordings keep their audio. A
   dictation with a piece still waiting or failed keeps its audio.
 - **A table of recordings.** The Recordings page lists everything in a
@@ -146,7 +146,7 @@ afterwards.
 | Title provider | automatic | Provider for titling, such as `codex` or `claude-code`. |
 | Title model | provider default | Model for titling. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
-| Keep dictation audio (days) | 30 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
+| Keep dictation audio (days) | 1 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
 
 ## Commands
 
