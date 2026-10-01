@@ -297,6 +297,31 @@
           "ref": "main"
         }
       }
+    },
+    {
+      "id": "studio-tables",
+      "displayName": "Studio Tables",
+      "description": "Part of BB Studio. Structured tables with typed columns, rows, views, CSV import and export, and agent tools.",
+      "icon": {
+        "url": "./packages/bb-studio-tables/assets/icon.svg"
+      },
+      "tags": [
+        "productivity",
+        "data",
+        "agents",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-tables",
+          "ref": "main"
+        }
+      }
     }
   ]
 }

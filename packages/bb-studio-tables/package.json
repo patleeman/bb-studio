@@ -1,0 +1,43 @@
+{
+  "name": "@bb-studio/studio-tables",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Studio Tables",
+    "description": "Part of BB Studio. Structured tables with typed columns, rows, views, CSV import and export, and agent tools.",
+    "branding": {
+      "icon": "./assets/icon.svg"
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "skills"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.mts",
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build ."
+  },
+  "dependencies": {
+    "@bb-studio/kit": "file:../bb-studio-kit",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "better-sqlite3": "^12.11.1",
+    "react": "19.2.4",
+    "sonner": "^1.7.4",
+    "typescript": "^5.7.0",
+    "vitest": "4.1.1",
+    "react-dom": "19.2.4"
+  }
+}
