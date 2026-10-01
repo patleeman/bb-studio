@@ -9,7 +9,7 @@ export function feedInstructions(): string {
   return [
     "Studio Feed is on: one feed of what agents report, which the user reads on desktop and phone.",
     "Publish to it only when your task or automation prompt asks you to post to the feed, or the user asks. Never post routine replies, status chatter or \"nothing new\".",
-    `To publish, make the post your final reply: the post's Markdown body (a short lede, then details, sources as Markdown links), then on its own line:`,
+    `To publish, make the post your final reply: the post's Markdown body (a short lede, then details, sources as Markdown links; the first image, or the first linked page's preview image, is its picture), then on its own line:`,
     `::${DIRECTIVE}{title="Harlem Line delays cleared" topic="Commute" story="harlem-line"}`,
     'Rules: title is required, under 100 characters, and says what happened. topic is a short section name (optional). story is a stable key for something you report on repeatedly; reuse it for follow-ups so they group as one story with updates. Add priority="urgent" only when the user must act or know now: it notifies their phone. Don\'t use double quotes inside a value.',
     "Put the line after the body, never inside a code block. If your reply also ends with ::explore or ::reactions lines, put the post line before them. The reply is shown in your thread or channel with the post card.",

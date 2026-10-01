@@ -16,6 +16,10 @@ export const postSchema = z.object({
   preview: z.string(),
   /** Link domains in the body. */
   domains: z.array(z.string()),
+  /** Its picture: the body's first image, or the preview image of the page it links to. */
+  image: z.string().nullable(),
+  /** The posting bot's avatar (an emoji), when a bot posted it. */
+  avatar: z.string().nullable(),
   topic: z.string().nullable(),
   story: z.string().nullable(),
   /** Posts in the story; 1 for a post on its own. */

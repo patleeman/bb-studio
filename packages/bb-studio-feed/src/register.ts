@@ -13,8 +13,9 @@ import { z } from "zod";
 import type { PostView } from "./contract";
 import { feedInstructions } from "./prompt";
 import { FeedService, type NotifyMode, type Origin } from "./service";
-import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, parseAttributes, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
+import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, firstLink, parseAttributes, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS, type PostRow } from "./store";
+import { fetchPreview } from "./unfurl";
 
 export const FEED_TOOLS = ["feed_list", "feed_read", "feed_edit"];
 
@@ -35,7 +36,7 @@ const USAGE = {
 export const FEED_USAGE = "bb feed <list|show|post|edit|remove> …";
 
 const teamsList = z.object({
-  bots: z.array(z.object({ id: z.string(), name: z.string() })),
+  bots: z.array(z.object({ id: z.string(), name: z.string(), avatar: z.string().optional() })),
   rooms: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 const threadBots = z.array(z.object({ threadId: z.string(), botId: z.string() }));
@@ -49,12 +50,16 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     bb.sdk.plugins.callRpc({ pluginId, method, input, outputSchema, signal: AbortSignal.timeout(RPC_TIMEOUT_MS) });
 
   // Studio Teams, when installed: which bot a thread belongs to, and names.
-  let teams: { at: number; value: Promise<{ bots: Map<string, string>; rooms: Map<string, string>; threads: Map<string, string> } | null> } | null = null;
+  let teams: {
+    at: number;
+    value: Promise<{ bots: Map<string, string>; avatars: Map<string, string>; rooms: Map<string, string>; threads: Map<string, string> } | null>;
+  } | null = null;
   function teamsDirectory() {
     if (teams && Date.now() - teams.at < TEAMS_CACHE_MS) return teams.value;
     const value = Promise.all([callRpc(TEAMS_PLUGIN_ID, "list", null, teamsList), callRpc(TEAMS_PLUGIN_ID, "threadBots", {}, threadBots)])
       .then(([list, links]) => ({
         bots: new Map(list.bots.map((bot) => [bot.id, bot.name])),
+        avatars: new Map(list.bots.flatMap((bot) => (bot.avatar ? [[bot.id, bot.avatar] as const] : []))),
         rooms: new Map(list.rooms.map((room) => [room.id, room.name])),
         threads: new Map(links.map((link) => [link.threadId, link.botId])),
       }))
@@ -113,29 +118,57 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     if (!row) throw new Error(`Post ${id} not found.`);
     return row;
   };
-  const views = (rows: PostRow[]) => rows.map((row) => service.view(row));
+  // Pictures for posts without one of their own, from the page each links to.
+  // A lookup runs once per link; the reader reloads when it lands.
+  const looking = new Set<string>();
+  function linkImage(row: PostRow): string | null {
+    const url = firstLink(row.body);
+    if (!url) return null;
+    const cached = store.linkImage(url);
+    if (cached !== undefined) return cached || null;
+    if (!looking.has(url)) {
+      looking.add(url);
+      fetchPreview(url)
+        .then(
+          (preview) => preview.image,
+          () => "",
+        )
+        .then((image) => {
+          store.setLinkImage(url, image);
+          if (image) bb.realtime.publish(REALTIME_CHANNEL, { type: "post", postId: row.id, story: row.story } satisfies RealtimeEvent);
+        })
+        .finally(() => looking.delete(url));
+    }
+    return null;
+  }
+
+  /** Posts for the reader: with a picture and the bot's avatar. */
+  async function views(rows: PostRow[]): Promise<PostView[]> {
+    const directory = rows.some((row) => row.bot_id) ? await teamsDirectory() : null;
+    return rows.map((row) => {
+      const post = service.view(row);
+      return { ...post, image: post.image ?? linkImage(row), avatar: (row.bot_id && directory?.avatars.get(row.bot_id)) || null };
+    });
+  }
+  const one = async (row: PostRow | null) => (row ? ((await views([row]))[0] ?? null) : null);
 
   // RPC ------------------------------------------------------------------------
 
   const rpc = {
-    list: ({ cursor, limit, topic, query }: { cursor?: string; limit?: number; topic?: string | null; query?: string }) => {
+    list: async ({ cursor, limit, topic, query }: { cursor?: string; limit?: number; topic?: string | null; query?: string }) => {
       const page = store.list({ cursor, limit: limit ?? 30, topic, query });
-      return { posts: page.rows.map((row) => service.view(row)), nextCursor: page.nextCursor, lastSeenAt: store.lastSeenAt() };
+      return { posts: await views(page.rows), nextCursor: page.nextCursor, lastSeenAt: store.lastSeenAt() };
     },
-    post: ({ postId }: { postId: string }) => {
-      const row = store.get(postId);
-      return { post: row ? service.view(row) : null };
-    },
-    story: ({ story }: { story: string }) => ({ posts: views(store.story(story)) }),
-    forDirective: ({ source }: { source: string }) => {
+    post: async ({ postId }: { postId: string }) => ({ post: await one(store.get(postId)) }),
+    story: async ({ story }: { story: string }) => ({ posts: await views(store.story(story)) }),
+    forDirective: async ({ source }: { source: string }) => {
       const title = postDirective(parseAttributes(source))?.title;
-      const row = store.byDirective(source) ?? (title ? store.byTitle(title) : null);
-      return { post: row ? service.view(row) : null };
+      return { post: await one(store.byDirective(source) ?? (title ? store.byTitle(title) : null)) };
     },
     topics: () => ({ topics: store.topics() }),
-    edit: ({ postId, resolved, ...patch }: { postId: string; title?: string; body?: string; topic?: string | null; priority?: (typeof PRIORITIES)[number]; resolved?: boolean }) => {
+    edit: async ({ postId, resolved, ...patch }: { postId: string; title?: string; body?: string; topic?: string | null; priority?: (typeof PRIORITIES)[number]; resolved?: boolean }) => {
       const row = service.edit(postId, { ...patch, ...(patch.topic === "" ? { topic: null } : {}), resolved }, "you");
-      return { post: row ? service.view(row) : null };
+      return { post: await one(row) };
     },
     remove: ({ postId }: { postId: string }) => ({ removed: service.remove(postId) }),
     seen: ({ at }: { at?: number }) => ({ lastSeenAt: service.seen(at) }),

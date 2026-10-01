@@ -3,7 +3,7 @@
 // notification for an urgent post or a story update. BB specifics (threads,
 // Teams, phones) come in as deps, so this is testable without a host.
 import type { PostView } from "./contract";
-import { parsePost, plainText, postHref, sourceDomains, type ParsedPost, type Priority, type RealtimeEvent } from "./shared";
+import { bodyImage, lede, parsePost, postHref, sourceDomains, type ParsedPost, type Priority, type RealtimeEvent } from "./shared";
 import { contentKey, directiveKey, FeedStore, type ListedRow, type PostPatch, type PostRow } from "./store";
 
 /** Where a reply came from. */
@@ -52,8 +52,10 @@ export function view(row: PostRow | ListedRow, storyPosts?: number): PostView {
     id: row.id,
     title: row.title,
     body: row.body,
-    preview: plainText(row.body, 240),
+    preview: lede(row.body),
     domains: sourceDomains(row.body),
+    image: bodyImage(row.body),
+    avatar: null,
     topic: row.topic,
     story: row.story,
     storyPosts: "story_posts" in row ? row.story_posts : (storyPosts ?? 1),
@@ -184,7 +186,7 @@ export class FeedService {
     try {
       await this.deps.notify({
         title: row.title,
-        body: `${earlier ? "Update · " : ""}${from}${row.body ? ` · ${plainText(row.body, 300)}` : ""}`,
+        body: `${earlier ? "Update · " : ""}${from}${row.body ? ` · ${lede(row.body, 300)}` : ""}`,
         threadId: row.thread_id,
         projectId: row.project_id,
         path: postHref(row.id),

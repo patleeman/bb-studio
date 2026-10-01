@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parsePost, plainText, sourceDomains, storyKey } from "./shared";
+import { bodyImage, firstLink, lede, parsePost, plainText, sourceDomains, storyKey } from "./shared";
 
 describe("parsePost", () => {
   it("reads the post line that ends a reply", () => {
@@ -56,6 +56,21 @@ describe("helpers", () => {
   it("makes plain previews", () => {
     expect(plainText("## Hi\n\n- **one** [link](https://a.com)\n```\ncode\n```")).toBe("Hi one link");
     expect(plainText("a".repeat(20), 10)).toBe(`${"a".repeat(9)}…`);
+  });
+
+  it("makes ledes from the first paragraph", () => {
+    expect(lede("## Today\n\n- Dentist at **3:00 PM**\n- Reply to the landlord\n\nWeather: rain")).toBe("Dentist at 3:00 PM · Reply to the landlord");
+    expect(lede("Today:\n- one\n- two")).toBe("Today: one · two");
+    expect(lede("![map](https://a.com/m.png)\n\nSee https://x.com/example/status/1 for [the thread](https://x.com/t).")).toBe("See for the thread.");
+    expect(lede("```\ncode\n```\n\nAfter")).toBe("After");
+  });
+
+  it("finds a post's picture and first link", () => {
+    expect(bodyImage("Hi ![a](https://a.com/p.jpg) ![b](https://b.com/q.jpg)")).toBe("https://a.com/p.jpg");
+    expect(bodyImage("[a](https://a.com)")).toBeNull();
+    expect(firstLink("![a](https://a.com/p.jpg) read [this](https://news.com/story) or https://b.com")).toBe("https://news.com/story");
+    expect(firstLink("bare <https://b.com/x> link")).toBe("https://b.com/x");
+    expect(firstLink("no links")).toBeNull();
   });
 
   it("lists link domains once", () => {

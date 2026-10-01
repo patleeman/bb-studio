@@ -135,6 +135,50 @@ export function plainText(markdown: string, max = 280): string {
   return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
 }
 
+const inline = (text: string) =>
+  text
+    .replace(/!\[[^\]]*\]\([^)]*\)/g, " ")
+    .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
+    .replace(/<?https?:\/\/[^\s>)]+>?/g, " ")
+    .replace(/[\\`*_~>]/g, "")
+    .replace(/\s+/g, " ")
+    .trim();
+
+const LIST_ITEM = /^\s*(?:[-*•+]|\d+[.)])\s+/;
+
+/**
+ * A post's lede for the reader: its first paragraph as plain text, skipping
+ * headings, pictures and bare links. A list reads "one · two · three".
+ */
+export function lede(markdown: string, max = 240): string {
+  const blocks = markdown.replace(/\r\n?/g, "\n").replace(/```[\s\S]*?```/g, "\n\n").split(/\n\s*\n/);
+  for (const block of blocks) {
+    let text = "";
+    for (const line of block.split("\n")) {
+      if (/^\s*#{1,6}\s/.test(line) || /^\s*(?:-{3,}|\*{3,}|_{3,})\s*$/.test(line)) continue;
+      const item = LIST_ITEM.test(line);
+      const part = inline(line.replace(LIST_ITEM, ""));
+      if (!part) continue;
+      if (!text) text = part;
+      else if (item) text += /[:.!?]$/.test(text) ? ` ${part}` : ` · ${part}`;
+      else text += ` ${part}`;
+    }
+    if (text) return text.length > max ? `${text.slice(0, max - 1).trimEnd()}…` : text;
+  }
+  return "";
+}
+
+/** The first picture in a post's body. */
+export function bodyImage(markdown: string): string | null {
+  return /!\[[^\]]*\]\((https?:\/\/[^)\s]+)/.exec(markdown)?.[1] ?? null;
+}
+
+/** The first page a post's body links to, whose preview picture can stand for the post. */
+export function firstLink(markdown: string): string | null {
+  const text = markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, " ");
+  return /\[[^\]]*\]\((https?:\/\/[^)\s]+)\)|<?(https?:\/\/[^\s>)]+)/.exec(text)?.slice(1).find(Boolean) ?? null;
+}
+
 /** The link domains in a post's body, for the reader's "from" line. */
 export function sourceDomains(markdown: string, max = 3): string[] {
   const domains: string[] = [];

@@ -58,6 +58,8 @@ export const MIGRATIONS = [
    CREATE INDEX IF NOT EXISTS feed_posts_content ON feed_posts (content_key, created_at);
    CREATE INDEX IF NOT EXISTS feed_posts_directive ON feed_posts (directive_key, created_at);`,
   `CREATE TABLE IF NOT EXISTS feed_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
+  // A linked page's preview picture; image is "" when it has none.
+  `CREATE TABLE IF NOT EXISTS feed_link_images (url TEXT PRIMARY KEY, image TEXT NOT NULL, fetched_at INTEGER NOT NULL);`,
 ];
 
 /** The same reply arriving again within this long (from the bot's thread and its channel) is one post. */
@@ -271,6 +273,17 @@ export class FeedStore {
   }
 
   /** When you last read the feed; 0 before the first time. */
+  /** The cached preview picture for a link: "" for none, undefined when it hasn't been looked up. */
+  linkImage(url: string): string | undefined {
+    return (this.db.prepare("SELECT image FROM feed_link_images WHERE url = ?").get(url) as { image: string } | undefined)?.image;
+  }
+
+  setLinkImage(url: string, image: string, now = Date.now()): void {
+    this.db
+      .prepare("INSERT INTO feed_link_images (url, image, fetched_at) VALUES (?, ?, ?) ON CONFLICT(url) DO UPDATE SET image = excluded.image, fetched_at = excluded.fetched_at")
+      .run(url, image, now);
+  }
+
   lastSeenAt(): number {
     return Number(this.meta("last_seen_at") ?? 0) || 0;
   }
