@@ -21,13 +21,17 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | File | Reason |
 | --- | --- |
 | `source/app.tsx` | Mount Studio section anchors above the thread list and name the provider Studio Sidebar. |
-| `source/app/list/ProjectList.tsx` | Mount the New project dialog and supply its menu action. |
+| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, and filter empty project rows through Studio's visibility rule. |
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context. |
-| `source/app/list/SidebarViewItems.tsx` | Insert New project and hidden Studio section menu items. |
+| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, and empty project filter menu items. |
+| `source/app/preferences/atoms.ts` | Expose the synced empty project preference. |
+| `source/shared/preferences.ts` | Define the synced empty project preference and default. |
+| `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
+| `source/server.test.ts` | Check the new preference default and parsing. |
 | `source/app/rows/ThreadActionsMenu.tsx` | Insert Float in Studio Chat after Open in split. |
 
-The restored upstream tests have only import path changes for the relocated
-fixture and expectations for the Studio menu and presence call. Studio's own
+The restored upstream tests have import path changes for the relocated
+fixture and expectations for Studio menu items, preferences, and presence calls. Studio's own
 tests are in `source/app/studio/StudioAdditions.test.tsx` and `source/app.test.tsx`.
 The top-level `components/ui`, `hooks`, and `lib` copies mirror BB's
 `packages/shared-ui`. They remain vendored upstream code; the kit's UI cleanup

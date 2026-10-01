@@ -1,4 +1,5 @@
 import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
+import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Icon } from "@/components/ui/icon";
@@ -147,7 +148,8 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
   const selectedSort = sort === "none" ? "updated" : sort;
   if (page === "filter") {
     return (
-      <DropdownMenuGroup aria-label="Filter">
+      <>
+        <DropdownMenuGroup aria-label="Filter">
         {(["active", "archived"] as const).map((lifecycle) => {
           const checked = lifecycles.includes(lifecycle);
           const required = checked && lifecycles.length === 1;
@@ -174,7 +176,9 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
             </DropdownMenuItem>
           );
         })}
-      </DropdownMenuGroup>
+        </DropdownMenuGroup>
+        <HideEmptyProjectsMenuItems />
+      </>
     );
   }
   if (page === "organize") {

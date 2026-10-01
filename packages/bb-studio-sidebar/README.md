@@ -14,6 +14,7 @@ list and its organization controls, and adds:
 - **New project** in the **Threads ⋯** menu. It opens a folder picker or
   accepts a folder path, creates the project through BB's Plugin SDK, and
   opens it.
+- **Hide empty projects** in **Filter → Projects** removes project groups with no visible threads. Selected, newly created, and renamed projects remain visible.
 - **Float in Studio Chat** in each thread's menu, after **Open in split**,
   while [Studio Chat](../bb-studio-chat) is installed. It puts the
   thread in Studio Chat's floating card.

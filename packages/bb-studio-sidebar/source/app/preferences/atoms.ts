@@ -44,3 +44,5 @@ export const sidebarThreadLifecyclesAtom =
   createSyncedPreferenceAtom("threadLifecycles");
 export const sidebarShowProviderIconsAtom =
   createSyncedPreferenceAtom("showProviderIcons");
+export const sidebarHideEmptyProjectsAtom =
+  createSyncedPreferenceAtom("hideEmptyProjects");

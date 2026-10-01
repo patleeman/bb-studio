@@ -1,7 +1,7 @@
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { describe, expect, it } from "vitest";
 import plugin, { migrateFromUiPreferences } from "./server.js";
-import { defaultPreferences } from "./shared/preferences.js";
+import { defaultPreferences, parsePreferenceValue } from "./shared/preferences.js";
 
 const PLUGIN_ID = "thread-list";
 
@@ -32,6 +32,9 @@ describe("thread-list preferences rpc", () => {
       preferences: defaultPreferences(),
     });
     expect(defaultPreferences().showProviderIcons).toBe(false);
+    expect(defaultPreferences().hideEmptyProjects).toBe(false);
+    expect(parsePreferenceValue("hideEmptyProjects", true)).toEqual({ success: true, value: true });
+    expect(parsePreferenceValue("hideEmptyProjects", "true").success).toBe(false);
 
     await expect(
       harness.behavior.callRpc("setPreference", {

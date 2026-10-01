@@ -37,6 +37,7 @@ export function useProjectCreation(onNavigate?: () => void) {
   const [path, setPath] = useState("");
   const [loading, setLoading] = useState(false);
   const [creating, setCreating] = useState(false);
+  const [createdProjectId, setCreatedProjectId] = useState<string | null>(null);
   const [picking, setPicking] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -103,6 +104,7 @@ export function useProjectCreation(onNavigate?: () => void) {
           source: { type: "local_path", hostId, path: selectedPath },
         })
         .then((project) => {
+          setCreatedProjectId(project.id);
           setOpen(false);
           navigate.toProject(project.id);
           onNavigate?.();
@@ -196,5 +198,5 @@ export function useProjectCreation(onNavigate?: () => void) {
     ],
   );
 
-  return { dialog, isCreating: creating, openDialog };
+  return { dialog, isCreating: creating, openDialog, createdProjectId };
 }

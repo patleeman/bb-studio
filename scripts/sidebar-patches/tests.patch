@@ -40,7 +40,24 @@
 +import { makeSidebarThread } from "../testing/fixtures.js";
 --- a/source/app/list/SidebarHeaderControls.test.tsx
 +++ b/source/app/list/SidebarHeaderControls.test.tsx
-@@ -174 +174 @@
+@@ -23,0 +24 @@
++  sidebarHideEmptyProjectsAtom,
+@@ -50,0 +52 @@
++  store.set(sidebarHideEmptyProjectsAtom, false);
+@@ -92,0 +95,12 @@
++  it("toggles Hide empty projects in Filter", async () => {
++    const { store } = setup();
++    await openMenu();
++    await openSubmenu("Filter");
++    const toggle = await screen.findByRole("menuitemcheckbox", {
++      name: "Hide empty projects",
++    });
++    expect(toggle.getAttribute("aria-checked")).toBe("false");
++    fireEvent.click(toggle);
++    expect(store.get(sidebarHideEmptyProjectsAtom)).toBe(true);
++    expect(toggle.getAttribute("aria-checked")).toBe("true");
++  });
+@@ -174 +188 @@
 -    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 +    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
 --- a/source/app/list/sortComparator.test.ts
@@ -135,3 +152,12 @@
 +    expect(screen.getByRole("textbox", { name: "Folder path" })).not.toBeNull();
 +  });
 +
+--- a/source/server.test.ts
++++ b/source/server.test.ts
+@@ -4 +4 @@
+-import { defaultPreferences } from "./shared/preferences.js";
++import { defaultPreferences, parsePreferenceValue } from "./shared/preferences.js";
+@@ -34,0 +35,3 @@
++    expect(defaultPreferences().hideEmptyProjects).toBe(false);
++    expect(parsePreferenceValue("hideEmptyProjects", true)).toEqual({ success: true, value: true });
++    expect(parsePreferenceValue("hideEmptyProjects", "true").success).toBe(false);

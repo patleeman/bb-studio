@@ -21,6 +21,7 @@ import {
   sidebarEnvironmentGroupingAtom,
   sidebarSortDirectionAtom,
   sidebarShowProviderIconsAtom,
+  sidebarHideEmptyProjectsAtom,
 } from "../preferences/atoms.js";
 import type { OrganizationMode } from "../../shared/preferences.js";
 
@@ -48,6 +49,7 @@ function setup(
   store.set(sidebarSortDirectionAtom, "default");
   store.set(sidebarEnvironmentGroupingAtom, "auto");
   store.set(sidebarShowProviderIconsAtom, false);
+  store.set(sidebarHideEmptyProjectsAtom, false);
   const newThread = vi.fn();
   const newSection = vi.fn();
   render(
@@ -90,6 +92,18 @@ async function openSubmenu(label: string) {
 }
 
 describe("sidebar header controls", () => {
+  it("toggles Hide empty projects in Filter", async () => {
+    const { store } = setup();
+    await openMenu();
+    await openSubmenu("Filter");
+    const toggle = await screen.findByRole("menuitemcheckbox", {
+      name: "Hide empty projects",
+    });
+    expect(toggle.getAttribute("aria-checked")).toBe("false");
+    fireEvent.click(toggle);
+    expect(store.get(sidebarHideEmptyProjectsAtom)).toBe(true);
+    expect(toggle.getAttribute("aria-checked")).toBe("true");
+  });
   it("supports keyboard selection when the menu first loads", async () => {
     const { store } = setup("Pinned", false, "chronological");
     await openMenu();

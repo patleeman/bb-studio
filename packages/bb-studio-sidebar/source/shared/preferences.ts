@@ -75,6 +75,12 @@ export const preferenceDefinitions = {
     "Show each thread's agent provider icon before its title.",
     null,
   ),
+  hideEmptyProjects: definePreference(
+    z.boolean(),
+    false,
+    "Hide projects with no visible threads from the sidebar.",
+    null,
+  ),
   threadLifecycles: definePreference(
     z
       .array(z.enum(["active", "archived"]))

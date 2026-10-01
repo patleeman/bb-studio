@@ -12,14 +12,89 @@
 +      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
-@@ -45,0 +46 @@
+@@ -45,0 +46,2 @@
 +import { useProjectCreation } from "../studio/useProjectCreation.js";
-@@ -1347,0 +1349 @@
++import { visibleProjects } from "../studio/visibleProjects.js";
+@@ -99,0 +102 @@
++  sidebarHideEmptyProjectsAtom,
+@@ -522,0 +526 @@
++  createdProjectId: string | null;
+@@ -548,0 +553 @@
++  createdProjectId,
+@@ -558,0 +564,3 @@
++  const hideEmptyProjects = useAtomValue(sidebarHideEmptyProjectsAtom);
++  const rename = useSidebarRenameState();
++  const [dragging, setDragging] = useState(false);
+@@ -593,2 +601,10 @@
+-      projects
+-        .filter((project) => !project.isPersonal)
++      visibleProjects({
++        projects,
++        threadsByProject,
++        hideEmptyProjects,
++        selectedThreadId,
++        renamingProjectId: rename?.kind === "project" ? rename.id : undefined,
++        createdProjectId,
++        dragging,
++        ready: status === "ready",
++      })
+@@ -603 +619,10 @@
+-    [projects, status, threadsByProject],
++    [
++      projects,
++      status,
++      threadsByProject,
++      hideEmptyProjects,
++      selectedThreadId,
++      rename,
++      createdProjectId,
++      dragging,
++    ],
+@@ -696,0 +722,30 @@
++  const projectThreadDnd = threadDnd && {
++    ...threadDnd,
++    dndContextProps: {
++      ...threadDnd.dndContextProps,
++      onDragStart: (
++        event: Parameters<
++          NonNullable<typeof threadDnd.dndContextProps.onDragStart>
++        >[0],
++      ) => {
++        setDragging(true);
++        threadDnd.dndContextProps.onDragStart?.(event);
++      },
++      onDragEnd: (
++        event: Parameters<
++          NonNullable<typeof threadDnd.dndContextProps.onDragEnd>
++        >[0],
++      ) => {
++        threadDnd.dndContextProps.onDragEnd?.(event);
++        setDragging(false);
++      },
++      onDragCancel: (
++        event: Parameters<
++          NonNullable<typeof threadDnd.dndContextProps.onDragCancel>
++        >[0],
++      ) => {
++        threadDnd.dndContextProps.onDragCancel?.(event);
++        setDragging(false);
++      },
++    },
++  };
+@@ -794 +849,4 @@
+-      <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
++      <ReorderableSidebarSectionOrderList
++        order={order}
++        threadDnd={projectThreadDnd}
++      >
+@@ -1347,0 +1406 @@
 +  const projectCreation = useProjectCreation(onProjectSelect);
-@@ -1733,0 +1736,2 @@
+@@ -1733,0 +1793,2 @@
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
-@@ -1860,0 +1865 @@
+@@ -1804,0 +1866 @@
++              createdProjectId={projectCreation.createdProjectId}
+@@ -1860,0 +1923 @@
 +      {projectCreation.dialog}
 --- a/source/app/list/SidebarHeaderControls.tsx
 +++ b/source/app/list/SidebarHeaderControls.tsx
@@ -28,12 +103,22 @@
 +  isCreatingProject?: boolean;
 --- a/source/app/list/SidebarViewItems.tsx
 +++ b/source/app/list/SidebarViewItems.tsx
-@@ -0,0 +1 @@
+@@ -0,0 +1,2 @@
 +import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
-@@ -74,0 +76 @@
++import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
+@@ -74,0 +77 @@
 +      <StudioNewProjectItem onSelect={creation.onNewProject} disabled={creation.isCreatingProject} />
-@@ -81,0 +84 @@
+@@ -81,0 +85 @@
 +      <HiddenStudioSectionItems />
+@@ -147 +151,2 @@
+-      <DropdownMenuGroup aria-label="Filter">
++      <>
++        <DropdownMenuGroup aria-label="Filter">
+@@ -174 +179,3 @@
+-      </DropdownMenuGroup>
++        </DropdownMenuGroup>
++        <HideEmptyProjectsMenuItems />
++      </>
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
 @@ -51,0 +52 @@
@@ -46,3 +131,17 @@
 +            <StudioChatFloatItem threadId={thread.id} surface={surface} />
 +          ) : null}
 +          {id === "split" && (onOpenInSplit || studioChat) ? separator : null}
+--- a/source/shared/preferences.ts
++++ b/source/shared/preferences.ts
+@@ -75,0 +76,6 @@
++    null,
++  ),
++  hideEmptyProjects: definePreference(
++    z.boolean(),
++    false,
++    "Hide projects with no visible threads from the sidebar.",
+--- a/source/app/preferences/atoms.ts
++++ b/source/app/preferences/atoms.ts
+@@ -46,0 +47,2 @@
++export const sidebarHideEmptyProjectsAtom =
++  createSyncedPreferenceAtom("hideEmptyProjects");

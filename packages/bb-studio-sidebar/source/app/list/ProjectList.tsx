@@ -44,6 +44,7 @@ import {
 import { cn } from "@/lib/utils";
 import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 import { useProjectCreation } from "../studio/useProjectCreation.js";
+import { visibleProjects } from "../studio/visibleProjects.js";
 import {
   ConfirmDeleteDialog,
   ConfirmDeleteDialogContent,
@@ -98,6 +99,7 @@ import {
   sidebarSortDirectionAtom,
   sidebarCollapsedMachinesAtom,
   sidebarManualSectionOrderAtom,
+  sidebarHideEmptyProjectsAtom,
   sidebarOrganizationModeAtom,
 } from "../preferences/atoms.js";
 import type {
@@ -521,6 +523,7 @@ interface ProjectModeSectionsProps
   onToggleThreadCollapsed: ToggleCollapsedId;
   personalProjectId: string | null;
   pinnedSection: BuiltInSidebarSectionOptions;
+  createdProjectId: string | null;
   projects: readonly SidebarProject[];
   selectedThreadId?: string;
   status: ThreadListStatus;
@@ -547,6 +550,7 @@ function ProjectModeSections({
   pinnedThreads,
   onReorderPinnedThread,
   personalProjectId,
+  createdProjectId,
   projects,
   selectedThreadId,
   showPinnedSection,
@@ -557,6 +561,9 @@ function ProjectModeSections({
   const groupThreadsByEnvironment = useAtomValue(
     sidebarGroupThreadsByEnvironmentAtom,
   );
+  const hideEmptyProjects = useAtomValue(sidebarHideEmptyProjectsAtom);
+  const rename = useSidebarRenameState();
+  const [dragging, setDragging] = useState(false);
   const [collapsedProjectIdList, setCollapsedProjectIdList] = useAtom(
     collapsedProjectIdsAtom,
   );
@@ -591,8 +598,16 @@ function ProjectModeSections({
   }, [effectivePinnedThreadIds, threads]);
   const projectRows = useMemo<ProjectListRowModel[]>(
     () =>
-      projects
-        .filter((project) => !project.isPersonal)
+      visibleProjects({
+        projects,
+        threadsByProject,
+        hideEmptyProjects,
+        selectedThreadId,
+        renamingProjectId: rename?.kind === "project" ? rename.id : undefined,
+        createdProjectId,
+        dragging,
+        ready: status === "ready",
+      })
         .map((project) => ({
           project,
           threadListState: getProjectThreadListState({
@@ -601,7 +616,16 @@ function ProjectModeSections({
           }),
           isActive: false,
         })),
-    [projects, status, threadsByProject],
+    [
+      projects,
+      status,
+      threadsByProject,
+      hideEmptyProjects,
+      selectedThreadId,
+      rename,
+      createdProjectId,
+      dragging,
+    ],
   );
   const projectSectionIds = useMemo(
     () =>
@@ -695,6 +719,36 @@ function ProjectModeSections({
     rootItems: groupRootItems,
     threads: nonPinnedThreads,
   });
+  const projectThreadDnd = threadDnd && {
+    ...threadDnd,
+    dndContextProps: {
+      ...threadDnd.dndContextProps,
+      onDragStart: (
+        event: Parameters<
+          NonNullable<typeof threadDnd.dndContextProps.onDragStart>
+        >[0],
+      ) => {
+        setDragging(true);
+        threadDnd.dndContextProps.onDragStart?.(event);
+      },
+      onDragEnd: (
+        event: Parameters<
+          NonNullable<typeof threadDnd.dndContextProps.onDragEnd>
+        >[0],
+      ) => {
+        threadDnd.dndContextProps.onDragEnd?.(event);
+        setDragging(false);
+      },
+      onDragCancel: (
+        event: Parameters<
+          NonNullable<typeof threadDnd.dndContextProps.onDragCancel>
+        >[0],
+      ) => {
+        threadDnd.dndContextProps.onDragCancel?.(event);
+        setDragging(false);
+      },
+    },
+  };
   const builtInSections: BuiltInSidebarSectionOptionsById = {
     pinned: pinnedSection,
     threads: {
@@ -792,7 +846,10 @@ function ProjectModeSections({
       label="Projects"
       selectedThreadId={selectedThreadId}
     >
-      <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
+      <ReorderableSidebarSectionOrderList
+        order={order}
+        threadDnd={projectThreadDnd}
+      >
         {(sectionId, consumeClickSuppression) => {
           const builtInSection = renderBuiltInSidebarSection({
             sectionId,
@@ -1806,6 +1863,7 @@ function ProjectListComponent({
             <ProjectModeSections
               personalProjectId={personalProjectId}
               projects={projects}
+              createdProjectId={projectCreation.createdProjectId}
               threads={threads}
               draftThreadIds={draftThreadIds}
               effectivePinnedThreadIds={
