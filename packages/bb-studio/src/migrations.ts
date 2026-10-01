@@ -1,5 +1,5 @@
-// Studio's own tables: tags (src/tags.ts), spaces (src/spaces.ts) and sidebar
-// tabs (src/tabs.ts).
+// Studio's own tables: tags (src/tags.ts), spaces (src/spaces.ts), saved
+// views (src/views.ts) and sidebar tabs (src/tabs.ts).
 
 /**
  * Append-only: statement index is the migration id, and BB checks each
@@ -86,4 +86,13 @@ export const MIGRATIONS = [
        description TEXT NOT NULL DEFAULT '',
        default_project_id TEXT
      );`,
+  // Saved collection queries (src/views.ts).
+  `CREATE TABLE views (
+       id TEXT PRIMARY KEY,
+       name TEXT NOT NULL,
+       query TEXT NOT NULL,
+       position INTEGER NOT NULL,
+       created_at INTEGER NOT NULL
+     );
+   CREATE UNIQUE INDEX views_name ON views (name COLLATE NOCASE);`,
 ];

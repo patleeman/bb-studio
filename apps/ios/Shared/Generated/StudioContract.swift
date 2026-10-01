@@ -31,6 +31,8 @@ public enum Studio {
     public static let spaceMembers = "spaceMembers"
     public static let spaceThreads = "spaceThreads"
     public static let recentThreads = "recentThreads"
+    public static let saveView = "saveView"
+    public static let deleteView = "deleteView"
     public static let studio_changed = "studio_changed"
     public static let sidebar = "sidebar"
     public static let tabs = "tabs"
@@ -117,6 +119,10 @@ public enum Studio {
   public typealias RecentThreadsInput = StudioJSONValue
 
   public typealias RecentThreads = RecentThreadsOutput
+
+  public typealias SaveView = SaveViewOutput
+
+  public typealias DeleteView = DeleteViewOutput
 
   public typealias StudioChanged = StudioChangedOutput
 
@@ -901,17 +907,31 @@ public enum Studio {
     }
   }
 
+  public struct OverviewOutputViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var query: String?
+
+    public init(id: String? = nil, name: String? = nil, query: String? = nil) {
+      self.id = id
+      self.name = name
+      self.query = query
+    }
+  }
+
   public struct OverviewOutput: Sendable, Hashable, Codable {
     public var providers: [OverviewOutputProvidersItem]?
     public var items: [OverviewOutputItemsItem]?
     public var tags: [OverviewOutputTagsItem]?
     public var spaces: [OverviewOutputSpacesItem]?
+    public var views: [OverviewOutputViewsItem]?
 
-    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil, spaces: [OverviewOutputSpacesItem]? = nil) {
+    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil, spaces: [OverviewOutputSpacesItem]? = nil, views: [OverviewOutputViewsItem]? = nil) {
       self.providers = providers
       self.items = items
       self.tags = tags
       self.spaces = spaces
+      self.views = views
     }
   }
 
@@ -2388,6 +2408,52 @@ public enum Studio {
 
     public init(threads: [RecentThreadsOutputThreadsItem]? = nil) {
       self.threads = threads
+    }
+  }
+
+  public struct SaveViewInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var query: String?
+
+    public init(name: String? = nil, query: String? = nil) {
+      self.name = name
+      self.query = query
+    }
+  }
+
+  public struct SaveViewOutputView: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var query: String?
+
+    public init(id: String? = nil, name: String? = nil, query: String? = nil) {
+      self.id = id
+      self.name = name
+      self.query = query
+    }
+  }
+
+  public struct SaveViewOutput: Sendable, Hashable, Codable {
+    public var view: SaveViewOutputView?
+
+    public init(view: SaveViewOutputView? = nil) {
+      self.view = view
+    }
+  }
+
+  public struct DeleteViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DeleteViewOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
     }
   }
 

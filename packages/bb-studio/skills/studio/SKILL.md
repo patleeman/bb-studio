@@ -24,14 +24,18 @@ Items belong to a BB project or are global. Every item has a link
 
 - Agent tool `studio_list_items`: newest first, each with its kind and link.
   In a thread that belongs to a space it lists that space's items (the first
-  line names the space); otherwise this project's and global items. Pass `query` to match titles and
-  content, `kind` (`page`, `recording`, `dictation`, `drawing`, `artifact`, `task`) to narrow, and
-  `allProjects: true` to look everywhere, `space` to list one space's items,
-  and `tag` to list one tag's items.
-  Archived items are left out. Each line shows the item's `#tags`; an item
-  that matched `query` on its content has the matching text on a `>` line
-  below it (`snippet` in `--json`).
-- CLI: `bb studio list [--all] [--space <name>] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]`;
+  line names the space); otherwise this project's and global items.
+  `allProjects: true` looks everywhere. `query` takes filters and words:
+  `kind:page project:"Q4 launch" tag:draft -tag:done space:Launch notes`.
+  Fields are `kind:`, `project:` (a name, or `global`), `tag:` (a name, or
+  `none`), `space:` and `is:archived` / `is:template`; `-` excludes, a repeated
+  field matches any of its values, and the remaining words match titles and
+  content. A `space:` or `project:` filter replaces the default scope.
+  Archived items show only with `is:archived`. Each line shows the item's
+  `#tags`; an item that matched on its content has the matching text on a `>`
+  line below it (`snippet` in `--json`).
+- CLI: `bb studio list [query…] [--all] [--json]`, with the same query, e.g.
+  `bb studio list kind:task -tag:done`;
   `bb studio tags` lists the tags and how many items each has, and
   `bb studio spaces` lists the spaces.
 - `bb studio providers` shows which add-ons are installed and whether each is

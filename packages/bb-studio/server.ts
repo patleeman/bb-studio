@@ -10,6 +10,8 @@ import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
 // - Studio keeps spaces, protected tags that gather items, BB projects and
 //   threads into one place (src/spaces.ts).
+// - Studio keeps saved views, named collection queries (src/views.ts). The
+//   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
@@ -23,6 +25,8 @@ import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
+import { compileQuery, parseQuery, type Filter, type Query } from "./src/query";
+import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
 import { externalResults } from "./src/search-external";
 import { StudioServices } from "./src/services";
@@ -38,6 +42,13 @@ const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
 const MAX_LISTED = 100;
 
+/** A CLI argument as query text: the shell took the quotes off `project:"Q4 launch"`. */
+function queryArg(arg: string): string {
+  if (!/\s/.test(arg) || arg.includes('"')) return arg;
+  const filter = /^(-?[a-z]+:)(.*)$/i.exec(arg);
+  return filter ? `${filter[1]}"${filter[2]}"` : `"${arg}"`;
+}
+
 export default async function plugin(bb: BbPluginApi) {
   const hub = new StudioHub(bb.sdk);
   const changes = new ChangeLog();
@@ -46,6 +57,7 @@ export default async function plugin(bb: BbPluginApi) {
   const tags = new TagStore(db);
   const spaces = new SpaceStore(db);
   const tabs = new TabStore(db);
+  const views = new ViewStore(db);
   const searchIndex = new SearchIndex(db, hub);
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();
@@ -156,6 +168,7 @@ export default async function plugin(bb: BbPluginApi) {
       items: result.items.map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${item.pluginId}:${item.id}`) ?? [] })),
       tags: tags.list(),
       spaces: allSpaces,
+      views: views.list(),
     };
   };
 
@@ -334,6 +347,16 @@ export default async function plugin(bb: BbPluginApi) {
       if (!space) throw new Error("That space no longer exists.");
       return { threads: await spaceThreads(space) };
     },
+    saveView: ({ name, query }) => {
+      const view = views.save(name, query);
+      tagsChanged();
+      return { view };
+    },
+    deleteView: ({ id }) => {
+      views.remove(id);
+      tagsChanged();
+      return { ok: true };
+    },
     recentThreads: async () => ({ threads: (await bb.sdk.threads.list({ archived: false, limit: 100 })).map((thread) => threadView(thread, false)) }),
     studio_changed: async ({ pluginId, ids, removed }) => {
       await searchIndex.changed(pluginId, ids, removed).catch(() => {});
@@ -475,44 +498,67 @@ export default async function plugin(bb: BbPluginApi) {
     return space;
   };
 
+  /** The values a query can name, with every field's names for an error. */
+  const vocabulary = async (data: Awaited<ReturnType<typeof overview>>) => ({
+    kinds: data.providers.flatMap((provider) => provider.kinds),
+    projects: (await bb.sdk.projects.list().catch(() => [])).map((project) => ({ id: project.id, name: project.name })),
+    tags: data.tags,
+    spaces: data.spaces,
+  });
+  const unknownFilter = (filter: Filter, names: Awaited<ReturnType<typeof vocabulary>>) => {
+    const known = {
+      kind: names.kinds.map((kind) => kind.id),
+      project: ["global", ...names.projects.map((project) => project.name)],
+      tag: ["none", ...names.tags.map((tag) => tag.name)],
+      space: names.spaces.map((space) => space.name),
+      is: ["archived", "template"],
+    }[filter.field];
+    const hint = filter.field === "space" ? " Only the user makes spaces." : "";
+    return new Error(`No ${filter.field} called "${filter.value}". Try: ${known.join(", ") || "none yet"}.${hint}`);
+  };
+
   /**
-   * Without `all`, a named space, or the spaces the thread is in, scope the
-   * list; outside any space it's the project's items and global ones.
+   * Lists items matching a query (src/query.ts). Without `all` or a space or
+   * project filter, the spaces the thread is in scope the list; outside any
+   * space it's the project's items and global ones.
    */
-  const listItems = async (options: { projectId: string | null; threadId?: string; all: boolean; kind?: string; query?: string; tag?: string; space?: string }) => {
-    const { providers, items, tags: allTags } = await overview();
-    const tag = options.tag ? tags.byName(options.tag) : null;
-    if (options.tag && !tag) throw new Error(`No tag called "${options.tag}". Tags: ${allTags.map((each) => each.name).join(", ") || "none yet"}.`);
-    const scope = options.space ? [requireSpace(options.space)] : options.all || !options.threadId ? [] : threadSpaces(options.threadId, options.projectId);
+  const listItems = async (options: { projectId: string | null; threadId?: string; all: boolean; query?: string; kind?: string; tag?: string; space?: string }) => {
+    const data = await overview();
+    const names = await vocabulary(data);
+    const parsed: Query = parseQuery(options.query ?? "");
+    for (const [field, value] of [["kind", options.kind], ["tag", options.tag], ["space", options.space]] as const) {
+      if (value) parsed.filters.push({ field, value });
+    }
+    const compiled = compileQuery(parsed, names);
+    if (compiled.unknown.length) throw unknownFilter(compiled.unknown[0]!, names);
+    const named = parsed.filters.filter((filter) => !filter.negate && (filter.field === "space" || filter.field === "project"));
+    const scope = named.length || options.all || !options.threadId ? [] : threadSpaces(options.threadId, options.projectId);
     const inScope = (item: HubItem) =>
-      scope.length ? scope.some((space) => inSpace(space, item)) : options.all || item.projectId === null || item.projectId === options.projectId;
-    const labels = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
-    const raw = options.query?.trim();
-    const query = raw?.toLowerCase();
-    const content = raw ? await contentSearch(raw) : null;
+      named.length || options.all ? true : scope.length ? scope.some((space) => inSpace(space, item)) : item.projectId === null || item.projectId === options.projectId;
+    const labels = new Map(data.providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
+    const text = compiled.text.toLowerCase();
+    const content = compiled.text ? await contentSearch(compiled.text) : null;
     const contentKeys = new Set(content?.keys);
-    const picked: ListedItem[] = items
+    const picked: ListedItem[] = data.items
       .filter(
         (item) =>
-          !item.archived &&
           inScope(item) &&
-          (!options.kind || item.kind === options.kind) &&
-          (!tag || item.tags.includes(tag.id)) &&
-          (!query || untitled(item.title).toLowerCase().includes(query) || contentKeys.has(`${item.pluginId}:${item.id}`)),
+          compiled.test(item) &&
+          (!text || untitled(item.title).toLowerCase().includes(text) || contentKeys.has(`${item.pluginId}:${item.id}`)),
       )
       .sort((a, b) => b.updatedAt - a.updatedAt)
       .map((item) => {
         const snippet = content?.snippets[`${item.pluginId}:${item.id}`];
         return snippet ? { ...item, snippet } : item;
       });
-    const problems = providers.filter((provider) => provider.state !== "ready").map((provider) => `${provider.name}: ${provider.detail}`);
-    const tagNames = new Map(allTags.map((each) => [each.id, each.name]));
-    return { picked, labels, problems, tagNames, scope, kinds: providers.flatMap((provider) => provider.kinds.map((kind) => kind.id)) };
+    const problems = data.providers.filter((provider) => provider.state !== "ready").map((provider) => `${provider.name}: ${provider.detail}`);
+    const tagNames = new Map(data.tags.map((each) => [each.id, each.name]));
+    return { picked, labels, problems, tagNames, scope };
   };
 
   const formatList = ({ picked, labels, problems, tagNames, scope }: Awaited<ReturnType<typeof listItems>>, allHint = "Pass allProjects") => {
     const lines = picked.slice(0, MAX_LISTED).map((item) => itemLine(item, labels.get(`${item.pluginId}:${item.kind}`) ?? item.kind, tagNames));
-    if (picked.length > MAX_LISTED) lines.push(`…and ${picked.length - MAX_LISTED} more. Narrow with a query or kind.`);
+    if (picked.length > MAX_LISTED) lines.push(`…and ${picked.length - MAX_LISTED} more. Narrow the query.`);
     if (!lines.length) lines.push("No Studio items match.");
     if (scope.length) lines.unshift(`In ${scope.length === 1 ? "space" : "spaces"} ${scope.map((space) => space.name).join(", ")}. ${allHint} for everything.`, "");
     if (problems.length) lines.push("", "Unavailable:", ...problems.map((problem) => `- ${problem}`));
@@ -522,13 +568,17 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_list_items",
     description:
-      "List the user's BB Studio items — pages, Talk recordings, drawings and anything else a Studio add-on provides — newest first. In a thread that belongs to a Studio space it lists that space's items; otherwise this project's and global ones. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
+      "List the user's BB Studio items — pages, Talk recordings, drawings and anything else a Studio add-on provides — newest first. In a thread that belongs to a Studio space it lists that space's items; otherwise this project's and global ones. A space: or project: filter, or allProjects, lists beyond that. Each line has a link and the item's #tags, and a content match shows the text that matched; open or mention it to work with the item.",
     parameters: z.object({
-      query: z.string().max(200).optional().describe("Match titles and content"),
-      kind: z.string().max(100).optional().describe("Only this kind, e.g. page, recording, drawing"),
+      query: z
+        .string()
+        .max(500)
+        .optional()
+        .describe('Words match titles and content. Filters: kind:<kind> project:<name|global> tag:<name|none> space:<name> is:archived is:template; quote names with spaces, repeat a field for any of its values, prefix - to exclude. E.g. kind:page -tag:draft project:"Q4 launch" pricing'),
+      kind: z.string().max(100).optional().describe("Only this kind, e.g. page, recording, drawing; same as kind: in the query"),
       allProjects: z.boolean().optional().describe("Include every project, not just this one"),
-      tag: z.string().max(100).optional().describe("Only items with this tag"),
-      space: z.string().max(100).optional().describe("Only items in this space, by name"),
+      tag: z.string().max(100).optional().describe("Only items with this tag; same as tag: in the query"),
+      space: z.string().max(100).optional().describe("Only items in this space, by name; same as space: in the query"),
     }),
     async execute({ query, kind, allProjects, tag, space }, ctx) {
       return formatList(await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId, all: allProjects === true, kind, query, tag, space }));
@@ -629,7 +679,7 @@ export default async function plugin(bb: BbPluginApi) {
     name: "studio",
     summary: "List BB Studio items across Pages, Talk, Draw and other add-ons",
     commands: [
-      { name: "list", summary: "List items in the current space, or the current project and global ones", usage: "bb studio list [--all] [--space <name>] [--kind <kind>] [--tag <tag>] [--query <text>] [--json]" },
+      { name: "list", summary: "List items in the current space, or the current project and global ones", usage: "bb studio list [query…] [--all] [--json], e.g. bb studio list kind:page -tag:draft pricing" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
       { name: "spaces", summary: "List spaces, their projects and how many items each has", usage: "bb studio spaces" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
@@ -643,15 +693,9 @@ export default async function plugin(bb: BbPluginApi) {
         switch (command) {
           case "list": {
             const json = flag("--json");
-            const result = await listItems({
-              projectId: ctx.projectId ?? null,
-              threadId: ctx.threadId ?? undefined,
-              all: flag("--all"),
-              space: option("--space"),
-              kind: option("--kind"),
-              query: option("--query"),
-              tag: option("--tag"),
-            });
+            const options = { all: flag("--all"), space: option("--space"), kind: option("--kind"), tag: option("--tag"), query: option("--query") };
+            const query = [options.query, ...rest.map(queryArg)].filter(Boolean).join(" ");
+            const result = await listItems({ projectId: ctx.projectId ?? null, threadId: ctx.threadId ?? undefined, ...options, query });
             if (json) return { exitCode: 0, stdout: `${JSON.stringify(result.picked.slice(0, MAX_LISTED), null, 2)}\n` };
             return { exitCode: 0, stdout: `${formatList(result, "Pass --all")}\n` };
           }

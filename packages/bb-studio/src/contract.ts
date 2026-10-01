@@ -74,6 +74,8 @@ const spaceThread = z.object({
   direct: z.boolean(),
 });
 export type SpaceThreadView = z.infer<typeof spaceThread>;
+const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
+export type SavedViewView = z.infer<typeof savedView>;
 const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), spaces: z.array(z.string()) });
 
 export { TABS_CHANNEL } from "./ids";
@@ -112,6 +114,7 @@ export const rpcContract = defineRpcContract({
       items: z.array(listedItem),
       tags: z.array(tag),
       spaces: z.array(space),
+      views: z.array(savedView),
     }),
   },
   items: { input: z.object({ pluginId, ids }), output: z.object({ items: z.array(listedItem) }) },
@@ -167,6 +170,9 @@ export const rpcContract = defineRpcContract({
   spaceThreads: { input: z.object({ id: spaceId }), output: z.object({ threads: z.array(spaceThread) }) },
   /** Open threads to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
+  /** Saves a collection query by name, replacing a view with that name. */
+  saveView: { input: z.object({ name: z.string().min(1).max(60), query: z.string().max(500) }), output: z.object({ view: savedView }) },
+  deleteView: { input: z.object({ id: z.string().min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
