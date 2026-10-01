@@ -240,30 +240,33 @@ struct CaptureSheet: View {
 
     private func saveFiles() async {
         guard !files.isEmpty else { return }
+        savedArtifactId = nil
+        error = nil
         saving = true
         defer { saving = false }
         do {
             let projects = try await app.client.projects()
             let saved = AppGroup.defaults.string(forKey: "newThreadProjectId")
             let project = projects.first { $0.id == saved }?.id ?? projects.first?.id
-            struct Envelope: Decodable { var id: String }
             for file in files {
                 guard file.data.count <= 25 * 1024 * 1024 else {
                     throw BBError(status: 413, message: "\(file.name) is over 25 MB.")
                 }
-                let result: Envelope = try await app.client.rpc("artifacts", "importFile", [
+                let result: Artifacts.ImportFileOutput = try await app.client.rpc("artifacts", Artifacts.Method.importFile, [
                     "name": .string(file.name),
                     "mime": .string(file.mimeType),
                     "bytes": .string(file.data.base64EncodedString()),
                     "projectId": project.map { .string($0) } ?? .null,
                 ])
-                savedArtifactId = result.id
+                guard let id = result.id else { throw BBError(status: 500, message: "Unexpected artifact response.") }
+                savedArtifactId = id
+                files.removeAll { $0.id == file.id }
             }
-            files = []
             error = nil
             Task { await StudioStore.shared.load(app.client) }
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
+            if savedArtifactId != nil { Task { await StudioStore.shared.load(app.client) } }
         }
     }
 }

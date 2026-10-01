@@ -12,6 +12,7 @@ public enum Artifacts {
     public static let threadArtifacts = "threadArtifacts"
     public static let candidates = "candidates"
     public static let saveFiles = "saveFiles"
+    public static let importFile = "importFile"
     public static let saveAsPage = "saveAsPage"
   }
 
@@ -32,6 +33,8 @@ public enum Artifacts {
   public typealias Candidates = CandidatesOutput
 
   public typealias SaveFiles = SaveFilesOutput
+
+  public typealias ImportFile = ImportFileOutput
 
   public typealias SaveAsPage = SaveAsPageOutput
 
@@ -574,6 +577,28 @@ public enum Artifacts {
     public init(saved: [SaveFilesOutputSavedItem]? = nil, failed: [SaveFilesOutputFailedItem]? = nil) {
       self.saved = saved
       self.failed = failed
+    }
+  }
+
+  public struct ImportFileInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var mime: String?
+    public var bytes: String?
+    public var projectId: String?
+
+    public init(name: String? = nil, mime: String? = nil, bytes: String? = nil, projectId: String? = nil) {
+      self.name = name
+      self.mime = mime
+      self.bytes = bytes
+      self.projectId = projectId
+    }
+  }
+
+  public struct ImportFileOutput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
     }
   }
 

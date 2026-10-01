@@ -721,6 +721,60 @@
         "additionalProperties": false
       }
     },
+    "importFile": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 255
+          },
+          "mime": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "bytes": {
+            "type": "string",
+            "maxLength": 34952536
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "name",
+          "mime",
+          "bytes",
+          "projectId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ],
+        "additionalProperties": false
+      }
+    },
     "saveAsPage": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

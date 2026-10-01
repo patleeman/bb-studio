@@ -46,6 +46,8 @@ with the Preview/Source toggle, New thread, Copy, Download and the ⋯ menu.
   changed, or generated, with the new ones already ticked. The panel also lists
   the thread's storage files and what the thread has already saved. The same
   panel is in the thread panel launcher, where it shows the latest reply.
+- **Capture from iPhone.** The Capture sheet accepts a photo or file and saves
+  it directly as an artifact in the selected default project.
 - **Agents save too.** The `artifacts_save`, `artifacts_list` and
   `artifacts_read` tools, and the `artifacts` skill, cover when to save
   something. When the agent puts `::artifact{id="art_…"}` in a reply, it shows
@@ -65,6 +67,9 @@ with the Preview/Source toggle, New thread, Copy, Download and the ⋯ menu.
   and path. A save whose bytes haven't changed doesn't add a version.
 - Saving reads the file from the thread's workspace or thread storage on
   the thread's machine. Paths outside those two roots are refused.
+- Phone capture uses the additive `importFile` RPC. It accepts Base64 file bytes,
+  a name, MIME type and project ID, applies the same 25 MB limit, and creates
+  an artifact without a source thread.
 - The "this reply's files" list comes from the thread's event history:
   generated images and file changes between the reply's turn request and its
   end, with deleted files left out.
