@@ -28,8 +28,17 @@ function botCreateRequestView(request: BotCreateRequest) {
   };
 }
 
-export function rosterHandlers(bb: BbPluginApi, store: Store, channelThreads: ChannelThreads, approvals: ChannelApprovals): Pick<PluginRpcHandlers<typeof rpcContract>, "list"> {
+export function rosterHandlers(bb: BbPluginApi, store: Store, channelThreads: ChannelThreads, approvals: ChannelApprovals): Pick<PluginRpcHandlers<typeof rpcContract>, "list" | "spaceConversations"> {
   return {
+    spaceConversations: () => ({
+      channels: store.rooms().flatMap((room) => {
+        const threadId = channelThreads.threadId(room.id);
+        return threadId ? [{ threadId, name: room.name, archived: !!room.archived }] : [];
+      }),
+      direct: store.all().flatMap((bot) => store.conversations(bot.id)
+        .filter((conversation) => conversation.kind === "admin")
+        .map((conversation) => ({ threadId: conversation.threadId, botName: bot.name }))),
+    }),
     list: async () => {
       const activity = store.botActivitySummary();
       const bots = store.all();

@@ -512,6 +512,14 @@ export const rpcContract = {
       botCreateRequests: z.array(botCreateRequestViewSchema),
     }),
   },
+  /** Channels and direct messages by BB thread, for Studio spaces. */
+  spaceConversations: {
+    input: z.null(),
+    output: z.object({
+      channels: z.array(z.object({ threadId: z.string(), name: z.string(), archived: z.boolean() })),
+      direct: z.array(z.object({ threadId: z.string(), botName: z.string() })),
+    }),
+  },
   create: {
     input: botCreateInput,
     output: botSchema,
