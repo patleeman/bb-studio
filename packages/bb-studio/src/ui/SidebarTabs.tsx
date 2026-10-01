@@ -157,7 +157,7 @@ export function SidebarTabs() {
         }
       >
         {error && !tabs ? <SidebarNote tone="danger">{error}</SidebarNote> : null}
-        {tabs && !tabs.length ? <SidebarNote>Pages, drawings and recordings you open show here.</SidebarNote> : null}
+        {tabs && !tabs.length ? <SidebarNote icon="GridView">No open items</SidebarNote> : null}
         {groups.map((group) => (
           <div key={group.label ?? "all"} className="flex flex-col gap-px">
             {group.label ? <SidebarGroupHeading>{group.label}</SidebarGroupHeading> : null}

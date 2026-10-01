@@ -219,9 +219,14 @@ function SectionPlacementItems({ sectionKey: key, title }: { sectionKey: string;
   );
 }
 
-/** A quiet line in a section: empty, loading, or a failure. */
-export function SidebarNote({ children, tone = "muted" }: { children: ReactNode; tone?: "muted" | "danger" }) {
-  return <p className={cn("m-0 px-2 py-1 text-xs", tone === "danger" ? "text-destructive" : "text-muted-foreground")}>{children}</p>;
+/** A quiet row in a section: empty, loading, or a failure. Shaped like BB's "No threads". */
+export function SidebarNote({ children, icon, tone = "muted" }: { children: ReactNode; icon?: string; tone?: "muted" | "danger" }) {
+  return (
+    <p className={`m-0 flex min-h-7 items-center gap-2 px-2 text-xs ${tone === "danger" ? "text-destructive" : "text-muted-foreground"}`}>
+      {icon ? <Icon name={icon} aria-hidden className="size-3.5 shrink-0" /> : null}
+      {children}
+    </p>
+  );
 }
 
 /** A group heading inside a section, e.g. "Needs you". */
