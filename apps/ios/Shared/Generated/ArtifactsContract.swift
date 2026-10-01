@@ -4,6 +4,7 @@ import Foundation
 public enum Artifacts {
   public enum Method {
     public static let get = "get"
+    public static let versionBytes = "versionBytes"
     public static let text = "text"
     public static let update = "update"
     public static let delete = "delete"
@@ -15,6 +16,8 @@ public enum Artifacts {
   }
 
   public typealias Get = GetOutput
+
+  public typealias VersionBytes = VersionBytesOutput
 
   public typealias Text = TextOutput
 
@@ -193,6 +196,26 @@ public enum Artifacts {
     public init(artifact: GetOutputArtifact? = nil, versions: [GetOutputVersionsItem]? = nil) {
       self.artifact = artifact
       self.versions = versions
+    }
+  }
+
+  public struct VersionBytesInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: String?
+
+    public init(id: String? = nil, versionId: String? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public struct VersionBytesOutput: Sendable, Hashable, Codable {
+    public var bytes: String?
+    public var sha256: String?
+
+    public init(bytes: String? = nil, sha256: String? = nil) {
+      self.bytes = bytes
+      self.sha256 = sha256
     }
   }
 

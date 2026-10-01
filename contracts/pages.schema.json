@@ -2075,6 +2075,41 @@
         "additionalProperties": false
       }
     },
+    "snapshotBytes": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$"
+          },
+          "snapshotId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "snapshotId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "bytes": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "bytes"
+        ],
+        "additionalProperties": false
+      }
+    },
     "snapshot": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

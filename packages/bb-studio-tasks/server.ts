@@ -19,6 +19,7 @@ import { firstLine, nextHandoff, type ThreadSignal } from "./src/server/handoff"
 import { handoffInput } from "./src/server/prompt";
 import { assigneeLabel, registerStudio } from "./src/server/studio";
 import { MIGRATIONS, TaskStore, type HandoffRow, type LinkRow, type TaskRow, type Writer } from "./src/server/store";
+import { studioServices } from "@bb-studio/kit/server";
 import {
   HANDOFF_LABELS,
   HANDOFF_STATES,
@@ -218,11 +219,35 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   const studio = studioSchemas(z);
+  const services = studioServices(bb.sdk);
+  const syncLinks = (id: string) => services.replaceLinks({ pluginId: PLUGIN_ID, id }, PLUGIN_ID,
+    store.links(id).filter((link) => link.target === "item" && link.plugin_id).map((link) => ({
+      from: { pluginId: PLUGIN_ID, id }, to: { pluginId: link.plugin_id!, id: link.item_id }, kind: "task-link" as const, source: PLUGIN_ID,
+    }))).catch(() => { /* The hub is optional. */ });
+  for (const task of store.list({ includeArchived: true })) {
+    void syncLinks(task.id);
+    for (const handoff of store.handoffs(task.id)) void services.linkThread({
+      threadId: handoff.thread_id, ref: { pluginId: PLUGIN_ID, id: task.id }, role: "handoff", state: handoff.state,
+      createdAt: handoff.created_at, updatedAt: handoff.updated_at, metadata: {},
+    }).catch(() => { /* The hub is optional. */ });
+  }
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: TASK_UPDATE_TYPE, taskId: id }) });
 
   /** Tells open boards, task views and Studio that a task changed. */
   function changed(id: string) {
     changeBus.changed(id);
+    void syncLinks(id);
+    const task = store.get(id);
+    if (task) {
+      void services.versionCreate({
+        ref: { pluginId: PLUGIN_ID, id }, bytes: Buffer.from(JSON.stringify(task)).toString("base64"),
+        label: task.title || "Task", actor: { kind: task.updated_by === "agent" ? "agent" : "user" },
+      }).catch(() => { /* The hub is optional. */ });
+      void services.recordActivity({
+        ref: { pluginId: PLUGIN_ID, id }, actor: { kind: task.updated_by === "agent" ? "agent" : "user" },
+        verb: "updated", at: task.updated_at, summary: task.title || "Untitled task",
+      }).catch(() => { /* The hub is optional. */ });
+    }
   }
 
   function mustGet(id: string): TaskRow {

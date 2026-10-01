@@ -88,6 +88,10 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: idSchema }),
     output: z.object({ artifact: artifactSchema.nullable(), versions: z.array(versionSchema) }),
   },
+  versionBytes: {
+    input: z.object({ id: idSchema, versionId: idSchema }),
+    output: z.object({ bytes: z.string().nullable(), sha256: z.string().nullable() }),
+  },
   /** A text version's contents, for the viewer and Copy. */
   text: {
     input: z.object({ id: idSchema, versionId: idSchema }),
@@ -303,6 +307,11 @@ export default async function plugin(bb: BbPluginApi) {
     get({ id }) {
       const artifact = store.get(id);
       return { artifact: artifact ? toDto(artifact) : null, versions: artifact ? store.versions(id).map(toVersionDto) : [] };
+    },
+    versionBytes({ id, versionId }) {
+      const version = store.version(id, versionId);
+      const bytes = version ? store.bytes(version.sha256) : null;
+      return { bytes: bytes?.toString("base64") ?? null, sha256: version?.sha256 ?? null };
     },
     text({ id, versionId }) {
       const version = store.version(id, versionId);

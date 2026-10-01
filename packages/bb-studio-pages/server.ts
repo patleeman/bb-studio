@@ -1,5 +1,5 @@
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -21,6 +21,7 @@ import type { Socket } from "./src/hub";
 import { errorText, pageUrl, PagesService, requestView, toView, truncate, validateCron } from "./src/service";
 import { MIGRATIONS, PageStore } from "./src/store";
 import { registerStudio } from "./src/studio";
+import { outgoingStudioLinks } from "./src/studio-links";
 import { agentConfiguration, registerTools } from "./src/tools";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
@@ -323,6 +324,10 @@ export default async function plugin(bb: BbPluginApi) {
     snapshots: ({ id }) => ({
       snapshots: store.snapshots(id).map((row) => ({ id: row.id, label: row.label, actor: row.actor, createdAt: row.created_at })),
     }),
+    snapshotBytes: ({ id, snapshotId }) => {
+      const snapshot = store.snapshotState(snapshotId);
+      return { bytes: snapshot?.page_id === id ? snapshot.state.toString("base64") : null };
+    },
     snapshot: ({ id, label }) => {
       requireMeta(id);
       const row = store.addSnapshot(id, Y.encodeStateAsUpdate(service.hub.open(id).doc), label?.trim() || "Saved version", HUMAN_USER_ID);
@@ -367,11 +372,31 @@ export default async function plugin(bb: BbPluginApi) {
   registerStudio(bb, service, studio);
   // Typing saves a page every few seconds; Studio only needs to hear about it now and then.
   const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
+  const services = studioServices(bb.sdk);
+  for (const page of store.list({ includeArchived: true })) {
+    for (const chat of store.chats(page.id, 1000)) void services.linkThread({
+      threadId: chat.thread_id, ref: { pluginId: PLUGIN_ID, id: page.id }, role: "chat", state: "idle",
+      createdAt: chat.created_at, updatedAt: chat.created_at, metadata: {},
+    }).catch(() => { /* Studio is optional. */ });
+  }
+  const syncLinks = (id: string) => {
+    const ref = { pluginId: PLUGIN_ID, id };
+    const markdown = store.meta(id) ? readMarkdown(service.hub.open(id).doc) : "";
+    void services.replaceLinks(ref, PLUGIN_ID, outgoingStudioLinks(id, markdown)).catch(() => { /* Studio is optional. */ });
+  };
   service.onPublish = (event) => {
     if (event.type === "deleted") explore.pagesDeleted(event.pageIds);
     // Explainer progress isn't a change to anything Studio lists.
-    if (event.type === "page") studioNotifier.changed(event.pageId);
-    else if (event.type === "deleted") for (const id of event.pageIds) studioNotifier.changed(id);
+    if (event.type === "page") {
+      studioNotifier.changed(event.pageId); syncLinks(event.pageId);
+      const meta = store.meta(event.pageId);
+      if (meta) void services.recordActivity({
+        ref: { pluginId: PLUGIN_ID, id: event.pageId },
+        actor: meta.updated_by.startsWith("bot:") ? { kind: "bot", id: meta.updated_by.slice(4) } : meta.updated_by.startsWith("agent:") ? { kind: "agent", id: meta.updated_by.slice(6) } : { kind: "user" },
+        verb: "updated", at: meta.updated_at, summary: meta.title || "Untitled page",
+      }).catch(() => { /* Studio is optional. */ });
+    }
+    else if (event.type === "deleted") for (const id of event.pageIds) { studioNotifier.changed(id); syncLinks(id); }
     else if (event.type !== "explainer") studioNotifier.changed();
   };
 

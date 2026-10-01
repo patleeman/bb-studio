@@ -1,5 +1,5 @@
 import { subcommand } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";
 // Studio Draw (plugin id `excalidraw`): create, edit, and attach Excalidraw
 // drawings.
@@ -120,6 +120,7 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new DrawingStore(db);
+  const services = studioServices(bb.sdk);
 
   const studio = studioSchemas(z);
   // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
@@ -128,6 +129,11 @@ export default async function plugin(bb: BbPluginApi) {
   /** Tells open editors, galleries, and Studio that a drawing changed. */
   function changed(id: string, updatedAt: number, by: Writer | "studio") {
     changeBus.changed(id, updatedAt, by);
+    const row = store.get(id);
+    if (row) void services.versionCreate({
+      ref: { pluginId: PLUGIN_ID, id }, bytes: Buffer.from(row.data).toString("base64"),
+      label: row.name || "Drawing", actor: { kind: by === "studio" ? "app" : by },
+    }).catch(() => { /* Studio is optional. */ });
   }
 
   function mustGet(id: string): DrawingRow {

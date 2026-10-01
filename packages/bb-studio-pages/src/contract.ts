@@ -249,6 +249,10 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ snapshots: z.array(snapshotSchema) }),
   },
+  snapshotBytes: {
+    input: z.object({ id: pageId, snapshotId: z.string() }),
+    output: z.object({ bytes: z.string().nullable() }),
+  },
   snapshot: {
     input: z.object({ id: pageId, label: z.string().max(120).optional() }),
     output: z.object({ snapshot: snapshotSchema }),

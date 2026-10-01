@@ -24,6 +24,7 @@ public enum Pages {
     public static let chats = "chats"
     public static let chatPage = "chatPage"
     public static let snapshots = "snapshots"
+    public static let snapshotBytes = "snapshotBytes"
     public static let snapshot = "snapshot"
     public static let restore = "restore"
     public static let comments = "comments"
@@ -84,6 +85,8 @@ public enum Pages {
   public typealias ChatPage = ChatPageOutput
 
   public typealias Snapshots = SnapshotsOutput
+
+  public typealias SnapshotBytes = SnapshotBytesOutput
 
   public typealias Snapshot = SnapshotOutput
 
@@ -1398,6 +1401,24 @@ public enum Pages {
 
     public init(snapshots: [SnapshotsOutputSnapshotsItem]? = nil) {
       self.snapshots = snapshots
+    }
+  }
+
+  public struct SnapshotBytesInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var snapshotId: String?
+
+    public init(id: String? = nil, snapshotId: String? = nil) {
+      self.id = id
+      self.snapshotId = snapshotId
+    }
+  }
+
+  public struct SnapshotBytesOutput: Sendable, Hashable, Codable {
+    public var bytes: String?
+
+    public init(bytes: String? = nil) {
+      self.bytes = bytes
     }
   }
 

@@ -1,6 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { ItemHeader, useStudioChatPresent } from "@bb-studio/kit/app";
+import { ItemHeader, RelatedPanel, useStudioChatPresent } from "@bb-studio/kit/app";
 import { STUDIO_CHAT_FLOAT_EVENT, STUDIO_CHAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -497,6 +497,7 @@ export function PageView({
         trailing={
           <>
           <ConnectionBadge status={status} />
+          <RelatedPanel ref={{ pluginId: "pages", id: page.id }} />
           <ActivityPill
             page={page}
             refreshBot={refreshBot}

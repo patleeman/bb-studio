@@ -1,4 +1,5 @@
 import { defineItemMention } from "@bb-studio/kit/server";
+import { studioServices } from "@bb-studio/kit/server";
 // bb-studio-chat server.
 //
 // - `viewing` asks Studio which item a path opens, so the chat knows what's
@@ -24,6 +25,7 @@ interface Link {
 }
 
 export default async function plugin(bb: BbPluginApi) {
+  const services = studioServices(bb.sdk);
   const itemAt = (input: { path: string } | ItemRef) =>
     bb.sdk.plugins.callRpc({
       pluginId: STUDIO_PLUGIN_ID,
@@ -34,7 +36,16 @@ export default async function plugin(bb: BbPluginApi) {
     });
 
   const linkKey = (ref: ItemRef) => `link:${itemKey(ref)}`;
-  const setLink = (ref: ItemRef, threadId: string) => bb.storage.kv.set(linkKey(ref), { threadId, at: Date.now() } satisfies Link);
+  for (const key of await bb.storage.kv.list("link:")) {
+    const ref = parseItemKey(key.slice("link:".length));
+    const link = ref ? await bb.storage.kv.get<Link>(key) : null;
+    if (ref && link) void services.linkThread({ threadId: link.threadId, ref, role: "chat", state: "idle", createdAt: link.at, updatedAt: link.at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+  }
+  const setLink = async (ref: ItemRef, threadId: string) => {
+    const at = Date.now();
+    await bb.storage.kv.set(linkKey(ref), { threadId, at } satisfies Link);
+    await services.linkThread({ threadId, ref, role: "chat", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+  };
 
   /** Pages records its own page chats; the newest one that still exists. */
   const lastPageChat = async (pageId: string): Promise<Link | null> => {
@@ -112,7 +123,9 @@ export default async function plugin(bb: BbPluginApi) {
       const pages = ref.pluginId === PAGES_PLUGIN_ID ? await lastPageChat(ref.id) : null;
       const newest = [own, pages].filter((link): link is Link => !!link).sort((a, b) => b.at - a.at)[0];
       if (!newest) return { threadId: null };
-      return { threadId: (await threadExists(newest.threadId)) ? newest.threadId : null };
+      if (!(await threadExists(newest.threadId))) return { threadId: null };
+      void services.linkThread({ threadId: newest.threadId, ref, role: "chat", state: "idle", createdAt: newest.at, updatedAt: newest.at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+      return { threadId: newest.threadId };
     },
     link: async ({ threadId, ...ref }) => {
       await setLink(ref, threadId);
