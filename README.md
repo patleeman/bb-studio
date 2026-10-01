@@ -115,6 +115,7 @@ pnpm check:compat        # every plugin installs on the current stable BB
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
 scripts/refresh-locks.sh bb-studio-tasks  # refresh a plugin npm lock in a clean clone
+node scripts/staged-bb.mjs start         # a staged BB for README screenshots; stop removes it
 ```
 
 The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)

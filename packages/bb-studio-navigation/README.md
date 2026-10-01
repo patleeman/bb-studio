@@ -30,17 +30,16 @@ and [LICENSE](LICENSE) for the upstream license.
 
 ## Staged preview
 
-![Studio Navigation with New thread, Search threads, and Studio, and More open](assets/staged-preview.png)
+![Studio Navigation with BB's rows, Teams, Forecast, and Studio, and More open](assets/staged-preview.png)
 
-Captured from the running BB sidebar with Studio Navigation as the navigation
-provider and Studio Sidebar as the thread list. Every Studio plugin with a
-sidebar row is installed and running. The rows show New thread, Search
-threads, and Studio; **More** holds Teams, BB's Plugins, Skills, and
-Automations, and Agent Plugins, a panel from a plugin outside BB Studio. The
-capture asserts that Studio Navigation draws the region, that New thread,
-Studio, Teams, Plugins, and Skills are present, and that none of Pages,
-Drawings, Artifacts, Recordings, Tasks, Tables, or New channel appear in the
-rows or in **More**.
+Captured from a staged BB 0.44.0 started by `scripts/staged-bb.mjs`, with
+every BB Studio plugin installed from this repository's Git source and a demo
+project, Orbit. Studio Navigation draws the rows and Studio Sidebar the thread
+list. The rows show BB's New thread, Plugins, Skills, and Automations, Studio
+Teams, Studio, and Forecast, a staged plugin outside BB Studio; **More** holds
+Search threads. The capture asserts that Studio Navigation draws the region,
+that those rows are present, and that none of Pages, Drawings, Artifacts,
+Recordings, Tasks, Tables, or New channel appear in the rows or in **More**.
 
 ## Development
 

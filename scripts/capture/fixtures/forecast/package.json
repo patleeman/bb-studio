@@ -1,0 +1,23 @@
+{
+  "name": "staged-forecast",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "A capture fixture: a plugin outside BB Studio with its own sidebar row.",
+  "engines": {
+    "bb": ">=0.44.0",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Forecast",
+    "description": "A staged plugin outside BB Studio with one sidebar row.",
+    "branding": {
+      "icon": "./assets/sun.svg",
+      "experimental_icons": {
+        "sun": "./assets/sun.svg"
+      }
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx"
+  }
+}

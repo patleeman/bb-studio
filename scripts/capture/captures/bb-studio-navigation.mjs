@@ -1,6 +1,8 @@
 // The Studio panels Studio Navigation leaves out, by the label bb gives their rows.
 const LEFT_OUT = ["Pages", "Drawings", "Artifacts", "Recordings", "Tasks", "Tables", "New channel"];
 const STUDIO_PLUGINS = ["studio", "pages", "excalidraw", "artifacts", "talk", "studio-tasks", "studio-tables", "bot-teams", "thread-list-plus", "studio-navigation"];
+// Staged by scripts/staged-bb.mjs: a plugin outside BB Studio whose row stays.
+const OUTSIDE_PLUGIN = "staged-forecast";
 
 export default ({ projectId, threadId, bbCli, sleep }) => [
   {
@@ -11,7 +13,7 @@ export default ({ projectId, threadId, bbCli, sleep }) => [
       // Every Studio plugin with a sidebar row is running, so the rows missing
       // below are ones Studio Navigation left out, not ones never registered.
       const plugins = await bbCli(["plugin", "list"]);
-      for (const id of STUDIO_PLUGINS) {
+      for (const id of [...STUDIO_PLUGINS, OUTSIDE_PLUGIN]) {
         if (!new RegExp(`^${id}@\\S+\\s+running`, "m").test(plugins)) throw new Error(`Install and enable ${id} before capturing`);
       }
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
@@ -25,14 +27,13 @@ export default ({ projectId, threadId, bbCli, sleep }) => [
         rows: Array.from(document.querySelectorAll('[data-sidebar-navigation-item]'), (el) => el.textContent.trim()),
         more: Array.from(document.querySelectorAll('[role="list"][aria-label="More navigation"] [data-sidebar-overflow-item]'), (el) => el.textContent.trim()),
       })`));
-      for (const label of ["New thread", "Studio"]) {
-        if (!shown.rows.some((row) => row.startsWith(label))) throw new Error(`The navigation is missing ${label}`);
-      }
-      for (const label of ["Teams", "Plugins", "Skills"]) {
-        if (!shown.more.some((row) => row.startsWith(label))) throw new Error(`More is missing ${label}`);
+      // Which rows sit in More depends on saved preferences, so look in both.
+      const listed = [...shown.rows, ...shown.more];
+      for (const label of ["New thread", "Studio", "Teams", "Plugins", "Skills", "Forecast"]) {
+        if (!listed.some((row) => row.startsWith(label))) throw new Error(`The navigation is missing ${label}`);
       }
       for (const label of LEFT_OUT) {
-        if ([...shown.rows, ...shown.more].some((row) => row === label)) throw new Error(`Studio Navigation still shows ${label}`);
+        if (listed.some((row) => row === label)) throw new Error(`Studio Navigation still shows ${label}`);
       }
       return async () => {
         await client.evaluate(`document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }))`);

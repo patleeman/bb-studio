@@ -60,6 +60,11 @@ BB application in a staged environment before handoff.
 
 - Start the normal BB application and use its full rendered UI. Seed the
   plugin's primary workflow with safe, deterministic local data.
+- Capture from a staged BB, not the one you work in, whose projects, threads,
+  and channels are private. `node scripts/staged-bb.mjs start` runs stable BB
+  on its own data directory and ports, installs every plugin from GitHub at a
+  pushed commit, seeds a demo project, and writes a `capture.env` to source
+  before capturing. `node scripts/staged-bb.mjs stop` removes it.
 - Add the plugin to the capture definitions in
   `scripts/capture/captures/<plugin>.mjs`, including an assertion for the
   live surface and the data that must be visible. Run it with a seeded thread:
