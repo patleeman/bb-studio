@@ -155,6 +155,10 @@ struct NewTaskIntent: AppIntent {
 
 struct BBShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
+        AppShortcut(intent: AddTaskIntent(), phrases: ["Add a task in \(.applicationName)"], shortTitle: "Add task", systemImageName: "checkmark.circle")
+        AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.text")
+        AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
+        AppShortcut(intent: StartRecordingIntent(), phrases: ["Start recording in \(.applicationName)"], shortTitle: "Record", systemImageName: "record.circle")
         AppShortcut(
             intent: AskBBIntent(), phrases: ["Ask \(.applicationName)", "Ask \(.applicationName) in \(\.$thread)"],
             shortTitle: "Ask BB", systemImageName: "bubble.left.and.text.bubble.right")
@@ -173,8 +177,5 @@ struct BBShortcuts: AppShortcutsProvider {
         AppShortcut(
             intent: WriteIntent(), phrases: ["Write in \(.applicationName)", "Take a note in \(.applicationName)"],
             shortTitle: "Write", systemImageName: "square.and.pencil")
-        AppShortcut(
-            intent: NewTaskIntent(), phrases: ["New \(.applicationName) task", "Add a task in \(.applicationName)"],
-            shortTitle: "New task", systemImageName: "checklist")
     }
 }

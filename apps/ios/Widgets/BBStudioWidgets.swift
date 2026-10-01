@@ -6,7 +6,10 @@ import WidgetKit
 struct BBStudioWidgets: WidgetBundle {
     var body: some Widget {
         BBStatusLiveActivity()
+        ThreadLiveActivity()
+        RecordingLiveActivity()
         StatusWidget()
+        WorkWidget()
         DictateControl()
         VoiceControl()
         NewThreadControl()

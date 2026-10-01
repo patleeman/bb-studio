@@ -76,6 +76,7 @@ final class StudioStore: ObservableObject {
         do {
             let items = try await fetch(client)
             self.items = items.sorted { $0.updatedAt > $1.updatedAt }
+            Spotlight.indexStudio(self.items)
             error = nil
             DiskCache.save(StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil), as: StudioSnapshot.cacheKey)
         } catch where BBClient.isCancellation(error) {

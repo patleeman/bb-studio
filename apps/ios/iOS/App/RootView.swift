@@ -32,6 +32,8 @@ struct RootView: View {
             switch sheet {
             case .dictation(let threadId, let autoStart):
                 DictationView(threadId: threadId, autoStart: autoStart)
+            case .recording:
+                DictationView(threadId: nil, autoStart: true, kind: "recording")
             case .voiceChat(let threadId):
                 VoiceChatView(threadId: threadId)
             case .write:

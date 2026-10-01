@@ -29,6 +29,7 @@ struct ThreadView: View {
     /// The page this thread was started from with "Work with this page".
     @State private var sourcePage: PageMeta?
     @State private var confirmingCompact = false
+    @State private var followingActivity = false
     @State private var renaming = false
     @State private var openingFile: OpenFile?
     @State private var newTitle = ""
@@ -148,6 +149,7 @@ struct ThreadView: View {
                 Task { sourcePage = try? await app.client.chatPage(model.threadId) }
             }
             await model.load()
+            followingActivity = LiveItems.isFollowing(model.threadId)
         }
         .onChange(of: draft) { _, text in
             mentions.removeAll { !text.contains($0.token) }
@@ -232,6 +234,21 @@ struct ThreadView: View {
                 }
                 // One menu rather than a row of buttons, so the title has room.
                 Menu {
+                    Button {
+                        Task {
+                            if followingActivity {
+                                await LiveItems.unfollow(model.threadId)
+                                followingActivity = false
+                            } else if let thread = model.thread {
+                                do {
+                                    try await LiveItems.follow(thread)
+                                    followingActivity = LiveItems.isFollowing(model.threadId)
+                                } catch { model.error = error.localizedDescription }
+                            }
+                        }
+                    } label: {
+                        Label(followingActivity ? "Stop Live Activity" : "Follow Live Activity", systemImage: "dot.radiowaves.left.and.right")
+                    }
                     Button { app.startVoiceChat(threadId: model.threadId) } label: {
                         Label("Voice chat", systemImage: "waveform")
                     }

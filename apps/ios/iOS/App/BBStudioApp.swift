@@ -16,7 +16,13 @@ struct BBStudioApp: App {
                 .onOpenURL { model.handle($0) }
                 .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhaseChanged(phase) }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
-                    if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String { model.openThread(id) }
+                    if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String {
+                        let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
+                        if parts.count == 2 {
+                            let host = ["pages": "page", "studio-tasks": "task", "talk": "recording", "excalidraw": "drawing", "artifacts": "artifact"][parts[0]]
+                            if let host, let url = URL(string: "bbstudio://\(host)/\(parts[1])") { model.handle(url) }
+                        } else { model.openThread(id) }
+                    }
                 }
                 .task {
                     // `-openURL bbstudio://…` drives headless simulator runs.
@@ -36,6 +42,7 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         PhoneRelay.shared.activate()
         // Also runs when iOS wakes the app to hand over a push-started activity's token.
         Task { @MainActor in LiveStatus.shared.start() }
+        Task { @MainActor in LiveItems.start() }
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         NotificationActions.register()

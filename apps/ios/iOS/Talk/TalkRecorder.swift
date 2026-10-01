@@ -65,6 +65,7 @@ final class TalkRecorder: ObservableObject {
             startedAt = Date()
             silentInput = nil
             phase = .recording
+            if kind == "recording" { LiveItems.recordingStarted(recording.id) }
             _ = try? await client.setRecordingState(recording.id, "recording")
             startHeartbeat(recording.id)
             watchInput()
@@ -81,6 +82,7 @@ final class TalkRecorder: ObservableObject {
     func finish() async -> String? {
         guard phase == .recording, let id = recordingId else { return nil }
         phase = .finishing
+        LiveItems.recordingEnded(id)
         let segments = capture.stop()
         heartbeatTask?.cancel()
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
@@ -124,6 +126,7 @@ final class TalkRecorder: ObservableObject {
         // An active session with the audio background mode keeps the app awake.
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         phase = .idle
+        LiveItems.recordingEnded(id)
         Task {
             await waitForHandoff(segments)
             outbox.finishWhenSent(id)

@@ -34,6 +34,7 @@ targets:
         ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME: AccentColor
     scheme:
       testTargets:
+        - BBStudioTests
         - BBStudioUITests
     dependencies:
       - package: SwiftTerm
@@ -118,4 +119,15 @@ targets:
       base:
         PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.uitests
         TEST_TARGET_NAME: BBStudio
+        GENERATE_INFOPLIST_FILE: YES
+  BBStudioTests:
+    type: bundle.unit-test
+    platform: iOS
+    sources:
+      - path: Tests
+    dependencies:
+      - target: BBStudio
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: nyc.plee.bbgo.tests
         GENERATE_INFOPLIST_FILE: YES
