@@ -47,13 +47,16 @@ function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
       return;
     }
     running.current = true;
-    rpc
-      .call("overview", null)
+    Promise.all([rpc.call("changes", { since: 0 }), rpc.call("overview", null)])
       .then(
-        (result) => {
+        ([checkpoint, result]) => {
           setData(result);
-          rpc.call("changes", { since: 0 }).then(({ cursor: current }) => { cursor.current = current; }, () => { cursor.current = null; });
+          cursor.current = checkpoint.cursor;
           setError(null);
+          // An item can change while overview is being fetched.
+          rpc.call("changes", { since: checkpoint.cursor }).then((later) => {
+            if (later.reset || later.changes.length) refetch();
+          }, () => refetch());
         },
         (cause: unknown) => setError(errorMessage(cause)),
       )
