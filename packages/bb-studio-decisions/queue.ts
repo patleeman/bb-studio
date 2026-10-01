@@ -36,6 +36,12 @@ export type SmartQueueDeps = {
   steer: (row: QueuedRow) => Promise<void>;
   /** Re-sends a core-queued row inline, so the dispatch hook holds it. */
   route: (row: QueuedRow) => Promise<void>;
+  /** The thread's live queue, in order. */
+  list: (threadId: string) => Promise<QueuedRow[]>;
+  /** Which of `candidates` belong in the same turn as `head`. */
+  batch: (head: QueuedRow, candidates: QueuedRow[], thread: ThreadInfo, signal: AbortSignal) => Promise<string[]>;
+  /** Moves `ids` to the front of the queue, in order, as one group core sends as one turn. */
+  group: (threadId: string, ids: string[]) => Promise<void>;
   recheck: () => Promise<void>;
   record: (record: DecisionRecord) => Promise<void>;
   warn: (message: string) => void;
@@ -53,6 +59,11 @@ export const followupRecheckMs = 60_000;
 /** A decision older than this is abandoned in favor of follow-up. */
 export const maxDecideMs = 90_000;
 export const decidingReason = "Smart Queue is deciding whether to steer or follow up.";
+export const batchingReason = "Smart Queue is grouping related follow-ups into one turn.";
+/** How many follow-ups one batching decision weighs. */
+export const maxBatch = 12;
+/** Batching gives up after this and sends the follow-ups one turn each. */
+export const maxBatchMs = 20_000;
 
 export function describeVerdict(verdict: Verdict) {
   const via = verdict.via ? ` via ${verdict.via}` : "";
@@ -67,6 +78,14 @@ export const isBusy = (status: ThreadInfo["status"]) => status === "active" || s
 export const rowText = (row: Pick<QueuedRow, "content">) =>
   row.content.flatMap((block) => (block.type === "text" ? [block.text] : [])).join("\n");
 
+/** Core only groups rows that would run the same way. */
+const sameEnvelope = (a: QueuedRow, b: QueuedRow) =>
+  a.senderThreadId === b.senderThreadId &&
+  a.model === b.model &&
+  a.reasoningLevel === b.reasoningLevel &&
+  a.permissionMode === b.permissionMode &&
+  a.serviceTier === b.serviceTier;
+
 const lostVerdict: Verdict = {
   action: "followup",
   source: "default",
@@ -79,6 +98,8 @@ const lostVerdict: Verdict = {
  * Steer delivers the row into the running turn now; follow-up keeps it held
  * until the thread is no longer busy. Core-queued rows (Enter set to queue)
  * are sent back through the hook, so they are held and decided the same way.
+ * When the thread frees up, related follow-ups are grouped into one turn,
+ * wherever they sit in the queue.
  */
 export class SmartQueue {
   readonly entries = new Map<string, Entry>();
@@ -86,6 +107,10 @@ export class SmartQueue {
   readonly routed = new Set<string>();
   /** Routes one row at a time, so the held rows keep the order the owner queued them in. */
   private routing = Promise.resolve();
+  /** Threads whose follow-ups are being grouped, so the drain waits for the plan. */
+  private readonly batching = new Map<string, AbortController>();
+  /** Threads whose next turn is arranged; cleared once the thread is busy again. */
+  private readonly batched = new Set<string>();
   private readonly now: () => number;
 
   constructor(private readonly deps: SmartQueueDeps) {
@@ -118,8 +143,16 @@ export class SmartQueue {
       if (!human || (context.attempt !== "join-turn" && !busy)) return proceed;
       return { action: "wait", reason: decidingReason, sendAt: this.now() + holdMs };
     }
-    // A thread that is free needs no decision: deliver what is waiting.
-    if (!busy) return proceed;
+    const threadId = context.thread.id;
+    if (!busy) {
+      // A thread that is free needs no decision: deliver what is waiting,
+      // once related follow-ups are grouped into the next turn.
+      if (this.batched.has(threadId) || !context.queuedMessages.some((row) => this.heldByUs(row))) return proceed;
+      if (!this.batching.has(threadId) && this.followups(threadId).length < 2) return proceed;
+      this.batch(threadId);
+      return { action: "wait", reason: batchingReason, sendAt: this.now() + holdMs };
+    }
+    this.batched.delete(threadId);
     let pending = false;
     let followup: Verdict | null = null;
     for (const row of context.queuedMessages) {
@@ -170,7 +203,8 @@ export class SmartQueue {
     // A claimed row is already on its way to the provider.
     if (row.payload.kind !== "inline" || !row.editable) return;
     if (!this.heldByUs(row)) {
-      if (row.waitingOn?.kind === "thread-busy" && !this.routed.has(row.id)) {
+      // A row the owner grouped by hand stays with core, so its group goes as one prompt.
+      if (row.waitingOn?.kind === "thread-busy" && !row.groupWithNext && !this.routed.has(row.id)) {
         this.routed.add(row.id);
         this.routing = this.routing.then(() => this.route(row));
       }
@@ -224,6 +258,55 @@ export class SmartQueue {
         this.deps.warn(`Smart Queue could not take over ${row.id}: ${String(error)}`);
       ignore();
     }
+  }
+
+  private followups(threadId: string) {
+    return [...this.entries.entries()].flatMap(([id, entry]) =>
+      entry.threadId === threadId && entry.state === "decided" && entry.verdict.action === "followup" ? [id] : [],
+    );
+  }
+
+  /**
+   * Groups the follow-ups that belong with the first queued row into one turn,
+   * moving them up to it from wherever they were queued. The rest wait for the
+   * next turn, where the same question is asked again. Anything that goes
+   * wrong leaves the queue as it was, so each row still sends on its own.
+   */
+  private batch(threadId: string) {
+    if (this.batching.has(threadId)) return;
+    const controller = new AbortController();
+    const timer = setTimeout(() => controller.abort(new Error("Batching timed out.")), maxBatchMs);
+    this.batching.set(threadId, controller);
+    void (async () => {
+      try {
+        const rows = await this.deps.list(threadId);
+        const head = rows[0];
+        const followups = new Set(this.followups(threadId));
+        // A group the owner made by hand is theirs to keep.
+        if (!head || !followups.has(head.id) || rows.some((row) => row.groupWithNext)) return;
+        const candidates = rows
+          .slice(1)
+          .filter((row) => followups.has(row.id) && sameEnvelope(head, row))
+          .slice(0, maxBatch - 1);
+        if (!candidates.length) return;
+        const thread = await this.deps.thread(threadId);
+        if (isBusy(thread.status)) return;
+        const joined = new Set(await this.deps.batch(head, candidates, thread, controller.signal));
+        const ids = [head.id, ...candidates.filter((row) => joined.has(row.id)).map((row) => row.id)];
+        if (ids.length > 1 && !controller.signal.aborted) await this.deps.group(threadId, ids);
+      } catch (error) {
+        if (!/not found|HTTP 404|claimed|stale/i.test(String(error)))
+          this.deps.warn(`Smart Queue could not group follow-ups in ${threadId}: ${String(error)}`);
+      } finally {
+        clearTimeout(timer);
+        // Forgotten or disposed meanwhile: there is nothing left to release.
+        if (this.batching.get(threadId) === controller) {
+          this.batching.delete(threadId);
+          this.batched.add(threadId);
+          await this.deps.recheck().catch((error) => this.deps.warn(`Smart Queue could not release ${threadId}: ${String(error)}`));
+        }
+      }
+    })();
   }
 
   /** Steers land in the order the owner sent them, even when a later classification finishes first. */
@@ -305,11 +388,15 @@ export class SmartQueue {
 
   /** `thread.idle` and `thread.failed`: release the follow-ups held for this thread. */
   async settled(threadId: string) {
+    this.batched.delete(threadId);
     if ([...this.entries.values()].some((entry) => entry.threadId === threadId)) await this.deps.recheck();
   }
 
   /** `thread.archived` and `thread.deleted`: rows vanish without a queue event. */
   forget(threadId: string) {
+    this.batching.get(threadId)?.abort();
+    this.batching.delete(threadId);
+    this.batched.delete(threadId);
     for (const [id, entry] of this.entries)
       if (entry.threadId === threadId) {
         if (entry.state === "pending") entry.controller.abort();
@@ -319,6 +406,8 @@ export class SmartQueue {
   }
 
   dispose() {
+    for (const controller of this.batching.values()) controller.abort();
+    this.batching.clear();
     for (const entry of this.entries.values()) {
       if (entry.state === "pending") entry.controller.abort();
       entry.finish();

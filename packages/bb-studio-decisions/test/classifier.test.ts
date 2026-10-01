@@ -6,6 +6,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import {
   JevUnavailableError,
+  askBatch,
   askJev,
   classify,
   modelPrompt,
@@ -191,4 +192,29 @@ test("a custom endpoint sends its extra headers and the key command's token", as
   assert.equal(headers.Authorization, "Bearer cmd-token");
   assert.equal(headers.source, "bb-smart-queue");
   assert.equal(headers["org-id"], "2");
+});
+
+test("Jev picks the follow-ups that belong in the next turn, as data, above the batch threshold", async () => {
+  let body: { state: string; questions: Record<string, { type: string }> } | null = null;
+  vi.spyOn(globalThis, "fetch").mockImplementation(async (_url: string | URL | Request, init?: RequestInit) => {
+    body = JSON.parse(String(init!.body));
+    return Response.json({ answers: { m1: { type: "noul", noul: 0.2 }, m2: { type: "noul", noul: 0.6 } } });
+  });
+  const result = await askBatch(
+    { typesafeApiKey: "k", batchConfidence: 0.5 },
+    {
+      title: "Build storage",
+      next: "Use SQLite",
+      messages: [
+        { id: "q_2", text: "Also, what's for lunch?" },
+        { id: "q_3", text: "And keep the old schema" },
+      ],
+    },
+    signal(),
+    env,
+  );
+  assert.deepEqual(result, { ids: ["q_3"], via: "TypeSafe" });
+  assert.deepEqual(Object.keys(body!.questions), ["m1", "m2"]);
+  assert.equal(body!.questions.m1!.type, "noul");
+  assert.deepEqual(JSON.parse(body!.state).messages, { m1: "Also, what's for lunch?", m2: "And keep the old schema" });
 });

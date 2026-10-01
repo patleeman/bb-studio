@@ -92,6 +92,16 @@ the queue every second, takes each new row out, and sends its text the way
 the composer's steer does. BB's dispatch check then holds it on Smart Queue's
 card, in the order you queued.
 
+When the thread goes idle with several follow-ups waiting, Smart Queue asks Jev
+which ones belong with the next one. Those move up beside it and go to the
+agent as one turn, using BB's queued-message grouping, wherever you queued
+them. Say you queue *also print the date*, then *what's the capital of
+France?*, then *use ISO format for the date*. The two date messages go
+together, and the France question gets its own turn afterward. Messages you
+grouped by hand, and messages set to a different model, reasoning level,
+permission mode or speed, are never regrouped. If Jev doesn't answer, each
+follow-up goes on its own, as before.
+
 When several messages steer, they reach the turn in the order you sent them.
 The queued card's own **Send now** and **Steer** buttons still override Smart
 Queue, and sending a card by hand cancels its pending decision. Editing a held
@@ -110,6 +120,7 @@ Open **Settings → Plugins → Studio Decisions**, or use `bb plugin config sma
 | `customJevEndpoint`, `customJevApiKey`, `customJevModel` | — | Your own System One endpoint. |
 | `jevTimeoutMs` | `5000` | Deadline for each provider attempt, 250 to 15000 ms, for every caller. |
 | `steerConfidence` | `0.7` | Smart Queue's minimum Jev confidence to steer. |
+| `batchConfidence` | `0.5` | Smart Queue's minimum Jev confidence to send a follow-up in the same turn as the next one. `1` sends each on its own. |
 
 Below the form, two sections complete the page:
 

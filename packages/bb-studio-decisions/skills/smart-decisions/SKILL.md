@@ -59,8 +59,8 @@ Change settings with `bb plugin config smart-decisions set <key> <value>`.
   set `customJevApiKeyCommand` to a command that prints the token instead of
   `customJevApiKey`. `customJevHeaders` adds `name: value` headers separated by
   semicolons.
-- `jevTimeoutMs` applies to every caller. `steerConfidence` and `enabled`
-  apply to Smart Queue only; Studio Teams keeps its own confidence threshold.
+- `jevTimeoutMs` applies to every caller. `steerConfidence`, `batchConfidence` and
+  `enabled` apply to Smart Queue only; Studio Teams keeps its own confidence threshold.
 - The fallback model is not a `bb plugin config` setting. Use
   `bb smart-decisions fallback`, or the picker on the settings page.
 
@@ -75,6 +75,10 @@ and any configuration problems.
   released when the thread goes idle. The owner can use the card's **Send now**
   or **Steer** button to override it. Sending a card by hand cancels its
   pending decision, and editing a held card classifies the new text.
+- *Smart Queue is grouping related follow-ups into one turn* shows for a few
+  seconds after a thread goes idle with several follow-ups. The logs say how
+  many were grouped (`Smart Queue grouped 1 of 2 follow-ups with …`). Raise
+  `batchConfidence` to group less, or set it to 1 to turn grouping off.
 - `request failed (HTTP 400)` from a Jev provider ends with the provider's own
   reason, such as an unsupported model name. Run `bb smart-decisions check` to
   retry with a fixed sample.

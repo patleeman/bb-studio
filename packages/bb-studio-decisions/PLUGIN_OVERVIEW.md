@@ -8,6 +8,8 @@ let Studio Teams pick which bots answer a channel message.
 
 - Corrections, cancellations, and urgent changes steer the running turn now.
 - New or later tasks wait as follow-ups until the turn ends.
+- Related follow-ups go to the agent together as one turn, in whatever order
+  you queued them.
 - When several messages steer, they reach the agent in the order you sent them.
 - Studio Teams routes channel messages with the same Jev setup, so its keys
   live here too.

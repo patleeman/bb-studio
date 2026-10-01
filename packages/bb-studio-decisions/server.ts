@@ -3,6 +3,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { personalProjectId } from "@bb-studio/kit/server";
 import { z } from "zod";
 import {
+  askBatch,
   askJev,
   askModel,
   classify,
@@ -125,6 +126,14 @@ export default async function plugin(bb: BbPluginApi) {
       default: 0.7,
       experimental_schema: z.number().min(0).max(1),
       description: "A value from 0 to 1. An uncertain steer becomes a follow-up. Other plugins apply their own thresholds.",
+    },
+    batchConfidence: {
+      type: "number",
+      label: "Smart Queue: minimum confidence to batch",
+      default: 0.5,
+      experimental_schema: z.number().min(0).max(1),
+      description:
+        "A value from 0 to 1. When a thread frees up, queued follow-ups Jev is this sure belong with the next one are sent with it as one turn. Set to 1 to send each on its own.",
     },
   });
   const config = async (): Promise<ClassifierSettings & { enabled: boolean }> => settings.get();
@@ -315,6 +324,42 @@ export default async function plugin(bb: BbPluginApi) {
         await bb.sdk.threads.queuedMessages.create(message);
         throw error;
       }
+    },
+    list: (threadId) => bb.sdk.threads.queuedMessages.list({ threadId }),
+    batch: async (head, candidates, thread, signal) => {
+      const settingsNow = await config();
+      if ((settingsNow.batchConfidence ?? 0.5) >= 1) return [];
+      const { ids, via } = await askBatch(
+        settingsNow,
+        {
+          title: thread.title ?? thread.titleFallback,
+          next: rowText(head),
+          messages: candidates.map((row) => ({ id: row.id, text: rowText(row) })),
+        },
+        signal,
+      );
+      bb.log.info(`Smart Queue grouped ${ids.length} of ${candidates.length} follow-ups with ${head.id} in ${head.threadId} (Jev via ${via}).`);
+      return ids;
+    },
+    group: async (threadId, ids) => {
+      let rows = await bb.sdk.threads.queuedMessages.list({ threadId });
+      for (const [index, id] of ids.entries()) {
+        if (index === 0) continue;
+        const previous = rows.findIndex((row) => row.id === ids[index - 1]);
+        if (rows[previous + 1]?.id === id) continue;
+        const next = rows[previous + 1]?.id ?? null;
+        rows = await bb.sdk.threads.queuedMessages.reorder({
+          threadId,
+          queuedMessageId: id,
+          previousQueuedMessageId: ids[index - 1]!,
+          nextQueuedMessageId: next,
+        });
+      }
+      await bb.sdk.threads.queuedMessages.setGroupBoundary({
+        threadId,
+        groupBoundaryQueuedMessageId: ids.at(-1)!,
+        expectedGroupedPrefixQueuedMessageIds: ids,
+      });
     },
     recheck: () => bb.experimental_hooks.recheck("message.dispatch"),
     record,

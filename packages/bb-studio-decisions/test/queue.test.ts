@@ -4,6 +4,7 @@ import type { MessageDispatchHookContext } from "@get-bb/plugin-sdk";
 import type { Verdict } from "../classifier";
 import {
   SmartQueue,
+  batchingReason,
   decidingReason,
   followupReason,
   followupRecheckMs,
@@ -52,7 +53,15 @@ const steer: Verdict = { action: "steer", source: "jev", confidence: 0.9, note: 
 const followup: Verdict = { action: "followup", source: "jev", confidence: 0.8, note: null };
 
 function harness(verdict: Verdict | Promise<Verdict> = followup, overrides: Partial<SmartQueueDeps> = {}) {
-  const calls = { steered: [] as string[], routed: [] as string[], rechecks: 0, records: [] as unknown[], classified: 0 };
+  const calls = {
+    steered: [] as string[],
+    routed: [] as string[],
+    grouped: [] as string[][],
+    asked: [] as string[][],
+    rechecks: 0,
+    records: [] as unknown[],
+    classified: 0,
+  };
   let now = 1_000;
   const queue = new SmartQueue({
     pluginId: "smart-queue",
@@ -67,6 +76,14 @@ function harness(verdict: Verdict | Promise<Verdict> = followup, overrides: Part
     },
     route: async (r) => {
       calls.routed.push(r.id);
+    },
+    list: async () => [],
+    batch: async (_head, candidates) => {
+      calls.asked.push(candidates.map((r) => r.id));
+      return [];
+    },
+    group: async (_threadId, ids) => {
+      calls.grouped.push(ids);
     },
     recheck: async () => {
       calls.rechecks++;
@@ -352,4 +369,82 @@ test("rows in threads Smart Queue skips are read once", async () => {
   await settle();
   assert.equal(reads, 1);
   assert.equal(calls.classified, 0);
+});
+
+/** Three follow-ups held on a thread that has just gone idle. */
+async function idleWithFollowups(overrides: Partial<SmartQueueDeps> = {}, rows = [1, 2, 3].map((n) => row({ id: `q_${n}`, createdAt: n }))) {
+  let status: ThreadInfo["status"] = "active";
+  const h = harness(followup, { thread: async () => thread({ status }), list: async () => rows, ...overrides });
+  for (const r of rows) h.queue.queued(r);
+  await settle();
+  status = "idle";
+  const release = () => h.queue.dispatch(context({ attempt: "start-turn", thread: thread({ status }), queuedMessages: [rows[0]!] }));
+  return { ...h, rows, release };
+}
+
+test("related follow-ups are grouped into one turn, wherever they were queued", async () => {
+  const { calls, release } = await idleWithFollowups({
+    batch: async (_head, candidates) => candidates.filter((r) => r.id === "q_3").map((r) => r.id),
+    group: async (_threadId, ids) => {
+      calls.grouped.push(ids);
+    },
+  });
+  const rechecks = calls.rechecks;
+  const held = await release();
+  assert.equal(held.action === "wait" && held.reason, batchingReason);
+  await settle();
+  assert.deepEqual(calls.grouped, [["q_1", "q_3"]]);
+  assert.equal(calls.rechecks, rechecks + 1, "the grouped turn is released");
+  assert.deepEqual(await release(), { action: "proceed" });
+});
+
+test("the next turn's follow-ups are weighed again once the thread was busy", async () => {
+  const { queue, calls, release } = await idleWithFollowups();
+  await release();
+  await settle();
+  assert.deepEqual(calls.asked, [["q_2", "q_3"]]);
+  assert.deepEqual(calls.grouped, [], "nothing related, so nothing grouped");
+  assert.deepEqual(await release(), { action: "proceed" });
+  await queue.dispatch(context({ queuedMessages: [row({ id: "q_2" })] }));
+  assert.equal((await release()).action, "wait", "a busy spell clears the plan");
+});
+
+test("a single follow-up is released without asking", async () => {
+  const { calls, release } = await idleWithFollowups({}, [row()]);
+  assert.deepEqual(await release(), { action: "proceed" });
+  assert.deepEqual(calls.asked, []);
+});
+
+test("rows the owner grouped by hand, or that run differently, are not regrouped", async () => {
+  const handGrouped = await idleWithFollowups({}, [row({ id: "q_1", groupWithNext: true }), row({ id: "q_2" })]);
+  await handGrouped.release();
+  await settle();
+  assert.deepEqual(handGrouped.calls.asked, []);
+
+  const mixed = await idleWithFollowups({}, [row({ id: "q_1" }), row({ id: "q_2", model: "other" }), row({ id: "q_3" })]);
+  await mixed.release();
+  await settle();
+  assert.deepEqual(mixed.calls.asked, [["q_3"]]);
+});
+
+test("a failed grouping still releases the follow-ups one turn each", async () => {
+  const warnings: string[] = [];
+  const { calls, release } = await idleWithFollowups({
+    batch: async () => {
+      throw new Error("Jev is down");
+    },
+    warn: (message) => warnings.push(message),
+  });
+  await release();
+  await settle();
+  assert.match(warnings.join("\n"), /Jev is down/);
+  assert.deepEqual(calls.grouped, []);
+  assert.deepEqual(await release(), { action: "proceed" });
+});
+
+test("core rows the owner grouped by hand stay with core", async () => {
+  const { queue, calls } = harness();
+  queue.queued(row({ waitingOn: { kind: "thread-busy" }, groupWithNext: true }));
+  await settle();
+  assert.deepEqual(calls.routed, []);
 });
