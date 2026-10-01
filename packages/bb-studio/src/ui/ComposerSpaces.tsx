@@ -1,6 +1,8 @@
-// A thread's spaces under its composer, next to its other settings, so a
-// thread, channel or direct message links back to the spaces it's in and can
-// join one there. A new thread joins the spaces picked before it starts.
+// A thread's spaces under its composer, beside its project, machine and
+// branch, so a thread, channel or direct message links back to the spaces
+// it's in and can join one there. A new thread joins the spaces picked
+// before it starts. BB has no slot in that row: the composer action portals
+// into it, and stays in the action row if the row isn't found.
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -11,13 +13,14 @@ import {
   Icon,
   openAppPath,
 } from "@bb-studio/kit/app";
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useComposer, useComposerView, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
-import { SpaceGlyph, spaceLink } from "./Spaces";
+import { spaceLink } from "./Spaces";
 
 const THREAD_REF = "bb-thread";
 const REFETCH_DEBOUNCE_MS = 300;
@@ -32,9 +35,58 @@ const savePick = (projectId: string, ids: string[]) => {
   if (ids.length) sessionStorage.setItem(pendingKey(projectId), JSON.stringify(ids));
   else sessionStorage.removeItem(pendingKey(projectId));
 };
-const TRIGGER = "inline-flex h-7 items-center gap-1 whitespace-nowrap rounded-md px-2 text-xs text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5";
+const TRIGGER = "inline-flex h-6 min-w-0 shrink items-center gap-1 whitespace-nowrap rounded-md px-1.5 text-xs text-muted-foreground hover:bg-accent hover:text-foreground data-[state=open]:bg-accent data-[state=open]:text-foreground [&_svg]:size-3.5 [&_svg]:shrink-0";
+
+/** The project, machine and branch group in the row under `anchor`'s composer. */
+function footerGroup(anchor: HTMLElement): HTMLElement | null {
+  const footer = anchor.closest("[data-promptbox]")?.nextElementSibling;
+  return footer?.firstElementChild instanceof HTMLElement ? footer.firstElementChild : null;
+}
+
+/** A node kept at the end of the composer's footer group, or null where there's none. */
+function useFooterSlot(anchor: HTMLElement | null): HTMLElement | null {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useEffect(() => {
+    const shell = anchor?.closest("[data-promptbox]")?.parentElement;
+    if (!anchor || !shell) return;
+    const host = document.createElement("span");
+    host.style.display = "contents";
+    host.setAttribute("data-bb-plugin", STUDIO_PLUGIN_ID);
+    host.setAttribute("data-bb-plugin-root", "");
+    // The footer can re-render or remount; keep the node in it.
+    const place = () => {
+      const group = footerGroup(anchor);
+      if (group && host.parentElement !== group) group.appendChild(host);
+      setSlot(group ? host : null);
+    };
+    place();
+    const observer = new MutationObserver(place);
+    observer.observe(shell, { childList: true, subtree: true });
+    return () => {
+      observer.disconnect();
+      host.remove();
+    };
+  }, [anchor]);
+  return slot;
+}
+
+/** A space's emoji, or the spaces icon: a colour dot here reads as a status. */
+function SpaceMark({ space }: { space: SpaceView | undefined }) {
+  return space?.icon ? <span className="text-xs leading-none">{space.icon}</span> : <Icon name="Layers" />;
+}
 
 export function ComposerSpaces() {
+  const [anchor, setAnchor] = useState<HTMLElement | null>(null);
+  const slot = useFooterSlot(anchor);
+  return (
+    <>
+      <span ref={setAnchor} hidden />
+      {slot ? createPortal(<SpacesPicker />, slot) : <SpacesPicker />}
+    </>
+  );
+}
+
+function SpacesPicker() {
   const view = useComposerView();
   const composer = useComposer();
   const rpc = useRpc<typeof rpcContract>();
@@ -107,7 +159,7 @@ export function ComposerSpaces() {
         <button type="button" className={TRIGGER}
           aria-label={first ? `Spaces: ${holding.map((space) => space.name).join(", ")}` : "Add to a space"}
           title={first ? holding.map((space) => space.name).join(", ") : "Add to a space"}>
-          {first ? <SpaceGlyph space={first} className="text-xs leading-none" /> : <Icon name="Layers" />}
+          <SpaceMark space={first} />
           <span className="max-w-32 truncate">{first ? first.name : "Space"}</span>
           {holding.length > 1 ? <span>+{holding.length - 1}</span> : null}
           <Icon name="ChevronDown" />
@@ -117,7 +169,7 @@ export function ComposerSpaces() {
         {holding.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">{threadId ? "In spaces" : "Joins"}</DropdownMenuLabel> : null}
         {holding.map((space) => (
           <DropdownMenuItem key={space.id} onSelect={() => openAppPath(spaceLink(space))}>
-            <SpaceGlyph space={space} className="text-sm leading-none" /> {space.name}
+            <SpaceMark space={space} /> {space.name}
             {inherited.includes(space.id) ? <span className="ml-auto text-xs text-muted-foreground">Project</span> : null}
           </DropdownMenuItem>
         ))}
@@ -125,7 +177,7 @@ export function ComposerSpaces() {
         {others.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add to space</DropdownMenuLabel> : null}
         {others.map((space) => (
           <DropdownMenuItem key={space.id} onSelect={() => void change(space, true)}>
-            <SpaceGlyph space={space} className="text-sm leading-none" /> {space.name}
+            <SpaceMark space={space} /> {space.name}
           </DropdownMenuItem>
         ))}
         {removable.length ? <DropdownMenuSeparator /> : null}
