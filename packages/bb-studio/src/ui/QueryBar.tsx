@@ -76,6 +76,8 @@ export function QueryBar({
   const input = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
   const [picked, setPicked] = useState(-1);
+  // Select all takes the chips with the text, so the whole query can be cleared or copied.
+  const [allSelected, setAllSelected] = useState(false);
   const word = pendingWord(query.text);
   const suggestions = useMemo(
     () => suggest(word, vocabulary).filter((each) => each.type === "field" || !query.filters.some((filter) => sameFilter(filter, { field: each.field, value: each.value, negate: each.negate }))),
@@ -86,7 +88,9 @@ export function QueryBar({
   const tabTarget = !open ? -1 : picked >= 0 ? picked : word ? 0 : -1;
 
   const setText = (text: string) => {
-    const next = absorb(query, text);
+    // Typing over a select-all replaces the whole query.
+    const next = absorb(allSelected ? { filters: [], text: "" } : query, text);
+    setAllSelected(false);
     onChange(next);
     // Picking is for building a filter; plain words search on Enter.
     setPicked(pendingWord(next.text).includes(":") ? 0 : -1);
@@ -123,6 +127,7 @@ export function QueryBar({
               className={cn(
                 "flex h-6 max-w-64 items-center gap-1 rounded border border-border bg-foreground/[0.04] pr-0.5 pl-1.5 text-xs",
                 unknown && "border-destructive/50 text-destructive",
+                allSelected && "border-primary/60 bg-primary/15",
               )}
             >
               <button
@@ -161,9 +166,39 @@ export function QueryBar({
           className="h-6 min-w-24 flex-1 bg-transparent px-1 outline-none placeholder:text-muted-foreground"
           value={query.text}
           onFocus={() => setFocused(true)}
-          onBlur={() => setFocused(false)}
+          onBlur={() => {
+            setFocused(false);
+            setAllSelected(false);
+          }}
           onChange={(event) => setText(event.target.value)}
+          onSelect={(event) => {
+            const field = event.currentTarget;
+            if (allSelected && (field.selectionStart !== 0 || field.selectionEnd !== field.value.length)) setAllSelected(false);
+          }}
+          onCopy={(event) => {
+            if (!allSelected) return;
+            event.preventDefault();
+            event.clipboardData.setData("text/plain", formatQuery(query));
+          }}
+          onCut={(event) => {
+            if (!allSelected) return;
+            event.preventDefault();
+            event.clipboardData.setData("text/plain", formatQuery(query));
+            onChange({ filters: [], text: "" });
+            setAllSelected(false);
+          }}
           onKeyDown={(event) => {
+            if (event.key.toLowerCase() === "a" && (event.metaKey || event.ctrlKey) && !event.altKey && !event.shiftKey) {
+              if (query.filters.length) setAllSelected(true);
+              return;
+            }
+            if (allSelected && (event.key === "Backspace" || event.key === "Delete")) {
+              event.preventDefault();
+              onChange({ filters: [], text: "" });
+              setAllSelected(false);
+              return;
+            }
+            if (allSelected && !["Meta", "Control", "Shift", "Alt"].includes(event.key) && !event.metaKey && !event.ctrlKey && event.key.length !== 1) setAllSelected(false);
             if (event.key === "ArrowDown" && open) {
               event.preventDefault();
               setPicked((picked + 1) % suggestions.length);
