@@ -41,7 +41,6 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     ) -> Bool {
         PhoneRelay.shared.activate()
         // Also runs when iOS wakes the app to hand over a push-started activity's token.
-        Task { @MainActor in LiveStatus.shared.start() }
         Task { @MainActor in LiveItems.start() }
         let center = UNUserNotificationCenter.current()
         center.delegate = self

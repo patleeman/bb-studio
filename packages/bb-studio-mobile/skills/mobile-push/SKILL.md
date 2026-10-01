@@ -1,6 +1,6 @@
 ---
 name: mobile-push
-description: Check or configure the BB Studio push relay (the Mobile plugin) that sends BB push notifications to the native iOS app over APNs and drives its status Live Activity.
+description: Check or configure the BB Studio push relay (the Mobile plugin) that sends BB push notifications to the native iOS app over APNs and drives its per-thread Live Activities.
 ---
 
 # BB Studio push relay
@@ -10,17 +10,22 @@ at `POST /api/v1/plugins/mobile/http/push` (token auth). Tokens starting with
 `apns:` go to Apple; every other token is forwarded to Expo unchanged, so the
 official mobile app keeps working.
 
-## Status Live Activity
+## Thread Live Activities
 
-BB Studio shows one Live Activity, not one per thread: how many top-level threads
-need you (a pending question, or an unread failure) and how many are running,
-plus the thread that needs you and the last notable event. The plugin starts
-it by push when something begins, updates it on thread events (and every two
-minutes, since answering a question has no event), alerts only when something
-newly needs you, and ends it when everything is done. iOS caps an activity at
-eight hours, so the plugin replaces it at 7.5.
+BB Studio shows a Live Activity for each top-level thread that is running,
+needs you (a pending approval or question), failed unread, or finished in the
+last 30 minutes and is still unread, up to three at once. Each shows the
+thread's latest reply and what it's asking. Approve/Deny, single-select answer
+choices, and Stop run from the lock screen; Reply opens the thread's composer.
 
-The app reports its push-to-start and activity tokens through the
+The plugin starts each activity by push, updates it on thread events (text at
+most every 30 seconds; phase and question changes at once, plus every two
+minutes), alerts quietly when a thread newly needs you, fails, or finishes, and
+ends it when the thread settles or is read. A swiped-away activity stays away
+until its thread's phase changes. iOS caps an activity at eight hours, so the
+plugin replaces it at 7.5.
+
+The app reports its push-to-start and per-activity tokens through the
 `live_register` RPC. Live Activity pushes use the same APNs settings below.
 
 ## Actionable notifications

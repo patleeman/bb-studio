@@ -31,7 +31,6 @@ struct ThreadView: View {
     /// The page this thread was started from with "Work with this page".
     @State private var sourcePage: PageMeta?
     @State private var confirmingCompact = false
-    @State private var followingActivity = false
     @State private var confirmingClearContext = false
     @State private var showingContext = false
     @State private var renaming = false
@@ -174,7 +173,6 @@ struct ThreadView: View {
                 Task { sourcePage = try? await app.client.chatPage(model.threadId) }
             }
             await model.load()
-            followingActivity = LiveItems.isFollowing(model.threadId)
         }
         .onChange(of: draft) { _, text in
             mentions.removeAll { !text.contains($0.token) }
@@ -259,21 +257,6 @@ struct ThreadView: View {
                 }
                 // One menu rather than a row of buttons, so the title has room.
                 Menu {
-                    Button {
-                        Task {
-                            if followingActivity {
-                                await LiveItems.unfollow(model.threadId)
-                                followingActivity = false
-                            } else if let thread = model.thread {
-                                do {
-                                    try await LiveItems.follow(thread)
-                                    followingActivity = LiveItems.isFollowing(model.threadId)
-                                } catch { model.error = error.localizedDescription }
-                            }
-                        }
-                    } label: {
-                        Label(followingActivity ? "Stop Live Activity" : "Follow Live Activity", systemImage: "dot.radiowaves.left.and.right")
-                    }
                     Button { app.startVoiceChat(threadId: model.threadId) } label: {
                         Label("Voice chat", systemImage: "waveform")
                     }
@@ -751,6 +734,12 @@ struct ThreadView: View {
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
         .background(.bar)
+        // A Reply from a thread's Live Activity lands here.
+        .onChange(of: app.replyThreadId, initial: true) { _, id in
+            guard id == model.threadId else { return }
+            composerFocused = true
+            app.replyThreadId = nil
+        }
     }
 
     /// Lines past this get hard to follow on an iPad or a wide window.

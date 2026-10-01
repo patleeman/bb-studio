@@ -78,6 +78,8 @@ final class AppModel: ObservableObject {
     @Published var sheet: Sheet?
     /// Opens the new-thread composer, optionally prefilled.
     @Published var newThreadDraft: String?
+    /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
+    @Published var replyThreadId: String?
 
     /// The last thread opened, so the action button can resume a voice chat with it.
     @AppStorage("lastThreadId") var lastThreadId: String = ""
@@ -125,7 +127,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
         guard AppLink.handles(url) else { return }
@@ -133,6 +135,11 @@ final class AppModel: ObservableObject {
         switch url.host() {
         case "capture": sheet = .capture
         case "thread": if let id { openThread(id) }
+        case "reply":
+            if let id {
+                openThread(id)
+                replyThreadId = id
+            }
         case "page": if let id { openPage(id) }
         case "automations": open(.automations)
         case "usage": open(.usage)

@@ -86,8 +86,8 @@ are unchanged, and old `bbgo://` links still open.
 | Spotlight indexes open threads and Studio pages, tasks, recordings, drawings, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
 | URL scheme `bbstudio://thread/<id>`, `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
-| One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `packages/bb-studio-mobile/live.ts` |
-| Opt-in Live Activity for a thread from its menu, plus one while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
+| A Live Activity for each thread that's running, needs you, or just finished (up to three): its latest reply and what it's asking, with Approve/Deny, answer choices, Stop, and Reply | `Widgets/ItemActivities.swift`, `LiveActivity/ThreadActivityIntents.swift`, `iOS/App/LiveItems.swift`, `packages/bb-studio-mobile/live.ts` |
+| A Live Activity while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads, tasks, and pages; add a task, open a page or task, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
 | Haptics for sends, answers, errors, and swipe actions | |

@@ -18,14 +18,14 @@ public enum Mobile {
   public typealias MuteSet = MuteSetOutput
 
   public struct LiveRegisterInput: Sendable, Hashable, Codable {
-    public var pushToStartToken: String?
+    public var threadPushToStartToken: String?
     public var activityId: String?
     public var activityToken: String?
     public var threadId: String?
     public var endedActivityId: String?
 
-    public init(pushToStartToken: String? = nil, activityId: String? = nil, activityToken: String? = nil, threadId: String? = nil, endedActivityId: String? = nil) {
-      self.pushToStartToken = pushToStartToken
+    public init(threadPushToStartToken: String? = nil, activityId: String? = nil, activityToken: String? = nil, threadId: String? = nil, endedActivityId: String? = nil) {
+      self.threadPushToStartToken = threadPushToStartToken
       self.activityId = activityId
       self.activityToken = activityToken
       self.threadId = threadId
