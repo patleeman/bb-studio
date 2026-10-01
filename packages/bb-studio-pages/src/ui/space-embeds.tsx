@@ -4,6 +4,7 @@
 // makes a space's page with all of them, and the user writes around them,
 // moves them or removes them. Pages asks Studio for the data; Studio's own
 // overlay shows the dialogs that change the space.
+import { projectName, useProjects } from "@bb-studio/kit/app";
 import { plural, relativeTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -196,6 +197,7 @@ function Recent({ view }: { view: SpaceWidgetView }) {
 
 function Threads({ view, conversations }: { view: SpaceWidgetView; conversations: boolean }) {
   const ui = usePagesUi();
+  const projects = useProjects();
   const [all, setAll] = useState(false);
   const threads = view.threads.filter((thread) => (thread.kind !== "thread") === conversations);
   const shown = all ? threads : threads.slice(0, SHOWN_THREADS);
@@ -204,7 +206,9 @@ function Threads({ view, conversations }: { view: SpaceWidgetView; conversations
       ? "Channel"
       : thread.kind === "dm"
         ? `With ${thread.botName ?? "a bot"}`
-        : (view.projects.find((project) => project.id === thread.projectId)?.name ?? (thread.projectId ? "Project" : "No project"));
+        : thread.projectId
+          ? projectName(projects, thread.projectId)
+          : "No project";
   return (
     <>
       <div className="py-1">

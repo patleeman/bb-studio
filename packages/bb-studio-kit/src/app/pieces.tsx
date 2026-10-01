@@ -130,8 +130,9 @@ export function useProjects(): Project[] {
   const [projects, setProjects] = useState<Project[]>([]);
   useEffect(() => {
     let live = true;
+    // Items can live in the personal project, so name it too.
     sdk.projects
-      .list()
+      .list({ includePersonal: true })
       .then((list) => live && setProjects((list as { id: string; name: string }[]).map(({ id, name }) => ({ id, name }))))
       .catch(() => live && setProjects([]));
     return () => {
