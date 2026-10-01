@@ -222,8 +222,8 @@ function SectionPlacementItems({ sectionKey: key, title }: { sectionKey: string;
 /** A quiet row in a section: empty, loading, or a failure. Shaped like BB's "No threads". */
 export function SidebarNote({ children, icon, tone = "muted" }: { children: ReactNode; icon?: string; tone?: "muted" | "danger" }) {
   return (
-    <p className={`m-0 flex min-h-7 items-center gap-2 px-2 text-xs ${tone === "danger" ? "text-destructive" : "text-muted-foreground"}`}>
-      {icon ? <Icon name={icon} aria-hidden className="size-3.5 shrink-0" /> : null}
+    <p className={`m-0 flex min-h-7 items-center gap-2 px-2 text-xs leading-4 ${tone === "danger" ? "text-destructive" : "text-subtle-foreground/60"}`}>
+      {icon ? <Icon name={icon} aria-hidden className="size-3.5 shrink-0 text-subtle-foreground/50" /> : null}
       {children}
     </p>
   );
