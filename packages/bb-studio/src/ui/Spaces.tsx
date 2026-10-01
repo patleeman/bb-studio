@@ -425,6 +425,7 @@ export function SpaceDialog({
   defaultProjectId,
   onClose,
   onSaved,
+  onDelete,
 }: {
   rpc: Rpc;
   /** null makes a new one. */
@@ -433,6 +434,8 @@ export function SpaceDialog({
   defaultProjectId: string | null;
   onClose(): void;
   onSaved(space: SpaceView): void;
+  /** Asks to delete the space being edited. */
+  onDelete?(): void;
 }) {
   const [name, setName] = useState(space?.name ?? "");
   const [icon, setIcon] = useState(space?.icon ?? "");
@@ -517,11 +520,18 @@ export function SpaceDialog({
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
           {restored ? <p className="text-xs text-muted-foreground">{restored}</p> : null}
           <DialogFooter>
-            {space?.pageId ? (
-              <Button type="button" variant="ghost" className="sm:mr-auto" disabled={busy} onClick={() => void restore()}>
-                Restore missing widgets
-              </Button>
-            ) : null}
+            <div className="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
+              {space && onDelete ? (
+                <Button type="button" variant="ghost" className="text-destructive" disabled={busy} onClick={onDelete}>
+                  Delete space
+                </Button>
+              ) : null}
+              {space?.pageId ? (
+                <Button type="button" variant="ghost" disabled={busy} onClick={() => void restore()}>
+                  Restore missing widgets
+                </Button>
+              ) : null}
+            </div>
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>

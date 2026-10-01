@@ -69,6 +69,7 @@ export function ManageSpace() {
             close();
             changed();
           }}
+          onDelete={() => setOpen({ spaceId: space.id, dialog: "delete" })}
         />
       );
     case "delete":

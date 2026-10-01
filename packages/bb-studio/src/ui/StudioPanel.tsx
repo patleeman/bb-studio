@@ -612,6 +612,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
             refetch();
             openSpace(saved.id);
           }}
+          onDelete={() => setSpaceDialog({ type: "delete", space: spaceDialog.space })}
         />
       ) : null}
       {spaceDialog?.type === "items" ? (
