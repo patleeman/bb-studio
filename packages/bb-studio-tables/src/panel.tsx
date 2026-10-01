@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { AddOnCollection, Icon, useAddOnPanel } from "@bb-studio/kit/app";
 import { Button, Input } from "@bb-studio/kit/ui";
 import { errorMessage } from "@bb-studio/kit/format";
@@ -186,7 +186,7 @@ function CalendarView({
   );
 }
 
-function Editor({ tableId, onBack }: { tableId: string; onBack(): void }) {
+function Editor({ tableId, backLabel, onBack }: { tableId: string; backLabel: string; onBack(): void }) {
   const rpc = useRpc<typeof rpcContract>();
   const [table, setTable] = useState<Table | null>(null);
   const [viewId, setViewId] = useState("");
@@ -260,8 +260,8 @@ function Editor({ tableId, onBack }: { tableId: string; onBack(): void }) {
       <header className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
         <button
           type="button"
-          onClick={onBack}
-          aria-label="Back to tables"
+          onClick={() => onBack()}
+          aria-label={`Back to ${backLabel}`}
           className="rounded p-1 hover:bg-muted"
         >
           <Icon name="ArrowLeft" className="size-4" />
@@ -596,14 +596,14 @@ function Editor({ tableId, onBack }: { tableId: string; onBack(): void }) {
   );
 }
 export function TablesPanel({ subPath }: { subPath: string }) {
-  const navigate = useBbNavigate();
-  const { call, refreshKey } = useAddOnPanel(channel, "tables", "table");
+  const { call, refreshKey, studio, toCollection } = useAddOnPanel(channel, "tables", "table");
   const id = subPath.split("/").filter(Boolean)[0];
   if (id)
     return (
       <Editor
         tableId={id}
-        onBack={() => navigate.toPluginPanel("tables", { subPath: "" })}
+        backLabel={studio ? "Studio" : "Tables"}
+        onBack={toCollection}
       />
     );
   return (
@@ -613,7 +613,6 @@ export function TablesPanel({ subPath }: { subPath: string }) {
       kind="table"
       call={call}
       refreshKey={refreshKey}
-      handOver={false}
     />
   );
 }

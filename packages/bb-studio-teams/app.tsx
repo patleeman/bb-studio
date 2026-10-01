@@ -17,6 +17,8 @@ import type {
   Room,
   rpcContract,
 } from "./contract";
+import { AddOnCollection, type ProviderCall } from "@bb-studio/kit/app";
+import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
 import {
   TabBar,
@@ -34,9 +36,9 @@ import {
 } from "./channels";
 import { Modal } from "./channel-controls";
 import { setThreadDraft } from "./channel-drafts";
-import { BotCollection } from "./bot-collection";
+import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
-import { NEW_BOT_EVENT } from "./studio-provider";
+import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID } from "./studio-provider";
 import {
   Badge,
   DropdownMenu,
@@ -333,7 +335,6 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
   }, [load]);
   useRealtime("scoped-changed", (event) => { if (affects(event, "bots")) load(); });
   const [id, section] = subPath.split("/");
-  const bots = data?.bots ?? [];
   if (id === "new")
     return <BotCreationThread key={section ?? "standalone"} roomId={section} />;
   if (id === "new-group" || id === "group")
@@ -352,14 +353,38 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
         />
       </div>
     );
+  return <BotList requests={data?.botCreateRequests ?? null} error={error} onResolved={load} />;
+}
+/**
+ * The bots as a Studio collection, like every add-on's page. With Studio
+ * installed it hands over to Studio's, except while bot creation requests,
+ * which Studio can't show, are waiting.
+ */
+function BotList({
+  requests,
+  error,
+  onResolved,
+}: {
+  requests: import("./contract").BotCreateRequestView[] | null;
+  error: string | null;
+  onResolved: () => void;
+}) {
+  const rpc = useRpc<StudioSchemas["provider"]>();
+  const call = useCallback<ProviderCall>((method, input) => rpc.call(method, input as never) as never, [rpc]);
+  const [version, setVersion] = useState(0);
+  useRealtime("scoped-changed", (event) => { if (affects(event, "bots")) setVersion((value) => value + 1); });
+  if (requests === null && !error) return null;
   return (
-    <BotCollection
-      bots={bots}
-      loading={!data}
-      error={error}
-      botCreateRequests={data?.botCreateRequests ?? []}
-      onBotCreateRequestResolved={load}
-    />
+    <div className="flex h-full flex-col">
+      {requests?.length ? (
+        <div className="mx-10 mt-6 max-md:mx-4">
+          <BotCreateRequests botCreateRequests={requests} onBotCreateRequestResolved={onResolved} />
+        </div>
+      ) : null}
+      <div className="min-h-0 flex-1">
+        <AddOnCollection pluginId={PLUGIN_ID} title="Bots" kind={BOT_KIND.id} call={call} refreshKey={version} handOver={!requests?.length} />
+      </div>
+    </div>
   );
 }
 /** Studio's New ▾ → Bot opens the bot setup chat. */

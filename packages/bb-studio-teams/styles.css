@@ -549,19 +549,6 @@
 .bot-activity-panel {
   padding: 0 12px;
 }
-.bot-collection-state {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-}
-.bot-last-active {
-  min-width: 64px;
-  color: var(--muted-foreground);
-  font-size: var(--text-xs);
-  font-variant-numeric: tabular-nums;
-  text-align: right;
-  white-space: nowrap;
-}
 .bot-archive-button:not(:disabled) {
   border: 1px solid color-mix(in oklab, var(--destructive) 55%, transparent);
   background: transparent;
@@ -590,11 +577,6 @@
   .bot-danger-zone-content {
     align-items: flex-start;
     flex-direction: column;
-  }
-  .bot-collection-state {
-    align-items: flex-end;
-    flex-direction: column;
-    gap: 4px;
   }
 }
 

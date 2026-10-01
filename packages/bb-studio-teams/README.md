@@ -11,7 +11,7 @@ Persistent bots with their own files, mission, and memory, and Slack-style chann
 1. Choose **New channel** in the sidebar. Studio Teams creates the channel and opens it as a regular BB thread, with BB's own transcript and composer. Mention a bot with `@handle` in your message to invite it. Opening an existing channel the first time creates its thread and replays its last 50 messages there, each as its own message; your earlier messages show as **You**. **Search channel** finds anything older. See [Channels are threads](#channels-are-threads).
 2. Type `@` to find a bot or choose `@all` / `@channel` to address everyone in the channel. Sending a mention invites that bot into the channel. The picker also includes **Create new bot…**, which opens a new thread with bot setup instructions prefilled. Describe what you need in chat; the agent creates the bot and invites it to this channel. Your channel draft stays saved.
 3. Click the overlapping avatars in the channel thread's header to see members and their activity. **Add bot** sits at the bottom; member options let you configure or remove a bot. Live work, with **Stop**, and requests that need you appear above the composer.
-4. Under **Direct messages**, each row is one private thread with a bot: the bot's avatar, the thread title, and the bot's name in muted text. A bot can have many threads. The list is flat and sorted by recent activity, and new direct threads open on BB's regular thread page and get a title from the first message. Each row's menu starts a new thread with that bot and links to its profile, mission, memory, and activity. Open **Studio Teams** to manage profiles, edit `MISSION.md` and `MEMORY.md`, or inspect activity. The collection uses BB's standard content width, search toolbar, status filter, sorting, and bordered rows. Shared conversations live in Channels. Each bot also has a work thread you can open from its channel activity.
+4. Under **Direct messages**, each row is one private thread with a bot: the bot's avatar, the thread title, and the bot's name in muted text. A bot can have many threads. The list is flat and sorted by recent activity, and new direct threads open on BB's regular thread page and get a title from the first message. Each row's menu starts a new thread with that bot and links to its profile, mission, memory, and activity. Open **Studio Teams** to manage profiles, edit `MISSION.md` and `MEMORY.md`, or inspect activity. **Studio Teams** opens the bots as the same collection every Studio add-on uses; with Studio installed it opens Studio's collection filtered to Bots. Shared conversations live in Channels. Each bot also has a work thread you can open from its channel activity.
 
 In a thread, choose **Handoff to new channel** from the composer’s **+** menu, or **Start channel from thread** from the thread’s sidebar menu. Studio Teams opens a new channel thread with the source thread already linked at the top of the draft. Mention bots, add your request, then send it. The sent message keeps the thread reference as a link.
 
@@ -294,10 +294,11 @@ stay within two hops; a request stops adding replies at 32 responses and reports
 that limit. These rules prevent runaway consultation loops.
 
 Bots may also run `bb bots create`, but creation is approval-gated. The request
-appears in **Plugins → Studio Teams** under **Pending bot approvals**, where the owner
+appears on the **Studio Teams** page under **Pending bot approvals**, above the bots, where the owner
 can review the requested profile and mission and approve or deny it. The
 workspace and profile are created only after approval; denying, cancelling, or
-letting the request expire leaves no partial bot behind.
+letting the request expire leaves no partial bot behind. While a request is
+waiting, **Studio Teams** stays on its own page instead of opening Studio.
 
 ## Plugin ID and command names
 
@@ -357,7 +358,9 @@ Atlas.
 
 ![Bots collection in BB](assets/bots-collection.png)
 
-The Bots collection uses BB's standard collection layout and search controls.
+**Studio Teams** opens Studio's collection filtered to Bots, the same page and
+controls as every other Studio add-on. The staged bots are listed with their
+model.
 
 ![Bot profile settings in BB](assets/bot-profile.png)
 

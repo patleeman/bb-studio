@@ -112,10 +112,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         })()`);
       };
       try {
-        await client.navigate("/plugins/bot-teams/bots");
-        await client.waitForText("New bot");
-        await client.clickButtonText("New bot");
-        await checkComposer();
         // Direct links and reload must show the same native composer.
         await client.navigate("/plugins/bot-teams/bots/new");
         await checkComposer();
@@ -174,7 +170,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     setup: async (client) => {
       await captures.find((capture) => capture.id === "bots-collection").setup(client);
       await client.evaluate(`(() => {
-        const bot = Array.from(document.querySelectorAll('[data-resource-row] button')).find((button) => button.textContent.startsWith('Atlas'));
+        const bot = document.querySelector('[role="link"][aria-label="Atlas"]');
         if (!bot) throw new Error('Atlas is missing from the live collection');
         bot.click();
       })()`);
@@ -250,22 +246,16 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           item.click();
         })()`);
       }
-      await client.waitForAriaButton("Filter bots");
-      await client.waitForAriaButton("Sort bots");
+      // Studio Teams hands over to Studio's collection, filtered to bots.
+      await client.waitForSelector('input[aria-label="Search studio"]');
       await client.waitForText("Research and verify the facts");
       await client.evaluate(`(() => {
-        const collection = document.querySelector('[data-bots-collection]');
-        if (!collection?.querySelector('input[aria-label="Search bots"]') || !collection.querySelector('[data-resource-list-panel]')) {
-          throw new Error('Bots collection must use a search toolbar and native bordered list');
-        }
-        const rows = Array.from(collection.querySelectorAll('[data-resource-row]'));
+        if (!location.pathname.endsWith("/plugins/studio/studio/bot")) throw new Error("Studio Teams must open Studio's Bots collection, not " + location.pathname);
+        const pressed = Array.from(document.querySelectorAll('button[aria-pressed="true"]')).map((button) => button.textContent.trim());
+        if (!pressed.includes("Bots")) throw new Error("The Bots filter must be selected");
         for (const name of ['Atlas', 'Quinn', 'Relay', 'Scribe']) {
-          if (!rows.some((row) => row.textContent.includes(name) && row.textContent.includes('@'))) {
-            throw new Error('Missing staged bot: ' + name);
-          }
+          if (!document.body.innerText.includes(name)) throw new Error('Missing staged bot: ' + name);
         }
-        const width = collection.firstElementChild.getBoundingClientRect().width;
-        if (width > 1024 || width < 900) throw new Error('Bots collection must use BB collection content width');
       })()`);
     },
   },
