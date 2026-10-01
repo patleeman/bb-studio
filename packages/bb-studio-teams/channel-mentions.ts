@@ -67,7 +67,7 @@ export function registerChannelMentions(
       return {
         context: [
           `@${bot.handle} is the Studio Teams bot ${bot.name}: ${bot.description}.`,
-          "In a channel, mention it to ask it. Elsewhere, reach it with the bots skill (`bb bots channel send`), or attach its profile to a thread.",
+          "In a channel, mention it to ask it. Elsewhere, reach it with the bots skill (`bb bots channel send`), or work as it in a thread.",
         ].join("\n"),
       };
     },
@@ -140,7 +140,7 @@ export function registerChannelMentions(
         .map(({ bot, conversation, title }) => ({
           id: conversation.threadId,
           title: /^direct message$/iu.test(title) ? `${bot.avatar} ${bot.name}` : title,
-          subtitle: `Works as ${bot.name}`,
+          subtitle: `Working as ${bot.name}`,
           icon: "MessageSquare",
         }));
     },
@@ -152,7 +152,7 @@ export function registerChannelMentions(
       const latest = (await bb.sdk.threads.output({ threadId }).catch(() => null))?.output;
       return {
         context: [
-          `Thread "${title}"${bot ? ` with the profile of the Studio Teams bot ${bot.name} (@${bot.handle})` : ""}: [${title}](/threads/${threadId}) (thread ${threadId}).`,
+          `Thread "${title}"${bot ? ` working as the Studio Teams bot ${bot.name} (@${bot.handle})` : ""}: [${title}](/threads/${threadId}) (thread ${threadId}).`,
           latest?.trim() ? `Latest reply: ${excerpt(latest)}` : "No replies yet.",
           `Read the whole thread with \`bb thread log ${threadId}\`.`,
         ].join("\n"),

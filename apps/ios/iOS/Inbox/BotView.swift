@@ -58,7 +58,7 @@ struct BotView: View {
                 } header: {
                     Text("Threads")
                 } footer: {
-                    Text("Threads that work as \(bot.name). Add a profile from a thread's menu.")
+                    Text("Threads working as \(bot.name). Choose Work as bot in any thread's menu.")
                 }
                 let rooms = teams?.rooms.filter { $0.archived != true && $0.memberIds.contains(id) } ?? []
                 if !rooms.isEmpty {
@@ -91,7 +91,7 @@ struct BotView: View {
         }
     }
 
-    /// Starts a new thread with this bot's profile, like Message on the web.
+    /// Starts a new thread working as this bot, like Message on the web.
     private func message() async {
         starting = true
         defer { starting = false }

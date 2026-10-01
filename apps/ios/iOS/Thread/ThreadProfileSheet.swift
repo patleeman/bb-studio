@@ -1,8 +1,8 @@
 import SwiftUI
 
-/// The bot profile a thread works as, like the profile control beside the web
-/// composer. A thread takes one profile; adding another bot opens a new
-/// channel with both, its draft linked back to this thread.
+/// The bot a thread works as, like Work as bot beside the web composer. A
+/// thread works as one bot; inviting another opens a new channel with both,
+/// its draft linked back to this thread.
 struct ThreadProfileSheet: View {
     let thread: ThreadEntry
     /// The attached bot's id, or nil for an ordinary thread.
@@ -24,12 +24,12 @@ struct ThreadProfileSheet: View {
                     let bot = bots.first { $0.id == botId }
                     Section {
                         if let bot { BotRow(bot: bot) } else { Text("Archived bot").foregroundStyle(.secondary) }
-                        Button("Remove profile", role: .destructive) { Task { await attach(nil) } }
+                        Button("Stop working as \(bot?.name ?? "this bot")", role: .destructive) { Task { await attach(nil) } }
                             .disabled(busy)
                     } header: {
-                        Text("Works as")
+                        Text("Working as")
                     } footer: {
-                        Text(busy ? "Change the profile after this response." : "Changing the model keeps the profile.")
+                        Text(busy ? "Change the bot after this response." : "Changing the model keeps the thread working as the bot.")
                     }
                     let others = bots.filter { $0.id != botId }
                     if !others.isEmpty {
@@ -39,14 +39,14 @@ struct ThreadProfileSheet: View {
                                     .foregroundStyle(.primary)
                             }
                         } header: {
-                            Text("Add a bot in a new channel")
+                            Text("Invite to a channel")
                         } footer: {
-                            Text("A thread works as one bot. Another bot opens a channel with both, linked to this thread.")
+                            Text("A thread works as one bot. Inviting another opens a new channel with both, linked to this thread.")
                         }
                     }
                 } else if bots.isEmpty {
                     ContentUnavailableView("No Bots", systemImage: "person.crop.circle",
-                        description: Text("Create a bot in Studio to give threads its profile."))
+                        description: Text("Create a bot in Studio to have threads work as it."))
                 } else {
                     Section {
                         ForEach(bots) { bot in
@@ -58,7 +58,7 @@ struct ThreadProfileSheet: View {
                         Text("Work as a bot")
                     } footer: {
                         Text(busy
-                            ? "Add a bot after this response."
+                            ? "Work as a bot after this response."
                             : "The thread works as the bot in its own project, with the bot's mission and memory.")
                     }
                 }
@@ -67,7 +67,7 @@ struct ThreadProfileSheet: View {
                 }
             }
             .disabled(saving)
-            .navigationTitle("Bot Profile")
+            .navigationTitle("Work as bot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }

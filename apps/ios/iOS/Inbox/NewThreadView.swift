@@ -22,8 +22,8 @@ struct NewThreadView: View {
     @State private var reasoning = ""
     @State private var permissionMode = ""
 
-    // A bot profile to work as. Picking one applies the bot's selection above,
-    // which can still be changed; the profile attaches with the first message.
+    // A bot to work as. Picking one applies the bot's selection above, which
+    // can still be changed; the thread works as it from the first message.
     @State private var bots: [Bot] = []
     @State private var profileBotId = ""
     /// A picked bot whose model waits for its provider's options to load.
@@ -68,7 +68,7 @@ struct NewThreadView: View {
                 if !bots.isEmpty {
                     Section {
                         Picker("Work as", selection: $profileBotId) {
-                            Text("No profile").tag("")
+                            Text("None").tag("")
                             ForEach(bots) { Text("\($0.avatar ?? "🤖") \($0.name)").tag($0.id) }
                         }
                     } footer: {

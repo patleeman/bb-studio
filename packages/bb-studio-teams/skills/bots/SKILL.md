@@ -101,7 +101,7 @@ positional argument and requires `--mission` or `--mission-file`.
 Use `bb provider` to discover available models. A manual swap exchanges the
 primary and fallback selections and starts fresh bot threads. A provider error
 retries a managed, non-fork channel or mission response once with the fallback
-in a new thread. Forks use manual swaps; threads with a bot's profile keep
+in a new thread. Forks use manual swaps; threads working as a bot keep
 their own model. A retry can repeat tool actions from the failed thread.
 Partial updates preserve omitted fields. Interval is minutes: `0` disables the schedule, otherwise `5`–`10080`.
 Permissions use BB values `accept-edits`, `auto`, or `full`.

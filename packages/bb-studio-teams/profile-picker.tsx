@@ -24,9 +24,9 @@ const savePick = (projectId: string, botId: string | null) =>
   botId ? sessionStorage.setItem(pendingKey(projectId), botId) : sessionStorage.removeItem(pendingKey(projectId));
 
 /**
- * Beside the composer: the bot profile this thread works as. A thread with a
- * profile is the bot, working in the thread's project with its mission and
- * memory. A thread takes one profile; adding a second bot hands the thread off
+ * Beside the composer: the bot this thread works as. Working as a bot, the
+ * thread's agent is the bot, in the thread's project with its mission and
+ * memory. A thread works as one bot; inviting another hands the thread off
  * to a new channel with both. In the new-thread composer the pick also applies
  * the bot's model and permissions, which can still be changed before sending,
  * and attaches when the first message is sent.
@@ -140,15 +140,15 @@ export function ProfilePicker() {
     setBotId(null);
   };
 
-  const label = bot ? bot.name : current ? "Archived bot" : "Add bot";
+  const label = bot ? bot.name : current ? "Archived bot" : "Work as bot";
   const others = bots.filter((b) => b.id !== current);
   return (
     <DropdownMenu onOpenChange={(open) => open && loadBots()}>
       <DropdownMenuTrigger asChild>
         <button type="button" className="channel-settings-trigger" disabled={pending}
           data-profile={current ? "" : undefined}
-          aria-label={current ? `Profile: ${label}` : "Add a bot profile"}
-          title={error ?? "Profile"}>
+          aria-label={current ? `Working as ${label}` : "Work as a bot"}
+          title={error ?? (current ? `Working as ${label}` : "Work as a bot")}>
           {bot?.avatar ? <span aria-hidden="true">{bot.avatar}</span> : <Icon name={current ? "Bot" : "Plus"} />}
           <span>{label}</span>
           <Icon name="ChevronDown" />
@@ -157,21 +157,21 @@ export function ProfilePicker() {
       <DropdownMenuContent align="start" className="w-72">
         {current ? (
           <>
-            <DropdownMenuLabel>Works as</DropdownMenuLabel>
+            <DropdownMenuLabel>Working as</DropdownMenuLabel>
             <SettingsItem selected label={bot ? `${bot.avatar ? `${bot.avatar} ` : ""}${bot.name}` : "Archived bot"}
-              description={bot?.description || (bot ? `@${bot.handle}` : "Restore it to use its profile")}
+              description={bot?.description || (bot ? `@${bot.handle}` : "Restore it to work as it again")}
               onSelect={() => undefined} />
             <DropdownMenuItem disabled={busy} onSelect={() => void attach(null)}>
               <span className="channel-settings-check"><Icon name="X" /></span>
-              <span>{busy ? "Remove profile after this response" : "Remove profile"}</span>
+              <span>{busy ? "Stop working as it after this response" : `Stop working as ${bot?.name ?? "this bot"}`}</span>
             </DropdownMenuItem>
             {others.length ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>Add a bot in a new channel</DropdownMenuLabel>
+                <DropdownMenuLabel>Invite to a channel</DropdownMenuLabel>
                 {others.map((b) => (
                   <BotItem key={b.id} bot={b} onSelect={() => handoff(b)}
-                    description={bot ? `Channel with ${bot.name} and ${b.name}` : `Channel with ${b.name}`} />
+                    description={bot ? `New channel with ${bot.name} and ${b.name}` : `New channel with ${b.name}`} />
                 ))}
               </>
             ) : null}
@@ -180,7 +180,7 @@ export function ProfilePicker() {
           <>
             <DropdownMenuLabel>Work as a bot</DropdownMenuLabel>
             {busy ? (
-              <DropdownMenuItem disabled>Add a bot after this response</DropdownMenuItem>
+              <DropdownMenuItem disabled>Work as a bot after this response</DropdownMenuItem>
             ) : null}
             {bots.map((b) => (
               <BotItem key={b.id} bot={b} disabled={busy} onSelect={() => void attach(b)}

@@ -1139,7 +1139,7 @@ export default async function plugin(bb: BbPluginApi) {
         tools: channelTools,
         skills: ["bots"],
         instructions: [
-          `This thread has the profile of the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Work as this bot. Your persistent bot home is ${JSON.stringify(bot.home)}. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md, using that absolute path. Do the work itself in this thread's initial working directory: it is the thread's project, not your bot home.`,
+          `This thread works as the persistent bot ${JSON.stringify(bot.name)} (@${bot.handle}). Work as this bot. Your persistent bot home is ${JSON.stringify(bot.home)}. Read AGENTS.md in this bot home as well as MISSION.md and MEMORY.md, using that absolute path. Do the work itself in this thread's initial working directory: it is the thread's project, not your bot home.`,
           "Read MISSION.md and MEMORY.md at the beginning of every turn, including follow-ups. Keep durable memory up to date.",
           "MISSION.md belongs to the owner. Change it only on an explicit owner request.",
           "Private information stays in its conversation. Shared MEMORY.md should contain only information suitable for all rooms this bot joins.",

@@ -86,7 +86,7 @@ test("bot threads resolve to the thread with its bot and latest reply", async ()
   const x = setup();
   const found = await x.search("dms", "release");
   assert.deepEqual(found.map((item) => [item.id, item.title, item.subtitle]), [
-    ["thr_dm", "Release notes", "Works as Scribe"],
+    ["thr_dm", "Release notes", "Working as Scribe"],
   ]);
   assert.deepEqual(await x.search("dms", "", "thr_dm"), []);
   const resolved = (await x.providers.get("dms")!.resolve("thr_dm")) as { context: string };

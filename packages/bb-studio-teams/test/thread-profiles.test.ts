@@ -26,7 +26,7 @@ test("attaching a profile to a thread makes its agent work as the bot in that th
     const config = await x.harness.behavior.resolveAgentConfiguration(
       makePluginAgentConfigurationContext({ thread: { id: "thr_work" } }),
     );
-    assert.match(config.instructions ?? "", /profile of the persistent bot "Atlas"/);
+    assert.match(config.instructions ?? "", /works as the persistent bot "Atlas"/);
     assert.match(config.instructions ?? "", /initial working directory: it is the thread's project/);
     assert.match(config.instructions ?? "", /MEMORY\.md/);
     const listed = await x.harness.behavior.callRpc("profileThreads", { id: x.a.id }) as { threadId: string }[];

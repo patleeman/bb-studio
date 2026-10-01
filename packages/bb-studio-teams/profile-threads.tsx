@@ -12,7 +12,7 @@ type ProfileThread = {
   updatedAt: number;
 };
 
-/** The threads this bot's profile is attached to, newest first. */
+/** The threads working as this bot, newest first. */
 export function ProfileThreads({ id }: { id: string }) {
   const rpc = useRpc<typeof rpcContract>(),
     navigate = useBbNavigate();
@@ -33,7 +33,7 @@ export function ProfileThreads({ id }: { id: string }) {
   if (!threads.length)
     return (
       <EmptyState icon="MessageSquare" title="No threads yet">
-        Pick this bot as a thread's profile in the composer, or use Message.
+        Choose Work as bot in any thread's composer, or use Message.
       </EmptyState>
     );
   return (

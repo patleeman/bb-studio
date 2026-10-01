@@ -38,7 +38,7 @@ struct ThreadView: View {
     @State private var newTitle = ""
     @State private var reviewingPlan: PlanReview?
     /// The bot this thread works as: `.some(nil)` for none, nil where it
-    /// can't take a profile (channels, bot work threads, no Bot Teams).
+    /// can't work as a bot (channels, bot work threads, no Bot Teams).
     @State private var profile: String??
     @State private var profileBot: Bot?
     @State private var choosingProfile = false
@@ -287,7 +287,7 @@ struct ThreadView: View {
                     Button { choosingModel = true } label: { Label("Model & permissions", systemImage: "cpu") }
                     if case .some(let botId) = profile {
                         Button { choosingProfile = true } label: {
-                            Label(botId == nil ? "Add bot" : "Works as \(profileBot?.name ?? "an archived bot")",
+                            Label(botId == nil ? "Work as bot" : "Working as \(profileBot?.name ?? "an archived bot")",
                                 systemImage: "person.crop.circle")
                         }
                     }
@@ -714,7 +714,7 @@ struct ThreadView: View {
                     Button { choosingProfile = true } label: {
                         Text(profileBot?.avatar ?? "🤖").font(.title3).frame(width: 36, height: 36)
                     }
-                    .accessibilityLabel("Profile: \(profileBot?.name ?? "Archived bot")")
+                    .accessibilityLabel("Working as \(profileBot?.name ?? "an archived bot")")
                 }
                 AttachmentMenu(items: $attachments)
                 Button { dictating = true } label: {

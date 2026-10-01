@@ -35,13 +35,13 @@ export class ThreadProfiles {
 
   async set(threadId: string, botId: string | null) {
     const current = this.profile(threadId);
-    if (!current) throw new Error("This thread can't take a bot profile.");
+    if (!current) throw new Error("This thread can't work as a bot.");
     if (current.botId === botId) return current;
     const bot = botId ? this.store.get(botId) : null;
-    if (bot?.retired) throw new Error("Restore this bot before attaching it.");
+    if (bot?.retired) throw new Error("Restore this bot before working as it.");
     const thread = await this.bb.sdk.threads.get({ threadId });
     if (["starting", "active", "stopping"].includes(thread.status))
-      throw new Error("Wait for this thread's current response before changing its profile.");
+      throw new Error("Wait for this thread's current response before changing which bot it works as.");
     this.store.deleteConversation(threadId);
     if (bot) {
       this.attach(bot, threadId);
