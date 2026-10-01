@@ -190,7 +190,7 @@ function ExploreRow({
           title="Regenerate"
           className="flex w-9 shrink-0 items-center justify-center text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-40"
         >
-          <Icon name="RotateCw" fallback="RotateCcw" className="size-3.5" />
+          <Icon name="RotateCcw" className="size-3.5" />
         </button>
       ) : null}
       {state === "running" ? (

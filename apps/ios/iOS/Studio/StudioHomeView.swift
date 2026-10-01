@@ -93,12 +93,17 @@ struct StudioHomeView: View {
                         if home.activity?.isEmpty == false {
                             Section("Activity") {
                                 ForEach(Array((home.activity ?? []).enumerated()), id: \.offset) { _, event in
-                                    VStack(alignment: .leading, spacing: 3) {
-                                        Text(event.summary ?? event.verb ?? "Update")
+                                    let row = VStack(alignment: .leading, spacing: 3) {
+                                        Text(event.summary ?? "Untitled")
                                         if let at = event.at {
-                                            Text(Date(timeIntervalSince1970: at / 1000), style: .relative)
+                                            Text("\(event.verb?.capitalized ?? "Updated") \(Date(timeIntervalSince1970: at / 1000), style: .relative) ago")
                                                 .font(.caption).foregroundStyle(.secondary)
                                         }
+                                    }
+                                    if let route = event.href.flatMap(Route.init(href:)) {
+                                        NavigationLink(value: route) { row }
+                                    } else {
+                                        row
                                     }
                                 }
                             }
@@ -116,6 +121,12 @@ struct StudioHomeView: View {
                 }
                 .refreshable { await load() }
                 .task { await load() }
+                // Items opened from Home read running add-ons from the shared store.
+                .task(id: app.serverURL) {
+                    StudioStore.shared.restore()
+                    StudioStore.shared.attach(app)
+                    await StudioStore.shared.load(app.client)
+                }
                 .alert("Answer question", isPresented: Binding(get: { answering != nil }, set: { if !$0 { answering = nil } })) {
                     TextField("Answer", text: $answer, axis: .vertical)
                     Button("Cancel", role: .cancel) { answer = "" }

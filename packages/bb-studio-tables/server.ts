@@ -115,7 +115,7 @@ const KIND: StudioKind = {
   id: "table",
   label: "Table",
   plural: "Tables",
-  icon: "Table",
+  icon: "Rows2",
   columns: [{ id: "rows", label: "Rows" }],
   actions: [],
   create: { mode: "rpc" },

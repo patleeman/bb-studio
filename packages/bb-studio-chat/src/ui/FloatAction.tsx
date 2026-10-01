@@ -20,7 +20,7 @@ export function FloatAction({ threadId, isCompactViewport }: PluginThreadHeaderA
       )}
       onClick={() => floatThread(threadId)}
     >
-      <Icon name="PictureInPicture2" className="size-4" />
+      <Icon name="SideChat" className="size-4" />
       {isCompactViewport ? null : <span>Float</span>}
     </button>
   );

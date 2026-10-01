@@ -114,7 +114,7 @@ export function registerStudio(
   createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "tasks", kinds: [TASK_KIND] }),
     studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(row, store.latestHandoff(id))] : []; }) }),
-    studio_read: ({ id }) => { const row = store.get(id); return { content: row ? [`# ${row.title}`, row.description].filter(Boolean).join("\n\n") : null }; },
+    studio_read: ({ id, format }) => { const row = store.get(id); return { content: row ? [format === "markdown" ? `# ${row.title}` : row.title, row.description].filter(Boolean).join("\n\n") : null }; },
     studio_list: () => ({
       items: store.list({ includeArchived: true }).map((task) => toStudioItem(task, store.latestHandoff(task.id))),
     }),

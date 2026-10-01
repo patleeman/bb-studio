@@ -151,4 +151,8 @@ describe("plainText", () => {
       "Goals\nShip the kit\nconst pricing = 1;",
     );
   });
+
+  it("leaves out chart, stats and embed settings", () => {
+    expect(plainText('Launch\n\n```chart\n{"type":"bar","data":[]}\n```\n\n```stats\n[]\n```\n\nChecklist')).toBe("Launch\nChecklist");
+  });
 });

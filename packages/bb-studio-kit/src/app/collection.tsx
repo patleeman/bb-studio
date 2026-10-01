@@ -331,7 +331,7 @@ export function CollectionPage({
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className={className}>
-            <Icon name="Plus" /> New <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+            <Icon name="Plus" /> {createTargets.length === 1 ? `New ${createTargets[0]!.label.toLowerCase()}` : "New"} <Icon name="ChevronDown" className="-mr-1 opacity-70" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
@@ -381,7 +381,7 @@ export function CollectionPage({
             <Icon name="MessageSquarePlus" className="size-4" /> New thread with this
           </DropdownMenuItem>
           {handlers.onDuplicate && kind?.capabilities?.duplicate ? <DropdownMenuItem onSelect={() => void handlers.onDuplicate!(item)}><Icon name="Copy" className="size-4" /> Duplicate</DropdownMenuItem> : null}
-          {handlers.onSetTemplate && kind?.capabilities?.templates ? <DropdownMenuItem onSelect={() => void handlers.onSetTemplate!(item, !item.template)}><Icon name="Bookmark" className="size-4" /> {item.template ? "Remove template" : "Save as template"}</DropdownMenuItem> : null}
+          {handlers.onSetTemplate && kind?.capabilities?.templates ? <DropdownMenuItem onSelect={() => void handlers.onSetTemplate!(item, !item.template)}><Icon name="Star" className="size-4" /> {item.template ? "Remove template" : "Save as template"}</DropdownMenuItem> : null}
           {handlers.onExport && kind?.capabilities?.export ? <DropdownMenuSub><DropdownMenuSubTrigger><Icon name="Download" className="size-4" /> Export</DropdownMenuSubTrigger><DropdownMenuSubContent>
             {(handlers.exportFormats?.(item) ?? []).map(({ format, label }) => <DropdownMenuItem key={format} onSelect={() => void handlers.onExport!(item, format)}>{label}</DropdownMenuItem>)}
           </DropdownMenuSubContent></DropdownMenuSub> : null}

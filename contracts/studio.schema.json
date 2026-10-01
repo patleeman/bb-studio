@@ -390,6 +390,9 @@
                 },
                 "id": {
                   "type": "number"
+                },
+                "href": {
+                  "type": "string"
                 }
               },
               "required": [
@@ -398,7 +401,8 @@
                 "ref",
                 "at",
                 "summary",
-                "id"
+                "id",
+                "href"
               ],
               "additionalProperties": false
             }

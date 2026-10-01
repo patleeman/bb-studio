@@ -157,7 +157,7 @@ export function ChannelSidebarRow({
           Open in split
         </ContextMenuItem>
         <ContextMenuItem onSelect={onCopyLink}>
-          <Icon name="Link" />
+          <Icon name="Copy" />
           Copy channel link
         </ContextMenuItem>
         <ContextMenuItem disabled={pending} onSelect={onMarkRead}>

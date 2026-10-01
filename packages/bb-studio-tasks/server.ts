@@ -268,7 +268,7 @@ export default async function plugin(bb: BbPluginApi) {
       }).catch(() => { /* The hub is optional. */ });
       void services.recordActivity({
         ref: { pluginId: PLUGIN_ID, id }, actor: { kind: task.updated_by === "agent" ? "agent" : "user" },
-        verb: "updated", at: task.updated_at, summary: task.title || "Untitled task",
+        verb: task.created_at === task.updated_at ? "created" : "updated", at: task.updated_at, summary: task.title || "Untitled task",
       }).catch(() => { /* The hub is optional. */ });
     }
   }

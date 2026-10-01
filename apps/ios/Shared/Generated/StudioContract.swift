@@ -429,14 +429,16 @@ public enum Studio {
     public var at: Double?
     public var summary: String?
     public var id: Double?
+    public var href: String?
 
-    public init(`actor`: HomeOutputActivityItemActor? = nil, verb: String? = nil, ref: HomeOutputActivityItemRef? = nil, at: Double? = nil, summary: String? = nil, id: Double? = nil) {
+    public init(`actor`: HomeOutputActivityItemActor? = nil, verb: String? = nil, ref: HomeOutputActivityItemRef? = nil, at: Double? = nil, summary: String? = nil, id: Double? = nil, href: String? = nil) {
       self.`actor` = `actor`
       self.verb = verb
       self.ref = ref
       self.at = at
       self.summary = summary
       self.id = id
+      self.href = href
     }
   }
 

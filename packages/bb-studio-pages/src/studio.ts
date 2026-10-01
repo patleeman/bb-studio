@@ -55,11 +55,22 @@ export function excerpt(markdown: string): string | null {
   return null;
 }
 
-/** A page's text for search snippets: every line, code included, without Markdown syntax. */
+/** Fenced blocks that hold block settings as JSON rather than text. */
+const DATA_FENCES = new Set(["chart", "stats", "embed"]);
+
+/** A page's text for search snippets: every line, code included, without Markdown syntax or block settings. */
 export function plainText(markdown: string): string {
+  let data = false;
   return markdown
     .split("\n")
-    .map((raw) => (raw.trim().startsWith("```") ? "" : plainLine(raw)))
+    .map((raw) => {
+      const line = raw.trim();
+      if (line.startsWith("```")) {
+        data = !data && DATA_FENCES.has(line.slice(3).trim().split(/\s/)[0]!);
+        return "";
+      }
+      return data ? "" : plainLine(raw);
+    })
     .filter(Boolean)
     .join("\n");
 }

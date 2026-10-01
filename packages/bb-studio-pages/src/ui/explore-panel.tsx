@@ -161,7 +161,7 @@ function ExplainerHeader({
         </button>
       ) : (
         <button type="button" className={button} disabled={acting} onClick={onRegenerate} title={state === "ready" ? "Write it again; the current page is kept as a version" : undefined}>
-          <Icon name={state === "ready" ? "RotateCw" : "RotateCcw"} fallback="RotateCcw" className="size-3.5" />
+          <Icon name="RotateCcw" className="size-3.5" />
           {state === "ready" ? "Regenerate" : state === "error" ? "Retry" : "Generate"}
         </button>
       )}

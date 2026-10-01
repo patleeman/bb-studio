@@ -77,7 +77,12 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
   const automations = automationLists?.some((list) => list !== null)
     ? automationLists.flatMap((list) => list ?? []).filter((item) => item.enabled && item.nextRunAt !== null && day(new Date(item.nextRunAt)) === today).sort((a, b) => (a.nextRunAt ?? 0) - (b.nextRunAt ?? 0)).slice(0, 8)
     : null;
-  const activity = services.activity(null, 0, 50).filter((event) => !projectId || overview.items.some((item) => item.pluginId === event.ref.pluginId && item.id === event.ref.id && sameProject(item, projectId))).slice(0, 12);
+  // Only items an add-on still lists, so deleted items drop out of Home.
+  const listed = new Map(overview.items.map((item) => [`${item.pluginId}:${item.id}`, item]));
+  const activity = services.activity(null, 0, 50).flatMap((event) => {
+    const item = listed.get(`${event.ref.pluginId}:${event.ref.id}`);
+    return item && sameProject(item, projectId) ? [{ ...event, href: item.href }] : [];
+  }).slice(0, 12);
   const threads = await Promise.all(threadList.filter((thread) => thread.updatedAt >= since).slice(0, 40).map(async (thread) => {
     const events = await sdk.threads.events.list({ threadId: thread.id, order: "desc", limit: "500", types: ["turn/started", "turn/completed"] }).catch(() => []);
     return { id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, ...summarizeTurns(events.map((event) => ({ type: event.type, createdAt: event.createdAt, data: { status: event.type === "turn/completed" ? event.data.status : undefined } })), since) };

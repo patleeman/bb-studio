@@ -304,7 +304,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       if (name === null) return;
       void rpc.call("instantiateTemplate", { pluginId: item.pluginId, id: item.id, projectId, variables: { name } }).then(({ item: created }) => { refetch(); openAppPath(created.href); }, (cause: unknown) => toast.error(`Couldn't use template: ${errorMessage(cause)}`));
     } })),
-    ...playbooks.map((book) => ({ id: `playbook:${book.id}`, label: `Playbook: ${book.name}`, icon: "BookOpen", onSelect: (projectId: string | null) => {
+    ...playbooks.map((book) => ({ id: `playbook:${book.id}`, label: `Playbook: ${book.name}`, icon: "ListTodo", onSelect: (projectId: string | null) => {
       if (!projectId) { toast.error("Pick a project to run a playbook."); return; }
       const name = window.prompt("Name for this playbook (optional)", "");
       if (name === null) return;

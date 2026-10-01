@@ -229,7 +229,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Read-only: opens sheets and screens, never sends, forks or compacts.
-    func testThreadExtras() {
+    func testThreadExtras() throws {
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let more = app.buttons["More"]
         XCTAssertTrue(more.waitForExistence(timeout: 10))
@@ -241,6 +241,8 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.segmentedControls.buttons["Changes"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-changes")
+        // The diff steps need the fixture thread's checkout to have changes.
+        try XCTSkipIf(app.staticTexts["No uncommitted changes"].exists, "no uncommitted changes to open")
         app.staticTexts.matching(NSPredicate(format: "label ENDSWITH '.md'")).firstMatch.tap()
         sleep(2)
         shot("extras-diff")
@@ -278,7 +280,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: filters Studio by kind, opens one of each, and searches. Records nothing.
     func testStudio() {
-        app.open(URL(string: "bbstudio://studio")!)
+        openStudioCollection()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
@@ -520,6 +522,14 @@ final class ThreadUITests: XCTestCase {
         guard let value = field.value as? String, !value.isEmpty, value != "Message" else { return }
         if !field.hasKeyboardFocus { field.tap() }
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 4))
+    }
+
+    /// Studio opens on Home; the collection is one tap away.
+    private func openStudioCollection() {
+        app.open(URL(string: "bbstudio://studio")!)
+        let collection = app.buttons["studioCollection"]
+        XCTAssertTrue(collection.waitForExistence(timeout: 10), "Collection button")
+        collection.tap()
     }
 
     /// The socket closes in the background: on return the inbox catches up on what
@@ -824,7 +834,7 @@ final class ThreadUITests: XCTestCase {
                 _ = self.rpc("pages", "remove", ["id": item["id"] as? String ?? ""])
             }
         }
-        app.open(URL(string: "bbstudio://studio")!)
+        openStudioCollection()
         let new = app.buttons["New"].firstMatch
         XCTAssertTrue(new.waitForExistence(timeout: 10), "New menu")
         new.tap()
@@ -879,7 +889,7 @@ final class ThreadUITests: XCTestCase {
                 }
             }
         }
-        app.open(URL(string: "bbstudio://studio")!)
+        openStudioCollection()
         let write = app.buttons["Write"].firstMatch
         XCTAssertTrue(write.waitForExistence(timeout: 10), "Write tile")
         XCTAssertTrue(app.buttons["Dictate"].exists && app.buttons["Task"].exists, "Dictate and Task tiles")
@@ -1091,7 +1101,7 @@ final class ThreadUITests: XCTestCase {
             }
             _ = self.rpc("studio-tasks", "delete", ["id": id])
         }
-        app.open(URL(string: "bbstudio://studio")!)
+        openStudioCollection()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15), "task in Studio")
         row.press(forDuration: 1)
@@ -1236,7 +1246,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Chief of Staff"].firstMatch.waitForExistence(timeout: 10), "bot screen")
         XCTAssertTrue(app.staticTexts["Channels"].waitForExistence(timeout: 5) || app.staticTexts["CHANNELS"].exists, "channels")
         shot("bot-view")
-        app.open(URL(string: "bbstudio://studio")!)
+        openStudioCollection()
         let bots = app.buttons["Bots"].firstMatch
         for _ in 0..<4 where !bots.isHittable { app.scrollViews.containing(.button, identifier: "All").firstMatch.swipeLeft() }
         bots.tap()
@@ -1267,7 +1277,7 @@ final class ThreadUITests: XCTestCase {
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
         _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio-tasks", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
-        app.open(URL(string: "bbstudio://studio")!)
+        openStudioCollection()
         let search = app.searchFields.firstMatch
         if !search.waitForExistence(timeout: 5) { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 10), "search field")

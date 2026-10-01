@@ -73,7 +73,7 @@ export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
   if (!studio) return null;
   return <div className="relative">
     <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-sm shadow-sm hover:bg-state-hover">
-      <Icon name="Link" className="size-4" /> Related
+      <Icon name="Layers" className="size-4" /> Related
     </button>
     {open ? <div className="absolute top-10 right-0 z-30 max-h-[70vh] w-72 overflow-y-auto rounded-lg border border-border bg-background p-3 shadow-xl">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">Related items</div>

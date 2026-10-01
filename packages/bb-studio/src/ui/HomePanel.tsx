@@ -59,9 +59,9 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
   return <PageColumn>
     <div className="flex flex-wrap items-center justify-between gap-3">
       <h1 className="text-2xl font-semibold">Studio</h1>
-      <button type="button" onClick={() => navigate.toPluginPanel("studio", { subPath: "collection" })} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-state-hover"><Icon name="LayoutGrid" className="size-4" /> Collection</button>
+      <button type="button" onClick={() => navigate.toPluginPanel("studio", { subPath: "collection" })} className="inline-flex items-center gap-2 rounded-md border border-border px-3 py-1.5 text-sm hover:bg-state-hover"><Icon name="GridView" className="size-4" /> Collection</button>
     </div>
-    <div role="tablist" aria-label="Home views" className="flex gap-1 border-b border-border">
+    <div role="tablist" aria-label="Home views" className="mb-2 flex gap-1 border-b border-border">
       {(["today", "activity"] as const).map((view) => <button key={view} type="button" role="tab" aria-selected={tab === view} onClick={() => navigate.toPluginPanel("studio", { subPath: view === "today" ? "" : "activity" })} className={`px-3 py-2 text-sm capitalize ${tab === view ? "border-b-2 border-foreground font-medium" : "text-muted-foreground hover:text-foreground"}`}>{view}</button>)}
     </div>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -73,7 +73,7 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
       {data.working.threads.length || data.working.bots?.length ? <Section title="Agents working now">{data.working.threads.map((thread) => <Row key={thread.id} title={thread.title} detail={thread.status} href={`/threads/${thread.id}`} />)}{data.working.bots?.map((bot) => <Row key={bot.id} title={bot.name} detail="Bot" />)}</Section> : null}
       {data.recent.length ? <Section title="Recent items">{data.recent.map((item) => <Row key={`${item.pluginId}:${item.id}`} title={item.title || "Untitled"} detail={item.kind} href={item.href} />)}</Section> : null}
       {data.automations?.length ? <Section title="Today's automations">{data.automations.map((automation) => <Row key={automation.id} title={automation.name} detail={automation.nextRunAt ? new Intl.DateTimeFormat(undefined, { hour: "numeric", minute: "2-digit" }).format(automation.nextRunAt) : undefined} />)}</Section> : null}
-      {data.activity.length ? <Section title="Activity">{data.activity.map((event) => <Row key={event.id} title={event.summary || event.verb} detail={new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(event.at)} />)}</Section> : null}
+      {data.activity.length ? <Section title="Activity">{data.activity.map((event) => <Row key={event.id} title={event.summary || "Untitled"} detail={`${event.verb} · ${new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(event.at)}`} href={event.href} />)}</Section> : null}
       {!data.needsYou?.length && !data.due?.length && !data.review?.length && !data.working.threads.length && !data.working.bots?.length && !data.recent.length && !data.automations?.length && !data.activity.length ? <p className="text-sm text-muted-foreground">Nothing needs attention today.</p> : null}
     </div> : null}
     {data && tab === "activity" ? <div className="space-y-6">

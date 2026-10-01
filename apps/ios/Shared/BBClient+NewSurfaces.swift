@@ -12,12 +12,13 @@ extension BBClient {
         ]))
     }
 
+    /// Searches every project unless one is given; a null projectId would mean global items only.
     public func studioSearchAll(_ query: String, projectId: String? = nil) async throws -> Studio.SearchAllOutput {
-        try await rpc("studio", Studio.Method.searchAll, [
+        try await rpc("studio", Studio.Method.searchAll, .object(omittingNil: [
             "query": .string(String(query.prefix(200))),
-            "projectId": projectId.map(JSONValue.string) ?? .null,
+            "projectId": projectId.map(JSONValue.string),
             "limit": .number(40),
-        ])
+        ]))
     }
 
     public func taskStatuses(projectId: String?) async throws -> [Tasks.StatusesOutputColumnsItem] {
