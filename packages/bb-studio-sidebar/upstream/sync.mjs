@@ -6,14 +6,15 @@ import { tmpdir } from "node:os";
 import { basename, dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 
-const repo = resolve(dirname(fileURLToPath(import.meta.url)), "..");
+const here = dirname(fileURLToPath(import.meta.url));
 const args = process.argv.slice(2);
 const option = (flag) => { const index = args.indexOf(flag); return index < 0 ? null : args[index + 1]; };
-const upstream = resolve(option("--upstream") ?? "/Users/patrick/workingdir/bb");
+if (!option("--upstream")) throw new Error("Usage: node upstream/sync.mjs --upstream <bb checkout> [--commit <sha>] [--check]");
+const upstream = resolve(option("--upstream"));
 const commit = option("--commit") ?? "HEAD";
 const check = args.includes("--check");
 const prefix = "plugins/thread-list/";
-const destination = join(repo, "packages/bb-studio-sidebar/source");
+const destination = join(here, "../source");
 const staging = mkdtempSync(join(tmpdir(), "bb-sidebar-sync-"));
 const run = (command, argv, cwd) => execFileSync(command, argv, { cwd, encoding: "utf8", stdio: ["ignore", "pipe", "pipe"] });
 
@@ -29,7 +30,7 @@ try {
     writeFileSync(output, execFileSync("git", ["show", `${sha}:${name}`], { cwd: upstream }));
   }
   for (const patch of ["studio-hooks.patch", "tests.patch"]) {
-    const file = join(repo, "scripts/sidebar-patches", patch);
+    const file = join(here, patch);
     if (!readFileSync(file, "utf8").trim()) continue;
     try {
       run("git", ["apply", "--unidiff-zero", "--check", file], staging);

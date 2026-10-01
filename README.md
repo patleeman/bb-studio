@@ -9,12 +9,13 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. One collection for pages, recordings, drawings, artifacts, tasks and bots, with search, tags, project filters and tabs. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tasks, tables and bots, with search, tags, project filters, templates and tabs. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
 | [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | A board of tasks you can hand to agents; each follows its thread from working to review. |
+| [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
@@ -30,7 +31,7 @@ all. Studio Teams needs Studio Decisions for its channel routing.
 
 [`apps/ios`](apps/ios/) is BB Studio for iPhone and Apple Watch: BB's threads,
 approvals, terminals and automations, plus native Studio, Pages, Talk, Draw,
-Artifacts, Tasks and Teams. It talks to your BB server and uses the plugins
+Artifacts, Tasks, Tables and Teams. It talks to your BB server and uses the plugins
 above; install `mobile` for push notifications. See its
 [README](apps/ios/README.md) to build it and ship it to TestFlight.
 
@@ -53,6 +54,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
    - studio-tasks: a task board you hand to agents
+   - studio-tables: structured tables with views and CSV import and export
    - bot-teams: persistent bots in channels
    - studio-chat: a chat that floats over Studio items
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list

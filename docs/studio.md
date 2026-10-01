@@ -1,6 +1,6 @@
 # BB Studio
 
-BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts, Tasks and Teams keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
+BB Studio collects the items owned by its add-ons in one searchable, tagged collection. Pages, Talk, Draw, Artifacts, Tasks, Tables and Teams keep their own data, item views and agent tools. Studio discovers providers through `studio_describe` and reads their items through the shared contract in `packages/bb-studio-kit/src/contract.ts`.
 
 ## Provider contract
 
@@ -16,6 +16,9 @@ A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accep
 | `studio_create` | `{ kind, projectId }` | Created item |
 | `studio_move`, `studio_archive`, `studio_delete` | Item ids and operation parameters | Per-id results |
 | `studio_action` | `{ action, ids }` | Message and optional text |
+| `studio_duplicate` (v2) | `{ id, projectId, includeChildren? }` | Copied item |
+| `studio_template`, `studio_instantiate` (v2) | Mark an item as a template; create an item from one with `{{name}}` variables | Item |
+| `studio_export` (v2) | `{ id, format }` | Files as base64 with names and MIME types |
 
 `StudioItem` includes an opaque id, kind, title, icon, project and parent ids, created and updated times, preview, facts, badge, thumbnail URL, view URL and archive state. Clients must not parse item ids. The provider's `studio_get` retrieves one or more items without listing its collection. `studio_read` is the common content entry point for agents and indexing. Binary artifacts return `null` content.
 
@@ -32,6 +35,14 @@ The Studio hub stores links, item threads, activity, comments, and content versi
 `replaceLinks` replaces one source's outgoing edges for an item. Pages sends mentions and item links; Tasks sends its `task_links` while keeping that table authoritative. `links` returns outgoing edges and backlinks. `spawnForItem` creates and records a thread; `linkItemThread` records threads created by existing workflows. Studio also links the first accepted composer input's item refs, including multiple selected items, while keeping the composer's model and workspace choices. Studio reconciles thread states at startup and tracks lifecycle events. Pages chats, Tasks handoffs, and Studio Chat links are imported without deleting their original records.
 
 `recordActivity` accepts a kit `Actor`, verb, item ref, time, and summary. `activity` reads a bounded feed, optionally filtered by item and cursor. Comments use `comments`, `commentCreate`, and `commentResolve`; Pages keeps its Yjs comments and maps them to this interface. Other item comments live in Studio and send explicit `@bot` mentions to Studio Teams. Versions use `versions`, `versionCreate`, and `versionRead`. Studio deduplicates new drawing and task blobs by SHA-256. Pages snapshots and artifact versions stay in their owner stores and are read through adapters.
+
+## Search and Home
+
+Studio keeps an SQLite FTS index of every provider's titles and `studio_read` text, updated from the change feed; `bb studio reindex` rebuilds it. `searchAll { query, kinds?, limit }` merges that index with live BB thread search and Studio Teams channel messages, and returns ranked hits with highlighted snippets. Cmd/Ctrl+Shift+K opens it as a quick-open palette; Cmd/Ctrl+K stays BB's thread search.
+
+`home { projectId?, periodDays }` feeds the Studio panel's Today view. **Needs you** gathers BB approvals and questions, Studio Teams attention requests, tasks in review or due, and open comments, ranked by urgency. `homeRespond` answers a BB approval or question from Home. The other sections list due and in-review tasks, running threads and bots, recent items, upcoming automations, and the activity feed. There is no separate inbox.
+
+Templates, playbooks, and bulk export are described in the [Studio README](../packages/bb-studio/README.md#templates-playbooks-and-export).
 
 ## Collection and installation
 

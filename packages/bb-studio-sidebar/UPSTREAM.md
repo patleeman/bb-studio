@@ -2,15 +2,15 @@
 
 Compared with BB commit `8595b6ea4b8bfa771f84d57e69124e76bacf9eef`
 (`plugins/thread-list`). The runtime source is vendored under `source/`.
-Run this from the repository root to check or refresh it:
+Run this from this package directory to check or refresh it:
 
 ```sh
-node scripts/sync-sidebar.mjs --upstream /path/to/bb --commit 8595b6ea4b8bfa771f84d57e69124e76bacf9eef --check
-node scripts/sync-sidebar.mjs --upstream /path/to/bb --commit <new-commit>
+node upstream/sync.mjs --upstream /path/to/bb --commit 8595b6ea4b8bfa771f84d57e69124e76bacf9eef --check
+node upstream/sync.mjs --upstream /path/to/bb --commit <new-commit>
 ```
 
 The script reads tracked files from the selected commit, applies
-`scripts/sidebar-patches/studio-hooks.patch` and `tests.patch` in a temporary
+`upstream/studio-hooks.patch` and `tests.patch` in a temporary
 directory, and stops before writing if either patch conflicts. Review and
 update the patches, tests, and this commit before accepting a newer BB commit.
 Studio-only files live in `source/app/studio/`. Test fixtures live in

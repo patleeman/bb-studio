@@ -66,7 +66,7 @@ portals into it. Without Studio Sidebar, `SidebarPortal` renders nothing.
 ```sh
 pnpm --filter @bb-studio/thread-list-plus typecheck
 pnpm --filter @bb-studio/thread-list-plus test
-node scripts/sync-sidebar.mjs --upstream /path/to/bb --commit <sha> --check
+node upstream/sync.mjs --upstream /path/to/bb --commit <sha> --check
 bb plugin build .
 ```
 
