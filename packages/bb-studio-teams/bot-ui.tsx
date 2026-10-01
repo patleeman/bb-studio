@@ -19,7 +19,6 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { Bot, Job, ProfileInput, rpcContract } from "./contract";
 import { Button } from "./components/ui/button";
-import { openWorkThread } from "./channel-threads";
 import { Input } from "./components/ui/input";
 import {
   Select,
@@ -816,7 +815,7 @@ export function WorkList({ jobs, bots }: { jobs: Job[]; bots: Bot[] }) {
               disabled={!job.threadId}
               title={job.threadId ? "Open work thread" : undefined}
               aria-label={`${bot?.name ?? "Bot"}, ${status.label}: ${title}`}
-              onClick={() => job.threadId && openWorkThread(navigate, job.threadId, job.roomId)}
+              onClick={() => job.threadId && navigate.toThread(job.threadId)}
             >
               <span className="activity-dot" data-status={status.kind} aria-hidden="true" />
               <span className="activity-bot">{bot?.name ?? "Bot"}</span>

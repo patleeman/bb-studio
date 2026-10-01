@@ -23,6 +23,13 @@ import {
   type Attachment,
 } from "./contract";
 import { Store, newId, document, saveDocument } from "./store";
+import { MIGRATIONS } from "./migrations";
+import { attentionHandlers } from "./rpc-attention";
+import { automationHandlers } from "./rpc-automations";
+import { botHandlers } from "./rpc-bots";
+import { roomHandlers } from "./rpc-rooms";
+import { attachmentHandlers } from "./rpc-attachments";
+import { rosterHandlers } from "./rpc-roster";
 import { personalProjectId } from "./bot-project";
 import { ChannelThreads } from "./channel-thread-link";
 import { registerChannelMentions } from "./channel-mentions";
@@ -64,30 +71,10 @@ import {
 } from "./agent-channels";
 export { rpcContract } from "./contract";
 
-function botCreateRequestView(request: BotCreateRequest) {
-  const mission = request.input.mission.slice(0, 4000);
-  return {
-    id: request.id,
-    requesterBotId: request.requesterBotId,
-    requesterName: request.requesterName,
-    channelName: request.channelName,
-    name: request.input.name,
-    description: request.input.description,
-    avatar: request.input.avatar,
-    providerId: request.input.providerId,
-    model: request.input.model,
-    reasoningLevel: request.input.reasoningLevel,
-    permissionMode: request.input.permissionMode,
-    intervalMinutes: request.input.intervalMinutes,
-    mission,
-    missionTruncated: mission.length < request.input.mission.length,
-    createdAt: request.createdAt,
-    expiresAt: request.expiresAt,
-  };
-}
-
 export default async function plugin(bb: BbPluginApi) {
-  const store = new Store(bb.storage.database());
+  const db = bb.storage.database();
+  bb.storage.migrate(db, MIGRATIONS);
+  const store = new Store(db);
   const runtime = new Runtime(bb, store);
   const activeConversations = (id: string) =>
     store.conversations(id).filter((c) =>
@@ -649,48 +636,8 @@ export default async function plugin(bb: BbPluginApi) {
       });
       return { threadId: thread.id };
     },
-    attentionList: ({ status, limit, offset, channelId }) => {
-      if (store.attention.wake()) runtime.changed();
-      return store.attention.list(status, limit, offset, channelId);
-    },
-    attentionUpdate: ({ id, action, minutes }) => {
-      const value = store.attention.update(id, action, minutes);
-      runtime.changed();
-      return value;
-    },
-    documentHistory: async ({ id, file, before }) => {
-      const latest = await document(store.get(id).home, file);
-      runtime.data.snapshot(`${id}:${file}`, latest.text, "Observed file");
-      return runtime.data.revisions(`${id}:${file}`, before);
-    },
-    channelSurface: async ({ threadId }) => {
-      const room = channelThreads.roomForThread(threadId);
-      if (!room) return null;
-      return {
-        room: { ...room, threadId },
-        bots: store.all(),
-        jobs: await runtime.roomJobsWithActivity(room.id),
-        runs: store.runs(room.id, 50),
-        approvals: approvals.list(room.id),
-        attention: store.attention.list("open", 10, 0, room.id).items,
-      };
-    },
-    openChannelThread: async ({ id }) => {
-      const room = store.room(id);
-      const threadId = await channelThreads.ensure(room);
-      void channelThreads.sync(room.id);
-      return { threadId };
-    },
-    channelForThread: ({ threadId }) => {
-      const linked = channelThreads.roomForThread(threadId);
-      if (linked) return linked.id;
-      const conversation = store.byThread(threadId);
-      const key = conversation?.originalKey ?? conversation?.key;
-      if (conversation?.kind !== "group" || !key?.startsWith("group:"))
-        return null;
-      const roomId = key.slice("group:".length).split(":")[0]!;
-      return store.findRoom(roomId) ? roomId : null;
-    },
+    ...attentionHandlers(store, runtime),
+    ...roomHandlers(store, runtime, channelThreads, approvals),
     usage: ({ id, kind }) =>
       runtime.data.usage(
         kind === "channel" ? id : undefined,
@@ -713,126 +660,8 @@ export default async function plugin(bb: BbPluginApi) {
           kind === "bot" ? id : undefined,
         );
       }),
-    automationCreate: (input) => automations.create(input),
-    automationList: (input) => automations.list(input),
-    automationUpdate: (input) => automations.update(input),
-    automationAction: (input) => automations.action(input),
-    automationRuns: (input) => automations.runs(input),
-    list: async () => {
-      const activity = store.botActivitySummary();
-      const bots = store.all();
-      // A linked channel is read when its thread is: reading happens there now.
-      // BB's own read state decides it. Delivering a message into the thread
-      // moves its lastReadAt past the room's updatedAt, so the room's clock
-      // cannot tell a bot's new reply from one the owner has seen.
-      const rooms = await Promise.all(store.rooms().map(async (room) => {
-        const threadId = channelThreads.threadId(room.id);
-        if (!threadId) return room;
-        try {
-          const thread = await bb.sdk.threads.get({ threadId });
-          const updatedAt = Math.max(room.updatedAt, thread.latestAttentionAt);
-          const lastReadAt = thread.latestAttentionAt > (thread.lastReadAt ?? 0)
-            ? Math.min(thread.lastReadAt ?? 0, updatedAt - 1)
-            : updatedAt;
-          return { ...room, threadId, updatedAt, lastReadAt };
-        } catch (cause) {
-          if (!missingThread(cause)) throw cause;
-          return room;
-        }
-      }));
-      const directConversations = Object.fromEntries(bots.map((bot) => [
-        bot.id,
-        store.conversations(bot.id).filter((conversation) => conversation.kind === "admin"),
-      ]));
-      const directThreadInfo: Record<string, {
-        title: string;
-        projectId: string;
-        archivedAt: number | null;
-        pinned: boolean;
-        unread: boolean;
-        sectionId: string | null;
-        updatedAt: number;
-      }> = {};
-      await Promise.all(Object.values(directConversations).flat().map(async (conversation) => {
-        try {
-          const thread = await bb.sdk.threads.get({ threadId: conversation.threadId });
-          directThreadInfo[conversation.threadId] = {
-            title: thread.title?.trim() || thread.titleFallback?.trim() || conversation.title,
-            projectId: thread.projectId,
-            archivedAt: thread.archivedAt,
-            pinned: thread.pinnedAt !== null,
-            unread: thread.latestAttentionAt > (thread.lastReadAt ?? 0),
-            sectionId: thread.sectionId,
-            updatedAt: thread.updatedAt,
-          };
-        } catch (cause) {
-          if (!missingThread(cause)) throw cause;
-        }
-      }));
-      const directThreadIds = new Map(
-        bots.flatMap((bot) => {
-          const current = store.currentDirectConversation(bot.id);
-          return current ? [[current.threadId, bot.id] as const] : [];
-        }),
-      );
-      const roomIds = new Set(rooms.map((room) => room.id));
-      const roomThreadIds = new Map(store.activeGroupThreadRooms()
-        .filter(({ roomId }) => roomIds.has(roomId))
-        .map(({ threadId, roomId }) => [threadId, roomId] as const));
-      const directThreads: Record<string, {
-        threadId: string;
-        status: "pending" | "starting" | "active" | "stopping" | "idle" | "error";
-        indicator: ReturnType<typeof directThreadIndicator>;
-      }> = {};
-      const roomThreads: Record<string, {
-        threadId: string;
-        status: "pending" | "starting" | "active" | "stopping" | "idle" | "error";
-        indicator: ReturnType<typeof directThreadIndicator>;
-      }[]> = {};
-      for (let offset = 0; directThreadIds.size || roomThreadIds.size; offset += 100) {
-        const page = await bb.sdk.threads.list({
-          originPluginId: "bot-teams", includeHidden: true, limit: 100, offset,
-        });
-        for (const thread of page) {
-          const botId = directThreadIds.get(thread.id);
-          const view = {
-            threadId: thread.id,
-            status: thread.status,
-            indicator: directThreadIndicator(thread),
-          };
-          if (botId) {
-            directThreads[botId] = view;
-            directThreadIds.delete(thread.id);
-          }
-          const roomId = roomThreadIds.get(thread.id);
-          if (roomId) {
-            (roomThreads[roomId] ??= []).push(view);
-            roomThreadIds.delete(thread.id);
-          }
-        }
-        if (page.length < 100) break;
-      }
-      return {
-        bots: bots.map((bot) => {
-          const summary = activity.get(bot.id);
-          return {
-            ...bot,
-            working: summary?.working ?? false,
-            lastActivityAt: summary?.lastActivityAt ?? null,
-          };
-        }),
-        rooms,
-        activeRoomIds: store.activeRoomIds(),
-        directThreads,
-        directConversations,
-        directThreadInfo,
-        roomThreads,
-        roomWork: store.roomWorkSummary(),
-        attentionCounts: store.attention.counts(),
-        approvalCounts: approvals.counts(),
-        botCreateRequests: store.botCreateRequests().map(botCreateRequestView),
-      };
-    },
+    ...automationHandlers(automations),
+    ...rosterHandlers(bb, store, channelThreads, approvals),
     create: (input) =>
       input.roomId
         ? runtime.locked(`room:${input.roomId}`, () => create(input))
@@ -856,15 +685,6 @@ export default async function plugin(bb: BbPluginApi) {
     },
     retire: ({ id, retired }) => runtime.retire(id, retired),
     retryJob: ({ id }) => runtime.retryJob(id),
-    history: ({ id, before, after, through, query, limit }) =>
-      after
-        ? store.historyAfter(id, after, through, limit)
-        : store.history(id, before, query, limit),
-    get: ({ id }) => ({
-      bot: store.get(id),
-      conversations: store.conversations(id),
-      jobs: store.jobs(id, 50),
-    }),
     update: ({ id, expectedUpdatedAt, ...patch }) =>
       updateBot(id, expectedUpdatedAt, patch),
     swapModel: ({ id, expectedUpdatedAt }) =>
@@ -881,46 +701,7 @@ export default async function plugin(bb: BbPluginApi) {
           fallbackReasoningLevel: bot.reasoningLevel,
         });
       }),
-    document: async ({ id, file }) => {
-      const d = await document(store.get(id).home, file);
-      runtime.data.snapshot(`${id}:${file}`, d.text, "Observed file");
-      return d;
-    },
-    saveDocument: ({ id, file, text, version }) =>
-      runtime.locked(id, async () => {
-        const previous = await document(store.get(id).home, file);
-        runtime.data.snapshot(
-          `${id}:${file}`,
-          previous.text,
-          "Previous version",
-        );
-        const result = await saveDocument(
-          store.get(id).home,
-          file,
-          text,
-          version,
-        );
-        runtime.data.snapshot(`${id}:${file}`, result.text, "You");
-        runtime.changed();
-        return result;
-      }),
-    wake: ({ id }) =>
-      runtime.locked(id, async () => ({ queued: runtime.wake(store.get(id)) })),
-    conversation: ({ id }) =>
-      runtime.locked(id, () => ensureDirectConversation(store.get(id))),
-    newConversation: ({ id }) =>
-      runtime.locked(id, () => newDirectConversation(store.get(id))),
-    handoffSource: async ({ threadId }) => {
-      const thread = await bb.sdk.threads.get({ threadId });
-      return {
-        threadId: thread.id,
-        projectId: thread.projectId,
-        title:
-          thread.title?.trim() ||
-          thread.titleFallback?.trim() ||
-          `Thread ${thread.id.slice(0, 8)}`,
-      };
-    },
+    ...botHandlers(bb, store, runtime, ensureDirectConversation, newDirectConversation),
     createRoom: ({ name, memberIds, requestId, responseBehavior: behavior }) =>
       runtime.locked("rooms", async () => {
         const existing =
@@ -1011,7 +792,7 @@ export default async function plugin(bb: BbPluginApi) {
               "bot_joined",
             );
           }
-          runtime.changed();
+          runtime.changed("channel", id);
           return store.room(id);
         }),
       ),
@@ -1020,71 +801,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (deleted) await channelThreads.forget(id);
       return { deleted };
     },
-    room: async ({ id, start, limit }) => {
-      return {
-        room: store.room(id),
-        ...store.transcript(id, { start, limit }),
-        runs: store.runs(id, 50),
-        jobs: await runtime.roomJobsWithActivity(id),
-        approvals: approvals.list(id),
-      };
-    },
-    upload: ({ id, name, mimeType, data }) =>
-      runtime.locked(`room:${id}`, async () => {
-        store.room(id);
-        const projectId = await project();
-        const bytes = Buffer.from(data, "base64");
-        if (!bytes.length || bytes.length > 8 * 1024 * 1024)
-          throw new Error("Attachments must be between 1 byte and 8 MB.");
-        // Content identity survives lost responses and reloads without duplicating files.
-        const hash = createHash("sha256")
-          .update(JSON.stringify([id, name, mimeType]))
-          .update(bytes)
-          .digest("hex");
-        const attachmentId = `${hash.slice(0, 8)}-${hash.slice(8, 12)}-4${hash.slice(13, 16)}-a${hash.slice(17, 20)}-${hash.slice(20, 32)}`;
-        try {
-          return store.attachment(attachmentId);
-        } catch {}
-        const detectedImage = imageMime(bytes);
-        const a: Attachment = {
-          id: attachmentId,
-          roomId: id,
-          projectId,
-          name,
-          path: "",
-          mimeType: detectedImage ?? mimeType,
-          type: detectedImage ? "localImage" : "localFile",
-          sizeBytes: bytes.length,
-        };
-        // Keep draft bytes in plugin storage. Only sent files enter BB attachment storage.
-        store.stageAttachment(a, bytes);
-        return a;
-      }),
-    discardAttachment: ({ id, attachmentId }) =>
-      runtime.locked(`room:${id}`, async () => {
-        const a = store.attachment(attachmentId);
-        if (a.roomId !== id)
-          throw new Error("Attachment belongs to a different group.");
-        store.discardAttachment(attachmentId);
-        return { ok: true as const };
-      }),
-    transcribe: async ({ data, mimeType, prompt }) => {
-      if (!(await bb.sdk.system.config()).voiceTranscriptionEnabled)
-        throw new Error(
-          "Enable voice transcription in BB settings to use dictation.",
-        );
-      const bytes = Buffer.from(data, "base64");
-      if (!bytes.length || bytes.length > 5 * 1024 * 1024)
-        throw new Error("Recording is empty or exceeds 5 MB.");
-      return bb.sdk.system.transcribeVoice({
-        file: new File(
-          [bytes],
-          mimeType.includes("mp4") ? "dictation.mp4" : "dictation.webm",
-          { type: mimeType },
-        ),
-        prompt,
-      });
-    },
+    ...attachmentHandlers(bb, store, runtime, project),
     send: (input) => sendMessage(input),
     member: ({ id, botId, present }) =>
       runtime.locked(`room:${id}`, async () => {
@@ -1113,7 +830,7 @@ export default async function plugin(bb: BbPluginApi) {
             `${bot.name} joined the channel.`,
             "bot_joined",
           );
-        runtime.changed();
+        runtime.changed("channel", id);
         return store.room(id);
       }),
     channelState: ({ id, rememberDefault, markUnread, ...patch }) =>
@@ -1145,7 +862,7 @@ export default async function plugin(bb: BbPluginApi) {
           await (markUnread
             ? bb.sdk.threads.markUnread({ threadId })
             : bb.sdk.threads.markRead({ threadId }));
-        runtime.changed();
+        runtime.changed("channel", id);
         return next;
       }),
     retryRouting: ({ id, requestId }) =>

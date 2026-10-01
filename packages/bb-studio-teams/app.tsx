@@ -1,3 +1,4 @@
+import { affects } from "./realtime";
 import { threadChannelMenu } from "./thread-channel-menu";
 import { UsagePanel } from "./channel-workbench";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -103,7 +104,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
       request.current++;
     };
   }, [load]);
-  useRealtime("changed", load);
+  useRealtime("scoped-changed", (event) => { if (affects(event, "bots", id)) load(); });
   const action = async (fn: () => Promise<unknown>) => {
     setPending(true);
     setError(null);
@@ -330,7 +331,7 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
       request.current++;
     };
   }, [load]);
-  useRealtime("changed", load);
+  useRealtime("scoped-changed", (event) => { if (affects(event, "bots")) load(); });
   const [id, section] = subPath.split("/");
   const bots = data?.bots ?? [];
   if (id === "new")

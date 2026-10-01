@@ -1,3 +1,4 @@
+import { publishChange } from "./realtime-server";
 import { isExecuting } from "./job-state";
 import { z } from "zod";
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
@@ -195,7 +196,7 @@ export function registerChannelTools(
     notifyInput,
     (input, threadId) => {
       const result = notifyOwner(store, input, threadId);
-      bb.realtime.publish("changed", {});
+      publishChange(bb, "channel", result.roomId);
       return result;
     },
   );

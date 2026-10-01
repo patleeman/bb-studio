@@ -108,7 +108,7 @@ function useRoster(reconcile = false) {
       request.current++;
     };
   }, [load]);
-  useRealtime("changed", (event) => {
+  useRealtime("scoped-changed", (event) => {
     sharedReads.invalidate(
       event && typeof event === "object" && "revision" in event
         ? event.revision

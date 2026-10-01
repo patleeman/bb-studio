@@ -1,3 +1,4 @@
+import { publishChange } from "./realtime-server";
 import { randomUUID } from "node:crypto";
 import { parseArgs, type ParseArgsOptionsConfig } from "node:util";
 import { posix, win32 } from "node:path";
@@ -538,7 +539,7 @@ export function registerCli(
           const [selector] = a.positional(1);
           const result = notifyOwner(store, notifyInput.parse({ channelId: channel(selector!, ctx.threadId).id,
             requestId: a.text("request-id") ?? randomUUID(), reason: a.required("reason"), text: a.required("text") }), ctx.threadId);
-          bb.realtime.publish("changed", {});
+          publishChange(bb, "channel", result.roomId);
           return emit(result);
         }
         if (

@@ -1,3 +1,4 @@
+import { relativeTime } from "@bb-studio/kit/format";
 import { useState } from "react";
 import {
   useBbNavigate,
@@ -14,25 +15,6 @@ import {
 import { Menu } from "./channel-controls";
 import { EmptyState, ErrorMessage, message, StatusBadge } from "./bot-ui";
 
-const relativeTime = new Intl.RelativeTimeFormat(undefined, {
-  numeric: "auto",
-  style: "narrow",
-});
-function relativeActivity(timestamp: number) {
-  const elapsed = Math.max(0, Date.now() - timestamp);
-  if (elapsed < 60_000) return "just now";
-  const units: [Intl.RelativeTimeFormatUnit, number][] = [
-    ["minute", 60_000],
-    ["hour", 3_600_000],
-    ["day", 86_400_000],
-    ["month", 2_592_000_000],
-    ["year", 31_536_000_000],
-  ];
-  const [unit, milliseconds] = units.find((_, index) =>
-    index === units.length - 1 || elapsed < units[index + 1]![1],
-  )!;
-  return relativeTime.format(-Math.max(1, Math.floor(elapsed / milliseconds)), unit);
-}
 
 export function BotCollection({
   bots,
@@ -363,7 +345,7 @@ export function BotCollection({
                     >
                       {bot.lastActivityAt === null
                         ? "Never"
-                        : relativeActivity(bot.lastActivityAt)}
+                        : relativeTime(bot.lastActivityAt)}
                     </span>
                   </span>
                 }

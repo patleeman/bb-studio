@@ -1,3 +1,4 @@
+import { affects } from "./realtime";
 import { useCallback, useEffect, useRef, useState } from "react";
 import {
   experimental_Icon as Icon,
@@ -14,7 +15,7 @@ import { Button } from "./components/ui/button";
 import { ChannelMembersMenu } from "./channel-members";
 import { railLive, railRoutingCount } from "./channel-rail";
 import { message } from "./bot-ui";
-import { attentionReasons } from "./attention-view";
+const attentionReasons = { decision: "Decision needed", blocker: "Blocked", update: "Important update" };
 import { ChannelSearch } from "./channel-search";
 import { ChannelAutomationsView } from "./channel-automations-view";
 import { channelHandoffText, takeChannelThreadHandoff } from "./handoff-draft";
@@ -44,7 +45,7 @@ function useChannelSurface(threadId: string | null) {
     );
   }, [rpc, threadId]);
   useEffect(load, [load]);
-  useRealtime("changed", load);
+  useRealtime("scoped-changed", (event) => { if (affects(event, "channel", surface?.room.id)) load(); });
   return { surface, load };
 }
 

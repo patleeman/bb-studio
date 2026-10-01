@@ -1,3 +1,4 @@
+import { affects } from "./realtime";
 import { AutomationEditor, scheduleDescription } from "./automation-editor";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useRpc, useRealtime, useBbNavigate } from "@get-bb/plugin-sdk/app";
@@ -75,8 +76,8 @@ export function ChannelAutomationsView({
       request.current++;
     };
   }, [open, load]);
-  useRealtime("changed", () => {
-    if (open && !pending) {
+  useRealtime("scoped-changed", (event) => {
+    if (open && !pending && affects(event, "channel", id)) {
       void load();
       const selected = items.find((a) => a.id === history?.automationId);
       if (selected) void showHistory(selected);
