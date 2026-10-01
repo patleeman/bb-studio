@@ -260,13 +260,17 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
         const title = flags.values.title?.trim().slice(0, MAX_TITLE);
         if (!title) return fail(`usage: ${USAGE.post}`);
         const threadOrigin = ctx.threadId ? await origin(ctx.threadId).catch(() => null) : null;
+        // --author names who it's from, even when run inside a thread.
+        const author = flags.values.author?.trim().slice(0, 80);
         const row = await service.create({
           title,
           body: (flags.values.body ?? "").replace(/\\n/g, "\n").slice(0, MAX_BODY),
           topic: flags.values.topic?.trim().slice(0, MAX_TOPIC) || null,
           story: storyKey(flags.values.story),
           priority: flags.values.urgent !== undefined ? "urgent" : priority(flags.values.priority),
-          origin: threadOrigin ?? { author: flags.values.author?.trim() || "CLI", botId: null, threadId: ctx.threadId ?? "", projectId: ctx.projectId ?? null, channelId: null, channelName: null },
+          origin: threadOrigin
+            ? { ...threadOrigin, author: author || threadOrigin.author }
+            : { author: author || "CLI", botId: null, threadId: ctx.threadId ?? "", projectId: ctx.projectId ?? null, channelId: null, channelName: null },
         });
         return { exitCode: 0, stdout: `${line(service.view(row))}\n` };
       }
