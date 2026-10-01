@@ -15,6 +15,9 @@ final class StudioStore: ObservableObject {
     /// Studio's tags, in name order.
     @Published private(set) var tags: [StudioTag] = []
     @Published private(set) var supportsTags = false
+    /// Studio's spaces, in name order.
+    @Published private(set) var spaces: [StudioSpace] = []
+    @Published private(set) var supportsSpaces = false
     @Published private(set) var projectNames: [String: String] = [:]
     @Published private(set) var plugins: Set<String> = []
     /// Listed by the Studio plugin, which can also search content and delete anything.
@@ -59,6 +62,8 @@ final class StudioStore: ObservableObject {
             kindInfo = snapshot.kinds ?? []
             tags = snapshot.tags ?? []
             supportsTags = snapshot.tags != nil
+            spaces = snapshot.spaces ?? []
+            supportsSpaces = snapshot.spaces != nil
             loaded = true
         }
         if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) {
@@ -78,7 +83,9 @@ final class StudioStore: ObservableObject {
             self.items = items.sorted { $0.updatedAt > $1.updatedAt }
             Spotlight.indexStudio(self.items)
             error = nil
-            DiskCache.save(StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil), as: StudioSnapshot.cacheKey)
+            DiskCache.save(
+                StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil, spaces: supportsSpaces ? spaces : nil),
+                as: StudioSnapshot.cacheKey)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -93,12 +100,16 @@ final class StudioStore: ObservableObject {
             kindInfo = overview.kinds
             tags = overview.tags ?? []
             supportsTags = overview.tags != nil
+            spaces = Self.sorted(overview.spaces ?? [])
+            supportsSpaces = overview.spaces != nil
             return overview.items
         }
         viaStudio = false
         kindInfo = []
         tags = []
         supportsTags = false
+        spaces = []
+        supportsSpaces = false
         async let pages = Self.attempt(plugins.contains("pages")) { try await client.pages() }
         async let recordings = Self.attempt(plugins.contains("talk")) { try await client.recordings(limit: 200) }
         async let drawings = Self.attempt(plugins.contains("excalidraw")) { try await client.drawings() }
@@ -256,6 +267,45 @@ final class StudioStore: ObservableObject {
         for index in items.indices { items[index].tags?.removeAll { $0 == tag.id } }
     }
 
+    // MARK: Spaces
+
+    func space(_ id: String) -> StudioSpace? { spaces.first { $0.id == id } }
+
+    /// Puts a changed or new space in the list.
+    func saved(_ space: StudioSpace) {
+        spaces = Self.sorted(spaces.filter { $0.id != space.id } + [space])
+    }
+
+    func deleteSpace(_ space: StudioSpace, client: BBClient) async throws {
+        try await client.deleteSpace(space.id)
+        spaces.removeAll { $0.id == space.id }
+        removed(pluginId: "studio", id: space.id)
+        for index in items.indices { items[index].spaces?.removeAll { $0 == space.id } }
+    }
+
+    /// Adds the item to the space, or takes it out when it was added on its own.
+    func toggle(_ space: StudioSpace, on item: StudioItem, client: BBClient) async throws {
+        let ref = (pluginId: item.pluginId, id: item.itemId)
+        let direct = space.itemKeys.contains(item.id)
+        saved(try await client.spaceMembers(space.id, add: direct ? [] : [ref], remove: direct ? [ref] : []))
+        update(item) { item in
+            var ids = item.spaces ?? []
+            if direct { ids.removeAll { $0 == space.id } } else if !ids.contains(space.id) { ids.append(space.id) }
+            item.spaces = ids
+        }
+    }
+
+    /// Refetches the spaces after a change made elsewhere, like a widget's sheet.
+    func reloadSpaces(_ client: BBClient) async {
+        guard let spaces = try? await client.studioSpaces() else { return }
+        self.spaces = Self.sorted(spaces)
+        supportsSpaces = true
+    }
+
+    private static func sorted(_ spaces: [StudioSpace]) -> [StudioSpace] {
+        spaces.sorted { $0.name.localizedCaseInsensitiveCompare($1.name) == .orderedAscending }
+    }
+
     private func update(_ item: StudioItem, _ change: (inout StudioItem) -> Void) {
         guard let index = items.firstIndex(where: { $0.id == item.id }) else { return }
         change(&items[index])
@@ -286,6 +336,8 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
         StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
         StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
+        StudioKind(id: "board", label: "Board", plural: "Boards", symbol: "rectangle.split.3x1", tint: .green),
+        StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
     ]
 
     static func other(_ id: String) -> StudioKind {
@@ -317,6 +369,8 @@ struct StudioView: View {
     @State private var taggingSelected = false
     @State private var renamingTag: StudioTag?
     @State private var deletingTag: StudioTag?
+    /// The space settings sheet: `.new` for a new space.
+    @State private var spaceSheet: SpaceSheet?
 
     private var selecting: Bool { editMode.isEditing }
     private var selected: [StudioItem] { store.items.filter { selection.contains($0.id) } }
@@ -354,7 +408,7 @@ struct StudioView: View {
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
             }
-            if store.kinds.count > 1 || hasArchived || !usedTags.isEmpty {
+            if store.kinds.count > 1 || hasArchived || !usedTags.isEmpty || !store.spaces.isEmpty {
                 Section { kindFilter }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -413,7 +467,7 @@ struct StudioView: View {
                     Button("Done") { endSelecting() }.fontWeight(.semibold)
                 }
             } else {
-                if !store.creatable.isEmpty {
+                if !store.creatable.isEmpty || store.supportsSpaces {
                     ToolbarItem(placement: .topBarTrailing) { newMenu }
                 }
                 ToolbarItem(placement: .topBarTrailing) { projectMenu }
@@ -430,6 +484,14 @@ struct StudioView: View {
             store.restore()
             store.attach(app)
             await store.load(app.client)
+        }
+        .sheet(item: $spaceSheet) { sheet in
+            SpaceSettingsSheet(space: sheet.space) { saved in
+                if let saved, sheet.space == nil { app.studioPath.append(.space(id: saved.id)) }
+            }
+        }
+        .onChange(of: store.spaces) {
+            if let id = app.studioSpace, store.loaded, store.supportsSpaces, store.space(id) == nil { app.studioSpace = nil }
         }
         .sheet(item: $recordingKind) { kind in
             DictationView(threadId: nil, autoStart: true, kind: kind)
@@ -569,6 +631,16 @@ struct StudioView: View {
                         app.studioKind = app.studioKind == kind.id ? nil : kind.id
                     }
                 }
+                ForEach(store.spaces) { space in
+                    chip(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
+                        selected: app.studioSpace == space.id, tint: Color(hex: space.color)) {
+                        app.studioSpace = app.studioSpace == space.id ? nil : space.id
+                    }
+                    .contextMenu {
+                        Button { app.studioPath.append(.space(id: space.id)) } label: { Label("Open Space", systemImage: "arrow.up.right") }
+                        Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
+                    }
+                }
                 ForEach(usedTags) { tag in
                     chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
                         tagFilter = tagFilter == tag.id ? nil : tag.id
@@ -611,6 +683,11 @@ struct StudioView: View {
             ForEach(store.creatable, id: \.id) { kind in
                 Button { Task { await create(kind) } } label: {
                     Label("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol)
+                }
+            }
+            if store.supportsSpaces {
+                Button { spaceSheet = SpaceSheet(space: nil) } label: {
+                    Label("New Space…", systemImage: StudioKind.of("space").symbol)
                 }
             }
         } label: {
@@ -710,6 +787,21 @@ struct StudioView: View {
                         }
                     }
                 } label: { Label("Move to Project", systemImage: "folder") }
+                if !store.spaces.isEmpty, item.kind != "space" {
+                    Menu {
+                        ForEach(store.spaces) { space in
+                            let inherited = item.spaces?.contains(space.id) == true && !space.itemKeys.contains(item.id)
+                            Button { Task { await toggle(space, on: item) } } label: {
+                                if item.spaces?.contains(space.id) == true {
+                                    Label(inherited ? "\(space.name) (through its project)" : space.name, systemImage: "checkmark")
+                                } else {
+                                    Text(space.name)
+                                }
+                            }
+                            .disabled(inherited)
+                        }
+                    } label: { Label("Spaces", systemImage: "square.stack.3d.up") }
+                }
                 if store.info(item)?.canArchive == true {
                     Button { Task { await archive(item) } } label: {
                         Label(item.archived ? "Restore from Archive" : "Archive", systemImage: item.archived ? "tray.and.arrow.up" : "archivebox")
@@ -731,6 +823,7 @@ struct StudioView: View {
         case "studio-tasks": .task(id: item.itemId)
         case "studio-tables": .table(id: item.itemId)
         case "bot-teams": .bot(id: item.itemId)
+        case "studio" where item.kind == "space": item.href.flatMap(Route.init(href:)) ?? .space(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
     }
@@ -758,6 +851,7 @@ struct StudioView: View {
             if let kind = app.studioKind, item.kind != kind { return false }
             if app.studioKind == nil, query.isEmpty, store.info(item)?.background == true { return false }
             if let tagFilter, item.tags?.contains(tagFilter) != true { return false }
+            if let space = app.studioSpace, item.spaces?.contains(space) != true { return false }
             switch project {
             case "": break
             case "none": if item.projectId != nil { return false }
@@ -799,13 +893,17 @@ struct StudioView: View {
     }
 
     private var emptyText: String {
-        switch app.studioKind {
+        if let space = app.studioSpace.flatMap(store.space) {
+            return "Nothing in \(space.name) yet. Add items from their menus, or make them on the space's page."
+        }
+        return switch app.studioKind {
         case "page": "Pages you and your agents write show up here."
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
         case "task": "Tasks you and your agents track show up here."
         case "bot": "Bot Teams bots show up here. Set one up from a chat in BB web."
+        case "space": "Spaces gather items, threads and projects. Make one with New."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
     }
@@ -850,6 +948,16 @@ struct StudioView: View {
         do {
             let item = try await store.create(kind, projectId: projectId, client: app.client)
             if let route = route(item) { app.studioPath.append(route) }
+        } catch {
+            flash(BBClient.describe(error, server: app.client.baseURL))
+        }
+    }
+
+    private func toggle(_ space: StudioSpace, on item: StudioItem) async {
+        do {
+            let had = item.spaces?.contains(space.id) == true
+            try await store.toggle(space, on: item, client: app.client)
+            flash(had ? "Removed from \(space.name)" : "Added to \(space.name)")
         } catch {
             flash(BBClient.describe(error, server: app.client.baseURL))
         }

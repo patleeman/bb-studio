@@ -4029,6 +4029,65 @@
         "additionalProperties": false
       }
     },
+    "spaceConversations": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "channels": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "threadId",
+                "name",
+                "archived"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "direct": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "threadId": {
+                  "type": "string"
+                },
+                "botName": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "threadId",
+                "botName"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "channels",
+          "direct"
+        ],
+        "additionalProperties": false
+      }
+    },
     "create": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

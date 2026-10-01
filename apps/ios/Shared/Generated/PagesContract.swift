@@ -21,6 +21,8 @@ public enum Pages {
     public static let boardView = "boardView"
     public static let boardRename = "boardRename"
     public static let boardTaskCreate = "boardTaskCreate"
+    public static let spaceView = "spaceView"
+    public static let spaceCreate = "spaceCreate"
     public static let recordingView = "recordingView"
     public static let markdown = "markdown"
     public static let editableMarkdown = "editableMarkdown"
@@ -91,6 +93,10 @@ public enum Pages {
   public typealias BoardRename = BoardRenameOutput
 
   public typealias BoardTaskCreate = BoardTaskCreateOutput
+
+  public typealias SpaceView = SpaceViewOutput
+
+  public typealias SpaceCreate = SpaceCreateOutput
 
   public typealias RecordingView = RecordingViewOutput
 
@@ -2134,6 +2140,181 @@ public enum Pages {
 
     public init(taskId: String? = nil) {
       self.taskId = taskId
+    }
+  }
+
+  public struct SpaceViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct SpaceViewOutputViewSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var defaultProjectId: String?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, defaultProjectId: String? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.defaultProjectId = defaultProjectId
+    }
+  }
+
+  public struct SpaceViewOutputViewRecentItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var title: String?
+    public var icon: String?
+    public var kindIcon: String?
+    public var kindLabel: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, kindLabel: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.title = title
+      self.icon = icon
+      self.kindIcon = kindIcon
+      self.kindLabel = kindLabel
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum SpaceViewOutputViewThreadsItemKind: Sendable, Hashable, Codable {
+    case thread
+    case channel
+    case dm
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "channel": self = .channel
+      case "dm": self = .dm
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .channel: try container.encode("channel")
+      case .dm: try container.encode("dm")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceViewOutputViewThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var direct: Bool?
+    public var kind: SpaceViewOutputViewThreadsItemKind?
+    public var botName: String?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, direct: Bool? = nil, kind: SpaceViewOutputViewThreadsItemKind? = nil, botName: String? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.direct = direct
+      self.kind = kind
+      self.botName = botName
+    }
+  }
+
+  public struct SpaceViewOutputViewProjectsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var items: Double?
+    public var threads: Double?
+    public var isDefault: Bool?
+
+    public init(id: String? = nil, name: String? = nil, items: Double? = nil, threads: Double? = nil, isDefault: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.items = items
+      self.threads = threads
+      self.isDefault = isDefault
+    }
+  }
+
+  public struct SpaceViewOutputViewKindsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var label: String?
+    public var icon: String?
+    public var event: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, label: String? = nil, icon: String? = nil, event: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.label = label
+      self.icon = icon
+      self.event = event
+    }
+  }
+
+  public struct SpaceViewOutputView: Sendable, Hashable, Codable {
+    public var space: SpaceViewOutputViewSpace?
+    public var recent: [SpaceViewOutputViewRecentItem]?
+    public var itemCount: Double?
+    public var threads: [SpaceViewOutputViewThreadsItem]?
+    public var projects: [SpaceViewOutputViewProjectsItem]?
+    public var kinds: [SpaceViewOutputViewKindsItem]?
+    public var threadPrompt: String?
+    public var itemsHref: String?
+
+    public init(space: SpaceViewOutputViewSpace? = nil, recent: [SpaceViewOutputViewRecentItem]? = nil, itemCount: Double? = nil, threads: [SpaceViewOutputViewThreadsItem]? = nil, projects: [SpaceViewOutputViewProjectsItem]? = nil, kinds: [SpaceViewOutputViewKindsItem]? = nil, threadPrompt: String? = nil, itemsHref: String? = nil) {
+      self.space = space
+      self.recent = recent
+      self.itemCount = itemCount
+      self.threads = threads
+      self.projects = projects
+      self.kinds = kinds
+      self.threadPrompt = threadPrompt
+      self.itemsHref = itemsHref
+    }
+  }
+
+  public struct SpaceViewOutput: Sendable, Hashable, Codable {
+    public var view: SpaceViewOutputView?
+
+    public init(view: SpaceViewOutputView? = nil) {
+      self.view = view
+    }
+  }
+
+  public struct SpaceCreateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var pluginId: String?
+    public var kind: String?
+
+    public init(id: String? = nil, pluginId: String? = nil, kind: String? = nil) {
+      self.id = id
+      self.pluginId = pluginId
+      self.kind = kind
+    }
+  }
+
+  public struct SpaceCreateOutput: Sendable, Hashable, Codable {
+    public var href: String?
+
+    public init(href: String? = nil) {
+      self.href = href
     }
   }
 

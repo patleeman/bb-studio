@@ -3,6 +3,7 @@ import SwiftUI
 struct ThreadView: View {
     @EnvironmentObject private var app: AppModel
     @StateObject private var model: ThreadModel
+    @StateObject private var spaces = ThreadSpacesModel()
     @State private var draft = ""
     @State private var mentions: [Mention] = []
     @ObservedObject private var outbox = Outbox.shared
@@ -185,6 +186,9 @@ struct ThreadView: View {
             if runningPlugins.split(separator: ",").contains("pages") {
                 Task { sourcePage = try? await app.client.chatPage(model.threadId) }
             }
+            if runningPlugins.split(separator: ",").contains("studio") {
+                Task { await spaces.load(model.threadId, client: app.client) }
+            }
             if runningPlugins.split(separator: ",").contains("bot-teams") {
                 Task {
                     profile = try? await app.client.threadProfile(model.threadId)
@@ -303,6 +307,7 @@ struct ThreadView: View {
                             Label("Save Files to Studio…", systemImage: "square.and.arrow.down.on.square")
                         }
                     }
+                    ThreadSpacesMenu(model: spaces, threadId: model.threadId) { model.error = $0 }
                     if let sourcePage {
                         Button { app.push(.page(id: sourcePage.id)) } label: {
                             Label("Open \(sourcePage.displayTitle)", systemImage: "doc.richtext")

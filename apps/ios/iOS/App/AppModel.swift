@@ -19,12 +19,18 @@ enum Route: Hashable {
     case table(id: String)
     case terminals(scope: TerminalScope, title: String)
     case bot(id: String)
+    /// A Studio space, which opens its page.
+    case space(id: String)
 }
 
 extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
+        if parts.count == 5, parts[0] == "plugins", parts[1...3] == ["studio", "studio", "space"] {
+            self = .space(id: parts[4].removingPercentEncoding ?? parts[4])
+            return
+        }
         guard parts.count == 4, parts[0] == "plugins" else { return nil }
         let id = parts[3]
         switch (parts[1], parts[2]) {
@@ -75,6 +81,8 @@ final class AppModel: ObservableObject {
     @Published var studioPath: [Route] = []
     /// The Studio tab's kind filter; nil for everything.
     @Published var studioKind: String?
+    /// The Studio tab's space filter; nil for every space.
+    @Published var studioSpace: String?
     @Published var sheet: Sheet?
     /// Opens the new-thread composer, optionally prefilled.
     @Published var newThreadDraft: String?
@@ -127,7 +135,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://space/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
         guard AppLink.handles(url) else { return }
@@ -151,6 +159,7 @@ final class AppModel: ObservableObject {
         case "task": openStudio(kind: nil, id.map { .task(id: $0) } ?? .tasks)
         case "tasks": openStudio(kind: nil, .tasks)
         case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
+        case "space": if let id { openStudio(kind: nil, .space(id: id)) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
@@ -198,6 +207,13 @@ final class AppModel: ObservableObject {
         tab = .studio
         if let kind { studioKind = kind }
         studioPath = route.map { [$0] } ?? []
+    }
+
+    /// Studio's collection, showing only what a space holds.
+    func openStudio(space id: String) {
+        studioKind = nil
+        studioSpace = id
+        openStudio(kind: nil)
     }
 
     func startDictation(threadId: String? = nil) {

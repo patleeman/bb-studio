@@ -1070,6 +1070,12 @@
                   "items": {
                     "type": "string"
                   }
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -1081,7 +1087,8 @@
                 "defaultProjectId",
                 "projectIds",
                 "threadIds",
-                "itemKeys"
+                "itemKeys",
+                "pageId"
               ],
               "additionalProperties": false
             }
@@ -3106,6 +3113,91 @@
         "additionalProperties": false
       }
     },
+    "spaces": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "defaultProjectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "threadIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "itemKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "icon",
+                "description",
+                "defaultProjectId",
+                "projectIds",
+                "threadIds",
+                "itemKeys",
+                "pageId"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "spaces"
+        ],
+        "additionalProperties": false
+      }
+    },
     "createSpace": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3196,6 +3288,12 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -3207,7 +3305,8 @@
               "defaultProjectId",
               "projectIds",
               "threadIds",
-              "itemKeys"
+              "itemKeys",
+              "pageId"
             ],
             "additionalProperties": false
           }
@@ -3313,6 +3412,12 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -3324,7 +3429,8 @@
               "defaultProjectId",
               "projectIds",
               "threadIds",
-              "itemKeys"
+              "itemKeys",
+              "pageId"
             ],
             "additionalProperties": false
           }
@@ -3475,6 +3581,12 @@
                 "items": {
                   "type": "string"
                 }
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
               }
             },
             "required": [
@@ -3486,7 +3598,8 @@
               "defaultProjectId",
               "projectIds",
               "threadIds",
-              "itemKeys"
+              "itemKeys",
+              "pageId"
             ],
             "additionalProperties": false
           }
@@ -3541,6 +3654,20 @@
                 },
                 "direct": {
                   "type": "boolean"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "channel",
+                    "dm"
+                  ]
+                },
+                "botName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -3549,7 +3676,9 @@
                 "status",
                 "projectId",
                 "updatedAt",
-                "direct"
+                "direct",
+                "kind",
+                "botName"
               ],
               "additionalProperties": false
             }
@@ -3557,6 +3686,447 @@
         },
         "required": [
           "threads"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "spacesForThread": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "color": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "description": {
+                  "type": "string"
+                },
+                "defaultProjectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "threadIds": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "itemKeys": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "color",
+                "icon",
+                "description",
+                "defaultProjectId",
+                "projectIds",
+                "threadIds",
+                "itemKeys",
+                "pageId"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "inherited": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "spaces",
+          "inherited"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "spacePage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "href": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "href"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "spaceWidget": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "space": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "defaultProjectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "icon",
+              "defaultProjectId"
+            ],
+            "additionalProperties": false
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "kindIcon": {
+                  "type": "string"
+                },
+                "kindLabel": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pluginId",
+                "id",
+                "title",
+                "icon",
+                "kindIcon",
+                "kindLabel",
+                "href",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "itemCount": {
+            "type": "number"
+          },
+          "threads": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string"
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "direct": {
+                  "type": "boolean"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "channel",
+                    "dm"
+                  ]
+                },
+                "botName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "title",
+                "status",
+                "projectId",
+                "updatedAt",
+                "direct",
+                "kind",
+                "botName"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "projects": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "number"
+                },
+                "threads": {
+                  "type": "number"
+                },
+                "isDefault": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "items",
+                "threads",
+                "isDefault"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "kinds": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": "string"
+                },
+                "event": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                }
+              },
+              "required": [
+                "pluginId",
+                "id",
+                "label",
+                "icon",
+                "event"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "threadPrompt": {
+            "type": "string"
+          },
+          "itemsHref": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "space",
+          "recent",
+          "itemCount",
+          "threads",
+          "projects",
+          "kinds",
+          "threadPrompt",
+          "itemsHref"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "restoreSpaceWidgets": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "added": {
+            "type": "number"
+          }
+        },
+        "required": [
+          "added"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "createInSpace": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "kind": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "pluginId",
+          "kind"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "href": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "href"
         ],
         "additionalProperties": false
       }
@@ -3595,6 +4165,20 @@
                 },
                 "direct": {
                   "type": "boolean"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "channel",
+                    "dm"
+                  ]
+                },
+                "botName": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
                 }
               },
               "required": [
@@ -3603,7 +4187,9 @@
                 "status",
                 "projectId",
                 "updatedAt",
-                "direct"
+                "direct",
+                "kind",
+                "botName"
               ],
               "additionalProperties": false
             }

@@ -54,6 +54,8 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
     public var archived: Bool
     /// Studio tag ids, from the Studio plugin's overview.
     public var tags: [String]?
+    /// Studio space ids it's in, directly or through its project.
+    public var spaces: [String]?
 
     public var id: String { "\(pluginId):\(itemId)" }
 
@@ -66,7 +68,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
 
     enum CodingKeys: String, CodingKey {
         case pluginId, itemId = "id", kind, title, icon, projectId, parentId, createdAt, updatedAt
-        case preview, facts, badge, thumbnailUrl, href, archived, tags
+        case preview, facts, badge, thumbnailUrl, href, archived, tags, spaces
     }
 
     public init(from decoder: Decoder) throws {
@@ -87,6 +89,7 @@ public struct StudioItem: Codable, Identifiable, Hashable, Sendable {
         href = try? c.decode(String.self, forKey: .href)
         archived = (try? c.decode(Bool.self, forKey: .archived)) ?? false
         tags = try? c.decode([String].self, forKey: .tags)
+        spaces = try? c.decode([String].self, forKey: .spaces)
     }
 
     public init(
@@ -172,7 +175,7 @@ public struct StudioKindInfo: Codable, Hashable, Sendable {
     public var actions: [Action]
     public var canArchive: Bool
     public var blurb: String
-    /// "rpc" when Studio's New can make one.
+    /// "rpc" when Studio's New can make one; "event" when the add-on's own dialog does.
     public var createMode: String?
     /// Kept out of the way: All skips these unless the user is searching.
     public var background: Bool?
@@ -191,6 +194,8 @@ public struct StudioOverview: Sendable {
     public var kinds: [StudioKindInfo]
     /// Nil when the Studio plugin predates tags.
     public var tags: [StudioTag]?
+    /// Nil when the Studio plugin predates spaces.
+    public var spaces: [StudioSpace]?
 }
 
 /// The last Studio list, for opening instantly and offline.
@@ -199,6 +204,7 @@ public struct StudioSnapshot: Codable, Sendable {
     public var items: [StudioItem]
     public var kinds: [StudioKindInfo]?
     public var tags: [StudioTag]?
+    public var spaces: [StudioSpace]?
 }
 
 extension BBClient {
@@ -223,6 +229,7 @@ extension BBClient {
             var items: [StudioItem]
             var providers: [Provider]?
             var tags: [StudioTag]?
+            var spaces: [StudioSpace]?
         }
         let overview: Overview = try await rpc("studio", "overview")
         let kinds = (overview.providers ?? []).flatMap { provider in
@@ -233,7 +240,7 @@ extension BBClient {
                     createMode: $0.create?.mode, background: $0.background)
             }
         }
-        return StudioOverview(items: overview.items, kinds: kinds, tags: overview.tags)
+        return StudioOverview(items: overview.items, kinds: kinds, tags: overview.tags, spaces: overview.spaces)
     }
 
     /// A new, empty item of a kind whose `createMode` is "rpc".

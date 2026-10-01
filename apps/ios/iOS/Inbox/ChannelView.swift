@@ -24,6 +24,7 @@ struct ChannelView: View {
     @State private var listener: UUID?
     @State private var dictating = false
     @State private var showingAutomations = false
+    @StateObject private var spaces = ThreadSpacesModel()
     /// Tool approvals and questions from bots working on this channel's jobs.
     @State private var approvals: [PendingInteraction] = []
 
@@ -50,11 +51,17 @@ struct ChannelView: View {
                         renaming = true
                     } label: { Label("Rename channel", systemImage: "pencil") }
                     Button { showingAutomations = true } label: { Label("Automations", systemImage: "clock.arrow.circlepath") }
+                    if let threadId = (current?.threadId ?? room.threadId) {
+                        ThreadSpacesMenu(model: spaces, threadId: threadId) { error = $0 }
+                    }
                 } label: { Image(systemName: "ellipsis") }
                 .accessibilityLabel("More")
             }
         }
         .sheet(isPresented: $showingAutomations) { ChannelAutomationsSheet(room: room) }
+        .task(id: (current?.threadId ?? room.threadId)) {
+            if let threadId = (current?.threadId ?? room.threadId) { await spaces.load(threadId, client: app.client) }
+        }
         .sheet(isPresented: $showingDetails) {
             ChannelDetailsSheet(room: current ?? room, bots: bots) { updated in
                 if let updated {

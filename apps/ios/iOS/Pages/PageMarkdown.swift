@@ -299,7 +299,9 @@ struct EmbedCard: View {
     var body: some View {
         let target = embed.target ?? embed.url ?? embed.id ?? ""
         let kind = embed.kind ?? "bookmark"
-        if let ref = Self.studioRef(kind, target) {
+        if kind == "space", let space = SpaceWidgetTarget(target) {
+            SpaceWidgetCard(target: space, title: embed.title)
+        } else if let ref = Self.studioRef(kind, target) {
             studioCard(kind, ref)
         } else {
             linkCard(kind, target)

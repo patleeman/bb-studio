@@ -452,6 +452,8 @@ public struct Room: Codable, Identifiable, Hashable, Sendable {
     public var responseBehavior: String?
     /// Overrides every member's own permission mode while set: `accept-edits`, `auto` or `full`.
     public var permissionMode: String?
+    /// The BB thread the channel runs in, which Studio spaces hold.
+    public var threadId: String?
 
     public static let modes: [(id: String, name: String, detail: String)] = [
         ("smart", "Smart", "A coordinator picks collaborators, work order, and busy-bot actions"),

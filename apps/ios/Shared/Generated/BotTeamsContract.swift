@@ -18,6 +18,7 @@ public enum BotTeams {
     public static let automationUpdate = "automationUpdate"
     public static let automationAction = "automationAction"
     public static let list = "list"
+    public static let spaceConversations = "spaceConversations"
     public static let create = "create"
     public static let resolveBotCreateRequest = "resolveBotCreateRequest"
     public static let update = "update"
@@ -88,6 +89,10 @@ public enum BotTeams {
   public typealias ListInput = StudioJSONValue
 
   public typealias List = ListOutput
+
+  public typealias SpaceConversationsInput = StudioJSONValue
+
+  public typealias SpaceConversations = SpaceConversationsOutput
 
   public typealias Create = CreateOutput
 
@@ -3799,6 +3804,38 @@ public enum BotTeams {
       self.attentionCounts = attentionCounts
       self.approvalCounts = approvalCounts
       self.botCreateRequests = botCreateRequests
+    }
+  }
+
+  public struct SpaceConversationsOutputChannelsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var name: String?
+    public var archived: Bool?
+
+    public init(threadId: String? = nil, name: String? = nil, archived: Bool? = nil) {
+      self.threadId = threadId
+      self.name = name
+      self.archived = archived
+    }
+  }
+
+  public struct SpaceConversationsOutputDirectItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botName: String?
+
+    public init(threadId: String? = nil, botName: String? = nil) {
+      self.threadId = threadId
+      self.botName = botName
+    }
+  }
+
+  public struct SpaceConversationsOutput: Sendable, Hashable, Codable {
+    public var channels: [SpaceConversationsOutputChannelsItem]?
+    public var direct: [SpaceConversationsOutputDirectItem]?
+
+    public init(channels: [SpaceConversationsOutputChannelsItem]? = nil, direct: [SpaceConversationsOutputDirectItem]? = nil) {
+      self.channels = channels
+      self.direct = direct
     }
   }
 
