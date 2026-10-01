@@ -24,6 +24,10 @@
       "source": "./packages/bb-studio-explore"
     },
     {
+      "name": "feed",
+      "source": "./packages/bb-studio-feed"
+    },
+    {
       "name": "talk",
       "source": "./packages/bb-studio-talk"
     },

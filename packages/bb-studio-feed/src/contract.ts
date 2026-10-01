@@ -1,0 +1,94 @@
+// Studio Feed's RPC surface for its app. Zod only, so the app can import the
+// types without server code.
+import { defineRpcContract } from "@get-bb/plugin-sdk";
+import { z } from "zod";
+import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES } from "./shared";
+
+const postId = z.string().min(1).max(100);
+const story = z.string().trim().min(1).max(MAX_STORY);
+
+export const postSchema = z.object({
+  id: z.string(),
+  title: z.string(),
+  /** Markdown. */
+  body: z.string(),
+  /** One line of the body, for a collapsed row. */
+  preview: z.string(),
+  /** Link domains in the body. */
+  domains: z.array(z.string()),
+  topic: z.string().nullable(),
+  story: z.string().nullable(),
+  /** Posts in the story; 1 for a post on its own. */
+  storyPosts: z.number(),
+  priority: z.enum(PRIORITIES),
+  /** A bot's name, the thread's title, or "CLI". */
+  author: z.string(),
+  botId: z.string().nullable(),
+  threadId: z.string().nullable(),
+  projectId: z.string().nullable(),
+  channelId: z.string().nullable(),
+  channelName: z.string().nullable(),
+  createdAt: z.number(),
+  updatedAt: z.number(),
+  /** Who last edited it: an agent's thread, or "you". */
+  editedBy: z.string().nullable(),
+  resolvedAt: z.number().nullable(),
+});
+
+export type PostView = z.infer<typeof postSchema>;
+
+export const rpcContract = defineRpcContract({
+  /** The feed, newest first: a story once, by its newest post. */
+  list: {
+    input: z.object({
+      cursor: z.string().max(200).optional(),
+      limit: z.number().int().min(1).max(100).optional(),
+      topic: z.string().max(MAX_TOPIC).nullable().optional(),
+      query: z.string().max(200).optional(),
+    }),
+    output: z.object({ posts: z.array(postSchema), nextCursor: z.string().nullable(), lastSeenAt: z.number() }),
+  },
+  post: {
+    input: z.object({ postId }),
+    output: z.object({ post: postSchema.nullable() }),
+  },
+  /** A story's posts, oldest first. */
+  story: {
+    input: z.object({ story }),
+    output: z.object({ posts: z.array(postSchema) }),
+  },
+  /** The post a reply's `::post` line made, for its card. */
+  forDirective: {
+    input: z.object({ source: z.string().min(1).max(4_000) }),
+    output: z.object({ post: postSchema.nullable() }),
+  },
+  topics: {
+    input: z.object({}),
+    output: z.object({ topics: z.array(z.object({ topic: z.string(), posts: z.number() })) }),
+  },
+  edit: {
+    input: z.object({
+      postId,
+      title: z.string().trim().min(1).max(MAX_TITLE).optional(),
+      body: z.string().max(MAX_BODY).optional(),
+      topic: z.string().trim().max(MAX_TOPIC).nullable().optional(),
+      priority: z.enum(PRIORITIES).optional(),
+      resolved: z.boolean().optional(),
+    }),
+    output: z.object({ post: postSchema.nullable() }),
+  },
+  remove: {
+    input: z.object({ postId }),
+    output: z.object({ removed: z.boolean() }),
+  },
+  /** Everything up to now is read. */
+  seen: {
+    input: z.object({ at: z.number().optional() }),
+    output: z.object({ lastSeenAt: z.number() }),
+  },
+  /** Stories with a post since you last read the feed. */
+  unread: {
+    input: z.object({}),
+    output: z.object({ count: z.number(), lastSeenAt: z.number() }),
+  },
+});

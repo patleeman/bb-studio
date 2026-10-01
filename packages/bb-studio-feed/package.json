@@ -1,0 +1,48 @@
+{
+  "name": "@bb-studio/feed",
+  "version": "0.1.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "bb": ">=0.44",
+    "bbPluginSdk": ">=0.5.29"
+  },
+  "bb": {
+    "name": "Studio Feed",
+    "description": "Part of BB Studio. One feed of what your agents report. An agent ends a reply with a ::post line and it's published, from any thread, channel or automation. Read it as a list on desktop and mobile, follow stories as they update, and discuss any post in a thread.",
+    "branding": {
+      "icon": "./icons/feed.svg",
+      "experimental_icons": {
+        "feed": "./icons/feed.svg"
+      }
+    },
+    "server": "./server.ts",
+    "app": "./app.tsx",
+    "skills": [
+      "skills"
+    ]
+  },
+  "scripts": {
+    "test": "vitest run --config vitest.config.mts",
+    "typecheck": "tsc --noEmit",
+    "build": "bb plugin build .",
+    "clean": "rm -rf dist"
+  },
+  "dependencies": {
+    "@bb-studio/kit": "file:../bb-studio-kit.tgz",
+    "zod": "^4.3.6"
+  },
+  "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "@types/better-sqlite3": "^7.6.12",
+    "@types/node": "^22.0.0",
+    "@types/react": "^19.0.0",
+    "@types/react-dom": "^19.0.0",
+    "better-sqlite3": "^12.11.1",
+    "hono": "^4.11.9",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "typescript": "^5.7.0",
+    "vitest": "4.1.1"
+  }
+}

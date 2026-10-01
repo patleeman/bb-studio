@@ -133,6 +133,31 @@
       }
     },
     {
+      "id": "feed",
+      "displayName": "Studio Feed",
+      "description": "Part of BB Studio. One feed of what your agents report. An agent ends a reply with a ::post line and it's published, from any thread, channel or automation. Read it as a list on desktop and mobile, follow stories as they update, and discuss any post in a thread.",
+      "icon": {
+        "url": "./packages/bb-studio-feed/icons/feed.svg"
+      },
+      "tags": [
+        "agents",
+        "automation",
+        "notifications",
+        "bb-studio"
+      ],
+      "author": {
+        "name": "Patrick Lee",
+        "github": "patleeman"
+      },
+      "source": {
+        "git": {
+          "url": "https://github.com/patleeman/bb-studio.git",
+          "subdir": "packages/bb-studio-feed",
+          "ref": "main"
+        }
+      }
+    },
+    {
       "id": "talk",
       "displayName": "Studio Talk",
       "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
