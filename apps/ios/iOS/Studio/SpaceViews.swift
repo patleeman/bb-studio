@@ -455,14 +455,32 @@ struct SpaceSettingsSheet: View {
     private var current: StudioSpace? { space ?? loaded }
     private var isNew: Bool { space == nil && spaceId == nil }
 
+    /// The same choices as Studio's picker on the web.
+    static let icons = [
+        "🚀", "🎯", "📣", "💡", "🧪", "🛠️", "📚", "🗓️", "📊", "📈", "🧭", "🗺️", "🏗️", "🔥", "⭐", "🧠",
+        "🤖", "💼", "💰", "📦", "🎨", "🎬", "🎵", "📷", "✈️", "🏠", "🌱", "🌍", "❤️", "🏆", "🧩", "🔒",
+    ]
+
     var body: some View {
         NavigationStack {
             Form {
                 Section {
                     TextField("Name", text: $name).accessibilityIdentifier("spaceName")
-                    TextField("Icon (an emoji)", text: $icon)
-                        .onChange(of: icon) { if icon.count > 2 { icon = String(icon.prefix(2)) } }
                     TextField("Description", text: $description, axis: .vertical).lineLimit(2...5)
+                }
+                Section("Icon") {
+                    LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 4), count: 8), spacing: 4) {
+                        ForEach(Self.icons, id: \.self) { each in
+                            Button { icon = each } label: {
+                                Text(each).font(.title3).frame(maxWidth: .infinity, minHeight: 36)
+                                    .background(icon == each ? Color.accentColor.opacity(0.2) : .clear, in: .rect(cornerRadius: 8))
+                            }
+                            .buttonStyle(.plain)
+                            .accessibilityLabel(each)
+                            .accessibilityAddTraits(icon == each ? .isSelected : [])
+                        }
+                    }
+                    if !icon.isEmpty { Button("No Icon") { icon = "" } }
                 }
                 Section {
                     Picker("Default project", selection: $defaultProjectId) {

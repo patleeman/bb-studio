@@ -20,10 +20,11 @@ import {
   type Project,
 } from "@bb-studio/kit/app";
 import { errorMessage, plural, relativeTime, untitled } from "@bb-studio/kit/format";
-import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Textarea } from "@bb-studio/kit/ui";
+import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Textarea } from "@bb-studio/kit/ui";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
+import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import type { rpcContract, SpaceThreadView, SpaceView } from "../contract";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
@@ -490,7 +491,7 @@ export function SpaceDialog({
           <div className="flex gap-2">
             <label className="flex w-16 flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">Icon</span>
-              <Input value={icon} maxLength={16} placeholder="🚀" onChange={(event) => setIcon(event.target.value)} className="text-center" />
+              <SpaceIconPicker icon={icon} onChange={setIcon} />
             </label>
             <label className="flex flex-1 flex-col gap-1.5">
               <span className="text-xs font-medium text-muted-foreground">Name</span>
@@ -517,21 +518,24 @@ export function SpaceDialog({
             </select>
             <span className="text-xs text-muted-foreground">New items go here, and it joins the space with its items and threads.</span>
           </label>
-          {error ? <p className="text-sm text-red-500">{error}</p> : null}
-          {restored ? <p className="text-xs text-muted-foreground">{restored}</p> : null}
-          <DialogFooter>
-            <div className="flex flex-col-reverse gap-2 sm:mr-auto sm:flex-row">
-              {space && onDelete ? (
-                <Button type="button" variant="ghost" className="text-destructive" disabled={busy} onClick={onDelete}>
-                  Delete space
-                </Button>
-              ) : null}
-              {space?.pageId ? (
-                <Button type="button" variant="ghost" disabled={busy} onClick={() => void restore()}>
+          {space?.pageId ? (
+            <div className="flex flex-col gap-1.5">
+              <span className="text-xs font-medium text-muted-foreground">Page</span>
+              <div className="flex items-center gap-2">
+                <Button type="button" variant="outline" size="sm" disabled={busy} onClick={() => void restore()}>
                   Restore missing widgets
                 </Button>
-              ) : null}
+                <span className="text-xs text-muted-foreground">{restored ?? "Puts back widgets taken off the space's page."}</span>
+              </div>
             </div>
+          ) : null}
+          {error ? <p className="text-sm text-red-500">{error}</p> : null}
+          <DialogFooter>
+            {space && onDelete ? (
+              <Button type="button" variant="ghost" className="text-destructive sm:mr-auto" disabled={busy} onClick={onDelete}>
+                Delete space
+              </Button>
+            ) : null}
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>
@@ -766,6 +770,56 @@ export function SpaceProjectsDialog({ rpc, space, projects, onClose, onChanged }
         </DialogFooter>
       </DialogContent>
     </Dialog>
+  );
+}
+
+const SPACE_ICONS = [
+  "🚀", "🎯", "📣", "💡", "🧪", "🛠️", "📚", "🗓️", "📊", "📈", "🧭", "🗺️", "🏗️", "🔥", "⭐", "🧠",
+  "🤖", "💼", "💰", "📦", "🎨", "🎬", "🎵", "📷", "✈️", "🏠", "🌱", "🌍", "❤️", "🏆", "🧩", "🔒",
+];
+
+/** Picks a space's emoji; "" is none. */
+function SpaceIconPicker({ icon, onChange }: { icon: string; onChange(icon: string): void }) {
+  const [open, setOpen] = useState(false);
+  const pick = (next: string) => {
+    onChange(next);
+    setOpen(false);
+  };
+  return (
+    <DropdownMenu open={open} onOpenChange={setOpen}>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          aria-label={icon ? `Icon ${icon}, change` : "Choose an icon"}
+          className="flex h-9 items-center justify-center rounded-md border border-border bg-background text-lg hover:bg-state-hover"
+        >
+          {icon || <Icon name="Plus" className="size-4 text-muted-foreground" />}
+        </button>
+      </DropdownMenuTrigger>
+      {/* Portaled out of Studio's styles, as on a space's page in Pages: bring them along. */}
+      <DropdownMenuContent align="start" className="w-72 p-2" data-bb-plugin={STUDIO_PLUGIN_ID} data-bb-plugin-root="">
+        <div className="grid grid-cols-8 gap-1">
+          {SPACE_ICONS.map((each) => (
+            <button
+              key={each}
+              type="button"
+              aria-label={each}
+              aria-pressed={each === icon}
+              className={cn("rounded p-1 text-lg hover:bg-state-hover", each === icon && "bg-state-active")}
+              onClick={() => pick(each)}
+            >
+              {each}
+            </button>
+          ))}
+        </div>
+        {icon ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={() => pick("")}>No icon</DropdownMenuItem>
+          </>
+        ) : null}
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 }
 
