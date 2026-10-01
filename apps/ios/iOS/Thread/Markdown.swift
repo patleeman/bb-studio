@@ -323,26 +323,30 @@ struct Directive {
         self.attributes = attributes
     }
 
-    /// Suggested replies from the emoji-react plugin's smart reactions: at most five
-    /// "emoji label" items of up to 60 characters, split on `|`.
+    /// The last line can offer up to five short "emoji label" replies.
     static func reactions(in text: String) -> [String] {
         var inCode = false
-        for line in text.components(separatedBy: "\n").reversed() {
-            let trimmed = line.trimmingCharacters(in: .whitespaces)
+        var last: String?
+        for line in text.components(separatedBy: "\n") {
+            let trimmed = line.trimmingCharacters(in: .whitespacesAndNewlines)
             if trimmed.hasPrefix("```") { inCode.toggle() }
-            guard !inCode, let directive = Directive(line: trimmed), directive.name == "reactions",
-                let raw = directive.attributes["items"]
-            else { continue }
-            var seen = Set<String>()
-            return raw.split(separator: "|")
-                .map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
-                .filter { item in
-                    item.count <= 60 && item.contains(" ") && seen.insert(item).inserted
-                }
-                .prefix(5)
-                .map { $0 }
+            if !trimmed.isEmpty { last = inCode ? nil : trimmed }
         }
-        return []
+        guard let last, let directive = Directive(line: last), directive.name == "reactions",
+            let raw = directive.attributes["items"] else { return [] }
+        return parseReactions(raw)
+    }
+
+    static func parseReactions(_ raw: String) -> [String] {
+        var seen = Set<String>()
+        return raw.components(separatedBy: "|")
+            .map { $0.split(whereSeparator: \.isWhitespace).joined(separator: " ") }
+            .filter { item in
+                guard !item.isEmpty, item.utf16.count <= 60 else { return false }
+                let words = item.split(separator: " ", maxSplits: 1)
+                return words.count == 2 && !words[1].isEmpty && seen.insert(item).inserted
+            }
+            .prefix(5).map { $0 }
     }
 }
 

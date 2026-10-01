@@ -1,12 +1,10 @@
 import SwiftUI
 
-/// The emoji-react plugin's default reactions, offered on every message's menu.
-private let defaultReactions = ["👍 Agree", "👎 Disagree", "✅ Do it", "❓ Clarify"]
-
 struct MessageBubble: View {
     let row: TimelineRow
     var projectId: String?
     var react: (String) -> Void = { _ in }
+    var reactionItems: [String] = ReactionSettings.defaults.items
     var quote: (String) -> Void = { _ in }
     var select: (String) -> Void = { _ in }
     /// Nil where side chats aren't available.
@@ -80,7 +78,7 @@ struct MessageBubble: View {
         }
         if !row.isUser {
             Section("React") {
-                ForEach(defaultReactions, id: \.self) { item in
+                ForEach(reactionItems, id: \.self) { item in
                     Button(item) { react(item) }
                 }
             }

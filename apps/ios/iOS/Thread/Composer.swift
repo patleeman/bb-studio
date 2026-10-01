@@ -115,6 +115,7 @@ final class PastingTextView: UITextView {
 /// Lets the user select part of a message; SwiftUI's `Text` only selects all of it.
 struct SelectableText: UIViewRepresentable {
     let text: String
+    @Binding var selection: String
 
     func makeUIView(context: Context) -> UITextView {
         let view = UITextView()
@@ -123,10 +124,27 @@ struct SelectableText: UIViewRepresentable {
         view.adjustsFontForContentSizeCategory = true
         view.textContainerInset = UIEdgeInsets(top: 16, left: 16, bottom: 16, right: 16)
         view.dataDetectorTypes = [.link]
+        view.delegate = context.coordinator
         return view
     }
 
     func updateUIView(_ view: UITextView, context: Context) {
         if view.text != text { view.text = text }
+    }
+
+    func makeCoordinator() -> Coordinator { Coordinator(self) }
+
+    final class Coordinator: NSObject, UITextViewDelegate {
+        let parent: SelectableText
+        init(_ parent: SelectableText) { self.parent = parent }
+
+        func textViewDidChangeSelection(_ textView: UITextView) {
+            let range = textView.selectedRange
+            guard range.length > 0, let selected = Range(range, in: textView.text) else {
+                parent.selection = ""
+                return
+            }
+            parent.selection = String(textView.text[selected])
+        }
     }
 }

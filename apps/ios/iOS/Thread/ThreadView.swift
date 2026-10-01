@@ -21,6 +21,8 @@ struct ThreadView: View {
     @State private var atBottom = true
     @State private var atTop = false
     @State private var selecting: SelectionText?
+    @State private var selectedExcerpt = ""
+    @State private var reactionSettings = ReactionSettings.defaults
     @State private var position = ScrollPosition()
     @State private var pickingSendTime = false
     @State private var showingFiles = false
@@ -30,6 +32,8 @@ struct ThreadView: View {
     @State private var sourcePage: PageMeta?
     @State private var confirmingCompact = false
     @State private var followingActivity = false
+    @State private var confirmingClearContext = false
+    @State private var showingContext = false
     @State private var renaming = false
     @State private var openingFile: OpenFile?
     @State private var newTitle = ""
@@ -99,6 +103,7 @@ struct ThreadView: View {
                 composerFocused = true
             }
         }
+        .sheet(isPresented: $showingContext) { ThreadContextView(threadId: model.threadId) }
         .alert("Rename thread", isPresented: $renaming) {
             TextField("Title", text: $newTitle)
             Button("Cancel", role: .cancel) {}
@@ -113,6 +118,13 @@ struct ThreadView: View {
         } message: {
             Text("The agent summarizes the conversation so far to free up context.")
         }
+        .confirmationDialog("Clear this thread's context?", isPresented: $confirmingClearContext, titleVisibility: .visible) {
+            Button("Clear context", role: .destructive) {
+                Task { await model.run { try await $0.clearContext(model.threadId) } }
+            }
+        } message: {
+            Text("The agent will start its next turn without this conversation's context.")
+        }
         .sheet(isPresented: $choosingModel) {
             ExecutionSheet(threadId: model.threadId, providerId: model.thread?.providerId)
         }
@@ -124,10 +136,22 @@ struct ThreadView: View {
         }
         .sheet(item: $selecting) { selection in
             NavigationStack {
-                SelectableText(text: selection.text)
+                SelectableText(text: selection.text, selection: $selectedExcerpt)
                     .navigationTitle("Select Text")
                     .navigationBarTitleDisplayMode(.inline)
-                    .toolbar { Button("Done") { selecting = nil } }
+                    .toolbar {
+                        if !selectedExcerpt.isEmpty, !reactionSettings.items.isEmpty {
+                            Menu("React") {
+                                ForEach(reactionSettings.items, id: \.self) { item in
+                                    Button(item) {
+                                        draftReaction(item, quote: selectedExcerpt)
+                                        selecting = nil
+                                    }
+                                }
+                            }
+                        }
+                        Button("Done") { selecting = nil }
+                    }
             }
             .presentationDetents([.medium, .large])
         }
@@ -145,6 +169,7 @@ struct ThreadView: View {
             }
             model.attach(app)
             Task { await muted.refresh() }
+            Task { reactionSettings = (try? await app.client.reactionSettings()) ?? .defaults }
             if runningPlugins.split(separator: ",").contains("pages") {
                 Task { sourcePage = try? await app.client.chatPage(model.threadId) }
             }
@@ -279,7 +304,11 @@ struct ThreadView: View {
                         Button {
                             Task { if let id = await model.fork() { app.path.append(.thread(id: id)) } }
                         } label: { Label("Fork thread", systemImage: "arrow.triangle.branch") }
+                        Button { showingContext = true } label: {
+                            Label("Context usage", systemImage: "chart.bar")
+                        }
                         Button { confirmingCompact = true } label: { Label("Compact context", systemImage: "rectangle.compress.vertical") }
+                        Button { confirmingClearContext = true } label: { Label("Clear context", systemImage: "eraser") }
                     }
                     let isMuted = muted.ids.contains(model.threadId)
                     Button {
@@ -331,6 +360,7 @@ struct ThreadView: View {
                                     row: row,
                                     projectId: model.thread?.projectId,
                                     react: { draftReply($0) },
+                                    reactionItems: reactionSettings.items,
                                     quote: { quote($0) },
                                     select: { selecting = SelectionText(text: $0) },
                                     sideChat: sideChat,
@@ -476,6 +506,10 @@ struct ThreadView: View {
         composerFocused = true
     }
 
+    private func draftReaction(_ reaction: String, quote text: String) {
+        draftReply(reactionSettings.draft(reaction, selection: text))
+    }
+
     private func quote(_ text: String) {
         let quoted = text.trimmingCharacters(in: .whitespacesAndNewlines)
             .components(separatedBy: "\n").map { "> " + $0 }.joined(separator: "\n")
@@ -595,6 +629,13 @@ struct ThreadView: View {
         mentions.append(mention)
     }
 
+    private func insertCommand(_ mention: Mention) {
+        guard let query = CommandSuggestions.query(in: draft) else { return }
+        draft = String(draft.dropLast(query.count + 1)) + mention.token + " "
+        mentions.append(mention)
+        composerFocused = true
+    }
+
     private var composer: some View {
         VStack(spacing: 6) {
             ThreadShelf(model: model)
@@ -648,6 +689,10 @@ struct ThreadView: View {
             }
             if composerFocused, let query = MentionSuggestions.query(in: draft) {
                 MentionSuggestions(query: query, threadId: model.threadId, projectId: model.thread?.projectId, pick: insert)
+            } else if composerFocused, let query = CommandSuggestions.query(in: draft),
+                let projectId = model.thread?.projectId, let providerId = model.thread?.providerId {
+                CommandSuggestions(query: query, projectId: projectId, providerId: providerId,
+                    environmentId: model.thread?.environmentId, pick: insertCommand)
             }
             AttachmentStrip(items: $attachments)
             HStack(alignment: .bottom, spacing: 4) {

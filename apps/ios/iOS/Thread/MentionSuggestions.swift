@@ -90,6 +90,9 @@ struct MentionSuggestions: View {
         case "dms": "bubble.left"
         case "recordings": "waveform"
         case "pages": "doc.richtext"
+        case "tasks", "task": "checkmark.square"
+        case "drawings", "drawing": "scribble.variable"
+        case "artifacts", "artifact": "doc.zipper"
         default: "at"
         }
     }
