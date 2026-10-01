@@ -41,8 +41,8 @@ export const PILL =
 /** The page-width column every Studio page sits in. */
 export function PageColumn({ children, className }: { children: ReactNode; className?: string }) {
   return (
-    <div className="studio-root h-full overflow-auto bg-background text-foreground">
-      <div className={cn("mx-auto w-full max-w-5xl px-10 pt-14 pb-20 max-md:px-4 max-md:pt-6", className)}>{children}</div>
+    <div className="studio-root @container/page h-full overflow-auto bg-background text-foreground">
+      <div className={cn("mx-auto w-full max-w-5xl px-10 pt-14 pb-20 @max-3xl/page:px-4 @max-3xl/page:pt-6", className)}>{children}</div>
     </div>
   );
 }

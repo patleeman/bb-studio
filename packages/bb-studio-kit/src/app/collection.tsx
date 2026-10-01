@@ -1,7 +1,7 @@
 // The Studio collection: one searchable, filterable list or grid of items of
 // any kind. Studio renders it for every installed add-on; an add-on renders
 // it alone for its own kind when Studio isn't installed.
-import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { StudioAction } from "../contract";
 import { errorMessage, plural, relativeTime, untitled } from "../format";
@@ -471,7 +471,11 @@ export function CollectionPage({
 
   const columns = single?.columns ?? [];
   const showKind = !single;
-  const gridTemplate = { gridTemplateColumns: `28px minmax(0,1fr)${showKind ? " 110px" : ""} minmax(0,160px)${columns.map(() => " 90px").join("")} 130px` };
+  // Below 48rem of list width the Kind column goes (the tile shows the kind);
+  // below 36rem rows stack into a name and a menu.
+  const template = (kind: boolean) => `28px minmax(0,1fr)${kind ? " 110px" : ""} minmax(0,160px)${columns.map(() => " 90px").join("")} 130px`;
+  const gridTemplate = { "--cols": template(showKind), "--cols-narrow": template(false) } as CSSProperties;
+  const gridColumns = "[grid-template-columns:var(--cols)] @max-3xl/list:[grid-template-columns:var(--cols-narrow)]";
 
   const header = (label: string, key: SortKey | null, className?: string) => {
     const active = key !== null && sort.key === key;
@@ -516,7 +520,7 @@ export function CollectionPage({
         {filter ? (
           <div className="min-w-0 flex-1">{filter.bar}</div>
         ) : (
-          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm focus-within:border-foreground/30 md:max-w-sm">
+          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm focus-within:border-foreground/30 @3xl/page:max-w-sm">
             <Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
             <input
               aria-label={`Search ${title.toLowerCase()}`}
@@ -539,7 +543,7 @@ export function CollectionPage({
           </label>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <div className="flex rounded-md border border-border p-0.5 max-md:hidden" role="group" aria-label="Layout">
+          <div className="flex rounded-md border border-border p-0.5 @max-3xl/page:hidden" role="group" aria-label="Layout">
             {(["list", "grid"] as const).map((option) => (
               <button
                 key={option}
@@ -561,12 +565,12 @@ export function CollectionPage({
       {notice ? <div className="mt-4">{notice}</div> : null}
 
       <div className={cn(filter?.rail && "flex items-start gap-8")}>
-        {filter?.rail ? <aside aria-label="Filters" className="sticky top-0 w-52 shrink-0 pt-4 max-md:hidden">{filter.rail}</aside> : null}
+        {filter?.rail ? <aside aria-label="Filters" className="sticky top-0 w-52 shrink-0 pt-4 @max-4xl/page:hidden">{filter.rail}</aside> : null}
         <div className={cn(filter?.rail && "min-w-0 flex-1")}>
           <div
             role="toolbar"
             aria-label={chosen.length ? "Selected items" : "Filters"}
-            className="sticky top-0 z-10 -mx-2 mt-4 flex min-h-11 flex-wrap items-center gap-1.5 bg-background px-2 py-1.5 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4"
+            className="sticky top-0 z-10 -mx-2 mt-4 flex min-h-11 flex-wrap items-center gap-1.5 bg-background px-2 py-1.5 @max-3xl/page:-mx-4 @max-3xl/page:flex-nowrap @max-3xl/page:overflow-x-auto @max-3xl/page:px-4"
           >
             {chosen.length ? (
               <>
@@ -748,7 +752,7 @@ export function CollectionPage({
             )}
           </div>
 
-          <div className="mt-3">
+          <div className="@container/list mt-3">
             {error ? <p className="py-2 text-sm text-destructive">{error}</p> : null}
             {items === null && !error ? <p className="py-2 text-sm text-muted-foreground">Loading…</p> : null}
             {filter && items !== null && !shown.length ? (
@@ -772,7 +776,7 @@ export function CollectionPage({
             ) : null}
 
             {shown.length && view === "grid" ? (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 max-md:hidden">
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 @max-3xl/page:hidden">
                 {shown.map((item) => {
                   const kind = kindOf(item);
                   const checked = selected.has(itemKey(item));
@@ -828,8 +832,8 @@ export function CollectionPage({
             ) : null}
 
             {shown.length ? (
-              <div role="grid" aria-label={title} aria-multiselectable className={cn("text-sm", view === "grid" && "md:hidden")}>
-                <div role="row" className={cn("grid gap-3 border-b border-border px-2 pb-2 text-xs text-muted-foreground max-md:hidden")} style={gridTemplate}>
+              <div role="grid" aria-label={title} aria-multiselectable className={cn("text-sm", view === "grid" && "@3xl/page:hidden")}>
+                <div role="row" className={cn("grid gap-3 border-b border-border px-2 pb-2 text-xs text-muted-foreground @max-xl/list:hidden", gridColumns)} style={gridTemplate}>
                   <span role="columnheader" className="flex items-center">
                     <Checkbox
                       checked={allChecked ? true : chosen.length ? "mixed" : false}
@@ -839,7 +843,7 @@ export function CollectionPage({
                     />
                   </span>
                   {header("Name", "title")}
-                  {showKind ? header("Kind", "kind") : null}
+                  {showKind ? header("Kind", "kind", "@max-3xl/list:hidden") : null}
                   {header("Project", "project")}
                   {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
                   {header("Last activity", "updatedAt")}
@@ -859,7 +863,8 @@ export function CollectionPage({
                       aria-selected={checked}
                       data-state={checked ? "selected" : undefined}
                       className={cn(
-                        "group/row grid cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-state-hover data-[state=selected]:bg-state-active max-md:!grid-cols-[minmax(0,1fr)_auto] max-md:py-2.5",
+                        "group/row grid cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-state-hover data-[state=selected]:bg-state-active @max-xl/list:!grid-cols-[minmax(0,1fr)_auto] @max-xl/list:py-2.5",
+                        gridColumns,
                       )}
                       style={gridTemplate}
                       onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
@@ -872,7 +877,7 @@ export function CollectionPage({
                         }
                       }}
                     >
-                      <div role="gridcell" className="flex items-center max-md:hidden">
+                      <div role="gridcell" className="flex items-center @max-xl/list:hidden">
                         <Checkbox
                           checked={checked}
                           label={`Select ${untitled(item.title)}`}
@@ -898,25 +903,25 @@ export function CollectionPage({
                           </div>
                           {parent ? <div className="truncate text-xs text-muted-foreground">{parent}</div> : null}
                           {!parent ? preview(item, "truncate") : null}
-                          <div className="truncate text-xs text-muted-foreground md:hidden">{subtitle(item)}</div>
+                          <div className="truncate text-xs text-muted-foreground @xl/list:hidden">{subtitle(item)}</div>
                         </div>
                       </div>
                       {showKind ? (
-                        <div role="gridcell" className="flex min-w-0 items-center gap-1.5 text-muted-foreground max-md:hidden">
+                        <div role="gridcell" className="flex min-w-0 items-center gap-1.5 text-muted-foreground @max-3xl/list:hidden">
                           <Icon name={kind?.icon ?? "File"} className="size-3.5 shrink-0" />
                           <span className="truncate">{kindLabel(item)}</span>
                         </div>
                       ) : null}
-                      <div role="gridcell" className="truncate text-muted-foreground max-md:hidden">
+                      <div role="gridcell" className="truncate text-muted-foreground @max-xl/list:hidden">
                         {projectLabel(item)}
                       </div>
                       {columns.map((column) => (
-                        <div key={column.id} role="gridcell" className="truncate text-right tabular-nums text-muted-foreground max-md:hidden">
+                        <div key={column.id} role="gridcell" className="truncate text-right tabular-nums text-muted-foreground @max-xl/list:hidden">
                           {item.facts.find((fact) => fact.id === column.id)?.value ?? "—"}
                         </div>
                       ))}
-                      <div role="gridcell" className="flex min-w-0 items-center justify-between gap-2 text-muted-foreground max-md:justify-end">
-                        <span className="truncate max-md:hidden" title={new Date(item.updatedAt).toLocaleString()}>
+                      <div role="gridcell" className="flex min-w-0 items-center justify-between gap-2 text-muted-foreground @max-xl/list:justify-end">
+                        <span className="truncate @max-xl/list:hidden" title={new Date(item.updatedAt).toLocaleString()}>
                           {relativeTime(item.updatedAt)}
                         </span>
                         {rowMenu(item, revealClass)}

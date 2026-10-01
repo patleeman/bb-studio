@@ -241,7 +241,7 @@ export function QueryBar({
         <button
           type="button"
           aria-label="Filters"
-          className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-state-hover hover:text-foreground md:hidden"
+          className="flex size-9 shrink-0 items-center justify-center rounded-md border border-border text-muted-foreground hover:bg-state-hover hover:text-foreground @4xl/page:hidden"
           onClick={onOpenFilters}
         >
           <Icon name="SlidersHorizontal" className="size-4" />
