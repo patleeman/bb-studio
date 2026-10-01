@@ -421,7 +421,7 @@ export default definePluginApp((app) => {
   });
   app.slots.navPanel({
     id: "bots",
-    title: "Studio Teams",
+    title: "Teams",
     icon: "Bot",
     path: "bots",
     component: BotsPage,

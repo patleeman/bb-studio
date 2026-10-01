@@ -232,11 +232,11 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     fileName: "bots-collection.png",
     setup: async (client) => {
       await client.navigate("/");
-      await client.waitForText("Studio Teams");
+      await client.waitForText("Teams");
       await client.evaluate(`(() => {
         const button = Array.from(document.querySelectorAll('[data-sidebar="sidebar"] button'))
-          .find((candidate) => candidate.textContent.trim() === 'Studio Teams');
-        if (!button) throw new Error('Studio Teams navigation is missing');
+          .find((candidate) => candidate.textContent.trim() === 'Teams');
+        if (!button) throw new Error('Teams navigation is missing');
         button.click();
       })()`);
       await client.waitForAriaButton("Filter bots");
