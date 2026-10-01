@@ -47,52 +47,62 @@ struct StudioHomeView: View {
                                 }
                             }
                         }
-                        if home.due?.isEmpty == false { Section("Due today") {
-                            ForEach(Array((home.due ?? []).enumerated()), id: \.offset) { _, task in
-                                if let id = task.id {
-                                    NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "calendar") }
-                                }
-                            }
-                        } }
-                        if home.review?.isEmpty == false { Section("In review") {
-                            ForEach(Array((home.review ?? []).enumerated()), id: \.offset) { _, task in
-                                if let id = task.id {
-                                    NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "checkmark.circle") }
-                                }
-                            }
-                        } }
-                        if home.working?.threads?.isEmpty == false || home.working?.bots?.isEmpty == false { Section("Agents working now") {
-                            ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in
-                                if let id = thread.id {
-                                    NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: "bubble.left") }
-                                }
-                            }
-                            ForEach(Array((home.working?.bots ?? []).enumerated()), id: \.offset) { _, bot in
-                                if let id = bot.id {
-                                    NavigationLink(value: Route.bot(id: id)) { Label(bot.name ?? "Bot", systemImage: "person.crop.square") }
-                                }
-                            }
-                        } }
-                        if home.recent?.isEmpty == false { Section("Recent items") {
-                            ForEach(Array((home.recent ?? []).enumerated()), id: \.offset) { _, item in
-                                if let route = item.href.flatMap(Route.init(href:)) {
-                                    NavigationLink(value: route) { Label(item.title ?? "Untitled", systemImage: StudioKind.of(item.kind ?? "").symbol) }
-                                } else {
-                                    Text(item.title ?? "Untitled")
-                                }
-                            }
-                        } }
-                        if home.activity?.isEmpty == false { Section("Activity") {
-                            ForEach(Array((home.activity ?? []).enumerated()), id: \.offset) { _, event in
-                                VStack(alignment: .leading, spacing: 3) {
-                                    Text(event.summary ?? event.verb ?? "Update")
-                                    if let at = event.at {
-                                        Text(Date(timeIntervalSince1970: at / 1000), style: .relative)
-                                            .font(.caption).foregroundStyle(.secondary)
+                        if home.due?.isEmpty == false {
+                            Section("Due today") {
+                                ForEach(Array((home.due ?? []).enumerated()), id: \.offset) { _, task in
+                                    if let id = task.id {
+                                        NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "calendar") }
                                     }
                                 }
                             }
-                        } }
+                        }
+                        if home.review?.isEmpty == false {
+                            Section("In review") {
+                                ForEach(Array((home.review ?? []).enumerated()), id: \.offset) { _, task in
+                                    if let id = task.id {
+                                        NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "checkmark.circle") }
+                                    }
+                                }
+                            }
+                        }
+                        if home.working?.threads?.isEmpty == false || home.working?.bots?.isEmpty == false {
+                            Section("Agents working now") {
+                                ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in
+                                    if let id = thread.id {
+                                        NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: "bubble.left") }
+                                    }
+                                }
+                                ForEach(Array((home.working?.bots ?? []).enumerated()), id: \.offset) { _, bot in
+                                    if let id = bot.id {
+                                        NavigationLink(value: Route.bot(id: id)) { Label(bot.name ?? "Bot", systemImage: "person.crop.square") }
+                                    }
+                                }
+                            }
+                        }
+                        if home.recent?.isEmpty == false {
+                            Section("Recent items") {
+                                ForEach(Array((home.recent ?? []).enumerated()), id: \.offset) { _, item in
+                                    if let route = item.href.flatMap(Route.init(href:)) {
+                                        NavigationLink(value: route) { Label(item.title ?? "Untitled", systemImage: StudioKind.of(item.kind ?? "").symbol) }
+                                    } else {
+                                        Text(item.title ?? "Untitled")
+                                    }
+                                }
+                            }
+                        }
+                        if home.activity?.isEmpty == false {
+                            Section("Activity") {
+                                ForEach(Array((home.activity ?? []).enumerated()), id: \.offset) { _, event in
+                                    VStack(alignment: .leading, spacing: 3) {
+                                        Text(event.summary ?? event.verb ?? "Update")
+                                        if let at = event.at {
+                                            Text(Date(timeIntervalSince1970: at / 1000), style: .relative)
+                                                .font(.caption).foregroundStyle(.secondary)
+                                        }
+                                    }
+                                }
+                            }
+                        }
                     } else if error == nil {
                         ProgressView()
                     }
