@@ -248,7 +248,7 @@ export function ProfileForm({
       const result = await rpc.call("update", {
         ...draft,
         id: bot.id,
-        expectedUpdatedAt: version ?? undefined,
+        ...(version === null ? {} : { expectedUpdatedAt: version }),
       });
       setDraft(result);
       setBaseline(result);

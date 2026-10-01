@@ -50,7 +50,7 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
   }, [context.projectId, periodDays, rpc]);
   const respond = useCallback(async (entry: NonNullable<Home["needsYou"]>[number], action: "approve" | "deny" | "answer", answer?: string) => {
     if (!entry.threadId || !entry.interactionId) return;
-    try { await rpc.call("homeRespond", { threadId: entry.threadId, interactionId: entry.interactionId, action, answer }); refresh(); }
+    try { await rpc.call("homeRespond", { threadId: entry.threadId, interactionId: entry.interactionId, action, ...(answer === undefined ? {} : { answer }) }); refresh(); }
     catch (cause) { setError(errorMessage(cause)); }
   }, [refresh, rpc]);
   useEffect(() => { refresh(); const onVisible = () => { if (document.visibilityState === "visible") refresh(); }; document.addEventListener("visibilitychange", onVisible); return () => document.removeEventListener("visibilitychange", onVisible); }, [refresh]);

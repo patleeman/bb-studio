@@ -288,7 +288,7 @@ function Editor({ tableId, onBack }: { tableId: string; onBack(): void }) {
             void run(async () => {
               const { csv } = await rpc.call("exportCsv", {
                 id: table.id,
-                viewId: view?.id,
+                ...(view ? { viewId: view.id } : {}),
               });
               const url = URL.createObjectURL(
                 new Blob([csv], { type: "text/csv" }),
