@@ -38,10 +38,7 @@ export type DelegateResult = {
 };
 export class Delegations {
   constructor(private store: Store) {
-    store.db
-      .exec(`CREATE TABLE IF NOT EXISTS delegations(id TEXT PRIMARY KEY,room_id TEXT NOT NULL,run_id TEXT NOT NULL,status TEXT NOT NULL,json TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS delegations_by_room ON delegations(room_id,status);
-      CREATE INDEX IF NOT EXISTS delegations_by_run ON delegations(run_id,status);`);
+
   }
   get(id: string) {
     const row = this.store.db

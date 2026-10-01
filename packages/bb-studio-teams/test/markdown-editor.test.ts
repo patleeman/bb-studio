@@ -1,5 +1,5 @@
 import assert from "node:assert/strict";
-import test from "node:test";
+import { test } from "vitest";
 import { EditorState, type StateCommand } from "@codemirror/state";
 import { history, undo, redo } from "@codemirror/commands";
 import {

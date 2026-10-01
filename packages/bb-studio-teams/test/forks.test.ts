@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -111,7 +112,7 @@ function setup() {
       },
     },
   });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const bot: Bot = {
     ...profileInput.parse({ name: "Atlas" }),
     id: "bot_0123456789abcdef",

@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
@@ -51,7 +52,7 @@ function setup(pending: unknown[] = [interaction()]) {
       },
     },
   });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const bot = botSchema.parse({
     id: "bot_0123456789abcdef",
     name: "Designer",

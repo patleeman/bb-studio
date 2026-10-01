@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
@@ -10,7 +11,7 @@ import { requestStatus } from "../agent-channels";
 
 function setup(executionMode: "serialized" | "parallel") {
   const host = createFakePluginHost({ pluginId: "bot-teams", sdk: { threads: { stop: async () => ({ ok: true }), queuedMessages: { list: async () => [] } } } });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const runtime = new Runtime(host.bb, store);
   const bots = ["News Desk", "Secretary", "Researcher"].map((name, i) => botSchema.parse({
     id: `bot_${String(i + 1).padStart(16, "0")}`,

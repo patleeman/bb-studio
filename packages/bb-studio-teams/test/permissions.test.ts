@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import {
@@ -60,7 +61,7 @@ function setup(modes: string[] = ["accept-edits", "auto", "full"]) {
       },
     },
   });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const atlas = makeBot("bot_0123456789abcdef", "Atlas");
   const scribe = makeBot("bot_1123456789abcdef", "Scribe", {
     providerId: "pi",

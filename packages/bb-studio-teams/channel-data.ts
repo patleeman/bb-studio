@@ -4,14 +4,7 @@ import { defaultLimits } from "./workspace-contract";
 /** Snapshots of the bot's plain-text documents and channel usage data. */
 export class ChannelData {
   constructor(readonly store: Store) {
-    store.db.exec(`
-      -- Retired channel context. Kept so existing data is not dropped.
-      CREATE TABLE IF NOT EXISTS channel_context (room_id TEXT PRIMARY KEY, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS document_revisions (id INTEGER PRIMARY KEY, scope TEXT NOT NULL, text TEXT NOT NULL, actor TEXT NOT NULL, created_at INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS revisions_by_scope ON document_revisions(scope,id);
-      CREATE TABLE IF NOT EXISTS routing_usage (id INTEGER PRIMARY KEY, room_id TEXT NOT NULL, created_at INTEGER NOT NULL, duration_ms INTEGER NOT NULL);
-      CREATE INDEX IF NOT EXISTS routing_usage_by_room ON routing_usage(room_id,created_at);
-    `);
+
   }
   snapshot(scope: string, text: string, actor: string) {
     const previous = this.store.db

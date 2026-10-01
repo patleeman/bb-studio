@@ -3,11 +3,7 @@ import { mkdir, readFile, writeFile, rename, lstat } from "node:fs/promises";
 import { dirname, join } from "node:path";
 import type Database from "better-sqlite3";
 import { AttentionStore, mentionsOwner } from "./attention";
-import {
-  TRANSCRIPT_PAGE_SIZE,
-  TRANSCRIPT_WINDOW_SIZE,
-  type TranscriptPage,
-} from "./transcript-window";
+
 import {
   isAutomationTrigger,
   runSchema,
@@ -26,6 +22,10 @@ import type {
   RoomRun,
 } from "./contract";
 
+const TRANSCRIPT_PAGE_SIZE = 50;
+const TRANSCRIPT_WINDOW_SIZE = 150;
+type TranscriptPage = { messages: RoomMessage[]; parents: RoomMessage[]; hasOlder: boolean; hasNewer: boolean };
+
 export function newId() {
   return `bot_${randomBytes(8).toString("hex")}`;
 }
@@ -34,34 +34,7 @@ export class Store {
   readonly attention: AttentionStore;
   constructor(readonly db: Database.Database) {
     this.root = join(dirname(db.name), "homes");
-    db.exec(`CREATE TABLE IF NOT EXISTS bots (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS conversations (id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, key TEXT NOT NULL, thread_id TEXT NOT NULL UNIQUE, json TEXT NOT NULL, UNIQUE(bot_id,key));
-      CREATE TABLE IF NOT EXISTS jobs (id TEXT PRIMARY KEY, bot_id TEXT NOT NULL, status TEXT NOT NULL, created_at INTEGER NOT NULL, json TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS jobs_by_bot ON jobs(bot_id,status,created_at);
-      CREATE TABLE IF NOT EXISTS rooms (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS room_messages (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS attachments (id TEXT PRIMARY KEY, json TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS draft_uploads (id TEXT PRIMARY KEY, bytes BLOB NOT NULL, created_at INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS routing_sessions (thread_id TEXT PRIMARY KEY, request_id TEXT NOT NULL);
-      CREATE TABLE IF NOT EXISTS bot_create_requests (id TEXT PRIMARY KEY, status TEXT NOT NULL, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, json TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS pending_bot_create_requests ON bot_create_requests(status,created_at);
-      CREATE TABLE IF NOT EXISTS channel_notifications (id TEXT PRIMARY KEY,room_id TEXT NOT NULL,kind TEXT NOT NULL,subject_id TEXT NOT NULL,created_at INTEGER NOT NULL,dispatched_at INTEGER);
-      CREATE INDEX IF NOT EXISTS pending_channel_notifications ON channel_notifications(dispatched_at,created_at);
-      CREATE TABLE IF NOT EXISTS room_runs (id TEXT PRIMARY KEY, room_id TEXT NOT NULL, json TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS messages_by_room ON room_messages(room_id);
-      CREATE INDEX IF NOT EXISTS runs_by_room ON room_runs(room_id);
-      CREATE INDEX IF NOT EXISTS active_runs_by_room ON room_runs(room_id,json_extract(json,'$.status'));
-      CREATE INDEX IF NOT EXISTS unfinished_jobs_by_room ON jobs(json_extract(json,'$.roomId'))
-        WHERE status IN ('queued','dispatching','running') OR json_extract(json,'$.cancellationPending')=1;
-      CREATE INDEX IF NOT EXISTS unfinished_runs_by_room ON room_runs(room_id)
-        WHERE json_extract(json,'$.status') IN ('queued','running');
-      CREATE INDEX IF NOT EXISTS jobs_by_bot_started ON jobs(bot_id,COALESCE(json_extract(json,'$.startedAt'),json_extract(json,'$.dispatchStartedAt')));
-      CREATE INDEX IF NOT EXISTS jobs_by_room_started ON jobs(json_extract(json,'$.roomId'),COALESCE(json_extract(json,'$.startedAt'),json_extract(json,'$.dispatchStartedAt')));
-      CREATE INDEX IF NOT EXISTS jobs_by_room ON jobs(json_extract(json,'$.roomId'),created_at);
-      CREATE INDEX IF NOT EXISTS jobs_by_run ON jobs(json_extract(json,'$.runId'),created_at);
-      CREATE INDEX IF NOT EXISTS messages_by_source_job ON room_messages(room_id,json_extract(json,'$.sourceJobId'));
-      CREATE INDEX IF NOT EXISTS messages_by_source ON room_messages(json_extract(json,'$.sourceThreadId'));
-      CREATE INDEX IF NOT EXISTS attachments_by_room ON attachments(json_extract(json,'$.roomId'));`);
+
     this.attention = new AttentionStore(this);
   }
   all(): Bot[] {

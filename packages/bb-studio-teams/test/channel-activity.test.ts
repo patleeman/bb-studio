@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import Database from "better-sqlite3";
@@ -7,7 +8,7 @@ import { jobSchema, roomSchema, runSchema, type Job } from "../contract";
 
 function setup() {
   const db = new Database(":memory:");
-  const store = new Store(db);
+  const store = createTestStore(db);
   const room = roomSchema.parse({
     id: randomUUID(),
     name: "Activity QA",

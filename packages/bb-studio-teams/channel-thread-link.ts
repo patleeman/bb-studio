@@ -9,7 +9,7 @@ import {
 import type { Room, RoomMessage } from "./contract";
 import { messageSchema } from "./contract";
 import type { Store } from "./store";
-import { attachmentUrl } from "./channel-attachments";
+const attachmentUrl = (id: string) => `/api/v1/plugins/bot-teams/http/attachment?id=${encodeURIComponent(id)}`;
 import { linkifyMentions } from "./mentions";
 import { isForkConversation } from "./send-mode";
 import { missingThread } from "./runtime";
@@ -55,8 +55,7 @@ export class ChannelThreads {
     private readonly store: Store,
     private readonly projectId: () => Promise<string>,
   ) {
-    store.db.exec(`CREATE TABLE IF NOT EXISTS channel_threads (room_id TEXT PRIMARY KEY, thread_id TEXT NOT NULL UNIQUE, title TEXT NOT NULL, delivered_rowid INTEGER NOT NULL);
-      CREATE TABLE IF NOT EXISTS channel_thread_origins (message_id TEXT PRIMARY KEY);`);
+
   }
 
   private link(roomId: string): Link | null {
@@ -199,7 +198,7 @@ export class ChannelThreads {
     if (!message.text.trim() && !message.attachments.length) return null;
     const attachments = message.attachments.map((a) => ({
       name: a.name,
-      url: attachmentUrl(a),
+      url: attachmentUrl(a.id),
       image: a.type === "localImage",
     }));
     if (message.botId) {

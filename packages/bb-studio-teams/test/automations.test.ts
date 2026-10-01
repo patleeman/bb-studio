@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import {
@@ -118,7 +119,7 @@ async function setup() {
     },
   });
   await plugin(host.bb);
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const runtime = new Runtime(host.bb, store);
   const service = new ChannelAutomations(host.bb, store, runtime);
   const a = botSchema.parse({

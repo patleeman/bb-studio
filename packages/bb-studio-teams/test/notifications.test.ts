@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -12,7 +13,7 @@ import { ChannelNotifications } from "../notifications";
 
 function setup() {
   const host = createFakePluginHost({ pluginId: "bot-teams" });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const bot = botSchema.parse({
     id: "bot_0123456789abcdef",
     name: "Atlas",

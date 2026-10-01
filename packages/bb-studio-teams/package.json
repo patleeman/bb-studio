@@ -25,7 +25,6 @@
     "@codemirror/search": "^6.7.2",
     "@codemirror/state": "^6.7.5",
     "@codemirror/view": "^6.43.12",
-    "@get-bb/plugin-sdk": "0.5.29",
     "@lezer/highlight": "^1.2.3",
     "@radix-ui/react-context-menu": "^2.3.3",
     "@radix-ui/react-dialog": "^1.1.19",
@@ -42,6 +41,8 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
+    "@get-bb/plugin-sdk": "0.5.29",
+    "vitest": "4.1.1",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-hover-card": "^1.1.19",
     "@radix-ui/react-menubar": "^1.1.20",
@@ -59,7 +60,7 @@
   "scripts": {
     "typecheck": "tsc --noEmit",
     "build": "bb plugin build .",
-    "test": "node --import tsx --test test/*.test.ts"
+    "test": "vitest run --config vitest.config.mts"
   },
   "allowScripts": {
     "better-sqlite3@12.11.1": true

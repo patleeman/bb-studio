@@ -33,14 +33,7 @@ export function mentionsOwner(text: string): boolean {
 
 export class AttentionStore {
   constructor(private store: Store) {
-    store.db.exec(`CREATE TABLE IF NOT EXISTS channel_attention (
-      id TEXT PRIMARY KEY, room_id TEXT NOT NULL, status TEXT NOT NULL,
-      snoozed_until INTEGER, json TEXT NOT NULL);
-      CREATE INDEX IF NOT EXISTS attention_by_status ON channel_attention(status,snoozed_until);
-      CREATE INDEX IF NOT EXISTS attention_by_room ON channel_attention(room_id);
-      CREATE TABLE IF NOT EXISTS attention_question_replies (
-        id TEXT PRIMARY KEY, attention_id TEXT NOT NULL, room_id TEXT NOT NULL, text TEXT NOT NULL,
-        revision INTEGER NOT NULL, error TEXT, retry_at INTEGER NOT NULL DEFAULT 0);`);
+
   }
   get(id: string): Attention | null {
     const row = this.store.db

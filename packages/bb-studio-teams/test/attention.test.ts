@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import { z } from "zod";
@@ -18,7 +19,7 @@ import { AttentionReplies, StaleAttentionReplyError } from "../attention-replies
 
 function setup() {
   const host = createFakePluginHost({ pluginId: "bot-teams" });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const bot = botSchema.parse({
     id: "bot_0123456789abcdef",
     name: "Atlas",
@@ -109,7 +110,7 @@ test("attention survives reading and reload, is deduplicated, and only acknowled
       (await x.notify.resolve("attention:message:0"))?.path,
       `/plugins/bot-teams/channels/${x.room.id}/message/message`,
     );
-    const restarted = new Store(x.store.db);
+    const restarted = createTestStore(x.store.db);
     assert.equal(
       restarted.attention.list("open", 30, 0).items[0]?.message.id,
       "message",
@@ -132,7 +133,7 @@ test("snooze suppresses queued delivery and wakes once after restart with a new 
     x.store.putMessage(x.message);
     const snoozed = x.store.attention.update("message", "snooze", 60);
     assert.equal(await x.notify.resolve("attention:message:0"), null);
-    const restarted = new Store(x.store.db);
+    const restarted = createTestStore(x.store.db);
     assert.equal(restarted.attention.wake(snoozed.snoozedUntil! - 1), 0);
     assert.equal(restarted.attention.wake(snoozed.snoozedUntil!), 1);
     assert.equal(restarted.attention.wake(snoozed.snoozedUntil!), 0);

@@ -1,4 +1,5 @@
-import test from "node:test";
+import { createTestStore } from "./test-store";
+import { test } from "vitest";
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -17,7 +18,7 @@ type Provider = {
 
 function setup() {
   const host = createFakePluginHost({ pluginId: "bot-teams" });
-  const store = new Store(host.bb.storage.database());
+  const store = createTestStore(host.bb.storage.database());
   const bot = (id: string, name: string, handle: string) =>
     botSchema.parse({
       id, name, handle, description: `${name} does things`, avatar: "🧭",
