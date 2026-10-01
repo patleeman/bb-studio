@@ -138,7 +138,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
   async function cli(argv: string[], ctx: PluginCliContext): Promise<CliResult> {
     const { command, rest } = subcommand(argv);
     const flags = parseFlags(rest, ["wait"]);
-    const positional = flags.positional;
+    const positional = rest.filter((arg) => !arg.startsWith("--"));
     const fail = (message: string): CliResult => ({ exitCode: 1, stderr: `${message}\n` });
     switch (command) {
       case "list": {

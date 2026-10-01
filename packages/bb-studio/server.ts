@@ -1,4 +1,4 @@
-import { subcommand, takeFlag, takeOption } from "@bb-studio/kit/cli";
+import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
 // - Studio finds add-ons through RPC discovery (src/hub.ts) and fans the
@@ -311,7 +311,7 @@ export default async function plugin(bb: BbPluginApi) {
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
           default:
-            return { exitCode: 1, stderr: "usage: bb studio <list|tags|providers> …\n" };
+            return usage("bb studio <list|tags|providers> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

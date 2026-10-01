@@ -1,4 +1,4 @@
-import { subcommand, takeFlag, takeOption } from "@bb-studio/kit/cli";
+import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
@@ -455,7 +455,7 @@ export default async function plugin(bb: BbPluginApi) {
           case "explore":
             return await explore.cli(rest, ctx);
           default:
-            return { exitCode: 1, stderr: "usage: bb pages <list|show|create|append|explore> …\n" };
+            return usage("bb pages <list|show|create|append|explore> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
