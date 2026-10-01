@@ -25,6 +25,7 @@ import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
+import { spaceItem, spaceKind } from "./src/space-items";
 import { compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -50,7 +51,8 @@ function queryArg(arg: string): string {
 }
 
 export default async function plugin(bb: BbPluginApi) {
-  const hub = new StudioHub(bb.sdk);
+  // Spaces list as Studio's own items; `spaces` is set up below, before any call.
+  const hub = new StudioHub(bb.sdk, { kinds: [spaceKind], items: () => spaces.list().map(spaceItem) });
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
@@ -251,7 +253,8 @@ export default async function plugin(bb: BbPluginApi) {
   const itemForPath = async (path: string) => {
     const parts = path.split(/[?#]/)[0]!.split("/");
     const pluginId = parts[2];
-    const id = parts[4];
+    // A space opens at /plugins/studio/studio/space/<id>.
+    const id = pluginId === STUDIO_PLUGIN_ID ? parts[5] : parts[4];
     if (!pluginId || !id) return null;
     const items = await hub.get(pluginId, [decodeURIComponent(id)]).catch(() => []);
     return itemAtPath(items, path);
@@ -421,7 +424,8 @@ export default async function plugin(bb: BbPluginApi) {
     sidebar: () => readSidebar(),
     tabs: async () => ({ tabs: tabViews(await tabData()) }),
     visitTab: async ({ path }) => {
-      if (!path.startsWith("/plugins/") || path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { tab: null };
+      // Studio's own pages aren't items, except a space's.
+      if (!path.startsWith("/plugins/") || (path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`) && !path.startsWith(spacePath("")))) return { tab: null };
       const item = await itemForPath(path);
       if (!item) return { tab: null };
       if (tabs.open(item)) tabsChanged();

@@ -30,6 +30,9 @@ export interface Space {
   threadIds: string[];
   /** Studio items added one by one, as `<plugin>:<id>`. */
   itemKeys: string[];
+  createdAt: number;
+  /** When it was made or last gained a member. */
+  updatedAt: number;
 }
 
 export interface SpaceInput {
@@ -49,6 +52,7 @@ interface SpaceRow {
   icon: string | null;
   description: string | null;
   default_project_id: string | null;
+  created_at: number;
 }
 
 function description(raw: string): string {
@@ -63,14 +67,14 @@ export class SpaceStore {
   list(): Space[] {
     const rows = this.db
       .prepare(
-        `SELECT tags.id, tags.name, tags.color, spaces.icon, spaces.description, spaces.default_project_id
+        `SELECT tags.id, tags.name, tags.color, tags.created_at, spaces.icon, spaces.description, spaces.default_project_id
            FROM tags LEFT JOIN spaces ON spaces.tag_id = tags.id
           WHERE tags.kind = 'space' ORDER BY tags.name COLLATE NOCASE`,
       )
       .all() as SpaceRow[];
     const members = this.db
-      .prepare("SELECT plugin_id, item_id, tag_id FROM item_tags JOIN tags ON tags.id = item_tags.tag_id WHERE tags.kind = 'space' ORDER BY item_tags.created_at")
-      .all() as { plugin_id: string; item_id: string; tag_id: string }[];
+      .prepare("SELECT plugin_id, item_id, tag_id, item_tags.created_at FROM item_tags JOIN tags ON tags.id = item_tags.tag_id WHERE tags.kind = 'space' ORDER BY item_tags.created_at")
+      .all() as { plugin_id: string; item_id: string; tag_id: string; created_at: number }[];
     return rows.map((row) => {
       const own = members.filter((member) => member.tag_id === row.id);
       return {
@@ -83,6 +87,8 @@ export class SpaceStore {
         projectIds: own.filter((member) => member.plugin_id === PROJECT_REF).map((member) => member.item_id),
         threadIds: own.filter((member) => member.plugin_id === THREAD_REF).map((member) => member.item_id),
         itemKeys: own.filter((member) => member.plugin_id !== PROJECT_REF && member.plugin_id !== THREAD_REF).map((member) => `${member.plugin_id}:${member.item_id}`),
+        createdAt: row.created_at,
+        updatedAt: Math.max(row.created_at, ...own.map((member) => member.created_at)),
       };
     });
   }

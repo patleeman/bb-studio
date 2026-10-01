@@ -234,6 +234,31 @@ function ProjectRows({
   );
 }
 
+/** Kinds a space can make, from every add-on but Studio's own spaces. */
+export function creatableKinds(kinds: readonly CollectionKind[]): CollectionKind[] {
+  return kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true) && kind.pluginId !== "studio");
+}
+
+/** One tile per thing to make in the space: each add-on's kinds, and a thread. */
+function CreateGrid({ space, kinds, onCreate }: { space: SpaceView; kinds: readonly CollectionKind[]; onCreate(kind: CollectionKind): void }) {
+  const navigate = useBbNavigate();
+  const tile = "flex h-10 min-w-0 items-center gap-2.5 rounded-md border border-border px-3 text-left text-sm hover:bg-state-hover";
+  return (
+    <section aria-label="Create" className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+      <button type="button" className={tile} onClick={() => navigate.toCompose({ initialPrompt: spacePrompt(space), focusPrompt: true })}>
+        <ItemTile icon={null} kindIcon="MessageSquarePlus" size="sm" />
+        <span className="truncate">Thread</span>
+      </button>
+      {creatableKinds(kinds).map((kind) => (
+        <button key={`${kind.pluginId}:${kind.id}`} type="button" className={tile} onClick={() => onCreate(kind)}>
+          <ItemTile icon={null} kindIcon={kind.icon} size="sm" />
+          <span className="truncate">{kind.label}</span>
+        </button>
+      ))}
+    </section>
+  );
+}
+
 /** Rows for a list of threads, the ones added directly removable. */
 function ThreadRows({ threads, projects, onRemove }: { threads: readonly SpaceThreadView[]; projects: readonly Project[]; onRemove(id: string): void }) {
   return (
@@ -245,7 +270,7 @@ function ThreadRows({ threads, projects, onRemove }: { threads: readonly SpaceTh
   );
 }
 
-/** A space's home page: what it's for, then its items, threads, channels and projects. */
+/** A space's page, to work from: what it's for, things to make, then its recent items, threads, channels and projects. */
 export function SpaceHome({
   rpc,
   space,
@@ -258,6 +283,7 @@ export function SpaceHome({
   onAddItems,
   onAddThreads,
   onShowItems,
+  onCreate,
   onChanged,
 }: {
   rpc: Rpc;
@@ -273,6 +299,8 @@ export function SpaceHome({
   onAddThreads(kind: ThreadKind): void;
   /** Opens the Studio collection filtered to the space. */
   onShowItems(): void;
+  /** Makes one of a kind in the space, and opens it. */
+  onCreate(kind: CollectionKind): void;
   onChanged(): void;
 }) {
   const members = useMembers(rpc, space, onChanged);
@@ -298,9 +326,10 @@ export function SpaceHome({
           Say what this space is for
         </button>
       )}
-      <div className="mt-8 flex flex-col gap-8">
+      <div className="mt-6 flex flex-col gap-8">
+        <CreateGrid space={space} kinds={kinds} onCreate={onCreate} />
         <Section
-          title="Items"
+          title="Recent"
           actions={
             <button type="button" className={OUTLINE_BUTTON} onClick={onAddItems}>
               <Icon name="Plus" /> Add items

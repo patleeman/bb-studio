@@ -3,7 +3,7 @@ export { errorText };
 // Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
 // publish `studio_describe` for discovery; the suite's own plugins are also
 // looked up by id, so an older version that predates Studio can be named.
-import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, type StudioItem, type StudioKind, type StudioProviderInfo } from "@bb-studio/kit/contract";
 import { discoverProviders, fanOutProviders, rpcErrorStatus } from "@bb-studio/kit/server";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
@@ -34,11 +34,24 @@ export interface HubSdk {
 type ProviderMethods = typeof schemas.provider;
 export type HubItem = StudioItem & { pluginId: string };
 
+/** Kinds Studio provides itself, listed alongside the add-ons'. */
+export interface LocalProvider {
+  kinds: StudioKind[];
+  items(): HubItem[];
+}
+
 
 export class StudioHub {
   private readonly described = new Map<string, { version: string; info: StudioProviderInfo }>();
 
-  constructor(private readonly sdk: HubSdk) {}
+  constructor(
+    private readonly sdk: HubSdk,
+    private readonly local: LocalProvider | null = null,
+  ) {}
+
+  private localView(): ProviderView[] {
+    return this.local ? [{ pluginId: STUDIO_PLUGIN_ID, name: "Studio", state: "ready", detail: null, panel: null, kinds: this.local.kinds }] : [];
+  }
 
   version(pluginId: string): 1 | 2 | null { return this.described.get(pluginId)?.info.version ?? null; }
 
@@ -64,7 +77,7 @@ export class StudioHub {
       known: SUITE,
       exclude: [STUDIO_PLUGIN_ID],
     });
-    return Promise.all(candidates.map((entry) => this.describe(entry)));
+    return [...(await Promise.all(candidates.map((entry) => this.describe(entry)))), ...this.localView()];
   }
 
   private async describe(entry: PluginEntry): Promise<ProviderView> {
@@ -99,6 +112,7 @@ export class StudioHub {
       providers,
       async (provider) => {
         if (provider.state !== "ready") return { provider, items: [] as HubItem[], truncated: false };
+        if (provider.pluginId === STUDIO_PLUGIN_ID) return { provider, items: this.local?.items() ?? [], truncated: false };
         const { items, truncated = false } = await this.call(provider.pluginId, "studio_list", null);
         return { provider, items: items.map((item) => ({ ...item, pluginId: provider.pluginId })), truncated };
       },
@@ -113,6 +127,7 @@ export class StudioHub {
 
   async get(pluginId: string, ids: string[]): Promise<HubItem[]> {
     if (!ids.length) return [];
+    if (pluginId === STUDIO_PLUGIN_ID) return this.local?.items().filter((item) => ids.includes(item.id)) ?? [];
     const info = (await this.providers()).find((provider) => provider.pluginId === pluginId);
     if (info?.state !== "ready") return [];
     const version = this.described.get(pluginId)?.info.version;
@@ -127,7 +142,7 @@ export class StudioHub {
    * where the add-on gave it; providers that fail are skipped.
    */
   async search(query: string, v1Only = false): Promise<{ keys: string[]; snippets: Record<string, string> }> {
-    const ready = (await this.providers()).filter((provider) => provider.state === "ready" && (!v1Only || this.version(provider.pluginId) === 1));
+    const ready = (await this.providers()).filter((provider) => provider.state === "ready" && provider.pluginId !== STUDIO_PLUGIN_ID && (!v1Only || this.version(provider.pluginId) === 1));
     const results = await Promise.all(
       ready.map((provider) =>
         this.call(provider.pluginId, "studio_search", { query }).then(

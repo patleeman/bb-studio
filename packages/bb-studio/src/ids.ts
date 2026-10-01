@@ -7,3 +7,6 @@ export const TABS_CHANNEL = "studio-tabs";
 
 /** Window event that opens or closes Studio search; no detail. */
 export const QUICK_OPEN_EVENT = "bb-studio:quick-open";
+
+/** Window event that makes a space: Studio's New space dialog; no detail. */
+export const NEW_SPACE_EVENT = "studio:new-space";

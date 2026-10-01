@@ -155,4 +155,13 @@ describe("StudioHub", () => {
     const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }));
     await expect(hub.call("studio", "studio_list", null)).rejects.toThrow("Studio isn't a provider.");
   });
+
+  it("lists Studio's own kinds and items beside the add-ons'", async () => {
+    const space = { ...item("spc_1"), kind: "space", href: "/plugins/studio/studio/space/spc_1" };
+    const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }), { kinds: [{ ...kind, id: "space" }], items: () => [{ ...space, pluginId: "studio" }] });
+    expect((await hub.providers()).map((provider) => [provider.pluginId, provider.state])).toEqual([["studio", "ready"]]);
+    expect((await hub.overview()).items.map((each) => each.id)).toEqual(["spc_1"]);
+    expect((await hub.get("studio", ["spc_1", "spc_2"])).map((each) => each.id)).toEqual(["spc_1"]);
+    expect(await hub.search("plan")).toEqual({ keys: [], snippets: {} });
+  });
 });

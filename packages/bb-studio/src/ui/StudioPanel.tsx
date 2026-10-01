@@ -505,6 +505,18 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           ? "Nothing matches."
           : "No items yet.";
 
+  // New items go to the space's default project and join the space itself.
+  const createInSpace = async (target: CollectionKind, into: SpaceView) => {
+    if (target.create?.mode !== "rpc") return handlers.onCreate?.(target, into.defaultProjectId);
+    try {
+      const { item } = await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId: into.defaultProjectId });
+      await rpc.call("spaceMembers", { id: into.id, add: [{ pluginId: target.pluginId, id: item.id }], remove: [] });
+      refetch();
+      openAppPath(item.href);
+    } catch (cause) {
+      toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
+    }
+  };
   const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
   const deleteSpace = async (target: SpaceView) => {
     setSpaceDialog(null);
@@ -536,6 +548,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
             setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
             openSpace(null);
           }}
+          onCreate={(target) => void createInSpace(target, space)}
           onChanged={refetch}
         />
       ) : (
