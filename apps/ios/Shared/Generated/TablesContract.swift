@@ -11,9 +11,11 @@ public enum Tables {
     public static let insert = "insert"
     public static let updateRow = "updateRow"
     public static let deleteRow = "deleteRow"
+    public static let patchRows = "patchRows"
     public static let query = "query"
     public static let exportCsv = "exportCsv"
     public static let importCsv = "importCsv"
+    public static let items = "items"
   }
 
   public typealias ListInput = StudioJSONValue
@@ -34,11 +36,17 @@ public enum Tables {
 
   public typealias DeleteRow = DeleteRowOutput
 
+  public typealias PatchRows = PatchRowsOutput
+
   public typealias Query = QueryOutput
 
   public typealias ExportCsv = ExportCsvOutput
 
   public typealias ImportCsv = ImportCsvOutput
+
+  public typealias ItemsInput = StudioJSONValue
+
+  public typealias Items = ItemsOutput
 
   public enum ListOutputTablesItemColumnsItemType: Sendable, Hashable, Codable {
     case text
@@ -93,12 +101,14 @@ public enum Tables {
     public var name: String?
     public var type: ListOutputTablesItemColumnsItemType?
     public var options: [String]?
+    public var width: Int?
 
-    public init(id: String? = nil, name: String? = nil, type: ListOutputTablesItemColumnsItemType? = nil, options: [String]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: ListOutputTablesItemColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
       self.id = id
       self.name = name
       self.type = type
       self.options = options
+      self.width = width
     }
   }
 
@@ -130,9 +140,11 @@ public enum Tables {
   }
 
   public enum ListOutputTablesItemViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
     case eq
     case neq
-    case contains
+    case gt
+    case lt
     case empty
     case not_empty
     case unknown(String)
@@ -140,9 +152,11 @@ public enum Tables {
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
+      case "contains": self = .contains
       case "eq": self = .eq
       case "neq": self = .neq
-      case "contains": self = .contains
+      case "gt": self = .gt
+      case "lt": self = .lt
       case "empty": self = .empty
       case "not-empty": self = .not_empty
       default: self = .unknown(value)
@@ -152,9 +166,11 @@ public enum Tables {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
+      case .contains: try container.encode("contains")
       case .eq: try container.encode("eq")
       case .neq: try container.encode("neq")
-      case .contains: try container.encode("contains")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
       case .empty: try container.encode("empty")
       case .not_empty: try container.encode("not-empty")
       case .unknown(let value): try container.encode(value)
@@ -216,8 +232,9 @@ public enum Tables {
     public var dateBy: String?
     public var filters: [ListOutputTablesItemViewsItemFiltersItem]?
     public var sorts: [ListOutputTablesItemViewsItemSortsItem]?
+    public var hidden: [String]?
 
-    public init(id: String? = nil, name: String? = nil, type: ListOutputTablesItemViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [ListOutputTablesItemViewsItemFiltersItem]? = nil, sorts: [ListOutputTablesItemViewsItemSortsItem]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: ListOutputTablesItemViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [ListOutputTablesItemViewsItemFiltersItem]? = nil, sorts: [ListOutputTablesItemViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
       self.id = id
       self.name = name
       self.type = type
@@ -225,6 +242,7 @@ public enum Tables {
       self.dateBy = dateBy
       self.filters = filters
       self.sorts = sorts
+      self.hidden = hidden
     }
   }
 
@@ -335,12 +353,14 @@ public enum Tables {
     public var name: String?
     public var type: GetOutputTableColumnsItemType?
     public var options: [String]?
+    public var width: Int?
 
-    public init(id: String? = nil, name: String? = nil, type: GetOutputTableColumnsItemType? = nil, options: [String]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: GetOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
       self.id = id
       self.name = name
       self.type = type
       self.options = options
+      self.width = width
     }
   }
 
@@ -372,9 +392,11 @@ public enum Tables {
   }
 
   public enum GetOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
     case eq
     case neq
-    case contains
+    case gt
+    case lt
     case empty
     case not_empty
     case unknown(String)
@@ -382,9 +404,11 @@ public enum Tables {
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
+      case "contains": self = .contains
       case "eq": self = .eq
       case "neq": self = .neq
-      case "contains": self = .contains
+      case "gt": self = .gt
+      case "lt": self = .lt
       case "empty": self = .empty
       case "not-empty": self = .not_empty
       default: self = .unknown(value)
@@ -394,9 +418,11 @@ public enum Tables {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
+      case .contains: try container.encode("contains")
       case .eq: try container.encode("eq")
       case .neq: try container.encode("neq")
-      case .contains: try container.encode("contains")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
       case .empty: try container.encode("empty")
       case .not_empty: try container.encode("not-empty")
       case .unknown(let value): try container.encode(value)
@@ -458,8 +484,9 @@ public enum Tables {
     public var dateBy: String?
     public var filters: [GetOutputTableViewsItemFiltersItem]?
     public var sorts: [GetOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
 
-    public init(id: String? = nil, name: String? = nil, type: GetOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [GetOutputTableViewsItemFiltersItem]? = nil, sorts: [GetOutputTableViewsItemSortsItem]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: GetOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [GetOutputTableViewsItemFiltersItem]? = nil, sorts: [GetOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
       self.id = id
       self.name = name
       self.type = type
@@ -467,6 +494,7 @@ public enum Tables {
       self.dateBy = dateBy
       self.filters = filters
       self.sorts = sorts
+      self.hidden = hidden
     }
   }
 
@@ -569,12 +597,14 @@ public enum Tables {
     public var name: String?
     public var type: CreateInputColumnsItemType?
     public var options: [String]?
+    public var width: Int?
 
-    public init(id: String? = nil, name: String? = nil, type: CreateInputColumnsItemType? = nil, options: [String]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: CreateInputColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
       self.id = id
       self.name = name
       self.type = type
       self.options = options
+      self.width = width
     }
   }
 
@@ -582,11 +612,13 @@ public enum Tables {
     public var title: String?
     public var projectId: String?
     public var columns: [CreateInputColumnsItem]?
+    public var rows: [[String: StudioJSONValue]]?
 
-    public init(title: String? = nil, projectId: String? = nil, columns: [CreateInputColumnsItem]? = nil) {
+    public init(title: String? = nil, projectId: String? = nil, columns: [CreateInputColumnsItem]? = nil, rows: [[String: StudioJSONValue]]? = nil) {
       self.title = title
       self.projectId = projectId
       self.columns = columns
+      self.rows = rows
     }
   }
 
@@ -643,12 +675,14 @@ public enum Tables {
     public var name: String?
     public var type: CreateOutputTableColumnsItemType?
     public var options: [String]?
+    public var width: Int?
 
-    public init(id: String? = nil, name: String? = nil, type: CreateOutputTableColumnsItemType? = nil, options: [String]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: CreateOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
       self.id = id
       self.name = name
       self.type = type
       self.options = options
+      self.width = width
     }
   }
 
@@ -680,9 +714,11 @@ public enum Tables {
   }
 
   public enum CreateOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
     case eq
     case neq
-    case contains
+    case gt
+    case lt
     case empty
     case not_empty
     case unknown(String)
@@ -690,9 +726,11 @@ public enum Tables {
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
+      case "contains": self = .contains
       case "eq": self = .eq
       case "neq": self = .neq
-      case "contains": self = .contains
+      case "gt": self = .gt
+      case "lt": self = .lt
       case "empty": self = .empty
       case "not-empty": self = .not_empty
       default: self = .unknown(value)
@@ -702,9 +740,11 @@ public enum Tables {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
+      case .contains: try container.encode("contains")
       case .eq: try container.encode("eq")
       case .neq: try container.encode("neq")
-      case .contains: try container.encode("contains")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
       case .empty: try container.encode("empty")
       case .not_empty: try container.encode("not-empty")
       case .unknown(let value): try container.encode(value)
@@ -766,8 +806,9 @@ public enum Tables {
     public var dateBy: String?
     public var filters: [CreateOutputTableViewsItemFiltersItem]?
     public var sorts: [CreateOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
 
-    public init(id: String? = nil, name: String? = nil, type: CreateOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [CreateOutputTableViewsItemFiltersItem]? = nil, sorts: [CreateOutputTableViewsItemSortsItem]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: CreateOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [CreateOutputTableViewsItemFiltersItem]? = nil, sorts: [CreateOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
       self.id = id
       self.name = name
       self.type = type
@@ -775,6 +816,7 @@ public enum Tables {
       self.dateBy = dateBy
       self.filters = filters
       self.sorts = sorts
+      self.hidden = hidden
     }
   }
 
@@ -877,12 +919,14 @@ public enum Tables {
     public var name: String?
     public var type: UpdateInputColumnsItemType?
     public var options: [String]?
+    public var width: Int?
 
-    public init(id: String? = nil, name: String? = nil, type: UpdateInputColumnsItemType? = nil, options: [String]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: UpdateInputColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
       self.id = id
       self.name = name
       self.type = type
       self.options = options
+      self.width = width
     }
   }
 
@@ -914,9 +958,11 @@ public enum Tables {
   }
 
   public enum UpdateInputViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
     case eq
     case neq
-    case contains
+    case gt
+    case lt
     case empty
     case not_empty
     case unknown(String)
@@ -924,9 +970,11 @@ public enum Tables {
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
+      case "contains": self = .contains
       case "eq": self = .eq
       case "neq": self = .neq
-      case "contains": self = .contains
+      case "gt": self = .gt
+      case "lt": self = .lt
       case "empty": self = .empty
       case "not-empty": self = .not_empty
       default: self = .unknown(value)
@@ -936,9 +984,11 @@ public enum Tables {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
+      case .contains: try container.encode("contains")
       case .eq: try container.encode("eq")
       case .neq: try container.encode("neq")
-      case .contains: try container.encode("contains")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
       case .empty: try container.encode("empty")
       case .not_empty: try container.encode("not-empty")
       case .unknown(let value): try container.encode(value)
@@ -1000,8 +1050,9 @@ public enum Tables {
     public var dateBy: String?
     public var filters: [UpdateInputViewsItemFiltersItem]?
     public var sorts: [UpdateInputViewsItemSortsItem]?
+    public var hidden: [String]?
 
-    public init(id: String? = nil, name: String? = nil, type: UpdateInputViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [UpdateInputViewsItemFiltersItem]? = nil, sorts: [UpdateInputViewsItemSortsItem]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: UpdateInputViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [UpdateInputViewsItemFiltersItem]? = nil, sorts: [UpdateInputViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
       self.id = id
       self.name = name
       self.type = type
@@ -1009,6 +1060,7 @@ public enum Tables {
       self.dateBy = dateBy
       self.filters = filters
       self.sorts = sorts
+      self.hidden = hidden
     }
   }
 
@@ -1083,12 +1135,14 @@ public enum Tables {
     public var name: String?
     public var type: UpdateOutputTableColumnsItemType?
     public var options: [String]?
+    public var width: Int?
 
-    public init(id: String? = nil, name: String? = nil, type: UpdateOutputTableColumnsItemType? = nil, options: [String]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: UpdateOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
       self.id = id
       self.name = name
       self.type = type
       self.options = options
+      self.width = width
     }
   }
 
@@ -1120,9 +1174,11 @@ public enum Tables {
   }
 
   public enum UpdateOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
     case eq
     case neq
-    case contains
+    case gt
+    case lt
     case empty
     case not_empty
     case unknown(String)
@@ -1130,9 +1186,11 @@ public enum Tables {
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
+      case "contains": self = .contains
       case "eq": self = .eq
       case "neq": self = .neq
-      case "contains": self = .contains
+      case "gt": self = .gt
+      case "lt": self = .lt
       case "empty": self = .empty
       case "not-empty": self = .not_empty
       default: self = .unknown(value)
@@ -1142,9 +1200,11 @@ public enum Tables {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
+      case .contains: try container.encode("contains")
       case .eq: try container.encode("eq")
       case .neq: try container.encode("neq")
-      case .contains: try container.encode("contains")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
       case .empty: try container.encode("empty")
       case .not_empty: try container.encode("not-empty")
       case .unknown(let value): try container.encode(value)
@@ -1206,8 +1266,9 @@ public enum Tables {
     public var dateBy: String?
     public var filters: [UpdateOutputTableViewsItemFiltersItem]?
     public var sorts: [UpdateOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
 
-    public init(id: String? = nil, name: String? = nil, type: UpdateOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [UpdateOutputTableViewsItemFiltersItem]? = nil, sorts: [UpdateOutputTableViewsItemSortsItem]? = nil) {
+    public init(id: String? = nil, name: String? = nil, type: UpdateOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [UpdateOutputTableViewsItemFiltersItem]? = nil, sorts: [UpdateOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
       self.id = id
       self.name = name
       self.type = type
@@ -1215,6 +1276,7 @@ public enum Tables {
       self.dateBy = dateBy
       self.filters = filters
       self.sorts = sorts
+      self.hidden = hidden
     }
   }
 
@@ -1364,10 +1426,139 @@ public enum Tables {
     }
   }
 
-  public enum QueryInputFiltersItemOp: Sendable, Hashable, Codable {
+  public struct PatchRowsInputUpdateItem: Sendable, Hashable, Codable {
+    public var rowId: String?
+    public var values: [String: StudioJSONValue]?
+
+    public init(rowId: String? = nil, values: [String: StudioJSONValue]? = nil) {
+      self.rowId = rowId
+      self.values = values
+    }
+  }
+
+  public struct PatchRowsInputInsertItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var before: String?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, before: String? = nil) {
+      self.id = id
+      self.values = values
+      self.before = before
+    }
+  }
+
+  public struct PatchRowsInput: Sendable, Hashable, Codable {
+    public var update: [PatchRowsInputUpdateItem]?
+    public var insert: [PatchRowsInputInsertItem]?
+    public var remove: [String]?
+    public var id: String?
+
+    public init(update: [PatchRowsInputUpdateItem]? = nil, insert: [PatchRowsInputInsertItem]? = nil, remove: [String]? = nil, id: String? = nil) {
+      self.update = update
+      self.insert = insert
+      self.remove = remove
+      self.id = id
+    }
+  }
+
+  public enum PatchRowsOutputTableColumnsItemType: Sendable, Hashable, Codable {
+    case text
+    case number
+    case select
+    case multi_select
+    case date
+    case checkbox
+    case person
+    case bot
+    case url
+    case relation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "text": self = .text
+      case "number": self = .number
+      case "select": self = .select
+      case "multi-select": self = .multi_select
+      case "date": self = .date
+      case "checkbox": self = .checkbox
+      case "person": self = .person
+      case "bot": self = .bot
+      case "url": self = .url
+      case "relation": self = .relation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .text: try container.encode("text")
+      case .number: try container.encode("number")
+      case .select: try container.encode("select")
+      case .multi_select: try container.encode("multi-select")
+      case .date: try container.encode("date")
+      case .checkbox: try container.encode("checkbox")
+      case .person: try container.encode("person")
+      case .bot: try container.encode("bot")
+      case .url: try container.encode("url")
+      case .relation: try container.encode("relation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PatchRowsOutputTableColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: PatchRowsOutputTableColumnsItemType?
+    public var options: [String]?
+    public var width: Int?
+
+    public init(id: String? = nil, name: String? = nil, type: PatchRowsOutputTableColumnsItemType? = nil, options: [String]? = nil, width: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.options = options
+      self.width = width
+    }
+  }
+
+  public enum PatchRowsOutputTableViewsItemType: Sendable, Hashable, Codable {
+    case table
+    case board
+    case calendar
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "table": self = .table
+      case "board": self = .board
+      case "calendar": self = .calendar
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .table: try container.encode("table")
+      case .board: try container.encode("board")
+      case .calendar: try container.encode("calendar")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum PatchRowsOutputTableViewsItemFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
     case eq
     case neq
-    case contains
+    case gt
+    case lt
     case empty
     case not_empty
     case unknown(String)
@@ -1375,9 +1566,11 @@ public enum Tables {
     public init(from decoder: Decoder) throws {
       let value = try decoder.singleValueContainer().decode(String.self)
       switch value {
+      case "contains": self = .contains
       case "eq": self = .eq
       case "neq": self = .neq
-      case "contains": self = .contains
+      case "gt": self = .gt
+      case "lt": self = .lt
       case "empty": self = .empty
       case "not-empty": self = .not_empty
       default: self = .unknown(value)
@@ -1387,9 +1580,164 @@ public enum Tables {
     public func encode(to encoder: Encoder) throws {
       var container = encoder.singleValueContainer()
       switch self {
+      case .contains: try container.encode("contains")
       case .eq: try container.encode("eq")
       case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
+      case .empty: try container.encode("empty")
+      case .not_empty: try container.encode("not-empty")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PatchRowsOutputTableViewsItemFiltersItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var op: PatchRowsOutputTableViewsItemFiltersItemOp?
+    public var value: StudioJSONValue?
+
+    public init(columnId: String? = nil, op: PatchRowsOutputTableViewsItemFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
+      self.columnId = columnId
+      self.op = op
+      self.value = value
+    }
+  }
+
+  public enum PatchRowsOutputTableViewsItemSortsItemDirection: Sendable, Hashable, Codable {
+    case asc
+    case desc
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "asc": self = .asc
+      case "desc": self = .desc
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .asc: try container.encode("asc")
+      case .desc: try container.encode("desc")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct PatchRowsOutputTableViewsItemSortsItem: Sendable, Hashable, Codable {
+    public var columnId: String?
+    public var direction: PatchRowsOutputTableViewsItemSortsItemDirection?
+
+    public init(columnId: String? = nil, direction: PatchRowsOutputTableViewsItemSortsItemDirection? = nil) {
+      self.columnId = columnId
+      self.direction = direction
+    }
+  }
+
+  public struct PatchRowsOutputTableViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var type: PatchRowsOutputTableViewsItemType?
+    public var groupBy: String?
+    public var dateBy: String?
+    public var filters: [PatchRowsOutputTableViewsItemFiltersItem]?
+    public var sorts: [PatchRowsOutputTableViewsItemSortsItem]?
+    public var hidden: [String]?
+
+    public init(id: String? = nil, name: String? = nil, type: PatchRowsOutputTableViewsItemType? = nil, groupBy: String? = nil, dateBy: String? = nil, filters: [PatchRowsOutputTableViewsItemFiltersItem]? = nil, sorts: [PatchRowsOutputTableViewsItemSortsItem]? = nil, hidden: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.type = type
+      self.groupBy = groupBy
+      self.dateBy = dateBy
+      self.filters = filters
+      self.sorts = sorts
+      self.hidden = hidden
+    }
+  }
+
+  public struct PatchRowsOutputTableRowsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var values: [String: StudioJSONValue]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.values = values
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct PatchRowsOutputTable: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [PatchRowsOutputTableColumnsItem]?
+    public var views: [PatchRowsOutputTableViewsItem]?
+    public var rows: [PatchRowsOutputTableRowsItem]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [PatchRowsOutputTableColumnsItem]? = nil, views: [PatchRowsOutputTableViewsItem]? = nil, rows: [PatchRowsOutputTableRowsItem]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.views = views
+      self.rows = rows
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct PatchRowsOutput: Sendable, Hashable, Codable {
+    public var table: PatchRowsOutputTable?
+
+    public init(table: PatchRowsOutputTable? = nil) {
+      self.table = table
+    }
+  }
+
+  public enum QueryInputFiltersItemOp: Sendable, Hashable, Codable {
+    case contains
+    case eq
+    case neq
+    case gt
+    case lt
+    case empty
+    case not_empty
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "contains": self = .contains
+      case "eq": self = .eq
+      case "neq": self = .neq
+      case "gt": self = .gt
+      case "lt": self = .lt
+      case "empty": self = .empty
+      case "not-empty": self = .not_empty
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
       case .contains: try container.encode("contains")
+      case .eq: try container.encode("eq")
+      case .neq: try container.encode("neq")
+      case .gt: try container.encode("gt")
+      case .lt: try container.encode("lt")
       case .empty: try container.encode("empty")
       case .not_empty: try container.encode("not-empty")
       case .unknown(let value): try container.encode(value)
@@ -1516,6 +1864,34 @@ public enum Tables {
 
     public init(imported: Double? = nil) {
       self.imported = imported
+    }
+  }
+
+  public struct ItemsOutputItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var itemId: String?
+    public var title: String?
+    public var kindLabel: String?
+    public var kindIcon: String?
+    public var icon: String?
+    public var href: String?
+
+    public init(pluginId: String? = nil, itemId: String? = nil, title: String? = nil, kindLabel: String? = nil, kindIcon: String? = nil, icon: String? = nil, href: String? = nil) {
+      self.pluginId = pluginId
+      self.itemId = itemId
+      self.title = title
+      self.kindLabel = kindLabel
+      self.kindIcon = kindIcon
+      self.icon = icon
+      self.href = href
+    }
+  }
+
+  public struct ItemsOutput: Sendable, Hashable, Codable {
+    public var items: [ItemsOutputItemsItem]?
+
+    public init(items: [ItemsOutputItemsItem]? = nil) {
+      self.items = items
     }
   }
 }

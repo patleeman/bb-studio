@@ -17,3 +17,4 @@ export * from "./utils";
 export * from "./hooks/use-compact-viewport";
 export * from "./hooks/use-media-query";
 export * from "./hooks/use-pointer-coarse";
+export * from "./popover";

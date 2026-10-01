@@ -8,3 +8,4 @@ export { actorName, type Actor } from "./actor";
 export { studioServices, type StudioActivity, type StudioLink, type StudioRef } from "./studio-services";
 
 export { personalProjectId, primaryHostId } from "./project";
+export { indexItem, studioIndex, STUDIO_SUITE, type StudioIndexItem } from "./studio-index";

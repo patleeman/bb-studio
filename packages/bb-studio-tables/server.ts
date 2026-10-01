@@ -1,116 +1,30 @@
-import {
-  studioSchemas,
-  type StudioItem,
-  type StudioKind,
-} from "@bb-studio/kit/contract";
-import { newId } from "@bb-studio/kit/ids";
+import { studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
-import {
-  createChangeBus,
-  createStoreProvider,
-  defineItemMention,
-} from "@bb-studio/kit/server";
-import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
-import { z } from "zod";
+import { createChangeBus, createStoreProvider, defineItemMention, studioIndex } from "@bb-studio/kit/server";
 import {
   columnSchema,
   csv,
   filterSchema,
-  importValues,
   markdown,
-  parseCsv,
   queryRows,
   sortSchema,
+  TABLES_CHANNEL,
+  TABLES_PANEL,
+  TABLES_PLUGIN_ID,
+  tableHref,
+  tablesContract,
   valuesSchema,
-  viewSchema,
+  type Filter,
+  type Sort,
   type Table,
   type View,
-} from "./src/model";
+} from "@bb-studio/kit/tables";
+import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 import { MIGRATIONS, TableStore } from "./src/store";
 
-const PLUGIN_ID = "studio-tables";
-const CHANNEL = "studio-tables-changed";
 const id = z.string().min(1).max(100);
-const tableSchema = z.object({
-  id,
-  title: z.string(),
-  projectId: z.string().nullable(),
-  columns: z.array(columnSchema),
-  views: z.array(viewSchema),
-  rows: z.array(
-    z.object({
-      id,
-      values: valuesSchema,
-      createdAt: z.number(),
-      updatedAt: z.number(),
-    }),
-  ),
-  archived: z.boolean(),
-  createdAt: z.number(),
-  updatedAt: z.number(),
-});
-const rowSchema = tableSchema.shape.rows.element;
-const text = z.string().trim().min(1).max(200);
-export const rpcContract = defineRpcContract({
-  list: { input: z.null(), output: z.object({ tables: z.array(tableSchema) }) },
-  get: {
-    input: z.object({ id }),
-    output: z.object({ table: tableSchema.nullable() }),
-  },
-  create: {
-    input: z.object({
-      title: text,
-      projectId: id.nullable().optional(),
-      columns: z.array(columnSchema).optional(),
-    }),
-    output: z.object({ table: tableSchema }),
-  },
-  update: {
-    input: z.object({
-      id,
-      title: text.optional(),
-      projectId: id.nullable().optional(),
-      columns: z.array(columnSchema).optional(),
-      views: z.array(viewSchema).optional(),
-      archived: z.boolean().optional(),
-    }),
-    output: z.object({ table: tableSchema }),
-  },
-  remove: { input: z.object({ id }), output: z.object({ ok: z.boolean() }) },
-  insert: {
-    input: z.object({ id, values: valuesSchema }),
-    output: z.object({ row: rowSchema }),
-  },
-  updateRow: {
-    input: z.object({ id, rowId: id, values: valuesSchema }),
-    output: z.object({ row: rowSchema }),
-  },
-  deleteRow: {
-    input: z.object({ id, rowId: id }),
-    output: z.object({ ok: z.boolean() }),
-  },
-  query: {
-    input: z.object({
-      id,
-      viewId: id.optional(),
-      filters: z.array(filterSchema).optional(),
-      sorts: z.array(sortSchema).optional(),
-      limit: z.number().int().min(1).max(500).default(100),
-    }),
-    output: z.object({ rows: z.array(rowSchema), total: z.number() }),
-  },
-  exportCsv: {
-    input: z.object({ id, viewId: id.optional() }),
-    output: z.object({ csv: z.string() }),
-  },
-  importCsv: {
-    input: z.object({ id, csv: z.string().max(2_000_000) }),
-    output: z.object({ imported: z.number() }),
-  },
-});
-function href(id: string) {
-  return `/plugins/${PLUGIN_ID}/tables/${id}`;
-}
+
 const KIND: StudioKind = {
   id: "table",
   label: "Table",
@@ -154,7 +68,7 @@ function item(table: Table): StudioItem {
     ],
     badge: null,
     thumbnailUrl: null,
-    href: href(table.id),
+    href: tableHref({ tableId: table.id }),
     archived: table.archived,
   };
 }
@@ -165,69 +79,33 @@ export default function plugin(bb: BbPluginApi) {
   const studio = studioSchemas(z);
   const changes = createChangeBus({
     bb,
-    channel: CHANNEL,
-    pluginId: PLUGIN_ID,
+    channel: TABLES_CHANNEL,
+    pluginId: TABLES_PLUGIN_ID,
     schemas: studio,
     event: (tableId) => ({ tableId }),
   });
   const changed = (tableId: string) => changes.changed(tableId);
-  const selected = (table: Table, viewId?: string): View | undefined => {
-    const view = viewId
-      ? table.views.find((item) => item.id === viewId)
-      : undefined;
+  const index = studioIndex(bb.sdk, studio);
+  const query = (table: Table, viewId?: string, filters?: Filter[], sorts?: Sort[]) => {
+    const view: View | undefined = viewId ? table.views.find((item) => item.id === viewId) : undefined;
     if (viewId && !view) throw new Error("View not found.");
-    return view;
-  };
-  const query = (
-    table: Table,
-    viewId?: string,
-    filters?: z.infer<typeof filterSchema>[],
-    sorts?: z.infer<typeof sortSchema>[],
-  ) => {
-    const view = selected(table, viewId);
-    return queryRows(
-      table,
-      view,
-      filters ?? view?.filters,
-      sorts ?? view?.sorts,
-    );
+    return queryRows(table, view, filters ?? view?.filters, sorts ?? view?.sorts);
   };
   const importCsv = (tableId: string, source: string) => {
-    const table = store.require(tableId);
-    const [head, ...records] = parseCsv(source);
-    if (
-      !head ||
-      head.map((name) => name.trim()).join("\0") !==
-        table.columns.map((column) => column.name).join("\0")
-    )
-      throw new Error("CSV headers must match table columns in order.");
-    const values = records
-      .filter((record) => record.some(Boolean))
-      .map((record) => importValues(table.columns, record));
-    const now = Date.now();
-    for (const value of values)
-      table.rows.push({
-        id: newId("row"),
-        values: value,
-        createdAt: now,
-        updatedAt: now,
-      });
-    store.save(table);
-    changed(table.id);
-    return values.length;
+    const imported = store.importCsv(tableId, source);
+    if (imported) changed(tableId);
+    return imported;
   };
-  bb.rpc.register(rpcContract, {
+  bb.rpc.register(tablesContract, {
     list: () => ({ tables: store.list() }),
     get: ({ id }) => ({ table: store.get(id) }),
-    create: ({ title, projectId, columns }) => {
-      const table = store.create(title, projectId ?? null, columns);
+    create: ({ title, projectId, columns, rows }) => {
+      const table = store.create(title, projectId ?? null, columns, rows);
       changed(table.id);
       return { table };
     },
-    update: ({ id, ...patch }) => {
-      const table = store.require(id);
-      Object.assign(table, patch);
-      store.save(table);
+    update: ({ id, ...changes }) => {
+      const table = store.update(id, changes);
       changed(id);
       return { table };
     },
@@ -251,6 +129,11 @@ export default function plugin(bb: BbPluginApi) {
       changed(id);
       return { ok: true };
     },
+    patchRows: ({ id, ...patch }) => {
+      const { table } = store.patchRows(id, patch);
+      changed(id);
+      return { table };
+    },
     query: ({ id, viewId, filters, sorts, limit }) => {
       const rows = query(store.require(id), viewId, filters, sorts);
       return { rows: rows.slice(0, limit), total: rows.length };
@@ -260,15 +143,26 @@ export default function plugin(bb: BbPluginApi) {
       return { csv: csv(table, query(table, viewId)) };
     },
     importCsv: ({ id, csv }) => ({ imported: importCsv(id, csv) }),
+    items: async () => ({
+      items: (await index.items()).map((item) => ({
+        pluginId: item.pluginId,
+        itemId: item.id,
+        title: item.title,
+        kindLabel: item.kindLabel,
+        kindIcon: item.kindIcon,
+        icon: item.icon,
+        href: item.href,
+      })),
+    }),
   });
   createStoreProvider(
     bb,
     studio,
     {
       studio_describe: () => ({
-        pluginId: PLUGIN_ID,
+        pluginId: TABLES_PLUGIN_ID,
         version: 2,
-        panel: "tables",
+        panel: TABLES_PANEL,
         kinds: [KIND],
       }),
       studio_get: ({ ids }) => ({
@@ -297,15 +191,11 @@ export default function plugin(bb: BbPluginApi) {
     },
     {
       move: (id, projectId) => {
-        const table = store.require(id);
-        table.projectId = projectId;
-        store.save(table);
+        store.update(id, { projectId });
         changed(id);
       },
       archive: (id, archived) => {
-        const table = store.require(id);
-        table.archived = archived;
-        store.save(table);
+        store.update(id, { archived });
         changed(id);
       },
       delete: (id) => {
@@ -390,6 +280,21 @@ export default function plugin(bb: BbPluginApi) {
       ),
   });
   bb.agents.registerTool({
+    name: "tables_create",
+    description:
+      "Create a table with typed columns and starting rows. Rows are values by column ID; select options are added from the rows.",
+    parameters: z.object({
+      title: z.string().trim().min(1).max(200),
+      columns: z.array(columnSchema).min(1),
+      rows: z.array(valuesSchema).max(1000).optional(),
+    }),
+    execute: ({ title, columns, rows }, ctx) => {
+      const table = store.create(title, ctx.projectId ?? null, columns, rows);
+      changed(table.id);
+      return JSON.stringify({ id: table.id, href: tableHref({ tableId: table.id }), rows: table.rows.length });
+    },
+  });
+  bb.agents.registerTool({
     name: "tables_insert",
     description:
       "Insert a row. Read tables_schema first for typed column IDs and options.",
@@ -413,6 +318,7 @@ export default function plugin(bb: BbPluginApi) {
   bb.agents.configure(() => ({
     tools: [
       "tables_list",
+      "tables_create",
       "tables_schema",
       "tables_query",
       "tables_insert",
