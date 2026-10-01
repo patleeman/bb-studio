@@ -82,6 +82,8 @@ export function QueryBar({
     [word, vocabulary, query.filters],
   );
   const open = focused && suggestions.length > 0;
+  // Tab completes what's being typed, so it takes the first suggestion when none is picked.
+  const tabTarget = !open ? -1 : picked >= 0 ? picked : word ? 0 : -1;
 
   const setText = (text: string) => {
     const next = absorb(query, text);
@@ -168,9 +170,12 @@ export function QueryBar({
             } else if (event.key === "ArrowUp" && open) {
               event.preventDefault();
               setPicked(picked <= 0 ? suggestions.length - 1 : picked - 1);
-            } else if ((event.key === "Enter" || event.key === "Tab") && open && picked >= 0) {
+            } else if (event.key === "Enter" && open && picked >= 0) {
               event.preventDefault();
               apply(suggestions[picked]!);
+            } else if (event.key === "Tab" && !event.shiftKey && tabTarget >= 0) {
+              event.preventDefault();
+              apply(suggestions[tabTarget]!);
             } else if (event.key === "Enter") {
               setText(`${query.text} `);
             } else if (event.key === "Backspace" && !query.text && query.filters.length) {
@@ -234,6 +239,7 @@ export function QueryBar({
                   <span className="truncate">{suggestion.label}</span>
                 </>
               )}
+              {index === tabTarget ? <kbd className="ml-auto shrink-0 rounded border border-border px-1 font-sans text-[10px] text-muted-foreground">Tab</kbd> : null}
             </div>
           ))}
         </div>
