@@ -11,9 +11,20 @@ later. It used to be part of Studio Pages.
 
 ## Staged preview
 
-![An Along the way section with three findings under an agent's reply](assets/staged-preview.png)
+![An Along the way section with two findings under an agent's reply](assets/staged-preview.png)
 
-STAGED_PREVIEW_DESCRIPTION
+This is a real BB thread in a staged BB (`node scripts/staged-bb.mjs start`).
+The staged project has a small upload queue with two bugs in it. Claude
+Sonnet 5 is asked a narrow question about how many times
+`uploadWithRetry` tries, with Explore on. It answers in one sentence and ends
+the reply with an `::explore` line. BB renders that line as the **Along the
+way** section:
+- one row per thing the agent noticed but didn't cover, here the delay cap's
+  unit mix-up and a queue that pops newest-first
+- **Explore** on each row, which starts an explainer
+- **Turn off in settings**, which links to this plugin's setting
+
+The rows' wording is the agent's, so it changes from run to run.
 
 ## What you get
 
