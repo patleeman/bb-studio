@@ -8,20 +8,22 @@ import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
-import { REALTIME_CHANNEL } from "../constants";
+import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
 import { labelKey, parseExploreItems, type ExploreItem } from "../explore/shared";
 import { EXPLORE_ICON, explainerEvent, openExplainer, rowState, useMinuteTick, type ExplainerView } from "./explore";
 import { relativeTime } from "./shared";
 
 const POLL_MS = 2_500;
+/** Where the Explore setting lives: this plugin's page in Settings. */
+const SETTINGS_HREF = `/settings/plugins/${PLUGIN_ID}`;
 
 /** `::explore{items="…"}` at the end of a reply. */
 export function ExploreDirective({ attributes, message }: PluginMessageDirectiveProps) {
   const raw = attributes.items;
   const items = useMemo(() => parseExploreItems(raw), [raw]);
   if (!items.length) return null;
-  return <ExploreRows items={items} threadId={message.threadId} messageId={message.id} turnId={message.turnId} />;
+  return <ExploreRows items={items} threadId={message.threadId} messageId={message.id} turnId={message.turnId} settingsHint />;
 }
 
 export interface ExploreRowsProps {
@@ -32,10 +34,12 @@ export interface ExploreRowsProps {
   /** Follow-ups of an explainer: explored from the same message, under it. */
   parentId?: string | null;
   title?: string;
+  /** Says, quietly, where to turn Explore off. Only for the end-of-reply rows the setting controls. */
+  settingsHint?: boolean;
   className?: string;
 }
 
-export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", className }: ExploreRowsProps) {
+export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, className }: ExploreRowsProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   useMinuteTick();
@@ -98,6 +102,15 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
       <header className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-xs text-muted-foreground">
         <Icon name={EXPLORE_ICON} fallback="Compass" className="size-3.5" />
         {title}
+        {settingsHint ? (
+          <a
+            href={SETTINGS_HREF}
+            title="Stop agents from ending answers with things to explore. Applies to new agent sessions."
+            className="ml-auto text-[11px] text-muted-foreground/60 hover:text-foreground hover:underline"
+          >
+            Turn off in settings
+          </a>
+        ) : null}
       </header>
       <ul className="divide-y divide-border/60 border-t border-border/60">
         {items.map((item) => {

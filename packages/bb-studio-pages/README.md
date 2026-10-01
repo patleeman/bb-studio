@@ -123,7 +123,9 @@ later.
   connected, 🕐 recently changed. They show as full-width rows, each with its
   state: **Explore**, **Generating · 45%** with a progress bar, **Open ·
   generated 2h ago** with a regenerate button, or **Retry**. Rows reflect
-  what's saved, so they survive a reload.
+  what's saved, so they survive a reload. A muted **Turn off in settings**
+  link in the header opens the Pages settings, where the **Explore** toggle
+  stops agents from adding them in new sessions.
 - **An explainer page per finding.** Clicking one starts a hidden copy of
   the thread at that reply, which investigates the finding in the repository
   and writes a page: what it is, why it matters for what you were doing, how
