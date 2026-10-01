@@ -81,18 +81,16 @@ ignores messages from agents and other threads, plugin submissions, retries,
 scheduled messages, hidden threads, and Studio Teams threads (Studio Teams routes
 those itself).
 
-Both composer settings work:
+Smart Queue holds the message. The queued card shows *Smart Queue is deciding
+whether to steer or follow up*. Then either the message joins the turn, or the
+card changes to *Smart Queue: follow-up after the current turn (Jev 67% via
+TypeSafe)*. A follow-up is released when the thread goes idle.
 
-- **Enter steers a busy thread.** Smart Queue holds the message. The queued
-  card shows *Smart Queue is deciding whether to steer or follow up*, then
-  either the message joins the turn or the card changes to *Smart Queue:
-  follow-up after the current turn*. The row is released when the thread goes
-  idle.
-- **Enter queues.** The app adds the message to the thread's queue directly.
-  Smart Queue checks the queue every second, classifies the new row, and sends
-  it into the turn if it should steer. A follow-up stays in the queue as BB
-  normally would. This row shows no Smart Queue reason, because core owns its
-  wait.
+Both composer settings get this card. When Enter queues, the app adds the
+message to BB's queue directly, where no plugin sees it. Smart Queue checks
+the queue every second, takes each new row out, and sends its text the way
+the composer's steer does. BB's dispatch check then holds it on Smart Queue's
+card, in the order you queued.
 
 When several messages steer, they reach the turn in the order you sent them.
 The queued card's own **Send now** and **Steer** buttons still override Smart

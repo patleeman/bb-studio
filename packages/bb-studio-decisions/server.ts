@@ -297,6 +297,25 @@ export default async function plugin(bb: BbPluginApi) {
     steer: async (row) => {
       await bb.sdk.threads.queuedMessages.send({ threadId: row.threadId, queuedMessageId: row.id, mode: "steer" });
     },
+    route: async (row) => {
+      const message = {
+        threadId: row.threadId,
+        input: row.content,
+        ...(row.model ? { model: row.model } : {}),
+        ...(row.reasoningLevel ? { reasoningLevel: row.reasoningLevel } : {}),
+        ...(row.permissionMode ? { permissionMode: row.permissionMode } : {}),
+        serviceTier: row.serviceTier,
+      };
+      // Deleting first means a row core already claimed is never sent twice.
+      await bb.sdk.threads.queuedMessages.delete({ threadId: row.threadId, queuedMessageId: row.id });
+      try {
+        // Sent the way the composer steers, so the dispatch hook sees it.
+        await bb.sdk.threads.send({ ...message, mode: "steer-if-active" });
+      } catch (error) {
+        await bb.sdk.threads.queuedMessages.create(message);
+        throw error;
+      }
+    },
     recheck: () => bb.experimental_hooks.recheck("message.dispatch"),
     record,
     warn: (message) => bb.log.warn(message),

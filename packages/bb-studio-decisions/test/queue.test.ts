@@ -52,7 +52,7 @@ const steer: Verdict = { action: "steer", source: "jev", confidence: 0.9, note: 
 const followup: Verdict = { action: "followup", source: "jev", confidence: 0.8, note: null };
 
 function harness(verdict: Verdict | Promise<Verdict> = followup, overrides: Partial<SmartQueueDeps> = {}) {
-  const calls = { steered: [] as string[], rechecks: 0, records: [] as unknown[], classified: 0 };
+  const calls = { steered: [] as string[], routed: [] as string[], rechecks: 0, records: [] as unknown[], classified: 0 };
   let now = 1_000;
   const queue = new SmartQueue({
     pluginId: "smart-queue",
@@ -64,6 +64,9 @@ function harness(verdict: Verdict | Promise<Verdict> = followup, overrides: Part
     },
     steer: async (r) => {
       calls.steered.push(r.id);
+    },
+    route: async (r) => {
+      calls.routed.push(r.id);
     },
     recheck: async () => {
       calls.rechecks++;
@@ -144,20 +147,40 @@ test("a row the plugin held before a restart waits as a follow-up", async () => 
   assert.equal(decision.action === "wait" && decision.reason.startsWith("Smart Queue: follow-up"), true);
 });
 
-test("core-queued owner rows are classified; only steer changes them", async () => {
-  const coreRow = row({ waitingOn: { kind: "thread-busy" } });
-  const steering = harness(steer);
-  steering.queue.queued(coreRow);
+test("core-queued owner rows are sent back through the hook, which holds them", async () => {
+  const { queue, calls } = harness(steer);
+  queue.queued(row({ waitingOn: { kind: "thread-busy" } }));
+  queue.queued(row({ waitingOn: { kind: "thread-busy" } }));
   await settle();
-  assert.deepEqual(steering.calls.steered, ["q_1"]);
+  assert.deepEqual(calls.routed, ["q_1"], "routed once, without a decision of its own");
+  assert.deepEqual(calls.steered, []);
+  assert.equal(calls.classified, 0);
+});
 
-  const waiting = harness(followup);
-  waiting.queue.queued(coreRow);
+test("core-queued rows route in the order they were queued", async () => {
+  const order: string[] = [];
+  const { queue } = harness(steer, {
+    thread: async () => {
+      // The first row's thread read is the slow one.
+      if (!order.length) await new Promise((resolve) => setTimeout(resolve, 5));
+      return thread();
+    },
+    route: async (r) => {
+      order.push(r.id);
+    },
+  });
+  queue.queued(row({ id: "q_first", waitingOn: { kind: "thread-busy" } }));
+  queue.queued(row({ id: "q_second", waitingOn: { kind: "thread-busy" } }));
+  await new Promise((resolve) => setTimeout(resolve, 20));
+  assert.deepEqual(order, ["q_first", "q_second"]);
+});
+
+test("a core-queued row on an idle thread stays with core", async () => {
+  const { queue, calls } = harness(steer, { thread: async () => thread({ status: "idle" }) });
+  queue.queued(row({ waitingOn: { kind: "thread-busy" } }));
   await settle();
-  assert.deepEqual(waiting.calls.steered, []);
-  assert.equal(waiting.calls.rechecks, 0, "core already owns the wait");
-  const drained = await waiting.queue.dispatch(context({ queuedMessages: [coreRow] }));
-  assert.deepEqual(drained, { action: "proceed" });
+  assert.deepEqual(calls.routed, []);
+  assert.equal(queue.entries.get("q_1")?.state, "ignored");
 });
 
 test("agent, plugin, retry, and timed rows are ignored", async () => {
@@ -301,10 +324,10 @@ test("the watcher picks up rows the app queued directly and forgets rows that le
   const appRow = row({ id: "q_app", waitingOn: { kind: "thread-busy" } });
   queue.sync([appRow], 1_000);
   await settle();
-  assert.deepEqual(calls.steered, ["q_app"]);
+  assert.deepEqual(calls.routed, ["q_app"]);
   advance(10);
   queue.sync([], 1_005);
-  assert.equal(queue.entries.has("q_app"), false, "a row gone from the snapshot is forgotten");
+  assert.equal(queue.routed.has("q_app"), false, "a row gone from the snapshot is forgotten");
 });
 
 test("a snapshot older than a row never prunes it", async () => {

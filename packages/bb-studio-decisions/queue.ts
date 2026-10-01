@@ -34,6 +34,8 @@ export type SmartQueueDeps = {
   thread: (threadId: string) => Promise<ThreadInfo>;
   classify: (row: QueuedRow, thread: ThreadInfo, signal: AbortSignal) => Promise<Verdict>;
   steer: (row: QueuedRow) => Promise<void>;
+  /** Re-sends a core-queued row inline, so the dispatch hook holds it. */
+  route: (row: QueuedRow) => Promise<void>;
   recheck: () => Promise<void>;
   record: (record: DecisionRecord) => Promise<void>;
   warn: (message: string) => void;
@@ -76,10 +78,14 @@ const lostVerdict: Verdict = {
  * Holds owner messages sent to a busy thread until a classifier decides.
  * Steer delivers the row into the running turn now; follow-up keeps it held
  * until the thread is no longer busy. Core-queued rows (Enter set to queue)
- * are classified too, but only a steer changes them.
+ * are sent back through the hook, so they are held and decided the same way.
  */
 export class SmartQueue {
   readonly entries = new Map<string, Entry>();
+  /** Core-queued rows being sent back through the dispatch hook. */
+  readonly routed = new Set<string>();
+  /** Routes one row at a time, so the held rows keep the order the owner queued them in. */
+  private routing = Promise.resolve();
   private readonly now: () => number;
 
   constructor(private readonly deps: SmartQueueDeps) {
@@ -148,6 +154,7 @@ export class SmartQueue {
    */
   sync(rows: readonly QueuedRow[], listedAt: number) {
     const live = new Map(rows.map((row) => [row.id, row]));
+    for (const id of this.routed) if (!live.has(id)) this.routed.delete(id);
     for (const [id, entry] of this.entries) {
       if (entry.seenAt >= listedAt) continue;
       const row = live.get(id);
@@ -156,14 +163,19 @@ export class SmartQueue {
     for (const row of rows) this.queued(row);
   }
 
-  /** `message.queued`: start one classification per owner row waiting on a busy thread. */
+  /** `message.queued`: decide each owner row this plugin holds, and route the ones core queued. */
   queued(row: QueuedRow) {
     if (this.entries.has(row.id)) return;
     if (row.initiator !== "user" || row.senderThreadId !== null || row.originPluginId !== null) return;
     // A claimed row is already on its way to the provider.
     if (row.payload.kind !== "inline" || !row.editable) return;
-    const held = this.heldByUs(row);
-    if (!held && row.waitingOn?.kind !== "thread-busy") return;
+    if (!this.heldByUs(row)) {
+      if (row.waitingOn?.kind === "thread-busy" && !this.routed.has(row.id)) {
+        this.routed.add(row.id);
+        this.routing = this.routing.then(() => this.route(row));
+      }
+      return;
+    }
     const controller = new AbortController();
     let finish!: () => void;
     const applied = new Promise<void>((resolve) => (finish = resolve));
@@ -178,7 +190,40 @@ export class SmartQueue {
       startedAt: this.now(),
       controller,
     });
-    void this.decide(row, held, controller).finally(finish);
+    void this.decide(row, controller).finally(finish);
+  }
+
+  /**
+   * The composer queues a busy-thread message as a core row, which no hook
+   * sees, and sending a queued row skips the hook too. Re-sending its content
+   * inline runs the dispatch pass, where Smart Queue holds it as a new row on
+   * its own card while it decides. A row on a thread Smart Queue skips is left
+   * with core.
+   */
+  private async route(row: QueuedRow) {
+    // Sent by hand or cancelled while earlier rows were routed.
+    if (!this.routed.has(row.id)) return;
+    const ignore = () => {
+      this.routed.delete(row.id);
+      this.entries.set(row.id, {
+        state: "ignored",
+        threadId: row.threadId,
+        createdAt: row.createdAt,
+        seenAt: this.now(),
+        text: rowText(row),
+        applied: Promise.resolve(),
+        finish: () => {},
+      });
+    };
+    try {
+      const thread = await this.deps.thread(row.threadId);
+      if (!isBusy(thread.status) || !this.eligibleThread(thread) || !(await this.deps.enabled())) return ignore();
+      await this.deps.route(row);
+    } catch (error) {
+      if (!/not found|HTTP 404|already being sent/i.test(String(error)))
+        this.deps.warn(`Smart Queue could not take over ${row.id}: ${String(error)}`);
+      ignore();
+    }
   }
 
   /** Steers land in the order the owner sent them, even when a later classification finishes first. */
@@ -192,7 +237,7 @@ export class SmartQueue {
     await Promise.all(earlier.map(([, entry]) => entry.applied));
   }
 
-  private async decide(row: QueuedRow, held: boolean, controller: AbortController) {
+  private async decide(row: QueuedRow, controller: AbortController) {
     const current = () => {
       const entry = this.entries.get(row.id);
       return entry?.state === "pending" && entry.controller === controller;
@@ -201,11 +246,9 @@ export class SmartQueue {
     try {
       const thread = await this.deps.thread(row.threadId);
       if (!current()) return;
-      if (!isBusy(thread.status) || (!held && (!this.eligibleThread(thread) || !(await this.deps.enabled())))) {
-        if (held) {
-          this.entries.delete(row.id);
-          await this.deps.recheck();
-        } else if (current()) this.entries.set(row.id, { ...this.entries.get(row.id)!, state: "ignored" });
+      if (!isBusy(thread.status)) {
+        this.entries.delete(row.id);
+        await this.deps.recheck();
         return;
       }
       verdict = await this.deps.classify(row, thread, controller.signal);
@@ -248,11 +291,12 @@ export class SmartQueue {
       this.deps.warn(`Smart Queue could not record a decision: ${String(error)}`);
     }
     // Refresh the queued card's reason, or release the row if the turn ended meanwhile.
-    if (held && verdict.action === "followup") await this.deps.recheck();
+    if (verdict.action === "followup") await this.deps.recheck();
   }
 
   /** `message.dispatched` and `message.cancelled`. */
   gone(row: Pick<QueuedRow, "id">) {
+    this.routed.delete(row.id);
     const entry = this.entries.get(row.id);
     if (entry?.state === "pending") entry.controller.abort();
     entry?.finish();
