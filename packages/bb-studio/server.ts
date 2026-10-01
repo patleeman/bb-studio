@@ -26,6 +26,7 @@ import { StudioServices } from "./src/services";
 import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { routeCommentMentions } from "./src/comment-routing";
+import { homeData } from "./src/home";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -64,6 +65,8 @@ export default async function plugin(bb: BbPluginApi) {
   const updateThread = (threadId: string, state: string) => {
     const found = services.thread(threadId);
     if (found) services.linkThread({ ...found, state, updatedAt: Date.now() });
+    changes.append(null);
+    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
   bb.events.on("thread.active", ({ thread }) => updateThread(thread.id, "working"));
   bb.events.on("thread.idle", ({ thread }) => updateThread(thread.id, "idle"));
@@ -143,6 +146,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   bb.rpc.register(rpcContract, {
+    home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, projectId, periodDays),
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
     searchAll: async ({ query, kinds, projectId, limit }) => {
@@ -285,7 +289,12 @@ export default async function plugin(bb: BbPluginApi) {
       return { threadId: thread.id };
     },
     activity: ({ ref, since, limit }) => ({ events: services.activity(ref ?? null, since ?? 0, limit ?? 50) }),
-    recordActivity: (event) => ({ id: services.recordActivity(event) }),
+    recordActivity: (event) => {
+      const id = services.recordActivity(event);
+      changes.append(null);
+      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+      return { id };
+    },
     comments: async ({ ref }) => ({ comments: (await providerComments.list(ref)) ?? services.comments(ref) }),
     commentCreate: async (input) => {
       const delegated = await providerComments.create(input);

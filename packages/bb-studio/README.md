@@ -2,7 +2,8 @@
 
 > **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: Studio, [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
 
-One collection for everything the Studio add-ons make: pages, Talk
+Home shows work that needs attention, agents working now, recent items, scheduled
+automations and activity. Open **Collection** for everything the Studio add-ons make: pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
 kind, project and tag, and hand any of them to an agent.
 
@@ -23,6 +24,11 @@ text with the match in bold.
 
 ## What you get
 
+- **Home** (sidebar → Studio) brings together due and review tasks, active threads
+  and bots, recent items, today's automations and Studio activity. Sections whose
+  add-ons are unavailable stay hidden. The Activity tab shows measured thread
+  turns, duration and failures, plus Teams bot usage and configured limits.
+  Choose 1, 7 or 30 days. The `home` RPC returns the same data for other clients.
 - **One collection** (sidebar → Studio): every add-on's items in one list or
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their

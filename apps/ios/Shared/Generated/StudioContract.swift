@@ -3,6 +3,7 @@ import Foundation
 
 public enum Studio {
   public enum Method {
+    public static let home = "home"
     public static let overview = "overview"
     public static let items = "items"
     public static let changes = "changes"
@@ -38,6 +39,8 @@ public enum Studio {
     public static let versionCreate = "versionCreate"
     public static let versionRead = "versionRead"
   }
+
+  public typealias Home = HomeOutput
 
   public typealias OverviewInput = StudioJSONValue
 
@@ -116,6 +119,282 @@ public enum Studio {
   public typealias VersionCreate = VersionCreateOutput
 
   public typealias VersionRead = VersionReadOutput
+
+  public struct HomeInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var periodDays: Int?
+
+    public init(projectId: String? = nil, periodDays: Int? = nil) {
+      self.projectId = projectId
+      self.periodDays = periodDays
+    }
+  }
+
+  public struct HomeOutputDueItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var due: String?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, due: String? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.due = due
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct HomeOutputReviewItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var due: String?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, due: String? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.due = due
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct HomeOutputWorkingThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.projectId = projectId
+    }
+  }
+
+  public struct HomeOutputWorkingBotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+    }
+  }
+
+  public struct HomeOutputWorking: Sendable, Hashable, Codable {
+    public var threads: [HomeOutputWorkingThreadsItem]?
+    public var bots: [HomeOutputWorkingBotsItem]?
+
+    public init(threads: [HomeOutputWorkingThreadsItem]? = nil, bots: [HomeOutputWorkingBotsItem]? = nil) {
+      self.threads = threads
+      self.bots = bots
+    }
+  }
+
+  public struct HomeOutputRecentItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var title: String?
+    public var href: String?
+    public var kind: String?
+    public var updatedAt: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, href: String? = nil, kind: String? = nil, updatedAt: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.title = title
+      self.href = href
+      self.kind = kind
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct HomeOutputAutomationsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var projectId: String?
+    public var enabled: Bool?
+    public var nextRunAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, enabled: Bool? = nil, nextRunAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.projectId = projectId
+      self.enabled = enabled
+      self.nextRunAt = nextRunAt
+    }
+  }
+
+  public enum HomeOutputActivityItemActorKind: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case bot
+    case cli
+    case app
+    case editor
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      case "bot": self = .bot
+      case "cli": self = .cli
+      case "app": self = .app
+      case "editor": self = .editor
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .bot: try container.encode("bot")
+      case .cli: try container.encode("cli")
+      case .app: try container.encode("app")
+      case .editor: try container.encode("editor")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct HomeOutputActivityItemActor: Sendable, Hashable, Codable {
+    public var kind: HomeOutputActivityItemActorKind?
+    public var id: String?
+    public var name: String?
+
+    public init(kind: HomeOutputActivityItemActorKind? = nil, id: String? = nil, name: String? = nil) {
+      self.kind = kind
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct HomeOutputActivityItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct HomeOutputActivityItem: Sendable, Hashable, Codable {
+    public var `actor`: HomeOutputActivityItemActor?
+    public var verb: String?
+    public var ref: HomeOutputActivityItemRef?
+    public var at: Double?
+    public var summary: String?
+    public var id: Double?
+
+    public init(`actor`: HomeOutputActivityItemActor? = nil, verb: String? = nil, ref: HomeOutputActivityItemRef? = nil, at: Double? = nil, summary: String? = nil, id: Double? = nil) {
+      self.`actor` = `actor`
+      self.verb = verb
+      self.ref = ref
+      self.at = at
+      self.summary = summary
+      self.id = id
+    }
+  }
+
+  public struct HomeOutputDashboardThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var turns: Double?
+    public var failures: Double?
+    public var durationMs: Double?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, turns: Double? = nil, failures: Double? = nil, durationMs: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.turns = turns
+      self.failures = failures
+      self.durationMs = durationMs
+    }
+  }
+
+  public struct HomeOutputDashboardBotsItemLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Double?
+    public var turnsPerDay: Double?
+    public var minutesPerTurn: Double?
+    public var concurrentForks: Double?
+
+    public init(turnsPerHour: Double? = nil, turnsPerDay: Double? = nil, minutesPerTurn: Double? = nil, concurrentForks: Double? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public struct HomeOutputDashboardBotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var turns: Double?
+    public var failures: Double?
+    public var durationMs: Double?
+    public var active: Double?
+    public var limits: HomeOutputDashboardBotsItemLimits?
+
+    public init(id: String? = nil, name: String? = nil, turns: Double? = nil, failures: Double? = nil, durationMs: Double? = nil, active: Double? = nil, limits: HomeOutputDashboardBotsItemLimits? = nil) {
+      self.id = id
+      self.name = name
+      self.turns = turns
+      self.failures = failures
+      self.durationMs = durationMs
+      self.active = active
+      self.limits = limits
+    }
+  }
+
+  public struct HomeOutputDashboard: Sendable, Hashable, Codable {
+    public var periodDays: Double?
+    public var threads: [HomeOutputDashboardThreadsItem]?
+    public var bots: [HomeOutputDashboardBotsItem]?
+
+    public init(periodDays: Double? = nil, threads: [HomeOutputDashboardThreadsItem]? = nil, bots: [HomeOutputDashboardBotsItem]? = nil) {
+      self.periodDays = periodDays
+      self.threads = threads
+      self.bots = bots
+    }
+  }
+
+  public struct HomeOutput: Sendable, Hashable, Codable {
+    public var due: [HomeOutputDueItem]?
+    public var review: [HomeOutputReviewItem]?
+    public var working: HomeOutputWorking?
+    public var recent: [HomeOutputRecentItem]?
+    public var automations: [HomeOutputAutomationsItem]?
+    public var activity: [HomeOutputActivityItem]?
+    public var dashboard: HomeOutputDashboard?
+
+    public init(due: [HomeOutputDueItem]? = nil, review: [HomeOutputReviewItem]? = nil, working: HomeOutputWorking? = nil, recent: [HomeOutputRecentItem]? = nil, automations: [HomeOutputAutomationsItem]? = nil, activity: [HomeOutputActivityItem]? = nil, dashboard: HomeOutputDashboard? = nil) {
+      self.due = due
+      self.review = review
+      self.working = working
+      self.recent = recent
+      self.automations = automations
+      self.activity = activity
+      self.dashboard = dashboard
+    }
+  }
 
   public enum OverviewOutputProvidersItemState: Sendable, Hashable, Codable {
     case ready

@@ -156,7 +156,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
   const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
   const kind = requested === "all" || !data || kinds.some((candidate) => candidate.id === requested) ? requested : "all";
-  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
+  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "collection" : encodeURIComponent(next) }), [navigate]);
   const nameOf = useCallback((pluginId: string) => providers.find((provider) => provider.pluginId === pluginId)?.name ?? pluginId, [providers]);
 
   const handlers = useMemo<CollectionHandlers>(

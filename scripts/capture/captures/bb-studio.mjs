@@ -1,4 +1,30 @@
-export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
+export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
+  {
+    id: "studio-home",
+    packageDir: "bb-studio",
+    fileName: "home.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const ids = [];
+      const cleanup = async () => { for (const id of ids) await pluginRpc("studio-tasks", "delete", { id }).catch(() => {}); };
+      try {
+        const today = new Date();
+        const due = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
+        for (const input of [
+          { title: "QA Review launch copy", status: "review", assignee: "me" },
+          { title: "QA Ship onboarding guide", status: "todo", assignee: "me", due },
+        ]) {
+          const { task } = await pluginRpc("studio-tasks", "create", { ...input, projectId });
+          ids.push(task.id);
+        }
+        await pluginRpc("studio", "recordActivity", { ref: { pluginId: "studio-tasks", id: ids[0] }, actor: { kind: "user" }, verb: "updated", at: Date.now(), summary: "QA Review launch copy is ready" });
+        await client.navigate("/plugins/studio/studio");
+        for (const label of ["Due today and overdue", "In review", "Recent items", "Activity", "QA Ship onboarding guide", "QA Review launch copy"]) await client.waitForText(label);
+        await sleep(600);
+      } catch (error) { await cleanup(); throw error; }
+      return cleanup;
+    },
+  },
   {
     id: "studio",
     packageDir: "bb-studio",
@@ -15,9 +41,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       try {
         // Studio only lists the recording, so it needn't be transcribed.
         recordingId = await seedTalkRecording(projectId, { transcribe: false });
-        await client.navigate("/plugins/studio/studio");
+        await client.navigate("/plugins/studio/studio/collection");
         await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:collection:project", ${JSON.stringify(projectId)}); localStorage.setItem("studio:sidebar-tip-dismissed", "1")`);
-        await client.navigate("/plugins/studio/studio");
+        await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search studio"]');
         await client.waitForText("Pages");
         await client.waitForText("Recordings");
@@ -69,7 +95,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         if (!found.some((hit) => `${hit.ref.pluginId}:${hit.ref.id}` === key && /weekly active teams/i.test(hit.snippet.text))) {
           throw new Error(`Studio search didn't find the artifact with a snippet: ${JSON.stringify(found)}`);
         }
-        await client.navigate("/plugins/studio/studio");
+        await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search studio"]');
         // Open Studio search with its real shortcut, Mod+K.
         const modifiers = process.platform === "darwin" ? 4 : 2;

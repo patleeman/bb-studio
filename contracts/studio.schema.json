@@ -1,6 +1,482 @@
 {
   "pluginId": "studio",
   "methods": {
+    "home": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string"
+          },
+          "periodDays": {
+            "default": 7,
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 90
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "due": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "due": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "projectId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "archived": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "due",
+                    "projectId",
+                    "archived"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "review": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "due": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "projectId": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "archived": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "due",
+                    "projectId",
+                    "archived"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "working": {
+            "type": "object",
+            "properties": {
+              "threads": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "projectId"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "bots": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "projectId": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "projectId"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "threads",
+              "bots"
+            ],
+            "additionalProperties": false
+          },
+          "recent": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "id": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "updatedAt": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pluginId",
+                "id",
+                "title",
+                "href",
+                "kind",
+                "updatedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "automations": {
+            "anyOf": [
+              {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    },
+                    "projectId": {
+                      "type": "string"
+                    },
+                    "enabled": {
+                      "type": "boolean"
+                    },
+                    "nextRunAt": {
+                      "type": [
+                        "number",
+                        "null"
+                      ]
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "name",
+                    "projectId",
+                    "enabled",
+                    "nextRunAt"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "activity": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "actor": {
+                  "type": "object",
+                  "properties": {
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "agent",
+                        "bot",
+                        "cli",
+                        "app",
+                        "editor"
+                      ]
+                    },
+                    "id": {
+                      "type": "string"
+                    },
+                    "name": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "kind"
+                  ],
+                  "additionalProperties": false
+                },
+                "verb": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "ref": {
+                  "type": "object",
+                  "properties": {
+                    "pluginId": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 100
+                    },
+                    "id": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    }
+                  },
+                  "required": [
+                    "pluginId",
+                    "id"
+                  ],
+                  "additionalProperties": false
+                },
+                "at": {
+                  "type": "number"
+                },
+                "summary": {
+                  "type": "string",
+                  "maxLength": 2000
+                },
+                "id": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "actor",
+                "verb",
+                "ref",
+                "at",
+                "summary",
+                "id"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "dashboard": {
+            "type": "object",
+            "properties": {
+              "periodDays": {
+                "type": "number"
+              },
+              "threads": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "id": {
+                      "type": "string"
+                    },
+                    "title": {
+                      "type": "string"
+                    },
+                    "status": {
+                      "type": "string"
+                    },
+                    "turns": {
+                      "type": "number"
+                    },
+                    "failures": {
+                      "type": "number"
+                    },
+                    "durationMs": {
+                      "type": "number"
+                    }
+                  },
+                  "required": [
+                    "id",
+                    "title",
+                    "status",
+                    "turns",
+                    "failures",
+                    "durationMs"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "bots": {
+                "anyOf": [
+                  {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "name": {
+                          "type": "string"
+                        },
+                        "turns": {
+                          "type": "number"
+                        },
+                        "failures": {
+                          "type": "number"
+                        },
+                        "durationMs": {
+                          "type": [
+                            "number",
+                            "null"
+                          ]
+                        },
+                        "active": {
+                          "type": "number"
+                        },
+                        "limits": {
+                          "anyOf": [
+                            {
+                              "type": "object",
+                              "properties": {
+                                "turnsPerHour": {
+                                  "type": "number"
+                                },
+                                "turnsPerDay": {
+                                  "type": "number"
+                                },
+                                "minutesPerTurn": {
+                                  "type": "number"
+                                },
+                                "concurrentForks": {
+                                  "type": "number"
+                                }
+                              },
+                              "required": [
+                                "turnsPerHour",
+                                "turnsPerDay",
+                                "minutesPerTurn",
+                                "concurrentForks"
+                              ],
+                              "additionalProperties": false
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "name",
+                        "turns",
+                        "failures",
+                        "durationMs",
+                        "active",
+                        "limits"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "periodDays",
+              "threads",
+              "bots"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "due",
+          "review",
+          "working",
+          "recent",
+          "automations",
+          "activity",
+          "dashboard"
+        ],
+        "additionalProperties": false
+      }
+    },
     "overview": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

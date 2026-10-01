@@ -30,6 +30,11 @@ const { tag, tagId, tagName, itemRef } = tagSchemas;
 const actor = z.object({ kind: z.enum(["user", "agent", "bot", "cli", "app", "editor"]), id: z.string().optional(), name: z.string().optional() });
 const link = z.object({ from: itemRef, to: itemRef, kind: z.enum(["mention", "embed", "task-link", "related"]), source: pluginId });
 const activityEvent = z.object({ actor, verb: z.string().min(1).max(100), ref: itemRef, at: z.number(), summary: z.string().max(2000) });
+const homeTask = z.object({ id: z.string(), title: z.string(), status: z.string(), due: z.string().nullable(), projectId: z.string().nullable(), archived: z.boolean() });
+const homeThread = z.object({ id: z.string(), title: z.string(), status: z.string(), projectId: z.string() });
+const homeBot = z.object({ id: z.string(), name: z.string(), projectId: z.string() });
+const homeActivity = activityEvent.extend({ id: z.number() });
+const usageLimits = z.object({ turnsPerHour: z.number(), turnsPerDay: z.number(), minutesPerTurn: z.number(), concurrentForks: z.number() });
 const thread = z.object({ threadId: z.string(), ref: itemRef, role: z.string(), state: z.string(), createdAt: z.number(), updatedAt: z.number(), metadata: z.record(z.string(), z.string()) });
 const comment = z.object({ id: z.string(), ref: itemRef, parentId: z.string().nullable(), anchor: z.string().nullable(), actor, body: z.string(), createdAt: z.number(), resolvedAt: z.number().nullable() });
 const version = z.object({ id: z.string(), ref: itemRef, sha256: z.string(), label: z.string(), actor, createdAt: z.number() });
@@ -49,6 +54,17 @@ const tab = z.object({
 export type TabView = z.infer<typeof tab>;
 
 export const rpcContract = defineRpcContract({
+  home: {
+    input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
+    output: z.object({
+      due: z.array(homeTask).nullable(), review: z.array(homeTask).nullable(),
+      working: z.object({ threads: z.array(homeThread), bots: z.array(homeBot).nullable() }),
+      recent: z.array(z.object({ pluginId: z.string(), id: z.string(), title: z.string(), href: z.string(), kind: z.string(), updatedAt: z.number() })),
+      automations: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), enabled: z.boolean(), nextRunAt: z.number().nullable() })).nullable(),
+      activity: z.array(homeActivity),
+      dashboard: z.object({ periodDays: z.number(), threads: z.array(homeThread.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number() })), bots: z.array(homeBot.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number().nullable(), active: z.number(), limits: usageLimits.nullable() })).nullable() }),
+    }),
+  },
   /** Every provider and all of their items. */
   overview: {
     input: z.null(),
