@@ -18,12 +18,14 @@ public enum Mobile {
     public var pushToStartToken: String?
     public var activityId: String?
     public var activityToken: String?
+    public var threadId: String?
     public var endedActivityId: String?
 
-    public init(pushToStartToken: String? = nil, activityId: String? = nil, activityToken: String? = nil, endedActivityId: String? = nil) {
+    public init(pushToStartToken: String? = nil, activityId: String? = nil, activityToken: String? = nil, threadId: String? = nil, endedActivityId: String? = nil) {
       self.pushToStartToken = pushToStartToken
       self.activityId = activityId
       self.activityToken = activityToken
+      self.threadId = threadId
       self.endedActivityId = endedActivityId
     }
   }

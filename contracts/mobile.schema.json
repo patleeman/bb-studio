@@ -17,6 +17,10 @@
           "activityToken": {
             "type": "string"
           },
+          "threadId": {
+            "type": "string",
+            "pattern": "^thr_[A-Za-z0-9]+$"
+          },
           "endedActivityId": {
             "type": "string",
             "minLength": 1,
