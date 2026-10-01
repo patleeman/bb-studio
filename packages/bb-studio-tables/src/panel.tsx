@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { AddOnCollection, Icon, useAddOnPanel } from "@bb-studio/kit/app";
+import { AddOnCollection, FLOATING_BUTTON, Icon, ItemHeader, useAddOnPanel } from "@bb-studio/kit/app";
 import { Button, Input } from "@bb-studio/kit/ui";
 import { errorMessage } from "@bb-studio/kit/format";
 import { toast } from "sonner";
@@ -214,14 +214,15 @@ function Editor({ tableId, backLabel, onBack }: { tableId: string; backLabel: st
       setBusy(false);
     }
   };
-  if (error)
+  if (error || !table)
     return (
-      <p role="alert" className="p-6 text-destructive">
-        {error}
-      </p>
+      <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
+        <ItemHeader className="relative shrink-0 items-center border-b border-border/70" backLabel={backLabel} onBack={() => onBack()} />
+        <p role={error ? "alert" : "status"} className={`p-6 text-sm ${error ? "text-destructive" : "text-muted-foreground"}`}>
+          {error || "Loading table…"}
+        </p>
+      </div>
     );
-  if (!table)
-    return <p className="p-6 text-muted-foreground">Loading table…</p>;
   const view = table.views.find((item) => item.id === viewId) ?? table.views[0];
   const rows = queryRows(table, view);
   const setColumn = (column: Column) =>
@@ -256,54 +257,59 @@ function Editor({ tableId, backLabel, onBack }: { tableId: string; backLabel: st
     );
   };
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex flex-wrap items-center gap-3 border-b border-border px-5 py-3">
-        <button
-          type="button"
-          onClick={() => onBack()}
-          aria-label={`Back to ${backLabel}`}
-          className="rounded p-1 hover:bg-muted"
-        >
-          <Icon name="ArrowLeft" className="size-4" />
-        </button>
-        <input
-          aria-label="Table title"
-          className="min-w-0 flex-1 bg-transparent text-lg font-semibold outline-none"
-          defaultValue={table.title}
-          key={table.id}
-          onBlur={(event) => {
-            if (event.target.value.trim() && event.target.value !== table.title)
-              void run(() =>
-                rpc.call("update", {
+    <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
+      <ItemHeader
+        className="relative shrink-0 items-center border-b border-border/70"
+        backLabel={backLabel}
+        onBack={() => onBack()}
+        leading={
+          <input
+            aria-label="Table title"
+            key={table.title}
+            defaultValue={table.title}
+            maxLength={200}
+            className="h-8 min-w-24 max-w-md rounded-md bg-transparent px-2 text-sm font-medium outline-none [field-sizing:content] hover:bg-state-hover focus:bg-state-hover max-md:max-w-32"
+            onKeyDown={(event) => {
+              if (event.key === "Enter") event.currentTarget.blur();
+              if (event.key === "Escape") {
+                event.currentTarget.value = table.title;
+                event.currentTarget.blur();
+              }
+            }}
+            onBlur={(event) => {
+              const title = event.currentTarget.value.trim();
+              if (title && title !== table.title) void run(() => rpc.call("update", { id: table.id, title }));
+              else event.currentTarget.value = table.title;
+            }}
+          />
+        }
+        thread={{ title: table.title, href: `/plugins/${pluginId}/tables/${table.id}` }}
+        trailing={
+          <button
+            type="button"
+            className={FLOATING_BUTTON}
+            disabled={busy}
+            onClick={() =>
+              void run(async () => {
+                const { csv } = await rpc.call("exportCsv", {
                   id: table.id,
-                  title: event.target.value.trim(),
-                }),
-              );
-          }}
-        />
-        <button
-          type="button"
-          className="text-xs text-muted-foreground underline"
-          onClick={() =>
-            void run(async () => {
-              const { csv } = await rpc.call("exportCsv", {
-                id: table.id,
-                ...(view ? { viewId: view.id } : {}),
-              });
-              const url = URL.createObjectURL(
-                new Blob([csv], { type: "text/csv" }),
-              );
-              const link = document.createElement("a");
-              link.href = url;
-              link.download = `${table.title}.csv`;
-              link.click();
-              setTimeout(() => URL.revokeObjectURL(url), 1000);
-            })
-          }
-        >
-          Export CSV
-        </button>
-      </header>
+                  ...(view ? { viewId: view.id } : {}),
+                });
+                const url = URL.createObjectURL(
+                  new Blob([csv], { type: "text/csv" }),
+                );
+                const link = document.createElement("a");
+                link.href = url;
+                link.download = `${table.title}.csv`;
+                link.click();
+                setTimeout(() => URL.revokeObjectURL(url), 1000);
+              })
+            }
+          >
+            <Icon name="Download" /> Export CSV
+          </button>
+        }
+      />
       <div className="flex flex-wrap items-center gap-2 border-b border-border px-5 py-2">
         <label className="text-xs text-muted-foreground" htmlFor="table-view">
           View

@@ -8,7 +8,8 @@ import type {
   ChannelAutomationRunPage,
 } from "./automation-contract";
 import { Button } from "@bb-studio/kit/ui";
-import { EmptyState, ErrorMessage, message, StatusBadge } from "./bot-ui";
+import { Badge } from "@bb-studio/kit/app";
+import { EmptyNote, ErrorMessage, message } from "./bot-ui";
 import { Modal } from "./channel-controls";
 import { channelMessageSubPath } from "./channel-links";
 
@@ -198,10 +199,7 @@ export function ChannelAutomationsView({
           <article className="channel-automation" key={a.id}>
             <div className="channel-automation-title">
               <strong>{a.name}</strong>
-              <StatusBadge
-                status={a.enabled ? "ready" : "paused"}
-                label={a.enabled ? "Enabled" : "Paused"}
-              />
+              <Badge label={a.enabled ? "Enabled" : "Paused"} tone={a.enabled ? "success" : "neutral"} />
             </div>
             <p>
               {bots.find((b) => b.id === a.botId)?.name ?? "Unavailable bot"} ·{" "}
@@ -297,7 +295,7 @@ export function ChannelAutomationsView({
               >
                 <p>Dispatch and response history</p>
                 {!history.runs.length && (
-                  <EmptyState title="No runs yet" />
+                  <EmptyNote title="No runs yet" />
                 )}
                 {history.runs.map((run) => (
                   <div key={run.id}>
@@ -370,12 +368,12 @@ export function ChannelAutomationsView({
           </article>
         ))}
         {!items.length && !loading && !error && (
-          <EmptyState
+          <EmptyNote
             title="No automations yet"
             description="Create a schedule to give a channel bot recurring work."
           />
         )}
-        {loading && <p role="status" className="bot-empty-state">Loading automations…</p>}
+        {loading && <EmptyNote role="status" title="Loading automations…" />}
         {offset !== null && (
           <Button
             variant="ghost"

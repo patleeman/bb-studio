@@ -1,3 +1,4 @@
+import { EmptyState, PILL } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { RevisionList, type Revision } from "./revision-list";
 import { MarkdownEditor } from "./markdown-editor";
@@ -57,111 +58,78 @@ export function FormRow({
   htmlFor,
   hint,
   children,
-  className = "",
 }: {
   label: string;
   htmlFor?: string;
   hint?: string;
   children: ReactNode;
-  className?: string;
 }) {
+  const labelClass = "pt-[7px] text-xs font-medium text-muted-foreground max-md:pt-0";
   return (
-    <div className={`bot-form-row ${className}`}>
-      {htmlFor ? (
-        <label htmlFor={htmlFor}>{label}</label>
-      ) : (
-        <div className="bot-form-row-label">{label}</div>
-      )}
-      <div className="bot-form-row-control">
+    <div data-form-row className="grid grid-cols-[140px_minmax(0,1fr)] items-start gap-4 p-3 max-md:grid-cols-1 max-md:gap-2">
+      {htmlFor ? <label htmlFor={htmlFor} className={labelClass}>{label}</label> : <div className={labelClass}>{label}</div>}
+      <div className="min-w-0 [&>:is(input,textarea,select):not(.w-20)]:w-full">
         {children}
-        {hint && <p className="bot-form-row-hint">{hint}</p>}
+        {hint && <p className="mt-1.5 text-xs leading-[1.45] text-muted-foreground">{hint}</p>}
       </div>
     </div>
   );
 }
 
+/** A titled, bordered group of form rows, like BB's settings. */
 export function Section({
   title,
+  tone,
   children,
-  className = "",
 }: {
   title: string;
+  tone?: "danger";
   children: ReactNode;
-  className?: string;
 }) {
   return (
-    <section className={`bot-ui-section ${className}`}>
-      <h2 className="bot-ui-section-title">{title}</h2>
-      <div className="bot-ui-section-content">{children}</div>
+    <section className="flex min-w-0 flex-col gap-2">
+      <h2 className={`text-xs font-semibold ${tone === "danger" ? "text-destructive" : "text-muted-foreground"}`}>{title}</h2>
+      <div className="min-w-0 divide-y divide-border overflow-hidden rounded-lg border border-border bg-card">{children}</div>
     </section>
   );
 }
 
-export function EmptyState({
+/** A quiet line inside a list that has nothing to show. */
+export function EmptyNote({
   title,
   description,
-  action,
   role,
 }: {
   title: string;
   description?: string;
-  action?: ReactNode;
   role?: "status";
 }) {
   return (
-    <div className="bot-empty-state" role={role}>
+    <div role={role} className="flex flex-col items-start gap-1 px-3 py-3.5 text-[13px] leading-[1.45] text-muted-foreground">
       <p>{title}</p>
-      {description && <p className="bot-empty-state-description">{description}</p>}
-      {action}
+      {description && <p>{description}</p>}
     </div>
   );
 }
 
-export type StatusKind = "ready" | "working" | "paused" | "error";
-export function StatusBadge({
-  status,
-  label,
-}: {
-  status: StatusKind;
-  label?: string;
-}) {
-  const labels: Record<StatusKind, string> = {
-    ready: "Ready",
-    working: "Working",
-    paused: "Paused",
-    error: "Error",
-  };
-  return (
-    <span className="bot-status-badge" data-status={status}>
-      <span className="bot-status-badge-dot" aria-hidden="true" />
-      {label ?? labels[status]}
-    </span>
-  );
-}
-
+/** Save status and buttons, pinned to the bottom of the scrolling page. */
 export function ActionBar({
   status,
   secondary,
   primary,
-  className = "",
 }: {
   status?: ReactNode;
   secondary?: ReactNode;
   primary?: ReactNode;
-  className?: string;
 }) {
   if (!status && !secondary && !primary) return null;
   return (
-    <div className={`bot-action-bar ${className}`}>
-      <div className="bot-action-bar-start">
-        {status && (
-          <span className="bot-action-bar-status" role="status">
-            {status}
-          </span>
-        )}
-        {secondary && <div className="bot-action-bar-secondary">{secondary}</div>}
+    <div className="sticky bottom-0 z-[3] mt-auto flex min-h-11 items-center justify-between gap-3 border-t border-border/75 bg-background/95 pt-2 pb-[max(8px,env(safe-area-inset-bottom))] backdrop-blur">
+      <div className="flex min-w-0 flex-1 flex-wrap items-center gap-1.5">
+        {status && <span role="status" className="text-xs text-muted-foreground">{status}</span>}
+        {secondary && <div className="flex min-w-0 items-center gap-1.5">{secondary}</div>}
       </div>
-      {primary && <div className="bot-action-bar-primary">{primary}</div>}
+      {primary && <div className="flex min-w-0 items-center justify-end gap-1.5">{primary}</div>}
     </div>
   );
 }
@@ -297,7 +265,7 @@ export function ProfileForm({
   return (
     <form
       onSubmit={submit}
-      className="bot-config-form"
+      className="flex min-w-0 flex-col gap-4"
       aria-label="Bot profile"
     >
       <fieldset disabled={pending} className="min-w-0 space-y-5 border-0 p-0">
@@ -479,11 +447,11 @@ export function ProfileForm({
         ) : undefined}
       />
       {bot && (
-        <details className="bot-config-workspace">
+        <details className="border-t border-border pt-3">
           <summary className="cursor-pointer text-sm text-muted-foreground">
             Workspace
           </summary>
-          <p className="bot-path">{bot.home}</p>
+          <p className="my-3 font-mono text-xs [overflow-wrap:anywhere]">{bot.home}</p>
           <p className="text-xs leading-5 text-muted-foreground">
             MISSION.md, MEMORY.md, and working files live here and persist
             across conversations and BB restarts.
@@ -491,9 +459,9 @@ export function ProfileForm({
         </details>
       )}
       {bot && onArchive && (
-        <Section title="Danger zone" className="bot-danger-zone">
-          <div className="bot-danger-zone-content">
-            <p>
+        <Section title="Danger zone" tone="danger">
+          <div className="flex items-center justify-between gap-4 px-3 py-3.5 max-md:flex-col max-md:items-start">
+            <p className="text-xs leading-normal text-muted-foreground">
               {bot.retired
                 ? "This bot is archived. Restore it to make it available again."
                 : "Archiving stops this bot and removes it from every channel. Its workspace and history are preserved."}
@@ -501,8 +469,8 @@ export function ProfileForm({
             <Button
               type="button"
               size="sm"
-              variant={bot.retired ? "outline" : "destructive"}
-              className={bot.retired ? undefined : "bot-archive-button"}
+              variant="outline"
+              className={bot.retired ? undefined : "border-destructive/55 text-destructive hover:bg-destructive/10 hover:text-destructive"}
               disabled={pending}
               onClick={onArchive}
             >
@@ -619,7 +587,7 @@ export function DocumentEditor({
     }
   };
   return (
-    <div className="bot-document">
+    <div data-bot-document className="flex flex-col gap-4">
       <p className="text-sm leading-5 text-muted-foreground">
         {file === "MISSION.md"
           ? "The standing direction this bot reads at the start of every turn."
@@ -756,6 +724,7 @@ export function BackButton({
     </Button>
   );
 }
+/** The item page's sections, as Studio's filter pills. */
 export function TabBar({
   items,
   selected,
@@ -768,17 +737,17 @@ export function TabBar({
   label: string;
 }) {
   return (
-    <nav className="bot-tabs" aria-label={label}>
+    <nav aria-label={label} className="flex gap-1 overflow-x-auto">
       {items.map((tab) => (
-        <Button
-          variant="ghost"
-          size="sm"
+        <button
+          type="button"
           key={tab}
           aria-current={selected === tab ? "page" : undefined}
+          className={`${PILL} aria-[current=page]:bg-state-active aria-[current=page]:text-foreground`}
           onClick={() => onSelect(tab)}
         >
           {tab[0].toUpperCase() + tab.slice(1)}
-        </Button>
+        </button>
       ))}
     </nav>
   );
@@ -790,43 +759,75 @@ const activityTime = (at: number) =>
       ? { timeStyle: "short" }
       : { dateStyle: "short", timeStyle: "short" },
   ).format(at);
+const ACTIVITY_DOT: Record<"ready" | "working" | "paused" | "error", string> = {
+  ready: "bg-muted-foreground/60",
+  working: "bg-primary",
+  paused: "bg-muted-foreground",
+  error: "bg-destructive",
+};
 /** Read-only log of bot calls. Each row opens the bot's work thread. */
 export function WorkList({ jobs, bots }: { jobs: Job[]; bots: Bot[] }) {
   const navigate = useBbNavigate();
-  if (!jobs.length) return <EmptyState title="No activity yet" />;
+  if (!jobs.length) return <EmptyState icon="Zap" title="No activity yet" />;
   return (
-    <ol className="activity-list">
+    <ol className="flex min-w-0 flex-col py-1">
       {jobs.map((job) => {
         const bot = bots.find((candidate) => candidate.id === job.botId);
-        const status: { kind: StatusKind; label: string } =
+        const status: { kind: keyof typeof ACTIVITY_DOT; label: string } =
           job.status === "error"
             ? { kind: "error", label: "Failed" }
             : job.status === "done"
               ? { kind: "ready", label: "Finished" }
               : job.status === "cancelled"
                 ? { kind: "paused", label: "Stopped" }
-                : { kind: "working", label: job.status === "queued" ? "Queued" : job.startedAt ? "Working" : "Starting" };
+                : {
+                    kind: "working",
+                    label:
+                      job.status === "queued"
+                        ? "Queued"
+                        : job.startedAt
+                          ? "Working"
+                          : "Starting",
+                  };
         const title = job.taskTitle || job.text || "Untitled request";
         return (
           <li key={job.id}>
             <button
               type="button"
-              className="activity-row"
+              className="grid min-h-7 w-full grid-cols-[8px_minmax(0,max-content)_minmax(0,1fr)_auto] items-baseline gap-x-2 rounded-md px-2 py-1 text-left text-xs enabled:hover:bg-state-hover focus-visible:bg-state-hover disabled:cursor-default"
               disabled={!job.threadId}
               title={job.threadId ? "Open work thread" : undefined}
               aria-label={`${bot?.name ?? "Bot"}, ${status.label}: ${title}`}
               onClick={() => job.threadId && navigate.toThread(job.threadId)}
             >
-              <span className="activity-dot" data-status={status.kind} aria-hidden="true" />
-              <span className="activity-bot">{bot?.name ?? "Bot"}</span>
-              <span className="activity-title">
-                {isForkConversation(job.conversationKey) && <span className="activity-tag">Fork</span>}
+              <span
+                className={`size-[7px] self-center rounded-full ${ACTIVITY_DOT[status.kind]}`}
+                aria-hidden="true"
+              />
+              <span className="font-semibold whitespace-nowrap">
+                {bot?.name ?? "Bot"}
+              </span>
+              <span className="min-w-0 truncate text-muted-foreground">
+                {isForkConversation(job.conversationKey) && (
+                  <span className="me-1.5 rounded-full bg-muted px-1.5">
+                    Fork
+                  </span>
+                )}
                 {title}
               </span>
-              <time dateTime={new Date(job.updatedAt || job.createdAt).toISOString()}>
+              <time
+                className="whitespace-nowrap text-muted-foreground tabular-nums"
+                dateTime={new Date(
+                  job.updatedAt || job.createdAt,
+                ).toISOString()}
+              >
                 {activityTime(job.updatedAt || job.createdAt)}
               </time>
-              {job.error && <span className="activity-error">{job.error}</span>}
+              {job.error && (
+                <span className="col-[3/-1] truncate text-destructive">
+                  {job.error}
+                </span>
+              )}
             </button>
           </li>
         );

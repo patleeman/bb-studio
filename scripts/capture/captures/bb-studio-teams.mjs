@@ -178,20 +178,20 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await client.waitForInputValue("Bot role", "Research and verify the facts");
       await client.waitForText("Mission schedule");
       await client.evaluate(`(() => {
-        const hero = document.querySelector('.bot-detail .bot-hero');
-        if (hero?.querySelector('h1')?.textContent !== 'Atlas' || !hero.textContent.includes('@atlas'))
+        const hero = document.querySelector('h1')?.parentElement;
+        if (hero?.querySelector('h1').textContent !== 'Atlas' || !hero.textContent.includes('@atlas'))
           throw new Error('The bot page must open with its avatar, name and handle');
-        const header = Array.from(document.querySelectorAll('.bot-detail button')).map((button) => button.getAttribute('aria-label') || button.textContent.trim());
+        const header = Array.from(document.querySelectorAll('button')).map((button) => button.getAttribute('aria-label') || button.textContent.trim());
         for (const label of ['Studio', 'Message', 'Bot options'])
           if (!header.some((text) => text.includes(label))) throw new Error('The bot header is missing ' + label);
         const form = document.querySelector('form[aria-label="Bot profile"]');
-        const rows = Array.from(form?.querySelectorAll('.bot-form-row > :first-child') ?? []).map((label) => label.textContent.trim());
+        const rows = Array.from(form?.querySelectorAll('[data-form-row] > :first-child') ?? []).map((label) => label.textContent.trim());
         const expected = ['Name', 'Avatar', 'Role', 'Primary model', 'Fallback model', 'Permissions', 'Mission schedule'];
         if (rows.join('|') !== expected.join('|') || !form.querySelector('button[aria-label="Mission schedule"]')) {
           throw new Error('Expected native bot settings rows and schedule picker, got ' + rows.join(', '));
         }
-        const width = form.closest('.bot-config-content').getBoundingClientRect().width;
-        if (width > 1024 || width < 900) throw new Error('Bot configuration must use BB collection width');
+        const width = form.getBoundingClientRect().width;
+        if (width > 1024 || width < 880) throw new Error('Bot configuration must use the Studio page column');
         const save = Array.from(form.querySelectorAll('button')).find((button) => button.textContent === 'Save profile');
         if ((save && !save.disabled) || document.body.innerText.includes('Unsaved changes')) throw new Error('Unchanged profiles must not offer Save');
       })()`);
@@ -203,7 +203,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     fileName: "bot-memory.png",
     setup: async (client) => {
       await captures.find((capture) => capture.id === "bots-profile").setup(client);
-      await client.evaluate(`Array.from(document.querySelectorAll('.bot-tabs button')).find((button) => button.textContent === 'Memory').click()`);
+      await client.evaluate(`Array.from(document.querySelectorAll('nav[aria-label="Bot sections"] button')).find((button) => button.textContent === 'Memory').click()`);
       await client.waitForText("MEMORY.md");
       // Wait for the real file, not just the empty editor shell.
       const started = Date.now();
@@ -217,8 +217,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         const frame = document.querySelector('.bot-markdown-editor').getBoundingClientRect();
         if (source.height < 208 || frame.bottom > innerHeight || editor.getAttribute('contenteditable') !== 'true')
           throw new Error('Memory editor must fit the page and be editable');
-        const save = Array.from(document.querySelectorAll('.bot-document button')).find((button) => button.textContent === 'Save memory');
-        if ((save && !save.disabled) || !document.querySelector('.bot-document [data-icon="RotateCcw"]')) throw new Error('Expected native reload and no save for unchanged memory');
+        const save = Array.from(document.querySelectorAll('[data-bot-document] button')).find((button) => button.textContent === 'Save memory');
+        if ((save && !save.disabled) || !document.querySelector('[data-bot-document] [data-icon="RotateCcw"]')) throw new Error('Expected native reload and no save for unchanged memory');
       })()`);
     },
   },

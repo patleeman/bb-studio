@@ -8,6 +8,7 @@ import { IconActionTooltip } from "./channel-controls";
 import { Input } from "@bb-studio/kit/ui";
 import {
   ActionBar,
+  EmptyNote,
   ErrorMessage,
   FormRow,
   message,
@@ -111,7 +112,7 @@ export function UsagePanel({
             ))}
           </dl>
         ) : (
-          <p role="status" className="bot-empty-state">Loading usage…</p>
+          <EmptyNote role="status" title="Loading usage…" />
         )}
       </Section>
       <Section title="Limits">

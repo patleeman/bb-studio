@@ -51,6 +51,7 @@ import {
   ItemHeader,
   ItemTile,
   openAppPath,
+  PageColumn,
   studioPath,
   useStudioPresent,
 } from "@bb-studio/kit/app";
@@ -121,10 +122,10 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
   };
   if (!data)
     return (
-      <div className="bot-page">
+      <PageColumn>
         <ErrorMessage error={error} />
-        <p role="status">Loading bot…</p>
-      </div>
+        <p role="status" className="text-sm text-muted-foreground">Loading bot…</p>
+      </PageColumn>
     );
   const { bot, jobs } = data;
   const activeWork = jobs.some((job) =>
@@ -153,7 +154,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
     }
   };
   return (
-    <div className="bot-detail relative">
+    <div className="relative h-full min-h-0">
       <ItemHeader
         backLabel={studio ? "Studio" : "Bots"}
         onBack={() =>
@@ -195,112 +196,108 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
           </>
         }
       />
-      <div className="bot-hero">
-        <ItemTile icon={bot.avatar || null} kindIcon="Bot" size="xl" />
-        <div className="min-w-0">
-          <h1>{bot.name}</h1>
-          <p>
-            @{bot.handle}
-            {bot.description ? ` · ${bot.description}` : ""}
-          </p>
-        </div>
-      </div>
-      <TabBar
-        items={tabs}
-        selected={tab}
-        label="Bot sections"
-        onSelect={(t) =>
-          navigate.toPluginPanel("bots", { subPath: `${id}/${t}` })
-        }
-      />
-      <Modal
-        title={`Archive ${bot.name}?`}
-        open={archiveOpen}
-        onOpenChange={setArchiveOpen}
-      >
-        <p className="text-sm leading-5">
-          This stops the bot’s work and removes it from every channel. Its
-          profile, mission, memory, files, and conversation history are
-          preserved. You can restore it later.
-        </p>
-        <div className="mt-4 flex justify-end gap-2">
-          <Button
-            variant="ghost"
-            size="sm"
-            disabled={pending}
-            onClick={() => setArchiveOpen(false)}
-          >
-            Cancel
-          </Button>
-          <Button
-            variant="destructive"
-            size="sm"
-            disabled={pending}
-            onClick={() =>
-              action(async () => {
-                await rpc.call("retire", { id, retired: true });
-                setArchiveOpen(false);
-              })
-            }
-          >
-            Archive bot
-          </Button>
-        </div>
-        <ErrorMessage error={error} />
-      </Modal>
-      {(error || bot.error) && (
-        <div className="bot-error">
-          <ErrorMessage error={error || bot.error} />
-        </div>
-      )}
-      {
-        <div className="bot-section">
-          <div className="bot-config-content">
-            {tab === "profile" && (
-              <ProfileForm
-                key={bot.id}
-                bot={bot}
-                onSaved={load}
-                onArchive={() => {
-                  if (bot.retired) {
-                    void action(() => rpc.call("retire", { id, retired: false }));
-                  } else {
-                    setArchiveOpen(true);
-                  }
-                }}
-              />
-            )}
-            {(tab === "mission" || tab === "memory") && (
-              <DocumentEditor
-                key={`${id}/${tab}`}
-                bot={bot}
-                file={tab === "mission" ? "MISSION.md" : "MEMORY.md"}
-              />
-            )}
-            {tab === "usage" && <UsagePanel id={id} kind="bot" />}
-            {tab === "activity" && (
-              <>
-                <div className="mb-3 flex items-center justify-between gap-3">
-                  <h2 className="text-sm font-medium text-muted-foreground">
-                    Activity
-                  </h2>
-                  <Button
-                    variant="outline"
-                    size="sm"
-                    disabled={pending || bot.retired}
-                    onClick={() => action(() => rpc.call("wake", { id }))}
-                  >
-                    Wake now
-                  </Button>
-                </div>
-                <div className="bot-activity-panel">
-                  <WorkList jobs={jobs} bots={[bot]} />
-                </div>
-              </>
-            )}
+      <PageColumn className="flex min-h-full flex-col">
+        <div className="flex items-center gap-4 pb-4">
+          <ItemTile icon={bot.avatar || null} kindIcon="Bot" size="xl" />
+          <div className="min-w-0">
+            <h1 className="truncate text-[32px] leading-tight font-semibold tracking-tight max-md:text-[28px]">{bot.name}</h1>
+            <p className="mt-0.5 truncate text-sm text-muted-foreground">
+              @{bot.handle}
+              {bot.description ? ` · ${bot.description}` : ""}
+            </p>
           </div>
         </div>
-      }
+        <TabBar
+          items={tabs}
+          selected={tab}
+          label="Bot sections"
+          onSelect={(t) =>
+            navigate.toPluginPanel("bots", { subPath: `${id}/${t}` })
+          }
+        />
+        <Modal
+          title={`Archive ${bot.name}?`}
+          open={archiveOpen}
+          onOpenChange={setArchiveOpen}
+        >
+          <p className="text-sm leading-5">
+            This stops the bot’s work and removes it from every channel. Its
+            profile, mission, memory, files, and conversation history are
+            preserved. You can restore it later.
+          </p>
+          <div className="mt-4 flex justify-end gap-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              disabled={pending}
+              onClick={() => setArchiveOpen(false)}
+            >
+              Cancel
+            </Button>
+            <Button
+              variant="destructive"
+              size="sm"
+              disabled={pending}
+              onClick={() =>
+                action(async () => {
+                  await rpc.call("retire", { id, retired: true });
+                  setArchiveOpen(false);
+                })
+              }
+            >
+              Archive bot
+            </Button>
+          </div>
+          <ErrorMessage error={error} />
+        </Modal>
+        {(error || bot.error) && (
+          <div className="mt-4">
+            <ErrorMessage error={error || bot.error} />
+          </div>
+        )}
+        <div className="mt-5 flex flex-1 flex-col">
+          {tab === "profile" && (
+            <ProfileForm
+              key={bot.id}
+              bot={bot}
+              onSaved={load}
+              onArchive={() => {
+                if (bot.retired) {
+                  void action(() => rpc.call("retire", { id, retired: false }));
+                } else {
+                  setArchiveOpen(true);
+                }
+              }}
+            />
+          )}
+          {(tab === "mission" || tab === "memory") && (
+            <DocumentEditor
+              key={`${id}/${tab}`}
+              bot={bot}
+              file={tab === "mission" ? "MISSION.md" : "MEMORY.md"}
+            />
+          )}
+          {tab === "usage" && <UsagePanel id={id} kind="bot" />}
+          {tab === "activity" && (
+            <>
+              <div className="mb-3 flex items-center justify-between gap-3">
+                <h2 className="text-sm font-medium text-muted-foreground">
+                  Activity
+                </h2>
+                <Button
+                  variant="outline"
+                  size="sm"
+                  disabled={pending || bot.retired}
+                  onClick={() => action(() => rpc.call("wake", { id }))}
+                >
+                  Wake now
+                </Button>
+              </div>
+              <WorkList jobs={jobs} bots={[bot]} />
+            </>
+          )}
+        </div>
+      </PageColumn>
     </div>
   );
 }
@@ -341,8 +338,7 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
     return <ChannelRedirect subPath={id === "group" ? section : "new"} />;
   if (id)
     return (
-      <div className="bot-route">
-        <BotDetail
+      <BotDetail
           key={id}
           id={id}
           tab={
@@ -351,7 +347,6 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
               : "profile"
           }
         />
-      </div>
     );
   return <BotList requests={data?.botCreateRequests ?? null} error={error} onResolved={load} />;
 }
