@@ -25,6 +25,11 @@ struct SettingsView: View {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
             }
             ServerControls()
+            Section("Server") {
+                NavigationLink { PluginStatusView() } label: {
+                    Label("Plugins", systemImage: "puzzlepiece.extension")
+                }
+            }
             if runningPlugins.split(separator: ",").contains("custom-instructions") {
                 Section("Agents") {
                     NavigationLink { CustomInstructionsView() } label: {

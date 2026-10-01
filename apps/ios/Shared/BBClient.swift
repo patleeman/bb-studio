@@ -364,7 +364,7 @@ extension BBClient {
         return result
     }
 
-    private static func input(_ text: String, _ attachments: [JSONValue], _ mentions: [Mention] = []) -> JSONValue {
+    static func input(_ text: String, _ attachments: [JSONValue], _ mentions: [Mention] = []) -> JSONValue {
         var input = attachments
         if !text.isEmpty {
             input.append(["type": "text", "text": .string(text), "mentions": .array(Mention.ranges(in: text, mentions))])

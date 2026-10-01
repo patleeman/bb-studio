@@ -5,6 +5,9 @@ struct NewThreadView: View {
     @Environment(\.dismiss) private var dismiss
     @AppStorage("newThreadProjectId", store: AppGroup.defaults) private var projectId = ""
     @State private var projects: [Project] = []
+    @State private var environments: [ThreadEnvironment] = []
+    @State private var workspace = "default"
+    @State private var baseBranch = ""
     @State private var text: String
     @State private var attachments: [PendingAttachment] = []
     @State private var dictating = false
@@ -28,6 +31,20 @@ struct NewThreadView: View {
             Form {
                 Picker("Project", selection: $projectId) {
                     ForEach(projects) { Text($0.name).tag($0.id) }
+                }
+                Section("Workspace") {
+                    Picker("Use", selection: $workspace) {
+                        Text("Project default").tag("default")
+                        if !environments.isEmpty { Text("New worktree").tag("worktree") }
+                        ForEach(environments.filter { $0.status == "ready" }) { environment in
+                            Text(environment.label).tag(environment.id)
+                        }
+                    }
+                    if workspace == "worktree" {
+                        TextField("Base branch (project default)", text: $baseBranch)
+                            .textInputAutocapitalization(.never)
+                            .autocorrectionDisabled()
+                    }
                 }
                 Section {
                     TextField("What should the agent do?", text: $text, axis: .vertical)
@@ -82,6 +99,8 @@ struct NewThreadView: View {
             }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
+                workspace = "default"
+                environments = (try? await app.client.threadEnvironments(projectId: projectId)) ?? []
                 defaults = (try? await app.client.projectDefaults(projectId)) ?? nil
                 if providerId.isEmpty { await loadOptions() }
             }
@@ -142,11 +161,20 @@ struct NewThreadView: View {
                 permissionMode: permissionMode.isEmpty ? nil : permissionMode)
             let thread = try await app.client.createThread(
                 projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
-                options: choice)
+                options: choice, workspace: selectedWorkspace)
             dismiss()
             app.openThread(thread.id)
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
+    }
+
+    private var selectedWorkspace: NewThreadWorkspace {
+        if workspace == "worktree", let hostId = environments.first?.hostId {
+            let branch = baseBranch.trimmingCharacters(in: .whitespacesAndNewlines)
+            return .worktree(hostId: hostId, baseBranch: branch.isEmpty ? nil : branch)
+        }
+        if environments.contains(where: { $0.id == workspace }) { return .reuse(workspace) }
+        return .projectDefault
     }
 }

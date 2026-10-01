@@ -7,6 +7,7 @@ struct FilesView: View {
     @Environment(\.dismiss) private var dismiss
     @State private var tab = Tab.changes
     @State private var status: WorkspaceStatus?
+    @State private var pullRequest: WorkspacePullRequest?
     @State private var diffs: [String: String] = [:]
     @State private var children: [String: [WorkspacePath]] = [:]
     @State private var all: [WorkspacePath] = []
@@ -37,6 +38,17 @@ struct FilesView: View {
                         }
                     }
                 } else if tab == .changes {
+                    if let pullRequest {
+                        Section("Pull request") {
+                            Link(destination: pullRequest.url) {
+                                VStack(alignment: .leading, spacing: 3) {
+                                    Text("#\(pullRequest.number) \(pullRequest.title)")
+                                    Text("\(pullRequest.state.capitalized) · \(pullRequest.headRefName) → \(pullRequest.baseRefName)")
+                                        .font(.caption).foregroundStyle(.secondary)
+                                }
+                            }
+                        }
+                    }
                     changes
                 } else {
                     directory("")
@@ -115,6 +127,7 @@ struct FilesView: View {
     private func load() async {
         do {
             async let status = app.client.workspaceStatus(environmentId)
+            async let pullRequest = app.client.workspacePullRequest(environmentId)
             async let paths = app.client.workspacePaths(environmentId)
             let listing = try await paths
             all = listing.paths
@@ -123,6 +136,7 @@ struct FilesView: View {
                 $0.sorted { ($0.isDirectory ? 0 : 1, $0.name.localizedLowercase) < ($1.isDirectory ? 0 : 1, $1.name.localizedLowercase) }
             }
             self.status = try? await status
+            self.pullRequest = try? await pullRequest
             if self.status?.changes.isEmpty == false {
                 diffs = (try? await app.client.uncommittedDiffs(environmentId)) ?? [:]
             } else if self.status == nil {
