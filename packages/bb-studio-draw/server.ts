@@ -1,3 +1,5 @@
+import { subcommand } from "@bb-studio/kit/cli";
+import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 // Studio Draw (plugin id `excalidraw`): create, edit, and attach Excalidraw
 // drawings.
 //
@@ -13,7 +15,7 @@
 //   - `attachDrawingImage` rpc — the frontend renders the scene to a PNG and
 //     the server uploads it as a project prompt attachment.
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createStudioNotifier } from "@bb-studio/kit/server";
+import { createChangeBus } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext as buildMentionContext } from "./lib/mention";
@@ -120,16 +122,11 @@ export default async function plugin(bb: BbPluginApi) {
 
   const studio = studioSchemas(z);
   // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
-  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio, delayMs: 1500 });
+  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by }), delayMs: 1500 });
 
   /** Tells open editors, galleries, and Studio that a drawing changed. */
   function changed(id: string, updatedAt: number, by: Writer | "studio") {
-    try {
-      bb.realtime.publish(REALTIME_CHANNEL, { type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by });
-    } catch {
-      // publishing is best-effort; editors also poll
-    }
-    studioNotifier.changed();
+    changeBus.changed(id, updatedAt, by);
   }
 
   function mustGet(id: string): DrawingRow {
@@ -259,14 +256,10 @@ export default async function plugin(bb: BbPluginApi) {
     const row = store.get(context.req.query("drawing") ?? "");
     const svg = row ? sceneThumbnail(parseSceneData(row.data)) : null;
     if (!svg) return context.text("Not found", 404);
-    return new Response(svg, {
-      headers: {
-        "content-type": "image/svg+xml; charset=utf-8",
-        "cache-control": "private, max-age=31536000, immutable",
-        // The SVG is built from scene data; never let it run anything.
-        "content-security-policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
-        "x-content-type-options": "nosniff",
-      },
+    return serveBytes(svg, {
+      "content-type": "image/svg+xml; charset=utf-8",
+      // The SVG is built from scene data; never let it run anything.
+      "content-security-policy": "default-src 'none'; img-src data:; style-src 'unsafe-inline'",
     });
   });
 
@@ -422,7 +415,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Mention provider: `@drawing` in any composer. Pick a drawing; at send
   // time the agent receives its scene data as context.
-  bb.ui.registerMentionProvider({
+  bb.ui.registerMentionProvider(defineItemMention({
     id: "drawing",
     label: "Drawings",
     search({ query }) {
@@ -441,7 +434,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (!row) throw new Error(`Excalidraw drawing ${itemId} not found`);
       return { context: buildMentionContext({ ...row, name: displayName(row) }) };
     },
-  });
+  }));
 
   // CLI: `bb excalidraw …` — agent-facing management of drawings.
   bb.cli.register({
@@ -482,7 +475,7 @@ export default async function plugin(bb: BbPluginApi) {
       },
     ],
     async run(argv, ctx) {
-      const [cmd, ...rest] = argv;
+      const { command: cmd, rest } = subcommand(argv);
       switch (cmd) {
         case "list": {
           const rows = store.list();
@@ -638,7 +631,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.onDispose(() => {
-    studioNotifier.dispose();
+    changeBus.dispose();
     bb.log.info("disposed");
   });
 }

@@ -1,3 +1,5 @@
+import { subcommand, takeFlag, takeOption } from "@bb-studio/kit/cli";
+import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -119,14 +121,10 @@ export default async function plugin(bb: BbPluginApi) {
       const file = store.file(c.req.query("id") ?? "");
       if (!file) return c.text("Not found", 404);
       const inline = INLINE_MIME.test(file.mime);
-      return new Response(new Uint8Array(file.data), {
-        headers: {
-          "content-type": inline ? file.mime : "application/octet-stream",
-          "content-disposition": `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/["\\\r\n]/g, "_")}"`,
-          "cache-control": "private, max-age=31536000, immutable",
-          "content-security-policy": "sandbox",
-          "x-content-type-options": "nosniff",
-        },
+      return serveBytes(new Uint8Array(file.data), {
+        "content-type": inline ? file.mime : "application/octet-stream",
+        "content-disposition": `${inline ? "inline" : "attachment"}; filename="${file.name.replace(/["\\\r\n]/g, "_")}"`,
+        "content-security-policy": "sandbox",
       });
     },
     { auth: "local" },
@@ -375,7 +373,7 @@ export default async function plugin(bb: BbPluginApi) {
     agentConfiguration(isExploreWorker(context.pluginMetadata) ? null : explore.configure(exploreEnabled)),
   );
 
-  bb.ui.registerMentionProvider({
+  bb.ui.registerMentionProvider(defineItemMention({
     id: "page",
     label: "Pages",
     search({ query, projectId }) {
@@ -400,7 +398,7 @@ export default async function plugin(bb: BbPluginApi) {
         ].join("\n"),
       };
     },
-  });
+  }));
 
   bb.cli.register({
     name: "pages",
@@ -413,19 +411,9 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "explore", summary: "Explore explainers: list, open (link, state, follow-ups), regenerate in place", usage: EXPLORE_USAGE },
     ],
     async run(argv, ctx) {
-      const [command, ...rest] = argv;
-      const flag = (name: string) => {
-        const index = rest.indexOf(name);
-        if (index < 0) return undefined;
-        rest.splice(index, 1);
-        return true;
-      };
-      const option = (name: string) => {
-        const index = rest.indexOf(name);
-        if (index < 0) return undefined;
-        const [, value] = rest.splice(index, 2);
-        return value;
-      };
+      const { command, rest } = subcommand(argv);
+      const flag = (name: string) => takeFlag(rest, name);
+      const option = (name: string) => takeOption(rest, name);
       try {
         switch (command) {
           case "list": {

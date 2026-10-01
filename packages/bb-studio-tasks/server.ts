@@ -1,3 +1,6 @@
+import { parseFlags, subcommand } from "@bb-studio/kit/cli";
+export { parseFlags } from "@bb-studio/kit/cli";
+import { defineItemMention } from "@bb-studio/kit/server";
 // Studio Tasks (plugin id `studio-tasks`): a board of tasks you can hand to agents.
 //
 // Backend entry. Tasks live in the plugin's SQLite database
@@ -7,7 +10,7 @@
 // (src/server/handoff.ts). With BB Studio installed, tasks list in Studio's
 // collection (src/server/studio.ts).
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createStudioNotifier } from "@bb-studio/kit/server";
+import { createChangeBus } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
@@ -214,16 +217,11 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   const studio = studioSchemas(z);
-  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio });
+  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: TASK_UPDATE_TYPE, taskId: id }) });
 
   /** Tells open boards, task views and Studio that a task changed. */
   function changed(id: string) {
-    try {
-      bb.realtime.publish(REALTIME_CHANNEL, { type: TASK_UPDATE_TYPE, taskId: id });
-    } catch {
-      // publishing is best-effort
-    }
-    studioNotifier.changed();
+    changeBus.changed(id);
   }
 
   function mustGet(id: string): TaskRow {
@@ -664,7 +662,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.configure(() => ({ tools: ["tasks_list", "tasks_get", "tasks_create", "tasks_update"], skills: [] }));
 
   // `@task` in any composer.
-  bb.ui.registerMentionProvider({
+  bb.ui.registerMentionProvider(defineItemMention({
     id: "task",
     label: "Tasks",
     search({ query }) {
@@ -692,7 +690,7 @@ export default async function plugin(bb: BbPluginApi) {
         }),
       };
     },
-  });
+  }));
 
   // CLI: `bb studio-tasks …`
   const usage = {
@@ -715,7 +713,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "done", summary: "Mark a task done", usage: usage.done },
     ],
     async run(argv, ctx) {
-      const [cmd, ...rest] = argv;
+      const { command: cmd, rest } = subcommand(argv);
       const flags = parseFlags(rest, ["me", "folder"]);
       const fail = (message: string) => ({ exitCode: 1, stderr: `${message}\n` });
       try {
@@ -778,32 +776,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.onDispose(() => {
-    studioNotifier.dispose();
+    changeBus.dispose();
     bb.log.info("disposed");
   });
-}
-
-/** `--name value` flags and positional arguments. A flag with no value is "". */
-/** `booleans` name the flags that take no value, so the word after them stays positional. */
-export function parseFlags(
-  argv: readonly string[],
-  booleans: readonly string[] = [],
-): { positional: string[]; values: Record<string, string | undefined> } {
-  const positional: string[] = [];
-  const values: Record<string, string | undefined> = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index]!;
-    if (arg.startsWith("--")) {
-      const next = argv[index + 1];
-      if (next !== undefined && !next.startsWith("--") && !booleans.includes(arg.slice(2))) {
-        values[arg.slice(2)] = next;
-        index += 1;
-      } else {
-        values[arg.slice(2)] = "";
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, values };
 }

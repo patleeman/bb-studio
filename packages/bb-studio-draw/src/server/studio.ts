@@ -1,9 +1,8 @@
 // Draw as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage drawings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { snippets } from "@bb-studio/kit/format";
-import { registerStudioProvider } from "@bb-studio/kit/server";
+import { type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import { getNonDeletedElements, parseSceneData } from "../../lib/merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
 import type { DrawingRow, DrawingStore } from "./store";
@@ -79,27 +78,13 @@ export function registerStudio(
   deps: { store: DrawingStore; changed(id: string): void },
 ): void {
   const { store } = deps;
-  const mustGet = (id: string) => {
-    const row = store.get(id);
-    if (!row) throw new Error("Drawing not found.");
-    return row;
-  };
+  const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Drawing not found.");
 
-  registerStudioProvider(bb, schemas, {
+  createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "drawings", kinds: [DRAWING_KIND] }),
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
       return { items: rows.map(toStudioItem), truncated: rows.length === LIST_LIMIT };
-    },
-    // Studio matches titles itself; this finds the words written on drawings.
-    studio_search: ({ query }) => {
-      const needle = query.toLowerCase();
-      const found = store
-        .list({ limit: 10_000 })
-        .map((row) => ({ id: row.id, text: drawingText(row.data).join("\n") }))
-        .filter((row) => row.text.toLowerCase().includes(needle))
-        .slice(0, 200);
-      return { ids: found.map((row) => row.id), snippets: snippets(found, query, (row) => row.text) };
     },
     studio_create: ({ kind, projectId }) => {
       if (kind !== DRAWING_KIND.id) throw new Error(`Unknown kind "${kind}".`);
@@ -107,25 +92,6 @@ export function registerStudio(
       deps.changed(row.id);
       return { item: toStudioItem(row) };
     },
-    studio_move: ({ ids, projectId }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.setProject(id, projectId);
-        deps.changed(id);
-      }),
-    studio_archive: ({ ids, archived }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.setArchived(id, archived);
-        deps.changed(id);
-      }),
-    studio_delete: ({ ids }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.delete(id);
-        summaries.delete(id);
-        deps.changed(id);
-      }),
     studio_action: ({ action, ids }) => {
       if (action !== "copy-text") throw new Error(`Unknown action "${action}".`);
       const parts = ids.map((id) => {
@@ -137,5 +103,28 @@ export function registerStudio(
       if (!text.trim()) return { message: "There's no text on this drawing.", text: null };
       return { message: ids.length === 1 ? "Text copied" : `Copied text from ${ids.length} drawings`, text };
     },
+  }, {
+    move: (id: string, projectId: string | null) => {
+      mustGet(id);
+      store.setProject(id, projectId);
+      deps.changed(id);
+    },
+    archive: (id: string, archived: boolean) => {
+      mustGet(id);
+      store.setArchived(id, archived);
+      deps.changed(id);
+    },
+    delete: (id: string) => {
+      mustGet(id);
+      store.delete(id);
+      summaries.delete(id);
+      deps.changed(id);
+    },
+  }, {
+    find: (query) => store.list({ limit: 10_000 })
+      .map((row) => ({ id: row.id, text: drawingText(row.data).join("\n") }))
+      .filter((row) => row.text.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 200),
+    text: (row) => row.text,
   });
 }

@@ -1,3 +1,4 @@
+import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 // Explore, wired into Pages: agents end answers with what they noticed along
 // the way (`::explore{items="…"}`); a click writes a page explaining it.
 //
@@ -135,15 +136,14 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
   };
 
   async function cli(argv: string[], ctx: PluginCliContext): Promise<CliResult> {
-    const [command, ...rest] = argv;
-    const positional = rest.filter((arg) => !arg.startsWith("--"));
-    const flag = (name: string) => rest.indexOf(`--${name}`);
+    const { command, rest } = subcommand(argv);
+    const flags = parseFlags(rest, ["wait"]);
+    const positional = flags.positional;
     const fail = (message: string): CliResult => ({ exitCode: 1, stderr: `${message}\n` });
     switch (command) {
       case "list": {
-        const at = flag("thread");
-        const threadId = at >= 0 ? rest[at + 1] : undefined;
-        if (at >= 0 && (!threadId || threadId.startsWith("--"))) return fail(`usage: ${USAGE.list}`);
+        const threadId = flags.values.thread;
+        if (threadId === "") return fail(`usage: ${USAGE.list}`);
         const rows = store.list({ threadId, limit: 200 });
         return { exitCode: 0, stdout: rows.length ? `${rows.map(line).join("\n")}\n` : "No explainers.\n" };
       }
@@ -156,7 +156,7 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
         const id = positional[0] ?? "";
         if (!store.explainer(id)) return fail(`usage: ${USAGE.regenerate}`);
         service.regenerate(id);
-        if (flag("wait") < 0) return { exitCode: 0, stdout: `${line(mustGet(id))}\n` };
+        if (flags.values.wait === undefined) return { exitCode: 0, stdout: `${line(mustGet(id))}\n` };
         const settled = (await service.settled(id, ctx.signal)) ?? mustGet(id);
         return { exitCode: settled.status === "error" || !settled.page_id ? 1 : 0, stdout: `${describe(settled)}\n` };
       }

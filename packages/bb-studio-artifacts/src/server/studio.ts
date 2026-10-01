@@ -1,9 +1,8 @@
 // Artifacts as a Studio add-on: the `studio_*` methods Studio calls to list
 // and manage artifacts in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { snippets } from "@bb-studio/kit/format";
-import { registerStudioProvider } from "@bb-studio/kit/server";
+import { type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import { ARTIFACT_ICON, PLUGIN_ID, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { displayTitle, versionType, type ArtifactStore, type ArtifactWithVersion } from "./store";
 
@@ -128,56 +127,17 @@ export function registerStudio(
   deps: { store: ArtifactStore; changed(id: string): void },
 ): void {
   const { store } = deps;
-  const mustGet = (id: string) => {
-    const artifact = store.get(id);
-    if (!artifact) throw new Error("Artifact not found.");
-    return artifact;
-  };
+  const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Artifact not found.");
 
-  registerStudioProvider(bb, schemas, {
+  createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "artifacts", kinds: [ARTIFACT_KIND] }),
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
       return { items: rows.map((a) => toStudioItem(store, a)), truncated: rows.length === LIST_LIMIT };
     },
-    // Studio matches titles itself; this finds descriptions, file names and text.
-    studio_search: ({ query }) => {
-      const needle = query.toLowerCase();
-      const found = store
-        .list({ limit: 10_000 })
-        .filter(
-          (artifact) =>
-            artifact.description.toLowerCase().includes(needle) ||
-            artifact.version.name.toLowerCase().includes(needle) ||
-            (searchText(store, artifact)?.toLowerCase().includes(needle) ?? false),
-        )
-        .slice(0, 200);
-      return {
-        ids: found.map((artifact) => artifact.id),
-        snippets: snippets(found, query, (artifact) => [artifact.description, searchText(store, artifact)].filter(Boolean).join("\n")),
-      };
-    },
     studio_create: () => {
       throw new Error("Artifacts are saved from threads, not created in Studio.");
     },
-    studio_move: ({ ids, projectId }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.setProject(id, projectId);
-        deps.changed(id);
-      }),
-    studio_archive: ({ ids, archived }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.setArchived(id, archived);
-        deps.changed(id);
-      }),
-    studio_delete: ({ ids }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.delete(id);
-        deps.changed(id);
-      }),
     studio_action: ({ action, ids }) => {
       if (action !== "copy-text") throw new Error(`Unknown action "${action}".`);
       const parts = ids.flatMap((id) => {
@@ -189,5 +149,32 @@ export function registerStudio(
       if (!parts.length) return { message: ids.length === 1 ? "This artifact isn't text." : "None of these are text.", text: null };
       return { message: parts.length === 1 ? "Text copied" : `Copied text from ${parts.length} artifacts`, text: parts.join("\n\n") };
     },
+  }, {
+    move: (id: string, projectId: string | null) => {
+      mustGet(id);
+      store.setProject(id, projectId);
+      deps.changed(id);
+    },
+    archive: (id: string, archived: boolean) => {
+      mustGet(id);
+      store.setArchived(id, archived);
+      deps.changed(id);
+    },
+    delete: (id: string) => {
+      mustGet(id);
+      store.delete(id);
+      deps.changed(id);
+    },
+  }, {
+    find: (query) => {
+      const needle = query.toLowerCase();
+      return store.list({ limit: 10_000 })
+        .filter((artifact) =>
+          artifact.description.toLowerCase().includes(needle) ||
+          artifact.version.name.toLowerCase().includes(needle) ||
+          (searchText(store, artifact)?.toLowerCase().includes(needle) ?? false))
+        .slice(0, 200);
+    },
+    text: (artifact) => [artifact.description, searchText(store, artifact)].filter(Boolean).join("\n"),
   });
 }

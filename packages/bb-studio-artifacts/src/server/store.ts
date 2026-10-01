@@ -1,7 +1,9 @@
+import type { Actor } from "@bb-studio/kit/server";
 // Artifacts in the plugin's SQLite database. An artifact is a titled item with
 // one or more versions; each version points at bytes stored once per sha256,
 // so saving an unchanged file again costs nothing.
-import { createHash, randomBytes, randomUUID } from "node:crypto";
+import { createHash, randomUUID } from "node:crypto";
+import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import { MAX_ARTIFACT_BYTES, artifactType, formatBytes, type ArtifactType } from "../shared";
 
@@ -72,7 +74,7 @@ export type VersionRow = {
 export type ArtifactWithVersion = ArtifactRow & { version: VersionRow; versions: number };
 
 /** Who saved. The CLI counts as an agent: agents are its main users. */
-export type Writer = "agent" | "cli" | "app";
+export type Writer = Extract<Actor["kind"], "agent" | "cli" | "app">;
 
 export function writerKind(by: Writer): "user" | "agent" {
   return by === "app" ? "user" : "agent";
@@ -267,11 +269,7 @@ export class ArtifactStore {
 }
 
 function newArtifactId(): string {
-  const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
-  const bytes = randomBytes(16);
-  let id = "art_";
-  for (const byte of bytes) id += alphabet[byte % alphabet.length];
-  return id;
+  return newId("art");
 }
 
 /** The type a version shows as. */

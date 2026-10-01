@@ -2,8 +2,7 @@
 // manage pages in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { snippets } from "@bb-studio/kit/format";
-import { registerStudioProvider } from "@bb-studio/kit/server";
+import { mustGet, registerStudioProvider, storeSearch } from "@bb-studio/kit/server";
 import { HUMAN_USER_ID, PLUGIN_ID } from "./constants";
 import { readMarkdown } from "./doc";
 import type { PagesService } from "./service";
@@ -82,11 +81,7 @@ export function toStudioItem(meta: PageMeta, markdown: string | null): StudioIte
 
 export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: StudioSchemas): void {
   const { store } = service;
-  const requireMeta = (id: string) => {
-    const meta = store.meta(id);
-    if (!meta) throw new Error("Page not found.");
-    return meta;
-  };
+  const requireMeta = (id: string) => mustGet((key) => store.meta(key), id, "Page not found.");
 
   registerStudioProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "pages", kinds: [PAGE_KIND] }),
@@ -94,13 +89,10 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
       const markdown = store.markdownHeads();
       return { items: store.list({ includeArchived: true }).map((meta) => toStudioItem(meta, markdown.get(meta.id) ?? null)) };
     },
-    studio_search: ({ query }) => {
-      const found = store.search(query, undefined, 200);
-      return {
-        ids: found.map((meta) => meta.id),
-        snippets: snippets(found, query, (meta) => plainText(store.get(meta.id)?.markdown ?? "")),
-      };
-    },
+    studio_search: storeSearch({
+      find: (query) => store.search(query, undefined, 200),
+      text: (meta) => plainText(store.get(meta.id)?.markdown ?? ""),
+    }),
     studio_create: ({ projectId }) => ({
       item: toStudioItem(service.createPage({ projectId, parentId: null, title: "", actor: HUMAN_USER_ID }), ""),
     }),

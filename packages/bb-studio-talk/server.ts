@@ -1,3 +1,5 @@
+import { subcommand, takeOption } from "@bb-studio/kit/cli";
+import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 // bb-studio-talk — durable long-form dictation.
 //
 // The browser captures audio in short segments and uploads each one over RPC
@@ -7,9 +9,9 @@
 // the user's ChatGPT subscription through Codex by default). Each recording is
 // a durable object: a page at /plugins/talk/recordings/<id>, a mention in the
 // composer's @ menu, and `bb talk` on the command line.
-import { randomBytes } from "node:crypto";
+import { newId } from "@bb-studio/kit/ids";
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createStudioNotifier } from "@bb-studio/kit/server";
+import { createChangeBus } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { rpcContract } from "./src/shared/contract";
@@ -27,10 +29,6 @@ export type { TalkRpcContract } from "./src/shared/contract";
 const STALE_AFTER_MS = 120_000;
 /** Enough transcript to say what a recording is about. */
 const TITLE_MIN_CHARS = 280;
-
-function newId(prefix: string): string {
-  return `${prefix}${randomBytes(10).toString("hex").slice(0, 16)}`;
-}
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -81,16 +79,13 @@ export default async function plugin(bb: BbPluginApi) {
   const lifetime = new AbortController();
   const studio = studioSchemas(z);
   // Transcription touches a recording every few seconds; Studio only needs to hear about it now and then.
-  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: "talk", schemas: studio, delayMs: 1500 });
+  const changeBus = createChangeBus({ bb, channel: RECORDING_CHANGED, pluginId: "talk", schemas: studio, event: (id) => ({ id }), delayMs: 1500 });
   bb.onDispose(() => {
     lifetime.abort();
-    studioNotifier.dispose();
+    changeBus.dispose();
   });
 
-  const changed = (id: string) => {
-    bb.realtime.publish(RECORDING_CHANGED, { id });
-    studioNotifier.changed();
-  };
+  const changed = (id: string) => changeBus.changed(id);
 
   // Empty recordings are never kept: one that finishes without a word
   // (a mic tapped by accident, silence, noise) is deleted with its audio.
@@ -249,16 +244,11 @@ export default async function plugin(bb: BbPluginApi) {
     const entry = store.segmentFile(recordingId, segmentId);
     if (!entry) return context.text("Not found", 404);
     const bytes = await files.read(entry.file);
-    return new Response(new Uint8Array(bytes), {
-      headers: {
-        "content-type": entry.mimeType.split(";")[0]!,
-        "cache-control": "private, max-age=31536000, immutable",
-      },
-    });
+    return serveBytes(new Uint8Array(bytes), { "content-type": entry.mimeType.split(";")[0]! });
   });
 
   // ── @ mentions ──────────────────────────────────────────────────────────
-  bb.ui.registerMentionProvider({
+  bb.ui.registerMentionProvider(defineItemMention({
     id: "recordings",
     label: "Talk recordings",
     search: ({ query }) =>
@@ -272,7 +262,7 @@ export default async function plugin(bb: BbPluginApi) {
       const recording = mustGet(id);
       return { context: mentionContext(recording, store.transcript(id)) };
     },
-  });
+  }));
 
   // ── `bb talk` ───────────────────────────────────────────────────────────
   const usage = [
@@ -296,17 +286,12 @@ export default async function plugin(bb: BbPluginApi) {
     async run(argv) {
       const json = argv.includes("--json");
       const args = argv.filter((arg) => arg !== "--json");
-      const option = (name: string): string | undefined => {
-        const at = args.indexOf(name);
-        if (at < 0) return undefined;
-        const value = args[at + 1];
-        args.splice(at, 2);
-        return value;
-      };
+      const option = (name: string) => takeOption(args, name);
       const query = option("--query");
       const offset = Number(option("--offset") ?? 0);
       const limit = Math.min(Number(option("--limit") ?? 20_000), MENTION_TRANSCRIPT_CHARS);
-      const [command, id] = args;
+      const { command, rest } = subcommand(args);
+      const id = rest[0];
       const missing = (value: string) => ({
         exitCode: 1,
         stderr: `No recording ${value}. Run "bb talk list" to see ids.`,

@@ -1,6 +1,7 @@
+import type { Actor } from "@bb-studio/kit/server";
 // Drawings in the plugin's SQLite database, stored as serialized Excalidraw
 // scenes (the JSON shape Excalidraw's "save to file" uses).
-import { randomUUID } from "node:crypto";
+import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import { elementCount, parseSceneData, serializeSceneData } from "../../lib/merge";
 
@@ -35,7 +36,7 @@ export type DrawingRow = {
 };
 
 /** Who wrote a change. The CLI counts as an agent: agents are its main users. */
-export type Writer = "editor" | "agent" | "cli" | "app";
+export type Writer = Extract<Actor["kind"], "editor" | "agent" | "cli" | "app">;
 
 export function writerKind(by: Writer): "user" | "agent" {
   return by === "agent" || by === "cli" ? "agent" : "user";
@@ -97,7 +98,7 @@ export class DrawingStore {
   }
 
   create(input: { name: string; projectId?: string | null; by: Writer }): DrawingRow {
-    const id = randomUUID();
+    const id = newId("drw");
     const at = this.now();
     this.db
       .prepare(

@@ -7,7 +7,7 @@ export * from "./constants";
 // RPC surface for the Pages app. Document content does not go through RPC:
 // editors sync over the `/sync` WebSocket (src/hub.ts).
 
-const pageId = z.string().regex(/^pg_[a-f0-9]{12}$/);
+const pageId = z.string().regex(/^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$/);
 const projectId = z.string().min(1).max(200).nullable();
 
 export const studioItemSchema = z.object({

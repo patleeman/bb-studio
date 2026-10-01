@@ -2,8 +2,7 @@
 // manage tasks in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioBadge, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { snippets } from "@bb-studio/kit/format";
-import { registerStudioProvider } from "@bb-studio/kit/server";
+import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import {
   HANDOFF_SHORT,
   HANDOFF_TONES,
@@ -97,50 +96,19 @@ export function registerStudio(
   },
 ): void {
   const { store } = deps;
-  const mustGet = (id: string) => {
-    const task = store.get(id);
-    if (!task) throw new Error("Task not found.");
-    return task;
-  };
+  const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Task not found.");
 
-  registerStudioProvider(bb, schemas, {
+  createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "tasks", kinds: [TASK_KIND] }),
     studio_list: () => ({
       items: store.list({ includeArchived: true }).map((task) => toStudioItem(task, store.latestHandoff(task.id))),
     }),
-    // Studio matches titles itself; this finds descriptions and handoff notes.
-    studio_search: ({ query }) => {
-      const needle = query.toLowerCase();
-      const found = store
-        .list()
-        .map((task) => ({ id: task.id, text: [task.description, ...store.handoffs(task.id).map((handoff) => handoff.note)].filter(Boolean).join("\n") }))
-        .filter((task) => task.text.toLowerCase().includes(needle))
-        .slice(0, 200);
-      return { ids: found.map((task) => task.id), snippets: snippets(found, query, (task) => task.text) };
-    },
     studio_create: ({ kind, projectId }) => {
       if (kind !== TASK_KIND.id) throw new Error(`Tasks can't make a "${kind}".`);
       const task = store.create({ title: "", projectId, by: "user" });
       deps.changed(task.id);
       return { item: toStudioItem(task, null) };
     },
-    studio_move: ({ ids, projectId }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.update(id, { projectId }, "user");
-        deps.changed(id);
-      }),
-    studio_archive: ({ ids, archived }) =>
-      eachId(ids, (id) => {
-        store.setArchived(id, archived);
-        deps.changed(id);
-      }),
-    studio_delete: ({ ids }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.delete(id);
-        deps.changed(id);
-      }),
     studio_action: async ({ action, ids }) => {
       if (action !== "mark-done" && action !== "reopen") throw new Error(`Unknown action "${action}".`);
       const status: TaskStatus = action === "mark-done" ? "done" : "todo";
@@ -151,5 +119,26 @@ export function registerStudio(
       const count = done.length === 1 ? "1 task" : `${done.length} tasks`;
       return { message: action === "mark-done" ? `Marked ${count} done` : `Moved ${count} to To do`, text: null };
     },
+  }, {
+    move: (id: string, projectId: string | null) => {
+      mustGet(id);
+      store.update(id, { projectId }, "user");
+      deps.changed(id);
+    },
+    archive: (id: string, archived: boolean) => {
+      store.setArchived(id, archived);
+      deps.changed(id);
+    },
+    delete: (id: string) => {
+      mustGet(id);
+      store.delete(id);
+      deps.changed(id);
+    },
+  }, {
+    find: (query) => store.list()
+      .map((task) => ({ id: task.id, text: [task.description, ...store.handoffs(task.id).map((handoff) => handoff.note)].filter(Boolean).join("\n") }))
+      .filter((task) => task.text.toLowerCase().includes(query.toLowerCase()))
+      .slice(0, 200),
+    text: (task) => task.text,
   });
 }

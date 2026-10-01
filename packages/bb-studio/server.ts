@@ -1,3 +1,4 @@
+import { subcommand, takeFlag, takeOption } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
 // - Studio finds add-ons through RPC discovery (src/hub.ts) and fans the
@@ -277,19 +278,9 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
     ],
     async run(argv, ctx) {
-      const [command, ...rest] = argv;
-      const flag = (name: string) => {
-        const index = rest.indexOf(name);
-        if (index < 0) return false;
-        rest.splice(index, 1);
-        return true;
-      };
-      const option = (name: string) => {
-        const index = rest.indexOf(name);
-        if (index < 0) return undefined;
-        const [, value] = rest.splice(index, 2);
-        return value;
-      };
+      const { command, rest } = subcommand(argv);
+      const flag = (name: string) => takeFlag(rest, name);
+      const option = (name: string) => takeOption(rest, name);
       try {
         switch (command) {
           case "list": {

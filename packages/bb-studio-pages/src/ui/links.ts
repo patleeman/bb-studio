@@ -3,7 +3,7 @@
 // for anything else on the web.
 import { STUDIO_EMBEDS, type EmbedKind, type StudioEmbedKind } from "../schema-config";
 
-const PAGE_PATH = /^\/plugins\/pages\/pages\/(pg_[a-f0-9]{12})(?:\/|$)/;
+const PAGE_PATH = /^\/plugins\/pages\/pages\/(pg_[a-f0-9]{12}(?:[a-f0-9]{4})?)(?:\/|$)/;
 const THREAD_PATH = /(?:^|\/)threads\/(thr_[a-z0-9]+)(?:\/|$)/;
 const ITEM_PATH = /^\/plugins\/([a-z0-9-]+)\/([a-z0-9-]+)\/([A-Za-z0-9_-]+)\/?$/;
 

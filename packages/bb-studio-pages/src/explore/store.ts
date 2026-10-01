@@ -1,6 +1,7 @@
 // Explore's explainers, their jobs, and each project's "Explore" parent page,
 // in Pages' database. The tables are created by Pages' MIGRATIONS (../store.ts).
-import { createHash, randomBytes } from "node:crypto";
+import { createHash } from "node:crypto";
+import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import { ACTIVE_JOB_STATUSES, STAGES, labelKey, type ExploreItem, type JobStatus } from "./shared";
 
@@ -51,7 +52,7 @@ export function explainerKey(input: { threadId: string; messageId: string; label
     .digest("hex");
 }
 
-const newId = (prefix: string) => `${prefix}_${randomBytes(8).toString("hex")}`;
+
 
 const ACTIVE_SQL = ACTIVE_JOB_STATUSES.map((status) => `'${status}'`).join(", ");
 

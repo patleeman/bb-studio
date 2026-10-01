@@ -2,6 +2,7 @@
 // each add-on through its Studio contract, so a new add-on shows up without
 // changes here.
 import type { StudioSchemas } from "@bb-studio/kit/contract";
+import { discoverProviders, fanOutProviders } from "@bb-studio/kit/server";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { PLUGIN_ID, type StudioEmbedItem } from "./contract";
@@ -30,21 +31,14 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
   let cached: { at: number; items: Promise<StudioEmbedItem[]> } | null = null;
 
   async function providers(): Promise<string[]> {
-    const [{ plugins }, discovered] = await Promise.all([
-      sdk.plugins.list(),
-      sdk.plugins.experimental_discoverRpc({ method: "studio_list" }).then(
-        (methods) => methods.map((method) => method.pluginId),
-        () => [] as string[],
-      ),
-    ]);
-    const ids = [...new Set([...SUITE, ...discovered])].filter((id) => id !== PLUGIN_ID && id !== "studio");
-    return ids.filter((id) => plugins.some((plugin) => plugin.id === id && plugin.enabled));
+    const found = await discoverProviders(sdk, { method: "studio_list", known: SUITE, exclude: [PLUGIN_ID, "studio"] });
+    return found.map((plugin) => plugin.id);
   }
 
   async function load(): Promise<StudioEmbedItem[]> {
-    const lists = await Promise.all(
-      (await providers()).map(async (pluginId) => {
-        try {
+    const lists = await fanOutProviders(
+      await providers(),
+      async (pluginId) => {
           const [{ items }, info] = await Promise.all([
             sdk.plugins.callRpc({ pluginId, method: "studio_list", input: null as never, outputSchema: studio.provider.studio_list.output }),
             sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null as never, outputSchema: studio.info }),
@@ -69,11 +63,8 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
                 updatedAt: item.updatedAt,
               };
             });
-        } catch {
-          // Not installed, disabled, or not a Studio add-on yet.
-          return [];
-        }
-      }),
+      },
+      () => [],
     );
     return lists
       .flat()

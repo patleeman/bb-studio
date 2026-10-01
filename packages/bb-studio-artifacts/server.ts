@@ -1,3 +1,6 @@
+import { parseFlags, subcommand } from "@bb-studio/kit/cli";
+export { parseFlags } from "@bb-studio/kit/cli";
+import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 // Studio Artifacts (plugin id `artifacts`): keep the files agents make.
 //
 // Backend entry. Saving is explicit: an agent calls `artifacts_save` (or
@@ -8,7 +11,7 @@
 // Studio's collection (src/server/studio.ts).
 import { basename } from "node:path";
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createStudioNotifier } from "@bb-studio/kit/server";
+import { createChangeBus } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
@@ -176,16 +179,11 @@ export default async function plugin(bb: BbPluginApi) {
   const store = new ArtifactStore(db);
 
   const studio = studioSchemas(z);
-  const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: PLUGIN_ID, schemas: studio });
+  const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
 
   /** Tells open viewers, collections and Studio that an artifact changed. */
   function changed(id: string) {
-    try {
-      bb.realtime.publish(REALTIME_CHANNEL, { type: ARTIFACT_UPDATE_TYPE, artifactId: id });
-    } catch {
-      // publishing is best-effort
-    }
-    studioNotifier.changed();
+    changeBus.changed(id);
   }
 
   function mustGet(id: string): ArtifactWithVersion {
@@ -422,7 +420,7 @@ export default async function plugin(bb: BbPluginApi) {
     const bytes = version ? store.bytes(version.sha256) : null;
     if (!version || !bytes) return context.text("Not found", 404);
     const body = new Uint8Array(bytes);
-    return new Response(body, { headers: contentHeaders(version, body, { download: context.req.query("download") === "1" }) });
+    return serveBytes(body, contentHeaders(version, body, { download: context.req.query("download") === "1" }));
   });
 
   // ---------------------------------------------------------------------
@@ -501,7 +499,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.configure(() => ({ tools: ["artifacts_save", "artifacts_list", "artifacts_read"], skills: [] }));
 
   // `@artifact` in any composer.
-  bb.ui.registerMentionProvider({
+  bb.ui.registerMentionProvider(defineItemMention({
     id: "artifact",
     label: "Artifacts",
     search({ query }) {
@@ -532,7 +530,7 @@ export default async function plugin(bb: BbPluginApi) {
         }),
       };
     },
-  });
+  }));
 
   // CLI: `bb artifacts …`
   bb.cli.register({
@@ -624,34 +622,11 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   bb.onDispose(() => {
-    studioNotifier.dispose();
+    changeBus.dispose();
     bb.log.info("disposed");
   });
 }
 
-/** `--name value` flags and positional arguments. A flag with no value is "". */
-/** `booleans` name the flags that take no value, so the word after them stays positional. */
-export function parseFlags(
-  argv: readonly string[],
-  booleans: readonly string[] = [],
-): { positional: string[]; values: Record<string, string | undefined> } {
-  const positional: string[] = [];
-  const values: Record<string, string | undefined> = {};
-  for (let index = 0; index < argv.length; index += 1) {
-    const arg = argv[index]!;
-    if (arg.startsWith("--")) {
-      const next = argv[index + 1];
-      if (next !== undefined && !next.startsWith("--") && !booleans.includes(arg.slice(2))) {
-        values[arg.slice(2)] = next;
-        index += 1;
-      } else {
-        values[arg.slice(2)] = "";
-      }
-    } else {
-      positional.push(arg);
-    }
-  }
-  return { positional, values };
-}
+
 
 export { MAX_ARTIFACT_BYTES };

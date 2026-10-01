@@ -1,3 +1,4 @@
+import { defineItemMention } from "@bb-studio/kit/server";
 // bb-studio-chat server.
 //
 // - `viewing` asks Studio which item a path opens, so the chat knows what's
@@ -61,7 +62,7 @@ export default async function plugin(bb: BbPluginApi) {
     }
   };
 
-  bb.ui.registerMentionProvider({
+  bb.ui.registerMentionProvider(defineItemMention({
     id: MENTION_PROVIDER_ID,
     label: "On screen",
     // Pills come from the chat itself; each add-on's own provider finds items by name.
@@ -72,7 +73,7 @@ export default async function plugin(bb: BbPluginApi) {
       const { item, kind } = await itemAt(ref).catch(() => ({ item: null, kind: null }));
       return { context: item ? pointerNote(item, kind) : missingNote(key) };
     },
-  });
+  }));
 
   bb.rpc.register(rpcContract, {
     viewing: async ({ path }) => {

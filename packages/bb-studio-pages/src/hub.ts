@@ -23,7 +23,7 @@ export interface Socket {
 /** Who made a change. Sockets are humans; strings are server-side actors. */
 export type Origin = Socket | string;
 
-export interface Actor {
+export interface Actor extends Pick<import("@bb-studio/kit/server").Actor, "name"> {
   /** Stable key, e.g. `bot:bot_…` or `agent:thr_…`. */
   key: string;
   name: string;

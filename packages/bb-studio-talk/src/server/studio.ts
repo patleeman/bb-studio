@@ -1,9 +1,8 @@
 // Talk as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage recordings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { snippets } from "@bb-studio/kit/format";
-import { registerStudioProvider } from "@bb-studio/kit/server";
+import { type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import type { Recording } from "../shared/contract";
 import { NEW_RECORDING_EVENT, TALK_ICON, formatLength, recordingBadge, recordingHref } from "../shared/format";
 import type { TalkStore } from "./store";
@@ -79,13 +78,9 @@ export function registerStudio(
   deps: { store: TalkStore; removeAudio(id: string): Promise<void>; changed(id: string): void },
 ): void {
   const { store } = deps;
-  const mustGet = (id: string) => {
-    const recording = store.recording(id);
-    if (!recording) throw new Error("Recording not found.");
-    return recording;
-  };
+  const mustGet = (id: string) => requireItem((key) => store.recording(key), id, "Recording not found.");
 
-  registerStudioProvider(bb, schemas, {
+  createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: "talk", version: 1, panel: "recordings", kinds: RECORDING_KINDS }),
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
@@ -94,35 +89,9 @@ export function registerStudio(
         truncated: rows.length === LIST_LIMIT,
       };
     },
-    studio_search: ({ query }) => {
-      const found = store.list({ query, limit: 200 });
-      return {
-        ids: found.map((recording) => recording.id),
-        snippets: snippets(found, query, (recording) => store.transcript(recording.id)),
-      };
-    },
     studio_create: () => {
       throw new Error("Start a recording from Talk's microphone.");
     },
-    studio_move: ({ ids, projectId }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.setProject(id, projectId);
-        deps.changed(id);
-      }),
-    studio_archive: ({ ids, archived }) =>
-      eachId(ids, (id) => {
-        mustGet(id);
-        store.setArchived(id, archived);
-        deps.changed(id);
-      }),
-    studio_delete: ({ ids }) =>
-      eachId(ids, async (id) => {
-        if (LIVE.has(mustGet(id).status)) throw new Error("Stop the recording before deleting it.");
-        store.delete(id);
-        await deps.removeAudio(id);
-        deps.changed(id);
-      }),
     studio_action: ({ action, ids }) => {
       if (action !== COPY_TRANSCRIPT.id) throw new Error(`Unknown action "${action}".`);
       const parts = ids.map((id) => {
@@ -135,5 +104,25 @@ export function registerStudio(
         text: parts.join("\n\n"),
       };
     },
+  }, {
+    move: (id: string, projectId: string | null) => {
+      mustGet(id);
+      store.setProject(id, projectId);
+      deps.changed(id);
+    },
+    archive: (id: string, archived: boolean) => {
+      mustGet(id);
+      store.setArchived(id, archived);
+      deps.changed(id);
+    },
+    delete: async (id: string) => {
+      if (LIVE.has(mustGet(id).status)) throw new Error("Stop the recording before deleting it.");
+      store.delete(id);
+      await deps.removeAudio(id);
+      deps.changed(id);
+    },
+  }, {
+    find: (query) => store.list({ query, limit: 200 }),
+    text: (recording) => store.transcript(recording.id),
   });
 }

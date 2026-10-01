@@ -2,6 +2,7 @@
 // replace with a version), and tagged Explore in Studio over cross-plugin
 // RPC. Studio is optional, so tagging is best effort.
 import type { JsonValue } from "@get-bb/plugin-sdk";
+import { STUDIO_PLUGIN_ID, studioTagSchemas } from "@bb-studio/kit/contract";
 import { z } from "zod";
 import { actorColor } from "../bots";
 import { PLUGIN_ID } from "../constants";
@@ -10,7 +11,6 @@ import type { Actor } from "../hub";
 import type { PagesService } from "../service";
 import { EXPLORE_ACTOR, EXPLORE_TAG } from "./shared";
 
-const STUDIO_PLUGIN_ID = "studio";
 const MAX_TITLE = 200;
 const MAX_SNAPSHOT_NAME = 120;
 
@@ -28,8 +28,7 @@ export interface CallRpc {
   callRpc<T>(args: { pluginId: string; method: string; input?: JsonValue; outputSchema: z.ZodType<T>; signal?: AbortSignal }): Promise<T>;
 }
 
-const tagOutput = z.looseObject({ tag: z.looseObject({ id: z.string() }) });
-const okOutput = z.looseObject({ ok: z.boolean() });
+const tagSchemas = studioTagSchemas(z);
 
 /** Explore writes pages like an agent does, so Pages shows its edits as "an agent". */
 export const EXPLORE_AUTHOR: Actor = { key: EXPLORE_ACTOR, name: "Explore", color: actorColor(EXPLORE_ACTOR) };
@@ -54,12 +53,12 @@ export function explorePages(pages: PagesService, plugins: CallRpc): ExplorePage
     },
     async tag(pageId) {
       try {
-        const { tag } = await plugins.callRpc({ pluginId: STUDIO_PLUGIN_ID, method: "createTag", input: { name: EXPLORE_TAG }, outputSchema: tagOutput });
+        const { tag } = await plugins.callRpc({ pluginId: STUDIO_PLUGIN_ID, method: "createTag", input: { name: EXPLORE_TAG }, outputSchema: tagSchemas.createTag.output });
         await plugins.callRpc({
           pluginId: STUDIO_PLUGIN_ID,
           method: "tagItems",
           input: { items: [{ pluginId: PLUGIN_ID, id: pageId }], add: [tag.id], remove: [] },
-          outputSchema: okOutput,
+          outputSchema: tagSchemas.tagItems.output,
         });
         return true;
       } catch {

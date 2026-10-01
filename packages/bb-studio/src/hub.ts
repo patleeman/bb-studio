@@ -2,7 +2,7 @@
 // publish `studio_describe` for discovery; the suite's own plugins are also
 // looked up by id, so an older version that predates Studio can be named.
 import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "@bb-studio/kit/contract";
-import { rpcErrorStatus } from "@bb-studio/kit/server";
+import { discoverProviders, fanOutProviders, rpcErrorStatus } from "@bb-studio/kit/server";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
 import { schemas } from "./contract";
@@ -58,17 +58,10 @@ export class StudioHub {
 
   /** Every installed, enabled provider, ready or not. */
   async providers(): Promise<ProviderView[]> {
-    const [{ plugins }, discovered] = await Promise.all([
-      this.sdk.plugins.list(),
-      this.sdk.plugins.experimental_discoverRpc({ method: "studio_describe" }).then(
-        (methods) => methods.map((method) => method.pluginId),
-        () => [] as string[],
-      ),
-    ]);
-    const extra = [...new Set(discovered)].filter((id) => !SUITE.includes(id)).sort();
-    const candidates = [...SUITE, ...extra].flatMap((id) => {
-      const entry = plugins.find((plugin) => plugin.id === id);
-      return entry && entry.enabled && id !== STUDIO_PLUGIN_ID ? [entry] : [];
+    const candidates = await discoverProviders(this.sdk, {
+      method: "studio_describe",
+      known: SUITE,
+      exclude: [STUDIO_PLUGIN_ID],
     });
     return Promise.all(candidates.map((entry) => this.describe(entry)));
   }
@@ -98,16 +91,14 @@ export class StudioHub {
    */
   async overview(): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string> }> {
     const providers = await this.providers();
-    const lists = await Promise.all(
-      providers.map(async (provider) => {
+    const lists = await fanOutProviders(
+      providers,
+      async (provider) => {
         if (provider.state !== "ready") return { provider, items: [] as HubItem[], truncated: false };
-        try {
-          const { items, truncated = false } = await this.call(provider.pluginId, "studio_list", null);
-          return { provider, items: items.map((item) => ({ ...item, pluginId: provider.pluginId })), truncated };
-        } catch (error) {
-          return { provider: { ...provider, state: "offline" as const, detail: errorText(error) }, items: [] as HubItem[], truncated: false };
-        }
-      }),
+        const { items, truncated = false } = await this.call(provider.pluginId, "studio_list", null);
+        return { provider, items: items.map((item) => ({ ...item, pluginId: provider.pluginId })), truncated };
+      },
+      (provider, error) => ({ provider: { ...provider, state: "offline" as const, detail: errorText(error) }, items: [] as HubItem[], truncated: false }),
     );
     return {
       providers: lists.map((list) => list.provider),

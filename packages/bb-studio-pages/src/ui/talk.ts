@@ -22,7 +22,7 @@ export function pageFieldKey(pageId: string): string {
 export function pageIdFromField(key: unknown): string | null {
   if (typeof key !== "string" || !key.startsWith(FIELD_PREFIX)) return null;
   const id = key.slice(FIELD_PREFIX.length);
-  return /^pg_[a-f0-9]{12}$/.test(id) ? id : null;
+  return /^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$/.test(id) ? id : null;
 }
 
 export function pageFieldLabel(title: string): string {

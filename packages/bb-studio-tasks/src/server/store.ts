@@ -1,6 +1,7 @@
+import type { Actor } from "@bb-studio/kit/server";
 // Tasks in the plugin's SQLite database: the tasks, what they link to, and
 // the threads they were handed to.
-import { randomBytes } from "node:crypto";
+import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 import type { Assignee, HandoffState, TaskStatus } from "../shared";
 
@@ -91,7 +92,7 @@ export type HandoffRow = {
 };
 
 /** The CLI counts as an agent: agents are its main users. */
-export type Writer = "user" | "agent";
+export type Writer = Extract<Actor["kind"], "user" | "agent">;
 
 export interface NewTask {
   title: string;
@@ -115,8 +116,7 @@ export interface TaskPatch {
 const MIN_GAP = 1e-6;
 
 export function newTaskId(): string {
-  const alphabet = "0123456789abcdefghijklmnopqrstuvwxyz";
-  return `tsk_${[...randomBytes(16)].map((byte) => alphabet[byte % 36]).join("")}`;
+  return newId("tsk");
 }
 
 export class TaskStore {

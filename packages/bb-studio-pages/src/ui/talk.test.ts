@@ -4,6 +4,7 @@ import { dictationParagraphs, pageFieldKey, pageFieldLabel, pageIdFromField, spa
 describe("Talk dictation bridge", () => {
   it("round-trips page ids through field keys and ignores other fields", () => {
     expect(pageIdFromField(pageFieldKey("pg_0123456789ab"))).toBe("pg_0123456789ab");
+    expect(pageIdFromField(pageFieldKey("pg_0123456789abcdef"))).toBe("pg_0123456789abcdef");
     expect(pageIdFromField("notes:pg_0123456789ab")).toBeNull();
     expect(pageIdFromField("pages:../settings")).toBeNull();
     expect(pageIdFromField(42)).toBeNull();

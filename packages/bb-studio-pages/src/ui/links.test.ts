@@ -10,6 +10,7 @@ describe("linkEmbed", () => {
 
   it("makes page and thread cards of BB links", () => {
     expect(linkEmbed(`${ORIGIN}/plugins/pages/pages/pg_0123456789ab`, ORIGIN)).toEqual({ kind: "page", target: "pg_0123456789ab" });
+    expect(linkEmbed(`${ORIGIN}/plugins/pages/pages/pg_0123456789abcdef`, ORIGIN)).toEqual({ kind: "page", target: "pg_0123456789abcdef" });
     expect(linkEmbed(`${ORIGIN}/projects/proj_a/threads/thr_abc123`, ORIGIN)).toEqual({ kind: "thread", target: "thr_abc123" });
   });
 

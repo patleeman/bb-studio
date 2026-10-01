@@ -1,5 +1,5 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
-import { studioSchemas } from "@bb-studio/kit/contract";
+import { studioSchemas, studioTagSchemas } from "@bb-studio/kit/contract";
 import { z } from "zod";
 
 export const schemas = studioSchemas(z);
@@ -25,11 +25,9 @@ const sidebar = z.object({
 });
 export type SidebarView = z.infer<typeof sidebar>;
 
-const tag = z.object({ id: z.string(), name: z.string(), color: z.string() });
+const tagSchemas = studioTagSchemas(z);
+const { tag, tagId, tagName, itemRef } = tagSchemas;
 export type TagView = z.infer<typeof tag>;
-const tagId = z.string().min(1).max(100);
-const tagName = z.string().min(1).max(100);
-const itemRef = z.object({ pluginId, id: z.string().min(1).max(200) });
 
 export { TABS_CHANNEL } from "./ids";
 
@@ -72,14 +70,11 @@ export const rpcContract = defineRpcContract({
     output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),
   },
   /** Makes a tag, or returns the one with this name. */
-  createTag: { input: z.object({ name: tagName }), output: z.object({ tag }) },
+  createTag: tagSchemas.createTag,
   renameTag: { input: z.object({ id: tagId, name: tagName }), output: z.object({ tag }) },
   deleteTag: { input: z.object({ id: tagId }), output: z.object({ ok: z.boolean() }) },
   /** Adds and removes tags on items from any add-on. */
-  tagItems: {
-    input: z.object({ items: z.array(itemRef).min(1).max(500), add: z.array(tagId).max(50), remove: z.array(tagId).max(50) }),
-    output: z.object({ ok: z.boolean() }),
-  },
+  tagItems: tagSchemas.tagItems,
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
