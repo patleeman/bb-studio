@@ -244,7 +244,7 @@ export function QueryBar({
 
 function RailHeading({ children, action }: { children: ReactNode; action?: ReactNode }) {
   return (
-    <div className="mt-5 mb-1 flex h-6 items-center justify-between px-2 text-xs font-medium text-muted-foreground first:mt-0">
+    <div className="mt-5 mb-1 flex h-6 items-center justify-between px-2 text-xs font-medium text-muted-foreground">
       {children}
       {action}
     </div>
@@ -398,7 +398,7 @@ export function FacetRail({
   const idOf = (value: FieldValue) => resolveValue(value, vocabulary);
   const archived = query.filters.find((filter) => filter.field === "is" && filter.value.toLowerCase() === "archived");
   return (
-    <nav aria-label="Filters" className="max-h-[calc(100vh-2rem)] overflow-auto pb-6">
+    <nav aria-label="Filters" className="max-h-[calc(100vh-2rem)] overflow-auto pb-6 [&>:first-child]:mt-0">
       <RailHeading
         action={
           current ? (
