@@ -37,6 +37,8 @@ describe("the Tasks Studio provider", () => {
     const info = await call("studio_describe", null);
     expect(studioSchemas(z).info.parse(info)).toBeTruthy();
     expect(info).toMatchObject({ pluginId: "studio-tasks", panel: "tasks", kinds: [{ id: "board", create: { mode: "rpc" } }, { id: "task", create: { mode: "rpc" }, canArchive: true }] });
+    // Studio takes a v2 provider offline when a kind leaves either out.
+    for (const kind of info.kinds) expect(kind).toMatchObject({ capabilities: expect.any(Object), mentionProviderId: expect.toBeOneOf([null, expect.any(String)]) });
     const { item } = await call("studio_create", { kind: "task", projectId: "proj_a" });
     expect(item).toMatchObject({ kind: "task", title: "", projectId: "proj_a", href: `/plugins/studio-tasks/tasks/${item.id}` });
     await expect(call("studio_create", { kind: "page", projectId: null })).rejects.toThrow(/can't make/);

@@ -34,6 +34,8 @@ export const BOARD_KIND: StudioKind = {
   create: { mode: "rpc" },
   canArchive: true,
   capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: false, versions: false, links: true, templates: true },
+  // Studio's v2 contract needs the field on every kind; boards have no @ mention.
+  mentionProviderId: null,
   blurb: "Columns of tasks, for you or an agent.",
   agentHint: "List its tasks with tasks_list and its boardId, and add one with tasks_create.",
 };
