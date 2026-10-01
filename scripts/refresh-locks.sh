@@ -17,6 +17,8 @@ for package_name in "$@"; do
   target_dir="$scratch_dir/repo/packages/$package_name"
   test -f "$source_dir/package.json" || { echo "Unknown package: $package_name" >&2; exit 2; }
   cp "$source_dir/package.json" "$target_dir/package.json"
+  # The plugin's .npmrc (install-links, legacy-peer-deps) shapes its lock.
+  cp "$source_dir/.npmrc" "$target_dir/.npmrc" 2>/dev/null || rm -f "$target_dir/.npmrc"
   cp "$source_dir/package-lock.json" "$target_dir/package-lock.json" 2>/dev/null || rm -f "$target_dir/package-lock.json"
   (cd "$target_dir" && npm install --package-lock-only --ignore-scripts --no-audit --no-fund)
   cp "$target_dir/package-lock.json" "$source_dir/package-lock.json"
