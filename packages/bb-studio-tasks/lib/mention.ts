@@ -8,6 +8,8 @@ export interface MentionTask {
   title: string;
   description: string;
   status: TaskStatus;
+  /** The status's column name, when the board renamed it. */
+  statusLabel?: string;
   due: string | null;
   assignee: Assignee;
   priority?: string;
@@ -23,7 +25,7 @@ export interface MentionTask {
 
 export function mentionContext(task: MentionTask, now = new Date()): string {
   const title = untitled(task.title);
-  const facts = [STATUS_LABELS[task.status]];
+  const facts = [task.statusLabel ?? STATUS_LABELS[task.status] ?? task.status];
   if (task.assignee) facts.push(task.assignee === "me" ? "assigned to the user" : "assigned to an agent");
   if (task.due) facts.push(`due ${formatDue(task.due, now)} (${task.due})`);
   if (task.priority && task.priority !== "none") facts.push(`${task.priority} priority`);

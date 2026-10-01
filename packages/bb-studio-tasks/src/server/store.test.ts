@@ -167,4 +167,12 @@ describe("the task store", () => {
     expect(store.statuses("project-2").map((column) => column.id)).toEqual(["todo", "doing", "done"]);
     expect(store.get(own.id)?.status).toBe("todo");
   });
+
+  it("names a task's status after its board's column", () => {
+    const { store } = memoryStore(clock());
+    const task = store.create({ title: "Spec", projectId: "project-1", status: "in_progress", by: "user" });
+    expect(store.statusLabel(task)).toBe("In progress");
+    store.setStatuses("project-1", [{ id: "todo", label: "Ideas" }, { id: "in_progress", label: "Drafting" }, { id: "done", label: "Shipped" }]);
+    expect(store.statusLabel(task)).toBe("Drafting");
+  });
 });

@@ -28,8 +28,6 @@ import {
   REALTIME_CHANNEL,
   PRIORITIES,
   RECURRENCES,
-  STATUSES,
-  STATUS_LABELS,
   TASK_UPDATE_TYPE,
   formatDue,
   isDay,
@@ -74,6 +72,8 @@ const taskSchema = z.object({
   title: z.string(),
   description: z.string(),
   status: statusSchema,
+  /** The status's column name on the task's board. */
+  statusLabel: z.string(),
   projectId: z.string().nullable(),
   due: z.string().nullable(),
   assignee: assigneeSchema,
@@ -297,6 +297,7 @@ export default async function plugin(bb: BbPluginApi) {
       title: task.title,
       description: task.description,
       status: task.status,
+      statusLabel: store.statusLabel(task),
       projectId: task.project_id,
       due: task.due,
       assignee: task.assignee,
@@ -511,9 +512,15 @@ export default async function plugin(bb: BbPluginApi) {
     return handoff ? store.get(handoff.task_id) : null;
   }
 
+  /** Board order: by the task's column on its board, then its place in the column. */
+  function byColumn(a: TaskRow, b: TaskRow): number {
+    const at = (task: TaskRow) => store.statuses(task.project_id).findIndex((column) => column.id === task.status);
+    return at(a) - at(b) || a.rank - b.rank;
+  }
+
   function taskLine(task: TaskRow): string {
     const handoff = store.latestHandoff(task.id);
-    const parts = [STATUS_LABELS[task.status] ?? task.status, assigneeLabel(task), `priority ${task.priority}`];
+    const parts = [store.statusLabel(task), assigneeLabel(task), `priority ${task.priority}`];
     if (task.due) parts.push(`due ${formatDue(task.due)} (${task.due})`);
     if (task.recurrence) parts.push(`repeats ${task.recurrence}`);
     if (JSON.parse(task.labels).length) parts.push(`labels ${(JSON.parse(task.labels) as string[]).join(", ")}`);
@@ -722,7 +729,7 @@ export default async function plugin(bb: BbPluginApi) {
         .list()
         .filter((task) => !status || task.status === status)
         .filter((task) => !needle || `${task.title} ${task.description}`.toLowerCase().includes(needle))
-        .sort((a, b) => (STATUSES as readonly string[]).indexOf(a.status) - (STATUSES as readonly string[]).indexOf(b.status) || a.rank - b.rank)
+        .sort(byColumn)
         .slice(0, 100);
       return rows.length ? rows.map((task) => `- ${taskLine(task)}`).join("\n") : "No tasks match.";
     },
@@ -815,7 +822,7 @@ export default async function plugin(bb: BbPluginApi) {
         .filter((task) => task.status !== "done")
         .filter((task) => !needle || task.title.toLowerCase().includes(needle))
         .slice(0, 50)
-        .map((task) => ({ id: task.id, title: untitled(task.title), subtitle: `${STATUS_LABELS[task.status]} · ${assigneeLabel(task)}` }));
+        .map((task) => ({ id: task.id, title: untitled(task.title), subtitle: `${store.statusLabel(task)} · ${assigneeLabel(task)}` }));
     },
     resolve(itemId) {
       const task = mustGet(itemId);
@@ -826,6 +833,7 @@ export default async function plugin(bb: BbPluginApi) {
           title: task.title,
           description: task.description,
           status: task.status,
+          statusLabel: store.statusLabel(task),
           due: task.due,
           assignee: task.assignee,
           priority: task.priority,
@@ -873,10 +881,10 @@ export default async function plugin(bb: BbPluginApi) {
             const rows = store.list().filter((task) => !status || task.status === status);
             if (!rows.length) return { exitCode: 0, stdout: "No tasks.\n" };
             const lines = rows
-              .sort((a, b) => (STATUSES as readonly string[]).indexOf(a.status) - (STATUSES as readonly string[]).indexOf(b.status) || a.rank - b.rank)
+              .sort(byColumn)
               .map((task) => {
                 const handoff = store.latestHandoff(task.id);
-                return [task.id, STATUS_LABELS[task.status], untitled(task.title), task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
+                return [task.id, store.statusLabel(task), untitled(task.title), task.due ?? "", handoff ? HANDOFF_LABELS[handoff.state] : ""].join("\t");
               });
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
@@ -915,7 +923,7 @@ export default async function plugin(bb: BbPluginApi) {
             const status = cmd === "done" ? "done" : target;
             if (!id || !store.get(id) || !status || !store.statuses(store.get(id)!.project_id).some((column) => column.id === status)) return fail(`usage: ${usage[cmd]}`);
             const { archivedThreads } = await move(id, status, "agent");
-            return { exitCode: 0, stdout: `${id}\t${STATUS_LABELS[status]}${archivedThreads ? `\tarchived ${archivedThreads} thread(s)` : ""}\n` };
+            return { exitCode: 0, stdout: `${id}\t${store.statusLabel(store.get(id)!)}${archivedThreads ? `\tarchived ${archivedThreads} thread(s)` : ""}\n` };
           }
           case "hand": {
             const id = flags.positional[0];

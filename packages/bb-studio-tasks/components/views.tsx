@@ -1,7 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import { Icon } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { STATUS_LABELS } from "../src/shared";
 import { useTasksRpc, type Task } from "./types";
 
 type Sort = "due" | "title" | "priority" | "updated";
@@ -29,7 +28,7 @@ export function TaskViews({ mode, refreshKey, onOpen, headerActions }: { mode: "
   const groups = useMemo(() => {
     const result = new Map<string, Task[]>();
     for (const task of ordered) {
-      const key = group === "none" ? "Tasks" : group === "status" ? STATUS_LABELS[task.status] ?? task.status : group === "priority" ? task.priority : task.projectId ?? "Global";
+      const key = group === "none" ? "Tasks" : group === "status" ? task.statusLabel : group === "priority" ? task.priority : task.projectId ?? "Global";
       result.set(key, [...(result.get(key) ?? []), task]);
     }
     return result;

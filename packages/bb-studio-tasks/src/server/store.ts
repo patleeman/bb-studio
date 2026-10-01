@@ -181,6 +181,11 @@ export class TaskStore {
     return defaults.length ? defaults : STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! }));
   }
 
+  /** The name of the column a task is in, as its board shows it. */
+  statusLabel(task: Pick<TaskRow, "project_id" | "status">): string {
+    return this.statuses(task.project_id).find((column) => column.id === task.status)?.label ?? STATUS_LABELS[task.status] ?? task.status;
+  }
+
   hasOwnStatuses(projectId: string): boolean {
     return this.columnsFor(projectId).length > 0;
   }

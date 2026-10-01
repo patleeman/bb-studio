@@ -4,7 +4,7 @@ import { untitled } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useState } from "react";
 import { ItemDirectiveCard } from "@bb-studio/kit/app";
 import { useBbNavigate, useRealtime, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { PANEL_PATH, REALTIME_CHANNEL, STATUS_LABELS, TASK_UPDATE_TYPE, isTaskId } from "../src/shared";
+import { PANEL_PATH, REALTIME_CHANNEL, TASK_UPDATE_TYPE, isTaskId } from "../src/shared";
 import { AssigneeChip, DueChip, HandoffBadge, STATUS_ICONS } from "./pieces";
 import { useTasksRpc, type Task, type TaskEvent } from "./types";
 
@@ -38,7 +38,7 @@ export function TaskDirective({ attributes }: PluginMessageDirectiveProps) {
       title={untitled(task.title)}
       onOpen={() => navigate.toPluginPanel(PANEL_PATH, { subPath: task.id })}
       details={<span className="flex flex-wrap items-center gap-x-3 gap-y-1">
-        <span>{STATUS_LABELS[task.status]} · Studio Tasks</span>
+        <span>{task.statusLabel} · Studio Tasks</span>
         <HandoffBadge handoff={task.handoff} status={task.status} />
         <DueChip due={task.due} status={task.status} />
         <AssigneeChip assignee={task.assignee} />

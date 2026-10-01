@@ -7,7 +7,6 @@ import {
   HANDOFF_SHORT,
   HANDOFF_TONES,
   PLUGIN_ID,
-  STATUSES,
   STATUS_LABELS,
   TASK_ICON,
   formatDue,
@@ -56,15 +55,18 @@ export function assigneeLabel(task: Pick<TaskRow, "assignee">): string {
   return task.assignee === "me" ? "Me" : task.assignee === "agent" ? "Agent" : task.assignee?.startsWith("bot:") ? "Bot" : "Unassigned";
 }
 
-export function taskBadge(task: TaskRow, handoff: HandoffRow | null): StudioBadge {
+export function taskBadge(task: TaskRow, handoff: HandoffRow | null, statusLabel = STATUS_LABELS[task.status] ?? task.status): StudioBadge {
   if (handoff && task.status !== "done" && isOpenHandoff(handoff.state) && LOUD.has(handoff.state)) {
     return { label: HANDOFF_SHORT[handoff.state], tone: HANDOFF_TONES[handoff.state] };
   }
   if (task.due && isOverdue(task.due, task.status)) return { label: "Overdue", tone: "danger" };
-  return { label: STATUS_LABELS[task.status] ?? task.status, tone: STATUS_TONES[task.status] ?? "neutral" };
+  return { label: statusLabel, tone: STATUS_TONES[task.status] ?? "neutral" };
 }
 
-export function toStudioItem(task: TaskRow, handoff: HandoffRow | null): StudioItem {
+/** `columns` is the task's board, which names and orders its status. */
+export function toStudioItem(task: TaskRow, handoff: HandoffRow | null, columns: readonly { id: string; label: string }[]): StudioItem {
+  const column = columns.findIndex((each) => each.id === task.status);
+  const statusLabel = columns[column]?.label ?? STATUS_LABELS[task.status] ?? task.status;
   return {
     id: task.id,
     kind: TASK_KIND.id,
@@ -77,11 +79,11 @@ export function toStudioItem(task: TaskRow, handoff: HandoffRow | null): StudioI
     updatedBy: task.updated_by === "user" || task.updated_by === "agent" ? task.updated_by : null,
     preview: firstLine(task.description) ?? handoff?.note ?? null,
     facts: [
-      { id: "status", value: STATUS_LABELS[task.status] ?? task.status, sort: (STATUSES as readonly string[]).indexOf(task.status) },
+      { id: "status", value: statusLabel, sort: column },
       { id: "due", value: task.due ? formatDue(task.due) : "", sort: task.due ? Date.parse(`${task.due}T00:00:00Z`) : null },
       { id: "assignee", value: assigneeLabel(task), sort: task.assignee === "me" ? 0 : task.assignee === "agent" ? 1 : null },
     ],
-    badge: taskBadge(task, handoff),
+    badge: taskBadge(task, handoff, statusLabel),
     thumbnailUrl: null,
     href: taskHref(task.id),
     archived: task.archived_at !== null,
@@ -100,6 +102,7 @@ export function registerStudio(
   },
 ): void {
   const { store } = deps;
+  const item = (task: TaskRow, handoff: HandoffRow | null) => toStudioItem(task, handoff, store.statuses(task.project_id));
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Task not found.");
   const duplicate = (id: string, projectId: string | null, variables?: Record<string, string>) => {
     const source = mustGet(id);
@@ -108,24 +111,24 @@ export function registerStudio(
       projectId, due: source.due, assignee: source.assignee, priority: source.priority,
       labels: JSON.parse(source.labels) as string[], by: "user" });
     deps.changed(row.id);
-    return toStudioItem(row, null);
+    return item(row, null);
   };
 
   createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "tasks", kinds: [TASK_KIND] }),
-    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(row, store.latestHandoff(id))] : []; }) }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [item(row, store.latestHandoff(id))] : []; }) }),
     studio_read: ({ id, format }) => { const row = store.get(id); return { content: row ? [format === "markdown" ? `# ${row.title}` : row.title, row.description].filter(Boolean).join("\n\n") : null }; },
     studio_list: () => ({
-      items: store.list({ includeArchived: true }).map((task) => toStudioItem(task, store.latestHandoff(task.id))),
+      items: store.list({ includeArchived: true }).map((task) => item(task, store.latestHandoff(task.id))),
     }),
     studio_create: ({ kind, projectId }) => {
       if (kind !== TASK_KIND.id) throw new Error(`Tasks can't make a "${kind}".`);
       const task = store.create({ title: "", projectId, by: "user" });
       deps.changed(task.id);
-      return { item: toStudioItem(task, null) };
+      return { item: item(task, null) };
     },
     studio_duplicate: ({ id, projectId }) => ({ item: duplicate(id, projectId) }),
-    studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(mustGet(id), store.latestHandoff(id)) }; },
+    studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: item(mustGet(id), store.latestHandoff(id)) }; },
     studio_instantiate: ({ id, projectId, variables }) => { if (!mustGet(id).template) throw new Error("Task is not a template."); return { item: duplicate(id, projectId, variables) }; },
     studio_export: ({ id, format }) => {
       const row = mustGet(id);
