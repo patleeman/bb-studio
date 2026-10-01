@@ -135,23 +135,40 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
 }
 
 /**
- * A thread that reads a small retry helper in Orbit with Explore on, so its
- * reply ends with an ::explore line of things noticed along the way.
+ * A thread that asks a narrow question about Orbit's upload code with Explore
+ * on. The code has more wrong with it than the question covers, so the reply
+ * ends with an ::explore line of things noticed along the way. GPT-6.1-Sol
+ * leaves the line out, and Claude Sonnet 5 sometimes drops its closing quote,
+ * which BB then shows as text, so this keeps the first well-formed reply of
+ * three and deletes the others. Smart reactions are off meanwhile, so the
+ * reply ends with the rows alone.
  */
 async function seedExploreThread(project, machine, orbitDir) {
   await bb("plugin", "config", "explore", "set", "explore", "true");
-  const thread = await bb(
-    "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
-    "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
-    "--title", "How does Orbit retry uploads?",
-    "--prompt", "Read src/retry.ts and explain in two short sentences how Orbit retries a failed upload.",
-  );
-  await bb("thread", "wait", thread.id, "--timeout", "5m");
-  const events = await bb("thread", "messages", thread.id);
-  const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
-  if (!/::explore\{items="[^"]+"\}/.test(reply)) throw new Error(`The retry reply has no ::explore line: ${reply}`);
-  await bb("thread", "read", thread.id);
-  return thread;
+  await bb("plugin", "config", "emoji-react", "set", "smartReactions", "false");
+  const replies = [];
+  try {
+    for (let attempt = 1; attempt <= 3; attempt++) {
+      const thread = await bb(
+        "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
+        "--provider", "claude-code", "--model", "claude-sonnet-5", "--reasoning-level", "medium",
+        "--title", "How does Orbit retry uploads?",
+        "--prompt", "Read src/retry.ts and src/queue.ts. In one sentence: how many times does uploadWithRetry call upload before it gives up?",
+      );
+      await bb("thread", "wait", thread.id, "--timeout", "5m");
+      const events = await bb("thread", "messages", thread.id);
+      const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
+      if (/::explore\{items="[^"]+"\}\s*$/.test(reply)) {
+        await bb("thread", "read", thread.id);
+        return thread;
+      }
+      replies.push(reply);
+      await bb("thread", "delete", thread.id, "--yes");
+    }
+  } finally {
+    await bb("plugin", "config", "emoji-react", "set", "smartReactions", "true");
+  }
+  throw new Error(`No retry reply ended with a well-formed ::explore line:\n${replies.join("\n---\n")}`);
 }
 
 /**
@@ -229,9 +246,8 @@ async function start() {
   const orbitDir = join(stagedDir, "orbit");
   await mkdir(orbitDir);
   await writeFile(join(orbitDir, "README.md"), "# Orbit\n\nThe ORBIT-42 release.\n");
-  // Code for the Explore thread to read: its retry delay and cap disagree.
-  await mkdir(join(orbitDir, "src"));
-  await cp(join(fixturesDir, "orbit/retry.ts"), join(orbitDir, "src/retry.ts"));
+  // Code for the Explore thread to read, with more in it than the question asks about.
+  await cp(join(fixturesDir, "orbit"), join(orbitDir, "src"), { recursive: true });
   await run("git", ["init", "-q"], { cwd: orbitDir });
   await run("git", ["add", "README.md", "src"], { cwd: orbitDir });
   await run("git", ["-c", "user.name=Staged", "-c", "user.email=staged@example.com", "commit", "-qm", "Start Orbit"], { cwd: orbitDir });

@@ -1,4 +1,6 @@
 // Retries a failed upload with exponential backoff.
+import { markFailed, nextUpload } from "./queue";
+
 const BASE_DELAY_MS = 500;
 const MAX_DELAY_MS = 10_000;
 const MAX_ATTEMPTS = 6;
@@ -9,9 +11,14 @@ export async function uploadWithRetry(upload: () => Promise<void>): Promise<void
       return await upload();
     } catch (error) {
       if (attempt > MAX_ATTEMPTS) throw error;
-      // Doubles each time, but the cap is in seconds while the delay is in ms.
       const delay = Math.min(BASE_DELAY_MS * 2 ** attempt, MAX_DELAY_MS / 1000);
       await new Promise((resolve) => setTimeout(resolve, delay));
     }
+  }
+}
+
+export async function drainQueue(): Promise<void> {
+  for (let item = nextUpload(); item; item = nextUpload()) {
+    uploadWithRetry(item.send).catch(() => markFailed(item.id));
   }
 }
