@@ -39,6 +39,16 @@ afterwards.
   text. It types the text into the dictation's thread when you go back. BB
   keeps unsent composer text on the device, so Talk can't safely write into a
   thread that isn't open.
+- **Hold to talk.** Hold Right Option (or the key set in settings) by itself
+  to dictate into the focused composer or field, and let go to insert. A
+  quick tap does nothing, and Option+key shortcuts and AltGr characters still
+  type as usual.
+- **Clean-up before inserting.** Talk asks Studio Decisions to drop filler
+  words and false starts, and to fix punctuation, without rewording. The
+  dictation keeps the raw transcript. Turn it on or off with the ✦ button on
+  the dictation pill; the choice is kept per device. If Decisions is missing,
+  slow, or returns something that isn't a clean-up, Talk inserts the text as
+  spoken.
 - **Dictation in other plugins.** Plugins can mark a text surface as a
   dictation field, as [Pages](../bb-studio-pages) does for its editor. Talk
   dictates into it with the same pill, durability, and **Go back** handling
@@ -50,6 +60,14 @@ afterwards.
   something goes wrong, but Studio's All view and Home leave them out. Pick
   the **Dictations** filter, or search, to find one. Recordings you start
   from Studio show up as usual.
+- **Keep a long dictation as a recording.** After a dictation of five
+  minutes or 800 words, a toast offers **Keep**. **Keep as a recording** on
+  the dictation's page does the same. It moves the dictation out of the
+  background and gives it a title and meeting notes. The text is still
+  inserted.
+- **Dictation audio expires.** After 30 days, a dictation's audio is
+  deleted and its transcript is kept. Recordings keep their audio. A
+  dictation with a piece still waiting or failed keeps its audio.
 - **A table of recordings.** The Recordings page lists everything in a
   table you can search, filter to recordings or dictations, and sort by
   title, date, length, or word count. Tick rows, or shift-click for a range,
@@ -127,6 +145,8 @@ afterwards.
 | Auto-title recordings | on | Titles recordings from their transcripts. |
 | Title provider | automatic | Provider for titling, such as `codex` or `claude-code`. |
 | Title model | provider default | Model for titling. |
+| Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
+| Keep dictation audio (days) | 30 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
 
 ## Commands
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanTitle, formatClock, formatLength, joinTranscript, tail, titleExcerpt } from "./format";
+import { cleanTitle, formatClock, holdKeyCode, isLongDictation, formatLength, joinTranscript, tail, titleExcerpt } from "./format";
 
 describe("format", () => {
   it("formats clocks and lengths", () => {
@@ -32,5 +32,19 @@ describe("format", () => {
     const excerpt = titleExcerpt("a".repeat(5000) + "END", 100);
     expect(excerpt.length).toBeLessThan(110);
     expect(excerpt.endsWith("END")).toBe(true);
+  });
+
+  it("maps the hold-to-talk setting to a key code", () => {
+    expect(holdKeyCode(undefined)).toBe("AltRight");
+    expect(holdKeyCode("Right Command")).toBe("MetaRight");
+    expect(holdKeyCode("Off")).toBeNull();
+  });
+
+  it("calls a dictation long by length or words", () => {
+    const dictation = { kind: "dictation", durationMs: 60_000, wordCount: 100 };
+    expect(isLongDictation(dictation)).toBe(false);
+    expect(isLongDictation({ ...dictation, durationMs: 5 * 60_000 })).toBe(true);
+    expect(isLongDictation({ ...dictation, wordCount: 800 })).toBe(true);
+    expect(isLongDictation({ ...dictation, kind: "recording", wordCount: 800 })).toBe(false);
   });
 });

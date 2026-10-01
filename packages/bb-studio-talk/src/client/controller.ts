@@ -22,7 +22,7 @@ import type {
   PluginRpcClient,
 } from "@get-bb/plugin-sdk/app";
 import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contract";
-import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, joinTranscript } from "../shared/format";
+import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, isLongDictation, joinTranscript } from "../shared/format";
 import { findComposer, insertIntoComposer, type MicState } from "./composer-dom";
 import {
   Outbox,
@@ -96,6 +96,8 @@ export interface TalkState {
   setAside: SetAsideSegment[] | null;
   recording: Recording | null;
   transcript: string;
+  /** Dictation only: the transcript is being tidied before it goes in. */
+  cleaning: boolean;
 }
 
 interface Persisted {
@@ -138,6 +140,7 @@ interface Capture {
 }
 
 const STORAGE_KEY = "bb-plugin-talk:active";
+const CLEANUP_KEY = "bb-plugin-talk:cleanup";
 const LOCK_NAME = "bb-plugin-talk-capture";
 const CHUNK_MS = 4000;
 const HEARTBEAT_MS = 20_000;
@@ -156,6 +159,7 @@ const INITIAL: TalkState = {
   setAside: null,
   recording: null,
   transcript: "",
+  cleaning: false,
 };
 
 type SetThreadRowStatus = NonNullable<PluginContentScriptContext["experimental_setThreadRowStatus"]>;
@@ -166,6 +170,23 @@ const PENDING_POLL_MS = 700;
 function randomId(length = 12): string {
   const bytes = crypto.getRandomValues(new Uint8Array(length));
   return Array.from(bytes, (byte) => (byte % 36).toString(36)).join("");
+}
+
+function readFlag(key: string, fallback: boolean): boolean {
+  try {
+    const value = localStorage.getItem(key);
+    return value === null ? fallback : value === "1";
+  } catch {
+    return fallback;
+  }
+}
+
+function writeFlag(key: string, value: boolean): void {
+  try {
+    localStorage.setItem(key, value ? "1" : "0");
+  } catch {
+    // Storage can be unavailable; the choice then lasts for this window.
+  }
 }
 
 function keyString(key: OutboxKey): string {
@@ -216,6 +237,11 @@ export class TalkController {
   /** Bumped by every stop, so a start still in flight backs out. */
   private startEpoch = 0;
   replaceBuiltIn = true;
+  /** The KeyboardEvent.code held to dictate, or null when off. */
+  holdKey: string | null = "AltRight";
+  /** Tidy dictations before inserting them; the pill toggles it. */
+  cleanupEnabled = readFlag(CLEANUP_KEY, true);
+  private delivering = false;
 
   // ── Store plumbing for React ─────────────────────────────────────────────
   getState = (): TalkState => this.state;
@@ -253,12 +279,19 @@ export class TalkController {
     void this.init();
   }
 
-  configure(options: { segmentSeconds: number; replaceBuiltIn: boolean }): void {
+  configure(options: { segmentSeconds: number; replaceBuiltIn: boolean; holdKey: string | null }): void {
     this.policy = segmentPolicy(options.segmentSeconds);
+    this.holdKey = options.holdKey;
     if (this.replaceBuiltIn !== options.replaceBuiltIn) {
       this.replaceBuiltIn = options.replaceBuiltIn;
       this.set({});
     }
+  }
+
+  setCleanup(enabled: boolean): void {
+    this.cleanupEnabled = enabled;
+    writeFlag(CLEANUP_KEY, enabled);
+    this.set({});
   }
 
   setContext(context: { projectId: string | null; threadId: string | null }): void {
@@ -880,7 +913,7 @@ export class TalkController {
       const { recording, segments } = await this.rpc.call("recording_get", { id });
       if (this.state.recordingId !== id) return;
       this.set({ recording, transcript: joinTranscript(segments) });
-      if (this.state.phase === "transcribing" && recording.status === "done") this.deliver();
+      if (this.state.phase === "transcribing" && recording.status === "done") void this.deliver();
     } catch (error) {
       if (/No recording/.test(message(error))) {
         // A dictation deleted while transcribing was discarded as empty.
@@ -895,9 +928,30 @@ export class TalkController {
    * Types a finished dictation into the composer it started in. Away from
    * that thread, the text waits and goes in when the thread is next open.
    */
-  private deliver(): void {
-    const text = this.state.transcript.trim();
-    const { threadId, field } = this.state;
+  private async deliver(): Promise<void> {
+    // Polls and realtime signals keep arriving while the cleanup runs.
+    if (this.delivering) return;
+    this.delivering = true;
+    try {
+      await this.deliverText();
+    } finally {
+      this.delivering = false;
+    }
+  }
+
+  private async deliverText(): Promise<void> {
+    const id = this.state.recordingId;
+    const raw = this.state.transcript.trim();
+    let text = raw;
+    if (raw !== "" && id && this.rpc && this.cleanupEnabled) {
+      this.set({ cleaning: true });
+      const cleaned = await this.rpc.call("dictation_cleanup", { id }).then((result) => result.text, () => null);
+      // Dismissed while it ran; the dictation is in recordings.
+      if (this.state.recordingId !== id || this.state.phase !== "transcribing") return;
+      this.set({ cleaning: false });
+      if (cleaned) text = cleaned;
+    }
+    const { threadId, field, recording } = this.state;
     if (text === "") {
       this.announceEmpty(this.state.kind);
     } else if (field) {
@@ -922,7 +976,29 @@ export class TalkController {
         () => toast.info("Dictation saved in Talk recordings."),
       );
     }
+    if (text !== "" && recording && isLongDictation(recording)) this.offerToKeep(recording);
     this.finishIdle();
+  }
+
+  /** A long dictation is probably a session: offer to keep it with the recordings. */
+  private offerToKeep(recording: Recording): void {
+    toast("That was a long dictation. Keep it as a recording?", {
+      description: "It gets a title and meeting notes, and shows in Studio.",
+      duration: 15_000,
+      action: { label: "Keep", onClick: () => void this.keepAsRecording(recording.id) },
+    });
+  }
+
+  async keepAsRecording(id: string): Promise<void> {
+    if (!this.rpc) return;
+    try {
+      await this.rpc.call("recording_keep", { id });
+      toast.success("Kept as a recording.", {
+        action: this.navigate ? { label: "Open", onClick: () => this.navigate?.toPluginPanel(PANEL_PATH, { subPath: id }) } : undefined,
+      });
+    } catch (error) {
+      toast.error(`Talk could not keep it: ${message(error)}`);
+    }
   }
 
   /**

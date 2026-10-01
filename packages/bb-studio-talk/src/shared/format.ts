@@ -134,3 +134,27 @@ export function recordingBadge(
   if (recording.failedCount > 0) return { label: `${recording.failedCount} failed`, tone: "danger" };
   return null;
 }
+
+/** Hold-to-talk choices, as the setting shows them; the first is the default. */
+export const HOLD_KEY_OPTIONS = ["Right Option (Alt)", "Right Command", "Right Control", "Off"] as const;
+
+/** The KeyboardEvent.code a hold-to-talk setting listens for, or null when off. */
+export function holdKeyCode(setting: unknown): string | null {
+  switch (setting) {
+    case "Right Command":
+      return "MetaRight";
+    case "Right Control":
+      return "ControlRight";
+    case "Off":
+      return null;
+    default:
+      return "AltRight";
+  }
+}
+
+/** Past this, a dictation is probably a session worth keeping as a recording. */
+export const LONG_DICTATION = { ms: 5 * 60_000, words: 800 } as const;
+
+export function isLongDictation(recording: { kind: string; durationMs: number; wordCount: number }): boolean {
+  return recording.kind === "dictation" && (recording.durationMs >= LONG_DICTATION.ms || recording.wordCount >= LONG_DICTATION.words);
+}

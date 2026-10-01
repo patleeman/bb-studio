@@ -4,12 +4,14 @@
 //   the recording pill on every page.
 // - A content script hands presses on the composer's microphone to Talk, and
 //   lets other plugins' fields ask for dictation (src/client/fields.ts).
+// - Another watches the hold-to-talk key (src/client/hold-to-talk.ts).
 // - The Recordings nav panel lists recordings and is each recording's page.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { PANEL_PATH, TALK_ICON } from "./src/shared/format";
 import { interceptBuiltInMic, findComposer } from "./src/client/composer-dom";
 import { talk } from "./src/client/controller";
 import { TOGGLE_EVENT, clearStatus, fieldAt, publishStatus } from "./src/client/fields";
+import { watchHoldToTalk } from "./src/client/hold-to-talk";
 import { TalkOverlay } from "./src/client/overlay";
 import { RecordingsPanel } from "./src/client/recordings-panel";
 
@@ -64,6 +66,30 @@ export default definePluginApp((app) => {
           clearStatus();
         },
         { once: true },
+      );
+    },
+  });
+
+  // Hold the configured key to dictate into the focused composer or field.
+  app.contentScripts.register({
+    id: "hold-to-talk",
+    mount({ signal }) {
+      // A release can come before the start has claimed the microphone lock.
+      let starting: Promise<void> = Promise.resolve();
+      watchHoldToTalk(
+        {
+          code: () => talk.holdKey,
+          start: () => {
+            if (talk.isActive()) return false;
+            const field = fieldAt(document.activeElement);
+            starting = (field ? talk.toggleFieldDictation(field.field) : talk.toggleDictation(findComposer())).catch(() => {});
+            return true;
+          },
+          finish: () => {
+            void starting.then(() => (talk.isDictating() ? talk.stop(true) : undefined));
+          },
+        },
+        signal,
       );
     },
   });

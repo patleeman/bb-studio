@@ -162,4 +162,35 @@ describe("TalkStore", () => {
     store.setStatus(REC, "paused");
     expect(store.emptyRecordings()).toEqual([]);
   });
+
+  it("expires only old finished dictation audio with nothing left to transcribe", () => {
+    const { store, clock } = setup();
+    const DICT = "rec_dddddddddddddddd";
+    const BUSY = "rec_eeeeeeeeeeeeeeee";
+    for (const id of [DICT, BUSY]) {
+      store.create({ id, kind: "dictation", projectId: null, threadId: null });
+      addSegment(store, id, "sessiona", 0, 100);
+    }
+    addSegment(store, REC, "sessiona", 0, 100);
+    for (const id of [REC, DICT]) store.markTranscribed(id, "sessiona-0", "hello");
+    for (const id of [REC, DICT, BUSY]) store.setStatus(id, "finishing");
+    store.markFailed(BUSY, "sessiona-0", "bad audio", null);
+    store.setStatus(BUSY, "finishing");
+    const cutoff = clock.advance(1);
+    expect(store.audioExpired(cutoff)).toEqual([DICT]);
+    expect(store.audioExpired(cutoff - 1)).toEqual([]);
+
+    expect(store.markAudioRemoved(DICT)).toBe(true);
+    expect(store.audioExpired(cutoff)).toEqual([]);
+    expect(store.recording(DICT)).toMatchObject({ audioRemoved: true, wordCount: 1 });
+    expect(store.segmentFile(DICT, "sessiona-0")).toBeNull();
+    expect(store.segmentFile(REC, "sessiona-0")).not.toBeNull();
+  });
+
+  it("keeps a dictation as a recording", () => {
+    const { store } = setup();
+    expect(store.setKind(REC, "recording")).toBe(false);
+    expect(store.setKind(REC, "dictation")).toBe(true);
+    expect(store.recording(REC)!.kind).toBe("dictation");
+  });
 });

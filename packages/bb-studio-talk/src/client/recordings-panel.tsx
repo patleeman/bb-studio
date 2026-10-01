@@ -370,6 +370,13 @@ function RecordingDetail({ id }: { id: string }) {
                 <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}>
                   <Icon name="MessageSquarePlus" className="size-4" /> New thread
                 </DropdownMenuItem>
+                {recording.kind === "dictation" && recording.status === "done" ? (
+                  <DropdownMenuItem
+                    onSelect={() => run(() => rpc.call("recording_keep", { id }).then(() => toast.success("Kept as a recording.")))}
+                  >
+                    <Icon name="Mic" className="size-4" /> Keep as a recording
+                  </DropdownMenuItem>
+                ) : null}
                 {recording.failedCount > 0 ? (
                   <DropdownMenuItem onSelect={() => run(() => rpc.call("recording_retry", { id }))}>
                     <Icon name="RotateCcw" className="size-4" /> Retry {recording.failedCount} failed
@@ -379,7 +386,9 @@ function RecordingDetail({ id }: { id: string }) {
                   <>
                     <DropdownMenuItem onSelect={() => downloadTranscript("markdown")}>Download Markdown</DropdownMenuItem>
                     <DropdownMenuItem onSelect={() => downloadTranscript("text")}>Download text</DropdownMenuItem>
-                    <DropdownMenuItem onSelect={() => window.open(`/api/v1/plugins/talk/http/audio-export?recording=${encodeURIComponent(id)}`, "_blank", "noopener")}>Download audio</DropdownMenuItem>
+                    {recording.audioRemoved ? null : (
+                      <DropdownMenuItem onSelect={() => window.open(`/api/v1/plugins/talk/http/audio-export?recording=${encodeURIComponent(id)}`, "_blank", "noopener")}>Download audio</DropdownMenuItem>
+                    )}
                   </>
                 ) : null}
             </ItemMenu>
@@ -407,6 +416,12 @@ function RecordingDetail({ id }: { id: string }) {
             </>
           ) : null}
         </div>
+
+        {recording.audioRemoved ? (
+          <p className="mt-3 text-sm text-muted-foreground">
+            Talk deleted this dictation's audio to save space. The transcript is kept.
+          </p>
+        ) : null}
 
         <UnsentNotice recordingId={id} className="mt-6" />
 
@@ -483,21 +498,31 @@ function RecordingDetail({ id }: { id: string }) {
           <div className="mt-8 flex flex-col gap-5">
             {groups.map((group) => (
               <section key={group.sessionId} className="flex gap-3">
-                <button
-                  type="button"
-                  onClick={() => player.play(group.segments[0]!.id)}
-                  className="mt-0.5 h-6 shrink-0 cursor-pointer rounded px-1 font-mono text-xs tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                  title="Play from here"
-                >
-                  {formatClock(group.offsetMs)}
-                </button>
+                {recording.audioRemoved ? (
+                  <span className="mt-0.5 h-6 shrink-0 px-1 font-mono text-xs leading-6 tabular-nums text-muted-foreground">
+                    {formatClock(group.offsetMs)}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => player.play(group.segments[0]!.id)}
+                    className="mt-0.5 h-6 shrink-0 cursor-pointer rounded px-1 font-mono text-xs tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground"
+                    title="Play from here"
+                  >
+                    {formatClock(group.offsetMs)}
+                  </button>
+                )}
                 <p className="min-w-0 flex-1 text-[15px] leading-relaxed">
                   {group.segments.map((segment) => (
                     <SegmentText
                       key={segment.id}
                       segment={segment}
                       playing={player.playing === segment.id}
-                      onPlay={() => (player.playing === segment.id ? player.stop() : player.play(segment.id))}
+                      onPlay={
+                        recording.audioRemoved
+                          ? undefined
+                          : () => (player.playing === segment.id ? player.stop() : player.play(segment.id))
+                      }
                     />
                   ))}
                 </p>
@@ -510,7 +535,8 @@ function RecordingDetail({ id }: { id: string }) {
   );
 }
 
-function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: boolean; onPlay: () => void }) {
+/** Without `onPlay` (the audio is gone) the text is plain. */
+function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: boolean; onPlay?: () => void }) {
   const at = formatClock(segment.offsetMs);
   if (segment.status === "empty") return null;
   if (segment.status === "pending") {
@@ -533,6 +559,7 @@ function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: 
       </button>
     );
   }
+  if (!onPlay) return <span>{segment.text} </span>;
   return (
     <span
       role="button"

@@ -149,7 +149,10 @@ struct RecordingDetailView: View {
             segments = detail.segments
             transcript = detail.transcript
             meetingNotes = try? await app.client.recordingNotes(id)
-            player.configure(client: app.client, recordingId: id, title: detail.recording.title, segments: detail.segments)
+            // Expired dictation audio: no segments, so nothing to play.
+            player.configure(
+                client: app.client, recordingId: id, title: detail.recording.title,
+                segments: detail.recording.audioRemoved == true ? [] : detail.segments)
             error = nil
         } catch where BBClient.isCancellation(error) {
         } catch {

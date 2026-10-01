@@ -20,6 +20,7 @@ const recording: Recording = {
   wordCount: 9000,
   preview: "",
   archived: false,
+  audioRemoved: false,
 };
 
 describe("mentions", () => {

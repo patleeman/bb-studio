@@ -10,7 +10,7 @@ import {
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import type { TalkRpcContract } from "../shared/contract";
-import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, tail } from "../shared/format";
+import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, holdKeyCode, tail } from "../shared/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState, type TalkState } from "./controller";
@@ -32,6 +32,7 @@ function useControllerWiring(): void {
     talk.configure({
       segmentSeconds: typeof values?.segmentSeconds === "number" ? values.segmentSeconds : 25,
       replaceBuiltIn: values?.replaceBuiltInDictation !== false,
+      holdKey: holdKeyCode(values?.holdToTalkKey),
     });
   }, [values]);
   useEffect(() => talk.setContext({ projectId, threadId }), [projectId, threadId]);
@@ -140,21 +141,26 @@ function PillButton({
   label,
   onClick,
   tone = "default",
+  pressed,
 }: {
   icon: string;
   label: string;
   onClick: () => void;
   tone?: "default" | "primary" | "danger";
+  /** Makes it a toggle. */
+  pressed?: boolean;
 }) {
   return (
     <button
       type="button"
       aria-label={label}
+      aria-pressed={pressed}
       title={label}
       onClick={onClick}
       className={cn(
         "inline-flex size-8 shrink-0 cursor-pointer items-center justify-center rounded-full transition-colors focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring max-sm:size-10",
         tone === "default" && "text-muted-foreground hover:bg-state-hover hover:text-foreground",
+        pressed && "bg-state-active text-foreground",
         tone === "primary" && "bg-foreground text-background hover:bg-foreground/90",
         tone === "danger" && "bg-red-500 text-white hover:bg-red-600",
       )}
@@ -175,7 +181,7 @@ function statusLabel(state: TalkState, online: boolean): string {
     case "finalizing":
       return state.pendingUploads > 0 ? `Saving ${state.pendingUploads}…` : "Saving…";
     case "transcribing":
-      return "Transcribing…";
+      return state.cleaning ? "Cleaning up…" : "Transcribing…";
     default:
       if (!online) return "Offline · saving locally";
       if (state.pendingUploads > 1) return `${state.pendingUploads} waiting to upload`;
@@ -267,6 +273,14 @@ export function TalkOverlay() {
             icon="ArrowTurnBackward"
             label={dictation ? "Back to where you're dictating" : "Back to the recording"}
             onClick={() => talk.goToSource()}
+          />
+        ) : null}
+        {dictation ? (
+          <PillButton
+            icon="AiContentGenerator01"
+            label={talk.cleanupEnabled ? "Clean up text before inserting: on" : "Clean up text before inserting: off"}
+            pressed={talk.cleanupEnabled}
+            onClick={() => talk.setCleanup(!talk.cleanupEnabled)}
           />
         ) : null}
         {canPause ? <PillButton icon="Pause" label="Pause" onClick={() => void talk.pause()} /> : null}

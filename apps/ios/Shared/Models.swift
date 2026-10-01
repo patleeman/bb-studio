@@ -568,6 +568,8 @@ public struct Recording: Decodable, Identifiable, Hashable, Sendable {
     public var projectId: String?
     public var updatedAt: Double?
     public var wordCount: Int?
+    /// A dictation whose audio expired; only the transcript is left.
+    public var audioRemoved: Bool?
 }
 
 public struct Segment: Decodable, Identifiable, Hashable, Sendable {

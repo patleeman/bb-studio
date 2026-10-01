@@ -46,6 +46,8 @@ export const recordingSchema = z.object({
   /** The last few hundred characters of transcript, for list rows. */
   preview: z.string(),
   archived: z.boolean(),
+  /** A dictation's audio was deleted after the retention period; the transcript stays. */
+  audioRemoved: z.boolean(),
   meetingNotes: meetingNotesSchema.nullable().optional(),
 });
 export type Recording = z.infer<typeof recordingSchema>;
@@ -134,6 +136,16 @@ export const rpcContract = defineRpcContract({
   meeting_create_task: {
     input: z.object({ id: recordingId, index: z.number().int().min(0).max(100) }),
     output: z.object({ taskId: z.string() }),
+  },
+  /** A finished dictation's transcript, tidied for inserting; null keeps the raw text. */
+  dictation_cleanup: {
+    input: z.object({ id: recordingId }),
+    output: z.object({ text: z.string().nullable() }),
+  },
+  /** Turns a dictation into a recording: out of the background, titled, with meeting notes. */
+  recording_keep: {
+    input: z.object({ id: recordingId }),
+    output: recordingSchema,
   },
   recording_delete: {
     input: z.object({ id: recordingId }),

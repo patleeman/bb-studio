@@ -52,6 +52,7 @@ export const MIGRATIONS = [
   // BB Studio: archiving, as for every Studio item.
   `ALTER TABLE recordings ADD COLUMN archived_at INTEGER;`,
   `ALTER TABLE recordings ADD COLUMN meeting_notes TEXT;`,
+  `ALTER TABLE recordings ADD COLUMN audio_removed_at INTEGER;`,
 ];
 
 interface RecordingRow {
@@ -69,6 +70,7 @@ interface RecordingRow {
   heartbeat_at: number;
   archived_at: number | null;
   meeting_notes: string | null;
+  audio_removed_at: number | null;
 }
 
 interface SegmentRow {
@@ -196,7 +198,10 @@ export class TalkStore {
 
   segmentFile(recordingId: string, segmentId: string): { file: string; mimeType: string } | null {
     const row = this.db
-      .prepare(`SELECT file, mime_type FROM segments WHERE recording_id = ? AND id = ?`)
+      .prepare(
+        `SELECT s.file, s.mime_type FROM segments s JOIN recordings r ON r.id = s.recording_id
+         WHERE s.recording_id = ? AND s.id = ? AND r.audio_removed_at IS NULL`,
+      )
       .get(recordingId, segmentId) as { file: string; mime_type: string } | undefined;
     return row ? { file: row.file, mimeType: row.mime_type } : null;
   }
@@ -411,6 +416,31 @@ export class TalkStore {
     return rows.map((row) => row.id);
   }
 
+  /**
+   * Finished dictations older than `before` that still have audio. One with a
+   * piece left to transcribe or retry keeps its audio, which is the only copy.
+   */
+  audioExpired(before: number): string[] {
+    const rows = this.db
+      .prepare(
+        `SELECT id FROM recordings r
+         WHERE kind = 'dictation' AND status = 'done' AND audio_removed_at IS NULL
+           AND COALESCE(ended_at, updated_at) < ?
+           AND NOT EXISTS (SELECT 1 FROM segments s
+                           WHERE s.recording_id = r.id AND s.status IN ('pending', 'failed'))`,
+      )
+      .all(before) as { id: string }[];
+    return rows.map((row) => row.id);
+  }
+
+  markAudioRemoved(id: string): boolean {
+    return this.db.prepare(`UPDATE recordings SET audio_removed_at = ? WHERE id = ?`).run(this.now(), id).changes > 0;
+  }
+
+  setKind(id: string, kind: RecordingKind): boolean {
+    return this.db.prepare(`UPDATE recordings SET kind = ?, updated_at = ? WHERE id = ? AND kind != ?`).run(kind, this.now(), id, kind).changes > 0;
+  }
+
   setProject(id: string, projectId: string | null): boolean {
     return this.db.prepare(`UPDATE recordings SET project_id = ?, updated_at = ? WHERE id = ?`).run(projectId, this.now(), id).changes > 0;
   }
@@ -497,6 +527,7 @@ export class TalkStore {
       wordCount: countWords(transcript),
       preview: tail(transcript, 240),
       archived: row.archived_at !== null,
+      audioRemoved: row.audio_removed_at !== null,
       meetingNotes: row.meeting_notes ? JSON.parse(row.meeting_notes) as MeetingNotes : null,
     };
   }

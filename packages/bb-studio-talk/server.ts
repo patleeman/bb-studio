@@ -24,6 +24,8 @@ import { registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
 import { generateMeetingNotes } from "./src/server/meetings";
+import { cleanTranscript } from "./src/server/cleanup";
+import { HOLD_KEY_OPTIONS } from "./src/shared/format";
 
 export type { TalkRpcContract } from "./src/shared/contract";
 
@@ -31,6 +33,9 @@ export type { TalkRpcContract } from "./src/shared/contract";
 const STALE_AFTER_MS = 120_000;
 /** Enough transcript to say what a recording is about. */
 const TITLE_MIN_CHARS = 280;
+/** A cleanup that takes longer than this inserts the text as spoken. */
+const CLEANUP_TIMEOUT_MS = 30_000;
+const DAY_MS = 86_400_000;
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -53,6 +58,21 @@ export default async function plugin(bb: BbPluginApi) {
       label: "Auto-title recordings",
       description: "Ask Studio Decisions for a short title once a recording has some text.",
       default: true,
+    },
+    holdToTalkKey: {
+      type: "select",
+      label: "Hold-to-talk key",
+      description:
+        "Hold this key to dictate into the focused composer or field, and let go to insert the text. Pressing it with another key does nothing.",
+      options: [...HOLD_KEY_OPTIONS],
+      default: HOLD_KEY_OPTIONS[0],
+    },
+    dictationAudioDays: {
+      type: "number",
+      label: "Keep dictation audio (days)",
+      description:
+        "Delete a finished dictation's audio after this many days and keep its transcript. Recordings keep their audio. 0 keeps it forever.",
+      default: 30,
     },
   });
   let config = await settings.get();
@@ -161,6 +181,28 @@ export default async function plugin(bb: BbPluginApi) {
     warn: (message) => bb.log.warn(message),
   });
   bb.background.service("transcriber", { start: (signal) => transcriber.run(signal) });
+
+  // Dictations are a safety net: after a while their audio goes, their text stays.
+  async function expireDictationAudio(): Promise<void> {
+    const days = config.dictationAudioDays;
+    if (typeof days !== "number" || !(days > 0)) return;
+    for (const id of store.audioExpired(Date.now() - days * DAY_MS)) {
+      await files.removeRecording(id);
+      store.markAudioRemoved(id);
+      changed(id);
+    }
+  }
+  bb.background.service("audio-expiry", {
+    async start(signal) {
+      while (!signal.aborted) {
+        await expireDictationAudio().catch((error) => bb.log.warn(`Talk could not expire dictation audio: ${String(error)}`));
+        await new Promise<void>((resolve) => {
+          const timer = setTimeout(resolve, 6 * 60 * 60_000);
+          signal.addEventListener("abort", () => (clearTimeout(timer), resolve()), { once: true });
+        });
+      }
+    },
+  });
 
   bb.background.service("watchdog", {
     async start(signal) {
@@ -271,6 +313,21 @@ export default async function plugin(bb: BbPluginApi) {
       }]).catch(() => { /* Studio is optional. */ });
       return { taskId };
     },
+    dictation_cleanup: async ({ id }) => {
+      const recording = mustGet(id);
+      if (recording.kind !== "dictation") return { text: null };
+      const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)]);
+      return { text: await cleanTranscript(bb, { recordingId: id, transcript: store.transcript(id) }, signal) };
+    },
+    recording_keep: ({ id }) => {
+      mustGet(id);
+      if (store.setKind(id, "recording")) {
+        changed(id);
+        maybeTitle(id);
+        maybeSummarize(id);
+      }
+      return mustGet(id);
+    },
     recording_delete: async ({ id }) => {
       // A window is capturing into it; deleting now would strand the audio
       // still on its way. An interrupted one (its window is gone) can go.
@@ -315,6 +372,7 @@ export default async function plugin(bb: BbPluginApi) {
     const id = context.req.query("recording") ?? "";
     const recording = store.recording(id);
     if (!recording || recording.status !== "done") return context.text("Not found", 404);
+    if (recording.audioRemoved) return context.text("This dictation's audio was deleted", 404);
     const segments = store.segments(id);
     const filesToArchive = await Promise.all(segments.map(async (segment, index) => {
       const entry = store.segmentFile(id, segment.id)!;
