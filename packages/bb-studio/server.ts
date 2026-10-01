@@ -785,7 +785,7 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Add Studio items, or this thread, to one of the user's spaces, or take them out. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file something in a space.",
     parameters: z.object({
-      space: z.string().min(1).max(100).describe("The space's name"),
+      space: z.string().min(1).max(100).describe("The space's name or id"),
       add: z.array(z.string().max(500)).max(100).optional().describe("Item links, e.g. /plugins/pages/pages/pg_x"),
       remove: z.array(z.string().max(500)).max(100).optional().describe("Item links to take out"),
       thisThread: z.enum(["add", "remove"]).optional().describe("Add this thread to the space, or take it out"),

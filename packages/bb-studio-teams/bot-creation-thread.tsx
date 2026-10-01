@@ -8,7 +8,7 @@ import type { Room, rpcContract } from "./contract";
 import { botCreationPrompt } from "./bot-creation";
 import { BackButton, ErrorMessage, message } from "./bot-ui";
 
-export function BotCreationThread({ roomId }: { roomId?: string }) {
+export function BotCreationThread({ roomId, spaceId }: { roomId?: string; spaceId?: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const [room, setRoom] = useState<Room | null>(null);
@@ -45,8 +45,8 @@ export function BotCreationThread({ roomId }: { roomId?: string }) {
       {!roomId || room ? (
         <NewThreadComposer
           className="mx-auto min-h-0 w-full max-w-5xl flex-1 px-4 pb-4"
-          draftKey={`bot-creation:${roomId ?? "standalone"}`}
-          initialPrompt={botCreationPrompt(room ?? undefined)}
+          draftKey={`bot-creation:${roomId ?? (spaceId ? `space:${spaceId}` : "standalone")}`}
+          initialPrompt={botCreationPrompt(room ?? undefined, spaceId)}
           focusRequest={1}
           onSubmit={async (request) => {
             setError(null);

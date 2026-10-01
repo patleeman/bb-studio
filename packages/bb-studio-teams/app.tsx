@@ -337,7 +337,9 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
     };
   }, [load]);
   useRealtime("scoped-changed", (event) => { if (affects(event, "bots")) load(); });
-  const [id, section] = subPath.split("/");
+  const [id, section, rest] = subPath.split("/");
+  if (id === "new" && section === "space")
+    return <BotCreationThread key={`space:${rest}`} spaceId={rest ? decodeURIComponent(rest) : undefined} />;
   if (id === "new")
     return <BotCreationThread key={section ?? "standalone"} roomId={section} />;
   if (id === "new-group" || id === "group")
@@ -392,7 +394,12 @@ function BotList({
 function NewBotListener() {
   const navigate = useBbNavigate();
   useEffect(() => {
-    const open = () => navigate.toPluginPanel("bots", { subPath: "new" });
+    const open = (event: Event) => {
+      event.preventDefault();
+      // A space's page passes its space, so the new bot joins it.
+      const spaceId = (event as CustomEvent<{ spaceId?: unknown } | null>).detail?.spaceId;
+      navigate.toPluginPanel("bots", { subPath: typeof spaceId === "string" && spaceId ? `new/space/${encodeURIComponent(spaceId)}` : "new" });
+    };
     window.addEventListener(NEW_BOT_EVENT, open);
     return () => window.removeEventListener(NEW_BOT_EVENT, open);
   }, [navigate]);
