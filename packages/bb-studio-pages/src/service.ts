@@ -5,7 +5,7 @@ import { actorColor, type BotDirectory, type BotInfo } from "./bots";
 import { listThreads, threadAuthors } from "./comments";
 import { HUMAN_USER_ID, PLUGIN_ID, REALTIME_CHANNEL, type RealtimeEvent } from "./constants";
 import type { PageMetaView, RequestView } from "./contract";
-import { applyEdits, mentionsIn, readMarkdown, replaceContent, restoreFromState, seedMarkdown, type EditOp, type EditResult } from "./doc";
+import { applyEdits, commentAnchors, mentionsIn, readMarkdown, replaceContent, restoreFromState, seedMarkdown, type EditOp, type EditResult } from "./doc";
 import { PageHub, type Actor, type LivePage } from "./hub";
 import { shortId } from "./markdown";
 import { PageStore, type PageMeta, type RequestRow } from "./store";
@@ -215,6 +215,22 @@ export class PagesService {
       this.markWorking(pageId, actor);
     }
     return result;
+  }
+
+  /** One human block edit from a client without Yjs sync. */
+  editClientBlock(pageId: string, expected: string, block: string | undefined, markdown: string): string {
+    if (!this.store.meta(pageId)) throw new Error("Page not found.");
+    const page = this.hub.open(pageId);
+    if (readMarkdown(page.doc, { ids: true }) !== expected) {
+      throw new Error("Page changed while you were editing. Reload and try again.");
+    }
+    if (block && [...commentAnchors(page.doc).values()].some((anchor) => anchor.blockId === block)) {
+      throw new Error("This block has comments. Edit it in BB web to keep their anchors.");
+    }
+    const op: EditOp = block ? { op: "replace", block, markdown } : { op: "append", markdown };
+    applyEdits(page.doc, [op], { client: "rpc" });
+    this.hub.flush(page);
+    return readMarkdown(page.doc, { ids: true });
   }
 
   /** Saves a named version, then replaces the whole page with `markdown`, live. */

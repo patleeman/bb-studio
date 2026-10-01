@@ -225,6 +225,13 @@ export default async function plugin(bb: BbPluginApi) {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc) };
     },
+    editableMarkdown: ({ id }) => {
+      requireMeta(id);
+      return { markdown: readMarkdown(service.hub.open(id).doc, { ids: true }) };
+    },
+    editBlock: ({ id, expected, block, markdown }) => {
+      return { markdown: service.editClientBlock(id, expected, block, markdown) };
+    },
     replaceMarkdown: ({ id, markdown, snapshotName }) => {
       requireMeta(id);
       const actor = { key: PLUGIN_RPC_ACTOR, name: "Agent", color: actorColor(PLUGIN_RPC_ACTOR) };

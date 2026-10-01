@@ -185,6 +185,21 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ markdown: z.string() }),
   },
+  /** Markdown with stable block ids, for clients without the Yjs editor. */
+  editableMarkdown: {
+    input: z.object({ id: pageId }),
+    output: z.object({ markdown: z.string() }),
+  },
+  /** Compare the loaded document before applying one targeted human edit. */
+  editBlock: {
+    input: z.object({
+      id: pageId,
+      expected: z.string().max(200_000),
+      block: z.string().min(4).optional(),
+      markdown: z.string().max(200_000),
+    }),
+    output: z.object({ markdown: z.string() }),
+  },
   /**
    * Saves a version named `snapshotName`, then replaces the whole page with
    * `markdown`. Open editors update live; the change is recorded as an agent's.
