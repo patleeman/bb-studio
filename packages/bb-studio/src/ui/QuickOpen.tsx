@@ -1,31 +1,15 @@
-// Studio search: a quick-open box over any page, opened by the "Studio:
-// Search" command (Mod+Shift+K). Titles match as you type; content matches
-// come from the add-ons, with the text that matched.
-import { Highlight, Icon, ItemTile, cn, openAppPath, projectName, useProjects } from "@bb-studio/kit/app";
-import { errorMessage, untitled } from "@bb-studio/kit/format";
-import { useRpc } from "@get-bb/plugin-sdk/app";
+import { Icon, ItemTile, cn, openAppPath, projectName, useProjects } from "@bb-studio/kit/app";
+import { untitled } from "@bb-studio/kit/format";
+import { mentionPrompt } from "@bb-studio/kit/contract";
+import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { ProviderView, rpcContract } from "../contract";
 import { QUICK_OPEN_EVENT } from "../ids";
-import { studioMatches, type ContentMatches } from "../search";
 
-const CONTENT_DEBOUNCE_MS = 180;
-const CONTENT_MIN_CHARS = 2;
+type Result = { ref: { pluginId: string; id: string }; kind: string; title: string; snippet: { text: string; ranges: { start: number; end: number }[] }; href: string; projectId: string | null; updatedAt: number; score: number };
+type Row = { type: "result"; hit: Result } | { type: "command"; label: string; run: () => void };
+const DEBOUNCE_MS = 150;
 
-/** The overview fields search uses. */
-type Item = {
-  pluginId: string;
-  id: string;
-  kind: string;
-  title: string;
-  icon: string | null;
-  projectId: string | null;
-  href: string;
-  updatedAt: number;
-  archived: boolean;
-};
-
-/** Mounted on every page; renders only while open. */
 export function QuickOpen() {
   const [open, setOpen] = useState(false);
   useEffect(() => {
@@ -36,151 +20,108 @@ export function QuickOpen() {
   return open ? <QuickOpenDialog onClose={() => setOpen(false)} /> : null;
 }
 
-export function toggleQuickOpen() {
-  window.dispatchEvent(new Event(QUICK_OPEN_EVENT));
+export function toggleQuickOpen() { window.dispatchEvent(new Event(QUICK_OPEN_EVENT)); }
+
+function Marked({ text, ranges }: { text: string; ranges: { start: number; end: number }[] }) {
+  if (!ranges.length) return <>{text}</>;
+  const parts: React.ReactNode[] = [];
+  let at = 0;
+  for (const range of ranges) {
+    if (range.start < at) continue;
+    parts.push(text.slice(at, range.start), <mark key={range.start} className="bg-transparent font-semibold text-foreground">{text.slice(range.start, range.end)}</mark>);
+    at = range.end;
+  }
+  parts.push(text.slice(at));
+  return <>{parts}</>;
 }
 
 function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const rpc = useRpc<typeof rpcContract>();
+  const navigate = useBbNavigate();
+  const context = useBbContext();
   const projects = useProjects();
-  const [overview, setOverview] = useState<{ items: Item[]; providers: ProviderView[] } | null>(null);
-  const [error, setError] = useState<string | null>(null);
+  const [providers, setProviders] = useState<ProviderView[]>([]);
+  const [results, setResults] = useState<Result[]>([]);
   const [query, setQuery] = useState("");
-  const [content, setContent] = useState<(ContentMatches & { query: string }) | null>(null);
+  const [threadOnly, setThreadOnly] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
   const list = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
-    rpc.call("overview", null).then(setOverview, (cause: unknown) => setError(errorMessage(cause)));
+    rpc.call("overview", null).then(({ providers }) => setProviders(providers), () => {});
     return () => before?.focus();
   }, [rpc]);
-
-  // Content search trails typing; a reply for an older query is dropped.
-  const trimmed = query.trim();
   useEffect(() => {
-    if (trimmed.length < CONTENT_MIN_CHARS) return;
     let live = true;
-    const timer = setTimeout(() => {
-      rpc.call("search", { query: trimmed }).then(
-        (found) => live && setContent({ ...found, query: trimmed }),
-        () => live && setContent({ keys: [], snippets: {}, query: trimmed }),
-      );
-    }, CONTENT_DEBOUNCE_MS);
-    return () => {
-      live = false;
-      clearTimeout(timer);
-    };
-  }, [rpc, trimmed]);
+    setLoading(true);
+    const timer = setTimeout(() => rpc.call("searchAll", { query: query.trim(), kinds: threadOnly ? ["thread"] : undefined, limit: 40 }).then(
+      (hits) => { if (live) { setResults(hits); setError(null); setLoading(false); } },
+      (cause: unknown) => { if (live) { setError(cause instanceof Error ? cause.message : "Search failed."); setLoading(false); } },
+    ), query ? DEBOUNCE_MS : 0);
+    return () => { live = false; clearTimeout(timer); };
+  }, [rpc, query, threadOnly]);
 
-  const current = content?.query === trimmed ? content : null;
-  const searching = trimmed.length >= CONTENT_MIN_CHARS && !current;
-  const matches = useMemo(() => studioMatches(overview?.items ?? [], query, current), [overview, query, current]);
-  const kinds = useMemo(
-    () => new Map(overview?.providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])) ?? []),
-    [overview],
-  );
-
+  const kinds = useMemo(() => new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind]))), [providers]);
+  const commands = useMemo(() => {
+    const create = (kind: string, label: string): Row => ({ type: "command", label, run: () => {
+      const provider = providers.find((entry) => entry.state === "ready" && entry.kinds.some((each) => each.id === kind && each.capabilities?.create));
+      if (!provider) return;
+      const target = provider.kinds.find((each) => each.id === kind);
+      if (target?.create?.mode === "event") { onClose(); window.dispatchEvent(new Event(target.create.event)); return; }
+      rpc.call("create", { pluginId: provider.pluginId, kind, projectId: context.projectId ?? null }).then(({ item }) => { onClose(); openAppPath(item.href); });
+    } });
+    return [
+      ...([ ["page", "New page"], ["recording", "New recording"], ["drawing", "New drawing"], ["task", "New task"] ] as const)
+        .filter(([kind]) => providers.some((provider) => provider.state === "ready" && provider.kinds.some((each) => each.id === kind && each.capabilities?.create)))
+        .map(([kind, label]) => create(kind, label)),
+      { type: "command", label: "Open Inbox", run: () => { onClose(); openAppPath("/plugins/bot-teams/channels"); } },
+      { type: "command", label: "Hand to agent", run: () => { onClose(); navigate.toCompose({ initialPrompt: results[0] ? mentionPrompt([results[0]]) : "", focusPrompt: true }); } },
+      { type: "command", label: "Go to thread", run: () => { setThreadOnly(true); setQuery(""); } },
+    ] satisfies Row[];
+  }, [providers, rpc, navigate, context.projectId, onClose, results]);
+  const visibleCommands = commands.filter((row) => row.type === "command" && (!query || row.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
+  const rows: Row[] = [...[...results].sort((a, b) => a.kind.localeCompare(b.kind) || b.score - a.score).map((hit): Row => ({ type: "result", hit })), ...visibleCommands];
   useEffect(() => setSelected(0), [query]);
-  useEffect(() => {
-    list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" });
-  }, [selected]);
-
-  const open = (item: Item | undefined) => {
-    if (!item) return;
-    onClose();
-    openAppPath(item.href);
+  useEffect(() => { list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" }); }, [selected]);
+  const activate = (row?: Row) => {
+    if (!row) return;
+    if (row.type === "command") row.run();
+    else { onClose(); openAppPath(row.hit.href); }
   };
-
   const onKeyDown = (event: KeyboardEvent) => {
-    // Enter confirms an IME candidate; it doesn't open an item.
     if (event.nativeEvent.isComposing) return;
-    const step = event.key === "ArrowDown" ? 1 : event.key === "ArrowUp" ? -1 : 0;
-    if (step && matches.length) setSelected((index) => (index + step + matches.length) % matches.length);
-    else if (event.key === "Enter") open(matches[selected]?.item);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") setSelected((at) => (at + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length);
+    else if (event.key === "Enter") activate(rows[selected]);
     else if (event.key === "Escape") onClose();
     else return;
-    event.preventDefault();
-    event.stopPropagation();
+    event.preventDefault(); event.stopPropagation();
   };
-
-  return (
-    <div className="studio-quick-open fixed inset-0 z-50 flex justify-center bg-black/20 px-4 pt-[12vh]" onMouseDown={onClose}>
-      <div
-        role="dialog"
-        aria-label="Search Studio"
-        className="flex max-h-[min(34rem,76vh)] w-full max-w-xl flex-col overflow-hidden rounded-xl border border-border bg-background shadow-2xl"
-        onMouseDown={(event) => event.stopPropagation()}
-      >
-        <div className="flex items-center gap-2.5 border-b border-border px-4">
-          <Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
-          <input
-            autoFocus
-            role="combobox"
-            aria-expanded
-            aria-controls="studio-quick-open-list"
-            aria-activedescendant={matches.length ? `studio-quick-open-${selected}` : undefined}
-            aria-label="Search Studio"
-            placeholder="Search Studio titles and content…"
-            className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={onKeyDown}
-          />
-          {searching ? <span className="text-xs text-muted-foreground">Searching content…</span> : null}
-        </div>
-        <div ref={list} id="studio-quick-open-list" role="listbox" aria-label="Studio items" className="min-h-0 flex-1 overflow-y-auto p-1.5">
-          {!trimmed && matches.length ? <p className="px-2.5 pt-1.5 pb-1 text-xs font-medium text-muted-foreground">Recently changed</p> : null}
-          {matches.map(({ item, snippet }, index) => {
-            const kind = kinds.get(`${item.pluginId}:${item.kind}`);
-            return (
-              <div
-                key={`${item.pluginId}:${item.id}`}
-                id={`studio-quick-open-${index}`}
-                data-index={index}
-                role="option"
-                aria-selected={index === selected}
-                className={cn(
-                  "studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-lg px-2.5 py-2",
-                  index === selected && "bg-state-hover",
-                )}
-                onMouseMove={() => setSelected(index)}
-                onClick={() => open(item)}
-              >
-                <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="md" />
-                <div className="min-w-0 flex-1">
-                  <div className="flex items-baseline gap-2">
-                    <span className="truncate text-sm font-medium">
-                      <Highlight text={untitled(item.title)} query={trimmed} />
-                    </span>
-                    <span className="shrink-0 text-xs text-muted-foreground">
-                      {kind?.label ?? item.kind}
-                      {item.projectId ? ` · ${projectName(projects, item.projectId)}` : ""}
-                    </span>
-                  </div>
-                  {snippet ? (
-                    <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground">
-                      <Highlight text={snippet} query={trimmed} />
-                    </p>
-                  ) : null}
-                </div>
-              </div>
-            );
-          })}
-          {overview && !matches.length ? (
-            <p className="px-3 py-6 text-center text-sm text-muted-foreground">
-              {!trimmed ? "Nothing in Studio yet." : searching ? "No titles match. Searching content…" : "Nothing in Studio matches."}
-            </p>
-          ) : null}
-          {!overview && !error ? <p className="px-3 py-6 text-center text-sm text-muted-foreground">Loading Studio…</p> : null}
-          {error ? <p className="px-3 py-6 text-center text-sm text-destructive">{error}</p> : null}
-        </div>
-        <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground">
-          <span>↑↓ to move</span>
-          <span>↵ to open</span>
-          <span>esc to close</span>
-        </div>
+  let lastKind = "";
+  return <div className="studio-quick-open fixed inset-0 z-50 flex justify-center bg-black/30 px-4 pt-[12vh]" onMouseDown={onClose}>
+    <div role="dialog" aria-modal="true" aria-label="Search Studio" className="flex max-h-[min(38rem,78vh)] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+      <div className="flex items-center gap-2.5 border-b border-border px-4"><Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
+        <input autoFocus role="combobox" aria-expanded aria-controls="studio-quick-open-list" aria-activedescendant={rows.length ? `studio-quick-open-${selected}` : undefined} aria-label="Search Studio" placeholder={threadOnly ? "Search threads…" : "Search Studio, threads and channels…"} className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} />
+        {loading ? <span className="text-xs text-muted-foreground">Searching…</span> : null}
       </div>
+      <div ref={list} id="studio-quick-open-list" role="listbox" aria-label="Search results" className="min-h-0 flex-1 overflow-y-auto p-1.5">
+        {rows.map((row, index) => {
+          const kind = row.type === "result" ? row.hit.kind : "command";
+          const group = kind !== lastKind; lastKind = kind;
+          const info = row.type === "result" ? kinds.get(`${row.hit.ref.pluginId}:${kind}`) : null;
+          return <div key={row.type === "result" ? `${row.hit.ref.pluginId}:${row.hit.ref.id}` : row.label}>
+            {group ? <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">{!query && row.type === "result" ? "Recently changed" : kind === "command" ? "Commands" : info?.plural ?? (kind === "thread" ? "Threads" : kind === "channel" ? "Channels" : kind)}</p> : null}
+            <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={() => activate(row)}>
+              {row.type === "result" ? <><ItemTile icon={null} kindIcon={info?.icon ?? (kind === "thread" ? "MessageSquare" : "File")} size="md" /><div className="min-w-0 flex-1"><div className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{untitled(row.hit.title)}</span><span className="shrink-0 text-xs text-muted-foreground">{info?.label ?? kind}{row.hit.projectId ? ` · ${projectName(projects, row.hit.projectId)}` : ""}</span></div>{row.hit.snippet.text ? <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground"><Marked {...row.hit.snippet} /></p> : null}</div></> : <><Icon name="CornerDownRight" className="size-4 text-muted-foreground" /><span className="text-sm">{row.label}</span></>}
+            </div>
+          </div>;
+        })}
+        {error ? <p className="px-3 py-4 text-sm text-destructive">{error}</p> : null}
+        {!loading && !results.length && query && !error ? <p className="px-3 py-3 text-sm text-muted-foreground">No matches.</p> : null}
+      </div>
+      <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>esc to close</span></div>
     </div>
-  );
+  </div>;
 }

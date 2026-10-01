@@ -7,6 +7,7 @@ public enum Studio {
     public static let items = "items"
     public static let changes = "changes"
     public static let search = "search"
+    public static let searchAll = "searchAll"
     public static let create = "create"
     public static let move = "move"
     public static let archive = "archive"
@@ -34,6 +35,10 @@ public enum Studio {
   public typealias Changes = ChangesOutput
 
   public typealias Search = SearchOutput
+
+  public typealias SearchAllOutput = [SearchAllOutputItem]
+
+  public typealias SearchAll = SearchAllOutput
 
   public typealias Create = CreateOutput
 
@@ -559,6 +564,72 @@ public enum Studio {
     public init(keys: [String]? = nil, snippets: [String: String]? = nil) {
       self.keys = keys
       self.snippets = snippets
+    }
+  }
+
+  public struct SearchAllInput: Sendable, Hashable, Codable {
+    public var query: String?
+    public var kinds: [String]?
+    public var projectId: String?
+    public var limit: Int?
+
+    public init(query: String? = nil, kinds: [String]? = nil, projectId: String? = nil, limit: Int? = nil) {
+      self.query = query
+      self.kinds = kinds
+      self.projectId = projectId
+      self.limit = limit
+    }
+  }
+
+  public struct SearchAllOutputItemRef: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct SearchAllOutputItemSnippetRangesItem: Sendable, Hashable, Codable {
+    public var start: Int?
+    public var end: Int?
+
+    public init(start: Int? = nil, end: Int? = nil) {
+      self.start = start
+      self.end = end
+    }
+  }
+
+  public struct SearchAllOutputItemSnippet: Sendable, Hashable, Codable {
+    public var text: String?
+    public var ranges: [SearchAllOutputItemSnippetRangesItem]?
+
+    public init(text: String? = nil, ranges: [SearchAllOutputItemSnippetRangesItem]? = nil) {
+      self.text = text
+      self.ranges = ranges
+    }
+  }
+
+  public struct SearchAllOutputItem: Sendable, Hashable, Codable {
+    public var ref: SearchAllOutputItemRef?
+    public var kind: String?
+    public var title: String?
+    public var snippet: SearchAllOutputItemSnippet?
+    public var href: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var score: Double?
+
+    public init(ref: SearchAllOutputItemRef? = nil, kind: String? = nil, title: String? = nil, snippet: SearchAllOutputItemSnippet? = nil, href: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, score: Double? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.snippet = snippet
+      self.href = href
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.score = score
     }
   }
 

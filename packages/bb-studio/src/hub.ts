@@ -40,6 +40,8 @@ export class StudioHub {
 
   constructor(private readonly sdk: HubSdk) {}
 
+  version(pluginId: string): 1 | 2 | null { return this.described.get(pluginId)?.info.version ?? null; }
+
   call<M extends keyof ProviderMethods>(
     pluginId: string,
     method: M,
@@ -124,8 +126,8 @@ export class StudioHub {
    * `<plugin>:<id>` keys whose content matches, and the matching text by key
    * where the add-on gave it; providers that fail are skipped.
    */
-  async search(query: string): Promise<{ keys: string[]; snippets: Record<string, string> }> {
-    const ready = (await this.providers()).filter((provider) => provider.state === "ready");
+  async search(query: string, v1Only = false): Promise<{ keys: string[]; snippets: Record<string, string> }> {
+    const ready = (await this.providers()).filter((provider) => provider.state === "ready" && (!v1Only || this.version(provider.pluginId) === 1));
     const results = await Promise.all(
       ready.map((provider) =>
         this.call(provider.pluginId, "studio_search", { query }).then(
@@ -140,4 +142,5 @@ export class StudioHub {
       snippets: Object.fromEntries(found.flatMap((match) => (match.snippet ? [[match.key, match.snippet]] : []))),
     };
   }
+
 }

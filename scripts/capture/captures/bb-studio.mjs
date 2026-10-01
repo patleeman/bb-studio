@@ -62,22 +62,24 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           const { task: created } = await pluginRpc("studio-tasks", "create", { ...task, projectId });
           taskIds.push(created.id);
         }
-        // Artifacts search their saved text; check it through Studio's hub.
-        const found = await pluginRpc("studio", "search", { query: "weekly active teams" });
+        // Artifacts search their saved text through Studio's index.
+        await bbCli(["studio", "reindex"]);
+        const found = await pluginRpc("studio", "searchAll", { query: "weekly active teams", limit: 40 });
         const key = `artifacts:${artifact.artifactId}`;
-        if (!found.keys.includes(key) || !/weekly active teams/i.test(found.snippets[key] ?? "")) {
+        if (!found.some((hit) => `${hit.ref.pluginId}:${hit.ref.id}` === key && /weekly active teams/i.test(hit.snippet.text))) {
           throw new Error(`Studio search didn't find the artifact with a snippet: ${JSON.stringify(found)}`);
         }
         await client.navigate("/plugins/studio/studio");
         await client.waitForSelector('input[aria-label="Search studio"]');
-        // Open Studio search with its real shortcut, Mod+Shift+K.
-        const modifiers = (process.platform === "darwin" ? 4 : 2) | 8;
+        // Open Studio search with its real shortcut, Mod+K.
+        const modifiers = process.platform === "darwin" ? 4 : 2;
         // rawKeyDown: a shortcut with no text, as a real keyboard sends it.
         for (const type of ["rawKeyDown", "keyUp"]) {
           await client.command("Input.dispatchKeyEvent", { type, modifiers, key: "K", code: "KeyK", windowsVirtualKeyCode: 75 });
         }
         await client.waitForSelector('.studio-quick-open [role="dialog"][aria-label="Search Studio"]');
         await client.waitForText("Recently changed");
+        await client.waitForText("Hand to agent");
         await client.command("Input.insertText", { text: "offline sync" });
         // The task's title matches; the page and the other task match on content.
         await client.waitForText("Add offline sync to settings");

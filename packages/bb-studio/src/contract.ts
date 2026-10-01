@@ -63,6 +63,14 @@ export const rpcContract = defineRpcContract({
     input: z.object({ query: z.string().min(1).max(200) }),
     output: z.object({ keys: z.array(z.string()), snippets: z.record(z.string(), z.string()) }),
   },
+  searchAll: {
+    input: z.object({ query: z.string().max(200), kinds: z.array(z.string()).max(20).optional(), projectId: projectId.optional(), limit: z.number().int().min(1).max(100).default(40) }),
+    output: z.array(z.object({
+      ref: z.object({ pluginId: z.string(), id: z.string() }), kind: z.string(), title: z.string(),
+      snippet: z.object({ text: z.string(), ranges: z.array(z.object({ start: z.number().int(), end: z.number().int() })) }),
+      href: z.string(), projectId, updatedAt: z.number(), score: z.number(),
+    })),
+  },
   create: {
     input: z.object({ pluginId, kind: z.string().min(1).max(100), projectId }),
     output: z.object({ item: schemas.item }),

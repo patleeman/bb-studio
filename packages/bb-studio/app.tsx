@@ -12,8 +12,8 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
   app.commands.register({
     id: "search",
-    title: "Studio: Search items",
-    defaultShortcut: { key: "k", mod: true, shift: true },
+    title: "Studio: Search everything",
+    defaultShortcut: { key: "k", mod: true },
     run: toggleQuickOpen,
   });
 });

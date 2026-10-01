@@ -28,4 +28,9 @@ export const MIGRATIONS = [
        opened_at INTEGER NOT NULL,
        PRIMARY KEY (plugin_id, item_id)
      );`,
+  `CREATE VIRTUAL TABLE studio_search_fts USING fts5(
+       plugin_id UNINDEXED, item_id UNINDEXED, kind UNINDEXED,
+       project_id UNINDEXED, href UNINDEXED, updated_at UNINDEXED,
+       title, body, tokenize='unicode61 remove_diacritics 2'
+     );`,
 ];

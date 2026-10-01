@@ -16,7 +16,7 @@ the kind filters and New menu in the header.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
-Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
+Studio search (Cmd/Ctrl+K) over the same staged project, searching
 "offline sync": a task matches on its title, and another task, an HTML
 artifact and two pages match on their content, each showing the matching
 text with the match in bold.
@@ -27,13 +27,12 @@ text with the match in bold.
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their
   length and word count.
-- **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search items**
+- **Search from anywhere.** Cmd/Ctrl+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
-  page. Titles match as you type; each add-on also searches its content —
+  page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening the inbox, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
   page text, transcripts, drawing text, artifact files, task notes, bot
   descriptions — and the row shows the text that matched. With nothing typed
-  it lists recently changed items. ↑↓ and ↵ open one. (Cmd/Ctrl+K stays
-  BB's thread search; plugins can't add results to it.)
+  it lists recently changed items. ↑↓ and ↵ open one.
 - **Tags** group items across add-ons: a page, a drawing and a task can all
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
@@ -65,6 +64,7 @@ text with the match in bold.
 bb studio list [--all] [--kind <kind>] [--query <text>] [--tag <tag>] [--json]
 bb studio tags
 bb studio providers
+bb studio reindex
 ```
 
 ## How it works
@@ -75,9 +75,7 @@ bb studio providers
   [`@bb-studio/kit`](../bb-studio-kit), and publish them for RPC discovery.
   Studio finds them with `bb.sdk.plugins.experimental_discoverRpc` and calls
   them with `callRpc`. Any plugin can join the suite this way.
-- `studio_search` returns the ids whose content matches and, optionally, a
-  snippet of the matching text for each (the kit's `snippets` helper makes
-  them). Studio matches titles itself.
+- Studio keeps an FTS5 index of item titles and `studio_read` text. `studio_changed` updates changed items; `bb studio reindex` rebuilds the index. Older v1 add-ons use `studio_search` as a fallback. The `searchAll` RPC returns ranked items, thread matches and channel messages with snippet ranges.
 - An add-on tells Studio when its items change (`studio_changed`); Studio
   relays that over realtime and the open collection refetches.
 - A stopped or failing add-on shows up as unavailable instead of breaking the

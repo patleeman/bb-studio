@@ -20,6 +20,8 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
+import { SearchIndex } from "./src/search-index";
+import { externalResults } from "./src/search-external";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -32,6 +34,16 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
   const tabs = new TabStore(db);
+  const searchIndex = new SearchIndex(db, hub);
+  const contentSearch = async (query: string) => {
+    await searchIndex.ensure();
+    const indexed = searchIndex.search(query, { limit: 100 });
+    const fallback = await hub.search(query, true);
+    return {
+      keys: [...new Set([...indexed.map((hit) => `${hit.ref.pluginId}:${hit.ref.id}`), ...fallback.keys])],
+      snippets: { ...fallback.snippets, ...Object.fromEntries(indexed.map((hit) => [`${hit.ref.pluginId}:${hit.ref.id}`, hit.snippet.text])) },
+    };
+  };
   /** Every window's sidebar refetches its tabs. */
   const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 
@@ -105,7 +117,26 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(rpcContract, {
     overview: () => overview(),
-    search: ({ query }) => hub.search(query),
+    search: ({ query }) => contentSearch(query),
+    searchAll: async ({ query, kinds, projectId, limit }) => {
+      await searchIndex.ensure();
+      const studio = query.trim() ? searchIndex.search(query, { kinds, projectId, limit }) : searchIndex.recent(limit, { kinds, projectId });
+      const others = query.trim() ? await externalResults(bb, query, { kinds, projectId, limit }) : [];
+      const fallback = query.trim() ? await hub.search(query, true) : { keys: [], snippets: {} };
+      const groups = new Map<string, string[]>();
+      for (const key of fallback.keys) {
+        const split = key.indexOf(":");
+        const pluginId = key.slice(0, split), id = key.slice(split + 1);
+        groups.set(pluginId, [...(groups.get(pluginId) ?? []), id]);
+      }
+      const legacy = (await Promise.all([...groups].map(([pluginId, ids]) => hub.get(pluginId, ids).catch(() => [])))).flat()
+        .filter((item) => !item.archived && (!kinds?.length || kinds.includes(item.kind)) && (projectId === undefined || item.projectId === projectId)).map((item) => ({
+        ref: { pluginId: item.pluginId, id: item.id }, kind: item.kind, title: item.title,
+        snippet: { text: fallback.snippets[`${item.pluginId}:${item.id}`] ?? "", ranges: [] },
+        href: item.href, projectId: item.projectId, updatedAt: item.updatedAt, score: 1,
+      }));
+      return [...studio, ...legacy, ...others].sort((a, b) => b.score - a.score || b.updatedAt - a.updatedAt).slice(0, limit);
+    },
     create: ({ pluginId, kind, projectId }) => hub.call(pluginId, "studio_create", { kind, projectId }),
     move: ({ pluginId, ids, projectId }) => hub.call(pluginId, "studio_move", { ids, projectId }),
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
@@ -137,6 +168,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     studio_changed: async ({ pluginId, ids, removed }) => {
+      await searchIndex.changed(pluginId, ids, removed).catch(() => {});
       if (!ids && !removed) changes.append(null);
       let fresh: HubItem[] | null = [];
       let fallbackKind: string | null = null;
@@ -225,7 +257,7 @@ export default async function plugin(bb: BbPluginApi) {
     const labels = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.label])));
     const raw = options.query?.trim();
     const query = raw?.toLowerCase();
-    const content = raw ? await hub.search(raw) : null;
+    const content = raw ? await contentSearch(raw) : null;
     const contentKeys = new Set(content?.keys);
     const picked: ListedItem[] = items
       .filter(
@@ -316,6 +348,7 @@ export default async function plugin(bb: BbPluginApi) {
       { name: "list", summary: "List items in the current project and global ones", usage: "bb studio list [--all] [--kind <kind>] [--tag <tag>] [--query <text>] [--json]" },
       { name: "tags", summary: "List tags and how many items have each", usage: "bb studio tags" },
       { name: "providers", summary: "Show which Studio add-ons are installed and ready", usage: "bb studio providers" },
+      { name: "reindex", summary: "Rebuild the Studio search index", usage: "bb studio reindex" },
     ],
     async run(argv, ctx) {
       const { command, rest } = subcommand(argv);
@@ -350,8 +383,12 @@ export default async function plugin(bb: BbPluginApi) {
             );
             return { exitCode: 0, stdout: `${lines.join("\n")}\n` };
           }
+          case "reindex": {
+            const count = await searchIndex.rebuild();
+            return { exitCode: 0, stdout: `Indexed ${count} Studio items.\n` };
+          }
           default:
-            return usage("bb studio <list|tags|providers> …");
+            return usage("bb studio <list|tags|providers|reindex> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };
