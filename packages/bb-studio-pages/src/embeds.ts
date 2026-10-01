@@ -8,11 +8,12 @@ import { indexItem, studioIndex, type StudioIndexItem } from "@bb-studio/kit/ser
 import { TABLES_PLUGIN_ID, tablesContract } from "@bb-studio/kit/tables";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { PLUGIN_ID, type BoardCard, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
+import { PLUGIN_ID, spaceWidgetSchema, type BoardCard, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
 
 const MAX_TEXT = 20_000;
 const TASKS_PLUGIN_ID = "studio-tasks";
 const TALK_PLUGIN_ID = "talk";
+const STUDIO_PLUGIN_ID = "studio";
 
 const taskFields = z.object({
   id: z.string(),
@@ -116,6 +117,15 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       const { task } = await call(TASKS_PLUGIN_ID, "create", { boardId, title, ...(status ? { status } : {}) }, z.object({ task: z.object({ id: z.string() }) }));
       index.invalidate();
       return { taskId: task.id };
+    },
+    /** A space widget's data; null when Studio or the space is gone. */
+    space(id: string) {
+      return call(STUDIO_PLUGIN_ID, "spaceWidget", { id }, spaceWidgetSchema).catch(() => null);
+    },
+    async createInSpace(id: string, pluginId: string, kind: string) {
+      const result = await call(STUDIO_PLUGIN_ID, "createInSpace", { id, pluginId, kind }, z.object({ href: z.string() }));
+      index.invalidate();
+      return result;
     },
     async recording(id: string): Promise<RecordingCard | null> {
       const result = await call(TALK_PLUGIN_ID, "recording_get", { id }, recordingSchema).catch(() => null);

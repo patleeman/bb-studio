@@ -95,4 +95,6 @@ export const MIGRATIONS = [
        created_at INTEGER NOT NULL
      );
    CREATE UNIQUE INDEX views_name ON views (name COLLATE NOCASE);`,
+  // A space's home page in Pages (src/space-page.ts).
+  `ALTER TABLE spaces ADD COLUMN page_id TEXT`,
 ];

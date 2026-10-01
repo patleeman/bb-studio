@@ -1,7 +1,7 @@
 import { blocksToYDoc, yDocToBlocks } from "@blocknote/core/yjs";
 import { describe, expect, it } from "vitest";
 import { blocksToMarkdown, markdownToBlocks, type PageBlock } from "./markdown";
-import { DOCUMENT_FRAGMENT, MAX_HTML_CHARS } from "./schema-config";
+import { DOCUMENT_FRAGMENT, MAX_HTML_CHARS, parseSpaceTarget } from "./schema-config";
 import { createServerEditor } from "./schema-server";
 
 const editor = createServerEditor();
@@ -137,6 +137,16 @@ See @[Roadmap](item:excalidraw:drw_1).
     expect(markdown).toContain("```mermaid\nflowchart LR\n  A --> B\n```");
     expect(markdown).toContain('{"kind":"drawing","target":"drw_1"}');
     expect(markdown).toContain("@[Roadmap](item:excalidraw:drw_1)");
+  });
+});
+
+describe("space widgets", () => {
+  it("round-trip as space embeds, and name their section", () => {
+    const blocks = markdownToBlocks('## Recent\n\n```embed\n{"kind":"space","target":"spc_1/recent"}\n```\n');
+    expect(blocks[1]).toMatchObject({ type: "embed", props: { kind: "space", target: "spc_1/recent" } });
+    expect(blocksToMarkdown(throughYjs(blocks))).toContain('{"kind":"space","target":"spc_1/recent"}');
+    expect(parseSpaceTarget("spc_1/threads")).toEqual({ spaceId: "spc_1", section: "threads" });
+    expect(parseSpaceTarget("spc_1/nonsense")).toEqual({ spaceId: "spc_1", section: "recent" });
   });
 });
 

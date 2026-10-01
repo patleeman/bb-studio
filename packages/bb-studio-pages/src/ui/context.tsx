@@ -1,7 +1,7 @@
 import { createContext, useContext } from "react";
 import type { Column, Table, Values } from "@bb-studio/kit/tables";
 import type { TableApi } from "@bb-studio/kit/table-grid";
-import type { BoardCard, BotView, PageMetaView, RecordingCard, StudioEmbedItem, TaskCard, TaskColumn } from "../contract";
+import type { BoardCard, BotView, PageMetaView, RecordingCard, SpaceWidgetView, StudioEmbedItem, TaskCard, TaskColumn } from "../contract";
 
 export interface ArtifactView {
   type: "image" | "html" | "markdown" | "code" | "text" | "pdf" | "other";
@@ -36,6 +36,12 @@ export interface PagesUi {
   /** Makes an item in another add-on, in the page's project. */
   createItem(pageId: string, pluginId: string, kind: string): Promise<StudioEmbedItem>;
   createTable(input: { pageId: string; title: string; columns: Column[]; rows: Values[] }): Promise<Table>;
+  /** A space widget's space, through Studio; null without it. */
+  space(id: string): Promise<SpaceWidgetView | null>;
+  /** Makes an item in a space; resolves to where it opens. */
+  createInSpace(input: { id: string; pluginId: string; kind: string }): Promise<{ href: string }>;
+  /** Opens the composer on a draft. */
+  compose(prompt: string): void;
 }
 
 const unavailable = () => Promise.reject(new Error("Not available here."));
@@ -60,6 +66,9 @@ export const PagesUiContext = createContext<PagesUi>({
   recording: unavailable,
   createItem: unavailable,
   createTable: unavailable,
+  space: () => Promise.resolve(null),
+  createInSpace: unavailable,
+  compose: () => {},
 });
 
 export const usePagesUi = () => useContext(PagesUiContext);

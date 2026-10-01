@@ -2,7 +2,8 @@
 // query (src/query.ts) from the bar above it and the rail beside it. The
 // panel's sub-path can start the query on a kind, so
 // /plugins/studio/studio/recording links to recordings; space/<id> opens a
-// space's home instead (Spaces.tsx), which lists the space's items here by
+// space's page in Pages, or Studio's own home for it without Pages
+// (Spaces.tsx), and space/<id>/items lists the space's items here by
 // filtering on it.
 import {
   CollectionPage,
@@ -217,6 +218,25 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   }, [data, spaceId, space, openSpace]);
 
   const [query, setQuery] = useStoredQuery("studio:query:all");
+  // A space opens its page; without Pages, the home below.
+  const listSpace = segments[2] === "items";
+  const [homeless, setHomeless] = useState<string | null>(null);
+  useEffect(() => {
+    if (!spaceId || listSpace) return;
+    let live = true;
+    rpc.call("spacePage", { id: spaceId }).then(
+      ({ href }) => live && (href ? openAppPath(href, { replace: true }) : setHomeless(spaceId)),
+      () => live && setHomeless(spaceId),
+    );
+    return () => {
+      live = false;
+    };
+  }, [rpc, spaceId, listSpace]);
+  useEffect(() => {
+    if (!listSpace || !space) return;
+    setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
+    navigate.toPluginPanel("studio", { subPath: "", replace: true });
+  }, [listSpace, space, setQuery, navigate]);
   // A link to a kind starts the query on it.
   const seededKind = useRef<string | null>(null);
   useEffect(() => {
@@ -532,7 +552,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   return (
     <>
-      {space ? (
+      {space && (listSpace || homeless !== space.id) ? null : space ? (
         <SpaceHome
           rpc={rpc}
           space={space}

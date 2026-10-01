@@ -26,6 +26,7 @@ import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
+import { PAGES_PLUGIN_ID, pageHref, spacePageMarkdown } from "./src/space-page";
 import { compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -165,9 +166,11 @@ export default async function plugin(bb: BbPluginApi) {
     const assigned = tags.assignments();
     const allSpaces = spaces.list();
     const inSpaces = spaceAssignments(allSpaces, result.items);
+    // A space's page lists as the space.
+    const homes = new Set(allSpaces.map((space) => space.pageId));
     return {
       providers: result.providers,
-      items: result.items.map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${item.pluginId}:${item.id}`) ?? [] })),
+      items: result.items.filter((item) => item.pluginId !== PAGES_PLUGIN_ID || !homes.has(item.id)).map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${item.pluginId}:${item.id}`) ?? [] })),
       tags: tags.list(),
       spaces: allSpaces,
       views: views.list(),
@@ -230,6 +233,40 @@ export default async function plugin(bb: BbPluginApi) {
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
 
+  const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean() }).nullable() });
+  const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
+    bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
+  const making = new Map<string, Promise<string | null>>();
+  /** A space's home page, made from the space template if it has none, or one was deleted; null without Pages. */
+  const spacePage = (id: string): Promise<string | null> => {
+    const pending = making.get(id);
+    if (pending) return pending;
+    const work = (async () => {
+      const space = spaces.get(id);
+      if (!space) throw new Error("That space no longer exists.");
+      if (space.pageId) {
+        const found = await callPages("get", { id: space.pageId }, pageResult).catch(() => undefined);
+        // Pages being down doesn't lose the page.
+        if (found === undefined || (found.page && !found.page.archived)) return space.pageId;
+      }
+      const made = await callPages(
+        "create",
+        { projectId: space.defaultProjectId, parentId: null, title: space.name, ...(space.icon ? { icon: space.icon } : {}), markdown: spacePageMarkdown(space) },
+        pageResult,
+      ).catch(() => null);
+      if (!made?.page) return null;
+      spaces.setPage(id, made.page.id);
+      tagsChanged();
+      return made.page.id;
+    })().finally(() => making.delete(id));
+    making.set(id, work);
+    return work;
+  };
+  /** A space's page keeps its name and icon. */
+  const renamePage = (space: Space) => {
+    if (space.pageId) void callPages("update", { id: space.pageId, title: space.name, icon: space.icon ?? "" }, pageResult).catch(() => {});
+  };
+
   const tabViews = ({ providers, items }: { providers: Awaited<ReturnType<typeof hub.providers>>; items: HubItem[] }): TabView[] => {
     const kindIcons = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.icon])));
     const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
@@ -256,6 +293,9 @@ export default async function plugin(bb: BbPluginApi) {
     // A space opens at /plugins/studio/studio/space/<id>.
     const id = pluginId === STUDIO_PLUGIN_ID ? parts[5] : parts[4];
     if (!pluginId || !id) return null;
+    // A space's page opens as the space.
+    const home = pluginId === PAGES_PLUGIN_ID ? spaces.list().find((space) => space.pageId === decodeURIComponent(id)) : undefined;
+    if (home) return spaceItem(home);
     const items = await hub.get(pluginId, [decodeURIComponent(id)]).catch(() => []);
     return itemAtPath(items, path);
   };
@@ -351,20 +391,72 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     spaces: () => ({ spaces: spaces.list() }),
-    createSpace: (input) => {
-      const space = spaces.create(input);
+    createSpace: async (input) => {
+      const made = spaces.create(input);
       tagsChanged();
-      return { space };
+      await spacePage(made.id);
+      return { space: spaces.get(made.id) ?? made };
     },
     updateSpace: ({ id, ...input }) => {
+      const before = spaces.get(id);
       const space = spaces.update(id, input);
+      if (before && (before.name !== space.name || before.icon !== space.icon)) renamePage(space);
       tagsChanged();
       return { space };
     },
     deleteSpace: ({ id }) => {
+      const pageId = spaces.get(id)?.pageId;
       spaces.remove(id);
+      // The page may hold the user's writing: archive it rather than delete it.
+      if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
       tagsChanged();
       return { ok: true };
+    },
+    spacePage: async ({ id }) => {
+      const pageId = await spacePage(id);
+      return { href: pageId ? pageHref(pageId) : null };
+    },
+    spaceWidget: async ({ id }) => {
+      const space = spaces.get(id);
+      if (!space) throw new Error("That space no longer exists.");
+      const [{ items, providers }, threads, projects] = await Promise.all([hub.overview(), spaceThreads(space), bb.sdk.projects.list().catch(() => [])]);
+      const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
+      const held = items
+        .filter((item) => !item.archived && inSpace(space, item) && !(item.pluginId === PAGES_PLUGIN_ID && item.id === space.pageId))
+        .sort((a, b) => b.updatedAt - a.updatedAt);
+      return {
+        space: { id: space.id, name: space.name, icon: space.icon, defaultProjectId: space.defaultProjectId },
+        recent: held.slice(0, 8).map((item) => {
+          const kind = kindsOf.get(`${item.pluginId}:${item.kind}`);
+          return { pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kind?.icon ?? "File", kindLabel: kind?.label ?? item.kind, href: item.href, updatedAt: item.updatedAt };
+        }),
+        itemCount: held.length,
+        threads,
+        projects: space.projectIds.map((projectId) => ({
+          id: projectId,
+          name: projects.find((project) => project.id === projectId)?.name ?? projectId,
+          items: held.filter((item) => item.projectId === projectId).length,
+          threads: threads.filter((thread) => thread.projectId === projectId).length,
+          isDefault: space.defaultProjectId === projectId,
+        })),
+        kinds: providers
+          .filter((provider) => provider.state === "ready" && provider.pluginId !== STUDIO_PLUGIN_ID)
+          .flatMap((provider) =>
+            provider.kinds
+              .filter((kind) => kind.create && (kind.capabilities?.create ?? true))
+              .map((kind) => ({ pluginId: provider.pluginId, id: kind.id, label: kind.label, icon: kind.icon, event: kind.create?.mode === "event" ? kind.create.event : null })),
+          ),
+        threadPrompt: `Space: ${space.name} (${spacePath(space.id)})\n\n`,
+        itemsHref: `${spacePath(space.id)}/items`,
+      };
+    },
+    createInSpace: async ({ id, pluginId, kind }) => {
+      const space = spaces.get(id);
+      if (!space) throw new Error("That space no longer exists.");
+      const { item } = await hub.call(pluginId, "studio_create", { kind, projectId: space.defaultProjectId });
+      spaces.add(id, [{ pluginId, id: item.id }]);
+      tagsChanged();
+      return { href: item.href };
     },
     spaceMembers: ({ id, add, remove }) => {
       if (add.length) spaces.add(id, add);
@@ -396,6 +488,8 @@ export default async function plugin(bb: BbPluginApi) {
       return { spaces: holding, inherited: holding.filter((space) => !space.threadIds.includes(threadId)).map((space) => space.id) };
     },
     studio_changed: async ({ pluginId, ids, removed }) => {
+      // A deleted space page is made again from the template when the space next opens.
+      if (pluginId === PAGES_PLUGIN_ID && removed?.length) for (const space of spaces.list()) if (space.pageId && removed.includes(space.pageId)) spaces.setPage(space.id, null);
       await searchIndex.changed(pluginId, ids, removed).catch(() => {});
       if (!ids && !removed) changes.append(null);
       let fresh: HubItem[] | null = [];

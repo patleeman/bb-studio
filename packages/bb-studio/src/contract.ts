@@ -54,6 +54,8 @@ const space = z.object({
   threadIds: z.array(z.string()),
   /** Items added one by one, as `<plugin>:<id>`. */
   itemKeys: z.array(z.string()),
+  /** The space's home page in Pages, or null before it has one. */
+  pageId: z.string().nullable(),
 });
 export type SpaceView = z.infer<typeof space>;
 const spaceId = z.string().min(1).max(100);
@@ -78,6 +80,22 @@ const spaceThread = z.object({
   botName: z.string().nullable(),
 });
 export type SpaceThreadView = z.infer<typeof spaceThread>;
+/** What a space page's widgets show; Pages renders them. */
+const spaceWidget = z.object({
+  space: z.object({ id: z.string(), name: z.string(), icon: z.string().nullable(), defaultProjectId: z.string().nullable() }),
+  /** The space's newest items, and how many it has. */
+  recent: z.array(z.object({ pluginId: z.string(), id: z.string(), title: z.string(), icon: z.string().nullable(), kindIcon: z.string(), kindLabel: z.string(), href: z.string(), updatedAt: z.number() })),
+  itemCount: z.number(),
+  threads: z.array(spaceThread),
+  projects: z.array(z.object({ id: z.string(), name: z.string(), items: z.number(), threads: z.number(), isDefault: z.boolean() })),
+  /** Kinds a space can make; an event kind opens its own dialog. */
+  kinds: z.array(z.object({ pluginId: z.string(), id: z.string(), label: z.string(), icon: z.string(), event: z.string().nullable() })),
+  /** A composer draft that files a new thread in the space. */
+  threadPrompt: z.string(),
+  /** Studio's collection, filtered to the space. */
+  itemsHref: z.string(),
+});
+export type SpaceWidgetView = z.infer<typeof spaceWidget>;
 const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
 export type SavedViewView = z.infer<typeof savedView>;
 const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), spaces: z.array(z.string()) });
@@ -176,6 +194,12 @@ export const rpcContract = defineRpcContract({
   spaceThreads: { input: z.object({ id: spaceId }), output: z.object({ threads: z.array(spaceThread) }) },
   /** The spaces a thread is in; `inherited` ones hold it through a project. */
   spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
+  /** Where a space opens: its home page, made from the space template if it has none; null without Pages. */
+  spacePage: { input: z.object({ id: spaceId }), output: z.object({ href: z.string().nullable() }) },
+  /** What a space page's widgets show, for Pages. */
+  spaceWidget: { input: z.object({ id: spaceId }), output: spaceWidget },
+  /** An item made in a space's default project and added to the space. */
+  createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string() }) },
   /** Open threads, channels and direct messages to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
   /** Saves a collection query by name, replacing a view with that name. */

@@ -30,6 +30,8 @@ export interface Space {
   threadIds: string[];
   /** Studio items added one by one, as `<plugin>:<id>`. */
   itemKeys: string[];
+  /** The space's home: a Pages page made from the space template, or null before it has one. */
+  pageId: string | null;
   createdAt: number;
   /** When it was made or last gained a member. */
   updatedAt: number;
@@ -52,6 +54,7 @@ interface SpaceRow {
   icon: string | null;
   description: string | null;
   default_project_id: string | null;
+  page_id: string | null;
   created_at: number;
 }
 
@@ -67,7 +70,7 @@ export class SpaceStore {
   list(): Space[] {
     const rows = this.db
       .prepare(
-        `SELECT tags.id, tags.name, tags.color, tags.created_at, spaces.icon, spaces.description, spaces.default_project_id
+        `SELECT tags.id, tags.name, tags.color, tags.created_at, spaces.icon, spaces.description, spaces.default_project_id, spaces.page_id
            FROM tags LEFT JOIN spaces ON spaces.tag_id = tags.id
           WHERE tags.kind = 'space' ORDER BY tags.name COLLATE NOCASE`,
       )
@@ -87,6 +90,7 @@ export class SpaceStore {
         projectIds: own.filter((member) => member.plugin_id === PROJECT_REF).map((member) => member.item_id),
         threadIds: own.filter((member) => member.plugin_id === THREAD_REF).map((member) => member.item_id),
         itemKeys: own.filter((member) => member.plugin_id !== PROJECT_REF && member.plugin_id !== THREAD_REF).map((member) => `${member.plugin_id}:${member.item_id}`),
+        pageId: row.page_id,
         createdAt: row.created_at,
         updatedAt: Math.max(row.created_at, ...own.map((member) => member.created_at)),
       };
@@ -143,6 +147,12 @@ export class SpaceStore {
       if (input.defaultProjectId) this.add(id, [{ pluginId: PROJECT_REF, id: input.defaultProjectId }]);
     })();
     return this.get(id)!;
+  }
+
+  /** Sets or clears the space's home page. */
+  setPage(id: string, pageId: string | null): void {
+    if (!this.exists(id)) throw new Error("That space no longer exists.");
+    this.db.prepare("INSERT INTO spaces (tag_id, page_id) VALUES (?, ?) ON CONFLICT (tag_id) DO UPDATE SET page_id = excluded.page_id").run(id, pageId);
   }
 
   /** Deletes the space; its members stay where they are. */

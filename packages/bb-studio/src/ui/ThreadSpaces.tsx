@@ -17,7 +17,7 @@ import { useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
-import { SpaceGlyph, spaceHref } from "./Spaces";
+import { SpaceGlyph, spaceLink } from "./Spaces";
 
 const THREAD_REF = "bb-thread";
 const REFETCH_DEBOUNCE_MS = 300;
@@ -69,7 +69,7 @@ export function ThreadSpaces({ threadId }: PluginThreadHeaderActionProps) {
       <DropdownMenuContent align="end" className="max-h-96 w-64 overflow-y-auto">
         {held.spaces.length ? <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">In spaces</DropdownMenuLabel> : null}
         {held.spaces.map((space) => (
-          <DropdownMenuItem key={space.id} onSelect={() => openAppPath(spaceHref(space.id))}>
+          <DropdownMenuItem key={space.id} onSelect={() => openAppPath(spaceLink(space))}>
             <SpaceGlyph space={space} className="text-sm leading-none" /> {space.name}
             {held.inherited.includes(space.id) ? <span className="ml-auto text-xs text-muted-foreground">Project</span> : null}
           </DropdownMenuItem>

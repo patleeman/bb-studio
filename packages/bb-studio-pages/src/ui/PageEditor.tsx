@@ -18,10 +18,11 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import { Icon } from "@bb-studio/kit/ui";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
-import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
+import { DOCUMENT_FRAGMENT, SPACE_SECTIONS, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed } from "./links";
 import { PageSideMenu, placeEmbed } from "./block-menu";
 import { focusNewTask } from "./live-embeds";
+import { pageSpaceId, SPACE_SECTION_LABELS } from "./space-embeds";
 import { pageSchema } from "./blocks";
 import { createHighlighter } from "./code";
 import type { PageConnection } from "./connection";
@@ -325,9 +326,21 @@ export function PageEditor({
             },
           ]
         : [];
-      return filterSuggestionItems([...slashItems, ...talk], query);
+      // A space's page can put back the widgets the user removed.
+      const spaceId = pageSpaceId(editor.document);
+      const widgets: DefaultReactSuggestionItem[] = spaceId
+        ? SPACE_SECTIONS.map((section) => ({
+            title: `Space: ${SPACE_SECTION_LABELS[section]}`,
+            subtext: "A live widget of this space",
+            aliases: ["space", "widget", section],
+            group: "Space",
+            icon: <Icon name="Layers" className="size-4" />,
+            onItemClick: () => insertOrUpdateBlockForSlashMenu(editor, { type: "embed", props: { kind: "space", target: `${spaceId}/${section}` } }),
+          }))
+        : [];
+      return filterSuggestionItems([...slashItems, ...widgets, ...talk], query);
     },
-    [slashItems, fieldKey],
+    [slashItems, fieldKey, editor],
   );
 
   // Talk dictates at the cursor. Before the user has put the cursor in the

@@ -2,6 +2,7 @@ import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { inSpace, linkedSpaceIds, PROJECT_REF, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace } from "./spaces";
+import { spacePageMarkdown } from "./space-page";
 import { TagStore } from "./tags";
 import { firstThreadSpaceIds } from "./thread-item-refs";
 
@@ -15,6 +16,17 @@ const page = { pluginId: "pages", id: "pg_1", projectId: null };
 const drawing = { pluginId: "excalidraw", id: "d1", projectId: "proj_app" };
 
 describe("spaces", () => {
+  it("keep their page, and start it with every widget", () => {
+    const { spaces } = stores();
+    const launch = spaces.create({ name: "Launch", description: "Q4 launch" });
+    expect(launch.pageId).toBeNull();
+    spaces.setPage(launch.id, "pg_1");
+    expect(spaces.get(launch.id)!.pageId).toBe("pg_1");
+    const markdown = spacePageMarkdown(launch);
+    expect(markdown.startsWith("Q4 launch")).toBe(true);
+    for (const section of ["actions", "recent", "threads", "channels", "projects"]) expect(markdown).toContain(`{"kind":"space","target":"${launch.id}/${section}"}`);
+  });
+
   it("are kept apart from tags", () => {
     const { tags, spaces } = stores();
     const launch = spaces.create({ name: "Launch", description: "Q4 launch" });

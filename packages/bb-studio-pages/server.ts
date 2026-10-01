@@ -235,6 +235,8 @@ export default async function plugin(bb: BbPluginApi) {
     boardRename: ({ id, title }) => embeds.renameBoard(id, title),
     boardTaskCreate: ({ boardId, title, status }) => embeds.createBoardTask(boardId, title, status),
     recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
+    spaceView: async ({ id }) => ({ view: await embeds.space(id) }),
+    spaceCreate: ({ id, pluginId, kind }) => embeds.createInSpace(id, pluginId, kind),
     markdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc) };

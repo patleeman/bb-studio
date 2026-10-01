@@ -27,6 +27,7 @@ import { codeBlockSpec } from "./code";
 import { usePagesUi } from "./context";
 import { HtmlBlock } from "./html";
 import { MermaidBlock } from "./mermaid";
+import { SpaceEmbed } from "./space-embeds";
 import { StudioEmbed, StudioPicker, useStudioItem } from "./studio-embeds";
 
 // React renderers for the custom blocks. Configs come from schema-config.ts so
@@ -295,6 +296,7 @@ const EMBED_ICONS = {
   board: "GridView",
   table: "Rows2",
   item: "GridView",
+  space: "Layers",
 } as const;
 
 function hostOf(url: string): string {
@@ -375,6 +377,7 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
   const [editing, setEditing] = useState(!target);
   const [draft, setDraft] = useState(target);
 
+  if (kind === "space") return <SpaceEmbed target={target} />;
   if (isStudioEmbed(kind)) {
     if (editing && onEdit) {
       return (
@@ -451,7 +454,7 @@ const EmbedBlock = createReactBlockSpec(embedConfig, {
     <div
       className={cn(
         "pages-embed my-1 w-full rounded-lg border border-border bg-card/50",
-        (block.props.kind === "bookmark" && block.props.target) || isStudioEmbed(block.props.kind) ? "overflow-hidden" : "p-2",
+        (block.props.kind === "bookmark" && block.props.target) || isStudioEmbed(block.props.kind) || block.props.kind === "space" ? "overflow-hidden" : "p-2",
       )}
       contentEditable={false}
     >

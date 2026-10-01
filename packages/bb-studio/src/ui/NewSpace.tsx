@@ -6,7 +6,7 @@ import { useBbContext, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
 import type { rpcContract } from "../contract";
 import { NEW_SPACE_EVENT } from "../ids";
-import { SpaceDialog, spaceHref } from "./Spaces";
+import { SpaceDialog, spaceLink } from "./Spaces";
 
 export function NewSpace() {
   const rpc = useRpc<typeof rpcContract>();
@@ -31,7 +31,7 @@ export function NewSpace() {
       onClose={() => setMaking(false)}
       onSaved={(saved) => {
         setMaking(false);
-        openAppPath(spaceHref(saved.id));
+        openAppPath(spaceLink(saved));
       }}
     />
   );

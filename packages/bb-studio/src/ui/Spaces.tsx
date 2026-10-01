@@ -53,6 +53,11 @@ export function spaceHref(id: string): string {
   return `/plugins/studio/studio/space/${encodeURIComponent(id)}`;
 }
 
+/** Where a space opens: its page, or Studio's route for it, which makes one. */
+export function spaceLink(space: SpaceView): string {
+  return space.pageId ? `/plugins/pages/pages/${encodeURIComponent(space.pageId)}` : spaceHref(space.id);
+}
+
 /** A composer draft that files the new thread in the space. */
 export function spacePrompt(space: SpaceView, rest = ""): string {
   return `${rest}${rest ? "\n\n" : ""}Space: ${space.name} (${spaceHref(space.id)})\n\n`;
@@ -683,6 +688,47 @@ export function AddThreadsDialog({
               {text ? `No ${noun} match.` : kind === "threads" ? "No open threads." : "No channels or direct messages. They come from Studio Teams."}
             </p>
           ) : null}
+        </div>
+        <DialogFooter>
+          <Button onClick={onClose}>Done</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
+/** Adds BB projects to a space, or takes them out; everything in one joins with it. */
+export function SpaceProjectsDialog({ rpc, space, projects, onClose, onChanged }: { rpc: Rpc; space: SpaceView; projects: readonly Project[]; onClose(): void; onChanged(): void }) {
+  const members = useMembers(rpc, space, onChanged);
+  const [busy, setBusy] = useState<string | null>(null);
+  const toggle = async (id: string, add: boolean) => {
+    setBusy(id);
+    const ref = [{ pluginId: PROJECT_REF, id }];
+    await members(add ? ref : [], add ? [] : ref);
+    setBusy(null);
+  };
+  return (
+    <Dialog open onOpenChange={(next) => !next && onClose()}>
+      <DialogContent className="sm:max-w-lg">
+        <DialogHeader>
+          <DialogTitle>Projects in {space.name}</DialogTitle>
+          <DialogDescription>A project's items and threads, now and later, belong to the space too. They stay in the project.</DialogDescription>
+        </DialogHeader>
+        <div className="-mx-2 flex max-h-96 flex-col overflow-y-auto">
+          {projects.map((project) => {
+            const added = space.projectIds.includes(project.id);
+            return (
+              <div key={project.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-state-hover">
+                <Icon name="Folder" className="size-4 shrink-0 text-muted-foreground" />
+                <span className="min-w-0 flex-1 truncate text-sm">{project.name}</span>
+                {space.defaultProjectId === project.id ? <span className="text-xs text-muted-foreground">Default</span> : null}
+                <button type="button" className={added ? GHOST_BUTTON : OUTLINE_BUTTON} disabled={busy === project.id} onClick={() => void toggle(project.id, !added)}>
+                  {added ? "Remove" : "Add"}
+                </button>
+              </div>
+            );
+          })}
+          {!projects.length ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">No projects.</p> : null}
         </div>
         <DialogFooter>
           <Button onClick={onClose}>Done</Button>
