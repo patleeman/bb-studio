@@ -7,6 +7,8 @@ struct TaskFieldsView: View {
     let projectId: String?
     let changed: () -> Void
     @State private var detail: Tasks.GetOutputTask?
+    @State private var subtasks: [Tasks.BoardOutputTasksItem] = []
+    @State private var firstStatus = "todo"
     @State private var priority = "none"
     @State private var labels = ""
     @State private var recurrence = ""
@@ -32,6 +34,15 @@ struct TaskFieldsView: View {
                 if let subtasks = detail?.subtasks, let total = subtasks.total, total > 0 {
                     LabeledContent("Subtasks", value: "\(Int(subtasks.done ?? 0)) of \(Int(total)) done")
                 }
+                ForEach(Array(subtasks.enumerated()), id: \.offset) { _, subtask in
+                    if let id = subtask.id {
+                        Button {
+                            Task { await toggleSubtask(id, done: subtask.status == "done") }
+                        } label: {
+                            Label(subtask.title ?? "Subtask", systemImage: subtask.status == "done" ? "checkmark.circle.fill" : "circle")
+                        }
+                    }
+                }
                 HStack {
                     TextField("New subtask", text: $subtaskTitle)
                     Button("Add") { Task { await addSubtask() } }
@@ -54,6 +65,8 @@ struct TaskFieldsView: View {
     private func load() async {
         do {
             detail = try await app.client.taskGenerated(id).task
+            subtasks = (try? await app.client.taskSubtasks(id)) ?? []
+            firstStatus = (try? await app.client.taskStatuses(projectId: projectId))?.first(where: { $0.id != "done" })?.id ?? "todo"
             if let detail {
                 priority = detail.priority.map { String(describing: $0) } ?? "none"
                 labels = (detail.labels ?? []).joined(separator: ", ")
@@ -82,6 +95,14 @@ struct TaskFieldsView: View {
         do {
             try await app.client.createSubtask(title, parentId: id, projectId: projectId)
             subtaskTitle = ""
+            changed()
+            await load()
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    }
+
+    private func toggleSubtask(_ id: String, done: Bool) async {
+        do {
+            _ = try await app.client.moveTask(id, to: done ? firstStatus : "done")
             changed()
             await load()
         } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }

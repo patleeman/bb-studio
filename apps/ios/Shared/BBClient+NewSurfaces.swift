@@ -5,6 +5,13 @@ extension BBClient {
         try await rpc("studio", Studio.Method.home, ["projectId": projectId.map(JSONValue.string) ?? .null])
     }
 
+    public func respondToStudioNeed(threadId: String, interactionId: String, action: String, answer: String? = nil) async throws {
+        let _: Studio.HomeRespondOutput = try await rpc("studio", Studio.Method.homeRespond, [
+            "threadId": .string(threadId), "interactionId": .string(interactionId),
+            "action": .string(action), "answer": answer.map(JSONValue.string) ?? .null,
+        ])
+    }
+
     public func studioSearchAll(_ query: String, projectId: String? = nil) async throws -> Studio.SearchAllOutput {
         try await rpc("studio", Studio.Method.searchAll, [
             "query": .string(String(query.prefix(200))),
@@ -22,6 +29,11 @@ extension BBClient {
 
     public func taskGenerated(_ id: String) async throws -> Tasks.GetOutput {
         try await rpc("studio-tasks", Tasks.Method.get, ["id": .string(id)])
+    }
+
+    public func taskSubtasks(_ id: String) async throws -> [Tasks.BoardOutputTasksItem] {
+        let result: Tasks.BoardOutput = try await rpc("studio-tasks", Tasks.Method.board, ["includeArchived": .bool(false)])
+        return (result.tasks ?? []).filter { $0.parentId == id }
     }
 
     public func updateTaskFields(_ id: String, priority: String, labels: [String], recurrence: String?, reminderAt: Date?) async throws {

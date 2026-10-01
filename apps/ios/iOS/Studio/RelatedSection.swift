@@ -45,7 +45,7 @@ struct RelatedSection: View {
                 }
             }
             if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            if links == nil, threads == nil, comments == nil { ProgressView() }
+            if links == nil, threads == nil, comments == nil, error == nil { ProgressView() }
             if links != nil, threads != nil, comments != nil,
                links?.outgoing?.isEmpty != false, links?.backlinks?.isEmpty != false,
                threads?.threads?.isEmpty != false, comments?.comments?.isEmpty != false {
@@ -79,6 +79,7 @@ struct RelatedSection: View {
         links = await foundLinks
         threads = await foundThreads
         comments = await foundComments
+        if links == nil, threads == nil, comments == nil { error = "Related items are unavailable." }
     }
 
     private func sendReply() async {

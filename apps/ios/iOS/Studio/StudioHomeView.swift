@@ -6,30 +6,62 @@ struct StudioHomeView: View {
     @State private var home: Studio.HomeOutput?
     @State private var error: String?
     @State private var collection = false
+    @State private var answering: Studio.HomeOutputNeedsYouItem?
+    @State private var answer = ""
 
     var body: some View {
         Group {
             if collection {
                 StudioView()
+                    .toolbar {
+                        ToolbarItem(placement: .topBarLeading) {
+                            Button("Home") { collection = false }
+                        }
+                    }
             } else {
                 List {
                     if let error { Text(error).foregroundStyle(.red) }
                     if let home {
-                        Section("Due today") {
+                        if let needs = home.needsYou, !needs.isEmpty {
+                            Section("Needs you") {
+                                ForEach(Array(needs.enumerated()), id: \.offset) { _, need in
+                                    VStack(alignment: .leading, spacing: 6) {
+                                        Text(need.title ?? "Needs you").font(.subheadline.weight(.semibold))
+                                        Text(need.body ?? "").font(.subheadline).foregroundStyle(.secondary)
+                                        HStack {
+                                            if let threadId = need.threadId {
+                                                Button("Open thread") { app.studioPath.append(.thread(id: threadId)) }
+                                            } else if let route = need.href.flatMap(Route.init(href:)) {
+                                                Button("Open") { app.studioPath.append(route) }
+                                            }
+                                            if need.responseKind == .approval {
+                                                Button("Approve once") { Task { await respond(need, action: "approve") } }
+                                                Button("Deny") { Task { await respond(need, action: "deny") } }
+                                            } else if need.responseKind == .question {
+                                                Button("Answer") { answering = need }
+                                            }
+                                        }
+                                        .font(.caption)
+                                    }
+                                    .accessibilityIdentifier("studioNeed")
+                                }
+                            }
+                        }
+                        if home.due?.isEmpty == false { Section("Due today") {
                             ForEach(Array((home.due ?? []).enumerated()), id: \.offset) { _, task in
                                 if let id = task.id {
                                     NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "calendar") }
                                 }
                             }
-                        }
-                        Section("In review") {
+                        } }
+                        if home.review?.isEmpty == false { Section("In review") {
                             ForEach(Array((home.review ?? []).enumerated()), id: \.offset) { _, task in
                                 if let id = task.id {
                                     NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "checkmark.circle") }
                                 }
                             }
-                        }
-                        Section("Agents working now") {
+                        } }
+                        if home.working?.threads?.isEmpty == false || home.working?.bots?.isEmpty == false { Section("Agents working now") {
                             ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in
                                 if let id = thread.id {
                                     NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: "bubble.left") }
@@ -40,8 +72,8 @@ struct StudioHomeView: View {
                                     NavigationLink(value: Route.bot(id: id)) { Label(bot.name ?? "Bot", systemImage: "person.crop.square") }
                                 }
                             }
-                        }
-                        Section("Recent items") {
+                        } }
+                        if home.recent?.isEmpty == false { Section("Recent items") {
                             ForEach(Array((home.recent ?? []).enumerated()), id: \.offset) { _, item in
                                 if let route = item.href.flatMap(Route.init(href:)) {
                                     NavigationLink(value: route) { Label(item.title ?? "Untitled", systemImage: StudioKind.of(item.kind ?? "").symbol) }
@@ -49,8 +81,8 @@ struct StudioHomeView: View {
                                     Text(item.title ?? "Untitled")
                                 }
                             }
-                        }
-                        Section("Activity") {
+                        } }
+                        if home.activity?.isEmpty == false { Section("Activity") {
                             ForEach(Array((home.activity ?? []).enumerated()), id: \.offset) { _, event in
                                 VStack(alignment: .leading, spacing: 3) {
                                     Text(event.summary ?? event.verb ?? "Update")
@@ -60,7 +92,7 @@ struct StudioHomeView: View {
                                     }
                                 }
                             }
-                        }
+                        } }
                     } else if error == nil {
                         ProgressView()
                     }
@@ -74,6 +106,14 @@ struct StudioHomeView: View {
                 }
                 .refreshable { await load() }
                 .task { await load() }
+                .alert("Answer question", isPresented: Binding(get: { answering != nil }, set: { if !$0 { answering = nil } })) {
+                    TextField("Answer", text: $answer, axis: .vertical)
+                    Button("Cancel", role: .cancel) { answer = "" }
+                    Button("Send") {
+                        if let need = answering { Task { await respond(need, action: "answer", answer: answer) } }
+                        answer = ""
+                    }
+                }
             }
         }
     }
@@ -85,5 +125,13 @@ struct StudioHomeView: View {
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
+    }
+
+    private func respond(_ need: Studio.HomeOutputNeedsYouItem, action: String, answer: String? = nil) async {
+        guard let threadId = need.threadId, let interactionId = need.interactionId else { return }
+        do {
+            try await app.client.respondToStudioNeed(threadId: threadId, interactionId: interactionId, action: action, answer: answer)
+            await load()
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
     }
 }
