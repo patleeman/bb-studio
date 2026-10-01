@@ -74,6 +74,23 @@ export interface CollectionHandlers {
   onExportBulk?(items: CollectionItem[]): Promise<void>;
 }
 
+/**
+ * A host that filters for itself, like Studio's query bar: `items` arrive
+ * filtered, `bar` takes the search box's place and `rail` sits beside the list.
+ */
+export interface CollectionFilter {
+  bar: ReactNode;
+  rail?: ReactNode;
+  /** The words searched for, to highlight. */
+  text: string;
+  /** Item keys whose content matched, with the text that matched if known. */
+  snippets: ReadonlyMap<string, string | null>;
+  /** Whether the items are archived ones, so bulk actions restore. */
+  archived: boolean;
+  /** Shown when no item matches. */
+  empty: string;
+}
+
 type View = "list" | "grid";
 const ALL = "all";
 const GLOBAL = "global";
@@ -132,6 +149,7 @@ export function CollectionPage({
   headerActions,
   extraCreateItems,
   handlers,
+  filter,
 }: {
   title: string;
   kinds: readonly CollectionKind[];
@@ -156,15 +174,19 @@ export function CollectionPage({
   headerActions?: ReactNode;
   extraCreateItems?: readonly { id: string; label: string; icon: string; onSelect(projectId: string | null): void }[];
   handlers: CollectionHandlers;
+  filter?: CollectionFilter;
 }) {
   const [query, setQuery] = useState("");
   const [project, setProject] = useStoredState<string>(`${storageKey}:project`, ALL);
   const [view, setView] = useStoredState<View>(`${storageKey}:view`, "list", ["list", "grid"]);
   const [tagFilter, setTagFilter] = useStoredState<string>(`${storageKey}:tag`, ALL);
   const [renaming, setRenaming] = useState(false);
-  const [archived, setArchived] = useState(false);
+  const [archivedFilter, setArchived] = useState(false);
+  const archived = filter ? filter.archived : archivedFilter;
   const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
-  const [contentMatches, setContentMatches] = useState<ReadonlyMap<string, string | null>>(() => new Map());
+  const [ownMatches, setContentMatches] = useState<ReadonlyMap<string, string | null>>(() => new Map());
+  const contentMatches = filter ? filter.snippets : ownMatches;
+  const searched = filter ? filter.text : query;
   const [selected, setSelected] = useState<ReadonlySet<string>>(() => new Set());
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [working, setWorking] = useState(false);
@@ -217,6 +239,7 @@ export function CollectionPage({
 
   const byKey = useMemo(() => new Map((items ?? []).map((item) => [itemKey(item), item])), [items]);
   const shown = useMemo(() => {
+    if (filter) return sortItems(items ?? [], sort, { kindLabel, projectLabel });
     const text = query.trim().toLowerCase();
     const filtered = (items ?? []).filter(
       (item) =>
@@ -228,7 +251,7 @@ export function CollectionPage({
         (!text || untitled(item.title).toLowerCase().includes(text) || contentMatches.has(itemKey(item))),
     );
     return sortItems(filtered, sort, { kindLabel, projectLabel });
-  }, [items, archived, kindFilter, kindOf, project, tagging, tagFilter, query, contentMatches, sort, kindLabel, projectLabel]);
+  }, [filter, items, archived, kindFilter, kindOf, project, tagging, tagFilter, query, contentMatches, sort, kindLabel, projectLabel]);
 
   const selectable = useCallback((item: CollectionItem) => (isSelectable ? isSelectable(item) : true), [isSelectable]);
   const selectableKeys = useMemo(() => shown.filter((item) => selectable(item) === true).map(itemKey), [shown, selectable]);
@@ -320,7 +343,7 @@ export function CollectionPage({
   const pickTag = useCallback((candidate: CollectionTag) => setTagFilter(candidate.id), [setTagFilter]);
 
   // New items land in the filtered project, else the one BB has open.
-  const newProject = project === GLOBAL ? null : project === ALL ? defaultProjectId : project;
+  const newProject = filter || project === ALL ? defaultProjectId : project === GLOBAL ? null : project;
   const creatable = kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true));
   const createTargets = activeKind ? creatable.filter((kind) => kind.id === activeKind.id) : creatable;
   const newButton = (className = PRIMARY_BUTTON) =>
@@ -476,7 +499,7 @@ export function CollectionPage({
     [showKind ? kindLabel(item) : null, projectLabel(item), relativeTime(item.updatedAt)].filter(Boolean).join(" · ");
   // While searching, an item that matched on content shows the text that matched.
   const preview = (item: CollectionItem, className: string) => {
-    const text = query.trim();
+    const text = searched.trim();
     const snippet = text ? contentMatches.get(itemKey(item)) : null;
     if (!snippet && !item.preview) return null;
     return (
@@ -487,30 +510,34 @@ export function CollectionPage({
   };
 
   return (
-    <PageColumn>
+    <PageColumn className={cn(filter?.rail && "max-w-6xl")}>
       <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
       <div className="mt-6 flex items-center gap-2">
-        <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm focus-within:border-foreground/30 md:max-w-sm">
-          <Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
-          <input
-            aria-label={`Search ${title.toLowerCase()}`}
-            placeholder="Search"
-            className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape" && query) {
-                event.preventDefault();
-                setQuery("");
-              }
-            }}
-          />
-          {query ? (
-            <button type="button" aria-label="Clear search" className="text-muted-foreground hover:text-foreground" onClick={() => setQuery("")}>
-              <Icon name="X" className="size-3.5" />
-            </button>
-          ) : null}
-        </label>
+        {filter ? (
+          <div className="min-w-0 flex-1">{filter.bar}</div>
+        ) : (
+          <label className="flex h-9 min-w-0 flex-1 items-center gap-2 rounded-md border border-border bg-background px-3 text-sm focus-within:border-foreground/30 md:max-w-sm">
+            <Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
+            <input
+              aria-label={`Search ${title.toLowerCase()}`}
+              placeholder="Search"
+              className="min-w-0 flex-1 bg-transparent outline-none placeholder:text-muted-foreground"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape" && query) {
+                  event.preventDefault();
+                  setQuery("");
+                }
+              }}
+            />
+            {query ? (
+              <button type="button" aria-label="Clear search" className="text-muted-foreground hover:text-foreground" onClick={() => setQuery("")}>
+                <Icon name="X" className="size-3.5" />
+              </button>
+            ) : null}
+          </label>
+        )}
         <div className="ml-auto flex items-center gap-2">
           <div className="flex rounded-md border border-border p-0.5 max-md:hidden" role="group" aria-label="Layout">
             {(["list", "grid"] as const).map((option) => (
@@ -533,365 +560,374 @@ export function CollectionPage({
 
       {notice ? <div className="mt-4">{notice}</div> : null}
 
-      <div
-        role="toolbar"
-        aria-label={chosen.length ? "Selected items" : "Filters"}
-        className="sticky top-0 z-10 -mx-2 mt-4 flex min-h-11 flex-wrap items-center gap-1.5 bg-background px-2 py-1.5 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4"
-      >
-        {chosen.length ? (
-          <>
-            <span className="mr-1 shrink-0 text-sm font-medium">{chosen.length} selected</span>
-            <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => handlers.onNewThread(chosen)}>
-              <Icon name="MessageSquarePlus" /> New thread
-            </button>
-            {chosenKind?.actions.map((action) => (
-              <button key={action.id} type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => act(chosenKind, action, chosen)}>
-                <Icon name={action.icon} /> {action.label.replace("{count}", String(chosen.length))}
-              </button>
-            ))}
-            {handlers.onExportBulk && chosen.length > 1 && chosen.every((item) => kindOf(item)?.capabilities?.export) ? <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => void handlers.onExportBulk!(chosen)}><Icon name="Download" /> Export ZIP</button> : null}
-            {chosen.every((item) => kindOf(item)?.capabilities?.move ?? true) ? <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" className={OUTLINE_BUTTON} disabled={working}>
-                  <Icon name="Folder" /> Move <Icon name="ChevronDown" className="-mr-1 opacity-70" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
-                <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move {plural(chosen.length, "item")} to</DropdownMenuLabel>
-                {projectItems(undefined, (projectId) => move(chosen, projectId))}
-              </DropdownMenuContent>
-            </DropdownMenu> : null}
-            {tagging ? (
-              <DropdownMenu>
-                <DropdownMenuTrigger asChild>
-                  <button type="button" className={OUTLINE_BUTTON} disabled={working}>
-                    <Icon name="studio/tag" className="size-4" /> Tag <Icon name="ChevronDown" className="-mr-1 opacity-70" />
-                  </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
-                  <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Tag {plural(chosen.length, "item")}</DropdownMenuLabel>
-                  {tagMenu(chosen)}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-            {allArchivable ? (
-              <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => archive(chosen, !archived)}>
-                <Icon name="Archive" /> {archived ? "Restore" : "Archive"}
-              </button>
-            ) : null}
-            {chosen.every((item) => kindOf(item)?.capabilities?.delete ?? true) ? <button
-              type="button"
-              className={confirmDelete ? DANGER_BUTTON : OUTLINE_BUTTON}
-              disabled={working}
-              onBlur={() => setConfirmDelete(false)}
-              onClick={() => (confirmDelete ? remove(chosen) : setConfirmDelete(true))}
-            >
-              <Icon name="Trash2" /> {confirmDelete ? `Delete ${chosen.length} for good` : "Delete"}
-            </button> : null}
-            <button type="button" className={cn(GHOST_BUTTON, "ml-auto")} onClick={clear}>
-              Clear
-            </button>
-          </>
-        ) : (
-          <>
-            {kinds.length > 1 ? (
+      <div className={cn(filter?.rail && "flex items-start gap-8")}>
+        {filter?.rail ? <aside aria-label="Filters" className="sticky top-0 w-52 shrink-0 pt-4 max-md:hidden">{filter.rail}</aside> : null}
+        <div className={cn(filter?.rail && "min-w-0 flex-1")}>
+          <div
+            role="toolbar"
+            aria-label={chosen.length ? "Selected items" : "Filters"}
+            className="sticky top-0 z-10 -mx-2 mt-4 flex min-h-11 flex-wrap items-center gap-1.5 bg-background px-2 py-1.5 max-md:-mx-4 max-md:flex-nowrap max-md:overflow-x-auto max-md:px-4"
+          >
+            {chosen.length ? (
               <>
-                <button type="button" aria-pressed={kindFilter === ALL} className={PILL} onClick={() => onKindChange(ALL)}>
-                  All
+                <span className="mr-1 shrink-0 text-sm font-medium">{chosen.length} selected</span>
+                <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => handlers.onNewThread(chosen)}>
+                  <Icon name="MessageSquarePlus" /> New thread
                 </button>
-                {kinds.map((kind) => (
-                  <button
-                    key={`${kind.pluginId}:${kind.id}`}
-                    type="button"
-                    aria-pressed={kindFilter === kind.id}
-                    className={PILL}
-                    onClick={() => onKindChange(kind.id)}
-                  >
-                    {kind.plural}
+                {chosenKind?.actions.map((action) => (
+                  <button key={action.id} type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => act(chosenKind, action, chosen)}>
+                    <Icon name={action.icon} /> {action.label.replace("{count}", String(chosen.length))}
                   </button>
                 ))}
-                <span className="mx-1 h-4 w-px shrink-0 bg-border" />
-              </>
-            ) : null}
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button
-                  type="button"
-                  aria-label="Filter by project"
-                  className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
-                >
-                  <Icon name="Folder" className="size-3.5" />
-                  <span className="max-w-40 truncate">{project === ALL ? "All projects" : project === GLOBAL ? "Global" : projectName(projects, project)}</span>
-                  <Icon name="ChevronDown" className="size-3.5" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
-                <DropdownMenuItem onSelect={() => setProject(ALL)}>
-                  All projects
-                  {project === ALL ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
-                </DropdownMenuItem>
-                {projectItems(project === ALL ? undefined : project === GLOBAL ? null : project, (projectId) => setProject(projectId ?? GLOBAL))}
-              </DropdownMenuContent>
-            </DropdownMenu>
-            {tagging ? (
-              <DropdownMenu onOpenChange={(open) => !open && setRenaming(false)}>
-                <DropdownMenuTrigger asChild>
-                  <button
-                    type="button"
-                    aria-label="Filter by tag"
-                    className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
-                  >
-                    {activeTag ? <TagDot color={activeTag.color} /> : <Icon name="studio/tag" className="size-3.5" />}
-                    <span className="max-w-40 truncate">{activeTag ? activeTag.name : tagFilter === UNTAGGED ? "Untagged" : "All tags"}</span>
-                    <Icon name="ChevronDown" className="size-3.5" />
+                {handlers.onExportBulk && chosen.length > 1 && chosen.every((item) => kindOf(item)?.capabilities?.export) ? <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => void handlers.onExportBulk!(chosen)}><Icon name="Download" /> Export ZIP</button> : null}
+                {chosen.every((item) => kindOf(item)?.capabilities?.move ?? true) ? <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button type="button" className={OUTLINE_BUTTON} disabled={working}>
+                      <Icon name="Folder" /> Move <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
+                    <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move {plural(chosen.length, "item")} to</DropdownMenuLabel>
+                    {projectItems(undefined, (projectId) => move(chosen, projectId))}
+                  </DropdownMenuContent>
+                </DropdownMenu> : null}
+                {tagging ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className={OUTLINE_BUTTON} disabled={working}>
+                        <Icon name="studio/tag" className="size-4" /> Tag <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
+                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Tag {plural(chosen.length, "item")}</DropdownMenuLabel>
+                      {tagMenu(chosen)}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+                {allArchivable ? (
+                  <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => archive(chosen, !archived)}>
+                    <Icon name="Archive" /> {archived ? "Restore" : "Archive"}
                   </button>
-                </DropdownMenuTrigger>
-                <DropdownMenuContent align="start" className="max-h-96 w-56 overflow-auto">
-                  {renaming && activeTag ? (
-                    <TagNameInput
-                      placeholder="Tag name"
-                      initial={activeTag.name}
-                      onSubmit={(name) => {
-                        setRenaming(false);
-                        run(async () => handlers.onRenameTag?.(activeTag, name));
-                      }}
-                    />
-                  ) : (
-                    <>
-                      <DropdownMenuItem onSelect={() => setTagFilter(ALL)}>
-                        All tags
-                        {tagFilter === ALL ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
-                      </DropdownMenuItem>
-                      <DropdownMenuItem onSelect={() => setTagFilter(UNTAGGED)}>
-                        Untagged
-                        {tagFilter === UNTAGGED ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
-                      </DropdownMenuItem>
-                      {tags!.length ? <DropdownMenuSeparator /> : null}
-                      {tags!.map((candidate) => (
-                        <DropdownMenuItem key={candidate.id} onSelect={() => setTagFilter(candidate.id)}>
-                          <TagDot color={candidate.color} />
-                          <span className="truncate">{candidate.name}</span>
-                          {candidate.id === tagFilter ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
-                        </DropdownMenuItem>
-                      ))}
-                      {!tags!.length ? (
-                        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Select items and pick Tag to group them.</DropdownMenuLabel>
-                      ) : null}
-                      {activeTag ? (
-                        <>
-                          <DropdownMenuSeparator />
-                          <DropdownMenuItem
-                            onSelect={(event) => {
-                              event.preventDefault();
-                              setRenaming(true);
-                            }}
-                          >
-                            <Icon name="Edit" className="size-4" /> Rename {activeTag.name}
-                          </DropdownMenuItem>
-                          <DropdownMenuItem
-                            className="text-destructive focus:bg-destructive/15 focus:text-destructive"
-                            onSelect={() => {
-                              if (!window.confirm(`Delete the tag "${activeTag.name}"? Its items stay; they just lose the tag.`)) return;
-                              run(async () => handlers.onDeleteTag?.(activeTag));
-                            }}
-                          >
-                            <Icon name="Trash2" className="size-4" /> Delete {activeTag.name}
-                          </DropdownMenuItem>
-                        </>
-                      ) : null}
-                    </>
-                  )}
-                </DropdownMenuContent>
-              </DropdownMenu>
-            ) : null}
-            {canArchive ? (
-              <button type="button" aria-pressed={archived} className={cn(PILL, "flex items-center gap-1.5")} onClick={() => setArchived(!archived)}>
-                <Icon name="Archive" className="size-3.5" /> Archived
-              </button>
-            ) : null}
-            {items !== null && shown.length ? (
-              <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{plural(shown.length, "item")}</span>
-            ) : null}
-          </>
-        )}
-      </div>
-
-      <div className="mt-3">
-        {error ? <p className="py-2 text-sm text-destructive">{error}</p> : null}
-        {items === null && !error ? <p className="py-2 text-sm text-muted-foreground">Loading…</p> : null}
-        {items !== null && noItemsAtAll && !archived ? (
-          <EmptyState icon={emptyKinds.length === 1 ? emptyKinds[0]!.icon : "Layers"} title={`No ${(activeKind?.plural ?? (kinds.length === 1 ? kinds[0]!.plural : "items")).toLowerCase()} yet`} actions={newButton()} />
-        ) : items !== null && !shown.length ? (
-          <p className="py-16 text-center text-sm text-muted-foreground">
-            {archived
-              ? "Nothing archived."
-              : query.trim()
-                ? "Nothing matches."
-                : tagging && activeTag
-                  ? `Nothing tagged ${activeTag.name}${activeKind ? ` among ${activeKind.plural.toLowerCase()}` : ""}.`
-                  : tagging && tagFilter === UNTAGGED
-                    ? "Everything here is tagged."
-                    : activeKind
-                      ? `No ${activeKind.plural.toLowerCase()} here.`
-                      : "Nothing here."}
-          </p>
-        ) : null}
-
-        {shown.length && view === "grid" ? (
-          <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 max-md:hidden">
-            {shown.map((item) => {
-              const kind = kindOf(item);
-              const checked = selected.has(itemKey(item));
-              const pickable = selectable(item) === true;
-              return (
-                <div
-                  key={itemKey(item)}
-                  role="link"
-                  tabIndex={0}
-                  aria-label={untitled(item.title)}
-                  data-state={checked ? "selected" : undefined}
-                  className="group/row relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-border hover:bg-state-hover data-[state=selected]:border-foreground/40 data-[state=selected]:bg-state-hover"
-                  onClick={(event) => (chosen.length && pickable ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
-                  onKeyDown={(event) => event.key === "Enter" && handlers.onOpen(item)}
+                ) : null}
+                {chosen.every((item) => kindOf(item)?.capabilities?.delete ?? true) ? <button
+                  type="button"
+                  className={confirmDelete ? DANGER_BUTTON : OUTLINE_BUTTON}
+                  disabled={working}
+                  onBlur={() => setConfirmDelete(false)}
+                  onClick={() => (confirmDelete ? remove(chosen) : setConfirmDelete(true))}
                 >
-                  {/* Every card has the same preview area, so a grid row doesn't
-                      stretch around the one card with a thumbnail. */}
-                  <div className={cn("flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03]", item.thumbnailUrl ? "p-1" : "p-3")}>
-                    {item.thumbnailUrl ? (
-                      <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
-                    ) : (
-                      <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="xl" />
-                    )}
-                  </div>
-                  <div className="absolute top-2 right-2 flex items-center gap-1">
-                    {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
-                    {rowMenu(item, revealClass)}
-                  </div>
-                  <div className="flex flex-1 flex-col p-4">
-                    <div className="min-w-0">
-                      <div className={cn("truncate font-medium", !item.title && "text-muted-foreground")}>{untitled(item.title)}</div>
-                      {preview(item, "mt-0.5 line-clamp-2")}
-                      <div className="mt-1 truncate text-xs text-muted-foreground">{subtitle(item)}</div>
-                      {tagging && item.tags?.length ? (
-                        <div className="mt-2 flex min-w-0 items-center gap-1 overflow-hidden">
-                          <TagChips ids={item.tags} tags={tagById} max={3} onPick={pickTag} />
+                  <Icon name="Trash2" /> {confirmDelete ? `Delete ${chosen.length} for good` : "Delete"}
+                </button> : null}
+                <button type="button" className={cn(GHOST_BUTTON, "ml-auto")} onClick={clear}>
+                  Clear
+                </button>
+              </>
+            ) : filter ? (
+              items !== null && shown.length ? <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{plural(shown.length, "item")}</span> : null
+            ) : (
+              <>
+                {kinds.length > 1 ? (
+                  <>
+                    <button type="button" aria-pressed={kindFilter === ALL} className={PILL} onClick={() => onKindChange(ALL)}>
+                      All
+                    </button>
+                    {kinds.map((kind) => (
+                      <button
+                        key={`${kind.pluginId}:${kind.id}`}
+                        type="button"
+                        aria-pressed={kindFilter === kind.id}
+                        className={PILL}
+                        onClick={() => onKindChange(kind.id)}
+                      >
+                        {kind.plural}
+                      </button>
+                    ))}
+                    <span className="mx-1 h-4 w-px shrink-0 bg-border" />
+                  </>
+                ) : null}
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button
+                      type="button"
+                      aria-label="Filter by project"
+                      className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
+                    >
+                      <Icon name="Folder" className="size-3.5" />
+                      <span className="max-w-40 truncate">{project === ALL ? "All projects" : project === GLOBAL ? "Global" : projectName(projects, project)}</span>
+                      <Icon name="ChevronDown" className="size-3.5" />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
+                    <DropdownMenuItem onSelect={() => setProject(ALL)}>
+                      All projects
+                      {project === ALL ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+                    </DropdownMenuItem>
+                    {projectItems(project === ALL ? undefined : project === GLOBAL ? null : project, (projectId) => setProject(projectId ?? GLOBAL))}
+                  </DropdownMenuContent>
+                </DropdownMenu>
+                {tagging ? (
+                  <DropdownMenu onOpenChange={(open) => !open && setRenaming(false)}>
+                    <DropdownMenuTrigger asChild>
+                      <button
+                        type="button"
+                        aria-label="Filter by tag"
+                        className="flex h-8 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
+                      >
+                        {activeTag ? <TagDot color={activeTag.color} /> : <Icon name="studio/tag" className="size-3.5" />}
+                        <span className="max-w-40 truncate">{activeTag ? activeTag.name : tagFilter === UNTAGGED ? "Untagged" : "All tags"}</span>
+                        <Icon name="ChevronDown" className="size-3.5" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="max-h-96 w-56 overflow-auto">
+                      {renaming && activeTag ? (
+                        <TagNameInput
+                          placeholder="Tag name"
+                          initial={activeTag.name}
+                          onSubmit={(name) => {
+                            setRenaming(false);
+                            run(async () => handlers.onRenameTag?.(activeTag, name));
+                          }}
+                        />
+                      ) : (
+                        <>
+                          <DropdownMenuItem onSelect={() => setTagFilter(ALL)}>
+                            All tags
+                            {tagFilter === ALL ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onSelect={() => setTagFilter(UNTAGGED)}>
+                            Untagged
+                            {tagFilter === UNTAGGED ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+                          </DropdownMenuItem>
+                          {tags!.length ? <DropdownMenuSeparator /> : null}
+                          {tags!.map((candidate) => (
+                            <DropdownMenuItem key={candidate.id} onSelect={() => setTagFilter(candidate.id)}>
+                              <TagDot color={candidate.color} />
+                              <span className="truncate">{candidate.name}</span>
+                              {candidate.id === tagFilter ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+                            </DropdownMenuItem>
+                          ))}
+                          {!tags!.length ? (
+                            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Select items and pick Tag to group them.</DropdownMenuLabel>
+                          ) : null}
+                          {activeTag ? (
+                            <>
+                              <DropdownMenuSeparator />
+                              <DropdownMenuItem
+                                onSelect={(event) => {
+                                  event.preventDefault();
+                                  setRenaming(true);
+                                }}
+                              >
+                                <Icon name="Edit" className="size-4" /> Rename {activeTag.name}
+                              </DropdownMenuItem>
+                              <DropdownMenuItem
+                                className="text-destructive focus:bg-destructive/15 focus:text-destructive"
+                                onSelect={() => {
+                                  if (!window.confirm(`Delete the tag "${activeTag.name}"? Its items stay; they just lose the tag.`)) return;
+                                  run(async () => handlers.onDeleteTag?.(activeTag));
+                                }}
+                              >
+                                <Icon name="Trash2" className="size-4" /> Delete {activeTag.name}
+                              </DropdownMenuItem>
+                            </>
+                          ) : null}
+                        </>
+                      )}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+                {canArchive ? (
+                  <button type="button" aria-pressed={archived} className={cn(PILL, "flex items-center gap-1.5")} onClick={() => setArchived(!archived)}>
+                    <Icon name="Archive" className="size-3.5" /> Archived
+                  </button>
+                ) : null}
+                {items !== null && shown.length ? (
+                  <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{plural(shown.length, "item")}</span>
+                ) : null}
+              </>
+            )}
+          </div>
+
+          <div className="mt-3">
+            {error ? <p className="py-2 text-sm text-destructive">{error}</p> : null}
+            {items === null && !error ? <p className="py-2 text-sm text-muted-foreground">Loading…</p> : null}
+            {filter && items !== null && !shown.length ? (
+              <p className="py-16 text-center text-sm text-muted-foreground">{filter.empty}</p>
+            ) : items !== null && noItemsAtAll && !archived ? (
+              <EmptyState icon={emptyKinds.length === 1 ? emptyKinds[0]!.icon : "Layers"} title={`No ${(activeKind?.plural ?? (kinds.length === 1 ? kinds[0]!.plural : "items")).toLowerCase()} yet`} actions={newButton()} />
+            ) : items !== null && !shown.length ? (
+              <p className="py-16 text-center text-sm text-muted-foreground">
+                {archived
+                  ? "Nothing archived."
+                  : query.trim()
+                    ? "Nothing matches."
+                    : tagging && activeTag
+                      ? `Nothing tagged ${activeTag.name}${activeKind ? ` among ${activeKind.plural.toLowerCase()}` : ""}.`
+                      : tagging && tagFilter === UNTAGGED
+                        ? "Everything here is tagged."
+                        : activeKind
+                          ? `No ${activeKind.plural.toLowerCase()} here.`
+                          : "Nothing here."}
+              </p>
+            ) : null}
+
+            {shown.length && view === "grid" ? (
+              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 max-md:hidden">
+                {shown.map((item) => {
+                  const kind = kindOf(item);
+                  const checked = selected.has(itemKey(item));
+                  const pickable = selectable(item) === true;
+                  return (
+                    <div
+                      key={itemKey(item)}
+                      role="link"
+                      tabIndex={0}
+                      aria-label={untitled(item.title)}
+                      data-state={checked ? "selected" : undefined}
+                      className="group/row relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-border hover:bg-state-hover data-[state=selected]:border-foreground/40 data-[state=selected]:bg-state-hover"
+                      onClick={(event) => (chosen.length && pickable ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
+                      onKeyDown={(event) => event.key === "Enter" && handlers.onOpen(item)}
+                    >
+                      {/* Every card has the same preview area, so a grid row doesn't
+                          stretch around the one card with a thumbnail. */}
+                      <div className={cn("flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03]", item.thumbnailUrl ? "p-1" : "p-3")}>
+                        {item.thumbnailUrl ? (
+                          <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
+                        ) : (
+                          <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="xl" />
+                        )}
+                      </div>
+                      <div className="absolute top-2 right-2 flex items-center gap-1">
+                        {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
+                        {rowMenu(item, revealClass)}
+                      </div>
+                      <div className="flex flex-1 flex-col p-4">
+                        <div className="min-w-0">
+                          <div className={cn("truncate font-medium", !item.title && "text-muted-foreground")}>{untitled(item.title)}</div>
+                          {preview(item, "mt-0.5 line-clamp-2")}
+                          <div className="mt-1 truncate text-xs text-muted-foreground">{subtitle(item)}</div>
+                          {tagging && item.tags?.length ? (
+                            <div className="mt-2 flex min-w-0 items-center gap-1 overflow-hidden">
+                              <TagChips ids={item.tags} tags={tagById} max={3} onPick={pickTag} />
+                            </div>
+                          ) : null}
+                        </div>
+                      </div>
+                      {pickable ? (
+                        <Checkbox
+                          checked={checked}
+                          label={`Select ${untitled(item.title)}`}
+                          onToggle={(event) => toggle(item, event.shiftKey)}
+                          className={cn("absolute top-2 left-2 opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100", (checked || chosen.length > 0) && "opacity-100")}
+                        />
+                      ) : null}
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+
+            {shown.length ? (
+              <div role="grid" aria-label={title} aria-multiselectable className={cn("text-sm", view === "grid" && "md:hidden")}>
+                <div role="row" className={cn("grid gap-3 border-b border-border px-2 pb-2 text-xs text-muted-foreground max-md:hidden")} style={gridTemplate}>
+                  <span role="columnheader" className="flex items-center">
+                    <Checkbox
+                      checked={allChecked ? true : chosen.length ? "mixed" : false}
+                      label={allChecked ? "Deselect all" : "Select all"}
+                      disabled={!selectableKeys.length}
+                      onToggle={() => setSelected(allChecked ? new Set() : new Set(selectableKeys))}
+                    />
+                  </span>
+                  {header("Name", "title")}
+                  {showKind ? header("Kind", "kind") : null}
+                  {header("Project", "project")}
+                  {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
+                  {header("Last activity", "updatedAt")}
+                </div>
+                {shown.map((item) => {
+                  const kind = kindOf(item);
+                  const key = itemKey(item);
+                  const checked = selected.has(key);
+                  const reason = selectionLabel(item);
+                  const parent = parentLine(item);
+                  return (
+                    <div
+                      key={key}
+                      role="row"
+                      tabIndex={0}
+                      aria-label={untitled(item.title)}
+                      aria-selected={checked}
+                      data-state={checked ? "selected" : undefined}
+                      className={cn(
+                        "group/row grid cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-state-hover data-[state=selected]:bg-state-active max-md:!grid-cols-[minmax(0,1fr)_auto] max-md:py-2.5",
+                      )}
+                      style={gridTemplate}
+                      onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
+                      onKeyDown={(event) => {
+                        if (event.target !== event.currentTarget) return;
+                        if (event.key === "Enter") handlers.onOpen(item);
+                        if (event.key === " ") {
+                          event.preventDefault();
+                          if (reason === undefined) toggle(item, event.shiftKey);
+                        }
+                      }}
+                    >
+                      <div role="gridcell" className="flex items-center max-md:hidden">
+                        <Checkbox
+                          checked={checked}
+                          label={`Select ${untitled(item.title)}`}
+                          disabled={reason !== undefined}
+                          title={reason}
+                          onToggle={(event) => toggle(item, event.shiftKey)}
+                          className={cn(!checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100")}
+                        />
+                      </div>
+                      <div role="gridcell" className="flex min-w-0 items-center gap-3">
+                        {item.thumbnailUrl ? (
+                          <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
+                            <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
+                          </span>
+                        ) : (
+                          <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />
+                        )}
+                        <div className="min-w-0">
+                          <div className={cn("flex min-w-0 items-center gap-1.5 font-medium", !item.title && "text-muted-foreground")}>
+                            <span className="truncate">{untitled(item.title)}</span>
+                            {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
+                            {tagging ? <TagChips ids={item.tags} tags={tagById} onPick={pickTag} /> : null}
+                          </div>
+                          {parent ? <div className="truncate text-xs text-muted-foreground">{parent}</div> : null}
+                          {!parent ? preview(item, "truncate") : null}
+                          <div className="truncate text-xs text-muted-foreground md:hidden">{subtitle(item)}</div>
+                        </div>
+                      </div>
+                      {showKind ? (
+                        <div role="gridcell" className="flex min-w-0 items-center gap-1.5 text-muted-foreground max-md:hidden">
+                          <Icon name={kind?.icon ?? "File"} className="size-3.5 shrink-0" />
+                          <span className="truncate">{kindLabel(item)}</span>
                         </div>
                       ) : null}
-                    </div>
-                  </div>
-                  {pickable ? (
-                    <Checkbox
-                      checked={checked}
-                      label={`Select ${untitled(item.title)}`}
-                      onToggle={(event) => toggle(item, event.shiftKey)}
-                      className={cn("absolute top-2 left-2 opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100", (checked || chosen.length > 0) && "opacity-100")}
-                    />
-                  ) : null}
-                </div>
-              );
-            })}
-          </div>
-        ) : null}
-
-        {shown.length ? (
-          <div role="grid" aria-label={title} aria-multiselectable className={cn("text-sm", view === "grid" && "md:hidden")}>
-            <div role="row" className={cn("grid gap-3 border-b border-border px-2 pb-2 text-xs text-muted-foreground max-md:hidden")} style={gridTemplate}>
-              <span role="columnheader" className="flex items-center">
-                <Checkbox
-                  checked={allChecked ? true : chosen.length ? "mixed" : false}
-                  label={allChecked ? "Deselect all" : "Select all"}
-                  disabled={!selectableKeys.length}
-                  onToggle={() => setSelected(allChecked ? new Set() : new Set(selectableKeys))}
-                />
-              </span>
-              {header("Name", "title")}
-              {showKind ? header("Kind", "kind") : null}
-              {header("Project", "project")}
-              {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
-              {header("Last activity", "updatedAt")}
-            </div>
-            {shown.map((item) => {
-              const kind = kindOf(item);
-              const key = itemKey(item);
-              const checked = selected.has(key);
-              const reason = selectionLabel(item);
-              const parent = parentLine(item);
-              return (
-                <div
-                  key={key}
-                  role="row"
-                  tabIndex={0}
-                  aria-label={untitled(item.title)}
-                  aria-selected={checked}
-                  data-state={checked ? "selected" : undefined}
-                  className={cn(
-                    "group/row grid cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-state-hover data-[state=selected]:bg-state-active max-md:!grid-cols-[minmax(0,1fr)_auto] max-md:py-2.5",
-                  )}
-                  style={gridTemplate}
-                  onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
-                  onKeyDown={(event) => {
-                    if (event.target !== event.currentTarget) return;
-                    if (event.key === "Enter") handlers.onOpen(item);
-                    if (event.key === " ") {
-                      event.preventDefault();
-                      if (reason === undefined) toggle(item, event.shiftKey);
-                    }
-                  }}
-                >
-                  <div role="gridcell" className="flex items-center max-md:hidden">
-                    <Checkbox
-                      checked={checked}
-                      label={`Select ${untitled(item.title)}`}
-                      disabled={reason !== undefined}
-                      title={reason}
-                      onToggle={(event) => toggle(item, event.shiftKey)}
-                      className={cn(!checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100")}
-                    />
-                  </div>
-                  <div role="gridcell" className="flex min-w-0 items-center gap-3">
-                    {item.thumbnailUrl ? (
-                      <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
-                        <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
-                      </span>
-                    ) : (
-                      <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />
-                    )}
-                    <div className="min-w-0">
-                      <div className={cn("flex min-w-0 items-center gap-1.5 font-medium", !item.title && "text-muted-foreground")}>
-                        <span className="truncate">{untitled(item.title)}</span>
-                        {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
-                        {tagging ? <TagChips ids={item.tags} tags={tagById} onPick={pickTag} /> : null}
+                      <div role="gridcell" className="truncate text-muted-foreground max-md:hidden">
+                        {projectLabel(item)}
                       </div>
-                      {parent ? <div className="truncate text-xs text-muted-foreground">{parent}</div> : null}
-                      {!parent ? preview(item, "truncate") : null}
-                      <div className="truncate text-xs text-muted-foreground md:hidden">{subtitle(item)}</div>
+                      {columns.map((column) => (
+                        <div key={column.id} role="gridcell" className="truncate text-right tabular-nums text-muted-foreground max-md:hidden">
+                          {item.facts.find((fact) => fact.id === column.id)?.value ?? "—"}
+                        </div>
+                      ))}
+                      <div role="gridcell" className="flex min-w-0 items-center justify-between gap-2 text-muted-foreground max-md:justify-end">
+                        <span className="truncate max-md:hidden" title={new Date(item.updatedAt).toLocaleString()}>
+                          {relativeTime(item.updatedAt)}
+                        </span>
+                        {rowMenu(item, revealClass)}
+                      </div>
                     </div>
-                  </div>
-                  {showKind ? (
-                    <div role="gridcell" className="flex min-w-0 items-center gap-1.5 text-muted-foreground max-md:hidden">
-                      <Icon name={kind?.icon ?? "File"} className="size-3.5 shrink-0" />
-                      <span className="truncate">{kindLabel(item)}</span>
-                    </div>
-                  ) : null}
-                  <div role="gridcell" className="truncate text-muted-foreground max-md:hidden">
-                    {projectLabel(item)}
-                  </div>
-                  {columns.map((column) => (
-                    <div key={column.id} role="gridcell" className="truncate text-right tabular-nums text-muted-foreground max-md:hidden">
-                      {item.facts.find((fact) => fact.id === column.id)?.value ?? "—"}
-                    </div>
-                  ))}
-                  <div role="gridcell" className="flex min-w-0 items-center justify-between gap-2 text-muted-foreground max-md:justify-end">
-                    <span className="truncate max-md:hidden" title={new Date(item.updatedAt).toLocaleString()}>
-                      {relativeTime(item.updatedAt)}
-                    </span>
-                    {rowMenu(item, revealClass)}
-                  </div>
-                </div>
-              );
-            })}
+                  );
+                })}
+              </div>
+            ) : null}
           </div>
-        ) : null}
+        </div>
       </div>
     </PageColumn>
   );

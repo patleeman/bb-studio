@@ -2,6 +2,7 @@
 // sections, and the pieces they are built from.
 export {
   CollectionPage,
+  type CollectionFilter,
   itemKey,
   sortItems,
   toggleSelection,
@@ -39,6 +40,7 @@ export {
   useProjects,
   type Project,
 } from "./pieces";
+export { TagDot } from "./tags";
 export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";
 export {

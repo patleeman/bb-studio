@@ -1,5 +1,4 @@
-// Spaces in the Studio collection: the switcher above it, the header of an
-// open space with its projects and threads, and the dialogs that make a space
+// Spaces in the Studio collection: the header of an open space with its projects and threads, and the dialogs that make a space
 // and fill it. Spaces are protected tags (src/spaces.ts); only the user makes
 // one here.
 import {
@@ -13,7 +12,6 @@ import {
   Icon,
   ItemTile,
   OUTLINE_BUTTON,
-  PILL,
   projectName,
   type CollectionItem,
   type CollectionKind,
@@ -42,31 +40,11 @@ export function spacePrompt(space: SpaceView, rest = ""): string {
   return `${rest}${rest ? "\n\n" : ""}Space: ${space.name} (${spaceHref(space.id)})\n\n`;
 }
 
-function SpaceGlyph({ space, className }: { space: SpaceView; className?: string }) {
+export function SpaceGlyph({ space, className }: { space: SpaceView; className?: string }) {
   return space.icon ? (
     <span className={className}>{space.icon}</span>
   ) : (
     <span className={`inline-block size-2.5 shrink-0 rounded-full ${className ?? ""}`} style={{ backgroundColor: space.color }} />
-  );
-}
-
-/** "All items" and one pill per space, plus New space. */
-export function SpaceBar({ spaces, current, onPick, onNew }: { spaces: readonly SpaceView[]; current: string | null; onPick(id: string | null): void; onNew(): void }) {
-  return (
-    <nav aria-label="Spaces" className="mb-3 flex items-center gap-1 overflow-x-auto">
-      <button type="button" className={PILL} aria-pressed={current === null} onClick={() => onPick(null)}>
-        All items
-      </button>
-      {spaces.map((space) => (
-        <button key={space.id} type="button" className={`${PILL} flex items-center gap-1.5`} aria-pressed={current === space.id} onClick={() => onPick(space.id)}>
-          <SpaceGlyph space={space} />
-          <span className="max-w-48 truncate">{space.name}</span>
-        </button>
-      ))}
-      <button type="button" className={GHOST_BUTTON} onClick={onNew}>
-        <Icon name="Plus" /> New space
-      </button>
-    </nav>
   );
 }
 

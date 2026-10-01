@@ -1,6 +1,8 @@
-// The Studio collection: every add-on's items in one list. The panel's
-// sub-path is the kind filter, so /plugins/studio/studio/recording is a
-// linkable "Recordings" view; space/<id>[/<kind>] opens a space.
+// The Studio collection: every add-on's items in one list, filtered by one
+// query (src/query.ts) from the bar above it and the rail beside it. The
+// panel's sub-path can start the query on a kind, so
+// /plugins/studio/studio/recording links to recordings; space/<id>[/<kind>]
+// opens a space.
 import {
   CollectionPage,
   DropdownMenu,
@@ -10,9 +12,8 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
   EmptyState,
-  GHOST_BUTTON,
   Icon,
-  OUTLINE_BUTTON,
+  itemKey,
   PageColumn,
   openAppPath,
   useProjects,
@@ -23,19 +24,50 @@ import {
   type CollectionTag,
 } from "@bb-studio/kit/app";
 import { mentionPrompt, STUDIO_REALTIME_CHANNEL, type StudioCreateEventDetail } from "@bb-studio/kit/contract";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
-import type { ProviderView, rpcContract, SidebarView, SpaceView, TagView } from "../contract";
+import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
+import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { NeedsYou } from "./HomePanel";
-import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceBar, SpaceDialog, SpaceHeader, SpaceMenu, spacePrompt } from "./Spaces";
+import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
+import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceHeader, SpaceMenu, spacePrompt } from "./Spaces";
 
-type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[] };
+type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
 type SpaceDialogState = { type: "new" } | { type: "edit" | "items" | "threads" | "delete"; space: SpaceView } | null;
-const TIP_DISMISSED_KEY = "studio:sidebar-tip-dismissed";
 const REFETCH_DEBOUNCE_MS = 300;
+const SEARCH_DEBOUNCE_MS = 200;
+const EMPTY_QUERY: Query = { filters: [], text: "" };
+
+/** The query, remembered per space and for all items. */
+function useStoredQuery(key: string): [Query, (query: Query) => void] {
+  const read = useCallback(() => {
+    try {
+      return parseQuery(localStorage.getItem(key) ?? "");
+    } catch {
+      return EMPTY_QUERY;
+    }
+  }, [key]);
+  const [stored, setStored] = useState(() => ({ key, query: read() }));
+  const query = stored.key === key ? stored.query : read();
+  useEffect(() => {
+    if (stored.key !== key) setStored({ key, query: read() });
+  }, [key, read, stored.key]);
+  const set = useCallback(
+    (next: Query) => {
+      setStored({ key, query: next });
+      try {
+        localStorage.setItem(key, formatQuery(next));
+      } catch {
+        // Private windows can refuse storage; the query lasts this session.
+      }
+    },
+    [key],
+  );
+  return [query, set];
+}
 
 function downloadFile(file: { name: string; mime: string; data: string }): void {
   const bytes = Uint8Array.from(atob(file.data), (char) => char.charCodeAt(0));
@@ -164,14 +196,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   useEffect(() => {
     rpc.call("templates", null).then(({ items }) => setTemplates(items), () => setTemplates([]));
   }, [rpc, data?.items]);
-  const [tipDismissed, setTipDismissed] = useState(() => {
-    try {
-      return localStorage.getItem(TIP_DISMISSED_KEY) === "1";
-    } catch {
-      return false;
-    }
-  });
-
   const providers = useMemo(() => data?.providers ?? [], [data]);
   const kinds = useMemo<CollectionKind[]>(
     () => providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
@@ -181,7 +205,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const spaceId = segments[0] === "space" ? decodeSegment(segments[1] ?? "") || null : null;
   const space = spaceId ? (data?.spaces.find((each) => each.id === spaceId) ?? null) : null;
   const requested = decodeSegment((spaceId ? segments[2] : segments[0]) ?? "") || "all";
-  const kind = requested === "all" || !data || kinds.some((candidate) => candidate.id === requested) ? requested : "all";
   const spacePath = useCallback((id: string | null, nextKind = "all") =>
     [id ? `space/${encodeURIComponent(id)}` : "", nextKind === "all" ? "" : encodeURIComponent(nextKind)].filter(Boolean).join("/"), []);
   const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: spacePath(spaceId, next) }), [navigate, spacePath, spaceId]);
@@ -191,10 +214,61 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   useEffect(() => {
     if (data && spaceId && !space) openSpace(null);
   }, [data, spaceId, space, openSpace]);
-  const shownItems = useMemo(
-    () => (data ? (space ? data.items.filter((item) => item.spaces?.includes(space.id)) : data.items) : null),
-    [data, space],
+
+  const [query, setQuery] = useStoredQuery(`studio:query:${spaceId ?? "all"}`);
+  // A link to a kind starts the query on it.
+  const seededKind = useRef<string | null>(null);
+  useEffect(() => {
+    if (!data || requested === "all" || seededKind.current === `${spaceId}/${requested}`) return;
+    seededKind.current = `${spaceId}/${requested}`;
+    setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), { field: "kind", value: requested }] });
+  }, [data, requested, spaceId, query, setQuery]);
+  const vocabulary = useMemo<QueryVocabulary>(
+    () => ({ kinds, projects: projects.map((project) => ({ id: project.id, name: project.name })), tags: data?.tags ?? [], spaces: data?.spaces ?? [] }),
+    [kinds, projects, data?.tags, data?.spaces],
   );
+  // Words being typed after the last filter search; a field still waiting for its value doesn't.
+  const searchText = useMemo(() => parseQuery(query.text).text.trim(), [query.text]);
+  const [snippets, setSnippets] = useState<ReadonlyMap<string, string | null>>(() => new Map());
+  useEffect(() => {
+    if (!searchText) {
+      setSnippets(new Map());
+      return;
+    }
+    let live = true;
+    const timer = setTimeout(() => {
+      rpc.call("search", { query: searchText }).then(
+        ({ keys, snippets: found }) => live && setSnippets(new Map(keys.map((key) => [key, found[key] ?? null]))),
+        () => {},
+      );
+    }, SEARCH_DEBOUNCE_MS);
+    return () => {
+      live = false;
+      clearTimeout(timer);
+    };
+  }, [rpc, searchText]);
+  const compiled = useMemo(() => compileQuery({ filters: query.filters, text: searchText }, vocabulary), [query.filters, searchText, vocabulary]);
+  const matchesText = useCallback(
+    (item: CollectionItem) => !searchText || untitled(item.title).toLowerCase().includes(searchText.toLowerCase()) || snippets.has(itemKey(item)),
+    [searchText, snippets],
+  );
+  const scoped = useMemo(() => (data ? (space ? data.items.filter((item) => item.spaces?.includes(space.id)) : data.items) : null), [data, space]);
+  const shownItems = useMemo(() => scoped?.filter((item) => compiled.test(item) && matchesText(item)) ?? null, [scoped, compiled, matchesText]);
+  const counts = useMemo(() => facetCounts(scoped ?? [], compiled, (item) => matchesText(item as CollectionItem)), [scoped, compiled, matchesText]);
+  const spaceCounts = useMemo(() => {
+    const live = data?.items.filter((item) => !item.archived) ?? [];
+    const bySpace = new Map<string, number>();
+    for (const item of live) for (const id of item.spaces ?? []) bySpace.set(id, (bySpace.get(id) ?? 0) + 1);
+    return { all: live.length, bySpace };
+  }, [data]);
+  // One kind or project in the query picks the columns and where new items go.
+  const only = (field: "kind" | "project") => {
+    const ids = [...new Set(query.filters.filter((filter) => filter.field === field && !filter.negate).map((filter) => resolveValue(filter, vocabulary)))];
+    return ids.length === 1 && ids[0] !== undefined ? { id: ids[0] } : null;
+  };
+  const onlyKind = only("kind");
+  const onlyProject = only("project");
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const nameOf = useCallback((pluginId: string) => providers.find((provider) => provider.pluginId === pluginId)?.name ?? pluginId, [providers]);
 
   const handlers = useMemo<CollectionHandlers>(
@@ -307,14 +381,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
 
   const shownPanels = sidebar?.panels.filter((panel) => panel.visible) ?? [];
-  const dismissTip = () => {
-    setTipDismissed(true);
-    try {
-      localStorage.setItem(TIP_DISMISSED_KEY, "1");
-    } catch {
-      // The tip comes back next session.
-    }
-  };
   const unavailable = providers.filter((provider) => provider.state !== "ready");
   const extraCreateItems = [
     ...templates.map((item) => ({ id: `template:${item.pluginId}:${item.id}`, label: `From template: ${item.title || "Untitled"}`, icon: "Copy", onSelect: (projectId: string | null) => {
@@ -326,7 +392,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const notice = (
     <>
-      {data ? <SpaceBar spaces={data.spaces} current={space?.id ?? null} onPick={openSpace} onNew={() => setSpaceDialog({ type: "new" })} /> : null}
       {space ? (
         <SpaceHeader
           rpc={rpc}
@@ -345,20 +410,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           {provider.detail ?? `${provider.name} isn't available.`}
         </p>
       ))}
-      {shownPanels.length && !tipDismissed && kinds.length ? (
-        <div className="flex items-center gap-3 rounded-lg border border-border px-4 py-3 text-sm max-md:flex-wrap">
-          <Icon name="PanelLeft" className="size-4 shrink-0 text-muted-foreground" />
-          <span className="min-w-0 flex-1">
-            {shownPanels.map((panel) => panel.label).join(", ")} {shownPanels.length === 1 ? "is" : "are"} also in the sidebar.
-          </span>
-          <button type="button" className={OUTLINE_BUTTON} onClick={() => void setVisible(false).then(dismissTip)}>
-            Hide from sidebar
-          </button>
-          <button type="button" className={GHOST_BUTTON} onClick={dismissTip}>
-            Not now
-          </button>
-        </div>
-      ) : null}
     </>
   );
 
@@ -416,6 +467,59 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     );
   }
 
+  const saveView = async () => {
+    const name = window.prompt("Name this view", "");
+    if (!name?.trim()) return;
+    try {
+      await rpc.call("saveView", { name, query: formatQuery(query) });
+      toast.success(`Saved the view ${name.trim()}`);
+      refetch();
+    } catch (cause) {
+      toast.error(`Couldn't save the view: ${errorMessage(cause)}`);
+    }
+  };
+  const deleteView = async (view: SavedViewView) => {
+    try {
+      await rpc.call("deleteView", { id: view.id });
+      toast.success(`Deleted the view ${view.name}`);
+      refetch();
+    } catch (cause) {
+      toast.error(`Couldn't delete the view: ${errorMessage(cause)}`);
+    }
+  };
+  const rail = data ? (
+    <FacetRail
+      query={query}
+      vocabulary={vocabulary}
+      counts={counts}
+      onChange={setQuery}
+      spaces={data.spaces}
+      spaceCounts={spaceCounts}
+      currentSpace={space?.id ?? null}
+      onOpenSpace={(id) => {
+        setFiltersOpen(false);
+        openSpace(id);
+      }}
+      onNewSpace={() => {
+        setFiltersOpen(false);
+        setSpaceDialog({ type: "new" });
+      }}
+      views={data.views}
+      onSaveView={() => void saveView()}
+      onDeleteView={(view) => void deleteView(view)}
+      tags={data.tags}
+    />
+  ) : null;
+  const empty = compiled.unknown.length
+    ? `Nothing is called ${compiled.unknown.map((filter) => `${filter.field}:${filter.value}`).join(", ")}.`
+    : compiled.archived
+      ? "Nothing archived matches."
+      : searchText || query.filters.length
+        ? "Nothing matches."
+        : space
+          ? "Nothing in this space yet. Add items or a project."
+          : "No items yet.";
+
   const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
   const deleteSpace = async (target: SpaceView) => {
     setSpaceDialog(null);
@@ -437,16 +541,27 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         items={shownItems}
         error={error && !data ? error : null}
         projects={projects}
-        defaultProjectId={space ? space.defaultProjectId : (context.projectId ?? null)}
+        defaultProjectId={onlyProject ? onlyProject.id : space ? space.defaultProjectId : (context.projectId ?? null)}
         storageKey={space ? "studio:space" : "studio:collection"}
         tags={data?.tags ?? []}
         extraCreateItems={extraCreateItems}
-        kind={kind}
+        kind={onlyKind?.id ?? "all"}
         onKindChange={setKind}
         notice={notice}
         headerActions={space ? <SpaceMenu onEdit={() => setSpaceDialog({ type: "edit", space })} onDelete={() => setSpaceDialog({ type: "delete", space })} /> : headerActions}
         handlers={handlers}
+        filter={{
+          bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} />,
+          rail,
+          text: searchText,
+          snippets,
+          archived: compiled.archived,
+          empty,
+        }}
       />
+      <FiltersDialog open={filtersOpen} onClose={() => setFiltersOpen(false)}>
+        {rail}
+      </FiltersDialog>
       {spaceDialog?.type === "new" || spaceDialog?.type === "edit" ? (
         <SpaceDialog
           rpc={rpc}
