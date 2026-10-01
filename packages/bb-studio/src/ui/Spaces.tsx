@@ -1,6 +1,6 @@
-// Spaces in the Studio collection: the header of an open space with its projects and threads, and the dialogs that make a space
-// and fill it. Spaces are protected tags (src/spaces.ts); only the user makes
-// one here.
+// Spaces in Studio: an open space's home, with tabs for its overview, items,
+// threads and projects, and the dialogs that make a space and fill it. Spaces
+// are protected tags (src/spaces.ts); only the user makes one here.
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,15 +12,17 @@ import {
   Icon,
   ItemTile,
   OUTLINE_BUTTON,
+  PageColumn,
+  openAppPath,
   projectName,
   type CollectionItem,
   type CollectionKind,
   type Project,
 } from "@bb-studio/kit/app";
-import { errorMessage, untitled } from "@bb-studio/kit/format";
+import { errorMessage, plural, relativeTime, untitled } from "@bb-studio/kit/format";
 import { Button, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Textarea } from "@bb-studio/kit/ui";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceThreadView, SpaceView } from "../contract";
 
@@ -48,10 +50,27 @@ export function SpaceGlyph({ space, className }: { space: SpaceView; className?:
   );
 }
 
-function useSpaceThreads(rpc: Rpc, space: SpaceView) {
+export type SpaceTab = "overview" | "items" | "threads" | "projects";
+const SPACE_TABS: readonly { id: SpaceTab; label: string }[] = [
+  { id: "overview", label: "Overview" },
+  { id: "items", label: "Items" },
+  { id: "threads", label: "Threads" },
+  { id: "projects", label: "Projects" },
+];
+const SHOWN_ITEMS = 8;
+
+/** The tab a space's sub-path names; any other segment is a kind in Items. */
+export function spaceTab(segment: string | undefined): { tab: SpaceTab; kind: string } {
+  if (!segment) return { tab: "overview", kind: "all" };
+  if (SPACE_TABS.some((each) => each.id === segment)) return { tab: segment as SpaceTab, kind: "all" };
+  return { tab: "items", kind: segment };
+}
+
+export function useSpaceThreads(rpc: Rpc, space: SpaceView | null) {
   const [threads, setThreads] = useState<SpaceThreadView[] | null>(null);
-  const key = `${space.id}|${space.projectIds.join(",")}|${space.threadIds.join(",")}`;
+  const key = space ? `${space.id}|${space.projectIds.join(",")}|${space.threadIds.join(",")}` : "";
   useEffect(() => {
+    if (!space) return;
     let live = true;
     rpc.call("spaceThreads", { id: space.id }).then(
       (result) => live && setThreads(result.threads),
@@ -63,31 +82,12 @@ function useSpaceThreads(rpc: Rpc, space: SpaceView) {
     // The key covers the space's members.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [rpc, key]);
-  return threads;
+  return space ? threads : null;
 }
 
-/** An open space: what it's for, its projects and threads, and how to fill it. */
-export function SpaceHeader({
-  rpc,
-  space,
-  projects,
-  onEdit,
-  onAddItems,
-  onAddThreads,
-  onChanged,
-}: {
-  rpc: Rpc;
-  space: SpaceView;
-  projects: readonly Project[];
-  onEdit(): void;
-  onAddItems(): void;
-  onAddThreads(): void;
-  onChanged(): void;
-}) {
-  const navigate = useBbNavigate();
-  const threads = useSpaceThreads(rpc, space);
-  const [showAll, setShowAll] = useState(false);
-  const members = async (add: { pluginId: string; id: string }[], remove: { pluginId: string; id: string }[]) => {
+/** Adds and removes projects and threads, reporting failures. */
+function useMembers(rpc: Rpc, space: SpaceView, onChanged: () => void) {
+  return async (add: { pluginId: string; id: string }[], remove: { pluginId: string; id: string }[]) => {
     try {
       await rpc.call("spaceMembers", { id: space.id, add, remove });
       onChanged();
@@ -95,99 +95,339 @@ export function SpaceHeader({
       toast.error(`Couldn't change the space: ${errorMessage(cause)}`);
     }
   };
-  const addable = projects.filter((project) => !space.projectIds.includes(project.id));
-  const shown = showAll ? threads : threads?.slice(0, SHOWN_THREADS);
+}
 
+/** What the space is for and its tabs, under its title; the same on every tab. */
+export function SpaceSubheader({
+  space,
+  tab,
+  counts,
+  onTab,
+  onEdit,
+  onDelete,
+}: {
+  space: SpaceView;
+  tab: SpaceTab;
+  counts: { items: number; threads: number | null; projects: number };
+  onTab(tab: SpaceTab): void;
+  onEdit(): void;
+  onDelete(): void;
+}) {
+  const navigate = useBbNavigate();
+  const count = (id: SpaceTab) => (id === "items" ? counts.items : id === "threads" ? counts.threads : id === "projects" ? counts.projects : null);
   return (
-    <section aria-label={`Space ${space.name}`} className="mb-4 flex flex-col gap-3 rounded-lg border border-border px-4 py-3">
-      {space.description ? <p className="text-sm text-muted-foreground">{space.description}</p> : null}
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-xs font-medium text-muted-foreground">Projects</span>
-        {space.projectIds.map((id) => (
-          <span key={id} className="flex h-7 items-center gap-1 rounded-md border border-border pr-1 pl-2 text-sm">
-            <Icon name="Folder" className="size-3.5 text-muted-foreground" />
-            {projectName(projects, id)}
-            {space.defaultProjectId === id ? <span className="text-xs text-muted-foreground">· default</span> : null}
-            <button
-              type="button"
-              aria-label={`Remove ${projectName(projects, id)} from the space`}
-              className="flex size-5 items-center justify-center rounded text-muted-foreground hover:bg-state-hover hover:text-foreground"
-              onClick={() => void members([], [{ pluginId: PROJECT_REF, id }])}
-            >
-              <Icon name="X" className="size-3" />
-            </button>
-          </span>
-        ))}
-        {!space.projectIds.length ? <span className="text-sm text-muted-foreground">None. Add one to bring in its items and threads.</span> : null}
-        {addable.length ? (
-          <DropdownMenu>
-            <DropdownMenuTrigger asChild>
-              <button type="button" className={GHOST_BUTTON}>
-                <Icon name="Plus" /> Add project
+    <>
+      {space.description ? <p className="mt-1 text-sm text-muted-foreground">{space.description}</p> : null}
+      <div className="mt-4 flex items-end gap-2 border-b border-border">
+        <nav aria-label={`${space.name} sections`} className="flex min-w-0 flex-1 gap-1 overflow-x-auto">
+          {SPACE_TABS.map((each) => {
+            const n = count(each.id);
+            return (
+              <button
+                key={each.id}
+                type="button"
+                aria-current={tab === each.id ? "page" : undefined}
+                className="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-2.5 pt-1 pb-2 text-sm text-muted-foreground hover:text-foreground aria-[current=page]:border-foreground aria-[current=page]:font-medium aria-[current=page]:text-foreground"
+                onClick={() => onTab(each.id)}
+              >
+                {each.label}
+                {n ? <span className="text-xs text-muted-foreground tabular-nums">{n}</span> : null}
               </button>
-            </DropdownMenuTrigger>
-            <DropdownMenuContent align="start" className="max-h-80 w-64 overflow-y-auto">
-              <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Everything in it joins the space</DropdownMenuLabel>
-              {addable.map((project) => (
-                <DropdownMenuItem key={project.id} onSelect={() => void members([{ pluginId: PROJECT_REF, id: project.id }], [])}>
-                  <Icon name="Folder" className="size-4" /> {project.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuContent>
-          </DropdownMenu>
-        ) : null}
-      </div>
-      <div className="flex flex-col gap-1">
-        <div className="flex items-center gap-2">
-          <span className="text-xs font-medium text-muted-foreground">Threads</span>
-          <span className="flex-1" />
-          <button type="button" className={GHOST_BUTTON} onClick={onAddThreads}>
-            <Icon name="Plus" /> Add thread
-          </button>
-          <button type="button" className={OUTLINE_BUTTON} onClick={() => navigate.toCompose({ initialPrompt: spacePrompt(space), focusPrompt: true })}>
+            );
+          })}
+        </nav>
+        <div className="flex shrink-0 items-center gap-1 pb-1.5">
+          <button type="button" className={GHOST_BUTTON} onClick={() => navigate.toCompose({ initialPrompt: spacePrompt(space), focusPrompt: true })}>
             <Icon name="MessageSquarePlus" /> New thread
           </button>
+          <SpaceMenu onEdit={onEdit} onDelete={onDelete} />
         </div>
-        {threads === null ? <p className="text-sm text-muted-foreground">Loading threads…</p> : null}
-        {threads?.length === 0 ? <p className="text-sm text-muted-foreground">No threads yet. Start one here, or add a project.</p> : null}
-        {shown?.map((thread) => (
-          <div key={thread.id} className="group flex items-center gap-2 rounded-md px-1 py-1 hover:bg-state-hover">
-            <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => navigate.toThread(thread.id)}>
-              <Icon name={thread.status === "active" || thread.status === "starting" ? "Loader" : "MessageSquare"} className="size-4 shrink-0 text-muted-foreground" />
-              <span className="truncate text-sm">{thread.title}</span>
-              <span className="shrink-0 text-xs text-muted-foreground">{projectName(projects, thread.projectId)}</span>
-            </button>
-            {thread.direct ? (
-              <button
-                type="button"
-                aria-label={`Remove ${thread.title} from the space`}
-                className="flex size-6 items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
-                onClick={() => void members([], [{ pluginId: THREAD_REF, id: thread.id }])}
-              >
-                <Icon name="X" className="size-3.5" />
-              </button>
-            ) : null}
-          </div>
-        ))}
-        {threads && threads.length > SHOWN_THREADS ? (
-          <button type="button" className={`${GHOST_BUTTON} self-start`} onClick={() => setShowAll(!showAll)}>
-            {showAll ? "Show fewer" : `Show all ${threads.length}`}
-          </button>
-        ) : null}
       </div>
-      <div className="flex items-center gap-2 border-t border-border pt-3">
-        <button type="button" className={OUTLINE_BUTTON} onClick={onAddItems}>
-          <Icon name="Plus" /> Add items
-        </button>
-        <button type="button" className={GHOST_BUTTON} onClick={onEdit}>
-          <Icon name="Pencil" /> Edit space
-        </button>
+    </>
+  );
+}
+
+/** A space's tab that isn't its item list: the title, the subheader, then the tab. */
+export function SpacePage({ title, subheader, children }: { title: string; subheader: ReactNode; children: ReactNode }) {
+  return (
+    <PageColumn className="max-w-6xl">
+      <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
+      {subheader}
+      <div className="mt-6">{children}</div>
+    </PageColumn>
+  );
+}
+
+function Section({ title, actions, footer, children }: { title: string; actions?: ReactNode; footer?: ReactNode; children: ReactNode }) {
+  return (
+    <section aria-label={title} className="flex min-w-0 flex-col gap-2">
+      <div className="flex h-8 items-center gap-2">
+        <h2 className="flex-1 text-sm font-semibold">{title}</h2>
+        {actions}
       </div>
+      <div className="divide-y divide-border rounded-md border border-border">{children}</div>
+      {footer}
     </section>
   );
 }
 
-/** The space's options menu, beside New. */
+function Empty({ children }: { children: ReactNode }) {
+  return <p className="px-3 py-6 text-center text-sm text-muted-foreground">{children}</p>;
+}
+
+function ThreadRow({ thread, projects, onRemove }: { thread: SpaceThreadView; projects: readonly Project[]; onRemove?(): void }) {
+  const navigate = useBbNavigate();
+  return (
+    <div className="group flex items-center gap-2 px-3 py-2 hover:bg-state-hover">
+      <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => navigate.toThread(thread.id)}>
+        <Icon name={thread.status === "active" || thread.status === "starting" ? "Loader" : "MessageSquare"} className="size-4 shrink-0 text-muted-foreground" />
+        <span className="min-w-0 flex-1 truncate text-sm">{thread.title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {projectName(projects, thread.projectId)} · {relativeTime(thread.updatedAt)}
+        </span>
+      </button>
+      {onRemove ? (
+        <button
+          type="button"
+          aria-label={`Remove ${thread.title} from the space`}
+          className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+          onClick={onRemove}
+        >
+          <Icon name="X" className="size-3.5" />
+        </button>
+      ) : null}
+    </div>
+  );
+}
+
+function ItemRow({ item, kinds, projects }: { item: CollectionItem; kinds: readonly CollectionKind[]; projects: readonly Project[] }) {
+  const kind = kinds.find((each) => each.pluginId === item.pluginId && each.id === item.kind);
+  return (
+    <button type="button" className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-state-hover" onClick={() => openAppPath(item.href)}>
+      <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="sm" />
+      <span className="min-w-0 flex-1 truncate text-sm">{untitled(item.title)}</span>
+      <span className="shrink-0 text-xs text-muted-foreground">
+        {kind?.label ?? item.kind} · {projectName(projects, item.projectId)} · {relativeTime(item.updatedAt)}
+      </span>
+    </button>
+  );
+}
+
+function AddThreadActions({ space, onAddThreads }: { space: SpaceView; onAddThreads(): void }) {
+  const navigate = useBbNavigate();
+  return (
+    <>
+      <button type="button" className={GHOST_BUTTON} onClick={onAddThreads}>
+        <Icon name="Plus" /> Add existing
+      </button>
+      <button type="button" className={OUTLINE_BUTTON} onClick={() => navigate.toCompose({ initialPrompt: spacePrompt(space), focusPrompt: true })}>
+        <Icon name="MessageSquarePlus" /> New thread
+      </button>
+    </>
+  );
+}
+
+function AddProjectMenu({ space, projects, onAdd }: { space: SpaceView; projects: readonly Project[]; onAdd(id: string): void }) {
+  const addable = projects.filter((project) => !space.projectIds.includes(project.id));
+  if (!addable.length) return null;
+  return (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" className={OUTLINE_BUTTON}>
+          <Icon name="Plus" /> Add project
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="max-h-80 w-64 overflow-y-auto">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Everything in it joins the space</DropdownMenuLabel>
+        {addable.map((project) => (
+          <DropdownMenuItem key={project.id} onSelect={() => onAdd(project.id)}>
+            <Icon name="Folder" className="size-4" /> {project.name}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+}
+
+function ProjectRows({
+  space,
+  projects,
+  items,
+  threads,
+  onRemove,
+}: {
+  space: SpaceView;
+  projects: readonly Project[];
+  items: readonly CollectionItem[];
+  threads: readonly SpaceThreadView[] | null;
+  onRemove(id: string): void;
+}) {
+  if (!space.projectIds.length) return <Empty>No projects yet. Add one to bring in its items and threads.</Empty>;
+  return (
+    <>
+      {space.projectIds.map((id) => {
+        const itemCount = items.filter((item) => item.projectId === id).length;
+        const threadCount = threads?.filter((thread) => thread.projectId === id).length;
+        return (
+          <div key={id} className="group flex items-center gap-2 px-3 py-2">
+            <Icon name="Folder" className="size-4 shrink-0 text-muted-foreground" />
+            <span className="min-w-0 truncate text-sm">{projectName(projects, id)}</span>
+            {space.defaultProjectId === id ? <span className="shrink-0 text-xs text-muted-foreground">Default</span> : null}
+            <span className="flex-1" />
+            <span className="shrink-0 text-xs text-muted-foreground">
+              {plural(itemCount, "item")}
+              {threadCount === undefined ? "" : ` · ${plural(threadCount, "thread")}`}
+            </span>
+            <button
+              type="button"
+              aria-label={`Remove ${projectName(projects, id)} from the space`}
+              className="flex size-6 shrink-0 items-center justify-center rounded text-muted-foreground opacity-0 group-hover:opacity-100 hover:text-foreground focus-visible:opacity-100"
+              onClick={() => onRemove(id)}
+            >
+              <Icon name="X" className="size-3.5" />
+            </button>
+          </div>
+        );
+      })}
+    </>
+  );
+}
+
+/** The space's home: its latest items and threads, and its projects. */
+export function SpaceOverview({
+  rpc,
+  space,
+  items,
+  threads,
+  kinds,
+  projects,
+  onTab,
+  onAddItems,
+  onAddThreads,
+  onChanged,
+}: {
+  rpc: Rpc;
+  space: SpaceView;
+  /** The space's items, archived ones left out. */
+  items: readonly CollectionItem[];
+  threads: readonly SpaceThreadView[] | null;
+  kinds: readonly CollectionKind[];
+  projects: readonly Project[];
+  onTab(tab: SpaceTab): void;
+  onAddItems(): void;
+  onAddThreads(): void;
+  onChanged(): void;
+}) {
+  const members = useMembers(rpc, space, onChanged);
+  const recent = useMemo(() => items.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, SHOWN_ITEMS), [items]);
+  const viewAll = (tab: SpaceTab, total: number, shown: number) =>
+    total > shown ? (
+      <button type="button" className={`${GHOST_BUTTON} self-start`} onClick={() => onTab(tab)}>
+        View all {total}
+      </button>
+    ) : null;
+  return (
+    <div className="flex flex-col gap-8">
+      <div className="grid gap-8 lg:grid-cols-2">
+        <Section
+          title="Recent items"
+          actions={
+            <button type="button" className={OUTLINE_BUTTON} onClick={onAddItems}>
+              <Icon name="Plus" /> Add items
+            </button>
+          }
+          footer={viewAll("items", items.length, recent.length)}
+        >
+          {recent.map((item) => (
+            <ItemRow key={`${item.pluginId}:${item.id}`} item={item} kinds={kinds} projects={projects} />
+          ))}
+          {!recent.length ? <Empty>No items yet. Add some, or add a project.</Empty> : null}
+        </Section>
+        <Section
+          title="Threads"
+          actions={<AddThreadActions space={space} onAddThreads={onAddThreads} />}
+          footer={threads ? viewAll("threads", threads.length, Math.min(threads.length, SHOWN_THREADS)) : null}
+        >
+          {threads === null ? <Empty>Loading threads…</Empty> : null}
+          {threads?.slice(0, SHOWN_THREADS).map((thread) => (
+            <ThreadRow
+              key={thread.id}
+              thread={thread}
+              projects={projects}
+              onRemove={thread.direct ? () => void members([], [{ pluginId: THREAD_REF, id: thread.id }]) : undefined}
+            />
+          ))}
+          {threads?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
+        </Section>
+      </div>
+      <Section
+        title="Projects"
+        actions={<AddProjectMenu space={space} projects={projects} onAdd={(id) => void members([{ pluginId: PROJECT_REF, id }], [])} />}
+      >
+        <ProjectRows space={space} projects={projects} items={items} threads={threads} onRemove={(id) => void members([], [{ pluginId: PROJECT_REF, id }])} />
+      </Section>
+    </div>
+  );
+}
+
+/** Every thread in the space. */
+export function SpaceThreads({
+  rpc,
+  space,
+  threads,
+  projects,
+  onAddThreads,
+  onChanged,
+}: {
+  rpc: Rpc;
+  space: SpaceView;
+  threads: readonly SpaceThreadView[] | null;
+  projects: readonly Project[];
+  onAddThreads(): void;
+  onChanged(): void;
+}) {
+  const members = useMembers(rpc, space, onChanged);
+  return (
+    <Section title="Threads" actions={<AddThreadActions space={space} onAddThreads={onAddThreads} />}>
+      {threads === null ? <Empty>Loading threads…</Empty> : null}
+      {threads?.map((thread) => (
+        <ThreadRow
+          key={thread.id}
+          thread={thread}
+          projects={projects}
+          onRemove={thread.direct ? () => void members([], [{ pluginId: THREAD_REF, id: thread.id }]) : undefined}
+        />
+      ))}
+      {threads?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
+    </Section>
+  );
+}
+
+/** The space's projects; everything in one is in the space. */
+export function SpaceProjects({
+  rpc,
+  space,
+  items,
+  threads,
+  projects,
+  onChanged,
+}: {
+  rpc: Rpc;
+  space: SpaceView;
+  items: readonly CollectionItem[];
+  threads: readonly SpaceThreadView[] | null;
+  projects: readonly Project[];
+  onChanged(): void;
+}) {
+  const members = useMembers(rpc, space, onChanged);
+  return (
+    <Section title="Projects" actions={<AddProjectMenu space={space} projects={projects} onAdd={(id) => void members([{ pluginId: PROJECT_REF, id }], [])} />}>
+      <ProjectRows space={space} projects={projects} items={items} threads={threads} onRemove={(id) => void members([], [{ pluginId: PROJECT_REF, id }])} />
+    </Section>
+  );
+}
+
+/** The space's options menu, beside its tabs. */
 export function SpaceMenu({ onEdit, onDelete }: { onEdit(): void; onDelete(): void }) {
   return (
     <DropdownMenu>

@@ -146,6 +146,7 @@ export function CollectionPage({
   onKindChange,
   isSelectable,
   notice,
+  subheader,
   headerActions,
   extraCreateItems,
   handlers,
@@ -170,6 +171,8 @@ export function CollectionPage({
   isSelectable?(item: CollectionItem): true | string;
   /** Shown under the header, e.g. a one-time tip. */
   notice?: ReactNode;
+  /** Under the title, above the search, e.g. a description and tabs. */
+  subheader?: ReactNode;
   /** Extra buttons beside New, e.g. a settings menu. */
   headerActions?: ReactNode;
   extraCreateItems?: readonly { id: string; label: string; icon: string; onSelect(projectId: string | null): void }[];
@@ -512,6 +515,7 @@ export function CollectionPage({
   return (
     <PageColumn className={cn(filter?.rail && "max-w-6xl")}>
       <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
+      {subheader}
       <div className="mt-6 flex items-center gap-2">
         {filter ? (
           <div className="min-w-0 flex-1">{filter.bar}</div>
