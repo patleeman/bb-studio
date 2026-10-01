@@ -12,7 +12,7 @@ around.
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): an Excalidraw drawing ("Checkout flow") with the
 seeded "Draft the ORBIT-42 release notes" thread floated into Studio Chat from
-its header's **Float** button. The card's header shows the thread, the
+its header's Float icon. The card's header shows the thread, the
 "Viewing: Checkout flow" chip names the drawing on screen, and the thread's
 scheduled message waits in its queue above the reply box.
 
@@ -23,7 +23,7 @@ scheduled message waits in its queue above the reply box.
   new-thread composer in the item's project. The message starts with a pill
   for the item, and the agent gets a note saying what it is and which tools
   read and change it.
-- **Any thread, anywhere.** A thread header's **Float** button, **Float in
+- **Any thread, anywhere.** A thread header's Float icon, **Float in
   Studio Chat** in a sidebar thread's menu (with
   [Studio Sidebar](../bb-studio-sidebar)), or the palette's "Studio
   Chat: float this thread" puts that thread in the card.

@@ -1,5 +1,5 @@
 // bb-studio-chat frontend: the floating chat over every window, a
-// Float button in thread headers, and commands to toggle and float.
+// Float icon in thread headers, and commands to toggle and float.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ChatOverlay } from "./src/ui/ChatOverlay";
 import { FloatAction } from "./src/ui/FloatAction";
