@@ -7,10 +7,15 @@ import { getNonDeletedElements, parseSceneData } from "../../lib/merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
 import type { DrawingRow, DrawingStore } from "./store";
 import { sceneThumbnail } from "./thumbnail";
+import { readFile } from "node:fs/promises";
 import { createRequire } from "node:module";
+import { initWasm, Resvg } from "@resvg/resvg-wasm";
 
-// Resvg ships a native .node binding; BB's server bundler leaves runtime require calls external.
-const { Resvg } = createRequire(import.meta.url)("@resvg/resvg-js") as typeof import("@resvg/resvg-js");
+// resvg's WebAssembly build: BB installs plugins without optional dependencies,
+// which drops resvg-js's per-platform native bindings. Load it on first export.
+let resvgReady: Promise<void> | undefined;
+const loadResvg = () =>
+  (resvgReady ??= readFile(createRequire(import.meta.url).resolve("@resvg/resvg-wasm/index_bg.wasm")).then(initWasm));
 
 export const DRAWING_KIND: StudioKind = {
   id: "drawing",
@@ -114,10 +119,11 @@ export function registerStudio(
     studio_duplicate: ({ id, projectId }) => ({ item: duplicate(id, projectId) }),
     studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(mustGet(id)) }; },
     studio_instantiate: ({ id, projectId, variables }) => { if (!mustGet(id).template) throw new Error("Drawing is not a template."); return { item: duplicate(id, projectId, variables) }; },
-    studio_export: ({ id, format }) => {
+    studio_export: async ({ id, format }) => {
       const row = mustGet(id);
       if (format === "svg" || format === "png") {
         const svg = sceneThumbnail(parseSceneData(row.data)) ?? '<svg xmlns="http://www.w3.org/2000/svg" width="1" height="1"/>';
+        if (format === "png") await loadResvg();
         const bytes = format === "png" ? new Resvg(svg).render().asPng() : Buffer.from(svg);
         return { files: [{ name: `${row.name.trim() || "Untitled drawing"}.${format}`, mime: format === "png" ? "image/png" : "image/svg+xml", data: Buffer.from(bytes).toString("base64") }] };
       }
