@@ -62,7 +62,7 @@ export const rpcContract = defineRpcContract({
       recent: z.array(z.object({ pluginId: z.string(), id: z.string(), title: z.string(), href: z.string(), kind: z.string(), updatedAt: z.number() })),
       automations: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), enabled: z.boolean(), nextRunAt: z.number().nullable() })).nullable(),
       activity: z.array(homeActivity),
-      dashboard: z.object({ periodDays: z.number(), threads: z.array(homeThread.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number() })), bots: z.array(homeBot.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number().nullable(), active: z.number(), limits: usageLimits.nullable() })).nullable() }),
+      dashboard: z.object({ periodDays: z.number(), threads: z.array(homeThread.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number() })), bots: z.array(homeBot.omit({ projectId: true }).extend({ turns: z.number(), failures: z.number(), durationMs: z.number(), active: z.number(), limits: usageLimits.nullable() })).nullable() }),
     }),
   },
   /** Every provider and all of their items. */

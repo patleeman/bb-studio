@@ -1,14 +1,22 @@
 import { describe, expect, it } from "vitest";
-import { homeData, summarizeTurns } from "./home";
+import { homeData, summarizeBotJobs, summarizeTurns } from "./home";
 
 describe("home activity", () => {
-  it("counts completed turns, measured duration and provider errors within the period", () => {
+  it("counts completed turns, measured duration and failures within the period", () => {
     expect(summarizeTurns([
       { type: "turn/completed", createdAt: 500 },
       { type: "turn/started", createdAt: 100 },
       { type: "turn/started", createdAt: 1_100 },
       { type: "turn/completed", createdAt: 1_400, data: { status: "failed" } },
       { type: "turn/started", createdAt: 1_500 },
+    ], 1_000)).toEqual({ turns: 1, failures: 1, durationMs: 300 });
+  });
+
+  it("counts only started bot jobs in the period", () => {
+    expect(summarizeBotJobs([
+      { startedAt: null, updatedAt: 1_500, status: "queued" },
+      { startedAt: 100, updatedAt: 500, status: "done" },
+      { startedAt: 1_100, updatedAt: 1_400, status: "error" },
     ], 1_000)).toEqual({ turns: 1, failures: 1, durationMs: 300 });
   });
 

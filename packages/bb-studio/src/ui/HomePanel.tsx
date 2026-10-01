@@ -56,7 +56,7 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
     {data && tab === "activity" ? <div className="space-y-6">
       <label className="flex items-center gap-2 text-sm">Period <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="rounded-md border border-border bg-background px-2 py-1"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select></label>
       <Section title="Threads">{data.dashboard.threads.length ? data.dashboard.threads.map((thread) => <Row key={thread.id} title={thread.title} detail={`${thread.turns} turns · ${thread.failures} errors · ${Math.round(thread.durationMs / 60000)} min · ${thread.status}`} href={`/threads/${thread.id}`} />) : <Row title="No thread activity in this period" />}</Section>
-      {data.dashboard.bots ? <Section title="Bots · last 24 hours">{data.dashboard.bots.length ? data.dashboard.bots.map((bot) => <Row key={bot.id} title={bot.name} detail={`${bot.turns} turns · ${bot.failures} errors${bot.limits ? ` · limit ${bot.limits.turnsPerDay}/day` : ""}`} />) : <Row title="No bots in this project" />}</Section> : null}
+      {data.dashboard.bots ? <Section title="Bots">{data.dashboard.bots.length ? data.dashboard.bots.map((bot) => <Row key={bot.id} title={bot.name} detail={`${bot.turns} turns · ${bot.failures} errors · ${Math.round(bot.durationMs / 60000)} min${bot.limits ? ` · limit ${bot.limits.turnsPerDay}/day` : ""}`} />) : <Row title="No bots in this project" />}</Section> : null}
     </div> : null}
   </PageColumn>;
 }

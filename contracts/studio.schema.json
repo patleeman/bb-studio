@@ -399,10 +399,7 @@
                           "type": "number"
                         },
                         "durationMs": {
-                          "type": [
-                            "number",
-                            "null"
-                          ]
+                          "type": "number"
                         },
                         "active": {
                           "type": "number"
