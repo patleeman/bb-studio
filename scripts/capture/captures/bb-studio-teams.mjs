@@ -250,12 +250,11 @@ export default ({ projectId, threadId, pluginRpc, launchRoomThread, getLaunchRoo
           })()`);
         }
         // Studio Teams hands over to Studio's collection, filtered to bots.
-        await client.waitForSelector('input[aria-label="Search studio"]');
+        await client.waitForSelector('input[aria-label="Search and filter studio"]');
         await client.waitForText("Research and verify the facts");
         await client.evaluate(`(() => {
           if (!location.pathname.endsWith("/plugins/studio/studio/bot")) throw new Error("Studio Teams must open Studio's Bots collection, not " + location.pathname);
-          const pressed = Array.from(document.querySelectorAll('button[aria-pressed="true"]')).map((button) => button.textContent.trim());
-          if (!pressed.includes("Bots")) throw new Error("The Bots filter must be selected");
+          if (!document.querySelector('button[aria-label="Remove Kind Bots"]')) throw new Error("The query must filter to bots");
           for (const name of ['Atlas', 'Quinn', 'Relay', 'Scribe']) {
             if (!document.body.innerText.includes(name)) throw new Error('Missing staged bot: ' + name);
           }

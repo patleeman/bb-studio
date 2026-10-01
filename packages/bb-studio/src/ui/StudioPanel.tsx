@@ -219,10 +219,10 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   // A link to a kind starts the query on it.
   const seededKind = useRef<string | null>(null);
   useEffect(() => {
-    if (!data || requested === "all" || seededKind.current === `${spaceId}/${requested}`) return;
+    if (!data || !kinds.some((each) => each.id === requested) || seededKind.current === `${spaceId}/${requested}`) return;
     seededKind.current = `${spaceId}/${requested}`;
     setQuery({ ...query, filters: [...query.filters.filter((filter) => filter.field !== "kind"), { field: "kind", value: requested }] });
-  }, [data, requested, spaceId, query, setQuery]);
+  }, [data, kinds, requested, spaceId, query, setQuery]);
   const vocabulary = useMemo<QueryVocabulary>(
     () => ({ kinds, projects: projects.map((project) => ({ id: project.id, name: project.name })), tags: data?.tags ?? [], spaces: data?.spaces ?? [] }),
     [kinds, projects, data?.tags, data?.spaces],

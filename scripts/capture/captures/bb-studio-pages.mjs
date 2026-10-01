@@ -39,9 +39,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         // With Studio installed, Pages' collection hands over to Studio,
         // filtered to pages. Shows the list view across every project.
         await client.navigate("/plugins/pages/pages");
-        await client.evaluate(`localStorage.setItem("studio:collection:view", "list"); localStorage.removeItem("studio:collection:project"); localStorage.setItem("studio:sidebar-tip-dismissed", "1")`);
+        await client.evaluate(`localStorage.setItem("studio:collection:view", "list"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/page");
-        await client.waitForSelector('input[aria-label="Search studio"]');
+        await client.waitForSelector('input[aria-label="Search and filter studio"]');
+        await client.waitForSelector('button[aria-label="Remove Kind Pages"]');
         await client.waitForSelector('[role="grid"]');
         await client.waitForText("New page");
         await client.waitForText("Offline mode launch");

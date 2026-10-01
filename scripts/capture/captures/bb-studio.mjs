@@ -44,9 +44,14 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
         // Studio only lists the recording, so it needn't be transcribed.
         recordingId = await seedTalkRecording(projectId, { transcribe: false });
         await client.navigate("/plugins/studio/studio/collection");
-        await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:collection:project", ${JSON.stringify(projectId)}); localStorage.setItem("studio:sidebar-tip-dismissed", "1")`);
+        await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/collection");
-        await client.waitForSelector('input[aria-label="Search studio"]');
+        await client.waitForSelector('input[aria-label="Search and filter studio"]');
+        await client.waitForSelector('nav[aria-label="Filters"]');
+        const rail = await client.evaluate(`document.querySelector('nav[aria-label="Filters"]')?.innerText ?? ""`);
+        for (const label of ["Spaces", "Kind", "Pages", "Recordings", "Drawings", "Project", "Orbit"]) {
+          if (!rail.includes(label)) throw new Error(`The filter rail didn't show ${label}: ${rail}`);
+        }
         await client.waitForText("Pages");
         await client.waitForText("Recordings");
         await client.waitForText("Drawings");
@@ -98,7 +103,7 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
           throw new Error(`Studio search didn't find the artifact with a snippet: ${JSON.stringify(found)}`);
         }
         await client.navigate("/plugins/studio/studio/collection");
-        await client.waitForSelector('input[aria-label="Search studio"]');
+        await client.waitForSelector('input[aria-label="Search and filter studio"]');
         // Open Studio search with its real shortcut, Mod+Shift+K.
         const modifiers = process.platform === "darwin" ? 4 : 2;
         // rawKeyDown: a shortcut with no text, as a real keyboard sends it.
