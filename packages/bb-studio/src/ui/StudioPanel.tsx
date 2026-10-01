@@ -34,10 +34,10 @@ import { applyItemChanges } from "../partial";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { NeedsYou } from "./HomePanel";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
-import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceHome, useSpaceThreads } from "./Spaces";
+import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
-type SpaceDialogState = { type: "edit" | "items" | "threads" | "delete"; space: SpaceView } | null;
+type SpaceDialogState = { type: "edit" | "items" | "delete"; space: SpaceView } | { type: "threads"; space: SpaceView; kind: ThreadKind } | null;
 const REFETCH_DEBOUNCE_MS = 300;
 const SEARCH_DEBOUNCE_MS = 200;
 const EMPTY_QUERY: Query = { filters: [], text: "" };
@@ -514,7 +514,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           onEdit={() => setSpaceDialog({ type: "edit", space })}
           onDelete={() => setSpaceDialog({ type: "delete", space })}
           onAddItems={() => setSpaceDialog({ type: "items", space })}
-          onAddThreads={() => setSpaceDialog({ type: "threads", space })}
+          onAddThreads={(kind) => setSpaceDialog({ type: "threads", space, kind })}
           onShowItems={() => {
             setQuery({ filters: [{ field: "space", value: space.name }], text: "" });
             openSpace(null);
@@ -568,7 +568,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         <AddItemsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} items={data?.items ?? []} kinds={kinds} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
       ) : null}
       {spaceDialog?.type === "threads" ? (
-        <AddThreadsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
+        <AddThreadsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} kind={spaceDialog.kind} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
       ) : null}
       {spaceDialog?.type === "delete" ? (
         <DeleteSpaceDialog space={spaceDialog.space} onClose={() => setSpaceDialog(null)} onConfirm={() => void deleteSpace(spaceDialog.space)} />

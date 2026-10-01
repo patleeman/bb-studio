@@ -1,5 +1,5 @@
-// Spaces in Studio: an open space's home page, with its items, threads and
-// projects, and the dialogs that make a space and fill it. Spaces are
+// Spaces in Studio: an open space's home page, with its items, threads,
+// channels and projects, and the dialogs that make a space and fill it. Spaces are
 // protected tags (src/spaces.ts); only the user makes one here.
 import {
   DropdownMenu,
@@ -31,6 +31,22 @@ type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 const PROJECT_REF = "bb-project";
 const THREAD_REF = "bb-thread";
 const SHOWN_THREADS = 6;
+
+/** Threads, or Studio Teams' channels and direct messages, which are threads too. */
+export type ThreadKind = "threads" | "conversations";
+const ofKind = (thread: SpaceThreadView, kind: ThreadKind) => (thread.kind === "thread") === (kind === "threads");
+
+function threadIcon(thread: SpaceThreadView) {
+  if (thread.status === "active" || thread.status === "starting") return "Loader";
+  return thread.kind === "channel" ? "Hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
+}
+
+/** Where a thread lives, or who a direct message is with. */
+function threadPlace(thread: SpaceThreadView, projects: readonly Project[]) {
+  if (thread.kind === "channel") return "Channel";
+  if (thread.kind === "dm") return `With ${thread.botName}`;
+  return projectName(projects, thread.projectId);
+}
 
 /** The app path that opens a space; a new thread that links it joins it. */
 export function spaceHref(id: string): string {
@@ -105,10 +121,10 @@ function ThreadRow({ thread, projects, onRemove }: { thread: SpaceThreadView; pr
   return (
     <div className="group flex items-center gap-2 px-3 py-2 hover:bg-state-hover">
       <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => navigate.toThread(thread.id)}>
-        <Icon name={thread.status === "active" || thread.status === "starting" ? "Loader" : "MessageSquare"} className="size-4 shrink-0 text-muted-foreground" />
+        <Icon name={threadIcon(thread)} className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm">{thread.title}</span>
         <span className="shrink-0 text-xs text-muted-foreground">
-          {projectName(projects, thread.projectId)} · {relativeTime(thread.updatedAt)}
+          {threadPlace(thread, projects)} · {relativeTime(thread.updatedAt)}
         </span>
       </button>
       {onRemove ? (
@@ -138,11 +154,11 @@ function ItemRow({ item, kinds, projects }: { item: CollectionItem; kinds: reado
   );
 }
 
-function AddThreadActions({ space, onAddThreads }: { space: SpaceView; onAddThreads(): void }) {
+function AddThreadActions({ space, onAddThreads }: { space: SpaceView; onAddThreads(kind: ThreadKind): void }) {
   const navigate = useBbNavigate();
   return (
     <>
-      <button type="button" className={GHOST_BUTTON} onClick={onAddThreads}>
+      <button type="button" className={GHOST_BUTTON} onClick={() => onAddThreads("threads")}>
         <Icon name="Plus" /> Add existing
       </button>
       <button type="button" className={OUTLINE_BUTTON} onClick={() => navigate.toCompose({ initialPrompt: spacePrompt(space), focusPrompt: true })}>
@@ -218,7 +234,18 @@ function ProjectRows({
   );
 }
 
-/** A space's home page: what it's for, then its items, threads and projects. */
+/** Rows for a list of threads, the ones added directly removable. */
+function ThreadRows({ threads, projects, onRemove }: { threads: readonly SpaceThreadView[]; projects: readonly Project[]; onRemove(id: string): void }) {
+  return (
+    <>
+      {threads.map((thread) => (
+        <ThreadRow key={thread.id} thread={thread} projects={projects} onRemove={thread.direct ? () => onRemove(thread.id) : undefined} />
+      ))}
+    </>
+  );
+}
+
+/** A space's home page: what it's for, then its items, threads, channels and projects. */
 export function SpaceHome({
   rpc,
   space,
@@ -243,7 +270,7 @@ export function SpaceHome({
   onEdit(): void;
   onDelete(): void;
   onAddItems(): void;
-  onAddThreads(): void;
+  onAddThreads(kind: ThreadKind): void;
   /** Opens the Studio collection filtered to the space. */
   onShowItems(): void;
   onChanged(): void;
@@ -251,7 +278,10 @@ export function SpaceHome({
   const members = useMembers(rpc, space, onChanged);
   const [allThreads, setAllThreads] = useState(false);
   const recent = useMemo(() => items.slice().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, SHOWN_ITEMS), [items]);
-  const shownThreads = allThreads ? threads : threads?.slice(0, SHOWN_THREADS);
+  const plain = threads?.filter((thread) => ofKind(thread, "threads")) ?? null;
+  const talk = threads?.filter((thread) => ofKind(thread, "conversations")) ?? null;
+  const shownThreads = allThreads ? plain : plain?.slice(0, SHOWN_THREADS);
+  const removeThread = (id: string) => void members([], [{ pluginId: THREAD_REF, id }]);
   return (
     <PageColumn>
       <div className="flex items-start gap-3">
@@ -293,23 +323,28 @@ export function SpaceHome({
           title="Threads"
           actions={<AddThreadActions space={space} onAddThreads={onAddThreads} />}
           footer={
-            threads && threads.length > SHOWN_THREADS ? (
+            plain && plain.length > SHOWN_THREADS ? (
               <button type="button" className={`${GHOST_BUTTON} self-start`} onClick={() => setAllThreads(!allThreads)}>
-                {allThreads ? "Show fewer" : `Show all ${threads.length}`}
+                {allThreads ? "Show fewer" : `Show all ${plain.length}`}
               </button>
             ) : null
           }
         >
-          {threads === null ? <Empty>Loading threads…</Empty> : null}
-          {shownThreads?.map((thread) => (
-            <ThreadRow
-              key={thread.id}
-              thread={thread}
-              projects={projects}
-              onRemove={thread.direct ? () => void members([], [{ pluginId: THREAD_REF, id: thread.id }]) : undefined}
-            />
-          ))}
-          {threads?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
+          {plain === null ? <Empty>Loading threads…</Empty> : null}
+          <ThreadRows threads={shownThreads ?? []} projects={projects} onRemove={removeThread} />
+          {plain?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
+        </Section>
+        <Section
+          title="Channels and messages"
+          actions={
+            <button type="button" className={OUTLINE_BUTTON} onClick={() => onAddThreads("conversations")}>
+              <Icon name="Plus" /> Add channel
+            </button>
+          }
+        >
+          {talk === null ? <Empty>Loading channels…</Empty> : null}
+          <ThreadRows threads={talk ?? []} projects={projects} onRemove={removeThread} />
+          {talk?.length === 0 ? <Empty>No channels or direct messages yet. Add a Studio Teams channel or a chat with a bot.</Empty> : null}
         </Section>
         <Section
           title="Projects"
@@ -533,7 +568,21 @@ export function AddItemsDialog({
 }
 
 /** Picks open threads to add to a space. */
-export function AddThreadsDialog({ rpc, space, projects, onClose, onChanged }: { rpc: Rpc; space: SpaceView; projects: readonly Project[]; onClose(): void; onChanged(): void }) {
+export function AddThreadsDialog({
+  rpc,
+  space,
+  kind,
+  projects,
+  onClose,
+  onChanged,
+}: {
+  rpc: Rpc;
+  space: SpaceView;
+  kind: ThreadKind;
+  projects: readonly Project[];
+  onClose(): void;
+  onChanged(): void;
+}) {
   const [threads, setThreads] = useState<SpaceThreadView[] | null>(null);
   const [query, setQuery] = useState("");
   const [busy, setBusy] = useState<string | null>(null);
@@ -547,7 +596,9 @@ export function AddThreadsDialog({ rpc, space, projects, onClose, onChanged }: {
     );
   }, [rpc]);
   const text = query.trim().toLowerCase();
-  const listed = threads?.filter((thread) => !text || thread.title.toLowerCase().includes(text)) ?? [];
+  const listed =
+    threads?.filter((thread) => ofKind(thread, kind) && (!text || `${thread.title} ${thread.botName ?? ""}`.toLowerCase().includes(text))) ?? [];
+  const noun = kind === "threads" ? "threads" : "channels and messages";
 
   const toggle = async (thread: SpaceThreadView, add: boolean) => {
     setBusy(thread.id);
@@ -566,10 +617,16 @@ export function AddThreadsDialog({ rpc, space, projects, onClose, onChanged }: {
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>Add threads to {space.name}</DialogTitle>
-          <DialogDescription>Threads in the space's projects are already in it. A thread stays in its project.</DialogDescription>
+          <DialogTitle>
+            Add {noun} to {space.name}
+          </DialogTitle>
+          <DialogDescription>
+            {kind === "threads"
+              ? "Threads in the space's projects are already in it. A thread stays in its project."
+              : "Studio Teams channels and direct messages with bots. Each stays where it is, and links back to the space."}
+          </DialogDescription>
         </DialogHeader>
-        <Input autoFocus value={query} placeholder="Search threads" onChange={(event) => setQuery(event.target.value)} />
+        <Input autoFocus value={query} placeholder={`Search ${noun}`} onChange={(event) => setQuery(event.target.value)} />
         <div className="-mx-2 flex max-h-96 flex-col overflow-y-auto">
           {threads === null ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">Loading…</p> : null}
           {listed.map((thread) => {
@@ -577,10 +634,10 @@ export function AddThreadsDialog({ rpc, space, projects, onClose, onChanged }: {
             const viaProject = !added && thread.projectId !== null && space.projectIds.includes(thread.projectId);
             return (
               <div key={thread.id} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-state-hover">
-                <Icon name="MessageSquare" className="size-4 shrink-0 text-muted-foreground" />
+                <Icon name={threadIcon(thread)} className="size-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">{thread.title}</div>
-                  <div className="truncate text-xs text-muted-foreground">{projectName(projects, thread.projectId)}</div>
+                  <div className="truncate text-xs text-muted-foreground">{threadPlace(thread, projects)}</div>
                 </div>
                 {viaProject ? (
                   <span className="text-xs text-muted-foreground">In a project</span>
@@ -592,7 +649,11 @@ export function AddThreadsDialog({ rpc, space, projects, onClose, onChanged }: {
               </div>
             );
           })}
-          {threads && !listed.length ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">No threads match.</p> : null}
+          {threads && !listed.length ? (
+            <p className="px-2 py-6 text-center text-sm text-muted-foreground">
+              {text ? `No ${noun} match.` : kind === "threads" ? "No open threads." : "No channels or direct messages. They come from Studio Teams."}
+            </p>
+          ) : null}
         </div>
         <DialogFooter>
           <Button onClick={onClose}>Done</Button>

@@ -72,6 +72,10 @@ const spaceThread = z.object({
   updatedAt: z.number(),
   /** Added to the space itself, not through one of its projects. */
   direct: z.boolean(),
+  /** A Studio Teams channel or direct message, which is a thread too. */
+  kind: z.enum(["thread", "channel", "dm"]),
+  /** The bot a direct message is with. */
+  botName: z.string().nullable(),
 });
 export type SpaceThreadView = z.infer<typeof spaceThread>;
 const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
@@ -170,7 +174,9 @@ export const rpcContract = defineRpcContract({
   },
   /** Threads added to a space and its projects' open threads, newest first. */
   spaceThreads: { input: z.object({ id: spaceId }), output: z.object({ threads: z.array(spaceThread) }) },
-  /** Open threads to pick from when adding one to a space. */
+  /** The spaces a thread is in; `inherited` ones hold it through a project. */
+  spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
+  /** Open threads, channels and direct messages to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
   /** Saves a collection query by name, replacing a view with that name. */
   saveView: { input: z.object({ name: z.string().min(1).max(60), query: z.string().max(500) }), output: z.object({ view: savedView }) },

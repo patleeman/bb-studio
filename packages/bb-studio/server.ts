@@ -17,7 +17,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
-import { rpcContract, TABS_CHANNEL, type SidebarView, type TabView } from "./src/contract";
+import { rpcContract, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
@@ -172,24 +172,52 @@ export default async function plugin(bb: BbPluginApi) {
     };
   };
 
-  type ThreadView = { id: string; title: string; status: string; projectId: string | null; updatedAt: number; direct: boolean };
-  const threadView = (thread: { id: string; title?: string | null; titleFallback?: string | null; status: string; projectId?: string | null; updatedAt?: number | null; createdAt?: number | null }, direct: boolean): ThreadView => ({
+  type ThreadView = SpaceThreadView;
+  type Conversation = { kind: "channel" | "dm"; name: string };
+  type ThreadLike = { id: string; title?: string | null; titleFallback?: string | null; status: string; projectId?: string | null; updatedAt?: number | null; createdAt?: number | null; archivedAt?: number | null };
+  const threadView = (thread: ThreadLike, direct: boolean, conversation?: Conversation): ThreadView => ({
     id: thread.id,
-    title: thread.title || thread.titleFallback || "Untitled thread",
+    title: conversation?.kind === "channel" ? conversation.name : thread.title || thread.titleFallback || "Untitled thread",
     status: thread.status,
     projectId: thread.projectId ?? null,
     updatedAt: thread.updatedAt ?? thread.createdAt ?? 0,
     direct,
+    kind: conversation?.kind ?? "thread",
+    botName: conversation?.kind === "dm" ? conversation.name : null,
   });
+  const conversationList = z.object({
+    channels: z.array(z.object({ threadId: z.string(), name: z.string(), archived: z.boolean() })),
+    direct: z.array(z.object({ threadId: z.string(), botName: z.string() })),
+  });
+  /** Studio Teams' channels and direct messages by thread; none without it. */
+  const conversations = async (): Promise<Map<string, Conversation>> => {
+    const found = new Map<string, Conversation>();
+    const result = await bb.sdk.plugins
+      .callRpc({ pluginId: "bot-teams", method: "spaceConversations", input: null as never, outputSchema: conversationList, signal: AbortSignal.timeout(10_000) })
+      .catch(() => null);
+    for (const channel of result?.channels ?? []) if (!channel.archived) found.set(channel.threadId, { kind: "channel", name: channel.name });
+    for (const direct of result?.direct ?? []) found.set(direct.threadId, { kind: "dm", name: direct.botName });
+    return found;
+  };
   /** A space's threads: the ones added to it and its projects' open ones, newest first. */
   const spaceThreads = async (space: Space): Promise<ThreadView[]> => {
-    const [byProject, added] = await Promise.all([
+    const [byProject, added, known] = await Promise.all([
       Promise.all(space.projectIds.map((projectId) => bb.sdk.threads.list({ projectId, archived: false, limit: 50 }).catch(() => []))),
       Promise.all(space.threadIds.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null))),
+      conversations(),
     ]);
     const found = new Map<string, ThreadView>();
-    for (const thread of byProject.flat()) found.set(thread.id, threadView(thread, false));
-    for (const thread of added) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, true));
+    for (const thread of byProject.flat()) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
+    for (const thread of added) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, true, known.get(thread.id)));
+    return [...found.values()].sort((a, b) => b.updatedAt - a.updatedAt);
+  };
+  /** Recent open threads, with every channel and direct message, which may be hidden from lists. */
+  const recentThreads = async (): Promise<ThreadView[]> => {
+    const [listed, known] = await Promise.all([bb.sdk.threads.list({ archived: false, limit: 100 }), conversations()]);
+    const found = new Map<string, ThreadView>(listed.map((thread) => [thread.id, threadView(thread, false, known.get(thread.id))]));
+    const missing = [...known.keys()].filter((id) => !found.has(id));
+    const fetched = await Promise.all(missing.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)));
+    for (const thread of fetched) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
     return [...found.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   };
   /** The spaces a thread is in, which scope what its agent sees by default. */
@@ -358,7 +386,12 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { ok: true };
     },
-    recentThreads: async () => ({ threads: (await bb.sdk.threads.list({ archived: false, limit: 100 })).map((thread) => threadView(thread, false)) }),
+    recentThreads: async () => ({ threads: await recentThreads() }),
+    spacesForThread: async ({ threadId }) => {
+      const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
+      const holding = threadSpaces(threadId, thread?.projectId ?? null);
+      return { spaces: holding, inherited: holding.filter((space) => !space.threadIds.includes(threadId)).map((space) => space.id) };
+    },
     studio_changed: async ({ pluginId, ids, removed }) => {
       await searchIndex.changed(pluginId, ids, removed).catch(() => {});
       if (!ids && !removed) changes.append(null);
