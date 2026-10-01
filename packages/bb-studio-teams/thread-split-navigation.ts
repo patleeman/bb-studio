@@ -1,7 +1,15 @@
+import type { MouseEvent as ReactMouseEvent } from "react";
 import { useBbNavigate, useSidebarSplitLayout } from "@get-bb/plugin-sdk/app";
 
 const splitClicks = new WeakSet<Event>();
 export const isThreadSplitClick = (event: Event) => splitClicks.has(event);
+
+export function handleSidebarLinkClick(event: ReactMouseEvent<HTMLAnchorElement>, open: () => void, openSplit: () => void) {
+  if (isThreadSplitClick(event.nativeEvent) || event.shiftKey || event.altKey) return;
+  event.preventDefault();
+  if (event.metaKey || event.ctrlKey) openSplit();
+  else open();
+}
 
 export function threadLinkPath(projectId: string, threadId: string): string {
   const threadPath = `threads/${encodeURIComponent(threadId)}`;

@@ -7,7 +7,7 @@ import {
 import type { Bot, Conversation, DirectThreadInfo, DirectThreadView } from "./contract";
 import { DirectMessageStatus } from "./bot-direct-chat";
 import { message } from "./bot-ui";
-import { isThreadSplitClick, threadLinkPath, useOpenThreadInSplit } from "./thread-split-navigation";
+import { handleSidebarLinkClick, threadLinkPath, useOpenThreadInSplit } from "./thread-split-navigation";
 import { useSidebarInlineRename } from "./sidebar-inline-rename";
 import {
   ContextMenu,
@@ -201,18 +201,7 @@ export function DirectSidebarThread({
             data-sidebar-thread-id={conversation.threadId}
             aria-current={selected ? "page" : undefined}
             title={untitled ? bot.name : `${title} · ${bot.name}`}
-            onClick={(event) => {
-              if (isThreadSplitClick(event.nativeEvent)) return;
-              if (event.shiftKey || event.altKey) return;
-              if (event.metaKey || event.ctrlKey) {
-                event.preventDefault();
-                openThreadInSplit(rowLink.current);
-                onNavigate();
-                return;
-              }
-              event.preventDefault();
-              open();
-            }}>
+            onClick={(event) => handleSidebarLinkClick(event, open, () => { openThreadInSplit(rowLink.current); onNavigate(); })}>
             <span className="direct-thread-avatar" aria-hidden>{bot.avatar}</span>
             <span className="channel-nav-name">{label}</span>
             {!untitled && <span className="direct-thread-bot">{bot.name}</span>}

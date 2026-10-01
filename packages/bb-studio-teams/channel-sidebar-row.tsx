@@ -1,7 +1,7 @@
 import { useId, useRef, useState } from "react";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import type { Room, RoomWork, ThreadStatusView } from "./contract";
-import { isThreadSplitClick, useOpenThreadInSplit } from "./thread-split-navigation";
+import { handleSidebarLinkClick, useOpenThreadInSplit } from "./thread-split-navigation";
 import { ChannelStatusIcon, useChannelStatus } from "./channel-status-view";
 import { IconActionTooltip } from "./channel-controls";
 import { useSidebarInlineRename } from "./sidebar-inline-rename";
@@ -114,17 +114,7 @@ export function ChannelSidebarRow({
             href={room.threadId ? `/threads/${room.threadId}` : `/plugins/bot-teams/channels/${room.id}`}
             className="channel-nav-row"
             aria-current={selected ? "page" : undefined}
-            onClick={(event) => {
-              if (isThreadSplitClick(event.nativeEvent)) return;
-              if (event.shiftKey || event.altKey) return;
-              if (event.metaKey || event.ctrlKey) {
-                event.preventDefault();
-                openInSplit();
-                return;
-              }
-              event.preventDefault();
-              onOpen();
-            }}
+            onClick={(event) => handleSidebarLinkClick(event, onOpen, openInSplit)}
           >
             {waitingLabel ? (
               <span className="channel-needs-attention" role="img"
