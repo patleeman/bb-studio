@@ -57,6 +57,7 @@ export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: Bo
       bots: bots.bots,
       openPage,
       openThread: (threadId) => navigate.toThread(threadId),
+      openProject: (projectId) => navigate.toProject(projectId),
       openUrl: (url) => {
         if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
       },

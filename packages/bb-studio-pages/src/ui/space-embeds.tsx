@@ -90,7 +90,7 @@ function FooterButton({ icon, children, onClick }: { icon?: string; children: Re
 }
 
 function Empty({ children }: { children: ReactNode }) {
-  return <p className="px-3 py-3 text-sm text-muted-foreground">{children}</p>;
+  return <div className="px-4 py-3 text-xs text-muted-foreground/70">{children}</div>;
 }
 
 function Row({ icon, glyph, title, sub, aside, onOpen }: { icon: string; glyph?: string | null; title: string; sub: string; aside?: string; onOpen(): void }) {
@@ -119,7 +119,7 @@ function Actions({ view }: { view: SpaceWidgetView }) {
   const make = async (kind: SpaceWidgetView["kinds"][number]) => {
     if (kind.event) {
       // An add-on's own dialog makes it, such as a bot.
-      const event = new CustomEvent(kind.event, { detail: { projectId: view.space.defaultProjectId }, cancelable: true });
+      const event = new CustomEvent(kind.event, { detail: { projectId: view.space.defaultProjectId, spaceId: view.space.id }, cancelable: true });
       window.dispatchEvent(event);
       if (!event.defaultPrevented) toast.error(`Couldn't open the new ${kind.label.toLowerCase()} dialog.`);
       return;
@@ -178,7 +178,7 @@ function Recent({ view }: { view: SpaceWidgetView }) {
             onOpen={() => ui.openPath(item.href)}
           />
         ))}
-        {!view.recent.length ? <Empty>Nothing here yet. Make something, or add existing items or a project.</Empty> : null}
+        {!view.recent.length ? <Empty>Nothing here yet.</Empty> : null}
       </div>
       <Footer>
         <FooterButton icon="Plus" onClick={() => spaceDialog(view.space.id, "items")}>
@@ -214,8 +214,8 @@ function Threads({ view, conversations }: { view: SpaceWidgetView; conversations
         {!threads.length ? (
           <Empty>
             {conversations
-              ? "No channels or direct messages yet. Add one here, or from its header's Spaces menu."
-              : "No threads yet. Start one here, or add a project."}
+              ? "No channels or messages yet."
+              : "No threads yet."}
           </Empty>
         ) : null}
       </div>
@@ -252,10 +252,10 @@ function Projects({ view }: { view: SpaceWidgetView }) {
             title={project.name}
             sub={`${plural(project.items, "item")} · ${plural(project.threads, "thread")}`}
             aside={project.isDefault ? "Default" : undefined}
-            onOpen={() => ui.openPath(view.itemsHref)}
+            onOpen={() => ui.openProject(project.id)}
           />
         ))}
-        {!view.projects.length ? <Empty>No projects yet. A project brings in all its items and threads.</Empty> : null}
+        {!view.projects.length ? <Empty>No projects yet.</Empty> : null}
       </div>
       <Footer>
         <FooterButton icon="Plus" onClick={() => spaceDialog(view.space.id, "projects")}>
@@ -270,9 +270,9 @@ function Projects({ view }: { view: SpaceWidgetView }) {
 export function SpaceEmbed({ target }: { target: string }) {
   const { spaceId, section } = parseSpaceTarget(target);
   const view = useSpace(spaceId);
-  if (!spaceId) return <Empty>This widget isn't linked to a space.</Empty>;
+  if (!spaceId) return <Empty>Not linked to a space.</Empty>;
   if (view === undefined) return <Empty>Loading {SPACE_SECTION_LABELS[section].toLowerCase()}…</Empty>;
-  if (view === null) return <Empty>This space is gone, or Studio isn't available.</Empty>;
+  if (view === null) return <Empty>Space unavailable.</Empty>;
   return (
     <div className="text-foreground" data-space-widget={section}>
       {section === "actions" ? <Actions view={view} /> : null}

@@ -16,6 +16,8 @@ export interface PagesUi {
   bots: BotView[];
   openPage(pageId: string): void;
   openThread(threadId: string): void;
+  /** Opens a BB project. */
+  openProject(projectId: string): void;
   openUrl(url: string): void;
   /** Opens a BB path, such as another add-on's item. */
   openPath(path: string): void;
@@ -51,6 +53,7 @@ export const PagesUiContext = createContext<PagesUi>({
   bots: [],
   openPage: () => {},
   openThread: () => {},
+  openProject: () => {},
   openUrl: (url) => void window.open(url, "_blank", "noopener"),
   openPath: () => {},
   linkPreview: () => Promise.reject(new Error("No link previews here.")),
