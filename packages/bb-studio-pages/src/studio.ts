@@ -18,6 +18,9 @@ export const PAGE_KIND: StudioKind = {
   actions: [{ id: "copy-markdown", label: "Copy as Markdown", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: true, export: true, comments: true, versions: true, links: true },
+  mentionProviderId: "page",
+
   blurb: "Documents you write with agents.",
   agentHint: "Read it with pages_read and change it with pages_edit; comments are in pages_comments.",
 };
@@ -85,7 +88,9 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
   const requireMeta = (id: string) => mustGet((key) => store.meta(key), id, "Page not found.");
 
   registerStudioProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "pages", kinds: [PAGE_KIND] }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "pages", kinds: [PAGE_KIND] }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const meta = store.meta(id); return meta ? [toStudioItem(meta, store.get(id)?.markdown ?? null)] : []; }) }),
+    studio_read: ({ id, format }) => { const markdown = store.get(id)?.markdown ?? null; return { content: markdown === null ? null : format === "markdown" ? markdown : plainText(markdown) }; },
     studio_list: () => {
       const markdown = store.markdownHeads();
       return { items: store.list({ includeArchived: true }).map((meta) => toStudioItem(meta, markdown.get(meta.id) ?? null)) };

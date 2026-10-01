@@ -127,6 +127,30 @@ describe("StudioHub", () => {
     expect(await new StudioHub(sdk).search("plan")).toEqual({ keys: ["pages:pg_1", "pages:pg_2"], snippets: { "pages:pg_1": "…the plan for…" } });
   });
 
+  it("uses studio_get for v2 and falls back to studio_list for v1", async () => {
+    const capabilities = { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false };
+    const sdk = fakeSdk({
+      plugins: [plugin("pages"), plugin("talk")],
+      rpc: {
+        "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: null, kinds: [{ ...kind, capabilities, mentionProviderId: "page" }] }),
+        "pages.studio_get": () => ({ items: [item("pg_1")] }),
+        "talk.studio_describe": () => ({ pluginId: "talk", version: 1, panel: null, kinds: [kind] }),
+        "talk.studio_list": () => ({ items: [item("pg_2"), item("pg_3")] }),
+      },
+    });
+    const hub = new StudioHub(sdk);
+    expect((await hub.get("pages", ["pg_1"])).map((row) => row.id)).toEqual(["pg_1"]);
+    expect((await hub.get("talk", ["pg_3"])).map((row) => row.id)).toEqual(["pg_3"]);
+    expect(sdk.calls).toContain("pages.studio_get");
+    expect(sdk.calls).not.toContain("pages.studio_list");
+    expect(sdk.calls).toContain("talk.studio_list");
+  });
+
+  it("marks an incomplete v2 description offline", async () => {
+    const sdk = fakeSdk({ plugins: [plugin("pages")], rpc: { "pages.studio_describe": () => ({ pluginId: "pages", version: 2, panel: null, kinds: [kind] }) } });
+    expect((await new StudioHub(sdk).providers())[0]).toMatchObject({ state: "offline", detail: expect.stringContaining("missing capabilities") });
+  });
+
   it("refuses to call itself", async () => {
     const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }));
     await expect(hub.call("studio", "studio_list", null)).rejects.toThrow("Studio isn't a provider.");

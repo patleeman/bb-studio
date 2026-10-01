@@ -14,6 +14,7 @@ describe("handoffInput", () => {
       ],
       "Keep it upbeat.",
       new Date(2026, 9, 1, 12),
+      new Map([["pages", "page"]]),
     );
     expect(input.type).toBe("text");
     expect(input.text).toContain('"Write the launch post"');
@@ -33,7 +34,7 @@ describe("handoffInput", () => {
   it("mentions a linked Studio task", () => {
     const input = handoffInput(task, [
       { target: "item", plugin_id: "studio-tasks", item_id: "tsk_other", label: "Follow-up", href: "/plugins/studio-tasks/tasks/tsk_other" },
-    ], null);
+    ], null, new Date(), new Map([["studio-tasks", "task"]]));
     expect(input.mentions).toEqual([{
       start: input.text.indexOf("@Follow-up"),
       end: input.text.indexOf("@Follow-up") + "@Follow-up".length,

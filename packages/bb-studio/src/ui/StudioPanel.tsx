@@ -28,6 +28,7 @@ import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ProviderView, rpcContract, SidebarView, TagView } from "../contract";
+import { applyItemChanges } from "../partial";
 
 type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] };
 const TIP_DISMISSED_KEY = "studio:sidebar-tip-dismissed";
@@ -39,6 +40,7 @@ function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
   // One request at a time; a change during a request fetches once more after.
   const running = useRef(false);
   const again = useRef(false);
+  const cursor = useRef<number | null>(null);
   const refetch = useCallback(() => {
     if (running.current) {
       again.current = true;
@@ -50,6 +52,7 @@ function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
       .then(
         (result) => {
           setData(result);
+          rpc.call("changes", { since: 0 }).then(({ cursor: current }) => { cursor.current = current; }, () => { cursor.current = null; });
           setError(null);
         },
         (cause: unknown) => setError(errorMessage(cause)),
@@ -72,9 +75,28 @@ function useOverview(rpc: ReturnType<typeof useRpc<typeof rpcContract>>) {
 
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
+  const catchUp = useCallback(async () => {
+    if (cursor.current === null) { refetch(); return; }
+    try {
+      const result = await rpc.call("changes", { since: cursor.current });
+      if (result.reset) { refetch(); return; }
+      const groups = new Map<string, string[]>();
+      for (const change of result.changes) {
+        if (change.removed) continue;
+        groups.set(change.pluginId, [...(groups.get(change.pluginId) ?? []), change.id]);
+      }
+      const fetched = await Promise.all([...groups].map(([pluginId, ids]) => rpc.call("items", { pluginId, ids })));
+      const updated = fetched.flatMap(({ items }) => items);
+      setData((previous) => previous && {
+        ...previous,
+        items: applyItemChanges(previous.items, updated, result.changes.filter((change) => change.removed)),
+      });
+      cursor.current = result.cursor;
+    } catch { refetch(); }
+  }, [rpc, refetch]);
   useRealtime(STUDIO_REALTIME_CHANNEL, () => {
     clearTimeout(timer.current);
-    timer.current = setTimeout(refetch, REFETCH_DEBOUNCE_MS);
+    timer.current = setTimeout(() => { void catchUp(); }, REFETCH_DEBOUNCE_MS);
   });
   return { data, error, refetch, setData };
 }

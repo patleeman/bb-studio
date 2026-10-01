@@ -35,6 +35,9 @@ export const TASK_KIND: StudioKind = {
   ],
   create: { mode: "rpc" },
   canArchive: true,
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: false, comments: false, versions: false, links: true },
+  mentionProviderId: "task",
+
   blurb: "Things to do, for you or an agent.",
   agentHint: "Read it with tasks_get and change it with tasks_update.",
 };
@@ -99,7 +102,9 @@ export function registerStudio(
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Task not found.");
 
   createStoreProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "tasks", kinds: [TASK_KIND] }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "tasks", kinds: [TASK_KIND] }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(row, store.latestHandoff(id))] : []; }) }),
+    studio_read: ({ id }) => { const row = store.get(id); return { content: row ? [`# ${row.title}`, row.description].filter(Boolean).join("\n\n") : null }; },
     studio_list: () => ({
       items: store.list({ includeArchived: true }).map((task) => toStudioItem(task, store.latestHandoff(task.id))),
     }),

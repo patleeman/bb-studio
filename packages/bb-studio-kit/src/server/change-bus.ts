@@ -25,7 +25,7 @@ export function createChangeBus<T extends unknown[]>(options: {
       } catch {
         // An open view can still catch up by refetching.
       }
-      notifier.changed();
+      notifier.changed(id);
     },
     dispose: () => notifier.dispose(),
   };

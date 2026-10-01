@@ -16,6 +16,9 @@ export const DRAWING_KIND: StudioKind = {
   actions: [{ id: "copy-text", label: "Copy text", icon: "Copy", result: "copy" }],
   create: { mode: "rpc" },
   canArchive: true,
+  capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false },
+  mentionProviderId: "drawing",
+
   blurb: "Diagrams and sketches.",
   agentHint: "Read it with excalidraw_get_drawing and change it with excalidraw_update_drawing.",
 };
@@ -81,7 +84,9 @@ export function registerStudio(
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Drawing not found.");
 
   createStoreProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "drawings", kinds: [DRAWING_KIND] }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "drawings", kinds: [DRAWING_KIND] }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(row)] : []; }) }),
+    studio_read: ({ id }) => ({ content: store.get(id) ? drawingText(store.get(id)!.data).join("\n") : null }),
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
       return { items: rows.map(toStudioItem), truncated: rows.length === LIST_LIMIT };

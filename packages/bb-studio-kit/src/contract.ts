@@ -12,7 +12,7 @@ export const STUDIO_PLUGIN_ID = "studio";
 export const STUDIO_PANEL_PATH = "studio";
 /** The RPC an add-on calls on Studio when its items change. */
 export const STUDIO_CHANGED_METHOD = "studio_changed";
-/** Studio's realtime channel; payload `{ pluginId }`. */
+/** Studio's realtime channel; payload `{ pluginId, ids?, removed? }`. */
 export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 /** Studio's RPC that finds the item a path opens, or an item by id. */
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
@@ -81,6 +81,10 @@ export interface StudioAction {
   result: "toast" | "copy";
 }
 
+export const STUDIO_CAPABILITIES = ["create", "move", "archive", "delete", "rename", "duplicate", "export", "comments", "versions", "links"] as const;
+export type StudioCapability = (typeof STUDIO_CAPABILITIES)[number];
+export type StudioCapabilities = Record<StudioCapability, boolean>;
+
 export interface StudioKind {
   id: string;
   /** "Page" */
@@ -100,6 +104,10 @@ export interface StudioKind {
    */
   create: { mode: "rpc" } | { mode: "event"; event: string } | null;
   canArchive: boolean;
+  /** v2: actions available for this kind. */
+  capabilities?: StudioCapabilities;
+  /** v2: item prefix used by BB mentions. */
+  mentionProviderId?: string | null;
   /** Empty-state copy for this kind. */
   blurb: string;
   /**
@@ -113,7 +121,7 @@ export interface StudioKind {
 export interface StudioProviderInfo {
   pluginId: string;
   /** Contract version, for future changes. */
-  version: 1;
+  version: 1 | 2;
   /** The add-on's own nav panel, which Studio offers to hide from the sidebar. */
   panel: string | null;
   kinds: StudioKind[];
@@ -180,10 +188,12 @@ export function studioSchemas(z: typeof Zod) {
       ])
       .nullable(),
     canArchive: z.boolean(),
+    capabilities: z.object(Object.fromEntries(STUDIO_CAPABILITIES.map((key) => [key, z.boolean()])) as Record<StudioCapability, ReturnType<typeof z.boolean>>).optional(),
+    mentionProviderId: z.string().nullable().optional(),
     blurb: z.string(),
     agentHint: z.string().max(500).optional(),
   });
-  const info = z.object({ pluginId: z.string(), version: z.literal(1), panel: z.string().nullable(), kinds: z.array(kind) });
+  const info = z.object({ pluginId: z.string(), version: z.union([z.literal(1), z.literal(2)]), panel: z.string().nullable(), kinds: z.array(kind) });
   const ids = z.array(z.string().min(1).max(200)).min(1).max(500);
   const projectId = z.string().min(1).max(200).nullable();
   const results = z.object({
@@ -209,6 +219,8 @@ export function studioSchemas(z: typeof Zod) {
        * `snippets` has the matching text by id, for as many as the add-on
        * cares to excerpt (see `snippet` in the kit's format module).
        */
+      studio_get: { input: z.object({ ids }), output: z.object({ items: z.array(item) }) },
+      studio_read: { input: z.object({ id: z.string().min(1).max(200), format: z.enum(["markdown", "text"]) }), output: z.object({ content: z.string().nullable() }) },
       studio_search: {
         input: z.object({ query: z.string().min(1).max(200) }),
         output: z.object({ ids: z.array(z.string()), snippets: z.record(z.string(), z.string()).optional() }),
@@ -232,7 +244,7 @@ export function studioSchemas(z: typeof Zod) {
     },
     /** Studio's own method add-ons call when their items change. */
     changed: {
-      input: z.object({ pluginId: z.string().min(1).max(100) }),
+      input: z.object({ pluginId: z.string().min(1).max(100), ids: z.array(z.string().min(1).max(200)).max(500).optional(), removed: z.array(z.string().min(1).max(200)).max(500).optional() }),
       output: z.object({ ok: z.boolean() }),
     },
   };

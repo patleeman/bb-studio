@@ -24,7 +24,6 @@ const artifactSchema = z.object({
     })
     .nullable(),
 });
-const textSchema = z.object({ text: z.string().nullable(), truncated: z.boolean() });
 
 type Sdk = BbPluginApi["sdk"];
 
@@ -90,11 +89,11 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       if (version.type === "markdown" || version.type === "code" || version.type === "text") {
         const result = await sdk.plugins.callRpc({
           pluginId: "artifacts",
-          method: "text",
-          input: { id, versionId: version.id } as never,
-          outputSchema: textSchema,
+          method: "studio_read",
+          input: { id, format: "markdown" } as never,
+          outputSchema: studio.provider.studio_read.output,
         });
-        text = result.text === null ? null : result.text.slice(0, MAX_TEXT) + (result.truncated || result.text.length > MAX_TEXT ? "\n…" : "");
+        text = result.content === null ? null : result.content.slice(0, MAX_TEXT) + (result.content.length > MAX_TEXT ? "\n…" : "");
       }
       const query = `artifact=${encodeURIComponent(artifact.id)}&version=${encodeURIComponent(version.id)}`;
       return { type: version.type, name: version.name, url: `/api/v1/plugins/artifacts/http/content?${query}`, text };

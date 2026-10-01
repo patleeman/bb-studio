@@ -20,6 +20,9 @@ export const ARTIFACT_KIND: StudioKind = {
   // Artifacts come from threads: agents save them, or you do from a reply.
   create: null,
   canArchive: true,
+  capabilities: { create: false, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: true, links: true },
+  mentionProviderId: "artifact",
+
   blurb: "Files your agents made.",
   agentHint: "Read it with artifacts_read.",
 };
@@ -130,7 +133,9 @@ export function registerStudio(
   const mustGet = (id: string) => requireItem((key) => store.get(key), id, "Artifact not found.");
 
   createStoreProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "artifacts", kinds: [ARTIFACT_KIND] }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "artifacts", kinds: [ARTIFACT_KIND] }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.get(id); return row ? [toStudioItem(store, row)] : []; }) }),
+    studio_read: ({ id, format }) => { const row = store.get(id); const content = row ? artifactText(store, row) : null; return { content: content && format === "text" && versionType(row!.version) === "html" ? htmlText(content) : content }; },
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
       return { items: rows.map((a) => toStudioItem(store, a)), truncated: rows.length === LIST_LIMIT };

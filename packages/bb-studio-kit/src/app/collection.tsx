@@ -167,7 +167,7 @@ export function CollectionPage({
   const kindOf = useCallback((item: CollectionItem) => kindById.get(`${item.pluginId}:${item.kind}`), [kindById]);
   const activeKind = kindFilter === ALL ? null : (kinds.find((kind) => kind.id === kindFilter) ?? null);
   const single = kinds.length === 1 ? kinds[0]! : activeKind;
-  const canArchive = kinds.some((kind) => kind.canArchive);
+  const canArchive = kinds.some((kind) => kind.capabilities?.archive ?? kind.canArchive);
   const projectLabel = useCallback((item: CollectionItem) => projectName(projects, item.projectId), [projects]);
   const kindLabel = useCallback((item: CollectionItem) => kindOf(item)?.label ?? item.kind, [kindOf]);
 
@@ -313,7 +313,7 @@ export function CollectionPage({
 
   // New items land in the filtered project, else the one BB has open.
   const newProject = project === GLOBAL ? null : project === ALL ? defaultProjectId : project;
-  const creatable = kinds.filter((kind) => kind.create);
+  const creatable = kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true));
   const createTargets = activeKind ? creatable.filter((kind) => kind.id === activeKind.id) : creatable;
   const newButton = (className = PRIMARY_BUTTON) =>
     createTargets.length === 0 ? null : createTargets.length === 1 ? (
@@ -375,7 +375,7 @@ export function CollectionPage({
             </DropdownMenuItem>
           ))}
           <DropdownMenuSeparator />
-          <DropdownMenuSub>
+          {(kind?.capabilities?.move ?? true) ? <DropdownMenuSub>
             <DropdownMenuSubTrigger>
               <Icon name="Folder" className="size-4" /> Move to project
               <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
@@ -383,7 +383,7 @@ export function CollectionPage({
             <DropdownMenuSubContent className="max-h-80 w-52 overflow-auto">
               {projectItems(item.projectId, (projectId) => move([item], projectId))}
             </DropdownMenuSubContent>
-          </DropdownMenuSub>
+          </DropdownMenuSub> : null}
           {tagging ? (
             <DropdownMenuSub>
               <DropdownMenuSubTrigger>
@@ -393,13 +393,13 @@ export function CollectionPage({
               <DropdownMenuSubContent className="max-h-80 w-56 overflow-auto">{tagMenu([item])}</DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : null}
-          {kind?.canArchive ? (
+          {(kind?.capabilities?.archive ?? kind?.canArchive) ? (
             <DropdownMenuItem onSelect={() => archive([item], !item.archived)}>
               <Icon name="Archive" className="size-4" /> {item.archived ? "Restore from archive" : "Archive"}
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
-          <DropdownMenuItem
+          {(kind?.capabilities?.delete ?? true) ? <DropdownMenuItem
             className="text-destructive focus:bg-destructive/15 focus:text-destructive"
             onSelect={() => {
               if (!window.confirm(`Delete "${untitled(item.title)}"? This can't be undone.`)) return;
@@ -407,7 +407,7 @@ export function CollectionPage({
             }}
           >
             <Icon name="Trash2" className="size-4" /> Delete
-          </DropdownMenuItem>
+          </DropdownMenuItem> : null}
         </DropdownMenuContent>
       </DropdownMenu>
     );
@@ -427,7 +427,7 @@ export function CollectionPage({
   // Bulk actions: shared ones, then a kind's own when every pick is that kind.
   const chosenKinds = [...new Set(chosen.map((item) => `${item.pluginId}:${item.kind}`))];
   const chosenKind = chosenKinds.length === 1 ? kindById.get(chosenKinds[0]!) : undefined;
-  const allArchivable = chosen.length > 0 && chosen.every((item) => kindOf(item)?.canArchive);
+  const allArchivable = chosen.length > 0 && chosen.every((item) => (kindOf(item)?.capabilities?.archive ?? kindOf(item)?.canArchive));
 
   const columns = single?.columns ?? [];
   const showKind = !single;
@@ -532,7 +532,7 @@ export function CollectionPage({
                 <Icon name={action.icon} /> {action.label.replace("{count}", String(chosen.length))}
               </button>
             ))}
-            <DropdownMenu>
+            {chosen.every((item) => kindOf(item)?.capabilities?.move ?? true) ? <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" className={OUTLINE_BUTTON} disabled={working}>
                   <Icon name="Folder" /> Move <Icon name="ChevronDown" className="-mr-1 opacity-70" />
@@ -542,7 +542,7 @@ export function CollectionPage({
                 <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Move {plural(chosen.length, "item")} to</DropdownMenuLabel>
                 {projectItems(undefined, (projectId) => move(chosen, projectId))}
               </DropdownMenuContent>
-            </DropdownMenu>
+            </DropdownMenu> : null}
             {tagging ? (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
@@ -561,7 +561,7 @@ export function CollectionPage({
                 <Icon name="Archive" /> {archived ? "Restore" : "Archive"}
               </button>
             ) : null}
-            <button
+            {chosen.every((item) => kindOf(item)?.capabilities?.delete ?? true) ? <button
               type="button"
               className={confirmDelete ? DANGER_BUTTON : OUTLINE_BUTTON}
               disabled={working}
@@ -569,7 +569,7 @@ export function CollectionPage({
               onClick={() => (confirmDelete ? remove(chosen) : setConfirmDelete(true))}
             >
               <Icon name="Trash2" /> {confirmDelete ? `Delete ${chosen.length} for good` : "Delete"}
-            </button>
+            </button> : null}
             <button type="button" className={cn(GHOST_BUTTON, "ml-auto")} onClick={clear}>
               Clear
             </button>

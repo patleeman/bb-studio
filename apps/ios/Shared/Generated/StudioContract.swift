@@ -4,6 +4,8 @@ import Foundation
 public enum Studio {
   public enum Method {
     public static let overview = "overview"
+    public static let items = "items"
+    public static let changes = "changes"
     public static let search = "search"
     public static let create = "create"
     public static let move = "move"
@@ -26,6 +28,10 @@ public enum Studio {
   public typealias OverviewInput = StudioJSONValue
 
   public typealias Overview = OverviewOutput
+
+  public typealias Items = ItemsOutput
+
+  public typealias Changes = ChangesOutput
 
   public typealias Search = SearchOutput
 
@@ -142,6 +148,32 @@ public enum Studio {
     }
   }
 
+  public struct OverviewOutputProvidersItemKindsItemCapabilities: Sendable, Hashable, Codable {
+    public var create: Bool?
+    public var move: Bool?
+    public var archive: Bool?
+    public var delete: Bool?
+    public var rename: Bool?
+    public var duplicate: Bool?
+    public var export: Bool?
+    public var comments: Bool?
+    public var versions: Bool?
+    public var links: Bool?
+
+    public init(create: Bool? = nil, move: Bool? = nil, archive: Bool? = nil, delete: Bool? = nil, rename: Bool? = nil, duplicate: Bool? = nil, export: Bool? = nil, comments: Bool? = nil, versions: Bool? = nil, links: Bool? = nil) {
+      self.create = create
+      self.move = move
+      self.archive = archive
+      self.delete = delete
+      self.rename = rename
+      self.duplicate = duplicate
+      self.export = export
+      self.comments = comments
+      self.versions = versions
+      self.links = links
+    }
+  }
+
   public struct OverviewOutputProvidersItemKindsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var label: String?
@@ -151,10 +183,12 @@ public enum Studio {
     public var actions: [OverviewOutputProvidersItemKindsItemActionsItem]?
     public var create: StudioJSONValue?
     public var canArchive: Bool?
+    public var capabilities: OverviewOutputProvidersItemKindsItemCapabilities?
+    public var mentionProviderId: String?
     public var blurb: String?
     public var agentHint: String?
 
-    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [OverviewOutputProvidersItemKindsItemColumnsItem]? = nil, actions: [OverviewOutputProvidersItemKindsItemActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, blurb: String? = nil, agentHint: String? = nil) {
+    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [OverviewOutputProvidersItemKindsItemColumnsItem]? = nil, actions: [OverviewOutputProvidersItemKindsItemActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: OverviewOutputProvidersItemKindsItemCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil) {
       self.id = id
       self.label = label
       self.plural = plural
@@ -163,6 +197,8 @@ public enum Studio {
       self.actions = actions
       self.create = create
       self.canArchive = canArchive
+      self.capabilities = capabilities
+      self.mentionProviderId = mentionProviderId
       self.blurb = blurb
       self.agentHint = agentHint
     }
@@ -329,6 +365,182 @@ public enum Studio {
       self.providers = providers
       self.items = items
       self.tags = tags
+    }
+  }
+
+  public struct ItemsInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var ids: [String]?
+
+    public init(pluginId: String? = nil, ids: [String]? = nil) {
+      self.pluginId = pluginId
+      self.ids = ids
+    }
+  }
+
+  public enum ItemsOutputItemsItemUpdatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ItemsOutputItemsItemFactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var value: String?
+    public var sort: Double?
+
+    public init(id: String? = nil, value: String? = nil, sort: Double? = nil) {
+      self.id = id
+      self.value = value
+      self.sort = sort
+    }
+  }
+
+  public enum ItemsOutputItemsItemBadgeTone: Sendable, Hashable, Codable {
+    case neutral
+    case live
+    case progress
+    case warning
+    case danger
+    case success
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "neutral": self = .neutral
+      case "live": self = .live
+      case "progress": self = .progress
+      case "warning": self = .warning
+      case "danger": self = .danger
+      case "success": self = .success
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .neutral: try container.encode("neutral")
+      case .live: try container.encode("live")
+      case .progress: try container.encode("progress")
+      case .warning: try container.encode("warning")
+      case .danger: try container.encode("danger")
+      case .success: try container.encode("success")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ItemsOutputItemsItemBadge: Sendable, Hashable, Codable {
+    public var label: String?
+    public var tone: ItemsOutputItemsItemBadgeTone?
+
+    public init(label: String? = nil, tone: ItemsOutputItemsItemBadgeTone? = nil) {
+      self.label = label
+      self.tone = tone
+    }
+  }
+
+  public struct ItemsOutputItemsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var projectId: String?
+    public var parentId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: ItemsOutputItemsItemUpdatedBy?
+    public var preview: String?
+    public var facts: [ItemsOutputItemsItemFactsItem]?
+    public var badge: ItemsOutputItemsItemBadge?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var archived: Bool?
+    public var pluginId: String?
+    public var tags: [String]?
+
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.projectId = projectId
+      self.parentId = parentId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.preview = preview
+      self.facts = facts
+      self.badge = badge
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.archived = archived
+      self.pluginId = pluginId
+      self.tags = tags
+    }
+  }
+
+  public struct ItemsOutput: Sendable, Hashable, Codable {
+    public var items: [ItemsOutputItemsItem]?
+
+    public init(items: [ItemsOutputItemsItem]? = nil) {
+      self.items = items
+    }
+  }
+
+  public struct ChangesInput: Sendable, Hashable, Codable {
+    public var since: Int?
+
+    public init(since: Int? = nil) {
+      self.since = since
+    }
+  }
+
+  public struct ChangesOutputChangesItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var removed: Bool?
+    public var at: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, removed: Bool? = nil, at: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.removed = removed
+      self.at = at
+    }
+  }
+
+  public struct ChangesOutput: Sendable, Hashable, Codable {
+    public var cursor: Int?
+    public var reset: Bool?
+    public var changes: [ChangesOutputChangesItem]?
+
+    public init(cursor: Int? = nil, reset: Bool? = nil, changes: [ChangesOutputChangesItem]? = nil) {
+      self.cursor = cursor
+      self.reset = reset
+      self.changes = changes
     }
   }
 
@@ -710,9 +922,13 @@ public enum Studio {
 
   public struct StudioChangedInput: Sendable, Hashable, Codable {
     public var pluginId: String?
+    public var ids: [String]?
+    public var removed: [String]?
 
-    public init(pluginId: String? = nil) {
+    public init(pluginId: String? = nil, ids: [String]? = nil, removed: [String]? = nil) {
       self.pluginId = pluginId
+      self.ids = ids
+      self.removed = removed
     }
   }
 
@@ -1026,6 +1242,32 @@ public enum Studio {
     }
   }
 
+  public struct ItemAtOutputKindCapabilities: Sendable, Hashable, Codable {
+    public var create: Bool?
+    public var move: Bool?
+    public var archive: Bool?
+    public var delete: Bool?
+    public var rename: Bool?
+    public var duplicate: Bool?
+    public var export: Bool?
+    public var comments: Bool?
+    public var versions: Bool?
+    public var links: Bool?
+
+    public init(create: Bool? = nil, move: Bool? = nil, archive: Bool? = nil, delete: Bool? = nil, rename: Bool? = nil, duplicate: Bool? = nil, export: Bool? = nil, comments: Bool? = nil, versions: Bool? = nil, links: Bool? = nil) {
+      self.create = create
+      self.move = move
+      self.archive = archive
+      self.delete = delete
+      self.rename = rename
+      self.duplicate = duplicate
+      self.export = export
+      self.comments = comments
+      self.versions = versions
+      self.links = links
+    }
+  }
+
   public struct ItemAtOutputKind: Sendable, Hashable, Codable {
     public var id: String?
     public var label: String?
@@ -1035,10 +1277,12 @@ public enum Studio {
     public var actions: [ItemAtOutputKindActionsItem]?
     public var create: StudioJSONValue?
     public var canArchive: Bool?
+    public var capabilities: ItemAtOutputKindCapabilities?
+    public var mentionProviderId: String?
     public var blurb: String?
     public var agentHint: String?
 
-    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [ItemAtOutputKindColumnsItem]? = nil, actions: [ItemAtOutputKindActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, blurb: String? = nil, agentHint: String? = nil) {
+    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [ItemAtOutputKindColumnsItem]? = nil, actions: [ItemAtOutputKindActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: ItemAtOutputKindCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil) {
       self.id = id
       self.label = label
       self.plural = plural
@@ -1047,6 +1291,8 @@ public enum Studio {
       self.actions = actions
       self.create = create
       self.canArchive = canArchive
+      self.capabilities = capabilities
+      self.mentionProviderId = mentionProviderId
       self.blurb = blurb
       self.agentHint = agentHint
     }

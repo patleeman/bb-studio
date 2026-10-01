@@ -19,6 +19,9 @@ export const BOT_KIND: StudioKind = {
   actions: [],
   create: { mode: "event", event: NEW_BOT_EVENT },
   canArchive: true,
+  capabilities: { create: true, move: false, archive: true, delete: false, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false },
+  mentionProviderId: "bot",
+
   blurb: "Persistent teammates with their own workspace and memory.",
   agentHint: "It's a bot: @mention it by name to hand it work; `bb bots show <id>` and `bb bots memory <id>` describe it.",
 };
@@ -69,7 +72,9 @@ export function registerStudio(
     return deps.bots().map((bot) => toStudioItem(bot, activity.get(bot.id)));
   };
   registerStudioProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 1, panel: "bots", kinds: [BOT_KIND] }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "bots", kinds: [BOT_KIND] }),
+    studio_get: ({ ids }) => ({ items: items().filter((item) => ids.includes(item.id)) }),
+    studio_read: ({ id }) => { const bot = deps.bots().find((each) => each.id === id); return { content: bot ? [`# ${bot.name}`, bot.description, `@${bot.handle}`].filter(Boolean).join("\n\n") : null }; },
     studio_list: () => ({ items: items() }),
     // Studio matches names itself; this finds descriptions and handles.
     studio_search: ({ query }) => {
@@ -84,15 +89,9 @@ export function registerStudio(
     studio_create: () => {
       throw new Error("Bots are created in a setup chat.");
     },
-    studio_move: ({ ids }) =>
-      eachId(ids, () => {
-        throw new Error("A bot keeps its own project.");
-      }),
+    studio_move: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: "A bot keeps its own project." })) }),
     studio_archive: ({ ids, archived }) => eachId(ids, (id) => deps.retire(id, archived)),
-    studio_delete: ({ ids }) =>
-      eachId(ids, () => {
-        throw new Error("Bots can't be deleted. Archive them instead.");
-      }),
+    studio_delete: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: "Bots can't be deleted. Archive them instead." })) }),
     studio_action: ({ action }) => {
       throw new Error(`Unknown action "${action}".`);
     },

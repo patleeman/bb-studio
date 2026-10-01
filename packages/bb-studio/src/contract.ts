@@ -53,6 +53,11 @@ export const rpcContract = defineRpcContract({
       tags: z.array(tag),
     }),
   },
+  items: { input: z.object({ pluginId, ids }), output: z.object({ items: z.array(schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()) })) }) },
+  changes: {
+    input: z.object({ since: z.number().int().min(0) }),
+    output: z.object({ cursor: z.number().int(), reset: z.boolean(), changes: z.array(z.object({ pluginId, id: z.string(), kind: z.string(), removed: z.boolean(), at: z.number() })) }),
+  },
   /** `<plugin>:<id>` keys of items whose content matches, and the matching text by key. */
   search: {
     input: z.object({ query: z.string().min(1).max(200) }),

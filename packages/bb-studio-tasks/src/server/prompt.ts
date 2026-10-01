@@ -2,20 +2,8 @@ import { untitled } from "@bb-studio/kit/format";
 // The first message of a handed-off thread: the task, and its links as real
 // mentions, so each add-on's mention provider hands the agent the item's
 // contents.
-import { formatDue, PLUGIN_ID as TASKS_PLUGIN_ID } from "../shared";
-import { PLUGIN_ID as PAGES_PLUGIN_ID } from "../../../bb-studio-pages/src/constants";
-import { PLUGIN_ID as DRAW_PLUGIN_ID } from "../../../bb-studio-draw/src/shared";
-import { PLUGIN_ID as ARTIFACTS_PLUGIN_ID } from "../../../bb-studio-artifacts/src/shared";
+import { formatDue } from "../shared";
 import type { LinkRow, TaskRow } from "./store";
-
-/** Each Studio add-on's mention provider id; a mention's item id is `<provider>:<id>`. */
-export const MENTION_PROVIDERS: Record<string, string> = {
-  [PAGES_PLUGIN_ID]: "page",
-  talk: "recordings",
-  [DRAW_PLUGIN_ID]: "drawing",
-  [ARTIFACTS_PLUGIN_ID]: "artifact",
-  [TASKS_PLUGIN_ID]: "task",
-};
 
 export type MentionResource =
   | { kind: "thread"; threadId: string; label: string }
@@ -38,6 +26,7 @@ export function handoffInput(
   links: readonly Pick<LinkRow, "target" | "plugin_id" | "item_id" | "label" | "href">[],
   note: string | null,
   now = new Date(),
+  mentionProviders: ReadonlyMap<string, string> = new Map(),
 ): PromptInput {
   let text = "";
   const mentions: Mention[] = [];
@@ -57,7 +46,7 @@ export function handoffInput(
     add("\nLinked: ");
     links.forEach((link, index) => {
       if (index) add(", ");
-      const provider = link.plugin_id ? MENTION_PROVIDERS[link.plugin_id] : undefined;
+      const provider = link.plugin_id ? mentionProviders.get(link.plugin_id) : undefined;
       if (link.target === "thread") mention(link.label, { kind: "thread", threadId: link.item_id, label: link.label });
       else if (link.plugin_id && provider) mention(link.label, { kind: "plugin", pluginId: link.plugin_id, itemId: `${provider}:${link.item_id}`, label: link.label });
       else add(link.href ? `[${link.label.replace(/[[\]]/g, "")}](${link.href})` : link.label);

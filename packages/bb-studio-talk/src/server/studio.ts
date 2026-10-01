@@ -23,6 +23,8 @@ export const RECORDING_KINDS: StudioKind[] = [
     actions: [COPY_TRANSCRIPT],
     create: { mode: "event", event: NEW_RECORDING_EVENT },
     canArchive: true,
+    capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false },
+    mentionProviderId: "recordings",
     blurb: "Long voice notes, transcribed.",
     agentHint: "Read the transcript with `bb talk transcript <id>`; `bb talk show <id>` has the details.",
   },
@@ -33,6 +35,8 @@ export const RECORDING_KINDS: StudioKind[] = [
     icon: "Mic",
     columns: COLUMNS,
     actions: [COPY_TRANSCRIPT],
+    capabilities: { create: false, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false },
+    mentionProviderId: "recordings",
     // Dictations start from a composer or a field's microphone.
     create: null,
     canArchive: true,
@@ -81,7 +85,9 @@ export function registerStudio(
   const mustGet = (id: string) => requireItem((key) => store.recording(key), id, "Recording not found.");
 
   createStoreProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: "talk", version: 1, panel: "recordings", kinds: RECORDING_KINDS }),
+    studio_describe: () => ({ pluginId: "talk", version: 2, panel: "recordings", kinds: RECORDING_KINDS }),
+    studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.recording(id); return row ? [toStudioItem(row, store.transcript(id))] : []; }) }),
+    studio_read: ({ id }) => ({ content: store.recording(id) ? store.transcript(id) : null }),
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
       return {

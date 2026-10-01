@@ -32,24 +32,33 @@ export function createStudioNotifier(options: {
   pluginId: string;
   schemas: StudioSchemas;
   delayMs?: number;
-}): { changed(): void; dispose(): void } {
+}): { changed(id?: string): void; dispose(): void } {
   let timer: ReturnType<typeof setTimeout> | undefined;
   let disposed = false;
+  const ids = new Set<string>();
+  let full = false;
   const send = () => {
     timer = undefined;
     if (disposed) return;
+    const changedIds = [...ids];
+    ids.clear();
+    const reset = full;
+    full = false;
     options.plugins
       .callRpc({
         pluginId: STUDIO_PLUGIN_ID,
         method: STUDIO_CHANGED_METHOD,
-        input: { pluginId: options.pluginId },
+        input: { pluginId: options.pluginId, ...(!reset && changedIds.length ? { ids: changedIds } : {}) },
         outputSchema: options.schemas.changed.output,
       })
       .catch(() => {});
   };
   return {
-    changed() {
-      if (disposed || timer) return;
+    changed(id) {
+      if (disposed) return;
+      if (id) ids.add(id);
+      else full = true;
+      if (timer) return;
       timer = setTimeout(send, options.delayMs ?? 250);
     },
     dispose() {

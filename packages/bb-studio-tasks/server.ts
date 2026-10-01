@@ -360,9 +360,18 @@ export default async function plugin(bb: BbPluginApi) {
     const projectId = input.projectId ?? task.project_id;
     if (!projectId) throw new Error("Pick a project for the agent to work in.");
     if (task.project_id !== projectId) task = store.update(task.id, { projectId }, input.by);
+    const linked = store.links(task.id);
+    const mentionProviders = new Map<string, string>();
+    await Promise.all([...new Set(linked.map((link) => link.plugin_id).filter((id): id is string => !!id))].map(async (pluginId) => {
+      try {
+        const info = await bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null as never, outputSchema: studio.info });
+        const kind = info.kinds[0];
+        if (kind?.mentionProviderId) mentionProviders.set(pluginId, kind.mentionProviderId);
+      } catch { /* A link still works without a mention provider. */ }
+    }));
     const thread = await bb.sdk.threads.spawn({
       projectId,
-      input: [handoffInput(task, store.links(task.id), input.note ?? null)],
+      input: [handoffInput(task, linked, input.note ?? null, new Date(), mentionProviders)],
       ...(input.providerId ? { providerId: input.providerId } : {}),
       ...(input.model ? { model: input.model } : {}),
       ...(input.reasoningLevel ? { reasoningLevel: input.reasoningLevel as never } : {}),

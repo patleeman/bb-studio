@@ -370,7 +370,9 @@ export default async function plugin(bb: BbPluginApi) {
   service.onPublish = (event) => {
     if (event.type === "deleted") explore.pagesDeleted(event.pageIds);
     // Explainer progress isn't a change to anything Studio lists.
-    if (event.type !== "explainer") studioNotifier.changed();
+    if (event.type === "page") studioNotifier.changed(event.pageId);
+    else if (event.type === "deleted") for (const id of event.pageIds) studioNotifier.changed(id);
+    else if (event.type !== "explainer") studioNotifier.changed();
   };
 
   // Agents --------------------------------------------------------------------

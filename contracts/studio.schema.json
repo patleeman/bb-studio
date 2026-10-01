@@ -152,6 +152,60 @@
                       "canArchive": {
                         "type": "boolean"
                       },
+                      "capabilities": {
+                        "type": "object",
+                        "properties": {
+                          "create": {
+                            "type": "boolean"
+                          },
+                          "move": {
+                            "type": "boolean"
+                          },
+                          "archive": {
+                            "type": "boolean"
+                          },
+                          "delete": {
+                            "type": "boolean"
+                          },
+                          "rename": {
+                            "type": "boolean"
+                          },
+                          "duplicate": {
+                            "type": "boolean"
+                          },
+                          "export": {
+                            "type": "boolean"
+                          },
+                          "comments": {
+                            "type": "boolean"
+                          },
+                          "versions": {
+                            "type": "boolean"
+                          },
+                          "links": {
+                            "type": "boolean"
+                          }
+                        },
+                        "required": [
+                          "create",
+                          "move",
+                          "archive",
+                          "delete",
+                          "rename",
+                          "duplicate",
+                          "export",
+                          "comments",
+                          "versions",
+                          "links"
+                        ],
+                        "additionalProperties": false
+                      },
+                      "mentionProviderId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
                       "blurb": {
                         "type": "string"
                       },
@@ -373,6 +427,271 @@
           "providers",
           "items",
           "tags"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "items": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "ids": {
+            "minItems": 1,
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "pluginId",
+          "ids"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "items": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "title": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "updatedBy": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "agent"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "preview": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "facts": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "value": {
+                        "type": "string"
+                      },
+                      "sort": {
+                        "type": [
+                          "number",
+                          "null"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "value",
+                      "sort"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "badge": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "label": {
+                          "type": "string"
+                        },
+                        "tone": {
+                          "type": "string",
+                          "enum": [
+                            "neutral",
+                            "live",
+                            "progress",
+                            "warning",
+                            "danger",
+                            "success"
+                          ]
+                        }
+                      },
+                      "required": [
+                        "label",
+                        "tone"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": "string"
+                },
+                "archived": {
+                  "type": "boolean"
+                },
+                "pluginId": {
+                  "type": "string"
+                },
+                "tags": {
+                  "type": "array",
+                  "items": {
+                    "type": "string"
+                  }
+                }
+              },
+              "required": [
+                "id",
+                "kind",
+                "title",
+                "icon",
+                "projectId",
+                "parentId",
+                "createdAt",
+                "updatedAt",
+                "updatedBy",
+                "preview",
+                "facts",
+                "badge",
+                "thumbnailUrl",
+                "href",
+                "archived",
+                "pluginId",
+                "tags"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "items"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "changes": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "since": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "since"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "cursor": {
+            "type": "integer",
+            "minimum": -9007199254740991,
+            "maximum": 9007199254740991
+          },
+          "reset": {
+            "type": "boolean"
+          },
+          "changes": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 100
+                },
+                "id": {
+                  "type": "string"
+                },
+                "kind": {
+                  "type": "string"
+                },
+                "removed": {
+                  "type": "boolean"
+                },
+                "at": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pluginId",
+                "id",
+                "kind",
+                "removed",
+                "at"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "cursor",
+          "reset",
+          "changes"
         ],
         "additionalProperties": false
       }
@@ -1075,6 +1394,24 @@
             "type": "string",
             "minLength": 1,
             "maxLength": 100
+          },
+          "ids": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "removed": {
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
           }
         },
         "required": [
@@ -1659,6 +1996,60 @@
                   },
                   "canArchive": {
                     "type": "boolean"
+                  },
+                  "capabilities": {
+                    "type": "object",
+                    "properties": {
+                      "create": {
+                        "type": "boolean"
+                      },
+                      "move": {
+                        "type": "boolean"
+                      },
+                      "archive": {
+                        "type": "boolean"
+                      },
+                      "delete": {
+                        "type": "boolean"
+                      },
+                      "rename": {
+                        "type": "boolean"
+                      },
+                      "duplicate": {
+                        "type": "boolean"
+                      },
+                      "export": {
+                        "type": "boolean"
+                      },
+                      "comments": {
+                        "type": "boolean"
+                      },
+                      "versions": {
+                        "type": "boolean"
+                      },
+                      "links": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "create",
+                      "move",
+                      "archive",
+                      "delete",
+                      "rename",
+                      "duplicate",
+                      "export",
+                      "comments",
+                      "versions",
+                      "links"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "mentionProviderId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
                   },
                   "blurb": {
                     "type": "string"

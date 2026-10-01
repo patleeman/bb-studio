@@ -15,6 +15,7 @@ import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { rpcContract, TABS_CHANNEL, type SidebarView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
+import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
@@ -26,6 +27,7 @@ const MAX_LISTED = 100;
 
 export default async function plugin(bb: BbPluginApi) {
   const hub = new StudioHub(bb.sdk);
+  const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
@@ -55,9 +57,12 @@ export default async function plugin(bb: BbPluginApi) {
     };
   };
   /** Open collections refetch, as when an add-on's items change. */
-  const tagsChanged = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+  const tagsChanged = () => {
+    changes.append(null);
+    bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+  };
 
-  const tabViews = ({ providers, items }: Awaited<ReturnType<typeof overview>>): TabView[] => {
+  const tabViews = ({ providers, items }: { providers: Awaited<ReturnType<typeof hub.providers>>; items: HubItem[] }): TabView[] => {
     const kindIcons = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.icon])));
     const byKey = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item]));
     // A tab whose add-on is down stays open but isn't shown until it's back.
@@ -66,6 +71,24 @@ export default async function plugin(bb: BbPluginApi) {
       if (!item) return [];
       return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kindIcons.get(`${item.pluginId}:${item.kind}`) ?? "File", href: item.href }];
     });
+  };
+
+  const tabData = async () => {
+    const providers = await hub.providers();
+    const refs = tabs.list();
+    const items = (await Promise.all([...new Set(refs.map((ref) => ref.pluginId))].map((pluginId) =>
+      hub.get(pluginId, refs.filter((ref) => ref.pluginId === pluginId).map((ref) => ref.id)).catch(() => []),
+    ))).flat();
+    return { providers, items };
+  };
+
+  const itemForPath = async (path: string) => {
+    const parts = path.split(/[?#]/)[0]!.split("/");
+    const pluginId = parts[2];
+    const id = parts[4];
+    if (!pluginId || !id) return null;
+    const items = await hub.get(pluginId, [decodeURIComponent(id)]).catch(() => []);
+    return itemAtPath(items, path);
   };
 
   const addonPanels = async () =>
@@ -113,19 +136,37 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { ok: true };
     },
-    studio_changed: ({ pluginId }) => {
-      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId });
+    studio_changed: async ({ pluginId, ids, removed }) => {
+      if (!ids && !removed) changes.append(null);
+      let fresh: HubItem[] | null = [];
+      let fallbackKind: string | null = null;
+      if (ids?.length) {
+        try {
+          const provider = (await hub.providers()).find((entry) => entry.pluginId === pluginId && entry.state === "ready");
+          if (!provider) throw new Error("Provider unavailable");
+          fallbackKind = provider.kinds.length === 1 ? provider.kinds[0]!.id : null;
+          fresh = await hub.get(pluginId, ids);
+        } catch { fresh = null; changes.append(null); }
+      }
+      const byId = new Map(fresh?.map((item) => [item.id, item]));
+      for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
+      for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
+      bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
       return { ok: true };
     },
+    changes: ({ since }) => changes.since(since),
+    items: async ({ pluginId, ids }) => {
+      const assigned = tags.assignments();
+      return { items: (await hub.get(pluginId, ids)).map((item) => ({ ...item, tags: assigned.get(`${pluginId}:${item.id}`) ?? [] })) };
+    },
     sidebar: () => readSidebar(),
-    tabs: async () => ({ tabs: tabViews(await overview()) }),
+    tabs: async () => ({ tabs: tabViews(await tabData()) }),
     visitTab: async ({ path }) => {
       if (!path.startsWith("/plugins/") || path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { tab: null };
-      const data = await overview();
-      const item = itemAtPath(data.items, path);
+      const item = await itemForPath(path);
       if (!item) return { tab: null };
       if (tabs.open(item)) tabsChanged();
-      return { tab: tabViews(data).find((each) => each.pluginId === item.pluginId && each.id === item.id) ?? null };
+      return { tab: tabViews(await tabData()).find((each) => each.pluginId === item.pluginId && each.id === item.id) ?? null };
     },
     closeTabs: ({ items }) => {
       let closed = false;
@@ -156,11 +197,10 @@ export default async function plugin(bb: BbPluginApi) {
     },
     itemAt: async (input) => {
       if ("path" in input && input.path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { item: null, kind: null };
-      const { providers, items } = await hub.overview();
-      const item =
-        "path" in input
-          ? itemAtPath(items, input.path)
-          : (items.find((each) => each.pluginId === input.pluginId && each.id === input.id) ?? null);
+      const providers = await hub.providers();
+      const item = "path" in input
+        ? await itemForPath(input.path)
+        : (await hub.get(input.pluginId, [input.id]))[0] ?? null;
       if (!item) return { item: null, kind: null };
       const kind = providers.find((provider) => provider.pluginId === item.pluginId)?.kinds.find((each) => each.id === item.kind) ?? null;
       return { item, kind };

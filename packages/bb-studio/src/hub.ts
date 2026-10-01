@@ -74,6 +74,9 @@ export class StudioHub {
     if (cached?.version === entry.version) return { ...base, state: "ready", detail: null, panel: cached.info.panel, kinds: cached.info.kinds };
     try {
       const info = await this.call(entry.id, "studio_describe", null);
+      if (info.version === 2 && info.kinds.some((kind) => !kind.capabilities || kind.mentionProviderId === undefined)) throw new Error("Studio provider v2 is missing capabilities or a mention provider id.");
+      if (info.version !== 1 && info.version !== 2) throw new Error(`Unsupported Studio provider version: ${info.version}`);
+      info.kinds = info.kinds.map((kind) => ({ ...kind, capabilities: kind.capabilities ?? { create: kind.create !== null, move: true, archive: kind.canArchive, delete: true, rename: true, duplicate: false, export: kind.actions.some((action) => action.id.startsWith("copy")), comments: false, versions: false, links: false }, mentionProviderId: kind.mentionProviderId ?? null }));
       this.described.set(entry.id, { version: entry.version, info });
       return { ...base, state: "ready", detail: null, panel: info.panel, kinds: info.kinds };
     } catch (error) {
@@ -104,6 +107,17 @@ export class StudioHub {
       items: lists.flatMap((list) => list.items),
       truncated: new Set(lists.filter((list) => list.truncated).map((list) => list.provider.pluginId)),
     };
+  }
+
+  async get(pluginId: string, ids: string[]): Promise<HubItem[]> {
+    if (!ids.length) return [];
+    const info = (await this.providers()).find((provider) => provider.pluginId === pluginId);
+    if (info?.state !== "ready") return [];
+    const version = this.described.get(pluginId)?.info.version;
+    const items = version === 2
+      ? (await this.call(pluginId, "studio_get", { ids })).items
+      : (await this.call(pluginId, "studio_list", null)).items.filter((item) => ids.includes(item.id));
+    return items.map((item) => ({ ...item, pluginId }));
   }
 
   /**
