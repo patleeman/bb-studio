@@ -18,6 +18,8 @@ for package_name in "$@"; do
   source_dir="$repo_dir/packages/$package_name"
   target_dir="$scratch_dir/repo/packages/$package_name"
   test -f "$source_dir/package.json" || { echo "Unknown package: $package_name" >&2; exit 2; }
+  # A package added since HEAD has no directory in the clone yet.
+  mkdir -p "$target_dir"
   cp "$source_dir/package.json" "$target_dir/package.json"
   cp "$source_dir/package-lock.json" "$target_dir/package-lock.json" 2>/dev/null || rm -f "$target_dir/package-lock.json"
   # npm keeps a locked tarball's integrity, so drop the kit to rehash it.

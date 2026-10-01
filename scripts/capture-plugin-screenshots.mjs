@@ -19,6 +19,7 @@ import bb_studio_reactions from "./capture/captures/bb-studio-reactions.mjs";
 import bb_studio_decisions from "./capture/captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./capture/captures/bb-studio-mobile.mjs";
 import bb_studio_tables from "./capture/captures/bb-studio-tables.mjs";
+import bb_studio_navigation from "./capture/captures/bb-studio-navigation.mjs";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginFlag = process.argv.indexOf("--plugin");
 if (pluginFlag >= 0 && !process.argv[pluginFlag + 1]) throw new Error("Usage: --plugin <plugin-id>");
@@ -45,7 +46,8 @@ const captures = [
   ...bb_studio_reactions(context),
   ...bb_studio_decisions(context),
   ...bb_studio_mobile(context),
-  ...bb_studio_tables(context)
+  ...bb_studio_tables(context),
+  ...bb_studio_navigation(context)
 ];
 
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();

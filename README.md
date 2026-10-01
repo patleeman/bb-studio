@@ -19,6 +19,7 @@ agent.
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | A chat that floats over the Studio item you're looking at. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
+| [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the Studio rows Studio and Studio Sidebar already open. Rows from BB and other plugins stay. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and routes Studio Teams channels. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
@@ -58,6 +59,8 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - bot-teams: persistent bots in channels
    - studio-chat: a chat that floats over Studio items
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
+   - studio-navigation: Studio Navigation; it replaces BB's sidebar navigation
+     without the Studio rows that Studio and Studio Sidebar already open
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies
    - smart-decisions: Studio Decisions; the fast Jev model for Smart Queue and
      Studio Teams routing; needed by bot-teams

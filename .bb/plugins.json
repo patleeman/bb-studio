@@ -40,6 +40,10 @@
       "source": "./packages/bb-studio-sidebar"
     },
     {
+      "name": "studio-navigation",
+      "source": "./packages/bb-studio-navigation"
+    },
+    {
       "name": "mobile",
       "source": "./packages/bb-studio-mobile"
     },
