@@ -79,6 +79,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       projectId: thread.projectId ?? null,
       channelId,
       channelName,
+      channelThread: isChannel,
     };
   }
 

@@ -1,6 +1,6 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
-import { FeedService, type Notification, type NotifyMode, type Origin } from "./service";
+import { FeedService, withoutSpeaker, type Notification, type NotifyMode, type Origin } from "./service";
 import type { RealtimeEvent } from "./shared";
 import { DUPLICATE_WINDOW_MS, FeedStore, MIGRATIONS } from "./store";
 
@@ -17,7 +17,7 @@ function setup(options: { mode?: NotifyMode; origins?: Record<string, Origin | n
   const notifications: Notification[] = [];
   const origins: Record<string, Origin | null> = {
     thr_bot: { author: "Commute Bot", botId: "bot_1", threadId: "thr_bot", projectId: "proj_1", channelId: "room_1", channelName: "command-center" },
-    thr_channel: { author: "command-center", botId: null, threadId: "thr_channel", projectId: "proj_1", channelId: "room_1", channelName: "command-center" },
+    thr_channel: { author: "command-center", botId: null, threadId: "thr_channel", projectId: "proj_1", channelId: "room_1", channelName: "command-center", channelThread: true },
     thr_plain: { author: "Morning research", botId: null, threadId: "thr_plain", projectId: "proj_1", channelId: null, channelName: null },
     ...options.origins,
   };
@@ -52,11 +52,18 @@ describe("FeedService", () => {
 
   it("publishes a bot's reply once when its channel goes idle with the same text", async () => {
     const { service, store } = setup();
-    const [fromChannel, fromBot] = await Promise.all([service.ingest("thr_channel", REPLY), service.ingest("thr_bot", REPLY)]);
+    // The channel's copy leads with the speaker.
+    const [fromChannel, fromBot] = await Promise.all([service.ingest("thr_channel", `**[🚆 Commute Bot](/threads/thr_bot)**\n\n${REPLY}`), service.ingest("thr_bot", REPLY)]);
     expect(store.list().rows).toHaveLength(1);
     expect(fromBot?.id).toBe(fromChannel?.id);
     // The bot's copy names the bot.
     expect(store.get(fromChannel!.id)).toMatchObject({ author: "Commute Bot", bot_id: "bot_1", channel_name: "command-center" });
+  });
+
+  it("names the speaker of a channel's copy when it arrives first", async () => {
+    const { service } = setup();
+    const row = await service.ingest("thr_channel", `**Commute Bot**\n\n${REPLY}`);
+    expect(row).toMatchObject({ author: "Commute Bot", body: "Delays cleared at 8:10.", channel_name: "command-center", thread_id: "thr_channel" });
   });
 
   it("publishes the same text again after a day", async () => {
@@ -139,5 +146,13 @@ describe("FeedService", () => {
       { topic: "Commute", posts: 1 },
       { topic: "Weather", posts: 1 },
     ]);
+  });
+});
+
+describe("withoutSpeaker", () => {
+  it("strips a channel delivery's speaker line", () => {
+    expect(withoutSpeaker("**[Atlas](/threads/thr_1)**\n\nBody")).toEqual({ speaker: "Atlas", body: "Body" });
+    expect(withoutSpeaker("**🛰 Atlas**\n\nBody")).toEqual({ speaker: "🛰 Atlas", body: "Body" });
+    expect(withoutSpeaker("**Bold** lead in the body")).toEqual({ speaker: null, body: "**Bold** lead in the body" });
   });
 });

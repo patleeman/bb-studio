@@ -4,7 +4,7 @@
 // Teams, phones) come in as deps, so this is testable without a host.
 import type { PostView } from "./contract";
 import { parsePost, plainText, postHref, sourceDomains, type ParsedPost, type Priority, type RealtimeEvent } from "./shared";
-import { contentKey, FeedStore, type ListedRow, type PostPatch, type PostRow } from "./store";
+import { contentKey, directiveKey, FeedStore, type ListedRow, type PostPatch, type PostRow } from "./store";
 
 /** Where a reply came from. */
 export interface Origin {
@@ -14,6 +14,15 @@ export interface Origin {
   projectId: string | null;
   channelId: string | null;
   channelName: string | null;
+  /** A Teams channel's own thread, whose bot replies lead with the speaker in bold. */
+  channelThread?: boolean;
+}
+
+/** A channel's copy of a bot reply: `**Name**` or `**[Name](/threads/…)**`, then the reply. */
+export function withoutSpeaker(body: string): { speaker: string | null; body: string } {
+  const match = /^\*\*(?:\[([^\]\n]+)\]\([^)\n]*\)|([^*\n]+))\*\*[ \t]*(?:\n|$)/.exec(body);
+  if (!match) return { speaker: null, body };
+  return { speaker: (match[1] ?? match[2] ?? "").trim() || null, body: body.slice(match[0].length).trim() };
 }
 
 export type NotifyMode = "urgent" | "all" | "off";
@@ -64,7 +73,7 @@ export function view(row: PostRow | ListedRow, storyPosts?: number): PostView {
 
 export class FeedService {
   private readonly now: () => number;
-  /** Replies being ingested, by content key: the bot's thread and its channel can go idle at once. */
+  /** Replies being ingested, by directive line. */
   private readonly inFlight = new Map<string, Promise<PostRow | null>>();
 
   constructor(private readonly deps: FeedDeps) {
@@ -83,43 +92,41 @@ export class FeedService {
   async ingest(threadId: string, text: string | null | undefined): Promise<PostRow | null> {
     const parsed = parsePost(text);
     if (!parsed) return null;
-    const key = contentKey(parsed.source, parsed.body);
-    const running = this.inFlight.get(key);
-    if (running) {
-      await running.catch(() => null);
-      return this.merge(key, threadId);
-    }
-    const work = this.ingestNew(threadId, parsed, key);
-    this.inFlight.set(key, work);
+    // The bot's thread and its channel can go idle at once with the same post: one at a time.
+    const lock = directiveKey(parsed.source);
+    const work = (this.inFlight.get(lock) ?? Promise.resolve(null)).catch(() => null).then(() => this.ingestOne(threadId, parsed));
+    this.inFlight.set(lock, work);
     try {
       return await work;
     } finally {
-      this.inFlight.delete(key);
+      if (this.inFlight.get(lock) === work) this.inFlight.delete(lock);
     }
   }
 
-  private async ingestNew(threadId: string, parsed: ParsedPost, key: string): Promise<PostRow | null> {
-    if (this.deps.store.duplicate(key, this.now())) return this.merge(key, threadId);
+  private async ingestOne(threadId: string, parsed: ParsedPost): Promise<PostRow | null> {
     const origin = await this.deps.origin(threadId).catch((error: unknown) => {
       this.deps.log.warn(`Could not resolve where a post came from: ${String(error)}`);
       return fallbackOrigin(threadId);
     });
     if (!origin) return null;
-    // Another copy may have landed while we looked the thread up.
-    if (this.deps.store.duplicate(key, this.now())) return this.merge(key, threadId, origin);
-    const row = this.deps.store.insert({ ...parsed, ...origin, at: this.now() });
+    let { body } = parsed;
+    let author = origin.author;
+    if (origin.channelThread) {
+      const copy = withoutSpeaker(body);
+      body = copy.body;
+      author = copy.speaker ?? author;
+    }
+    const existing = this.deps.store.duplicate(contentKey(parsed.source, body), this.now());
+    if (existing) return this.merge(existing, { ...origin, author });
+    const row = this.deps.store.insert({ ...parsed, ...origin, author, body, at: this.now() });
     this.changed(row);
     await this.notifyFor(row);
     return row;
   }
 
-  /** The same reply again (the channel's copy of a bot's reply): fill in what this copy knows. */
-  private async merge(key: string, threadId: string, known?: Origin): Promise<PostRow | null> {
-    const existing = this.deps.store.duplicate(key, this.now());
-    if (!existing) return null;
-    if (existing.thread_id === threadId) return existing;
-    const origin = known ?? (await this.deps.origin(threadId).catch(() => null));
-    if (!origin) return existing;
+  /** The same reply again (the other copy of a bot's reply): fill in what this copy knows. */
+  private merge(existing: PostRow, origin: Origin): PostRow {
+    if (existing.thread_id === origin.threadId) return existing;
     const merged = this.deps.store.fillOrigin(existing.id, {
       author: origin.author,
       bot_id: origin.botId,
@@ -127,7 +134,8 @@ export class FeedService {
       channel_id: origin.channelId,
       channel_name: origin.channelName,
     });
-    if (merged && merged !== existing) this.changed(merged);
+    if (!merged) return existing;
+    if (merged !== existing) this.changed(merged);
     return merged;
   }
 
