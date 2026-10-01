@@ -283,6 +283,8 @@ export default async function plugin(bb: BbPluginApi) {
           prompt: service.requestPrompt(meta, ["The user asked you about a page:", message, "", "Make any page changes with pages_edit."]),
         });
         if (!row?.thread_id || row.status === "failed") throw new Error(row?.error ?? `Couldn't reach ${bot.name}.`);
+        const at = Date.now();
+        void services.linkThread({ threadId: row.thread_id, ref: { pluginId: PLUGIN_ID, id }, role: "work", state: "working", createdAt: at, updatedAt: at, metadata: { botId: bot.id } }).catch(() => { /* Studio is optional. */ });
         return { threadId: row.thread_id, botName: bot.name };
       }
       const markdown = readMarkdown(service.hub.open(id).doc, { ids: true });
@@ -303,6 +305,8 @@ export default async function plugin(bb: BbPluginApi) {
         ],
       });
       store.addChat(id, thread.id);
+      const at = Date.now();
+      void services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id }, role: "chat", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* Studio is optional. */ });
       return { threadId: thread.id, botName: null };
     },
     chats: async ({ pageId }) => {

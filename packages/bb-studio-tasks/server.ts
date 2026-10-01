@@ -408,6 +408,8 @@ export default async function plugin(bb: BbPluginApi) {
       pluginMetadata: { taskId: task.id },
     });
     store.addHandoff(task.id, thread.id, await agentLabel(thread.providerId, input.model ?? null));
+    const at = Date.now();
+    void services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id: task.id }, role: "handoff", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* The hub is optional. */ });
     // The thread may have started, or failed, before the handoff was recorded.
     const recorded = store.handoff(thread.id);
     if (recorded) void catchUp(recorded, true);
