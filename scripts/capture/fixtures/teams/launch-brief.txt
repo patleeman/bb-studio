@@ -1,0 +1,5 @@
+ORBIT-42 launch brief
+
+Release: Friday
+Release-check owner: Atlas
+Decision log: Scribe

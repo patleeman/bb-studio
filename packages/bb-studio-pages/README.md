@@ -14,7 +14,7 @@ becomes a page that explains it.
 
 ![A Pages document with stats, a chart, and a checklist](assets/staged-preview.png)
 
-This is the real BB **Pages** panel, opened from the nav panel. The capture
+This is the real BB **Pages** panel in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. The capture
 script uses the plugin's own `create` RPC to seed three project pages:
 - "Offline mode launch"
 - a nested "Rollout risks" sub-page
@@ -37,10 +37,9 @@ The collection is what the **Pages** nav item opens. It shows:
 - the search box
 - the filter pills and the project pill
 - the list/grid toggle and **New page**
-- every page in the staged app, with its project and last activity
+- the three seeded pages, with their project and last activity
 
-"Rollout risks" shows the page it sits in. The **Untitled** row is a page
-that already existed in the staged app. The script deletes its three pages
+"Rollout risks" shows the page it sits in. The script deletes its three pages
 afterwards.
 
 ## What you get

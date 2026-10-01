@@ -321,19 +321,19 @@ Rebuild and run `bb plugin reload bot-teams` after changes. Inspect state with `
 
 ## Staged preview
 
-These captures come from the running BB app through
-`scripts/capture-plugin-screenshots.mjs`. They use a seeded **Launch room**
-channel with two demo bots, **Atlas** and **Scribe**, whose missions fix their
-replies so each run shows the same conversation. BB's own sidebar stays
-collapsed so no real threads or projects appear.
+These captures come from a staged BB through
+`scripts/capture-plugin-screenshots.mjs`. `node scripts/staged-bb.mjs start`
+seeds the fixture in [docs/QA.md](docs/QA.md#readme-capture-fixture): four
+bots, and a **Launch room** channel with two of them, **Atlas** and **Scribe**,
+whose missions fix their replies so each run shows the same conversation.
 
 ![A Studio Teams channel as a native BB thread](assets/staged-preview.png)
 
 **Launch room** open as a BB thread. You share the ORBIT-42 brief with both
 bots and each replies under its own name; Atlas hands the release check to
-`@scribe`, which renders as a link. The header shows the member avatars and
-**Search channel**. The composer's model picker shows
-the **Directed** chat mode with **Each bot's own** permissions.
+`@scribe`, which renders as a link. The header shows the member avatars,
+**Search channel** and **Channel automations**. The channel control beside the
+composer shows the **Directed** chat mode with **Each bot's own** permissions.
 
 ![Bots in the composer's @ menu](assets/channel-mentions.png)
 
@@ -342,19 +342,22 @@ pill, and the router receives its `@handle`.
 
 ![Search across channel history](assets/channel-search.png)
 
-**Search channel** finds every message about the release check, including
-older history.
+**Search channel** finds the three messages about the release check.
+
+![Channel automations with a paused weekday task](assets/channel-automations.png)
+
+**Channel automations** lists the paused **Weekday launch status** task, which
+Scribe runs at 09:00 New York time on weekdays.
 
 ![Bot creation through a prefilled BB thread](assets/bot-creation-thread.png)
 
 **New bot** opens BB's standard new-thread composer with the setup instructions.
 
-![Channels and Direct messages in Studio Sidebar](assets/studio-sidebar.png)
+![Channels in Studio Sidebar](assets/studio-sidebar.png)
 
-In Studio Sidebar, **Channels** and **Direct messages** sit between the Studio
-tabs and **Threads**, in the sidebar's one scroll area. The staged data shows
-the **Design review** and **Launch room** channels and two direct threads with
-Atlas.
+In Studio Sidebar, **Channels** sits between the Studio tabs and **Threads**,
+in the sidebar's one scroll area. The staged data shows the **Design review**
+and **Launch room** channels above the demo project's threads.
 
 ![Bots collection in BB](assets/bots-collection.png)
 
@@ -368,19 +371,15 @@ A bot's page opens with its avatar, name, and handle, like other Studio items.
 **Studio** goes back to the collection, **Message** starts a thread with its profile, and
 **⋯** wakes or archives the bot. The profile uses the native settings layout.
 
-![Bot Markdown editor in BB](assets/bot-markdown-editor.jpg)
+![Atlas's memory in the Markdown editor](assets/bot-memory.png)
 
-A bot's memory in the Markdown editor.
+Atlas's **Memory** tab: its MEMORY.md, with the staged notes about ORBIT-42, in
+the Markdown editor.
 
-To reproduce the channel captures, create Atlas and Scribe with the demo
-missions in [docs/QA.md](docs/QA.md#readme-capture-fixture), seed **Launch room**,
-then run:
+To reproduce them, start the staged BB, source its `capture.env`, and run:
 
 ```sh
-BB_CAPTURE_ONLY=bots,bots-mentions,bots-rail,bots-search,bots-automations \
-BB_CAPTURE_PROJECT_ID=proj_... \
-BB_CAPTURE_THREAD_ID=thr_... \
-node scripts/capture-plugin-screenshots.mjs
+node scripts/capture-plugin-screenshots.mjs --plugin bot-teams
 ```
 
 ## Notifications

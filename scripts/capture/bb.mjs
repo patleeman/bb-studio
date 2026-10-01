@@ -1,7 +1,11 @@
 import { spawn } from "node:child_process";
-export const serverUrl = (process.env.BB_SERVER_URL ?? "http://127.0.0.1:38886").replace(/\/$/, "");
+// Captures run against a staged BB (scripts/staged-bb.mjs), never the BB you
+// work in, whose projects, threads, and channels are private.
+if (!process.env.BB_SERVER_URL || !process.env.BB_DATA_DIR)
+  throw new Error('Source a staged BB\'s capture.env first: node scripts/staged-bb.mjs start, then . "$TMPDIR/bb-studio-staged/capture.env".');
+export const serverUrl = process.env.BB_SERVER_URL.replace(/\/$/, "");
 export const cdpPort = Number(process.env.BB_CAPTURE_CDP_PORT ?? "9222");
-export const projectId = process.env.BB_CAPTURE_PROJECT_ID ?? process.env.BB_PROJECT_ID;
+export const projectId = process.env.BB_CAPTURE_PROJECT_ID;
 export const threadId = process.env.BB_CAPTURE_THREAD_ID;
 export const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 export async function pluginRpc(pluginId, method, input) {
@@ -17,10 +21,9 @@ export async function pluginRpc(pluginId, method, input) {
   return payload.result;
 }
 
-/** Run the bb CLI as the owner, not as the thread this script may run inside. */
 // Studio Teams captures read the seeded "Launch room" channel: Atlas and Scribe
 // with fixed replies from their demo missions (see the Studio Teams README).
-const launchRoomReplies = [
+export const launchRoomReplies = [
   "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
   "Release check passed: the brief, owner, and Friday window all line up.",
   "Logged: release check passed. Next step: confirm the Friday release window.",
@@ -38,6 +41,7 @@ export async function launchRoomThread() {
   return room.threadId;
 }
 
+/** Run the bb CLI as the owner, not as the thread this script may run inside. */
 export async function bbCli(args) {
   const env = { ...process.env };
   delete env.BB_THREAD_ID;
@@ -50,6 +54,5 @@ export async function bbCli(args) {
   if (code !== 0) throw new Error(`bb ${args.join(" ")} failed: ${stderr || stdout}`);
   return stdout;
 }
-
 
 export const getLaunchRoomId = () => launchRoomId;

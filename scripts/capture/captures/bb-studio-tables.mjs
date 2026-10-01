@@ -15,9 +15,12 @@ export default ({ projectId, pluginRpc, sleep }) => [{
       ]) await pluginRpc("studio-tables", "insert", { id: table.id, values });
       await client.navigate(`/plugins/studio-tables/tables/${table.id}`);
       await client.waitForInputValue("Table title", "QA Inventory");
-      await client.waitForInputValue("Name", "Sample kits");
+      // Text cells render as text until you edit them; the seeded row shows in the grid.
+      await client.waitForSelector('[role="checkbox"][aria-label="Checked"][aria-checked="true"]');
+      await client.waitForText("Sample kits");
+      await client.waitForText("Review notes");
       await client.waitForText("Quantity");
-      await client.waitForText("Add row");
+      await client.waitForText("New row");
       const result = await pluginRpc("studio-tables", "get", { id: table.id });
       if (result.table?.rows.length !== 2) throw new Error("Seeded rows are missing");
       await sleep(700);

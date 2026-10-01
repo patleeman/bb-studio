@@ -613,7 +613,8 @@ read-only review, marketplace schema/index checks, and `git diff --check` passed
 ## README capture fixture
 
 The README's channel screenshots use two demo bots on a small model with
-mission schedules off, so their replies are fixed:
+mission schedules off, so their replies are fixed. `node scripts/staged-bb.mjs
+start` seeds all of this from `scripts/capture/fixtures/teams`; by hand:
 
 ```sh
 bb bots create Atlas --description "Research and verify the facts" --avatar "🧭" \

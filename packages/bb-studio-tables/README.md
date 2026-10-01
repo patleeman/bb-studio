@@ -14,4 +14,7 @@ In a thread's side panel, the **Tables** tab lists the tables made in that threa
 
 ![A seeded inventory table in the live BB Studio Tables panel](assets/staged-preview.png)
 
-The running BB app shows a QA inventory table with typed columns and seeded rows.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): a seeded "QA Inventory" table open in the Tables panel.
+Its Name, Status, Quantity and Checked columns are typed (text, select, number
+and checkbox), with two seeded rows, the row count, Filter, Sort, Columns, and
+Import and Export.

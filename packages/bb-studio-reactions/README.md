@@ -63,17 +63,17 @@ than 60 characters, and drops items without both an emoji and a label.
 
 ![Live BB screenshot of Studio Reactions settings](assets/staged-preview.png)
 
-Captured from the running BB application with configured reaction data. The
-settings page shows the default reaction list, the location toggles, and the
-**Smart reactions** toggle turned on.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`), which turns
+smart reactions on. The settings page shows the default reaction list, the
+location toggles, and the **Smart reactions** toggle turned on.
 
 ![Smart reactions under a live assistant reply](assets/smart-reactions.png)
 
-A live thread with smart reactions on. It asked whether to use SQLite or
-Postgres for a small todo app. The assistant's reply ends with its suggested
-reactions: SQLite, Postgres, and Clarify. The capture script also clicks
-SQLite and checks that the reply was drafted in the composer. To seed it, turn
-smart reactions on, start a thread with that question, and pass its ID as
+A live thread in the staged BB, run on GPT-6.1-Sol with smart reactions on. It
+asked whether to use SQLite or Postgres for a small todo app, and the
+assistant's reply ends with its suggested reactions, SQLite and Postgres. The
+capture script also clicks SQLite and checks that the reply was drafted in the
+composer. The staged BB passes the thread's ID as
 `BB_CAPTURE_SMART_REACTIONS_THREAD_ID`.
 
 ## Settings

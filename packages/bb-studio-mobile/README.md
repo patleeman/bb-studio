@@ -20,5 +20,6 @@ bb plugin install .
 
 ![Studio Mobile settings in the running BB app](assets/staged-preview.png)
 
-The live BB plugin settings show the APNs environment and Expo relay URL. No
-private APNs key or device token is staged for the capture.
+The plugin's settings page in a staged BB (`node scripts/staged-bb.mjs start`) shows the APNs key, key ID, team,
+bundle ID and environment fields and the Expo push URL. No private APNs key or
+device token is staged for the capture.

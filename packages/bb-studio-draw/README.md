@@ -10,8 +10,9 @@ plugin id stays `excalidraw`, so existing installs and drawings carry over.
 
 ![Live BB screenshot of the Studio Draw editor](assets/staged-preview.png)
 
-Captured from the running BB application: a drawing open in the Draw editor,
-under Studio's shared item header, with staged shapes and labels.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded "Checkout flow" drawing open in the Draw
+editor, under Studio's shared item header. Cart, Payment and Confirmation boxes
+are joined by arrows, with a "Retry payment on failure" note.
 
 ## What you get
 

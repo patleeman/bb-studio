@@ -185,11 +185,13 @@ export function usageReportHtml({ draft }) {
 }
 
 /**
- * Saves "Q3 usage report" to Studio Artifacts twice from the capture thread's
- * workspace, so the viewer shows the second version of a real HTML artifact.
+ * Saves "Q3 usage report" to Studio Artifacts twice from a thread's workspace,
+ * so the viewer shows the second version of a real HTML artifact. The staged
+ * BB's workspace thread has run once, so it has one.
  */
 export async function seedArtifact() {
-  const thread = JSON.parse(await bbCli(["thread", "get", threadId, "--json"]));
+  const workspaceThreadId = process.env.BB_CAPTURE_WORKSPACE_THREAD_ID ?? threadId;
+  const thread = JSON.parse(await bbCli(["thread", "get", workspaceThreadId, "--json"]));
   const workspace = thread.environment?.path;
   const hostId = thread.environment?.hostId;
   if (!workspace || !hostId) throw new Error("The capture thread needs a workspace to stage the report in.");
@@ -204,7 +206,7 @@ export async function seedArtifact() {
   try {
     for (const draft of [true, false]) {
       await write(usageReportHtml({ draft }));
-      const { saved, failed } = await pluginRpc("artifacts", "saveFiles", { threadId, paths: [file] });
+      const { saved, failed } = await pluginRpc("artifacts", "saveFiles", { threadId: workspaceThreadId, paths: [file] });
       if (failed.length) throw new Error(`Couldn't save the report: ${failed[0].error}`);
       artifactId = saved[0].artifactId;
     }

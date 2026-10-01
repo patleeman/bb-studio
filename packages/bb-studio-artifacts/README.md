@@ -14,10 +14,11 @@ agent to save it.
 
 ![Live BB screenshot of the Studio Artifacts viewer](assets/staged-preview.png)
 
-Captured from the running BB application. It shows a staged HTML report,
-"Q3 usage report", saved twice from a thread's workspace. The viewer
-shows version 2 in its sandboxed frame, under Studio's shared item header,
-with the Preview/Source toggle, New thread, Copy, Download and the ⋯ menu.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`). It shows an
+HTML report, "Q3 usage report", saved twice from a staged thread's workspace.
+The viewer shows version 2 in its sandboxed frame, under Studio's shared item
+header, with Related, New thread, the Preview/Source toggle, Copy, Download and
+the ⋯ menu.
 
 ## What you get
 

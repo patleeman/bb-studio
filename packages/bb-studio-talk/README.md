@@ -12,7 +12,7 @@ can link to and @-mention.
 
 ![Talk recording page with the live recording pill](assets/staged-preview.png)
 
-This is the real BB Recordings page, opened from the nav panel. It shows a
+This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. It shows a
 seeded recording called "Weekly product sync".
 
 To stage it, the capture script:

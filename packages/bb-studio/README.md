@@ -10,21 +10,22 @@ kind, project and tag, and hand any of them to an agent. Anything that needs you
 
 ![Live BB screenshot of the Studio collection](assets/staged-preview.png)
 
-Captured from the running BB application: the Studio collection in a staged
-project, listing a page, a Talk recording and a drawing side by side, with
-the kind filters and New menu in the header.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio collection filtered to the seeded Orbit
+project, as cards. It lists a paused Talk recording, a drawing, three pages and
+a Tasks board, with the kind filters and the New menu in the header.
 
 ![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
 
-The Studio landing page with two staged tasks: one in review and one due today
-appear in the **Needs you** strip above the collection.
+The Studio landing page with two seeded tasks: one in review and one due today
+appear in the **Needs you** strip above the collection, with the staged bots
+and the task board below.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
 Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": a task matches on its title, and another task, an HTML
-artifact and two pages match on their content, each showing the matching
-text with the match in bold.
+artifact, the task board and two pages match on their content, each showing
+the matching text with the match in bold.
 
 ## What you get
 

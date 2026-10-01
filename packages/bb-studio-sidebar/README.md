@@ -35,7 +35,7 @@ and vendored UI policy, and [LICENSE](LICENSE) for the upstream license.
 
 ![Studio section with two open tabs above Threads](assets/staged-preview.png)
 
-Captured from the running BB sidebar with Studio Sidebar selected as the
+Captured from the sidebar of a staged BB (`node scripts/staged-bb.mjs start`), with Studio Sidebar selected as the
 thread list provider. Two staged pages, "Offline mode launch" and "Release
 notes: October", were opened, so the Studio section lists them as tabs above
 the Threads list. The capture asserts that both tabs are present, that the

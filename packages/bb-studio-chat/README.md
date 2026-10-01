@@ -10,11 +10,11 @@ around.
 
 ![Live BB screenshot of Studio Chat floating over a drawing](assets/staged-preview.png)
 
-Captured from the running BB application: a staged Excalidraw drawing
-("Checkout flow") with a seeded thread floated into Studio Chat from its
-header's **Float** button. The card's header shows the thread, and the
-"Viewing: Checkout flow" chip names the drawing on screen. The staged BB
-has no provider credentials, so the thread shows its connection error.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): an Excalidraw drawing ("Checkout flow") with the
+seeded "Draft the ORBIT-42 release notes" thread floated into Studio Chat from
+its header's **Float** button. The card's header shows the thread, the
+"Viewing: Checkout flow" chip names the drawing on screen, and the thread's
+scheduled message waits in its queue above the reply box.
 
 ## What you get
 

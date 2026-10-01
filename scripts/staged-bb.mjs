@@ -2,8 +2,9 @@
 /**
  * Run a staged BB for README screenshots: the current stable BB on its own
  * data directory and ports, every plugin installed from GitHub at a pushed
- * commit the way users install them, and a seeded demo project. It never
- * touches ~/.bb or the BB you work in.
+ * commit the way users install them, and seeded demo data. It never touches
+ * ~/.bb or the BB you work in. Some fixtures are real agent replies on small
+ * models, using this machine's Codex sign-in, so start takes a few minutes.
  *
  *   node scripts/staged-bb.mjs start [--ref <pushed commit>]
  *   . "$TMPDIR/bb-studio-staged/capture.env"
@@ -29,6 +30,7 @@ const port = Number(process.env.BB_STAGED_PORT ?? "48986");
 const serverUrl = `http://127.0.0.1:${port}`;
 const dataDir = join(stagedDir, "data");
 const binDir = join(stagedDir, "bb-app", "node_modules", ".bin");
+const fixturesDir = join(repoRoot, "scripts/capture/fixtures");
 const sleep = (ms) => new Promise((resolvePromise) => setTimeout(resolvePromise, ms));
 
 // Demo threads in the seeded project. Their first message is scheduled weeks
@@ -65,6 +67,25 @@ function run(command, args, { cwd = stagedDir, quiet = false } = {}) {
 
 const bb = async (...args) => JSON.parse(await run(join(binDir, "bb"), [...args, "--json"], { quiet: true }));
 
+async function pluginRpc(pluginId, method, input) {
+  const response = await fetch(`${serverUrl}/api/v1/plugins/${pluginId}/rpc/${method}`, {
+    method: "POST",
+    headers: { "content-type": "application/json" },
+    body: JSON.stringify(input),
+  });
+  const payload = await response.json();
+  if (!response.ok || !payload.ok) throw new Error(payload.error?.message ?? `${pluginId}/${method} failed`);
+  return payload.result;
+}
+
+async function until(what, check, timeoutMs = 300000) {
+  const started = Date.now();
+  while (!(await check())) {
+    if (Date.now() - started > timeoutMs) throw new Error(`Timed out waiting for ${what}`);
+    await sleep(3000);
+  }
+}
+
 async function healthy() {
   try {
     return (await fetch(`${serverUrl}/health`)).ok;
@@ -89,6 +110,61 @@ async function pushedRef(ref) {
     throw new Error(`${commit} isn't on origin/main yet. BB installs from GitHub, so push it first or pass --ref.`);
   }
   return commit;
+}
+
+/**
+ * A thread that asks "SQLite or Postgres?" with smart reactions on, so its
+ * reply ends with suggested reactions. Running it also gives the thread a
+ * workspace in the Orbit repository, where the artifact capture stages its
+ * report. GPT-6-Luna leaves the reactions out, so this uses GPT-6.1-Sol.
+ */
+async function seedSmartReactionsThread(project, machine, orbitDir) {
+  await bb("plugin", "config", "emoji-react", "set", "smartReactions", "true");
+  const thread = await bb(
+    "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
+    "--provider", "codex", "--model", "gpt-6.1-sol", "--reasoning-level", "low",
+    "--title", "Pick a database for the todo app",
+    "--prompt", "I'm building a small todo app just for me. Should it store its data in SQLite or Postgres? Give me two short sentences on the trade-off, then ask me which one I want.",
+  );
+  await bb("thread", "wait", thread.id, "--timeout", "5m");
+  const events = await bb("thread", "messages", thread.id);
+  const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
+  if (!/::reactions\{[^}]*SQLite[^}]*Postgres/.test(reply)) throw new Error(`The SQLite or Postgres reply has no smart reactions: ${reply}`);
+  await bb("thread", "read", thread.id);
+  return thread;
+}
+
+/**
+ * Studio Teams' README fixture (packages/bb-studio-teams/docs/QA.md): four
+ * bots, a Launch room where Atlas and Scribe give the fixed replies their
+ * missions spell out, a Design review channel, a paused automation, and
+ * Atlas's memory of the launch.
+ */
+async function seedTeams(machine) {
+  const teams = join(fixturesDir, "teams");
+  const profile = ["--provider", "codex", "--model", "gpt-6-luna", "--reasoning", "low", "--interval", "0", "--machine", machine.id];
+  await bb("bots", "create", "Atlas", "--description", "Research and verify the facts", "--avatar", "🧭", ...profile, "--mission-file", join(teams, "atlas-mission.md"));
+  await bb("bots", "create", "Scribe", "--description", "Record decisions and next steps", "--avatar", "📝", ...profile, "--mission-file", join(teams, "scribe-mission.md"));
+  await bb("bots", "create", "Quinn", "--description", "Review designs for clarity", "--avatar", "🎨", ...profile, "--mission", "Review designs for the owner.");
+  await bb("bots", "create", "Relay", "--description", "Hand work between threads", "--avatar", "📡", ...profile, "--mission", "Hand work between threads for the owner.");
+  await bb("bots", "memory", "atlas", "--text", "# Memory\n\n- ORBIT-42 ships in the Friday release window.\n- Scribe owns the release-check log.\n");
+  for (const [name, ...bots] of [["Launch room", "atlas", "scribe"], ["Design review", "quinn"]]) {
+    const channel = await bb("bots", "channel", "create", name, ...bots.flatMap((bot) => ["--bot", bot]), "--behavior", "directed");
+    // A channel made from the CLI gets its BB thread when one first opens it.
+    await pluginRpc("bot-teams", "openChannelThread", { id: channel.id });
+  }
+
+  const replied = (start) => async () =>
+    (await bb("bots", "channel", "messages", "Launch room", "--limit", "50")).messages.some((message) => message.botId && message.text.startsWith(start));
+  await bb("bots", "channel", "send", "Launch room", "--text", "@atlas @scribe Here's the ORBIT-42 launch brief. Are you both ready?",
+    "--attach", join(teams, "launch-brief.txt"), "--machine", machine.id);
+  await until("Atlas to read the brief", replied("Ready. I checked the brief"));
+  await until("Scribe to read the brief", replied("Ready. I'll keep the decision log"));
+  await bb("bots", "channel", "send", "Launch room", "--text", "@atlas Please run the release check.");
+  await until("Scribe to log the release check", replied("Logged: release check passed."));
+  await bb("bots", "channel", "schedule", "Launch room", "--name", "Weekday launch status",
+    "--text", "Post the day's ORBIT-42 launch status and open decisions.",
+    "--bot", "scribe", "--cron", "0 9 * * 1-5", "--timezone", "America/New_York", "--paused");
 }
 
 async function start() {
@@ -143,6 +219,12 @@ async function start() {
     threads.push(await bb("thread", "spawn", "--project", project.id, "--title", title, "--prompt", `${title}.`, "--send-at", "30d"));
   }
 
+  // Talk's meeting notes and Studio Decisions fall back to this model.
+  await bb("smart-decisions", "fallback", "codex", "gpt-6-luna", "low");
+  process.stdout.write("Seeding agent replies\n");
+  const smartReactionsThread = await seedSmartReactionsThread(project, machine, orbitDir);
+  await seedTeams(machine);
+
   const envFile = join(stagedDir, "capture.env");
   await writeFile(
     envFile,
@@ -151,6 +233,8 @@ async function start() {
       `export BB_SERVER_URL=${serverUrl}`,
       `export BB_CAPTURE_PROJECT_ID=${project.id}`,
       `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
+      `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
+      `export BB_CAPTURE_WORKSPACE_THREAD_ID=${smartReactionsThread.id}`,
       `export BB_CAPTURE_CDP_PORT=${port + 2}`,
       `export PATH="${binDir}:$PATH"`,
       "unset BB_CLI BB_HOST_DAEMON_PORT BB_THREAD_ID BB_PROJECT_ID BB_ENVIRONMENT_ID BB_THREAD_STORAGE",
