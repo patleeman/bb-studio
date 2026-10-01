@@ -1,7 +1,7 @@
 // Tags group Studio items across add-ons. Studio keeps them, keyed by
 // `<plugin>:<id>`, so every add-on's items can be tagged without the add-on
 // knowing about tags.
-import { randomBytes } from "node:crypto";
+import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
 
 /** Tag colours, picked in turn; each reads on light and dark backgrounds. */
@@ -48,7 +48,7 @@ export class TagStore {
     const existing = this.byName(name);
     if (existing) return existing;
     const count = (this.db.prepare("SELECT COUNT(*) AS n FROM tags").get() as { n: number }).n;
-    const tag = { id: `tag_${randomBytes(8).toString("hex")}`, name, color: TAG_COLORS[count % TAG_COLORS.length]! };
+    const tag = { id: newId("tag"), name, color: TAG_COLORS[count % TAG_COLORS.length]! };
     this.db.prepare("INSERT INTO tags (id, name, color, created_at) VALUES (?, ?, ?, ?)").run(tag.id, tag.name, tag.color, Date.now());
     return tag;
   }
