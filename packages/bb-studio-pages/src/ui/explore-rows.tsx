@@ -6,8 +6,8 @@
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import { REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
 import { labelKey, parseExploreItems, type ExploreItem } from "../explore/shared";

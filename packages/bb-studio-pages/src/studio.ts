@@ -2,6 +2,7 @@
 // manage pages in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { untitled } from "@bb-studio/kit/format";
 import { mustGet, registerStudioProvider, storeSearch } from "@bb-studio/kit/server";
 import { HUMAN_USER_ID, PLUGIN_ID } from "./constants";
 import { readMarkdown } from "./doc";
@@ -131,7 +132,7 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
       const pages = ids.map((id) => {
         const meta = requireMeta(id);
         const markdown = readMarkdown(service.hub.open(id).doc);
-        return ids.length === 1 ? markdown : `# ${meta.icon ? `${meta.icon} ` : ""}${meta.title || "Untitled"}\n\n${markdown}`;
+        return ids.length === 1 ? markdown : `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}\n\n${markdown}`;
       });
       return { message: ids.length === 1 ? "Copied as Markdown" : `Copied ${ids.length} pages as Markdown`, text: pages.join("\n\n---\n\n") };
     },

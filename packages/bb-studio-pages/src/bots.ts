@@ -1,3 +1,4 @@
+import { errorMessage as message } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
@@ -169,5 +170,5 @@ export class BotDirectory {
   }
 }
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+
 const escapeRegExp = (text: string) => text.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");

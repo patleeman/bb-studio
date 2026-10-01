@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   ThreadChat,
@@ -10,9 +11,9 @@ import {
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+} from "@bb-studio/kit/ui";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import type { PageMetaView } from "../contract";
 import type { Rpc } from "./shared";
 
@@ -127,7 +128,7 @@ export function PageChat({
                 const result = await rpc.call("work", { id: page.id, request });
                 onStarted(result.threadId);
               } catch (cause) {
-                setError(cause instanceof Error ? cause.message : String(cause));
+                setError(errorMessage(cause));
                 throw cause; // Keeps the draft for another try.
               }
             }}

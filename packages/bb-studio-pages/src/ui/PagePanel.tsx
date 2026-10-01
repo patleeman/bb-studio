@@ -1,6 +1,7 @@
+import { untitled } from "@bb-studio/kit/format";
 import { useBbNavigate, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-studio/kit/ui";
 import type { rpcContract } from "../contract";
 import { explainerIdFrom } from "./explore";
 import { ExplainerPanel } from "./explore-panel";
@@ -68,7 +69,7 @@ function PageTab({ threadId, params }: PluginThreadPanelProps) {
         <header className="flex h-11 shrink-0 items-center gap-2 border-b border-border px-3">
           {page.icon ? <span className="shrink-0 text-base leading-none">{page.icon}</span> : <Icon name="FileText" className="size-4 shrink-0 text-muted-foreground" />}
           <div className="min-w-0 flex-1">
-            <div className="truncate text-sm font-medium">{page.title || "Untitled"}</div>
+            <div className="truncate text-sm font-medium">{untitled(page.title)}</div>
             <div className="truncate text-[11px] text-muted-foreground">Edited {relativeTime(page.updatedAt)}</div>
           </div>
           <OpenInPages onOpen={() => navigate.toPluginPanel("pages", { subPath: page.id })} />

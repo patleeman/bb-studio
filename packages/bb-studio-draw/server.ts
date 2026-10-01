@@ -1,5 +1,6 @@
 import { subcommand } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { errorMessage } from "@bb-studio/kit/format";
 // Studio Draw (plugin id `excalidraw`): create, edit, and attach Excalidraw
 // drawings.
 //
@@ -573,7 +574,7 @@ export default async function plugin(bb: BbPluginApi) {
             return {
               exitCode: 1,
               stderr: `cannot read/parse ${filePath}: ${
-                error instanceof Error ? error.message : String(error)
+                errorMessage(error)
               }\n`,
             };
           }

@@ -1,15 +1,32 @@
 // The bar floating over every Studio item view: a back pill on the left,
 // then the view's own breadcrumb or status, and its buttons on the right.
 import type { ReactNode } from "react";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { mentionPrompt } from "../contract";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
-import { FLOATING } from "./pieces";
+import { FLOATING, FLOATING_BUTTON } from "./pieces";
+
+export type ItemThread = { title: string; href: string };
+
+export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, item: ItemThread) {
+  navigate.toCompose({ initialPrompt: mentionPrompt([item]), focusPrompt: true });
+}
+
+/** The shared action used by item headers and narrow-screen menus. */
+export function useNewItemThread(item: ItemThread | undefined) {
+  const navigate = useBbNavigate();
+  return () => {
+    if (item) openNewItemThread(navigate, item);
+  };
+}
 
 export function ItemHeader({
   backLabel,
   onBack,
   leading,
   trailing,
+  thread,
   className,
 }: {
   backLabel: string;
@@ -18,8 +35,11 @@ export function ItemHeader({
   leading?: ReactNode;
   /** The view's buttons, built from ICON_BUTTON and FLOATING_BUTTON. */
   trailing?: ReactNode;
+  /** Adds the standard New thread action for this item. */
+  thread?: ItemThread;
   className?: string;
 }) {
+  const newThread = useNewItemThread(thread);
   return (
     <div
       className={cn(
@@ -40,7 +60,12 @@ export function ItemHeader({
         </button>
         {leading}
       </div>
-      {trailing ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">{trailing}</div> : null}
+      {trailing || thread ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+        {thread ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
+          <Icon name="MessageSquarePlus" /> New thread
+        </button> : null}
+        {trailing}
+      </div> : null}
     </div>
   );
 }

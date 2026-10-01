@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { z } from "zod";
 
 // Agents write charts and stat rows as fenced JSON in markdown
@@ -58,7 +59,7 @@ export function parseJsonWith<T>(schema: z.ZodType<T>, text: string): { ok: true
   try {
     raw = JSON.parse(text);
   } catch (error) {
-    return { ok: false, error: `Invalid JSON: ${error instanceof Error ? error.message : String(error)}` };
+    return { ok: false, error: `Invalid JSON: ${errorMessage(error)}` };
   }
   const result = schema.safeParse(raw);
   if (!result.success) {

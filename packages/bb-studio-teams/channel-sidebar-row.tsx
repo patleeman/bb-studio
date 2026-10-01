@@ -11,7 +11,7 @@ import {
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
-} from "./components/ui/context-menu";
+} from "@bb-studio/kit/ui";
 
 function openOptions(target: HTMLElement) {
   const rect = target.getBoundingClientRect();

@@ -1,16 +1,17 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import type { useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useState } from "react";
-import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
-import { Textarea } from "@/components/ui/textarea";
-import { cn } from "@/lib/utils";
+import { Button } from "@bb-studio/kit/ui";
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "@bb-studio/kit/ui";
+import { Icon } from "@bb-studio/kit/ui";
+import { Input } from "@bb-studio/kit/ui";
+import { Textarea } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import type { BotView, PageMetaView, rpcContract, SnapshotView } from "../contract";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
-const message = (error: unknown) => (error instanceof Error ? error.message : String(error));
+const message = (error: unknown) => (errorMessage(error));
 
 function BotPicker({ bots, value, onChange }: { bots: BotView[]; value: string; onChange(id: string): void }) {
   if (!bots.length) {

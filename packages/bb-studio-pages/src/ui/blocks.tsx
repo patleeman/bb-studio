@@ -18,8 +18,8 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
 import { ThreadTitle } from "@get-bb/plugin-sdk/app";
 import { calloutConfig, chartConfig, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";

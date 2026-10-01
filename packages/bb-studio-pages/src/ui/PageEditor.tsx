@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 import { filterSuggestionItems, insertOrUpdateBlockForSlashMenu, SyntaxHighlightingExtension } from "@blocknote/core";
 import { CommentsExtension, DefaultThreadStoreAuth } from "@blocknote/core/comments";
 import { withCollaboration, YjsThreadStore } from "@blocknote/core/yjs";
@@ -13,7 +14,7 @@ import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-studio/kit/ui";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import type { BotView, PageMetaView } from "../contract";
 import { DOCUMENT_FRAGMENT, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
@@ -347,10 +348,10 @@ export function PageEditor({
     const pageItems = pagesRef.current
       .filter((candidate) => candidate.id !== page.id && !candidate.archived)
       .map((candidate) => ({
-        title: candidate.title || "Untitled",
+        title: untitled(candidate.title),
         group: "Pages",
         icon: candidate.icon ? <span className="text-base leading-none">{candidate.icon}</span> : <Icon name="FileText" className="size-4" />,
-        onItemClick: insert("page", candidate.id, candidate.title || "Untitled"),
+        onItemClick: insert("page", candidate.id, untitled(candidate.title)),
       }));
     const dates = [
       { title: "Today", offset: 0 },

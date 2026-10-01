@@ -17,7 +17,7 @@ import {
   useProjects,
   type Project,
 } from "@bb-studio/kit/app";
-import { errorMessage, plural } from "@bb-studio/kit/format";
+import { errorMessage, plural, untitled } from "@bb-studio/kit/format";
 import { useBbContext } from "@get-bb/plugin-sdk/app";
 import { STATUSES, STATUS_LABELS, type TaskStatus } from "../src/shared";
 import { AssigneeChip, DueChip, HandoffBadge, STATUS_ICONS } from "./pieces";
@@ -146,7 +146,7 @@ export function Board({
       return;
     }
     if (!task.openThreads) return;
-    toast.success(`Done: ${task.title || "Untitled"}`, {
+    toast.success(`Done: ${untitled(task.title)}`, {
       action: {
         label: task.openThreads === 1 ? "Archive thread" : "Archive threads",
         onClick: () =>
@@ -379,7 +379,7 @@ function TaskCard({
       draggable
       role="button"
       tabIndex={0}
-      aria-label={task.title || "Untitled"}
+      aria-label={untitled(task.title)}
       className={cn(
         "group relative cursor-grab rounded-md border border-border/70 bg-background px-3 py-2.5 text-left shadow-xs hover:border-border active:cursor-grabbing",
         dragging && "opacity-40",

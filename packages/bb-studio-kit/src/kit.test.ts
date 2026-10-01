@@ -6,10 +6,12 @@ import { eachId, mentionPrompt, studioSchemas } from "./contract";
 import { plural, relativeTime, snippet, untitled } from "./format";
 import { nextSort, sortItems, toggleSelection, type CollectionItem } from "./app/selection";
 
-// Each Studio plugin bundles the kit from outside its own folder, so esbuild
-// can't find the kit's own dependencies. Values may only come from modules BB
-// provides at runtime; anything else must be a type-only import.
+// Every value import must be supplied by the kit package or the BB host.
+const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")) as {
+  dependencies: Record<string, string>;
+};
 const RUNTIME = new Set([
+  ...Object.keys(packageJson.dependencies),
   "react",
   "react/jsx-runtime",
   "react-dom",

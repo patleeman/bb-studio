@@ -1,7 +1,8 @@
+import { untitled } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc, type PluginThreadHeaderActionProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract } from "../contract";
 
@@ -21,7 +22,7 @@ export function ThreadPageLink({ threadId, isCompactViewport }: PluginThreadHead
   });
 
   if (!page) return null;
-  const title = page.title || "Untitled";
+  const title = untitled(page.title);
   return (
     <button
       type="button"

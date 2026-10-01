@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 // What the agent is told about the item on screen: a pointer, not the
 // content. The add-on's own tools read the latest version.
 import type { StudioItem, StudioKind } from "@bb-studio/kit/contract";
@@ -33,7 +34,7 @@ export function parseItemKey(key: string): { pluginId: string; id: string } | nu
 
 export function pointerNote(item: Item, kind: StudioKind | null): string {
   const label = (kind?.label ?? item.kind).toLowerCase();
-  const title = item.title.trim() || "Untitled";
+  const title = untitled(item.title);
   return [
     `The user has this Studio ${label} open while they talk to you: "${title}" (${label} id ${item.id}, from the ${item.pluginId} plugin, link ${item.href}).`,
     `When they say "this" or "here", they mean it. ${kind?.agentHint ?? GENERIC_HINT}`,
@@ -58,11 +59,11 @@ export function withItemPill(
   /** `wireId` is `<mention provider>:<item key>`, as BB namespaces mention ids. */
   pill: { pluginId: string; wireId: string; label: string; icon: string | null },
 ): NewThreadRequest["input"] {
-  const label = `@${pill.label.trim() || "Untitled"}`;
+  const label = `@${untitled(pill.label)}`;
   const mention = {
     start: 0,
     end: label.length,
-    resource: { kind: "plugin" as const, pluginId: pill.pluginId, itemId: pill.wireId, label: pill.label.trim() || "Untitled", icon: pill.icon },
+    resource: { kind: "plugin" as const, pluginId: pill.pluginId, itemId: pill.wireId, label: untitled(pill.label), icon: pill.icon },
   };
   const at = input.findIndex((item) => item.type === "text" && item.visibility !== "agent-only");
   if (at < 0) return [{ type: "text", text: label, mentions: [mention] } as TextInput, ...input];

@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { createThread, listThreads, reply, setResolved, type ThreadView } from "./comments";
@@ -52,7 +53,7 @@ export function registerTools(bb: BbPluginApi, service: PagesService): void {
   const { store } = service;
 
   const pageLine = (page: PageMeta, depth = 0) =>
-    `${"  ".repeat(depth)}- ${page.icon ? `${page.icon} ` : ""}${page.title || "Untitled"} (id ${page.id}${page.project_id ? "" : ", global"})`;
+    `${"  ".repeat(depth)}- ${page.icon ? `${page.icon} ` : ""}${untitled(page.title)} (id ${page.id}${page.project_id ? "" : ", global"})`;
 
   bb.agents.registerTool({
     name: "pages_list",
@@ -94,7 +95,7 @@ export function registerTools(bb: BbPluginApi, service: PagesService): void {
       const threads = listThreads(live.doc);
       return truncate(
         [
-          `# ${meta.icon ? `${meta.icon} ` : ""}${meta.title || "Untitled"}`,
+          `# ${meta.icon ? `${meta.icon} ` : ""}${untitled(meta.title)}`,
           `Page id ${meta.id} · ${meta.project_id ? "project page" : "global page"} · ${pageUrl(meta.id)}`,
           "",
           markdown.trim() || "(empty page)",

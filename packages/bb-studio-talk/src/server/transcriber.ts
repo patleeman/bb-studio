@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 // The transcription queue. Segments are transcribed in recorded order within a
 // recording (each uses the previous segment's text as its hint) and in
 // parallel across recordings. Failures back off and retry; nothing is dropped.
@@ -85,7 +86,7 @@ export class Transcriber {
       store.markTranscribed(segment.recordingId, segment.id, text);
     } catch (cause) {
       if (signal.aborted) return;
-      const error = cause instanceof Error ? cause.message : String(cause);
+      const error = errorMessage(cause);
       const missing = /ENOENT/.test(error);
       const delay = missing ? null : retryDelay(segment.attempts, error);
       if (delay === null || segment.attempts === 0) {

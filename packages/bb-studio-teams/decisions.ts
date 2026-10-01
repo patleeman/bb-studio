@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 
@@ -68,7 +69,7 @@ async function call<T extends { ok: boolean }>(
   } catch (error) {
     signal.throwIfAborted();
     // The host reports a missing or disabled plugin as a failed call.
-    throw new DecisionsUnavailableError(`Studio Decisions did not answer. ${installHint} (${error instanceof Error ? error.message : String(error)})`);
+    throw new DecisionsUnavailableError(`Studio Decisions did not answer. ${installHint} (${errorMessage(error)})`);
   }
   signal.throwIfAborted();
   const outcome = result as T & ({ ok: true } | z.infer<typeof failure>);

@@ -18,7 +18,7 @@ import {
   ContextMenuSubContent,
   ContextMenuSubTrigger,
   ContextMenuTrigger,
-} from "./components/ui/context-menu";
+} from "@bb-studio/kit/ui";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -28,7 +28,7 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "./components/ui/dropdown-menu";
+} from "@bb-studio/kit/ui";
 
 const botPages = [
   ["profile", "View profile", "UserRound"],

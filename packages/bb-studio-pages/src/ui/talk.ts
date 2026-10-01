@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 // Dictation through the Talk plugin. Talk's contract is plain DOM (see
 // bb-studio-talk/src/client/fields.ts): the editor is marked as a dictation
 // field, Talk hands transcripts back as a cancelable `bb-talk:insert` event,
@@ -26,7 +27,7 @@ export function pageIdFromField(key: unknown): string | null {
 }
 
 export function pageFieldLabel(title: string): string {
-  return `“${title.trim() || "Untitled"}”`;
+  return `“${untitled(title)}”`;
 }
 
 export type TalkMode =

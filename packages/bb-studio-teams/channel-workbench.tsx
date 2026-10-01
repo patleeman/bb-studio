@@ -2,10 +2,10 @@ import { useEffect, useId, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./contract";
 import { defaultLimits } from "./workspace-contract";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import { IconActionTooltip } from "./channel-controls";
-import { Input } from "./components/ui/input";
+import { Input } from "@bb-studio/kit/ui";
 import {
   ActionBar,
   ErrorMessage,

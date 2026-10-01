@@ -1,3 +1,5 @@
+import { errorMessage as errorText } from "@bb-studio/kit/format";
+export { errorText };
 // Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
 // publish `studio_describe` for discovery; the suite's own plugins are also
 // looked up by id, so an older version that predates Studio can be named.
@@ -32,9 +34,6 @@ export interface HubSdk {
 type ProviderMethods = typeof schemas.provider;
 export type HubItem = StudioItem & { pluginId: string };
 
-export function errorText(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 export class StudioHub {
   private readonly described = new Map<string, { version: string; info: StudioProviderInfo }>();

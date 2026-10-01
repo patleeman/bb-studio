@@ -12,7 +12,10 @@ export {
   type CollectionTag,
 } from "./collection";
 export { AddOnCollection, type ProviderCall } from "./add-on";
-export { EditableTitle, ItemHeader } from "./item-header";
+export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
+export { EditableTitle, ItemHeader, openNewItemThread, useNewItemThread, type ItemThread } from "./item-header";
+export { ItemDeleteConfirm, ItemMenu } from "./item-menu";
+export { ItemDirectiveCard } from "./directive-card";
 export { openAppPath, studioPath } from "./nav";
 export {
   Badge,

@@ -1,8 +1,9 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-studio/kit/ui";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract, StudioEmbedItem } from "../contract";
 import { PagesUiContext, type PagesUi } from "./context";
@@ -19,7 +20,7 @@ export function usePagesData(rpc: Rpc) {
         setPages(result.pages);
         setError(null);
       },
-      (cause: unknown) => setError(cause instanceof Error ? cause.message : String(cause)),
+      (cause: unknown) => setError(errorMessage(cause)),
     );
   }, [rpc]);
   const refetchBots = useCallback(() => {

@@ -8,16 +8,14 @@ import {
   AddOnCollection,
   Badge,
   DANGER_BUTTON,
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
   EditableTitle,
-  FLOATING_BUTTON,
   GHOST_BUTTON,
   ICON_BUTTON,
   ItemHeader,
+  ItemDeleteConfirm,
+  ItemMenu,
+  openNewItemThread,
   OUTLINE_BUTTON,
   PageColumn,
   openAppPath,
@@ -25,8 +23,8 @@ import {
   useStudioPresent,
   type ProviderCall,
 } from "@bb-studio/kit/app";
-import { mentionPrompt, type StudioSchemas } from "@bb-studio/kit/contract";
-import { shortDateTime } from "@bb-studio/kit/format";
+import type { StudioSchemas } from "@bb-studio/kit/contract";
+import { errorMessage, formatBytes, shortDateTime } from "@bb-studio/kit/format";
 import {
   useBbNavigate,
   useRealtime,
@@ -44,14 +42,10 @@ import {
   recordingBadge,
   recordingHref,
 } from "../shared/format";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState } from "./controller";
 import { sameKey, type SetAsideSegment } from "./outbox";
-
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 function useChangedSignal(onChange: (id: string) => void): void {
   useRealtime(RECORDING_CHANGED, (payload) => {
@@ -88,10 +82,6 @@ function RecordingList() {
 }
 
 // ── Unsent audio ─────────────────────────────────────────────────────────
-function formatBytes(bytes: number): string {
-  if (bytes < 1024 * 1024) return `${Math.max(1, Math.round(bytes / 1024))} KB`;
-  return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
-}
 
 /** Points at audio this device kept because the server refused it. */
 function UnsentNotice({ recordingId, className }: { recordingId?: string; className?: string }) {
@@ -123,7 +113,7 @@ function UnsentAudio() {
   const act = (work: () => Promise<unknown>) => {
     setBusy(true);
     void work()
-      .catch((cause: unknown) => toast.error(message(cause)))
+      .catch((cause: unknown) => toast.error(errorMessage(cause)))
       .finally(() => setBusy(false));
   };
   const toCollection = () => (studio ? openAppPath(studioPath("recording")) : navigate.toPluginPanel(PANEL_PATH));
@@ -226,7 +216,7 @@ function useRecording(id: string) {
         setData(result);
         setError(null);
       },
-      (cause) => setError(message(cause)),
+      (cause) => setError(errorMessage(cause)),
     );
   }, [rpc, id]);
   useEffect(() => {
@@ -269,7 +259,7 @@ function usePlayer(recordingId: string, segments: readonly Segment[]) {
       });
       element.play().catch((error: unknown) => {
         if (audio.current === element) stop();
-        toast.error(`Could not play audio: ${message(error)}`);
+        toast.error(`Could not play audio: ${errorMessage(error)}`);
       });
     },
     [recordingId, stop],
@@ -352,12 +342,12 @@ function RecordingDetail({ id }: { id: string }) {
   const activeHere = state.recordingId === id && state.phase !== "idle";
   const badge = recordingBadge(recording, activeHere && state.phase === "recording");
   const run = (work: () => Promise<unknown>) => {
-    void work().then(refetch, (cause) => toast.error(message(cause)));
+    void work().then(refetch, (cause) => toast.error(errorMessage(cause)));
   };
   const copy = () =>
     void navigator.clipboard.writeText(transcript).then(
       () => toast.success("Transcript copied"),
-      (cause: unknown) => toast.error(message(cause)),
+      (cause: unknown) => toast.error(errorMessage(cause)),
     );
 
   return (
@@ -365,40 +355,16 @@ function RecordingDetail({ id }: { id: string }) {
       <ItemHeader
         backLabel={backLabel}
         onBack={() => toCollection()}
+        thread={{ title: recording.title, href: recordingHref(recording.id) }}
         leading={badge ? <Badge label={badge.label} tone={badge.tone} /> : null}
         trailing={
           <>
-            <button
-              type="button"
-              className={cn(FLOATING_BUTTON, "max-md:hidden")}
-              onClick={() =>
-                navigate.toCompose({
-                  initialPrompt: mentionPrompt([{ title: recording.title, href: recordingHref(recording.id) }]),
-                  focusPrompt: true,
-                })
-              }
-            >
-              <Icon name="MessageSquarePlus" /> New thread
-            </button>
             <button type="button" aria-label="Copy transcript" title="Copy transcript" className={ICON_BUTTON} disabled={transcript === ""} onClick={copy}>
               <Icon name="Copy" className="size-4" />
             </button>
-            <DropdownMenu>
-              <DropdownMenuTrigger asChild>
-                <button type="button" aria-label="More" className={ICON_BUTTON}>
-                  <Icon name="MoreHorizontal" className="size-4" />
-                </button>
-              </DropdownMenuTrigger>
-              <DropdownMenuContent align="end" className="w-56">
-                <DropdownMenuItem
-                  className="md:hidden"
-                  onSelect={() =>
-                    navigate.toCompose({
-                      initialPrompt: mentionPrompt([{ title: recording.title, href: recordingHref(recording.id) }]),
-                      focusPrompt: true,
-                    })
-                  }
-                >
+            <ItemMenu onDelete={() => setConfirmDelete(true)} deleteDisabled={activeHere || recording.status === "recording"}>
+
+                <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}>
                   <Icon name="MessageSquarePlus" className="size-4" /> New thread
                 </DropdownMenuItem>
                 {recording.failedCount > 0 ? (
@@ -406,12 +372,7 @@ function RecordingDetail({ id }: { id: string }) {
                     <Icon name="RotateCcw" className="size-4" /> Retry {recording.failedCount} failed
                   </DropdownMenuItem>
                 ) : null}
-                <DropdownMenuSeparator />
-                <DropdownMenuItem variant="destructive" disabled={activeHere || recording.status === "recording"} onSelect={() => setConfirmDelete(true)}>
-                  <Icon name="Trash2" className="size-4" /> Delete…
-                </DropdownMenuItem>
-              </DropdownMenuContent>
-            </DropdownMenu>
+            </ItemMenu>
           </>
         }
       />
@@ -420,7 +381,7 @@ function RecordingDetail({ id }: { id: string }) {
           title={recording.title}
           placeholder="Untitled recording"
           onRename={(title) =>
-            void rpc.call("recording_rename", { id, title }).then(refetch, (cause: unknown) => toast.error(message(cause)))
+            void rpc.call("recording_rename", { id, title }).then(refetch, (cause: unknown) => toast.error(errorMessage(cause)))
           }
         />
         <div className="mt-2 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
@@ -440,24 +401,18 @@ function RecordingDetail({ id }: { id: string }) {
         <UnsentNotice recordingId={id} className="mt-6" />
 
         {confirmDelete ? (
-          <div className="mt-6 flex items-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 px-4 py-3 text-sm max-md:flex-wrap">
-            <span className="min-w-0 flex-1">Delete this recording and its audio? This can't be undone.</span>
-            <button
-              type="button"
-              className={DANGER_BUTTON}
-              onClick={() => {
+          <div className="mt-6">
+            <ItemDeleteConfirm
+              label="Delete this recording and its audio? This can't be undone."
+              onDelete={() => {
                 player.stop();
                 void rpc.call("recording_delete", { id }).then(
                   () => toCollection(true),
-                  (cause) => toast.error(message(cause)),
+                  (cause) => toast.error(errorMessage(cause)),
                 );
               }}
-            >
-              Delete
-            </button>
-            <button type="button" className={GHOST_BUTTON} onClick={() => setConfirmDelete(false)}>
-              Cancel
-            </button>
+              onCancel={() => setConfirmDelete(false)}
+            />
           </div>
         ) : null}
 

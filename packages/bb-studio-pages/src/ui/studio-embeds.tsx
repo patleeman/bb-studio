@@ -2,8 +2,8 @@
 // artifact its content, and recordings, tasks and the rest a card. Each opens
 // the item in its own add-on.
 import { useEffect, useMemo, useState } from "react";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import type { StudioEmbedItem } from "../contract";
 import { STUDIO_EMBEDS, studioEmbedFor, studioRef, studioSubtitle, type StudioEmbedKind } from "../schema-config";
 import { usePagesUi, type ArtifactView } from "./context";

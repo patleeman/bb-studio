@@ -17,21 +17,17 @@ import "../assets/excalidraw/excalidraw.css";
 // the vendored css so the overrides win at equal specificity.
 import "../assets/excalidraw-theme.css";
 import {
-  DANGER_BUTTON,
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  FLOATING,
   FLOATING_BUTTON,
-  GHOST_BUTTON,
   ICON_BUTTON,
   Icon,
   ItemHeader,
+  ItemDeleteConfirm,
+  ItemMenu,
+  openNewItemThread,
   cn,
 } from "@bb-studio/kit/app";
-import { mentionPrompt } from "@bb-studio/kit/contract";
+
 import { errorMessage } from "@bb-studio/kit/format";
 import {
   useBbNavigate,
@@ -368,12 +364,7 @@ export function DrawingEditor({
     void rpc.call("renameDrawing", { id: drawingId, name: trimmed }).catch((error) => toast.error(errorMessage(error)));
   }
 
-  function newThread() {
-    navigate.toCompose({
-      initialPrompt: mentionPrompt([{ title: name.trim() || "Untitled drawing", href: drawingHref(drawingId) }]),
-      focusPrompt: true,
-    });
-  }
+  const thread = { title: name.trim() || "Untitled drawing", href: drawingHref(drawingId) };
 
   async function attachAsImage() {
     if (!threadId) return;
@@ -428,56 +419,35 @@ export function DrawingEditor({
   );
 
   const trailing = confirmDelete ? (
-    <div className={cn(FLOATING, "flex items-center gap-1.5 rounded-md py-1 pr-1 pl-3 text-sm")}>
-      <span className="max-sm:hidden">Delete this drawing?</span>
-      <button type="button" className={DANGER_BUTTON} onClick={() => void deleteDrawing()}>
-        Delete
-      </button>
-      <button type="button" className={GHOST_BUTTON} onClick={() => setConfirmDelete(false)}>
-        Cancel
-      </button>
-    </div>
+    <ItemDeleteConfirm label="Delete this drawing?" onDelete={() => void deleteDrawing()} onCancel={() => setConfirmDelete(false)} />
   ) : (
     <>
       {threadId ? (
         <button type="button" className={FLOATING_BUTTON} disabled={attaching} onClick={() => void attachAsImage()}>
           <Icon name={attaching ? "Loading" : "Paperclip"} className={attaching ? SPIN : undefined} /> Attach
         </button>
-      ) : (
-        <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
-          <Icon name="MessageSquarePlus" /> New thread
-        </button>
-      )}
+      ) : null}
       <button type="button" aria-label="Copy image" title="Copy image" className={ICON_BUTTON} onClick={() => void copyImage()}>
         <Icon name="Copy" className="size-4" />
       </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="More" className={ICON_BUTTON}>
-            <Icon name="MoreHorizontal" className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-52">
+      <ItemMenu onDelete={() => setConfirmDelete(true)} className="w-52">
+
           {threadId ? null : (
-            <DropdownMenuItem className="md:hidden" onSelect={newThread}>
+            <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
               <Icon name="MessageSquarePlus" className="size-4" /> New thread
             </DropdownMenuItem>
           )}
           <DropdownMenuItem onSelect={() => void downloadPng()}>
             <Icon name="Download" className="size-4" /> Download PNG
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-            <Icon name="Trash2" className="size-4" /> Delete…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      </ItemMenu>
     </>
   );
 
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
       <ItemHeader
+        thread={threadId || confirmDelete ? undefined : thread}
         className="relative shrink-0 items-center border-b border-border/70"
         backLabel={backLabel}
         onBack={() => onBack()}

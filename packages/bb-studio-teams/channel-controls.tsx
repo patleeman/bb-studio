@@ -4,8 +4,8 @@ import * as Dialog from "@radix-ui/react-dialog";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import type { Bot } from "./contract";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
+import { Button } from "@bb-studio/kit/ui";
+import { Input } from "@bb-studio/kit/ui";
 import { matchingBroadcastMentions, type BroadcastMention } from "./mentions";
 
 export function Menu({

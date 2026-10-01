@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { ItemHeader, useStudioChatPresent } from "@bb-studio/kit/app";
 import { STUDIO_CHAT_FLOAT_EVENT, STUDIO_CHAT_RIGHT_VAR } from "@bb-studio/kit/contract";
@@ -9,9 +10,9 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+} from "@bb-studio/kit/ui";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import type { BotView, PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog, KeepUpdatedDialog } from "./dialogs";
@@ -169,13 +170,13 @@ function Breadcrumbs({ page, pages }: { page: PageMetaView; pages: PageMetaView[
       {trail.map((crumb) => (
         <span key={crumb.id} className="flex min-w-0 items-center gap-1">
           <button type="button" className="max-w-40 truncate hover:text-foreground" onClick={() => navigate.toPluginPanel("pages", { subPath: crumb.id })}>
-            {crumb.icon} {crumb.title || "Untitled"}
+            {crumb.icon} {untitled(crumb.title)}
           </button>
           <Icon name="ChevronRight" className="size-3 shrink-0" />
         </span>
       ))}
       <span className="max-w-64 truncate text-foreground">
-        {page.icon} {page.title || "Untitled"}
+        {page.icon} {untitled(page.title)}
       </span>
     </nav>
   );

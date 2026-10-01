@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 // Items from the other Studio add-ons, for embeds and mentions. Pages asks
 // each add-on through its Studio contract, so a new add-on shows up without
 // changes here.
@@ -53,7 +54,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
                 kind: item.kind,
                 kindLabel: kind?.label ?? item.kind,
                 kindIcon: kind?.icon ?? "File",
-                title: item.title || "Untitled",
+                title: untitled(item.title),
                 icon: item.icon,
                 preview: item.preview,
                 facts: item.facts.map((fact) => fact.value).filter(Boolean),

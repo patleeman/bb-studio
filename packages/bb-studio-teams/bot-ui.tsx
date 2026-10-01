@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { RevisionList, type Revision } from "./revision-list";
 import { MarkdownEditor } from "./markdown-editor";
 import { isForkConversation } from "./send-mode";
@@ -18,15 +19,14 @@ import {
   experimental_PermissionModePicker as PermissionModePicker,
 } from "@get-bb/plugin-sdk/app";
 import type { Bot, Job, ProfileInput, rpcContract } from "./contract";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
+import { Button, Input } from "@bb-studio/kit/ui";
 import {
   Select,
   SelectContent,
   SelectItem,
   SelectTrigger,
   SelectValue,
-} from "./components/ui/select";
+} from "@bb-studio/kit/ui";
 import {
   readConfigDraft,
   writeConfigDraft,
@@ -34,11 +34,11 @@ import {
   documentDraft,
 } from "./config-draft";
 import { Modal } from "./channel-controls";
-import { COARSE_POINTER_HEADER_ICON_BUTTON_CLASS } from "./components/ui/coarse-pointer-sizing";
+import { COARSE_POINTER_HEADER_ICON_BUTTON_CLASS } from "@bb-studio/kit/ui";
 import "./styles.css";
 
 export const message = (e: unknown) =>
-  e instanceof Error ? e.message : String(e);
+  errorMessage(e);
 const defaults: ProfileInput = {
   name: "",
   description: "",

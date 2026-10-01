@@ -3,7 +3,7 @@
 // Mermaid diagrams.
 import { createReactBlockSpec, SourceBlockWithPreview } from "@blocknote/react";
 import { useEffect, useRef, useState } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-studio/kit/ui";
 import { htmlConfig } from "../schema-config";
 import { plainSource } from "./mermaid";
 import { useDarkMode } from "./shared";

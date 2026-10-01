@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 // @bb-studio/emoji-react — frontend.
 //
 // Port of NeonPilot's system-reply-actions extension for bb:
@@ -34,9 +35,9 @@ import {
   type PluginMessageActionContext,
   type PluginMessageDirectiveProps,
 } from "@get-bb/plugin-sdk/app";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
-import { Input } from "@/components/ui/input";
+import { Button } from "@bb-studio/kit/ui";
+import { Icon } from "@bb-studio/kit/ui/huge-icon";
+import { Input } from "@bb-studio/kit/ui";
 import {
   MAX_EMOJI_ITEMS,
   parseEmojiItems,
@@ -328,7 +329,7 @@ function EmojiReactionsSettings() {
     } catch (error) {
       toast.error(
         `Couldn't save reactions: ${
-          error instanceof Error ? error.message : String(error)
+          errorMessage(error)
         }`,
       );
     } finally {

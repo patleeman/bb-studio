@@ -11,8 +11,8 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { TalkRpcContract } from "../shared/contract";
 import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, tail } from "../shared/format";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { useDraggable } from "./draggable";
 

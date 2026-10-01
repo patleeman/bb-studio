@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { describeHttpFailure, jevRoutes, type JevProviderSettings, type JevRoute } from "./jev-providers";
 import { commandToken, forgetCommandToken, hasCommandToken } from "./key-command";
@@ -178,7 +179,7 @@ export async function askSystemOne(
       return { answers: await askRoute(route, state, request.questions, timeoutMs, signal), via: route.name };
     } catch (error) {
       signal.throwIfAborted();
-      failures.push(error instanceof Error ? error.message : String(error));
+      failures.push(errorMessage(error));
     }
   }
   throw new Error(failures.join(" "));

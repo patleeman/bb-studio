@@ -1,6 +1,7 @@
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { errorMessage } from "@bb-studio/kit/format";
 // Studio Artifacts (plugin id `artifacts`): keep the files agents make.
 //
 // Backend entry. Saving is explicit: an agent calls `artifacts_save` (or
@@ -205,7 +206,7 @@ export default async function plugin(bb: BbPluginApi) {
       const storage = await bb.sdk.threads.storageLocation({ threadId });
       roots.push({ kind: "storage", hostId: storage.hostId, path: storage.storageRootPath });
     } catch (error) {
-      storageError = error instanceof Error ? error.message : String(error);
+      storageError = errorMessage(error);
     }
     return { projectId: thread.projectId ?? null, roots, storageError };
   }
@@ -379,7 +380,7 @@ export default async function plugin(bb: BbPluginApi) {
             });
           }
         } catch (error) {
-          listError = error instanceof Error ? error.message : String(error);
+          listError = errorMessage(error);
         }
       }
       return { reply, storage, storageError: listError };
@@ -392,7 +393,7 @@ export default async function plugin(bb: BbPluginApi) {
           const result = await saveFromThread({ threadId, path, by: "app" });
           saved.push({ path, artifactId: result.artifact.id, outcome: result.outcome, restored: result.restored ?? false });
         } catch (error) {
-          failed.push({ path, error: error instanceof Error ? error.message : String(error) });
+          failed.push({ path, error: errorMessage(error) });
         }
       }
       return { saved, failed };
@@ -455,7 +456,7 @@ export default async function plugin(bb: BbPluginApi) {
         }
         return `${savedLine(result)}\n\nTo show it in your reply, put this on its own line:\n${directive(result.artifact.id)}`;
       } catch (error) {
-        return { content: [{ type: "text", text: error instanceof Error ? error.message : String(error) }], isError: true };
+        return { content: [{ type: "text", text: errorMessage(error) }], isError: true };
       }
     },
   });
@@ -562,7 +563,7 @@ export default async function plugin(bb: BbPluginApi) {
             });
             return { exitCode: 0, stdout: `${savedLine(result)}\nShow it in your reply with:\n${directive(result.artifact.id)}\n` };
           } catch (error) {
-            return { exitCode: 1, stderr: `${error instanceof Error ? error.message : String(error)}\n` };
+            return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
           }
         }
         case "list": {
@@ -605,7 +606,7 @@ export default async function plugin(bb: BbPluginApi) {
             });
             return { exitCode: 0, stdout: `${destination.path}\n` };
           } catch (error) {
-            return { exitCode: 1, stderr: `${error instanceof Error ? error.message : String(error)}\n` };
+            return { exitCode: 1, stderr: `${errorMessage(error)}\n` };
           }
         }
         case "delete": {

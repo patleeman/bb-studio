@@ -17,7 +17,7 @@ import type {
   Room,
   rpcContract,
 } from "./contract";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 import {
   TabBar,
   ProfileForm,

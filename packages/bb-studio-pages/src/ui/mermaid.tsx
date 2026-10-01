@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 // Mermaid diagrams: the block shows the rendered diagram and edits its source
 // in BlockNote's source popup (click the diagram, or Enter on it).
 import { createReactBlockSpec, SourceBlockWithPreview } from "@blocknote/react";
@@ -74,7 +75,7 @@ function MermaidPreview({ source, children }: { source: string; children(result:
           setSvg(next);
           setError(null);
         })
-        .catch((cause: unknown) => live && setError(cause instanceof Error ? cause.message : String(cause)));
+        .catch((cause: unknown) => live && setError(errorMessage(cause)));
     }, 250);
     return () => {
       live = false;

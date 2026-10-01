@@ -22,7 +22,7 @@ import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
 import { tags } from "@lezer/highlight";
 import { Markdown, experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 import { IconActionTooltip } from "./channel-controls";
 import {
   wrapMarkdown,

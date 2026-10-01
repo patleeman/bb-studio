@@ -7,7 +7,7 @@ import type {
   ChannelAutomation,
   ChannelAutomationRunPage,
 } from "./automation-contract";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 import { EmptyState, ErrorMessage, message, StatusBadge } from "./bot-ui";
 import { Modal } from "./channel-controls";
 import { channelMessageSubPath } from "./channel-links";

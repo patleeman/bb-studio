@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 // Pure helper: the agent-visible context for a task mention. Kept free of bb
 // imports so it can be unit-tested standalone.
 import { HANDOFF_LABELS, STATUS_LABELS, formatDue, taskHref, type Assignee, type HandoffState, type TaskStatus } from "../src/shared";
@@ -15,7 +16,7 @@ export interface MentionTask {
 }
 
 export function mentionContext(task: MentionTask, now = new Date()): string {
-  const title = task.title || "Untitled";
+  const title = untitled(task.title);
   const facts = [STATUS_LABELS[task.status]];
   if (task.assignee) facts.push(task.assignee === "me" ? "assigned to the user" : "assigned to an agent");
   if (task.due) facts.push(`due ${formatDue(task.due, now)} (${task.due})`);

@@ -11,7 +11,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "./contract";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 import { ChannelMembersMenu } from "./channel-members";
 import { railLive, railRoutingCount } from "./channel-rail";
 import { message } from "./bot-ui";

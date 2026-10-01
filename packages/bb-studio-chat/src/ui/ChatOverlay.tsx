@@ -10,7 +10,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { cn, Icon, usePathname } from "@bb-studio/kit/app";
 import { STUDIO_CHAT_FLOAT_EVENT, STUDIO_CHAT_RIGHT_VAR } from "@bb-studio/kit/contract";
-import { errorMessage } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { useEffect, useRef, useState } from "react";
 import type { rpcContract, Viewed } from "../contract";
 import { MENTION_PROVIDER_ID } from "../ids";
@@ -86,7 +86,7 @@ function useFloatEvent() {
 function ViewingChip({ threadId, viewed }: { threadId: string; viewed: Viewed }) {
   const composer = useComposer();
   const writesHere = composer.scope.kind === "thread" && composer.scope.threadId === threadId;
-  const title = viewed.title.trim() || "Untitled";
+  const title = untitled(viewed.title);
   return (
     <div className="studio-chat-viewing mx-3 mt-2 flex items-center gap-2 rounded-md border border-border bg-muted/40 px-2.5 py-1.5 text-xs text-muted-foreground">
       <Icon name={viewed.kindIcon} className="size-3.5 shrink-0" />
@@ -200,7 +200,7 @@ export function ChatOverlay() {
             {viewed ? <Icon name={viewed.kindIcon} className="size-3.5 shrink-0" /> : null}
             <span className="min-w-0 flex-1 truncate">
               {viewed
-                ? `An agent works on "${viewed.title.trim() || "Untitled"}" with you. @mention a bot to hand it off.`
+                ? `An agent works on "${untitled(viewed.title)}" with you. @mention a bot to hand it off.`
                 : "A new thread, kept here while you move around."}
             </span>
             <button

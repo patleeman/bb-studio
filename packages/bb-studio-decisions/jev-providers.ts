@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import { z } from "zod";
 
 /**
@@ -153,7 +154,7 @@ export function jevRoutes(
           ...(Object.keys(headers).length ? { headers } : {}),
         });
       } catch (error) {
-        problems.push(error instanceof Error ? error.message : String(error));
+        problems.push(errorMessage(error));
       }
       continue;
     }

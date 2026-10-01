@@ -41,8 +41,8 @@ import type {
   RoomWork,
   ThreadStatusView,
 } from "./contract";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
+import { Button } from "@bb-studio/kit/ui";
+import { Input } from "@bb-studio/kit/ui";
 import { sharedReads } from "./shared-read";
 import { ErrorMessage, message } from "./bot-ui";
 import { ChannelSidebarRow } from "./channel-sidebar-row";

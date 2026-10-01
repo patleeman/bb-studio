@@ -2,7 +2,7 @@
 // Keep the native row, input, spacing, and theme classes; omit unused actions.
 import type { ReactNode } from "react";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
-import { Input } from "./input";
+import { Input } from "@bb-studio/kit/ui";
 
 export function ResourceToolbar({
   value,

@@ -4,32 +4,27 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { toast } from "sonner";
 import {
   Badge,
-  DANGER_BUTTON,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuSub,
-  DropdownMenuSubContent,
-  DropdownMenuSubTrigger,
   DropdownMenuTrigger,
   EditableTitle,
-  FLOATING,
   FLOATING_BUTTON,
   GHOST_BUTTON,
   ICON_BUTTON,
   Icon,
   ItemHeader,
+  ItemDeleteConfirm,
+  ItemMenu,
+  openNewItemThread,
   OUTLINE_BUTTON,
   PageColumn,
   cn,
   openAppPath,
-  projectName,
   useProjects,
 } from "@bb-studio/kit/app";
-import { mentionPrompt } from "@bb-studio/kit/contract";
-import { errorMessage, plural, relativeTime } from "@bb-studio/kit/format";
+
+import { errorMessage, plural, relativeTime, untitled } from "@bb-studio/kit/format";
 import { Markdown, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
 import {
   HANDOFF_LABELS,
@@ -141,21 +136,11 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
     }
   }
 
-  function newThread() {
-    navigate.toCompose({ initialPrompt: mentionPrompt([{ title: task.title || "Untitled", href: taskHref(taskId) }]), focusPrompt: true });
-  }
+  const thread = { title: untitled(task.title), href: taskHref(taskId) };
 
   const done = task.status === "done";
   const trailing = confirmDelete ? (
-    <div className={cn(FLOATING, "flex items-center gap-1.5 rounded-md py-1 pr-1 pl-3 text-sm")}>
-      <span className="max-sm:hidden">Delete this task?</span>
-      <button type="button" className={DANGER_BUTTON} onClick={() => void remove()}>
-        Delete
-      </button>
-      <button type="button" className={GHOST_BUTTON} onClick={() => setConfirmDelete(false)}>
-        Cancel
-      </button>
-    </div>
+    <ItemDeleteConfirm label="Delete this task?" onDelete={() => void remove()} onCancel={() => setConfirmDelete(false)} />
   ) : (
     <>
       {!done ? (
@@ -166,13 +151,8 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
       <button type="button" className={FLOATING_BUTTON} onClick={() => void move(done ? "todo" : "done")}>
         <Icon name={done ? "RotateCcw" : "CircleCheck"} /> {done ? "Reopen" : "Mark done"}
       </button>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="More" className={ICON_BUTTON}>
-            <Icon name="MoreHorizontal" className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-60">
+      <ItemMenu projects={projects} projectId={task.projectId} onMove={(id) => void update({ projectId: id })} onDelete={() => setConfirmDelete(true)} className="w-60">
+
           {!done && openThreads ? (
             <DropdownMenuItem onSelect={() => void move("done", true)}>
               <Icon name="CircleCheck" className="size-4" /> Mark done and archive threads
@@ -183,7 +163,7 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
               <Icon name="Bot" className="size-4" /> Hand off
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem onSelect={newThread}>
+          <DropdownMenuItem onSelect={() => openNewItemThread(navigate, thread)}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread about this
           </DropdownMenuItem>
           {openThreads ? (
@@ -191,34 +171,16 @@ export function TaskView({ taskId, onBack }: { taskId: string; onBack: (replace?
               <Icon name="Archive" className="size-4" /> Archive {openThreads === 1 ? "thread" : `${openThreads} threads`}
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Icon name="MoveTo" className="size-4" /> Move to project
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Now in {projectName(projects, task.projectId)}</DropdownMenuLabel>
-              {[{ id: null, name: "Global" }, ...projects].map((project) => (
-                <DropdownMenuItem key={project.id ?? "global"} disabled={project.id === task.projectId} onSelect={() => void update({ projectId: project.id })}>
-                  <Icon name={project.id ? "Folder" : "Globe"} className="size-4" /> {project.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
           <DropdownMenuItem onSelect={() => void run(rpc.call("archive", { id: taskId, archived: !task.archived }), "Couldn't archive the task")}>
             <Icon name={task.archived ? "ArchiveRestore" : "Archive"} className="size-4" /> {task.archived ? "Unarchive task" : "Archive task"}
           </DropdownMenuItem>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-            <Icon name="Trash2" className="size-4" /> Delete…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      </ItemMenu>
     </>
   );
 
   return (
     <div className="relative h-full min-h-0">
-      <ItemHeader backLabel="Tasks" onBack={() => onBack()} trailing={trailing} />
+      <ItemHeader backLabel="Tasks" onBack={() => onBack()} thread={confirmDelete ? undefined : thread} trailing={trailing} />
       <PageColumn className="max-w-3xl">
         {task.archived ? (
           <div className="mb-4 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">

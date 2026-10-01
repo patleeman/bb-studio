@@ -5,11 +5,11 @@ import {
   useRpc,
   useSettings,
 } from "@get-bb/plugin-sdk/app";
-import { Button } from "@/components/ui/button";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { Button } from "@bb-studio/kit/ui";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@bb-studio/kit/ui";
 import type { Fallback, rpcContract } from "./contract";
 
-const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+import { errorMessage as errorText } from "@bb-studio/kit/format";
 
 /** Matches the host-rendered settings rows above: copy on the left, control on the right. */
 function Row({ label, description, children }: { label: string; description: ReactNode; children: ReactNode }) {

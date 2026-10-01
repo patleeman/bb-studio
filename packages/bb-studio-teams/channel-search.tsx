@@ -1,8 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import { Markdown, useRpc } from "@get-bb/plugin-sdk/app";
 import type { RoomMessage, rpcContract } from "./contract";
-import { Input } from "./components/ui/input";
-import { Button } from "./components/ui/button";
+import { Input } from "@bb-studio/kit/ui";
+import { Button } from "@bb-studio/kit/ui";
 import { ErrorMessage, message } from "./bot-ui";
 import { Modal } from "./channel-controls";
 

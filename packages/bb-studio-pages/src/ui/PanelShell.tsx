@@ -3,7 +3,7 @@
 // header.
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
-import { Icon } from "@/components/ui/icon";
+import { Icon } from "@bb-studio/kit/ui";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
 import { PagesUiContext } from "./context";

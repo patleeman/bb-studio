@@ -6,8 +6,8 @@
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import { REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
 import { EXPLORE_ICON, explainerEvent, rowState, useMinuteTick, type ExplainerView, type RowState } from "./explore";

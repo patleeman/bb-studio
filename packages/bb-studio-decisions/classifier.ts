@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { Fallback } from "./contract";
@@ -212,7 +213,7 @@ export async function classify(
       return await attempt(signal);
     } catch (error) {
       signal.throwIfAborted();
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       if (!(error instanceof UnavailableError)) deps.warn(`${name} could not classify: ${message}`);
       failures.push(`${name}: ${message}`);
     }

@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 // The explainer lifecycle: find-or-start by key, run a job through its
 // stages (collect context → start worker → write → save), stop, regenerate.
 // BB specifics (threads, timeline) and page writes come in as deps, so this
@@ -271,7 +272,7 @@ export class ExploreService {
       this.deps.changed(saved);
     } catch (error) {
       if (error instanceof Stopped || signal.aborted) return;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       this.deps.log?.warn(`explainer ${active.explainerId} failed: ${message}`);
       this.store.updateJob(active.jobId, { status: "error", label: STAGES.error.label, detail: message, error: message });
       const row = this.store.explainer(active.explainerId);

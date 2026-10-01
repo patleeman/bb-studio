@@ -5,7 +5,7 @@ import {
   useRpc,
 } from "@get-bb/plugin-sdk/app";
 import type { Bot, Job, Room, rpcContract } from "./contract";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 import { InvitePicker, Menu, Modal } from "./channel-controls";
 import { channelWork } from "./channel-work";
 import { ErrorMessage, message } from "./bot-ui";

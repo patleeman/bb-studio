@@ -3,28 +3,24 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
-  DANGER_BUTTON,
-  DropdownMenu,
-  DropdownMenuContent,
   DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  DropdownMenuTrigger,
   FLOATING,
-  FLOATING_BUTTON,
   GHOST_BUTTON,
   ICON_BUTTON,
   Icon,
   ItemHeader,
+  ItemDeleteConfirm,
+  ItemMenu,
+  openNewItemThread,
   cn,
   openAppPath,
   projectName,
   useProjects,
 } from "@bb-studio/kit/app";
-import { mentionPrompt } from "@bb-studio/kit/contract";
+
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
@@ -111,9 +107,7 @@ export function ArtifactViewer({
     void rpc.call("update", { id: artifactId, title }).catch((failure) => toast.error(errorMessage(failure)));
   }
 
-  function newThread() {
-    navigate.toCompose({ initialPrompt: mentionPrompt([{ title: artifact.title, href: artifactHref(artifactId) }]), focusPrompt: true });
-  }
+  const thread = { title: artifact.title, href: artifactHref(artifactId) };
 
   async function copy() {
     try {
@@ -167,17 +161,7 @@ export function ArtifactViewer({
   const facts = `${TYPE_LABELS[version.type]} · ${formatBytes(version.size)}${versions.length > 1 ? ` · v${version.number}` : ""}`;
 
   const trailing = confirmDelete ? (
-    <div className={cn(FLOATING, "flex items-center gap-1.5 rounded-md py-1 pr-1 pl-3 text-sm")}>
-      <span className="max-sm:hidden">
-        Delete this artifact{versions.length > 1 ? ` and its ${versions.length} versions` : ""}?
-      </span>
-      <button type="button" className={DANGER_BUTTON} onClick={() => void remove()}>
-        Delete
-      </button>
-      <button type="button" className={GHOST_BUTTON} onClick={() => setConfirmDelete(false)}>
-        Cancel
-      </button>
-    </div>
+    <ItemDeleteConfirm label={`Delete this artifact${versions.length > 1 ? ` and its ${versions.length} versions` : ""}?`} onDelete={() => void remove()} onCancel={() => setConfirmDelete(false)} />
   ) : (
     <>
       {canToggle ? (
@@ -195,9 +179,6 @@ export function ArtifactViewer({
           ))}
         </div>
       ) : null}
-      <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
-        <Icon name="MessageSquarePlus" /> New thread
-      </button>
       {text || version.type === "image" ? (
         <button type="button" aria-label="Copy" title={version.type === "image" ? "Copy image" : "Copy text"} className={ICON_BUTTON} onClick={() => void copy()}>
           <Icon name="Copy" className="size-4" />
@@ -206,14 +187,9 @@ export function ArtifactViewer({
       <a aria-label="Download" title="Download" className={ICON_BUTTON} href={contentUrl(artifactId, version.id, { download: true })} download={version.name}>
         <Icon name="Download" className="size-4" />
       </a>
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="More" className={ICON_BUTTON}>
-            <Icon name={busy ? "Loading" : "MoreHorizontal"} className={cn("size-4", busy && SPIN)} />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem className="md:hidden" onSelect={newThread}>
+      <ItemMenu projects={projects} projectId={artifact.projectId} onMove={(id) => void move(id)} onDelete={() => setConfirmDelete(true)}>
+
+          <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread
           </DropdownMenuItem>
           {artifact.sourceThreadId ? (
@@ -244,25 +220,7 @@ export function ArtifactViewer({
               </DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : null}
-          <DropdownMenuSub>
-            <DropdownMenuSubTrigger>
-              <Icon name="MoveTo" className="size-4" /> Move to
-            </DropdownMenuSubTrigger>
-            <DropdownMenuSubContent className="max-h-80 w-56 overflow-y-auto">
-              <DropdownMenuLabel className="text-xs text-muted-foreground">Now in {projectName(projects, artifact.projectId)}</DropdownMenuLabel>
-              {[{ id: null, name: "Global" }, ...projects].map((project) => (
-                <DropdownMenuItem key={project.id ?? "global"} disabled={project.id === artifact.projectId} onSelect={() => void move(project.id)}>
-                  <Icon name={project.id ? "Folder" : "Globe"} className="size-4" /> {project.name}
-                </DropdownMenuItem>
-              ))}
-            </DropdownMenuSubContent>
-          </DropdownMenuSub>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem variant="destructive" onSelect={() => setConfirmDelete(true)}>
-            <Icon name="Trash2" className="size-4" /> Delete…
-          </DropdownMenuItem>
-        </DropdownMenuContent>
-      </DropdownMenu>
+      </ItemMenu>
     </>
   );
 
@@ -294,6 +252,7 @@ export function ArtifactViewer({
             </span>
           </>
         }
+        thread={confirmDelete ? undefined : thread}
         trailing={trailing}
       />
       {older ? (

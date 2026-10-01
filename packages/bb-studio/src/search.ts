@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 // Ranking for Studio search: titles match as you type, content matches come
 // from the add-ons and follow them.
 
@@ -27,7 +28,7 @@ const keyOf = (item: Searchable) => `${item.pluginId}:${item.id}`;
 
 /** Lower is better; null when a word of the query isn't in the title. */
 function titleScore(title: string, query: string): number | null {
-  const text = (title.trim() || "Untitled").toLowerCase();
+  const text = (untitled(title)).toLowerCase();
   if (!query.split(/\s+/).every((word) => text.includes(word))) return null;
   if (text === query) return 0;
   if (text.startsWith(query)) return 1;

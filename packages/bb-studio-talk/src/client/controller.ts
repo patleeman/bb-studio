@@ -1,3 +1,4 @@
+import { errorMessage as message } from "@bb-studio/kit/format";
 // The capture controller: one per browser window, living at module scope so it
 // outlives route changes. The app overlay attaches it to RPC and renders it;
 // the composer content script and commands drive it.
@@ -171,9 +172,6 @@ function keyString(key: OutboxKey): string {
   return `${key.recordingId}/${key.sessionId}/${key.index}`;
 }
 
-function message(error: unknown): string {
-  return error instanceof Error ? error.message : String(error);
-}
 
 /** A start that a stop cancelled while it waited on the microphone or server. */
 class StartCancelled extends Error {

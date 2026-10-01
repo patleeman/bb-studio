@@ -1,3 +1,4 @@
+import { errorMessage } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import {
@@ -168,7 +169,7 @@ export default async function plugin(bb: BbPluginApi) {
         ms: Date.now() - started,
       };
     } catch (error) {
-      return { ok: false as const, error: error instanceof Error ? error.message : String(error) };
+      return { ok: false as const, error: errorMessage(error) };
     }
   }
   async function suggestFallback() {
@@ -198,7 +199,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true as const, ...(await run()), ms: Date.now() - started };
     } catch (error) {
       const unavailable = error instanceof UnavailableError;
-      const message = error instanceof Error ? error.message : String(error);
+      const message = errorMessage(error);
       if (!unavailable) bb.log.warn(`${what} for ${caller} failed: ${message}`);
       return { ok: false as const, unavailable, error: message };
     }

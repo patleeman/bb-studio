@@ -1,6 +1,7 @@
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention } from "@bb-studio/kit/server";
+import { errorMessage } from "@bb-studio/kit/format";
 // Studio Tasks (plugin id `studio-tasks`): a board of tasks you can hand to agents.
 //
 // Backend entry. Tasks live in the plugin's SQLite database
@@ -770,7 +771,7 @@ export default async function plugin(bb: BbPluginApi) {
             return fail("unknown command — try: list | add <title> | show <id> | move <id> <status> | hand <id> | done <id>");
         }
       } catch (error) {
-        return fail(error instanceof Error ? error.message : String(error));
+        return fail(errorMessage(error));
       }
     },
   });

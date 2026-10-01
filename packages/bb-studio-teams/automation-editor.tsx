@@ -2,9 +2,9 @@ import { useId, useRef, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
 import type { Bot, rpcContract } from "./contract";
 import type { ChannelAutomation } from "./automation-contract";
-import { Button } from "./components/ui/button";
-import { Input } from "./components/ui/input";
-import { Textarea } from "./components/ui/textarea";
+import { Button } from "@bb-studio/kit/ui";
+import { Input } from "@bb-studio/kit/ui";
+import { Textarea } from "@bb-studio/kit/ui";
 import {
   ActionBar,
   ErrorMessage,

@@ -1,3 +1,4 @@
+import { untitled } from "@bb-studio/kit/format";
 // The first message of a handed-off thread: the task, and its links as real
 // mentions, so each add-on's mention provider hands the agent the item's
 // contents.
@@ -49,7 +50,7 @@ export function handoffInput(
     add(shown);
   };
 
-  add(`Work on this task from Studio Tasks: "${task.title || "Untitled"}"\n`);
+  add(`Work on this task from Studio Tasks: "${untitled(task.title)}"\n`);
   if (task.description.trim()) add(`\n${task.description.trim()}\n`);
   if (task.due) add(`\nDue: ${formatDue(task.due, now)} (${task.due})\n`);
   if (links.length) {

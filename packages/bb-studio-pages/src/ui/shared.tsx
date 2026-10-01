@@ -1,4 +1,5 @@
-import { useSdk, type useRpc } from "@get-bb/plugin-sdk/app";
+import { type useRpc } from "@get-bb/plugin-sdk/app";
+import { untitled } from "@bb-studio/kit/format";
 import { useEffect, useState } from "react";
 import {
   DropdownMenu,
@@ -9,13 +10,15 @@ import {
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Icon } from "@/components/ui/icon";
-import { cn } from "@/lib/utils";
+} from "@bb-studio/kit/ui";
+import { Icon } from "@bb-studio/kit/ui";
+import { cn } from "@bb-studio/kit/ui";
 import type { BotView, PageMetaView, rpcContract } from "../contract";
 
 export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
-export type Project = { id: string; name: string };
+export { useProjects } from "@bb-studio/kit/app";
+export type { Project } from "@bb-studio/kit/app";
+import type { Project } from "@bb-studio/kit/app";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
 // Shared with every Studio plugin, so the chrome matches.
@@ -31,18 +34,6 @@ export function actorName(key: string, bots: BotView[]): string {
 }
 
 export const editedByAgent = (key: string) => key.startsWith("bot:") || key.startsWith("agent:");
-
-export function useProjects(): Project[] {
-  const sdk = useSdk();
-  const [projects, setProjects] = useState<Project[]>([]);
-  useEffect(() => {
-    sdk.projects
-      .list()
-      .then((list) => setProjects((list as { id: string; name: string }[]).map(({ id, name }) => ({ id, name }))))
-      .catch(() => setProjects([]));
-  }, [sdk]);
-  return projects;
-}
 
 /** The page's icon on a soft tile, or a document glyph when it has none. */
 export function IconTile({ page, size = "md" }: { page: PageMetaView; size?: "md" | "lg" }) {
@@ -124,7 +115,7 @@ export function PageMenu({
         <DropdownMenuItem
           className="text-destructive focus:bg-destructive/15 focus:text-destructive"
           onSelect={() => {
-            if (!window.confirm(`Delete "${page.title || "Untitled"}" and every page inside it? This can't be undone.`)) return;
+            if (!window.confirm(`Delete "${untitled(page.title)}" and every page inside it? This can't be undone.`)) return;
             void rpc.call("remove", { id: page.id }).then(() => {
               onChanged();
               onDeleted?.();

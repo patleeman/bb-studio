@@ -1,3 +1,4 @@
+import { errorMessage as errorText, untitled } from "@bb-studio/kit/format";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { CronExpressionParser } from "cron-parser";
 import * as Y from "yjs";
@@ -33,7 +34,7 @@ export function validateCron(cron: string): string | null {
     CronExpressionParser.parse(cron);
     return null;
   } catch (error) {
-    return error instanceof Error ? error.message : String(error);
+    return errorText(error);
   }
 }
 
@@ -314,7 +315,7 @@ export class PagesService {
       "",
       ...lines.slice(1),
       "",
-      `Page: "${page.title || "Untitled"}" (id ${page.id}, ${pageUrl(page.id)}).`,
+      `Page: "${untitled(page.title)}" (id ${page.id}, ${pageUrl(page.id)}).`,
       "Use pages_read to see the page with block ids, pages_edit to change it, and the pages_comment tools to answer in the page. The user sees your edits live.",
     ].join("\n");
   }
@@ -504,4 +505,4 @@ const quote = (text: string) =>
     .map((line) => `> ${line}`)
     .join("\n");
 export const truncate = (text: string, max: number) => (text.length > max ? `${text.slice(0, max - 1)}…` : text);
-export const errorText = (error: unknown) => (error instanceof Error ? error.message : String(error));
+export { errorText };

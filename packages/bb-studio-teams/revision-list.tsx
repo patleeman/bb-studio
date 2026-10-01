@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Button } from "./components/ui/button";
+import { Button } from "@bb-studio/kit/ui";
 export type Revision = {
   id: number;
   text: string;
