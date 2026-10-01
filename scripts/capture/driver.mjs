@@ -329,6 +329,31 @@ export class CdpClient {
     await sleep(700);
   }
 
+  /**
+   * Drags the first element matching `selector` by `dx`, `dy` with real mouse
+   * events, pressing `atX` pixels in from its left edge (default: its middle).
+   */
+  async dragBy(selector, dx, dy, { atX } = {}) {
+    const start = await this.evaluate(`(() => {
+      const element = document.querySelector(${JSON.stringify(selector)});
+      if (!element) throw new Error("Element not found: " + ${JSON.stringify(selector)});
+      const rect = element.getBoundingClientRect();
+      const atX = ${JSON.stringify(atX ?? null)};
+      return { x: rect.left + (atX ?? rect.width / 2), y: rect.top + rect.height / 2 };
+    })()`);
+    await this.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: start.x, y: start.y, buttons: 0 });
+    await this.command("Input.dispatchMouseEvent", { type: "mousePressed", x: start.x, y: start.y, button: "left", buttons: 1, clickCount: 1 });
+    const steps = 12;
+    for (let step = 1; step <= steps; step += 1) {
+      const x = start.x + (dx * step) / steps;
+      const y = start.y + (dy * step) / steps;
+      await this.command("Input.dispatchMouseEvent", { type: "mouseMoved", x, y, button: "left", buttons: 1 });
+      await sleep(16);
+    }
+    await this.command("Input.dispatchMouseEvent", { type: "mouseReleased", x: start.x + dx, y: start.y + dy, button: "left", buttons: 0, clickCount: 1 });
+    await sleep(500);
+  }
+
   async capture(outputPath, clip) {
     const screenshot = await this.command("Page.captureScreenshot", {
       format: "png",

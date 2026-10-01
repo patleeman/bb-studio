@@ -1,20 +1,20 @@
 # Float
 
-Float puts threads, channels, Studio items and views in windows along the
-bottom of the screen, side by side. Plugin id `float`, display name "Float",
+Float puts threads, channels, Studio items and views in one panel of tabs,
+docked at the bottom right or dragged anywhere on screen. Plugin id `float`, display name "Float",
 in `packages/bb-studio-float`. It started as Studio Chat's single floating
 card, which was split out so anything you can open from the sidebar can
-float, and several things at once.
+float, several things at once.
 
 ## Pieces
 
 | Piece | Where |
 |---|---|
-| The windows, the row and thread windows | `packages/bb-studio-float` (`experimental_appOverlay` "dock") |
+| The panel, its tabs and thread tabs | `packages/bb-studio-float` (`experimental_appOverlay` "dock"); state in `src/stack.ts`, UI in `src/Panel.tsx` |
 | The registry between Float and other plugins | `packages/bb-studio-kit/src/app/float-registry.ts`, on `window.__bbStudioFloat_v1` |
 | `openFloat`, `useFloatAvailable`, `useCanFloat`, `FloatPanels`, `FloatThreadLeading`, `FloatDockPortal`, `useInFloat` | `packages/bb-studio-kit/src/app/float.tsx` |
 
-A window's target is a thread (`{ kind: "thread", threadId }`) or an in-app
+A tab's target is a thread (`{ kind: "thread", threadId }`) or an in-app
 path (`{ kind: "path", path }`, e.g. an item's href). A channel is a BB
 thread, so it floats as one.
 
@@ -27,45 +27,55 @@ versioned key, and:
 1. Each plugin that can show paths renders
    `<FloatPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} />`
    from an app overlay. This registers `/plugins/<plugin id>/<path>`.
-2. Float publishes an empty element for each open path window.
-3. The plugin whose registered path is the longest prefix of the window's
+2. Float publishes an empty element for the path tab showing. The kit calls
+   a tab a "window" (`windowKey`, `floatBodies`), from before tabs.
+3. The plugin whose registered path is the longest prefix of the tab's
    path portals its panel into that element, with the rest of the path as
    `subPath`, just as BB passes it to a nav panel. The portal carries
    `data-bb-plugin-root` and `data-bb-plugin` so the plugin's CSS applies.
 
 Inside the portal, `useInFloat()` is true, so a view can skip what only fits
-its own screen. Pages, for example, doesn't move the windows or float its
-chat from inside a window.
+its own screen. Pages, for example, doesn't move the panel or float its
+chat from inside the panel.
 
-## Other plugins in the row
+## Other plugins
 
-- `FloatDockPortal` renders at the right end of the row; Studio Chat's
-  "Work with this…" bar and composer sit there, and the windows fit around
-  them.
-- `FloatThreadLeading` renders above each thread window's messages; Studio
-  Chat's "Viewing" chip uses it.
-- `openFloat(target, { minimized, tag })`: a tag swaps a still-minimized
-  window opened under the same tag, so Studio Chat bringing back each item's
-  chat doesn't stack a window per item.
-- `--studio-float-right` on the root element moves the row left; Pages sets
-  it while its comments card is open.
+- `FloatDockPortal` renders in Float's bottom-right corner; Studio Chat's
+  "Work with this…" bar and composer sit there, and a docked panel sits to
+  their left.
+- `FloatThreadLeading` renders above a thread tab's messages; Studio Chat's
+  "Viewing" chip uses it.
+- `openFloat(target, { minimized, tag })`: `minimized` opens the tab behind
+  the one showing (folded, in an empty panel). A tag swaps the tab opened
+  under the same tag unless you're looking at it, so Studio Chat bringing
+  back each item's chat doesn't add a tab per item.
+- `--studio-float-right` on the root element moves the corner and a docked
+  panel left; Pages sets it while its comments card is open.
 - The older `bb-studio:chat:float` window event still floats a thread.
 
 ## Layout
 
-New windows join at the right. An open window is 400px wide, a minimized
-one 240px. Counting from the newest, windows show while they fit beside the
-corner content; the rest go in a menu at the left end. The newest always
-shows, so phones get one full-width window. State is per browser window in
-session storage: the list, each window's minimized flag and tag, and whether
-the windows are hidden (Mod+Shift+J).
+- **Tabs.** New tabs join at the end and show. One tab shows at a time, and
+  only it is mounted, so switching reloads the tab. Tabs reorder by dragging
+  (pointer events, committed on drop). While every tab fits at 96px, all
+  are labeled; past that, the tab showing keeps its label and the others
+  are 32px icons, as many as fit around it. The ⋯ menu lists every tab. At
+  most 12; past that the oldest closes, never the one showing.
+- **Place.** Docked, the panel is 400px wide at the bottom right, left of
+  the corner content. Dragging the header (anywhere that isn't a tab or a
+  button) pulls it free. A free panel is stored by its left edge and its gap
+  above the screen's bottom, so it grows upward when it opens, as it does
+  docked, and it's clamped onto the screen when the screen shrinks. Dropped
+  less than 48px above the bottom, it docks; an outline shows where.
+- **State.** Per browser window in session storage: the tabs and their tags,
+  the tab showing, folded, hidden (Mod+Shift+J), and the place.
 
 ## Limits
 
 - **Navigation.** A floated panel's `useBbNavigate()` and links drive the main
   route, since BB gives the portal no router of its own.
-- **One item twice.** An item open both in a window and in the main view runs
+- **One item twice.** An item open both in the panel and in the main view runs
   two editors, each saving on its own.
-- **Window actions.** BB has no slot in its own thread menu or next to the
+- **Float actions.** BB has no slot in its own thread menu or next to the
   sidebar toggle, so Float is offered in Studio Sidebar's, Studio Teams' and
   Studio's own row menus and in the palette.

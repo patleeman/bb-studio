@@ -10,28 +10,27 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await cleanup();
       };
       try {
-        // Over a Studio item, the chat is a bar named for its kind, in Float's row.
+        // Over a Studio item, the chat is a bar named for its kind, in Float's corner.
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.evaluate(`sessionStorage.removeItem("bb-studio-float:windows")`);
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.waitForSelector("canvas.excalidraw__canvas");
         await client.waitForSelector(".float-corner .studio-chat-bar");
         await client.waitForText("Work with this drawing…");
-        // The seeded thread's sidebar menu floats it into a Float window.
+        // The seeded thread's sidebar menu floats it into a Float tab.
         const title = await client.evaluate(
           `(async () => { const body = await (await fetch("/api/v1/threads/${threadId}")).json(); const thread = body.thread ?? body; return thread.title ?? thread.titleFallback ?? ""; })()`,
           true,
         );
-        if (!title) throw new Error("The seeded thread has no title to check the window header against");
+        if (!title) throw new Error("The seeded thread has no title to check the Float tab against");
         await client.openThreadContextMenu();
         await client.waitForSelector('[role="menuitem"]');
         await client.clickElementWithTextAndPointer('[role="menuitem"]', "Float");
-        // Studio Chat names the drawing on screen in the thread's window.
-        const window = `[data-float-window="thread:${threadId}"]`;
-        await client.waitForSelector(`${window} .studio-chat-viewing`);
+        // Studio Chat names the drawing on screen in the thread's tab.
+        await client.waitForSelector(`[data-float-window="thread:${threadId}"] .studio-chat-viewing`);
         await client.waitForText("Viewing: Checkout flow");
-        const header = await client.evaluate(`document.querySelector('${window} .float-title')?.innerText ?? ""`);
-        if (!header.includes(title)) throw new Error(`The Float window shows "${header}", not the seeded thread "${title}"`);
+        const tab = await client.evaluate(`document.querySelector('[data-float-tab="thread:${threadId}"][aria-selected="true"] .float-tab-title')?.innerText ?? ""`);
+        if (!tab.includes(title)) throw new Error(`The showing Float tab is "${tab}", not the seeded thread "${title}"`);
         await client.waitForSelector("canvas.excalidraw__canvas");
         await sleep(1500);
       } catch (error) {

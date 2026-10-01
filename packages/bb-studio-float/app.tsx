@@ -1,12 +1,12 @@
-// bb-studio-float frontend: the windows along the bottom of the screen, and
-// commands to float what's on screen and to put the windows away.
+// bb-studio-float frontend: the panel of floated tabs, and commands to float
+// what's on screen and to put the panel away.
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { floatPanelFor } from "@bb-studio/kit/app";
 import { Dock } from "./src/Dock";
 import { update } from "./src/store";
-import { openWindow, toggleHidden } from "./src/windows";
+import { openTab, toggleHidden } from "./src/stack";
 
-/** The view on screen as a window: another plugin's panel, else the thread. */
+/** The view on screen as a tab: another plugin's panel, else the thread. */
 function currentTarget(threadId: string | null) {
   const path = window.location.pathname;
   if (floatPanelFor(path)) return { kind: "path" as const, path };
@@ -21,12 +21,12 @@ export default definePluginApp((app) => {
     isAvailable: ({ threadId }) => currentTarget(threadId) !== null,
     run: ({ threadId }) => {
       const target = currentTarget(threadId);
-      if (target) update((state) => openWindow(state, target));
+      if (target) update((state) => openTab(state, target));
     },
   });
   app.commands.register({
     id: "toggle",
-    title: "Float: show or hide windows",
+    title: "Float: show or hide the floating tabs",
     defaultShortcut: { key: "j", mod: true, shift: true },
     run: () => update(toggleHidden),
   });

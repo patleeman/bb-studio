@@ -23,12 +23,13 @@ of Float's row.
   "Work with this page…", "…this drawing…", and so on by kind. It opens BB's
   new-thread composer in the item's project. The message starts with a pill
   for the item, and the agent gets a note saying what it is and which tools
-  read and change it. The new thread opens in a Float window, or in BB's own
+  read and change it. The new thread opens as a Float tab, or in BB's own
   view without Float.
 - **Chats come back.** Each item remembers the last thread used on it, so
-  reopening it brings its chat back as a minimized Float window. Moving on to
-  another item swaps that window for the next item's chat, unless you opened it.
-- **Viewing chip.** Every Float thread window shows which Studio item is on
+  reopening it brings its chat back as a Float tab behind the one showing.
+  Moving on to another item swaps that tab for the next item's chat, unless
+  you're looking at it.
+- **Viewing chip.** Every Float thread tab shows which Studio item is on
   screen.
 - **Pages hands over.** With Studio Chat installed, Studio Pages drops its own
   "Work with this page…" box. Page chats still start through Pages, so they

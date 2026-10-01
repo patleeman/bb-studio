@@ -1,13 +1,13 @@
-// Where floating windows meet the plugins that fill them.
+// Where floating tabs meet the plugins that fill them.
 //
-// The Float plugin draws the windows: their frames, the row along the bottom
-// of the screen, and threads, which BB's ThreadChat renders anywhere. Any
-// other content belongs to another plugin, and BB has no way to embed one
-// plugin's view in another's. So each plugin registers the panel paths it can
-// show, the Float plugin publishes an empty element per window, and the plugin
-// that owns the window's path portals its panel into it. Every plugin bundles
-// its own copy of the kit, so the registry lives on `window` under a versioned
-// key and every copy uses the same shape.
+// The Float plugin draws the panel of floated tabs, and threads, which BB's
+// ThreadChat renders anywhere. Any other content belongs to another plugin,
+// and BB has no way to embed one plugin's view in another's. So each plugin
+// registers the panel paths it can show, the Float plugin publishes an empty
+// element for the tab showing, and the plugin that owns the tab's path
+// portals its panel into it. Every plugin bundles its own copy of the kit, so
+// the registry lives on `window` under a versioned key and every copy uses
+// the same shape. ("Window" in the names below means a floated tab.)
 
 /** What a window shows: a thread, or an in-app path such as an item's href. */
 export type FloatTarget =
@@ -15,12 +15,12 @@ export type FloatTarget =
   | { kind: "path"; path: string; title?: string; icon?: string };
 
 export interface FloatOpenOptions {
-  /** Open as a title bar along the bottom, not expanded. */
+  /** Open as a tab behind the one showing (folded, if it's the only one). */
   minimized?: boolean;
   /**
-   * Stands in for whichever window a caller opened last under the same tag,
-   * while that window is still minimized: e.g. Studio Chat bringing back the
-   * chat of each item you look at without stacking a window per item.
+   * Stands in for whichever tab a caller opened last under the same tag,
+   * unless you're looking at it: e.g. Studio Chat bringing back the chat of
+   * each item you look at without adding a tab per item.
    */
   tag?: string;
 }

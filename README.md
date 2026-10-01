@@ -19,7 +19,7 @@ agent.
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bots that work together in channels, delegate, and keep their own workspaces and memory. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | "Work with this…" on every Studio item: a thread that knows what you're looking at. |
-| [Float](packages/bb-studio-float/) | `float` | Windows along the bottom of the screen for any thread, channel, Studio item or view. Keep several open while you work. |
+| [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
 | [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the Studio rows Studio and Studio Sidebar already open. Rows from BB and other plugins stay. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
@@ -63,8 +63,8 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - studio-tables: structured tables with views and CSV import and export
    - bot-teams: persistent bots in channels
    - studio-chat: "Work with this…" on Studio items
-   - float: windows along the bottom of the screen for threads, channels
-     and Studio items
+   - float: a panel of tabs for threads, channels and Studio items, docked
+     or dragged anywhere
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
    - studio-navigation: Studio Navigation; it replaces BB's sidebar navigation
      without the Studio rows that Studio and Studio Sidebar already open

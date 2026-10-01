@@ -1,7 +1,7 @@
 // The windows of this browser window. sessionStorage keeps them across a
 // reload without one window's floats following you into another.
 import { useSyncExternalStore } from "react";
-import { EMPTY, parseState, type FloatState } from "./windows";
+import { EMPTY, parseState, type FloatState } from "./stack";
 
 const KEY = "bb-studio-float:windows";
 

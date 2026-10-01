@@ -102,7 +102,7 @@ export function FloatThreadLeading({ render }: { render(threadId: string): React
   );
 }
 
-/** Renders `children` at the right end of the windows' row; null without one. */
+/** Renders `children` in Float's bottom-right corner; null without Float. */
 export function FloatDockPortal({ children }: { children: ReactNode }) {
   const pluginId = experimental_usePluginId();
   useFloatRevision();

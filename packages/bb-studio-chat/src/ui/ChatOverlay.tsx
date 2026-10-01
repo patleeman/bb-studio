@@ -1,7 +1,7 @@
 // Studio Chat: over a Studio item, a "Work with this…" bar that starts a
-// thread about it, and the item's last chat brought back. Threads show in
-// Float's windows, which this plugin adds a "Viewing" chip to; the bar sits
-// at the right end of Float's row, or on its own without Float.
+// thread about it, and the item's last chat brought back. Threads show as
+// Float tabs, which this plugin adds a "Viewing" chip to; the bar sits in
+// Float's bottom-right corner, or on its own without Float.
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   useBbNavigate,
@@ -19,7 +19,7 @@ import { HEADER_BUTTON } from "./styles";
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
 const CARD = "pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl";
-/** Float windows opened for "the item's chat" replace each other while minimized. */
+/** Float tabs opened for "the item's chat" replace each other while you're not looking at them. */
 const ITEM_CHAT_TAG = "studio-chat:item";
 
 /** The Studio item on screen, or null; each path is asked once. */
@@ -40,7 +40,7 @@ function useViewing(rpc: Rpc, path: string): Viewed | null {
   return viewed?.item ?? null;
 }
 
-/** Brings back the chat last used on the item, minimized, when it comes on screen. */
+/** Brings back the chat last used on the item, as a background tab, when it comes on screen. */
 function useItemChat(rpc: Rpc, viewed: Viewed | null, floatAvailable: boolean) {
   const key = viewed ? itemKey(viewed) : null;
   useEffect(() => {
@@ -93,7 +93,7 @@ function ViewingChip({ threadId, viewed }: { threadId: string; viewed: Viewed })
   );
 }
 
-/** The bar or composer: in Float's row, or bottom right on its own. */
+/** The bar or composer: in Float's corner, or bottom right on its own. */
 function Corner({ children }: { children: ReactNode }) {
   const floatAvailable = useFloatAvailable();
   if (floatAvailable) return <FloatDockPortal>{children}</FloatDockPortal>;
