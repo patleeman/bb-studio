@@ -41,9 +41,11 @@ export function HomePanel({ tab }: { tab: "today" | "activity" }) {
   const [error, setError] = useState<string | null>(null);
   const refresh = useCallback(() => {
     let cursor = 0;
-    void rpc.call("changes", { since: 0 }).then((checkpoint) => { cursor = checkpoint.cursor; return rpc.call("home", { projectId: context.projectId ?? undefined, periodDays }); })
+    // RPC input must be JSON, so leave projectId out rather than sending undefined.
+    const input = context.projectId ? { projectId: context.projectId, periodDays } : { periodDays };
+    void rpc.call("changes", { since: 0 }).then((checkpoint) => { cursor = checkpoint.cursor; return rpc.call("home", input); })
       .then((home) => { setData(home); setError(null); return rpc.call("changes", { since: cursor }); })
-      .then((later) => { if (later.reset || later.changes.length) void rpc.call("home", { projectId: context.projectId ?? undefined, periodDays }).then(setData); })
+      .then((later) => { if (later.reset || later.changes.length) void rpc.call("home", input).then(setData); })
       .catch((cause: unknown) => setError(errorMessage(cause)));
   }, [context.projectId, periodDays, rpc]);
   const respond = useCallback(async (entry: NonNullable<Home["needsYou"]>[number], action: "approve" | "deny" | "answer", answer?: string) => {

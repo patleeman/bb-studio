@@ -17,7 +17,7 @@ the kind filters and New menu in the header.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
-Studio search (Cmd/Ctrl+K) over the same staged project, searching
+Studio search (Cmd/Ctrl+Shift+K) over the same staged project, searching
 "offline sync": a task matches on its title, and another task, an HTML
 artifact and two pages match on their content, each showing the matching
 text with the match in bold.
@@ -38,9 +38,9 @@ text with the match in bold.
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their
   length and word count.
-- **Search from anywhere.** Cmd/Ctrl+K (or **Studio: Search everything**
+- **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
-  page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening the inbox, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
+  page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening Home, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
   page text, transcripts, drawing text, artifact files, task notes, bot
   descriptions — and the row shows the text that matched. With nothing typed
   it lists recently changed items. ↑↓ and ↵ open one.

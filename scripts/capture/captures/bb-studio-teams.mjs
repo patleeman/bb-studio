@@ -232,13 +232,24 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     fileName: "bots-collection.png",
     setup: async (client) => {
       await client.navigate("/");
-      await client.waitForText("Teams");
-      await client.evaluate(`(() => {
-        const button = Array.from(document.querySelectorAll('[data-sidebar="sidebar"] button'))
-          .find((candidate) => candidate.textContent.trim() === 'Teams');
-        if (!button) throw new Error('Teams navigation is missing');
-        button.click();
+      await client.waitForText("New thread");
+      // BB pins a few nav panels and moves the rest under More.
+      const pinned = await client.evaluate(`(() => {
+        const buttons = Array.from(document.querySelectorAll('[data-sidebar="sidebar"] button'));
+        const button = buttons.find((candidate) => candidate.textContent.trim() === 'Teams');
+        if (button) { button.click(); return true; }
+        buttons.find((candidate) => candidate.textContent.trim() === 'More')?.click();
+        return false;
       })()`);
+      if (!pinned) {
+        await client.waitForText("Customize sidebar");
+        await client.evaluate(`(() => {
+          const item = Array.from(document.querySelectorAll('[role="dialog"] button'))
+            .find((candidate) => candidate.textContent.trim() === 'Teams');
+          if (!item) throw new Error('Teams navigation is missing');
+          item.click();
+        })()`);
+      }
       await client.waitForAriaButton("Filter bots");
       await client.waitForAriaButton("Sort bots");
       await client.waitForText("Research and verify the facts");

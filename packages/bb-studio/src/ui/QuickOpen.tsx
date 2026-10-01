@@ -57,7 +57,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   useEffect(() => {
     let live = true;
     setLoading(true);
-    const timer = setTimeout(() => rpc.call("searchAll", { query: query.trim(), kinds: threadOnly ? ["thread"] : undefined, limit: 40 }).then(
+    const timer = setTimeout(() => rpc.call("searchAll", { query: query.trim(), ...(threadOnly ? { kinds: ["thread"] } : {}), limit: 40 }).then(
       (hits) => { if (live) { setResults(hits); setError(null); setLoading(false); } },
       (cause: unknown) => { if (live) { setError(cause instanceof Error ? cause.message : "Search failed."); setLoading(false); } },
     ), query ? DEBOUNCE_MS : 0);
@@ -77,7 +77,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       ...([ ["page", "New page"], ["recording", "New recording"], ["drawing", "New drawing"], ["task", "New task"] ] as const)
         .filter(([kind]) => providers.some((provider) => provider.state === "ready" && provider.kinds.some((each) => each.id === kind && each.capabilities?.create)))
         .map(([kind, label]) => create(kind, label)),
-      { type: "command", label: "Open Inbox", run: () => { onClose(); openAppPath("/plugins/bot-teams/channels"); } },
+      { type: "command", label: "Open Home", run: () => { onClose(); openAppPath("/plugins/studio/studio"); } },
       { type: "command", label: "Hand to agent", run: () => { onClose(); navigate.toCompose({ initialPrompt: results[0] ? mentionPrompt([results[0]]) : "", focusPrompt: true }); } },
       { type: "command", label: "Go to thread", run: () => { setThreadOnly(true); setQuery(""); } },
     ] satisfies Row[];

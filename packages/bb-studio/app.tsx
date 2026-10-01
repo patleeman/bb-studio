@@ -19,7 +19,7 @@ export default definePluginApp((app) => {
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",
-    defaultShortcut: { key: "k", mod: true },
+    defaultShortcut: { key: "k", mod: true, shift: true },
     run: toggleQuickOpen,
   });
 });

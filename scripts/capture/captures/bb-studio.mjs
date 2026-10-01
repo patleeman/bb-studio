@@ -99,11 +99,11 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
         }
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search studio"]');
-        // Open Studio search with its real shortcut, Mod+K.
+        // Open Studio search with its real shortcut, Mod+Shift+K.
         const modifiers = process.platform === "darwin" ? 4 : 2;
         // rawKeyDown: a shortcut with no text, as a real keyboard sends it.
         for (const type of ["rawKeyDown", "keyUp"]) {
-          await client.command("Input.dispatchKeyEvent", { type, modifiers, key: "K", code: "KeyK", windowsVirtualKeyCode: 75 });
+          await client.command("Input.dispatchKeyEvent", { type, modifiers: modifiers | 8, key: "K", code: "KeyK", windowsVirtualKeyCode: 75 });
         }
         await client.waitForSelector('.studio-quick-open [role="dialog"][aria-label="Search Studio"]');
         await client.waitForText("Recently changed");

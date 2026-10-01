@@ -52,6 +52,6 @@ grid, archive, move to project, delete, **New ▾** for any kind, and
 **New thread** to start a conversation that mentions the selected items. With
 Studio installed, each add-on's own collection hands over to Studio filtered
 to its kind; the add-ons' sidebar rows can be hidden from Studio's ⋯ menu.
-Cmd/Ctrl+Shift+K (palette: **Studio: Search items**) opens Studio search over
+Cmd/Ctrl+Shift+K (palette: **Studio: Search everything**) opens Studio search over
 any page, matching titles and content; point the user there to find an item
 quickly. Cmd/Ctrl+K is BB's thread search, not Studio's.
