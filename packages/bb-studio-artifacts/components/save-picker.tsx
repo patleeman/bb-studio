@@ -1,4 +1,4 @@
-// "Save to Studio" in a thread's side panel: the files a reply made and the
+// "Artifacts" in a thread's side panel: the files a reply made and the
 // thread's storage files, to tick and save, and what this thread has saved.
 // Opened from a message's action bar (params `{ seq }`) or the panel launcher
 // (the latest reply).
@@ -28,7 +28,7 @@ export function pickerSeq(params: unknown): number | null {
 export function SavePicker({ threadId, params }: PluginThreadPanelProps) {
   const [openId, setOpenId] = useState<string | null>(null);
   const back = useCallback(() => setOpenId(null), []);
-  if (openId) return <ArtifactViewer artifactId={openId} backLabel="Save to Studio" onBack={back} />;
+  if (openId) return <ArtifactViewer artifactId={openId} backLabel="Artifacts" onBack={back} />;
   const seq = pickerSeq(params);
   // Another reply is another list: start its selection afresh.
   return <PickerList key={`${threadId}:${seq}`} threadId={threadId} seq={seq} onOpen={setOpenId} />;

@@ -45,7 +45,8 @@ with the Preview/Source toggle, New thread, Copy, Download and the ⋯ menu.
   **Save to Studio**, which opens a side panel with the files that reply created,
   changed, or generated, with the new ones already ticked. The panel also lists
   the thread's storage files and what the thread has already saved. The same
-  panel is in the thread panel launcher, where it shows the latest reply.
+  panel is **Artifacts** in the thread panel launcher, where it shows the
+  latest reply.
 - **Capture from iPhone.** The Capture sheet accepts a photo or file and saves
   it directly as an artifact in the selected default project.
 - **Agents save too.** The `artifacts_save`, `artifacts_list` and

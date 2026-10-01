@@ -4,7 +4,7 @@
 //   - navPanel "Artifacts": Studio's collection of artifacts, and the viewer
 //     at artifacts/<id>. With Studio installed, Studio's page takes over.
 //   - messageAction "Save to Studio": opens the picker below for that reply.
-//   - threadPanelAction "Save to Studio": the files a reply made and the
+//   - threadPanelAction "Artifacts": the files a reply made and the
 //     thread's storage files, to save; and what the thread already saved.
 //   - messageDirective `::artifact{id="art_…"}`: a card in a reply.
 //   - mention provider (server): `@artifact` works in every composer.
@@ -28,7 +28,7 @@ export default definePluginApp((app) => {
 
   app.slots.threadPanelAction({
     id: PICKER,
-    title: "Save to Studio",
+    title: "Artifacts",
     icon: SAVE_ICON,
     layout: "flush",
     component: SavePicker,
@@ -39,7 +39,7 @@ export default definePluginApp((app) => {
     title: "Save to Studio",
     icon: SAVE_ICON,
     run: ({ message, openPanel }) => {
-      const opened = openPanel({ actionId: PICKER, title: "Save to Studio", params: { seq: message.sourceSeqEnd } });
+      const opened = openPanel({ actionId: PICKER, title: "Artifacts", params: { seq: message.sourceSeqEnd } });
       if (!opened) toast.error("Open this thread on its own to save its files.");
     },
   });
