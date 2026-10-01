@@ -35,7 +35,8 @@ struct NewThreadView: View {
                 Section("Workspace") {
                     Picker("Use", selection: $workspace) {
                         Text("Project default").tag("default")
-                        if !environments.isEmpty { Text("New worktree").tag("worktree") }
+                        if checkoutHostId != nil { Text("Project checkout").tag("checkout") }
+                        if worktreeHostId != nil { Text("New worktree").tag("worktree") }
                         ForEach(environments.filter { $0.status == "ready" }) { environment in
                             Text(environment.label).tag(environment.id)
                         }
@@ -170,11 +171,22 @@ struct NewThreadView: View {
     }
 
     private var selectedWorkspace: NewThreadWorkspace {
-        if workspace == "worktree", let hostId = environments.first?.hostId {
+        if workspace == "checkout", let hostId = checkoutHostId {
+            return .projectCheckout(hostId: hostId)
+        }
+        if workspace == "worktree", let hostId = worktreeHostId {
             let branch = baseBranch.trimmingCharacters(in: .whitespacesAndNewlines)
             return .worktree(hostId: hostId, baseBranch: branch.isEmpty ? nil : branch)
         }
         if environments.contains(where: { $0.id == workspace }) { return .reuse(workspace) }
         return .projectDefault
+    }
+
+    private var checkoutHostId: String? {
+        environments.first { $0.status == "ready" && $0.environmentProviderId == "project-checkout" }?.hostId
+    }
+
+    private var worktreeHostId: String? {
+        environments.first { $0.status == "ready" && $0.isGitRepo == true && $0.environmentProviderId == "project-checkout" }?.hostId
     }
 }

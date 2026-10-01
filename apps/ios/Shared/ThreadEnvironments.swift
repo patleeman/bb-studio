@@ -8,12 +8,15 @@ public struct ThreadEnvironment: Decodable, Identifiable, Sendable {
     public var path: String?
     public var branchName: String?
     public var status: String
+    public var environmentProviderId: String?
+    public var isGitRepo: Bool?
 
     public var label: String { name ?? branchName ?? path ?? id }
 }
 
 public enum NewThreadWorkspace: Sendable {
     case projectDefault
+    case projectCheckout(hostId: String)
     case worktree(hostId: String, baseBranch: String?)
     case reuse(String)
 
@@ -21,6 +24,9 @@ public enum NewThreadWorkspace: Sendable {
         switch self {
         case .projectDefault:
             return ["type": "project-default"]
+        case .projectCheckout(let hostId):
+            return ["type": "provider", "environmentProviderId": "project-checkout",
+                    "machine": ["type": "existing", "hostId": .string(hostId)], "inputs": [:]]
         case .worktree(let hostId, let branch):
             let selection: JSONValue = branch.map { ["kind": "named", "name": .string($0)] } ?? ["kind": "default"]
             return ["type": "provider", "environmentProviderId": "git-worktree",

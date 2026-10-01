@@ -19,6 +19,7 @@ final class WorkflowUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Workspace"].exists)
         app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Use'")).firstMatch.tap()
+        XCTAssertTrue(app.buttons["Project checkout"].exists)
         XCTAssertTrue(app.buttons["New worktree"].waitForExistence(timeout: 5))
         app.buttons["New worktree"].tap()
         XCTAssertTrue(app.textFields["Base branch (project default)"].exists)
