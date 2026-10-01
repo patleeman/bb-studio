@@ -3489,6 +3489,54 @@
         "additionalProperties": false
       }
     },
+    "spaceOfPage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "space": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "name": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "name"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "space"
+        ],
+        "additionalProperties": false
+      }
+    },
     "spaceCreate": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

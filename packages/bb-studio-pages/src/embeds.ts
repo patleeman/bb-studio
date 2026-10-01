@@ -122,6 +122,13 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
     space(id: string) {
       return call(STUDIO_PLUGIN_ID, "spaceWidget", { id }, spaceWidgetSchema).catch(() => null);
     },
+    /** The space whose page this is; null when it's none's or Studio is gone. */
+    async spaceOfPage(pageId: string) {
+      const schema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), pageId: z.string().nullable().optional() })) });
+      const result = await call(STUDIO_PLUGIN_ID, "spaces", null, schema).catch(() => null);
+      const space = result?.spaces.find((each) => each.pageId === pageId);
+      return space ? { id: space.id, name: space.name } : null;
+    },
     async createInSpace(id: string, pluginId: string, kind: string) {
       const result = await call(STUDIO_PLUGIN_ID, "createInSpace", { id, pluginId, kind }, z.object({ href: z.string() }));
       index.invalidate();

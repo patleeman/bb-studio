@@ -218,6 +218,7 @@ export default async function plugin(bb: BbPluginApi) {
     boardTaskCreate: ({ boardId, title, status }) => embeds.createBoardTask(boardId, title, status),
     recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
     spaceView: async ({ id }) => ({ view: await embeds.space(id) }),
+    spaceOfPage: async ({ id }) => ({ space: await embeds.spaceOfPage(id) }),
     spaceCreate: ({ id, pluginId, kind }) => embeds.createInSpace(id, pluginId, kind),
     markdown: ({ id }) => {
       requireMeta(id);

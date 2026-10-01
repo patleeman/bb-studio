@@ -19,6 +19,7 @@ export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 export { useProjects } from "@bb-studio/kit/app";
 export type { Project } from "@bb-studio/kit/app";
 import type { Project } from "@bb-studio/kit/app";
+import { spaceDialog } from "./space-embeds";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
 // Shared with every Studio plugin, so the chrome matches.
@@ -71,8 +72,11 @@ export function PageMenu({
     await rpc.call("update", { id: page.id, ...patch });
     onChanged();
   };
+  // A space's page is the space: its settings and deleting it are the space's.
+  const [space, setSpace] = useState<{ id: string; name: string } | null>(null);
+  const loadSpace = () => rpc.call("spaceOfPage", { id: page.id }).then(({ space }) => (setSpace(space), space), () => null);
   return (
-    <DropdownMenu>
+    <DropdownMenu onOpenChange={(open) => open && void loadSpace()}>
       <DropdownMenuTrigger asChild>
         <button
           type="button"
@@ -85,6 +89,14 @@ export function PageMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56" onClick={(event) => event.stopPropagation()}>
         {leading}
+        {space ? (
+          <>
+            <DropdownMenuItem onSelect={() => spaceDialog(space.id, "edit")}>
+              <Icon name="Settings" className="size-4" /> Space settings
+            </DropdownMenuItem>
+            <DropdownMenuSeparator />
+          </>
+        ) : null}
         {page.parentId ? (
           <DropdownMenuItem onSelect={() => void update({ parentId: null })}>
             <Icon name="ChevronLeft" className="size-4" /> Move to top level
@@ -108,13 +120,17 @@ export function PageMenu({
             ))}
           </DropdownMenuSubContent>
         </DropdownMenuSub>
-        <DropdownMenuItem onSelect={() => void update({ archived: !page.archived })}>
-          <Icon name="Archive" className="size-4" /> {page.archived ? "Restore from archive" : "Archive"}
-        </DropdownMenuItem>
+        {space && !page.archived ? null : (
+          <DropdownMenuItem onSelect={() => void update({ archived: !page.archived })}>
+            <Icon name="Archive" className="size-4" /> {page.archived ? "Restore from archive" : "Archive"}
+          </DropdownMenuItem>
+        )}
         <DropdownMenuSeparator />
         <DropdownMenuItem
           className="text-destructive focus:bg-destructive/15 focus:text-destructive"
-          onSelect={() => {
+          onSelect={async () => {
+            const home = space ?? (await loadSpace());
+            if (home) return spaceDialog(home.id, "delete");
             if (!window.confirm(`Delete "${untitled(page.title)}" and every page inside it? This can't be undone.`)) return;
             void rpc.call("remove", { id: page.id }).then(() => {
               onChanged();
@@ -122,7 +138,7 @@ export function PageMenu({
             });
           }}
         >
-          <Icon name="Trash2" className="size-4" /> Delete
+          <Icon name="Trash2" className="size-4" /> {space ? "Delete space" : "Delete"}
         </DropdownMenuItem>
       </DropdownMenuContent>
     </DropdownMenu>

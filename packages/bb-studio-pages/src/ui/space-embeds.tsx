@@ -70,7 +70,7 @@ function useSpace(id: string): SpaceWidgetView | null | undefined {
 }
 
 /** Opens one of Studio's dialogs for the space. */
-function spaceDialog(spaceId: string, dialog: "edit" | "items" | "threads" | "channels" | "projects") {
+export function spaceDialog(spaceId: string, dialog: "edit" | "delete" | "items" | "threads" | "channels" | "projects") {
   const event = new CustomEvent(SPACE_DIALOG_EVENT, { detail: { spaceId, dialog }, cancelable: true });
   window.dispatchEvent(event);
   if (!event.defaultPrevented) toast.error("Studio isn't available to change the space.");

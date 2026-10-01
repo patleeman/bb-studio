@@ -301,6 +301,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: itemId }),
     output: z.object({ view: spaceWidgetSchema.nullable() }),
   },
+  /** The space whose page this is, through Studio; null for any other page or without Studio. */
+  spaceOfPage: {
+    input: z.object({ id: pageId }),
+    output: z.object({ space: z.object({ id: z.string(), name: z.string() }).nullable() }),
+  },
   /** An item made in a space from its actions widget; returns where to open it. */
   spaceCreate: {
     input: z.object({ id: itemId, pluginId: z.string().min(1).max(100), kind: z.string().min(1).max(100) }),

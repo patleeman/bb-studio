@@ -22,6 +22,7 @@ public enum Pages {
     public static let boardRename = "boardRename"
     public static let boardTaskCreate = "boardTaskCreate"
     public static let spaceView = "spaceView"
+    public static let spaceOfPage = "spaceOfPage"
     public static let spaceCreate = "spaceCreate"
     public static let recordingView = "recordingView"
     public static let markdown = "markdown"
@@ -88,6 +89,8 @@ public enum Pages {
   public typealias BoardTaskCreate = BoardTaskCreateOutput
 
   public typealias SpaceView = SpaceViewOutput
+
+  public typealias SpaceOfPage = SpaceOfPageOutput
 
   public typealias SpaceCreate = SpaceCreateOutput
 
@@ -2274,6 +2277,32 @@ public enum Pages {
 
     public init(view: SpaceViewOutputView? = nil) {
       self.view = view
+    }
+  }
+
+  public struct SpaceOfPageInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct SpaceOfPageOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct SpaceOfPageOutput: Sendable, Hashable, Codable {
+    public var space: SpaceOfPageOutputSpace?
+
+    public init(space: SpaceOfPageOutputSpace? = nil) {
+      self.space = space
     }
   }
 
