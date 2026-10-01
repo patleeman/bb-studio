@@ -46,13 +46,18 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         let center = UNUserNotificationCenter.current()
         center.delegate = self
         NotificationActions.register()
-        // `-skipPushPrompt YES` keeps the permission alert out of headless simulator runs.
-        guard !UserDefaults.standard.bool(forKey: "skipPushPrompt") else { return true }
+        #if targetEnvironment(simulator)
+        return true
+        #else
+        guard !UserDefaults.standard.bool(forKey: "skipPushPrompt"),
+            PushRegistration.allowed(arguments: ProcessInfo.processInfo.arguments,
+            environment: ProcessInfo.processInfo.environment) else { return true }
         center.requestAuthorization(options: [.alert, .sound, .badge]) { granted, _ in
             guard granted else { return }
             DispatchQueue.main.async { application.registerForRemoteNotifications() }
         }
         return true
+        #endif
     }
 
     func application(
@@ -65,9 +70,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
     }
 
     func application(_ application: UIApplication, didRegisterForRemoteNotificationsWithDeviceToken deviceToken: Data) {
+        #if !targetEnvironment(simulator)
+        guard !UserDefaults.standard.bool(forKey: "skipPushPrompt"),
+            PushRegistration.allowed(arguments: ProcessInfo.processInfo.arguments,
+            environment: ProcessInfo.processInfo.environment) else { return }
         let token = deviceToken.map { String(format: "%02x", $0) }.joined()
         let label = "BB Studio · \(UIDevice.current.name)"
-        Task { try? await BBClient().registerPush(apnsToken: token, label: label) }
+        Task { try? await PushRegistration.shared.register(apnsToken: token, label: label, client: BBClient()) }
+        #endif
     }
 
     func userNotificationCenter(

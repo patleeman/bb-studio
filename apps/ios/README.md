@@ -89,6 +89,7 @@ are unchanged, and old `bbgo://` links still open.
 | Watch app: inbox, last messages, dictated or quick replies, and answering approvals and questions (relayed through the phone) | `Watch/` |
 | Watch complication: needs-you and running counts | `WatchWidgets/` |
 | APNs push relay for BB's push-notifications plugin, with notification categories | `packages/bb-studio-mobile/` |
+| Push registration replaces this install's prior subscription when APNs changes its token. Simulator and QA runs skip registration | `iOS/App/PushRegistration.swift` |
 
 ## Connection
 

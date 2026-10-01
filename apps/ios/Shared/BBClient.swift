@@ -591,18 +591,6 @@ extension BBClient {
     }
 }
 
-// MARK: Push
-
-extension BBClient {
-    /// Registers this device with BB's push-notifications plugin. The token is
-    /// prefixed `apns:` so the bb-plugin-mobile relay can route it to APNs.
-    public func registerPush(apnsToken: String, label: String) async throws {
-        let _: JSONValue = try await rpc(
-            "push-notifications", "pushSubscriptions.add",
-            ["expoPushToken": .string("apns:\(apnsToken)"), "platform": "ios", "deviceLabel": .string(label)])
-    }
-}
-
 extension PermissionMode {
     /// Adds the pending mode to a send body.
     static func apply(_ threadId: String, to body: inout [String: JSONValue]) {
