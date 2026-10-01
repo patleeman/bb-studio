@@ -21,12 +21,18 @@ enum Route: Hashable {
     case bot(id: String)
     /// A Studio space, which opens its page.
     case space(id: String)
+    case feed
+    case feedPost(id: String)
 }
 
 extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
+        if parts == ["plugins", "feed", "feed"] {
+            self = .feed
+            return
+        }
         if parts.count == 5, parts[0] == "plugins", parts[1...3] == ["studio", "studio", "space"] {
             self = .space(id: parts[4].removingPercentEncoding ?? parts[4])
             return
@@ -41,6 +47,7 @@ extension Route {
         case ("studio-tasks", "tasks"): self = .task(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"): self = .bot(id: id)
+        case ("feed", "feed"): self = .feedPost(id: id)
         default: return nil
         }
     }
@@ -135,7 +142,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://space/<id>`,
+    /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://space/<id>`, `bbstudio://feed`, `bbstudio://post/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
         guard AppLink.handles(url) else { return }
@@ -160,6 +167,8 @@ final class AppModel: ObservableObject {
         case "tasks": openStudio(kind: nil, .tasks)
         case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
         case "space": if let id { openStudio(kind: nil, .space(id: id)) }
+        case "feed": open(.feed)
+        case "post": if let id { openFeedPost(id) }
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
@@ -187,6 +196,12 @@ final class AppModel: ObservableObject {
     func open(_ route: Route) {
         tab = .inbox
         path = [route]
+    }
+
+    /// Over the feed, so Back reads the rest of it.
+    func openFeedPost(_ id: String) {
+        tab = .inbox
+        path = [.feed, .feedPost(id: id)]
     }
 
     /// Onto the stack of the tab showing, so Back returns where you were.

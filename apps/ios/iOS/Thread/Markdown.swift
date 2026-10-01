@@ -2,9 +2,9 @@ import SwiftUI
 
 /// Block-level markdown on top of `AttributedString`'s inline parser: headings,
 /// paragraphs, ordered, nested and task lists, quotes, tables, rules and fenced
-/// code, and images. `::artifact{id="…"}` lines become artifact cards and `::inline-vis{…}`
-/// lines show the file they name, and `::task{id="…"}` lines task cards; other directives,
-/// such as `::reactions{…}`, are left out; see `Directive`.
+/// code, and images. `::artifact{id="…"}` lines become artifact cards, `::inline-vis{…}`
+/// lines show the file they name, `::task{id="…"}` lines task cards, and `::post{…}` lines
+/// the feed post they made; other directives, such as `::reactions{…}`, are left out; see `Directive`.
 struct MarkdownText: View {
     let source: String
 
@@ -57,6 +57,8 @@ struct MarkdownText: View {
             InlineVisCard(vis: vis)
         case .task(let id):
             TaskCard(id: id)
+        case .feedPost(let source, let title):
+            FeedPostCard(source: source, title: title)
         case .image(let alt, let src):
             MarkdownImage(alt: alt, src: src)
         }
@@ -165,6 +167,8 @@ enum MarkdownBlock {
     case inlineVis(InlineVis)
     /// A Studio Tasks task, from an agent's `tasks_create`.
     case task(String)
+    /// A `::post{…}` line: the Studio Feed post the reply made.
+    case feedPost(source: String, title: String)
     /// `![alt](src)`, shown below the text of its paragraph.
     case image(alt: String, src: String)
 
@@ -227,6 +231,9 @@ enum MarkdownBlock {
                 } else if directive.name == "task", let id = directive.attributes["id"], StudioTask.isId(id) {
                     flush()
                     blocks.append(.task(id))
+                } else if directive.name == "post", let title = directive.attributes["title"] {
+                    flush()
+                    blocks.append(.feedPost(source: trimmed, title: title))
                 } else if directive.name == "inline-vis" {
                     flush()
                     blocks.append(.inlineVis(InlineVis(directive)))

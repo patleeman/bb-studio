@@ -102,10 +102,14 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         withCompletionHandler completionHandler: @escaping () -> Void
     ) {
         Task {
-            if await !NotificationActions.handle(response),
-                let threadId = response.notification.request.content.userInfo["threadId"] as? String
-            {
-                await MainActor.run { AppModel.shared.openThread(threadId) }
+            let userInfo = response.notification.request.content.userInfo
+            if await !NotificationActions.handle(response) {
+                // A feed post's notification opens the post, not the thread that posted it.
+                if case .feedPost(let id)? = (userInfo["path"] as? String).flatMap(Route.init(href:)) {
+                    await MainActor.run { AppModel.shared.openFeedPost(id) }
+                } else if let threadId = userInfo["threadId"] as? String {
+                    await MainActor.run { AppModel.shared.openThread(threadId) }
+                }
             }
             completionHandler()
         }

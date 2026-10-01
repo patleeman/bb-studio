@@ -17,6 +17,18 @@ final class SpacesTests: XCTestCase {
         XCTAssertNil(Route(href: "/plugins/studio/studio/space/sp_1/items"))
     }
 
+    func testFeedPathsOpenTheFeed() {
+        XCTAssertEqual(Route(href: "/plugins/feed/feed"), .feed)
+        XCTAssertEqual(Route(href: "/plugins/feed/feed/post_1"), .feedPost(id: "post_1"))
+    }
+
+    func testMarkdownShowsAPostLineAsItsCard() {
+        let blocks = MarkdownBlock.parse("Done.\n\n::post{title=\"Build is green\" topic=\"CI\"}")
+        guard case .feedPost(let source, let title) = blocks.last else { return XCTFail("No post card: \(blocks)") }
+        XCTAssertEqual(source, "::post{title=\"Build is green\" topic=\"CI\"}")
+        XCTAssertEqual(title, "Build is green")
+    }
+
     func testOverviewSpacesAndItemSpacesDecode() throws {
         let json = """
             {"id":"sp_1","name":"Launch","color":"#22c55e","icon":"🚀","description":"","defaultProjectId":null,
