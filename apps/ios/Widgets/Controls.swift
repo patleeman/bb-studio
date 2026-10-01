@@ -2,6 +2,7 @@ import AppIntents
 import SwiftUI
 import WidgetKit
 
+/// Control Center, lock screen, and Action button controls that jump straight into BB Studio.
 struct CaptureControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "nyc.plee.bbgo.capture") {
@@ -13,7 +14,6 @@ struct CaptureControl: ControlWidget {
     }
 }
 
-/// Control Center, lock screen, and Action button controls that jump straight into BB Studio.
 struct DictateControl: ControlWidget {
     var body: some ControlWidgetConfiguration {
         StaticControlConfiguration(kind: "nyc.plee.bbgo.dictate") {
