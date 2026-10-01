@@ -255,7 +255,7 @@ export default async function plugin(bb: BbPluginApi) {
     }
   };
   const making = new Map<string, Promise<string | null>>();
-  /** A space's home page, made from the space template if it has none, or one was deleted; null without Pages. */
+  /** A space's home page, made from the space template if it has none, or its page was archived; null without Pages. */
   const spacePage = (id: string): Promise<string | null> => {
     const pending = making.get(id);
     if (pending) return pending;
@@ -288,6 +288,18 @@ export default async function plugin(bb: BbPluginApi) {
     })().finally(() => making.delete(id));
     making.set(id, work);
     return work;
+  };
+  /**
+   * A space is its page: deleting the page deletes the space. Checks the space
+   * pages among the changed ids, or all of them when Pages doesn't say which.
+   * Only Pages answering that a page is gone counts, never Pages being down.
+   */
+  const dropSpacesWithoutPages = async (changed: string[] | null) => {
+    const candidates = spaces.list().filter((space) => space.pageId && (!changed || changed.includes(space.pageId)));
+    const found = await Promise.all(candidates.map((space) => callPages("get", { id: space.pageId }, pageResult).catch(() => undefined)));
+    const deleted = candidates.filter((_, index) => found[index] && !found[index]!.page);
+    for (const space of deleted) spaces.remove(space.id);
+    if (deleted.length) tagsChanged();
   };
   /** A space's page keeps its name and icon. */
   const renamePage = (space: Space) => {
@@ -519,8 +531,6 @@ export default async function plugin(bb: BbPluginApi) {
       return { spaces: holding, inherited: holding.filter((space) => !space.threadIds.includes(threadId)).map((space) => space.id) };
     },
     studio_changed: async ({ pluginId, ids, removed }) => {
-      // A deleted space page is made again from the template when the space next opens.
-      if (pluginId === PAGES_PLUGIN_ID && removed?.length) for (const space of spaces.list()) if (space.pageId && removed.includes(space.pageId)) spaces.setPage(space.id, null);
       await searchIndex.changed(pluginId, ids, removed).catch(() => {});
       if (!ids && !removed) changes.append(null);
       let fresh: HubItem[] | null = [];
@@ -536,6 +546,7 @@ export default async function plugin(bb: BbPluginApi) {
       const byId = new Map(fresh?.map((item) => [item.id, item]));
       for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
       for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
+      if (pluginId === PAGES_PLUGIN_ID) await dropSpacesWithoutPages(ids || removed ? [...(ids ?? []), ...(removed ?? [])] : null);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
       return { ok: true };
     },
