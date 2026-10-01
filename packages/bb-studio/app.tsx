@@ -1,6 +1,7 @@
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind or opens a space, the sidebar's Studio tabs
-// (spaces among them), each thread's spaces in its header, and Studio search.
+// (spaces among them), each thread's spaces under its composer, and Studio
+// search.
 import { FloatPanels } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ManageSpace } from "./src/ui/ManageSpace";
@@ -8,7 +9,7 @@ import { NewSpace } from "./src/ui/NewSpace";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { StudioPanel } from "./src/ui/StudioPanel";
-import { ThreadSpaces } from "./src/ui/ThreadSpaces";
+import { ComposerSpaces } from "./src/ui/ComposerSpaces";
 import { ActivityPanel } from "./src/ui/HomePanel";
 
 function StudioRoot({ subPath }: { subPath: string }) {
@@ -26,8 +27,9 @@ export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "new-space", component: NewSpace });
   app.slots.experimental_appOverlay({ id: "manage-space", component: ManageSpace });
   app.slots.experimental_appOverlay({ id: "quick-open", component: QuickOpen });
-  // Links a thread, channel or direct message back to its spaces.
-  app.slots.experimental_threadHeaderAction({ id: "thread-spaces", title: "Spaces", component: ThreadSpaces });
+  // Links a thread, channel or direct message back to its spaces, and picks
+  // the spaces a new thread joins.
+  app.composer.customize({ id: "thread-spaces", scopes: ["thread", "new-thread"], actions: [{ id: "spaces", component: ComposerSpaces }] });
   app.commands.register({
     id: "search",
     title: "Studio: Search everything",

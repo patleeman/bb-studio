@@ -146,6 +146,21 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   });
+  // Spaces picked in a new-thread composer join the thread its user starts
+  // there, with the first message, as a profile picked there does in Teams.
+  const PENDING_SPACES_MS = 10 * 60_000;
+  const pendingSpaces = new Map<string, { ids: string[]; at: number }>();
+  bb.experimental_hooks.on("message.dispatch", (context) => {
+    const pending = pendingSpaces.get(context.project.id);
+    if (!pending || context.thread.status !== "pending" || context.initiator !== "user" || context.senderThreadId !== null ||
+      context.originPluginId || context.thread.originPluginId) return { action: "proceed" };
+    pendingSpaces.delete(context.project.id);
+    if (Date.now() - pending.at > PENDING_SPACES_MS) return { action: "proceed" };
+    const joined = pending.ids.filter((id) => spaces.get(id));
+    for (const id of joined) spaces.add(id, [{ pluginId: THREAD_REF, id: context.thread.id }]);
+    if (joined.length) tagsChanged();
+    return { action: "proceed" };
+  });
   /** Every window's sidebar refetches its tabs. */
   const tabsChanged = () => bb.realtime.publish(TABS_CHANNEL, {});
 
@@ -553,6 +568,11 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     recentThreads: async () => ({ threads: await recentThreads() }),
+    pendingThreadSpaces: ({ projectId, ids }) => {
+      if (ids.length) pendingSpaces.set(projectId, { ids, at: Date.now() });
+      else pendingSpaces.delete(projectId);
+      return { ok: true };
+    },
     spacesForThread: async ({ threadId }) => {
       const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
       const holding = threadSpaces(threadId, thread?.projectId ?? null);

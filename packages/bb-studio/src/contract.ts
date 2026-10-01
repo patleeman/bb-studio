@@ -194,6 +194,8 @@ export const rpcContract = defineRpcContract({
   spaceThreads: { input: z.object({ id: spaceId }), output: z.object({ threads: z.array(spaceThread) }) },
   /** The spaces a thread is in; `inherited` ones hold it through a project. */
   spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
+  /** Spaces picked in a project's new-thread composer; the next thread started there joins them. */
+  pendingThreadSpaces: { input: z.object({ projectId: z.string().min(1).max(200), ids: z.array(spaceId).max(50) }), output: z.object({ ok: z.boolean() }) },
   /** Where a space opens: its home page, made from the space template if it has none; null without Pages. */
   spacePage: { input: z.object({ id: spaceId }), output: z.object({ href: z.string().nullable() }) },
   /** What a space page's widgets show, for Pages. */
