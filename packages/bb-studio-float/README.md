@@ -51,8 +51,8 @@ into the panel through a portal. The shared kit's `FloatPanels` does this
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 
-[Studio Chat](../bb-studio-chat) puts its New thread and Open thread buttons in Float's
-bottom-right corner, and adds a "Viewing" chip to thread tabs.
+[Studio Chat](../bb-studio-chat) puts its New in Float and Open in Float buttons in
+Float's bottom-right corner, and adds a "Viewing" chip to thread tabs.
 
 More in [docs/float.md](../../docs/float.md).
 

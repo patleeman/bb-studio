@@ -2,9 +2,9 @@
 
 > **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), Studio Chat, and [Studio Teams](../bb-studio-teams).
 
-New thread and Open thread on every page, drawing and other Studio item.
-New thread starts a thread that knows which item you're looking at; Open
-thread brings back one you already have. The item's last chat comes back when
+New in Float and Open in Float on every page, drawing and other Studio item.
+New in Float starts a thread that knows which item you're looking at; Open
+in Float brings back one you already have. The item's last chat comes back when
 you return to it. Threads open as [Float](../bb-studio-float) tabs.
 
 ## Staged preview
@@ -19,12 +19,13 @@ of Float's row.
 
 ## What you get
 
-- **New thread.** At the bottom right of every Studio item, New thread opens
-  BB's new-thread composer in the item's project. The message starts with a pill
+- **New in Float.** At the bottom right of every Studio item, New in Float
+  opens BB's new-thread composer in the item's project. The message starts with a pill
   for the item, and the agent gets a note saying what it is and which tools
   read and change it. The new thread opens as a Float tab, or in BB's own
-  view without Float.
-- **Open thread.** Next to it, Open thread lists the item's last chat and
+  view without Float, where the buttons read New thread and Open thread.
+  (The item header's own New thread button opens BB's full composer.)
+- **Open in Float.** Next to it, Open in Float lists the item's last chat and
   your recent threads; type to search them all. The one you pick opens as a
   Float tab.
 - **Chats come back.** Each item remembers the last thread used on it, so

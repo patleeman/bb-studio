@@ -10,21 +10,21 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await cleanup();
       };
       try {
-        // Over a Studio item, New thread and Open thread sit in Float's corner.
+        // Over a Studio item, New in Float and Open in Float sit in Float's corner.
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.evaluate(`sessionStorage.removeItem("bb-studio-float:windows")`);
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.waitForSelector("canvas.excalidraw__canvas");
         await client.waitForSelector(".float-corner .studio-chat-bar");
         const bar = await client.evaluate(`document.querySelector(".float-corner .studio-chat-bar").innerText`);
-        if (!bar.includes("New thread") || !bar.includes("Open thread")) throw new Error(`The corner offers "${bar}"`);
-        // Open thread lists recent threads; picking the seeded one opens it as a Float tab.
+        if (!bar.includes("New in Float") || !bar.includes("Open in Float")) throw new Error(`The corner offers "${bar}"`);
+        // Open in Float lists recent threads; picking the seeded one opens it as a Float tab.
         const title = await client.evaluate(
           `(async () => { const body = await (await fetch("/api/v1/threads/${threadId}")).json(); const thread = body.thread ?? body; return thread.title ?? thread.titleFallback ?? ""; })()`,
           true,
         );
         if (!title) throw new Error("The seeded thread has no title to check the Float tab against");
-        await client.clickElementWithTextAndPointer(".studio-chat-bar button", "Open thread");
+        await client.clickElementWithTextAndPointer(".studio-chat-bar button", "Open in Float");
         await client.waitForSelector(`.studio-chat-picker [data-thread-id="${threadId}"]`);
         // A press and release without moving is a click.
         await client.dragBy(`.studio-chat-picker [data-thread-id="${threadId}"]`, 0, 0);

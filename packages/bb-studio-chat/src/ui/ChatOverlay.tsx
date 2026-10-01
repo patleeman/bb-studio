@@ -1,5 +1,6 @@
-// Studio Chat: over a Studio item, "New thread" starts a thread about it and
-// "Open thread" brings back one you have, and the item's last chat comes back
+// Studio Chat: over a Studio item, "New in Float" starts a thread about it and
+// "Open in Float" brings back one you have (without Float, "New thread" and
+// "Open thread" open BB's own view), and the item's last chat comes back
 // by itself. Threads show as Float tabs, which this plugin adds a "Viewing"
 // chip to; the buttons sit in Float's bottom-right corner, or on their own
 // without Float.
@@ -190,7 +191,7 @@ export function ChatOverlay() {
               onClick={compose}
             >
               <Icon name="MessageSquarePlus" className="size-4 shrink-0" />
-              New thread
+              {floatAvailable ? "New in Float" : "New thread"}
             </button>
             <span aria-hidden className="mx-0.5 h-5 w-px bg-border" />
             <button
@@ -199,8 +200,8 @@ export function ChatOverlay() {
               className="flex h-full items-center gap-2 rounded-md px-3 text-muted-foreground hover:bg-state-hover hover:text-foreground"
               onClick={() => setOpen("pick")}
             >
-              <Icon name="MessagesSquare" className="size-4 shrink-0" />
-              Open thread
+              <Icon name="MessageSquare" className="size-4 shrink-0" />
+              {floatAvailable ? "Open in Float" : "Open thread"}
             </button>
           </div>
         )}
