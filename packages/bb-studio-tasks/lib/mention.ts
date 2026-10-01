@@ -13,6 +13,9 @@ export interface MentionTask {
   priority?: string;
   labels?: string[];
   recurrence?: string | null;
+  parentId?: string | null;
+  subtasks?: { total: number; done: number };
+  reminderAt?: number | null;
   handoff: { state: HandoffState; note: string | null } | null;
   /** Labels of what the task links to. */
   links: string[];
@@ -26,6 +29,9 @@ export function mentionContext(task: MentionTask, now = new Date()): string {
   if (task.priority && task.priority !== "none") facts.push(`${task.priority} priority`);
   if (task.labels?.length) facts.push(`labels ${task.labels.join(", ")}`);
   if (task.recurrence) facts.push(`repeats ${task.recurrence}`);
+  if (task.parentId) facts.push(`subtask of ${task.parentId}`);
+  if (task.subtasks?.total) facts.push(`${task.subtasks.done}/${task.subtasks.total} subtasks done`);
+  if (task.reminderAt) facts.push(`reminder ${new Date(task.reminderAt).toISOString()}`);
   const lines = [
     `Studio task "${title}" (id ${task.id}): ${facts.join(", ")}.`,
     `Link to it in replies as [${title.replace(/[[\]]/g, "")}](${taskHref(task.id)}).`,

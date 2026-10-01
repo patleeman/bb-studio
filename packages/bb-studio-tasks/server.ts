@@ -512,6 +512,10 @@ export default async function plugin(bb: BbPluginApi) {
 
   function taskDetails(task: TaskRow): string {
     const lines = [taskLine(task)];
+    if (task.parent_id) lines.push(`Parent: ${task.parent_id}`);
+    const subtasks = store.subtasks(task.id);
+    if (subtasks.total) lines.push(`Subtasks: ${subtasks.done}/${subtasks.total} done`);
+    if (task.reminder_at) lines.push(`Reminder: ${new Date(task.reminder_at).toISOString()}`);
     if (task.description) lines.push(`\n${task.description}`);
     const links = store.links(task.id);
     if (links.length) lines.push(`\nLinked:\n${links.map((link) => `- ${link.label} (${link.target === "thread" ? "thread" : link.plugin_id}${link.href ? `, ${link.href}` : ""})`).join("\n")}`);
@@ -731,7 +735,7 @@ export default async function plugin(bb: BbPluginApi) {
     parameters: z.object({
       title: z.string().trim().min(1).max(300),
       description: z.string().max(20_000).optional(),
-      status: z.enum(["todo", "in_progress", "review"]).optional(),
+      status: statusSchema.optional(),
       due: z.string().optional().describe("A day, like 2026-10-01."),
       assignee: assigneeSchema.optional().describe('"me", "agent", or "bot:<id>".'),
       priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.optional(),
@@ -740,6 +744,7 @@ export default async function plugin(bb: BbPluginApi) {
     execute({ title, description, status, due: rawDue, assignee, priority, labels, parentId, recurrence, reminderAt }, context) {
       const due = rawDue?.trim() || undefined;
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
+      if (status && (status === "done" || !store.statuses(context.projectId ?? null).some((column) => column.id === status))) return { content: [{ type: "text", text: "Use an active project status other than Done." }], isError: true };
       const task = store.create({ title, description, status, due: due ?? null, assignee: assignee ?? null, priority, labels, parentId, recurrence, reminderAt, projectId: context.projectId ?? null, by: "agent" });
       changed(task.id);
       return `Added ${taskLine(task)}\n\nTo show it in your reply, put this on its own line:\n${directive(task.id)}`;
@@ -754,7 +759,7 @@ export default async function plugin(bb: BbPluginApi) {
       "(Studio items, e.g. an artifact's id with pluginId \"artifacts\"). Only the user marks a task done.",
     parameters: z.object({
       id: idSchema.optional(),
-      status: z.enum(["todo", "in_progress", "review"]).optional(),
+      status: statusSchema.optional(),
       note: z.string().max(2000).optional(),
       title: z.string().trim().min(1).max(300).optional(),
       description: z.string().max(20_000).optional(),
@@ -770,6 +775,7 @@ export default async function plugin(bb: BbPluginApi) {
       const task = id ? store.get(id) : threadTask(context.threadId);
       if (!task) return { content: [{ type: "text", text: id ? `Task ${id} not found.` : "This thread isn't working on a task. Pass an id." }], isError: true };
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
+      if (status && (status === "done" || !store.statuses(task.project_id).some((column) => column.id === status))) return { content: [{ type: "text", text: "Use an active project status other than Done." }], isError: true };
       if (title !== undefined || description !== undefined || due !== undefined || priority !== undefined || labels !== undefined || parentId !== undefined || recurrence !== undefined || reminderAt !== undefined || assignee !== undefined) store.update(task.id, { title, description, due, priority, labels, parentId, recurrence, reminderAt, assignee }, "agent");
       for (const link of addLinks ?? []) {
         store.link(task.id, { target: "item", plugin_id: link.pluginId, item_id: link.itemId, label: link.label, href: studioHref(link.pluginId, link.itemId) });
@@ -813,6 +819,9 @@ export default async function plugin(bb: BbPluginApi) {
           priority: task.priority,
           labels: JSON.parse(task.labels) as string[],
           recurrence: task.recurrence,
+          parentId: task.parent_id,
+          subtasks: store.subtasks(task.id),
+          reminderAt: task.reminder_at,
           handoff: handoff ? { state: handoff.state, note: handoff.note } : null,
           links: store.links(task.id).map((link) => link.label),
         }),
