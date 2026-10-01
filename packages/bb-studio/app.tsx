@@ -4,11 +4,12 @@ import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { QuickOpen, toggleQuickOpen } from "./src/ui/QuickOpen";
 import { SidebarTabs } from "./src/ui/SidebarTabs";
 import { StudioPanel } from "./src/ui/StudioPanel";
-import { HomePanel } from "./src/ui/HomePanel";
+import { ActivityPanel } from "./src/ui/HomePanel";
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
-  return !path || path === "activity" ? <HomePanel tab={path === "activity" ? "activity" : "today"} /> : <StudioPanel subPath={path === "collection" ? "" : path} />;
+  // "collection" is the old address of the landing page.
+  return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path === "collection" ? "" : path} />;
 }
 
 export default definePluginApp((app) => {

@@ -2,10 +2,9 @@
 
 > **Studio** is the core of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: Studio, [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
 
-Home shows work that needs attention, agents working now, recent items, scheduled
-automations and activity. Open **Collection** for everything the Studio add-ons make: pages, Talk
+Studio opens on the collection: everything the Studio add-ons make, including pages, Talk
 recordings and dictations, drawings, and saved artifacts. Search across all of them, filter by
-kind, project and tag, and hand any of them to an agent.
+kind, project and tag, and hand any of them to an agent. Anything that needs you sits above it.
 
 ## Staged preview
 
@@ -14,6 +13,11 @@ kind, project and tag, and hand any of them to an agent.
 Captured from the running BB application: the Studio collection in a staged
 project, listing a page, a Talk recording and a drawing side by side, with
 the kind filters and New menu in the header.
+
+![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
+
+The Studio landing page with two staged tasks: one in review and one due today
+appear in the **Needs you** strip above the collection.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 
@@ -24,23 +28,23 @@ text with the match in bold.
 
 ## What you get
 
-- **Home** (sidebar → Studio) puts **Needs you** first: pending thread approvals
-  and questions, Teams attention, review and due tasks, and unresolved comment
-  replies or mentions. Rows open their source; simple approvals and single-text
-  questions can be answered in place. This is a live view of the sources, with
-  no separate read or done state.
-- Home also brings together due and review tasks, active threads
-  and bots, recent items, today's automations and Studio activity. Sections whose
-  add-ons are unavailable stay hidden. The Activity tab shows measured thread
-  turns, duration and failures, plus Teams bot usage and configured limits.
-  Choose 1, 7 or 30 days. The `home` RPC returns the same data for other clients.
+- **Needs you** sits above the collection, only when something does: pending
+  thread approvals and questions, Teams attention, review and due tasks, and
+  unresolved comment replies or mentions. Rows open their source; simple
+  approvals and single-text questions can be answered in place. This is a live
+  view of the sources, with no separate read or done state.
+- **Activity** (Studio's **…** menu) shows measured thread turns, duration and
+  failures, Teams bot usage and configured limits, and recent Studio changes.
+  Choose 1, 7 or 30 days. The `home` RPC returns this data, plus due and review
+  tasks, active threads and bots, recent items and today's automations, for
+  other clients such as the iOS app's Today view.
 - **One collection** (sidebar → Studio): every add-on's items in one list or
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their
   length and word count.
 - **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
-  page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening Home, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
+  page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening Studio, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —
   page text, transcripts, drawing text, artifact files, task notes, bot
   descriptions — and the row shows the text that matched. With nothing typed
   it lists recently changed items. ↑↓ and ↵ open one.

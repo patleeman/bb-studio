@@ -77,7 +77,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       ...([ ["page", "New page"], ["recording", "New recording"], ["drawing", "New drawing"], ["task", "New task"] ] as const)
         .filter(([kind]) => providers.some((provider) => provider.state === "ready" && provider.kinds.some((each) => each.id === kind && each.capabilities?.create)))
         .map(([kind, label]) => create(kind, label)),
-      { type: "command", label: "Open Home", run: () => { onClose(); openAppPath("/plugins/studio/studio"); } },
+      { type: "command", label: "Open Studio", run: () => { onClose(); openAppPath("/plugins/studio/studio"); } },
       { type: "command", label: "Hand to agent", run: () => { onClose(); navigate.toCompose({ initialPrompt: results[0] ? mentionPrompt([results[0]]) : "", focusPrompt: true }); } },
       { type: "command", label: "Go to thread", run: () => { setThreadOnly(true); setQuery(""); } },
     ] satisfies Row[];

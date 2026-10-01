@@ -1,8 +1,8 @@
 export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
   {
-    id: "studio-home",
+    id: "studio-needs-you",
     packageDir: "bb-studio",
-    fileName: "home.png",
+    fileName: "needs-you.png",
     privateSidebar: true,
     setup: async (client) => {
       const ids = [];
@@ -19,9 +19,9 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
         }
         await pluginRpc("studio", "recordActivity", { ref: { pluginId: "studio-tasks", id: ids[0] }, actor: { kind: "user" }, verb: "updated", at: Date.now(), summary: "QA Review launch copy is ready" });
         await client.navigate("/plugins/studio/studio");
-        for (const label of ["Needs you", "Due today and overdue", "In review", "Recent items", "Activity", "QA Ship onboarding guide", "QA Review launch copy"]) await client.waitForText(label);
-        const needs = await client.evaluate(`(() => { const heading = [...document.querySelectorAll("h2")].find((node) => node.textContent === "Needs you"); return heading?.closest("section")?.innerText ?? ""; })()`);
-        if (!needs.includes("QA Ship onboarding guide") || !needs.includes("QA Review launch copy")) throw new Error("Home did not derive the staged task requests");
+        for (const label of ["Needs you", "QA Ship onboarding guide", "QA Review launch copy"]) await client.waitForText(label);
+        const needs = await client.evaluate(`document.querySelector('section[aria-label="Needs you"]')?.innerText ?? ""`);
+        if (!needs.includes("QA Ship onboarding guide") || !needs.includes("QA Review launch copy")) throw new Error("The collection's Needs you strip did not show the staged task requests");
         await sleep(600);
       } catch (error) { await cleanup(); throw error; }
       return cleanup;

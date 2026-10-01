@@ -1,11 +1,11 @@
 import SwiftUI
 
-/// The Studio landing page. The collection remains one tap away.
+/// Studio opens on the collection; Today (what needs you, due and recent work) is one tap away.
 struct StudioHomeView: View {
     @EnvironmentObject private var app: AppModel
     @State private var home: Studio.HomeOutput?
     @State private var error: String?
-    @State private var collection = false
+    @State private var collection = true
     @State private var answering: Studio.HomeOutputNeedsYouItem?
     @State private var answer = ""
 
@@ -15,7 +15,8 @@ struct StudioHomeView: View {
                 StudioView()
                     .toolbar {
                         ToolbarItem(placement: .topBarLeading) {
-                            Button("Home") { collection = false }
+                            Button { collection = false } label: { Label("Today", systemImage: "sun.max") }
+                                .accessibilityIdentifier("studioToday")
                         }
                     }
             } else {
@@ -112,7 +113,7 @@ struct StudioHomeView: View {
                         ProgressView()
                     }
                 }
-                .navigationTitle("Studio")
+                .navigationTitle("Today")
                 .toolbar {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button { collection = true } label: { Label("Collection", systemImage: "square.stack") }

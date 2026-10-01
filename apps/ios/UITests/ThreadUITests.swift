@@ -524,12 +524,10 @@ final class ThreadUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 4))
     }
 
-    /// Studio opens on Home; the collection is one tap away.
+    /// Studio opens on the collection.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
-        let collection = app.buttons["studioCollection"]
-        XCTAssertTrue(collection.waitForExistence(timeout: 10), "Collection button")
-        collection.tap()
+        XCTAssertTrue(app.buttons["studioToday"].waitForExistence(timeout: 10), "Studio collection")
     }
 
     /// The socket closes in the background: on return the inbox catches up on what

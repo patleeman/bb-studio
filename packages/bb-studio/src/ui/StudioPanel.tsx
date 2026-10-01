@@ -29,6 +29,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import type { ProviderView, rpcContract, SidebarView, TagView } from "../contract";
 import { applyItemChanges } from "../partial";
+import { NeedsYou } from "./HomePanel";
 
 type Overview = { providers: ProviderView[]; items: CollectionItem[]; tags: TagView[] };
 const TIP_DISMISSED_KEY = "studio:sidebar-tip-dismissed";
@@ -178,7 +179,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
   const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
   const kind = requested === "all" || !data || kinds.some((candidate) => candidate.id === requested) ? requested : "all";
-  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "collection" : encodeURIComponent(next) }), [navigate]);
+  const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
   const nameOf = useCallback((pluginId: string) => providers.find((provider) => provider.pluginId === pluginId)?.name ?? pluginId, [providers]);
 
   const handlers = useMemo<CollectionHandlers>(
@@ -314,6 +315,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const notice = (
     <>
+      <NeedsYou />
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name={provider.state === "outdated" ? "Info" : "AlertTriangle"} className="size-4 shrink-0" />
@@ -337,7 +339,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     </>
   );
 
-  const headerActions = sidebar?.panels.length ? (
+  const headerActions = (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -349,16 +351,24 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add-ons in the sidebar</DropdownMenuLabel>
-        {shownPanels.length ? (
-          <DropdownMenuItem onSelect={() => void setVisible(false)}>
-            <Icon name="EyeOff" className="size-4" /> Hide {sidebar.panels.map((panel) => panel.label).join(", ")}
-          </DropdownMenuItem>
-        ) : null}
-        {shownPanels.length < sidebar.panels.length ? (
-          <DropdownMenuItem onSelect={() => void setVisible(true)}>
-            <Icon name="Eye" className="size-4" /> Show {sidebar.panels.map((panel) => panel.label).join(", ")}
-          </DropdownMenuItem>
+        <DropdownMenuItem onSelect={() => navigate.toPluginPanel("studio", { subPath: "activity" })}>
+          <Icon name="ChartColumn" className="size-4" /> Activity
+        </DropdownMenuItem>
+        {sidebar?.panels.length ? (
+          <>
+            <DropdownMenuSeparator />
+            <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add-ons in the sidebar</DropdownMenuLabel>
+            {shownPanels.length ? (
+              <DropdownMenuItem onSelect={() => void setVisible(false)}>
+                <Icon name="EyeOff" className="size-4" /> Hide {sidebar.panels.map((panel) => panel.label).join(", ")}
+              </DropdownMenuItem>
+            ) : null}
+            {shownPanels.length < sidebar.panels.length ? (
+              <DropdownMenuItem onSelect={() => void setVisible(true)}>
+                <Icon name="Eye" className="size-4" /> Show {sidebar.panels.map((panel) => panel.label).join(", ")}
+              </DropdownMenuItem>
+            ) : null}
+          </>
         ) : null}
         <DropdownMenuSeparator />
         <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add-ons</DropdownMenuLabel>
@@ -370,7 +380,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
-  ) : null;
+  );
 
   if (data && !providers.length) {
     return (

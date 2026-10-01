@@ -8,11 +8,13 @@ final class NewSurfacesUITests: XCTestCase {
         let app = launch()
         app.tabBars.buttons["Studio"].tap()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.buttons["studioCollection"].waitForExistence(timeout: 10))
+        XCTAssertTrue(studioSearch(app).exists)
+        shot(app, "collection")
+        app.buttons["studioToday"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
         shot(app, "home")
         app.buttons["studioCollection"].tap()
-        shot(app, "collection")
-        XCTAssertTrue(studioSearch(app).exists)
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
     }
 
     func testSearch() throws {
@@ -21,7 +23,6 @@ final class NewSurfacesUITests: XCTestCase {
         }
         let app = launch()
         app.tabBars.buttons["Studio"].tap()
-        app.buttons["studioCollection"].tap()
         let search = studioSearch(app)
         XCTAssertTrue(search.exists)
         search.tap()
@@ -83,7 +84,6 @@ final class NewSurfacesUITests: XCTestCase {
         let app = launch()
         app.open(URL(string: "bbstudio://studio")!)
         app.tabBars.buttons["Studio"].tap()
-        app.buttons["studioCollection"].tap()
         XCTAssertTrue(app.staticTexts["QA iOS7 table"].waitForExistence(timeout: 15))
         app.staticTexts["QA iOS7 table"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["studioTable"].waitForExistence(timeout: 10))
