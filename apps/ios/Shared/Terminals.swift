@@ -43,15 +43,11 @@ public struct TerminalSession: Decodable, Identifiable, Hashable, Sendable {
 public enum TerminalScope: Hashable, Sendable {
     case thread(String)
     case environment(String)
-    case host(String, cwd: String?)
 
     var query: String {
         switch self {
         case .thread(let id): "threadId=\(id)"
         case .environment(let id): "environmentId=\(id)"
-        case .host(let id, let cwd):
-            "hostId=\(id)"
-                + (cwd.flatMap { $0.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) }.map { "&cwd=\($0)" } ?? "")
         }
     }
 
@@ -59,19 +55,8 @@ public enum TerminalScope: Hashable, Sendable {
         switch self {
         case .thread(let id): ["kind": "thread", "threadId": .string(id)]
         case .environment(let id): ["kind": "environment", "environmentId": .string(id)]
-        case .host(let id, let cwd): ["kind": "host_path", "hostId": .string(id), "cwd": cwd.map { .string($0) } ?? .null]
         }
     }
-}
-
-/// A machine BB runs agents and terminals on.
-public struct BBHost: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var name: String
-    /// connected or disconnected.
-    public var status: String
-
-    public var isConnected: Bool { status == "connected" }
 }
 
 extension BBClient {
@@ -114,10 +99,6 @@ extension BBClient {
 
     public func closeTerminal(_ id: String) async throws {
         let _: TerminalSession = try await post("/api/v1/terminals/\(id)/close", ["mode": "force", "reason": "user"])
-    }
-
-    public func hosts() async throws -> [BBHost] {
-        try await get("/api/v1/hosts")
     }
 
     /// The socket that streams a terminal's output from `sinceSeq` and takes its input.

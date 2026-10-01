@@ -74,7 +74,7 @@ private struct WorkWidgetView: View {
                 Link(destination: URL(string: "bbstudio://tasks")!) {
                     Label("\(entry.tasks.count) due", systemImage: "calendar")
                 }
-                Link(destination: URL(string: "bbstudio://attention")!) {
+                Link(destination: URL(string: "bbstudio://inbox")!) {
                     Label("\(entry.attention) attention", systemImage: "exclamationmark.bubble")
                 }
                 Label("\(entry.running.count) running", systemImage: "circle.fill")

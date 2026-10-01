@@ -34,12 +34,4 @@ extension BBClient {
     public func attention(status: String = "open", offset: Int = 0) async throws -> AttentionPage {
         try await rpc("bot-teams", "attentionList", ["status": .string(status), "limit": 30, "offset": .from(offset)])
     }
-
-    /// `acknowledge`, `snooze` (with minutes) or `reopen`.
-    @discardableResult
-    public func updateAttention(_ id: String, _ action: String, minutes: Int? = nil) async throws -> AttentionItem {
-        var input: [String: JSONValue] = ["id": .string(id), "action": .string(action)]
-        if let minutes { input["minutes"] = .from(minutes) }
-        return try await rpc("bot-teams", "attentionUpdate", .object(input))
-    }
 }

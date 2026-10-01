@@ -83,10 +83,8 @@ struct RouteDestination: View {
         case .automations: AutomationsView()
         case .automation(let automation): AutomationView(automation: automation).id(automation.id)
         case .usage: UsageView()
-        case .queue: QueueView()
         case .archived: ArchivedView()
         case .drawings: DrawingsView()
-        case .attention: AttentionView()
         case .drawing(let id): DrawingView(id: id)
         case .recording(let id): RecordingDetailView(id: id)
         case .artifact(let id): ArtifactView(id: id)
@@ -94,7 +92,6 @@ struct RouteDestination: View {
         case .task(let id): TaskView(id: id).id(id)
         case .table(let id): StudioTableView(id: id).id(id)
         case .terminals(let scope, let title): TerminalsView(scope: scope, title: title)
-        case .machines: MachinesView()
         case .bot(let id): BotView(id: id)
         }
     }

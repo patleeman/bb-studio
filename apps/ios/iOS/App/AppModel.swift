@@ -9,10 +9,8 @@ enum Route: Hashable {
     case automations
     case automation(Automation)
     case usage
-    case queue
     case archived
     case drawings
-    case attention
     case drawing(id: String)
     case recording(id: String)
     case artifact(id: String)
@@ -20,7 +18,6 @@ enum Route: Hashable {
     case task(id: String)
     case table(id: String)
     case terminals(scope: TerminalScope, title: String)
-    case machines
     case bot(id: String)
 }
 
@@ -128,7 +125,7 @@ final class AppModel: ObservableObject {
         }
     }
 
-    /// `bbstudio://thread/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://queue`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://attention`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://terminals`,
+    /// `bbstudio://thread/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
         guard AppLink.handles(url) else { return }
@@ -138,11 +135,8 @@ final class AppModel: ObservableObject {
         case "thread": if let id { openThread(id) }
         case "page": if let id { openPage(id) }
         case "automations": open(.automations)
-        case "queue": open(.queue)
         case "usage": open(.usage)
         case "archived": open(.archived)
-        case "attention": open(.attention)
-        case "terminals", "terminal": open(.machines)
         case "drawing", "drawings": openStudio(kind: "drawing", id.map { .drawing(id: $0) })
         case "pages": openStudio(kind: "page")
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })

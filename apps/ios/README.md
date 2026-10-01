@@ -13,7 +13,7 @@ are unchanged, and old `bbgo://` links still open.
 
 | Feature | Where |
 |---|---|
-| Home: the BB web sidebar on the phone. Channels, direct messages (current bots, unarchived threads), Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
+| Home: the BB web sidebar on the phone. Automations, Channels (with open attention and approval counts), direct messages (current bots, unarchived threads), Pinned, your project groups in the sidebar's order, then Threads. Running threads first, then most recent activity; child threads nest under their parent; sections collapse | `iOS/Inbox/InboxView.swift` |
 | Swipe and context-menu actions: archive, delete (with confirmation), pin, read/unread, rename (threads, channels and DMs) | `iOS/Inbox/InboxView.swift` |
 | Search across thread titles and messages, active and archived | `iOS/Inbox/InboxView.swift` |
 | New thread with project, provider, model, reasoning, and permissions (the choice becomes the project default, as in the web app) | `iOS/Inbox/NewThreadView.swift` |
@@ -39,24 +39,22 @@ are unchanged, and old `bbgo://` links still open.
 | Studio Tables: read-only list and grid views | `iOS/Studio/TableView.swift` |
 | Edit the whole page as one continuous Markdown text, styled as you type: headings stand out, checkboxes toggle on tap, and Return continues lists. Heading, list, checklist, link, and dictation controls sit above the keyboard. Edits autosave a moment after typing stops; the server rewrites only changed blocks through the live Yjs document, keeps blocks with comments intact, and asks for a reload if the page changed elsewhere. Empty pages open in the editor. Keep updated status and agent activity are visible on the page | `iOS/Pages/PageEditor.swift`, `iOS/Pages/PageTextView.swift`, `iOS/Pages/PageActivity.swift` |
 | Automations: create agent schedules; edit names, prompts and schedules; browse runs by project, run now, pause and resume | `iOS/Tools/AutomationsView.swift`, `iOS/Tools/AutomationEditor.swift` |
-| Queue: every unsent message across threads, including drafts, scheduled sends, automatic retries, and waits on a busy thread, offline host or plugin (with Smart Queue's reason). Send now, edit or cancel | `iOS/Tools/QueueView.swift` |
 | Drafts: long-press Send, then Save as Draft to park a message on the thread until you send it | `Shared/PluginExtras.swift` |
-| Attention: what bots flagged across channels (decisions, blockers, updates). Open, Snoozed and Done; swipe to mark done or snooze, or open the channel. Home shows open attention and approval counts per channel | `iOS/Tools/AttentionView.swift` |
 | Channel approvals: bots' pending tool approvals and questions show in their channel and are answered there | `iOS/Inbox/ChannelView.swift` |
 | Channel controls: New Channel from Home (the Channels section or the compose menu) with name and members. ⋯ → Members & Settings sets the mode (Smart, Directed, Everyone), bot permissions, and members, and archives or deletes. While bots work, a bar says who and Stop cancels it all; a message whose routing failed shows the error and Retry Routing | `iOS/Inbox/ChannelSettings.swift`, `iOS/Inbox/ChannelView.swift` |
 | Channel automations: ⋯ → Automations in a channel lists its scheduled bot prompts. Create or edit one (bot, task, Weekdays/Every day/Every hour/Once/custom cron, timezone), pause or resume, run now, delete, and browse runs with links to the response threads | `Shared/ChannelAutomations.swift`, `iOS/Inbox/ChannelAutomationsView.swift` |
 | Plan reviews: when an agent asks for a Plannotator review, a card opens the review UI; cancel from its menu | `iOS/Thread/PlanReviewSheet.swift` |
 | Custom instructions: edit the text BB adds to every agent's system prompt (Settings → Agents) | `iOS/App/CustomInstructionsView.swift` |
-| Usage: each pooled Claude and Codex account's 5-hour and weekly limits, with reset times | `iOS/Tools/UsageView.swift` |
+| Usage, in Settings: each pooled Claude and Codex account's 5-hour and weekly limits, with reset times | `iOS/Tools/UsageView.swift` |
 | Send later: long-press Send for 30 minutes, 1 hour, 3 hours, tomorrow at 9, or a picked time | `iOS/Thread/SendLater.swift` |
 | Side chat: ask about one message in a hidden fork without derailing the thread | `MessageBubble` |
 | Host settings: keep the Mac awake, and how many threads run at once | `iOS/Tools/ServerControls.swift` |
 | Installed plugin status and errors in Settings → Plugins | `iOS/Tools/PluginStatusView.swift` |
 | Files & changes: a thread's uncommitted changes with diffs, a file browser, file search, and file previews (images, rendered Markdown, text) | `iOS/Thread/FilesView.swift` |
 | Pull request status and link for the workspace branch, when BB finds one | `iOS/Thread/FilesView.swift` |
-| Terminals: BB's persistent terminals, from a thread's ⋯ menu (its workspace) or Home → Terminals (any connected machine). A full VT terminal (SwiftTerm) with a key bar for Esc, Ctrl, Tab and arrows; new shell or run a command; rename, restart, close, paste, copy output, text size. Reconnects replay only missed output, and the shell keeps running when you leave | `iOS/Terminal/`, `Shared/Terminals.swift` |
+| Terminals: BB's persistent terminals, from a thread's ⋯ menu (its workspace). A full VT terminal (SwiftTerm) with a key bar for Esc, Ctrl, Tab and arrows; new shell or run a command; rename, restart, close, paste, copy output, text size. Reconnects replay only missed output, and the shell keeps running when you leave | `iOS/Terminal/`, `Shared/Terminals.swift` |
 | Edit the last message you sent, retry a failed turn, fork, inspect context usage, compact, clear context with confirmation, and resend a recent prompt | `ThreadView`, `iOS/Thread/ThreadContextView.swift`, `iOS/Thread/PromptHistoryView.swift` |
-| Archived threads: search, open, and unarchive | `iOS/Tools/ArchivedView.swift` |
+| Archived threads, in Settings: search, open, and unarchive | `iOS/Tools/ArchivedView.swift` |
 | Drawings (in Studio): Excalidraw drawings rendered natively, with zoom, live updates while an agent draws, and share as an image, and rename | `iOS/Tools/DrawingsView.swift` |
 | Create and edit drawings in the full Excalidraw editor inside the app, including pen, shapes, text, moving, deleting, and undo. Empty drawings open in the editor | `iOS/Tools/DrawingsView.swift` |
 | Markdown in replies and your own messages: headings, nested and task lists, quotes, tables, code blocks with Copy, images (`![alt](path)`: files on the thread's host, absolute or from the workspace root, as BB web loads them, or web URLs; tap for full screen), and `@thread` mentions that show the thread's title and open it. Long messages of yours fold at 15 lines with Show more, as in BB web | `iOS/Thread/Markdown.swift`, `iOS/Thread/MarkdownImage.swift`, `iOS/Thread/Messages.swift` |
@@ -87,7 +85,7 @@ are unchanged, and old `bbgo://` links still open.
 | Work widget: tasks due today, bot attention and approvals, and running agents. Tap a task, thread, or review link to open it | `Widgets/WorkWidget.swift` |
 | Spotlight indexes open threads and Studio pages, tasks, recordings, drawings, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
-| URL scheme `bbstudio://thread/<id>`, `page/<id>`, `automations`, `queue`, `usage`, `archived`, `attention`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `terminals`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
+| URL scheme `bbstudio://thread/<id>`, `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
 | One status Live Activity: how many threads need you and how many are running, in the Dynamic Island and on the lock screen | `Widgets/`, `iOS/App/LiveStatus.swift`, `packages/bb-studio-mobile/live.ts` |
 | Opt-in Live Activity for a thread from its menu, plus one while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads, tasks, and pages; add a task, open a page or task, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |

@@ -202,7 +202,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     /// Every Pages block kind, from a built-in page rather than a real one.
-    /// Automations, queue, usage and host settings. Read-only: nothing is run, paused or sent.
+    /// Automations, usage and host settings. Read-only: nothing is run, paused or sent.
     func testTools() {
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
@@ -212,10 +212,6 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
         sleep(2)
         shot("tools-automation")
-        app.open(URL(string: "bbstudio://queue")!)
-        XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 10))
-        sleep(2)
-        shot("tools-queue")
         app.open(URL(string: "bbstudio://usage")!)
         XCTAssertTrue(app.navigationBars["Usage"].waitForExistence(timeout: 10))
         sleep(2)
@@ -314,26 +310,16 @@ final class ThreadUITests: XCTestCase {
         }
     }
 
-    /// Read-only: browses attention, a channel, the queue and custom instructions.
+    /// Read-only: browses a channel and custom instructions.
     func testPluginScreens() {
-        app.open(URL(string: "bbstudio://attention")!)
-        XCTAssertTrue(app.navigationBars["Attention"].waitForExistence(timeout: 10))
-        sleep(2)
-        shot("plugins-attention-open")
-        app.segmentedControls.buttons["Done"].tap()
-        sleep(2)
-        shot("plugins-attention-done")
-        let first = app.cells.firstMatch
-        if first.waitForExistence(timeout: 5) {
-            first.tap()
+        app.open(URL(string: "bbstudio://home")!)
+        let channel = app.buttons.containing(.image, identifier: "number").firstMatch
+        if channel.waitForExistence(timeout: 10) {
+            channel.tap()
             sleep(3)
             shot("plugins-channel")
             app.navigationBars.buttons.element(boundBy: 0).tap()
         }
-        app.open(URL(string: "bbstudio://queue")!)
-        XCTAssertTrue(app.navigationBars["Queue"].waitForExistence(timeout: 10))
-        sleep(2)
-        shot("plugins-queue")
         app.tabBars.buttons["Settings"].tap()
         let instructions = app.buttons["Custom Instructions"]
         if instructions.waitForExistence(timeout: 5) {
@@ -976,12 +962,15 @@ final class ThreadUITests: XCTestCase {
         shot("message-sent-time")
     }
 
+    /// Opens terminals from a scratch thread's menu, named by
+    /// `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
     func testTerminal() throws {
-        app.open(URL(string: "bbstudio://terminals")!)
-        let host = app.buttons.containing(NSPredicate(format: "label CONTAINS 'MegaMac'")).firstMatch
-        XCTAssertTrue(host.waitForExistence(timeout: 10), "machine list")
-        shot("terminal-machines")
-        host.tap()
+        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
+        let more = app.buttons["More"].firstMatch
+        XCTAssertTrue(more.waitForExistence(timeout: 15), "thread")
+        more.tap()
+        app.buttons["Terminals"].tap()
         let create = app.buttons["newTerminal"]
         XCTAssertTrue(create.waitForExistence(timeout: 10), "terminal list")
         create.tap()

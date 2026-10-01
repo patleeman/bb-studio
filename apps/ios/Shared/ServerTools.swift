@@ -123,12 +123,6 @@ extension BBClient {
         return result.threadId
     }
 
-    /// Every queued message on every thread: scheduled sends, retries, and
-    /// messages waiting on a busy thread or an offline host.
-    public func allQueuedMessages() async throws -> [QueuedMessage] {
-        try await get("/api/v1/queued-messages")
-    }
-
     /// Queues the message to go at `date` rather than now.
     public func send(_ threadId: String, text: String, mentions: [Mention] = [], at date: Date) async throws -> SendResult {
         var body: [String: JSONValue] = [

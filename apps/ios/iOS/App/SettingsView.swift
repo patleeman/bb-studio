@@ -29,6 +29,16 @@ struct SettingsView: View {
                 NavigationLink { PluginStatusView() } label: {
                     Label("Plugins", systemImage: "puzzlepiece.extension")
                 }
+                if runningPlugins.split(separator: ",").contains("account-pool") {
+                    NavigationLink { UsageView() } label: {
+                        Label("Usage", systemImage: "gauge.with.dots.needle.33percent")
+                    }
+                }
+            }
+            Section("Threads") {
+                NavigationLink { ArchivedView() } label: {
+                    Label("Archived threads", systemImage: "archivebox")
+                }
             }
             if runningPlugins.split(separator: ",").contains("custom-instructions") {
                 Section("Agents") {

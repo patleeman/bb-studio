@@ -108,39 +108,3 @@ struct TerminalsView: View {
         }
     }
 }
-
-/// Machines to open a terminal on.
-struct MachinesView: View {
-    @EnvironmentObject private var app: AppModel
-    @State private var hosts: [BBHost]?
-    @State private var error: String?
-
-    var body: some View {
-        List {
-            if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-            if let hosts {
-                ForEach(hosts) { host in
-                    NavigationLink(value: Route.terminals(scope: .host(host.id, cwd: nil), title: host.name)) {
-                        Label {
-                            VStack(alignment: .leading) {
-                                Text(host.name)
-                                Text(host.isConnected ? "Connected" : "Offline").font(.caption).foregroundStyle(.secondary)
-                            }
-                        } icon: {
-                            Image(systemName: "desktopcomputer").foregroundStyle(host.isConnected ? .green : .secondary)
-                        }
-                    }
-                    .disabled(!host.isConnected)
-                }
-            } else if error == nil {
-                ProgressView().frame(maxWidth: .infinity)
-            }
-        }
-        .navigationTitle("Terminals")
-        .task {
-            do { hosts = try await app.client.hosts() } catch {
-                self.error = BBClient.describe(error, server: app.client.baseURL)
-            }
-        }
-    }
-}

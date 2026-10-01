@@ -263,9 +263,8 @@ struct InboxView: View {
     @State private var renamingDirect: String?
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
-    /// The server's running plugins, comma-separated; remembered so the tool rows show offline.
+    /// The server's running plugins, comma-separated; remembered so plugin rows show offline.
     @AppStorage("runningPlugins") private var runningPlugins = ""
-    @State private var queuedCount = 0
 
     var body: some View {
         List {
@@ -281,8 +280,11 @@ struct InboxView: View {
                     ContentUnavailableView.search(text: query)
                 }
             } else {
-                if query.isEmpty {
-                    collapsible("tools", "Tools") { tools }
+                // Plain rows under no header, like the sidebar's nav.
+                if query.isEmpty, runningPlugins.split(separator: ",").contains("automations") {
+                    Section {
+                        NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
+                    }
                 }
                 if query.isEmpty, model.botTeams != nil {
                     collapsible("channels", "Channels") {
@@ -420,13 +422,6 @@ struct InboxView: View {
             if let running = try? await app.client.runningPlugins() { runningPlugins = running.sorted().joined(separator: ",") }
             await MutedThreads.shared.refresh()
         }
-        // The queue changes on its own (retries fire, scheduled sends go out).
-        .task(id: app.serverURL) {
-            while !Task.isCancelled {
-                if let queued = try? await app.client.allQueuedMessages() { queuedCount = queued.count }
-                try? await Task.sleep(for: .seconds(60))
-            }
-        }
         .task(id: app.serverURL) {
             model.restore()
             model.attach(app)
@@ -436,25 +431,6 @@ struct InboxView: View {
 
     /// Section expansion survives relaunches, like the sidebar's collapsed groups.
     @AppStorage("collapsedHomeGroups") private var collapsedGroups = ""
-
-    @ViewBuilder
-    private var tools: some View {
-        let plugins = Set(runningPlugins.split(separator: ",").map(String.init))
-        if plugins.contains("automations") {
-            NavigationLink(value: Route.automations) { Label("Automations", systemImage: "clock.arrow.circlepath") }
-        }
-        if plugins.contains("bot-teams") {
-            NavigationLink(value: Route.attention) { Label("Attention", systemImage: "bell.badge") }
-                .badge(model.botTeams?.attentionCounts?.values.reduce(0, +) ?? 0)
-        }
-        NavigationLink(value: Route.queue) { Label("Queue", systemImage: "tray.full") }
-            .badge(queuedCount)
-        if plugins.contains("account-pool") {
-            NavigationLink(value: Route.usage) { Label("Usage", systemImage: "gauge.with.dots.needle.33percent") }
-        }
-        NavigationLink(value: Route.machines) { Label("Terminals", systemImage: "apple.terminal") }
-        NavigationLink(value: Route.archived) { Label("Archived", systemImage: "archivebox") }
-    }
 
     private func expanded(_ id: String) -> Binding<Bool> {
         Binding(
