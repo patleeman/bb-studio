@@ -205,6 +205,14 @@ export const rpcContract = defineRpcContract({
     output: z.object({ markdown: z.string() }),
   },
   /**
+   * Compare the loaded document, then apply the whole page as plain Markdown.
+   * Only changed top-level blocks are rewritten, so ids and comments survive.
+   */
+  editDocument: {
+    input: z.object({ id: pageId, expected: z.string().max(200_000), markdown: z.string().max(200_000) }),
+    output: z.object({ markdown: z.string() }),
+  },
+  /**
    * Saves a version named `snapshotName`, then replaces the whole page with
    * `markdown`. Open editors update live; the change is recorded as an agent's.
    */

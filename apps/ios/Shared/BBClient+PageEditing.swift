@@ -7,13 +7,12 @@ extension BBClient {
         return result.markdown
     }
 
-    public func editPageBlock(_ id: String, expected: String, block: String?, markdown: String) async throws -> String {
+    /// Saves the whole page as plain Markdown; returns the page with block ids as it now is.
+    public func editPageDocument(_ id: String, expected: String, markdown: String) async throws -> String {
         struct Result: Decodable { var markdown: String }
-        var input: [String: JSONValue] = [
-            "id": .string(id), "expected": .string(expected), "markdown": .string(markdown)
-        ]
-        if let block { input["block"] = .string(block) }
-        let result: Result = try await rpc("pages", "editBlock", .object(input))
+        let result: Result = try await rpc("pages", "editDocument", [
+            "id": .string(id), "expected": .string(expected), "markdown": .string(markdown),
+        ])
         return result.markdown
     }
 

@@ -15,6 +15,7 @@ public enum Pages {
     public static let editableMarkdown = "editableMarkdown"
     public static let taskFromCheckbox = "taskFromCheckbox"
     public static let editBlock = "editBlock"
+    public static let editDocument = "editDocument"
     public static let replaceMarkdown = "replaceMarkdown"
     public static let search = "search"
     public static let bots = "bots"
@@ -66,6 +67,8 @@ public enum Pages {
   public typealias TaskFromCheckbox = TaskFromCheckboxOutput
 
   public typealias EditBlock = EditBlockOutput
+
+  public typealias EditDocument = EditDocumentOutput
 
   public typealias ReplaceMarkdown = ReplaceMarkdownOutput
 
@@ -587,6 +590,26 @@ public enum Pages {
   }
 
   public struct EditBlockOutput: Sendable, Hashable, Codable {
+    public var markdown: String?
+
+    public init(markdown: String? = nil) {
+      self.markdown = markdown
+    }
+  }
+
+  public struct EditDocumentInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var expected: String?
+    public var markdown: String?
+
+    public init(id: String? = nil, expected: String? = nil, markdown: String? = nil) {
+      self.id = id
+      self.expected = expected
+      self.markdown = markdown
+    }
+  }
+
+  public struct EditDocumentOutput: Sendable, Hashable, Codable {
     public var markdown: String?
 
     public init(markdown: String? = nil) {

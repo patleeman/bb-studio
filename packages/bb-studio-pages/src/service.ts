@@ -7,6 +7,7 @@ import { listThreads, threadAuthors } from "./comments";
 import { HUMAN_USER_ID, PLUGIN_ID, REALTIME_CHANNEL, type RealtimeEvent } from "./constants";
 import type { PageMetaView, RequestView } from "./contract";
 import { applyEdits, commentAnchors, mentionsIn, readMarkdown, replaceContent, restoreFromState, seedMarkdown, type EditOp, type EditResult } from "./doc";
+import { editDocument } from "./document-edit";
 import { PageHub, type Actor, type LivePage } from "./hub";
 import { shortId } from "./markdown";
 import { PageStore, type PageMeta, type RequestRow } from "./store";
@@ -231,6 +232,18 @@ export class PagesService {
     const op: EditOp = block ? { op: "replace", block, markdown } : { op: "append", markdown };
     applyEdits(page.doc, [op], { client: "rpc" });
     this.hub.flush(page);
+    return readMarkdown(page.doc, { ids: true });
+  }
+
+  /** Applies the whole page as plain Markdown, rewriting only the blocks that changed. */
+  editClientDocument(pageId: string, expected: string, markdown: string): string {
+    if (!this.store.meta(pageId)) throw new Error("Page not found.");
+    const page = this.hub.open(pageId);
+    if (readMarkdown(page.doc, { ids: true }) !== expected) {
+      throw new Error("Page changed while you were editing. Reload and try again.");
+    }
+    const locked = new Set([...commentAnchors(page.doc).values()].map((anchor) => anchor.blockId));
+    if (editDocument(page.doc, markdown, locked, { client: "rpc" }).changed) this.hub.flush(page);
     return readMarkdown(page.doc, { ids: true });
   }
 

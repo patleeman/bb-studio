@@ -256,6 +256,7 @@ export default async function plugin(bb: BbPluginApi) {
     editBlock: ({ id, expected, block, markdown }) => {
       return { markdown: service.editClientBlock(id, expected, block, markdown) };
     },
+    editDocument: ({ id, expected, markdown }) => ({ markdown: service.editClientDocument(id, expected, markdown) }),
     replaceMarkdown: ({ id, markdown, snapshotName }) => {
       requireMeta(id);
       const actor = { key: PLUGIN_RPC_ACTOR, name: "Agent", color: actorColor(PLUGIN_RPC_ACTOR) };

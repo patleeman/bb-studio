@@ -3,7 +3,7 @@ import { afterEach, describe, expect, it } from "vitest";
 import * as Y from "yjs";
 import { HUMAN_USER_ID, PLUGIN_RPC_ACTOR } from "./constants";
 import { rpcContract } from "./contract";
-import { readMarkdown } from "./doc";
+import { addCommentMark, readBlocks, readMarkdown } from "./doc";
 import { PagesService } from "./service";
 import { MIGRATIONS, PageStore } from "./store";
 
@@ -93,5 +93,46 @@ describe("editClientBlock", () => {
     const before = readMarkdown(service.hub.open(page.id).doc, { ids: true });
     service.editClientBlock(page.id, before, undefined, "New note");
     expect(readMarkdown(service.hub.open(page.id).doc)).toContain("New note");
+  });
+});
+
+describe("editClientDocument", () => {
+  const ids = (doc: Y.Doc) => readBlocks(doc).map((block) => block.id);
+
+  it("rewrites only the blocks that changed, keeping the others' ids", () => {
+    const { service } = setup();
+    const page = service.createPage({ projectId: null, parentId: null, title: "Plan", markdown: "# Plan\n\nFirst.\n\nSecond.\n\n- [ ] Ship\n", actor: HUMAN_USER_ID });
+    const doc = service.hub.open(page.id).doc;
+    const [heading, first, second, check] = ids(doc);
+    const expected = readMarkdown(doc, { ids: true });
+
+    const after = service.editClientDocument(page.id, expected, "# Plan\n\nFirst, edited.\n\nNew between.\n\n- [x] Ship\n\nAt the end.\n");
+
+    expect(readMarkdown(doc)).toBe("# Plan\n\nFirst, edited.\n\nNew between.\n\n- [x] Ship\n\nAt the end.\n");
+    expect(after).toBe(readMarkdown(doc, { ids: true }));
+    const now = ids(doc);
+    expect(now[0]).toBe(heading);
+    expect(now[1]).toBe(first);
+    expect(now[2]).toBe(second);
+    expect(now[3]).toBe(check);
+    expect(now).toHaveLength(5);
+  });
+
+  it("deletes removed blocks, rejects stale documents, and protects commented blocks", () => {
+    const { service } = setup();
+    const page = service.createPage({ projectId: null, parentId: null, title: "Plan", markdown: "Keep.\n\nDrop.\n\nDiscussed.\n", actor: HUMAN_USER_ID });
+    const doc = service.hub.open(page.id).doc;
+    const discussed = ids(doc)[2]!;
+    addCommentMark(doc, discussed, "thread-1", "Discussed", "test");
+    let expected = readMarkdown(doc, { ids: true });
+
+    expected = service.editClientDocument(page.id, expected, "Keep.\n\nDiscussed.\n");
+    expect(readMarkdown(doc)).toBe("Keep.\n\nDiscussed.\n");
+    expect(ids(doc)[1]).toBe(discussed);
+
+    expect(() => service.editClientDocument(page.id, "stale", "Keep.\n")).toThrow("Page changed");
+    expect(() => service.editClientDocument(page.id, expected, "Keep.\n\nDiscussed, edited.\n")).toThrow("has comments");
+    expect(() => service.editClientDocument(page.id, expected, "")).toThrow("has comments");
+    expect(readMarkdown(doc)).toBe("Keep.\n\nDiscussed.\n");
   });
 });

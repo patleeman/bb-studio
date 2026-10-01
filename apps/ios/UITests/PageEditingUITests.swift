@@ -15,7 +15,7 @@ final class PageEditingUITests: XCTestCase {
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-ui-ios2-drawing-editor.png"))
     }
 
-    func testBlockEditorFormatsText() {
+    func testPageEditorIsOneContinuousText() {
         let app = XCUIApplication()
         app.launchArguments = ["-qaPageDemo"]
         app.launch()
@@ -23,14 +23,20 @@ final class PageEditingUITests: XCTestCase {
         let edit = app.buttons["Edit page"]
         XCTAssertTrue(edit.waitForExistence(timeout: 10))
         edit.tap()
-        XCTAssertTrue(app.navigationBars["Edit page"].waitForExistence(timeout: 5))
-        app.buttons["pageBlock-11111111-1111-1111-1111-111111111111"].tap()
-        let editor = app.textViews["pageBlockEditor"]
+        let editor = app.textViews["pageEditor"]
         XCTAssertTrue(editor.waitForExistence(timeout: 5))
-        XCTAssertTrue((editor.value as? String)?.contains("Launch plan") == true)
-        app.buttons["Format"].tap()
+        XCTAssertEqual(editor.value as? String, "# Launch plan\n\nShip it", "the whole page, without block markers")
+        // Below the last line, so the cursor lands at the end.
+        editor.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.8)).tap()
+        editor.typeText("\nNext line")
+        try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-ui-page-editor-typing.png"))
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("Ship it\nNext line") == true, String(describing: editor.value))
+        XCTAssertTrue(app.buttons["Checklist"].waitForExistence(timeout: 5), "format bar")
         app.buttons["Checklist"].tap()
-        XCTAssertTrue((editor.value as? String)?.contains("- [ ] Launch plan") == true)
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("- [ ] Next line") == true)
+        editor.typeText("\nThird")
+        XCTAssertTrue((editor.value as? String)?.hasSuffix("- [ ] Next line\n- [ ] Third") == true, "Return continues the checklist")
+        XCTAssertTrue(app.staticTexts["Saved"].waitForExistence(timeout: 5), "autosaves after typing stops")
         let path = "/tmp/qa-ui-ios2-page-editor.png"
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: path))
     }
