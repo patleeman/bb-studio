@@ -12,7 +12,7 @@ struct PluginStatusView: View {
             ForEach(plugins) { plugin in
                 HStack(alignment: .top, spacing: 12) {
                     Image(systemName: !plugin.enabled ? "minus.circle.fill" : plugin.status == "running" ? "checkmark.circle.fill" : "exclamationmark.circle.fill")
-                        .foregroundStyle(!plugin.enabled ? .secondary : plugin.status == "running" ? .green : .orange)
+                        .foregroundStyle(!plugin.enabled ? Color.secondary : plugin.status == "running" ? Color.green : Color.orange)
                         .accessibilityHidden(true)
                     VStack(alignment: .leading, spacing: 4) {
                         Text(plugin.name ?? plugin.id)
