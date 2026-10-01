@@ -12,6 +12,8 @@ public enum Pages {
     public static let studioItems = "studioItems"
     public static let artifactView = "artifactView"
     public static let markdown = "markdown"
+    public static let editableMarkdown = "editableMarkdown"
+    public static let editBlock = "editBlock"
     public static let replaceMarkdown = "replaceMarkdown"
     public static let search = "search"
     public static let bots = "bots"
@@ -56,6 +58,10 @@ public enum Pages {
   public typealias ArtifactView = ArtifactViewOutput
 
   public typealias Markdown = MarkdownOutput
+
+  public typealias EditableMarkdown = EditableMarkdownOutput
+
+  public typealias EditBlock = EditBlockOutput
 
   public typealias ReplaceMarkdown = ReplaceMarkdownOutput
 
@@ -519,6 +525,44 @@ public enum Pages {
   }
 
   public struct MarkdownOutput: Sendable, Hashable, Codable {
+    public var markdown: String?
+
+    public init(markdown: String? = nil) {
+      self.markdown = markdown
+    }
+  }
+
+  public struct EditableMarkdownInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct EditableMarkdownOutput: Sendable, Hashable, Codable {
+    public var markdown: String?
+
+    public init(markdown: String? = nil) {
+      self.markdown = markdown
+    }
+  }
+
+  public struct EditBlockInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var expected: String?
+    public var block: String?
+    public var markdown: String?
+
+    public init(id: String? = nil, expected: String? = nil, block: String? = nil, markdown: String? = nil) {
+      self.id = id
+      self.expected = expected
+      self.block = block
+      self.markdown = markdown
+    }
+  }
+
+  public struct EditBlockOutput: Sendable, Hashable, Codable {
     public var markdown: String?
 
     public init(markdown: String? = nil) {
