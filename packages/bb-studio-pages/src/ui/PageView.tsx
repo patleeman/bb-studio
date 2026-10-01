@@ -203,8 +203,18 @@ function PresenceStack({ presence }: { presence: Presence[] }) {
   );
 }
 
+/** How long a dropped connection waits to say so; a plugin reload reconnects sooner. */
+const CONNECTION_GRACE_MS = 2500;
+
 function ConnectionBadge({ status }: { status: PageConnection["status"] }) {
-  if (status === "connected") return null;
+  const [shown, setShown] = useState(false);
+  useEffect(() => {
+    if (status === "connected") return setShown(false);
+    if (status === "missing") return setShown(true);
+    const timer = setTimeout(() => setShown(true), CONNECTION_GRACE_MS);
+    return () => clearTimeout(timer);
+  }, [status]);
+  if (status === "connected" || !shown) return null;
   return (
     <span className={cn(FLOATING, "flex h-8 items-center gap-1.5 rounded-md px-3 text-xs text-amber-600 dark:text-amber-300")}>
       <span className="size-1.5 rounded-full bg-current" />

@@ -27,7 +27,7 @@ import {
   type CollectionTag,
 } from "@bb-studio/kit/app";
 import { mentionPrompt, STUDIO_REALTIME_CHANNEL, type StudioCreateEventDetail } from "@bb-studio/kit/contract";
-import { errorMessage, plural, untitled } from "@bb-studio/kit/format";
+import { errorMessage, untitled } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -634,12 +634,13 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
 /** What an itemless space holds instead, since threads and projects live on its page. */
 function spaceEmpty(spaces: readonly SpaceView[]): string {
-  const threads = spaces.reduce((sum, each) => sum + each.threadIds.length, 0);
-  const projects = spaces.reduce((sum, each) => sum + each.projectIds.length, 0);
-  const elsewhere = [threads ? plural(threads, "thread") : null, projects ? plural(projects, "project") : null].filter(Boolean);
+  // Added threads may since be archived, so this says what kinds, not how many.
+  const threads = spaces.some((each) => each.threadIds.length);
+  const projects = spaces.some((each) => each.projectIds.length);
+  const elsewhere = [threads ? "threads" : null, projects ? "projects" : null].filter(Boolean).join(" and ");
   const which = spaces.length === 1 ? "this space" : "these spaces";
-  return elsewhere.length
-    ? `No items in ${which}. Its ${elsewhere.join(" and ")} are on its page.`
+  return elsewhere
+    ? `No items in ${which} yet. Its ${elsewhere} are on its page.`
     : `No items in ${which} yet. Open its page to add items, projects, threads and channels.`;
 }
 
