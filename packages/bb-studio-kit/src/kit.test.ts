@@ -4,7 +4,7 @@ import { describe, expect, it } from "vitest";
 import { z } from "zod";
 import { eachId, mentionPrompt, studioSchemas } from "./contract";
 import { plural, relativeTime, snippet, untitled } from "./format";
-import { nextSort, sortItems, toggleSelection, type CollectionItem } from "./app/selection";
+import { groupItems, nextSort, parseSort, formatSort, sortItems, toggleSelection, type CollectionItem } from "./app/selection";
 
 // Every value import must be supplied by the kit package or the BB host.
 const packageJson = JSON.parse(readFileSync(join(import.meta.dirname, "../package.json"), "utf8")) as {
@@ -165,5 +165,26 @@ describe("sorting", () => {
     expect(nextSort({ key: "title", descending: false }, "updatedAt")).toEqual({ key: "updatedAt", descending: true });
     expect(nextSort({ key: "updatedAt", descending: true }, "title")).toEqual({ key: "title", descending: false });
     expect(nextSort({ key: "title", descending: false }, "title")).toEqual({ key: "title", descending: true });
+  });
+  it("stores a sort as text and falls back on junk", () => {
+    expect(parseSort(formatSort({ key: "fact:length", descending: false }))).toEqual({ key: "fact:length", descending: false });
+    expect(parseSort("nonsense")).toEqual({ key: "updatedAt", descending: true });
+  });
+});
+
+describe("grouping", () => {
+  it("shows an item in each of its spaces, in the listed order, and spaceless items last", () => {
+    const items = [item("a", { spaces: ["s2", "s1"] }), item("b"), item("c", { spaces: ["s1"] })];
+    const groups = groupItems(items, "space", { label: (id) => id || "No space", order: ["s1", "s2"] });
+    expect(groups.map((group) => [group.label, group.items.map((each) => each.id)])).toEqual([
+      ["s1", ["a", "c"]],
+      ["s2", ["a"]],
+      ["No space", ["b"]],
+    ]);
+  });
+  it("orders unlisted groups by label", () => {
+    const items = [item("a", { projectId: "p2" }), item("b", { projectId: "p1" }), item("c")];
+    const labels: Record<string, string> = { p1: "Zebra", p2: "Apple", "": "Global" };
+    expect(groupItems(items, "project", { label: (id) => labels[id]! }).map((group) => group.label)).toEqual(["Apple", "Zebra", "Global"]);
   });
 });

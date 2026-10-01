@@ -66,12 +66,15 @@ export function QueryBar({
   vocabulary,
   onChange,
   onOpenFilters,
+  loading = false,
 }: {
   query: Query;
   vocabulary: QueryVocabulary;
   onChange(query: Query): void;
   /** Opens the rail where there's no room for it. */
   onOpenFilters?(): void;
+  /** While the vocabulary loads, no value is flagged as unknown. */
+  loading?: boolean;
 }) {
   const input = useRef<HTMLInputElement>(null);
   const [focused, setFocused] = useState(false);
@@ -120,7 +123,7 @@ export function QueryBar({
         <Icon name="Search" className="ml-1 size-4 shrink-0 text-muted-foreground" />
         {query.filters.map((filter, index) => {
           const { field, value } = describeFilter(filter, vocabulary);
-          const unknown = resolveValue(filter, vocabulary) === undefined;
+          const unknown = !loading && resolveValue(filter, vocabulary) === undefined;
           return (
             <span
               key={`${index}:${filter.field}:${filter.value}`}
@@ -434,28 +437,33 @@ export function FacetRail({
   const archived = query.filters.find((filter) => filter.field === "is" && filter.value.toLowerCase() === "archived");
   return (
     <nav aria-label="Filters" className="max-h-[calc(100vh-2rem)] overflow-auto pb-6 [&>:first-child]:mt-0">
-      <RailHeading
-        action={
-          current ? (
-            <button type="button" aria-label="Save view" title="Save this search as a view" className="rounded p-0.5 hover:bg-state-hover hover:text-foreground" onClick={onSaveView}>
-              <Icon name="Plus" className="size-3.5" />
-            </button>
-          ) : null
-        }
-      >
-        Views
-      </RailHeading>
-      {views.map((view) => (
-        <RailRow
-          key={view.id}
-          label={view.name}
-          active={view.query === current}
-          glyph={<Icon name="Bookmark" className="size-3.5 shrink-0" />}
-          onClick={() => onChange(view.query === current ? { filters: [], text: "" } : parseQuery(view.query))}
-          onRemove={() => onDeleteView(view)}
-        />
-      ))}
-      {!views.length ? <p className="px-2 text-xs text-muted-foreground">{current ? "Save this search with +." : "Filter, then save it here."}</p> : null}
+      {/* Views show once there's one, or a search to save. */}
+      {views.length || current ? (
+        <>
+          <RailHeading
+            action={
+              current ? (
+                <button type="button" aria-label="Save view" title="Save this search as a view" className="rounded p-0.5 hover:bg-state-hover hover:text-foreground" onClick={onSaveView}>
+                  <Icon name="Plus" className="size-3.5" />
+                </button>
+              ) : null
+            }
+          >
+            Views
+          </RailHeading>
+          {views.map((view) => (
+            <RailRow
+              key={view.id}
+              label={view.name}
+              active={view.query === current}
+              glyph={<Icon name="Bookmark" className="size-3.5 shrink-0" />}
+              onClick={() => onChange(view.query === current ? { filters: [], text: "" } : parseQuery(view.query))}
+              onRemove={() => onDeleteView(view)}
+            />
+          ))}
+          {!views.length ? <p className="px-2 text-xs text-muted-foreground">Save this search with +.</p> : null}
+        </>
+      ) : null}
 
       <FacetSection
         title="Space"
@@ -479,15 +487,18 @@ export function FacetRail({
         query={query}
         onChange={onChange}
       />
-      <FacetSection
-        title="Tag"
-        field="tag"
-        values={fieldValues("tag", vocabulary)}
-        countOf={(value) => counts.tag.get(idOf(value) ?? UNTAGGED) ?? 0}
-        query={query}
-        onChange={onChange}
-        glyph={(value) => (value.value === UNTAGGED ? null : <TagDot color={tagColor.get(value.value.toLowerCase()) ?? "currentColor"} />)}
-      />
+      {/* Only "Untagged" would be no help: show tags once one is used or filtered by. */}
+      {[...counts.tag].some(([id, count]) => id !== UNTAGGED && count > 0) || query.filters.some((filter) => filter.field === "tag") ? (
+        <FacetSection
+          title="Tag"
+          field="tag"
+          values={fieldValues("tag", vocabulary)}
+          countOf={(value) => counts.tag.get(idOf(value) ?? UNTAGGED) ?? 0}
+          query={query}
+          onChange={onChange}
+          glyph={(value) => (value.value === UNTAGGED ? null : <TagDot color={tagColor.get(value.value.toLowerCase()) ?? "currentColor"} />)}
+        />
+      ) : null}
 
       <RailHeading>Status</RailHeading>
       <RailRow

@@ -15,7 +15,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   Icon,
-  OUTLINE_BUTTON,
+  GHOST_BUTTON,
   itemKey,
   PageColumn,
   openAppPath,
@@ -27,7 +27,7 @@ import {
   type CollectionTag,
 } from "@bb-studio/kit/app";
 import { mentionPrompt, STUDIO_REALTIME_CHANNEL, type StudioCreateEventDetail } from "@bb-studio/kit/contract";
-import { errorMessage, untitled } from "@bb-studio/kit/format";
+import { errorMessage, plural, untitled } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -407,18 +407,18 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const filteredSpaces = (data?.spaces ?? []).filter((each) =>
     query.filters.some((filter) => filter.field === "space" && !filter.negate && filter.value.toLowerCase() === each.name.toLowerCase()),
   );
+  // The chip already names the space; this links to its page.
+  const spaceLinks = filteredSpaces.map((each) => (
+    <button key={each.id} type="button" className={GHOST_BUTTON} title={each.description || undefined} onClick={() => openSpace(each.id)}>
+      <SpaceGlyph space={each} className="text-sm leading-none" /> Open {each.name} <Icon name="ArrowRight" />
+    </button>
+  ));
+  const collectionSpaces = useMemo(
+    () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
+    [data?.spaces],
+  );
   const notice = (
     <>
-      {filteredSpaces.map((each) => (
-        <div key={each.id} className="mb-3 flex items-center gap-2 rounded-md border border-border px-3 py-2 text-sm">
-          <SpaceGlyph space={each} className="text-sm leading-none" />
-          <span className="min-w-0 truncate font-medium">{each.name}</span>
-          <span className="min-w-0 flex-1 truncate text-muted-foreground">{each.description || "Showing this space's items"}</span>
-          <button type="button" className={OUTLINE_BUTTON} onClick={() => openSpace(each.id)}>
-            Open space page <Icon name="ArrowRight" />
-          </button>
-        </div>
-      ))}
       <NeedsYou />
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
@@ -503,6 +503,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       toast.error(`Couldn't delete the view: ${errorMessage(cause)}`);
     }
   };
+  // null while loading still holds the rail's room.
   const rail = data ? (
     <FacetRail
       query={query}
@@ -521,7 +522,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     : compiled.archived
       ? "Nothing archived matches."
       : filteredSpaces.length && !searchText && query.filters.length === filteredSpaces.length
-        ? "No items in this space yet. Open its page to add items, projects, threads and channels."
+        ? spaceEmpty(filteredSpaces)
         : searchText || query.filters.length
           ? "Nothing matches."
           : "No items yet.";
@@ -582,6 +583,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           defaultProjectId={onlyProject ? onlyProject.id : (context.projectId ?? null)}
           storageKey="studio:collection"
           tags={data?.tags ?? []}
+          spaces={collectionSpaces}
           extraCreateItems={extraCreateItems}
           kind={onlyKind?.id ?? "all"}
           onKindChange={setKind}
@@ -589,8 +591,9 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           headerActions={headerActions}
           handlers={handlers}
           filter={{
-            bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} />,
+            bar: <QueryBar query={query} vocabulary={vocabulary} onChange={setQuery} onOpenFilters={() => setFiltersOpen(true)} loading={!data || !projects.length} />,
             rail,
+            toolbar: spaceLinks.length ? <>{spaceLinks}</> : undefined,
             text: searchText,
             snippets,
             archived: compiled.archived,
@@ -627,6 +630,17 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       ) : null}
     </>
   );
+}
+
+/** What an itemless space holds instead, since threads and projects live on its page. */
+function spaceEmpty(spaces: readonly SpaceView[]): string {
+  const threads = spaces.reduce((sum, each) => sum + each.threadIds.length, 0);
+  const projects = spaces.reduce((sum, each) => sum + each.projectIds.length, 0);
+  const elsewhere = [threads ? plural(threads, "thread") : null, projects ? plural(projects, "project") : null].filter(Boolean);
+  const which = spaces.length === 1 ? "this space" : "these spaces";
+  return elsewhere.length
+    ? `No items in ${which}. Its ${elsewhere.join(" and ")} are on its page.`
+    : `No items in ${which} yet. Open its page to add items, projects, threads and channels.`;
 }
 
 /** A path segment, or "" for a malformed one like `100%`. */

@@ -65,7 +65,7 @@ export interface StudioItem {
   preview: string | null;
   facts: StudioFact[];
   badge: StudioBadge | null;
-  /** A small image for grid cards, served by the provider. */
+  /** A small image shown in place of the icon, served by the provider. */
   thumbnailUrl: string | null;
   /** App path that opens the item, e.g. /plugins/pages/pages/pg_x. */
   href: string;

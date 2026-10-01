@@ -1,5 +1,5 @@
-// The Studio collection: one searchable, filterable list or grid of items of
-// any kind. Studio renders it for every installed add-on; an add-on renders
+// The Studio collection: one searchable, filterable list of items of any
+// kind, sorted and optionally grouped. Studio renders it for every installed add-on; an add-on renders
 // it alone for its own kind when Studio isn't installed.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -36,20 +36,26 @@ import {
 } from "./pieces";
 import {
   DEFAULT_SORT,
+  formatSort,
+  GROUP_BYS,
+  groupItems,
   itemKey,
   nextSort,
+  parseSort,
   sortItems,
   toggleSelection,
   type ActionResults,
   type CollectionItem,
   type CollectionKind,
+  type Group,
+  type GroupBy,
   type Sort,
   type SortKey,
 } from "./selection";
 import { TagChips, TagDot, TagMenuItems, TagNameInput, type CollectionTag } from "./tags";
 
 export type { CollectionTag } from "./tags";
-export { itemKey, sortItems, toggleSelection, type ActionResults, type CollectionItem, type CollectionKind, type Sort } from "./selection";
+export { groupItems, itemKey, sortItems, toggleSelection, type ActionResults, type CollectionItem, type CollectionKind, type GroupBy, type Sort } from "./selection";
 
 export interface CollectionHandlers {
   onOpen(item: CollectionItem): void;
@@ -80,7 +86,10 @@ export interface CollectionHandlers {
  */
 export interface CollectionFilter {
   bar: ReactNode;
+  /** null while it loads, which keeps its room so the list doesn't jump. */
   rail?: ReactNode;
+  /** Shown at the start of the toolbar, e.g. a link to the filtered space. */
+  toolbar?: ReactNode;
   /** The words searched for, to highlight. */
   text: string;
   /** Item keys whose content matched, with the text that matched if known. */
@@ -91,7 +100,14 @@ export interface CollectionFilter {
   empty: string;
 }
 
-type View = "list" | "grid";
+/** A space items can belong to, for grouping and the Spaces column. */
+export interface CollectionSpace {
+  id: string;
+  name: string;
+  glyph?: ReactNode;
+}
+
+const GROUP_LABELS: Record<GroupBy, string> = { none: "None", kind: "Kind", project: "Project", space: "Space", tag: "Tag" };
 const ALL = "all";
 const GLOBAL = "global";
 const UNTAGGED = "untagged";
@@ -142,6 +158,7 @@ export function CollectionPage({
   defaultProjectId,
   storageKey,
   tags,
+  spaces,
   kind: kindFilter,
   onKindChange,
   isSelectable,
@@ -163,6 +180,8 @@ export function CollectionPage({
   storageKey: string;
   /** Every tag, or undefined when the collection has no tags. */
   tags?: readonly CollectionTag[];
+  /** Every space, when items carry `spaces`. */
+  spaces?: readonly CollectionSpace[];
   /** The kind filter; "all" or a kind id. */
   kind: string;
   onKindChange(kind: string): void;
@@ -178,12 +197,15 @@ export function CollectionPage({
 }) {
   const [query, setQuery] = useState("");
   const [project, setProject] = useStoredState<string>(`${storageKey}:project`, ALL);
-  const [view, setView] = useStoredState<View>(`${storageKey}:view`, "list", ["list", "grid"]);
+  const [groupChoice, setGroupBy] = useStoredState<GroupBy>(`${storageKey}:group`, "none", GROUP_BYS);
+  const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(() => new Set());
   const [tagFilter, setTagFilter] = useStoredState<string>(`${storageKey}:tag`, ALL);
   const [renaming, setRenaming] = useState(false);
   const [archivedFilter, setArchived] = useState(false);
   const archived = filter ? filter.archived : archivedFilter;
-  const [sort, setSort] = useState<Sort>(DEFAULT_SORT);
+  const [sortText, setSortText] = useStoredState<string>(`${storageKey}:sort`, formatSort(DEFAULT_SORT));
+  const sort = useMemo(() => parseSort(sortText), [sortText]);
+  const setSort = useCallback((next: Sort) => setSortText(formatSort(next)), [setSortText]);
   const [ownMatches, setContentMatches] = useState<ReadonlyMap<string, string | null>>(() => new Map());
   const contentMatches = filter ? filter.snippets : ownMatches;
   const searched = filter ? filter.text : query;
@@ -215,7 +237,7 @@ export function CollectionPage({
   useEffect(() => {
     if (sort.key.startsWith("fact:") && !single?.columns.some((column) => `fact:${column.id}` === sort.key)) setSort(DEFAULT_SORT);
     if (sort.key === "kind" && single) setSort(DEFAULT_SORT);
-  }, [single, sort.key]);
+  }, [single, sort.key, setSort]);
 
   const { onSearch } = handlers;
   useEffect(() => {
@@ -253,8 +275,33 @@ export function CollectionPage({
     return sortItems(filtered, sort, { kindLabel, projectLabel });
   }, [filter, items, archived, kindFilter, kindOf, project, tagging, tagFilter, query, contentMatches, sort, kindLabel, projectLabel]);
 
+  // Grouping by something with one value, or that this collection lacks, is no grouping.
+  const tagged = tagging && !!items?.some((item) => item.tags?.length);
+  const groupable = (by: GroupBy) =>
+    by === "none" || by === "project" || (by === "kind" && !single) || (by === "space" && !!spaces?.length) || (by === "tag" && tagged);
+  const grouping = groupable(groupChoice) ? groupChoice : "none";
+  const spaceById = useMemo(() => new Map((spaces ?? []).map((space) => [space.id, space])), [spaces]);
+  const groups = useMemo<Group[] | null>(() => {
+    if (grouping === "none") return null;
+    const label = (id: string) =>
+      grouping === "kind"
+        ? (kinds.find((kind) => kind.id === id)?.plural ?? id)
+        : grouping === "project"
+          ? projectName(projects, id || null)
+          : grouping === "space"
+            ? (spaceById.get(id)?.name ?? "No space")
+            : (tagById.get(id)?.name ?? "Untagged");
+    const order = grouping === "kind" ? kinds.map((kind) => kind.id) : grouping === "space" ? spaces?.map((space) => space.id) : grouping === "tag" ? tags?.map((tag) => tag.id) : undefined;
+    return groupItems(shown, grouping, { label, order });
+  }, [grouping, shown, kinds, projects, spaceById, spaces, tagById, tags]);
+  // Rows in the order they show, for shift-click ranges.
+  const ordered = useMemo(
+    () => (groups ? [...new Map(groups.flatMap((group) => group.items).map((item) => [itemKey(item), item])).values()] : shown),
+    [groups, shown],
+  );
+
   const selectable = useCallback((item: CollectionItem) => (isSelectable ? isSelectable(item) : true), [isSelectable]);
-  const selectableKeys = useMemo(() => shown.filter((item) => selectable(item) === true).map(itemKey), [shown, selectable]);
+  const selectableKeys = useMemo(() => ordered.filter((item) => selectable(item) === true).map(itemKey), [ordered, selectable]);
   const chosen = useMemo(() => shown.filter((item) => selected.has(itemKey(item)) && selectable(item) === true), [shown, selected, selectable]);
   // Forget picks that were deleted, filtered out, or became unpickable.
   useEffect(() => {
@@ -470,11 +517,15 @@ export function CollectionPage({
   const allArchivable = chosen.length > 0 && chosen.every((item) => (kindOf(item)?.capabilities?.archive ?? kindOf(item)?.canArchive));
 
   const columns = single?.columns ?? [];
-  const showKind = !single;
-  // Below 48rem of list width the Kind column goes (the tile shows the kind);
-  // below 36rem rows stack into a name and a menu.
-  const template = (kind: boolean) => `minmax(0,1fr)${kind ? " 110px" : ""} minmax(0,160px)${columns.map(() => " 90px").join("")} 130px`;
-  const gridTemplate = { "--cols": template(showKind), "--cols-narrow": template(false) } as CSSProperties;
+  // A column the rows are grouped by would repeat the group header.
+  const showKind = !single && grouping !== "kind";
+  const showProject = grouping !== "project";
+  const showSpaces = grouping !== "space" && shown.some((item) => item.spaces?.some((id) => spaceById.has(id)));
+  // Below 48rem of list width the Kind and Spaces columns go (the tile shows
+  // the kind); below 36rem rows stack into a name and a menu.
+  const template = (wide: boolean) =>
+    `minmax(0,1fr)${wide && showKind ? " 110px" : ""}${showProject ? " minmax(0,160px)" : ""}${wide && showSpaces ? " minmax(0,140px)" : ""}${columns.map(() => " 90px").join("")} 130px`;
+  const gridTemplate = { "--cols": template(true), "--cols-narrow": template(false) } as CSSProperties;
   const gridColumns = "[grid-template-columns:var(--cols)] @max-3xl/list:[grid-template-columns:var(--cols-narrow)]";
 
   const header = (label: string, key: SortKey | null, className?: string) => {
@@ -500,7 +551,67 @@ export function CollectionPage({
   const emptyKinds = activeKind ? [activeKind] : kinds;
   const noItemsAtAll = items !== null && !(items ?? []).some((item) => !item.archived);
   const subtitle = (item: CollectionItem) =>
-    [showKind ? kindLabel(item) : null, projectLabel(item), relativeTime(item.updatedAt)].filter(Boolean).join(" · ");
+    [showKind ? kindLabel(item) : null, showProject ? projectLabel(item) : null, relativeTime(item.updatedAt)].filter(Boolean).join(" · ");
+  const spaceNames = (item: CollectionItem) => (item.spaces ?? []).flatMap((id) => spaceById.get(id)?.name ?? []);
+
+  const sortChoices: { key: SortKey; label: string }[] = [
+    { key: "title", label: "Name" },
+    ...(single ? [] : [{ key: "kind" as const, label: "Kind" }]),
+    { key: "project", label: "Project" },
+    ...columns.map((column) => ({ key: `fact:${column.id}` as const, label: column.label })),
+    { key: "createdAt", label: "Created" },
+    { key: "updatedAt", label: "Last activity" },
+  ];
+  const textSort = sort.key === "title" || sort.key === "kind" || sort.key === "project";
+  const displayMenu = (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button
+          type="button"
+          title="Sort and group"
+          className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
+        >
+          <Icon name="SlidersHorizontal" className="size-4" />
+          <span className="@max-xl/page:hidden">{grouping === "none" ? "Display" : `By ${GROUP_LABELS[grouping].toLowerCase()}`}</span>
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-52">
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Group by</DropdownMenuLabel>
+        {GROUP_BYS.filter(groupable).map((by) => (
+          <DropdownMenuItem key={by} onSelect={() => setGroupBy(by)}>
+            {GROUP_LABELS[by]}
+            {grouping === by ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Sort by</DropdownMenuLabel>
+        {sortChoices.map((choice) => (
+          <DropdownMenuItem key={choice.key} onSelect={() => sort.key !== choice.key && setSort(nextSort(sort, choice.key))}>
+            {choice.label}
+            {sort.key === choice.key ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+          </DropdownMenuItem>
+        ))}
+        <DropdownMenuSeparator />
+        {[false, true].map((descending) => (
+          <DropdownMenuItem key={String(descending)} onSelect={() => setSort({ key: sort.key, descending })}>
+            <Icon name={descending ? "ArrowDown" : "ArrowUp"} className="size-4" />
+            {textSort ? (descending ? "Z to A" : "A to Z") : descending ? (sort.key.startsWith("fact:") ? "Largest first" : "Newest first") : sort.key.startsWith("fact:") ? "Smallest first" : "Oldest first"}
+            {sort.descending === descending ? <Icon name="Check" className="ml-auto size-3.5" /> : null}
+          </DropdownMenuItem>
+        ))}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
+  const groupGlyph = (id: string) =>
+    grouping === "kind" ? (
+      <Icon name={kinds.find((kind) => kind.id === id)?.icon ?? "File"} className="size-3.5" />
+    ) : grouping === "tag" ? (
+      tagById.get(id) ? <TagDot color={tagById.get(id)!.color} /> : null
+    ) : grouping === "space" ? (
+      (spaceById.get(id)?.glyph ?? null)
+    ) : (
+      <Icon name={id ? "Folder" : "Globe"} className="size-3.5" />
+    );
   // While searching, an item that matched on content shows the text that matched.
   const preview = (item: CollectionItem, className: string) => {
     const text = searched.trim();
@@ -513,8 +624,101 @@ export function CollectionPage({
     );
   };
 
+  const row = (item: CollectionItem, group: string) => {
+    const kind = kindOf(item);
+    const key = itemKey(item);
+    const checked = selected.has(key);
+    const reason = selectionLabel(item);
+    const parent = parentLine(item);
+    return (
+      <div
+        key={`${group}:${key}`}
+        role="row"
+        tabIndex={0}
+        aria-label={untitled(item.title)}
+        aria-selected={checked}
+        data-state={checked ? "selected" : undefined}
+        className={cn(
+          "group/row grid cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-state-hover data-[state=selected]:bg-state-active @max-xl/list:!grid-cols-[minmax(0,1fr)_auto] @max-xl/list:py-2.5",
+          gridColumns,
+        )}
+        style={gridTemplate}
+        onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
+        onKeyDown={(event) => {
+          if (event.target !== event.currentTarget) return;
+          if (event.key === "Enter") handlers.onOpen(item);
+          if (event.key === " ") {
+            event.preventDefault();
+            if (reason === undefined) toggle(item, event.shiftKey);
+          }
+        }}
+      >
+        <div role="gridcell" className="flex min-w-0 items-center gap-3">
+          {/* The checkbox sits on the avatar: it shows on hover, focus, or while selecting. */}
+          <span className="group/pick relative flex size-8 shrink-0 items-center justify-center">
+            <span className={cn("flex", checked || chosen.length ? "invisible" : "group-hover/row:invisible group-focus-within/pick:invisible")}>
+              {item.thumbnailUrl ? (
+                <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
+                  <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
+                </span>
+              ) : (
+                <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />
+              )}
+            </span>
+            <Checkbox
+              checked={checked}
+              label={`Select ${untitled(item.title)}`}
+              disabled={reason !== undefined}
+              title={reason}
+              onToggle={(event) => toggle(item, event.shiftKey)}
+              className={cn("absolute", !checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100")}
+            />
+          </span>
+          <div className="min-w-0">
+            <div className={cn("flex min-w-0 items-center gap-1.5 font-medium", !item.title && "text-muted-foreground")}>
+              <span className="truncate">{untitled(item.title)}</span>
+              {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
+              {tagging ? <TagChips ids={item.tags} tags={tagById} onPick={pickTag} /> : null}
+            </div>
+            {parent ? <div className="truncate text-xs text-muted-foreground">{parent}</div> : null}
+            {!parent ? preview(item, "truncate") : null}
+            <div className="truncate text-xs text-muted-foreground @xl/list:hidden">{subtitle(item)}</div>
+          </div>
+        </div>
+        {showKind ? (
+          <div role="gridcell" className="flex min-w-0 items-center gap-1.5 text-muted-foreground @max-3xl/list:hidden">
+            <Icon name={kind?.icon ?? "File"} className="size-3.5 shrink-0" />
+            <span className="truncate">{kindLabel(item)}</span>
+          </div>
+        ) : null}
+        {showProject ? (
+          <div role="gridcell" className="truncate text-muted-foreground @max-xl/list:hidden">
+            {projectLabel(item)}
+          </div>
+        ) : null}
+        {showSpaces ? (
+          <div role="gridcell" className="truncate text-muted-foreground @max-3xl/list:hidden" title={spaceNames(item).join(", ") || undefined}>
+            {spaceNames(item).join(", ") || "—"}
+          </div>
+        ) : null}
+        {columns.map((column) => (
+          <div key={column.id} role="gridcell" className="truncate text-right tabular-nums text-muted-foreground @max-xl/list:hidden">
+            {item.facts.find((fact) => fact.id === column.id)?.value ?? "—"}
+          </div>
+        ))}
+        <div role="gridcell" className="flex min-w-0 items-center justify-between gap-2 text-muted-foreground @max-xl/list:justify-end">
+          <span className="truncate @max-xl/list:hidden" title={new Date(item.updatedAt).toLocaleString()}>
+            {relativeTime(item.updatedAt)}
+          </span>
+          {rowMenu(item, revealClass)}
+        </div>
+      </div>
+    );
+  };
+
+  const hasRail = filter !== undefined && filter.rail !== undefined;
   return (
-    <PageColumn className={cn(filter?.rail && "max-w-6xl")}>
+    <PageColumn className={cn(filter && "max-w-6xl")}>
       <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
       <div className="mt-6 flex items-center gap-2">
         {filter ? (
@@ -543,20 +747,7 @@ export function CollectionPage({
           </label>
         )}
         <div className="ml-auto flex items-center gap-2">
-          <div className="flex rounded-md border border-border p-0.5 @max-3xl/page:hidden" role="group" aria-label="Layout">
-            {(["list", "grid"] as const).map((option) => (
-              <button
-                key={option}
-                type="button"
-                aria-label={option === "list" ? "List view" : "Grid view"}
-                aria-pressed={view === option}
-                className="flex size-7 items-center justify-center rounded-sm text-muted-foreground hover:text-foreground aria-pressed:bg-state-active aria-pressed:text-foreground"
-                onClick={() => setView(option)}
-              >
-                <Icon name={option === "list" ? "ListView" : "GridView"} className="size-4" />
-              </button>
-            ))}
-          </div>
+          {displayMenu}
           {headerActions}
           {newButton()}
         </div>
@@ -564,9 +755,9 @@ export function CollectionPage({
 
       {notice ? <div className="mt-4">{notice}</div> : null}
 
-      <div className={cn(filter?.rail && "flex items-start gap-8")}>
-        {filter?.rail ? <aside aria-label="Filters" className="sticky top-0 w-52 shrink-0 pt-4 @max-4xl/page:hidden">{filter.rail}</aside> : null}
-        <div className={cn(filter?.rail && "min-w-0 flex-1")}>
+      <div className={cn(hasRail && "flex items-start gap-8")}>
+        {hasRail ? <aside aria-label="Filters" className="sticky top-0 w-52 shrink-0 pt-4 @max-4xl/page:hidden">{filter.rail}</aside> : null}
+        <div className={cn(hasRail && "min-w-0 flex-1")}>
           <div
             role="toolbar"
             aria-label={chosen.length ? "Selected items" : "Filters"}
@@ -627,7 +818,10 @@ export function CollectionPage({
                 </button>
               </>
             ) : filter ? (
-              items !== null && shown.length ? <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{plural(shown.length, "item")}</span> : null
+              <>
+                {filter.toolbar}
+                {items !== null && shown.length ? <span className="ml-auto shrink-0 pl-2 text-xs text-muted-foreground">{plural(shown.length, "item")}</span> : null}
+              </>
             ) : (
               <>
                 {kinds.length > 1 ? (
@@ -775,64 +969,8 @@ export function CollectionPage({
               </p>
             ) : null}
 
-            {shown.length && view === "grid" ? (
-              <div className="grid grid-cols-[repeat(auto-fill,minmax(220px,1fr))] gap-3 @max-3xl/page:hidden">
-                {shown.map((item) => {
-                  const kind = kindOf(item);
-                  const checked = selected.has(itemKey(item));
-                  const pickable = selectable(item) === true;
-                  return (
-                    <div
-                      key={itemKey(item)}
-                      role="link"
-                      tabIndex={0}
-                      aria-label={untitled(item.title)}
-                      data-state={checked ? "selected" : undefined}
-                      className="group/row relative flex cursor-pointer flex-col overflow-hidden rounded-lg border border-border hover:bg-state-hover data-[state=selected]:border-foreground/40 data-[state=selected]:bg-state-hover"
-                      onClick={(event) => (chosen.length && pickable ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
-                      onKeyDown={(event) => event.key === "Enter" && handlers.onOpen(item)}
-                    >
-                      {/* Every card has the same preview area, so a grid row doesn't
-                          stretch around the one card with a thumbnail. */}
-                      <div className={cn("flex h-32 items-center justify-center border-b border-border bg-foreground/[0.03]", item.thumbnailUrl ? "p-1" : "p-3")}>
-                        {item.thumbnailUrl ? (
-                          <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
-                        ) : (
-                          <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="xl" />
-                        )}
-                      </div>
-                      <div className="absolute top-2 right-2 flex items-center gap-1">
-                        {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
-                        {rowMenu(item, revealClass)}
-                      </div>
-                      <div className="flex flex-1 flex-col p-4">
-                        <div className="min-w-0">
-                          <div className={cn("truncate font-medium", !item.title && "text-muted-foreground")}>{untitled(item.title)}</div>
-                          {preview(item, "mt-0.5 line-clamp-2")}
-                          <div className="mt-1 truncate text-xs text-muted-foreground">{subtitle(item)}</div>
-                          {tagging && item.tags?.length ? (
-                            <div className="mt-2 flex min-w-0 items-center gap-1 overflow-hidden">
-                              <TagChips ids={item.tags} tags={tagById} max={3} onPick={pickTag} />
-                            </div>
-                          ) : null}
-                        </div>
-                      </div>
-                      {pickable ? (
-                        <Checkbox
-                          checked={checked}
-                          label={`Select ${untitled(item.title)}`}
-                          onToggle={(event) => toggle(item, event.shiftKey)}
-                          className={cn("absolute top-2 left-2 opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 focus-visible:opacity-100", (checked || chosen.length > 0) && "opacity-100")}
-                        />
-                      ) : null}
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-
             {shown.length ? (
-              <div role="grid" aria-label={title} aria-multiselectable className={cn("text-sm", view === "grid" && "@3xl/page:hidden")}>
+              <div role="grid" aria-label={title} aria-multiselectable className="text-sm">
                 <div role="row" className={cn("grid gap-3 border-b border-border px-2 pb-2 text-xs text-muted-foreground @max-xl/list:hidden", gridColumns)} style={gridTemplate}>
                   <span className="flex items-center gap-3">
                     <span role="columnheader" className="flex w-8 shrink-0 justify-center">
@@ -846,94 +984,41 @@ export function CollectionPage({
                     {header("Name", "title")}
                   </span>
                   {showKind ? header("Kind", "kind", "@max-3xl/list:hidden") : null}
-                  {header("Project", "project")}
+                  {showProject ? header("Project", "project") : null}
+                  {showSpaces ? header("Spaces", null, "@max-3xl/list:hidden") : null}
                   {columns.map((column) => header(column.label, `fact:${column.id}`, "text-right"))}
                   {header("Last activity", "updatedAt")}
                 </div>
-                {shown.map((item) => {
-                  const kind = kindOf(item);
-                  const key = itemKey(item);
-                  const checked = selected.has(key);
-                  const reason = selectionLabel(item);
-                  const parent = parentLine(item);
-                  return (
-                    <div
-                      key={key}
-                      role="row"
-                      tabIndex={0}
-                      aria-label={untitled(item.title)}
-                      aria-selected={checked}
-                      data-state={checked ? "selected" : undefined}
-                      className={cn(
-                        "group/row grid cursor-pointer items-center gap-3 rounded-md px-2 py-2 hover:bg-state-hover data-[state=selected]:bg-state-active @max-xl/list:!grid-cols-[minmax(0,1fr)_auto] @max-xl/list:py-2.5",
-                        gridColumns,
-                      )}
-                      style={gridTemplate}
-                      onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
-                      onKeyDown={(event) => {
-                        if (event.target !== event.currentTarget) return;
-                        if (event.key === "Enter") handlers.onOpen(item);
-                        if (event.key === " ") {
-                          event.preventDefault();
-                          if (reason === undefined) toggle(item, event.shiftKey);
-                        }
-                      }}
-                    >
-                      <div role="gridcell" className="flex min-w-0 items-center gap-3">
-                        {/* The checkbox sits on the avatar: it shows on hover, focus, or while selecting. */}
-                        <span className="group/pick relative flex size-8 shrink-0 items-center justify-center">
-                          <span className={cn("flex", checked || chosen.length ? "invisible" : "group-hover/row:invisible group-focus-within/pick:invisible")}>
-                            {item.thumbnailUrl ? (
-                              <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
-                                <img src={item.thumbnailUrl} alt="" loading="lazy" className={THUMBNAIL} />
-                              </span>
-                            ) : (
-                              <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} />
-                            )}
-                          </span>
-                          <Checkbox
-                            checked={checked}
-                            label={`Select ${untitled(item.title)}`}
-                            disabled={reason !== undefined}
-                            title={reason}
-                            onToggle={(event) => toggle(item, event.shiftKey)}
-                            className={cn("absolute", !checked && !chosen.length && "opacity-0 group-hover/row:opacity-100 focus-visible:opacity-100")}
-                          />
-                        </span>
-                        <div className="min-w-0">
-                          <div className={cn("flex min-w-0 items-center gap-1.5 font-medium", !item.title && "text-muted-foreground")}>
-                            <span className="truncate">{untitled(item.title)}</span>
-                            {item.badge ? <Badge label={item.badge.label} tone={item.badge.tone} /> : null}
-                            {tagging ? <TagChips ids={item.tags} tags={tagById} onPick={pickTag} /> : null}
+                {groups
+                  ? groups.map((group) => {
+                      const open = !collapsed.has(group.id);
+                      return (
+                        <div key={`group:${group.id}`} role="rowgroup" aria-label={group.label}>
+                          <div role="row" className="mt-2 border-b border-border/60">
+                            <button
+                              type="button"
+                              role="gridcell"
+                              aria-expanded={open}
+                              className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left text-xs font-medium text-muted-foreground hover:bg-state-hover hover:text-foreground"
+                              onClick={() =>
+                                setCollapsed((previous) => {
+                                  const next = new Set(previous);
+                                  if (!next.delete(group.id)) next.add(group.id);
+                                  return next;
+                                })
+                              }
+                            >
+                              <Icon name={open ? "ChevronDown" : "ChevronRight"} className="size-3.5" />
+                              <span className="flex w-4 justify-center">{groupGlyph(group.id)}</span>
+                              <span className="truncate text-foreground">{group.label}</span>
+                              <span className="tabular-nums">{group.items.length}</span>
+                            </button>
                           </div>
-                          {parent ? <div className="truncate text-xs text-muted-foreground">{parent}</div> : null}
-                          {!parent ? preview(item, "truncate") : null}
-                          <div className="truncate text-xs text-muted-foreground @xl/list:hidden">{subtitle(item)}</div>
+                          {open ? group.items.map((item) => row(item, group.id)) : null}
                         </div>
-                      </div>
-                      {showKind ? (
-                        <div role="gridcell" className="flex min-w-0 items-center gap-1.5 text-muted-foreground @max-3xl/list:hidden">
-                          <Icon name={kind?.icon ?? "File"} className="size-3.5 shrink-0" />
-                          <span className="truncate">{kindLabel(item)}</span>
-                        </div>
-                      ) : null}
-                      <div role="gridcell" className="truncate text-muted-foreground @max-xl/list:hidden">
-                        {projectLabel(item)}
-                      </div>
-                      {columns.map((column) => (
-                        <div key={column.id} role="gridcell" className="truncate text-right tabular-nums text-muted-foreground @max-xl/list:hidden">
-                          {item.facts.find((fact) => fact.id === column.id)?.value ?? "—"}
-                        </div>
-                      ))}
-                      <div role="gridcell" className="flex min-w-0 items-center justify-between gap-2 text-muted-foreground @max-xl/list:justify-end">
-                        <span className="truncate @max-xl/list:hidden" title={new Date(item.updatedAt).toLocaleString()}>
-                          {relativeTime(item.updatedAt)}
-                        </span>
-                        {rowMenu(item, revealClass)}
-                      </div>
-                    </div>
-                  );
-                })}
+                      );
+                    })
+                  : shown.map((item) => row(item, ""))}
               </div>
             ) : null}
           </div>

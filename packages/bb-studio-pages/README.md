@@ -94,8 +94,8 @@ afterwards.
   `commentReply` and `commentResolve` RPCs, which write as you, so an @bot in
   a comment reaches the bot the same way.
 - **A collection of pages.** The **Pages** nav item lists every page, with
-  search over titles and content, filters, a project filter, and a list or
-  grid view. **New page** opens a blank full-page document.
+  search over titles and content, filters, a project filter, and sorting and
+  grouping from **Display**. **New page** opens a blank full-page document.
 - **Projects and nesting.** Pages belong to a project or are global, and
   nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
   move it, archive it, or delete it from its ⋯ menu.

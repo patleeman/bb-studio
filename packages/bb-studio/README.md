@@ -48,10 +48,14 @@ the matching text with the match in bold.
   Choose 1, 7 or 30 days. The `home` RPC returns this data, plus due and review
   tasks, active threads and bots, recent items and today's automations, for
   other clients such as the iOS app's Today view.
-- **One collection** (sidebar → Studio): every add-on's items in one list or
-  grid, with search over titles and content, kind pills, a project filter,
-  and an Archived view. Drawings show thumbnails; recordings show their
-  length and word count. Background kinds, such as Talk's dictations, stay
+- **One collection** (sidebar → Studio): every add-on's items in one list,
+  with search over titles and content, filters by kind, project, space and
+  tag, and an Archived view. **Display** groups the list by kind, project,
+  space or tag (collapsible, and an item in two spaces shows in both) and
+  sorts it by name, kind, project, created or last activity, either way; both
+  choices are remembered. The column you group by drops out, and a Spaces
+  column appears once items belong to spaces. Drawings show thumbnails;
+  recordings show their length and word count. Background kinds, such as Talk's dictations, stay
   out of All and Home; their own pill and search still show them.
 - **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
