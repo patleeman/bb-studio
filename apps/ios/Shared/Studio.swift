@@ -174,6 +174,8 @@ public struct StudioKindInfo: Codable, Hashable, Sendable {
     public var blurb: String
     /// "rpc" when Studio's New can make one.
     public var createMode: String?
+    /// Kept out of the way: All skips these unless the user is searching.
+    public var background: Bool?
 }
 
 /// A label the user puts on Studio items from any add-on.
@@ -211,6 +213,7 @@ extension BBClient {
             var canArchive: Bool?
             var blurb: String?
             var create: Create?
+            var background: Bool?
         }
         struct Provider: Decodable {
             var pluginId: String
@@ -227,7 +230,7 @@ extension BBClient {
                 StudioKindInfo(
                     pluginId: provider.pluginId, id: $0.id, label: $0.label, plural: $0.plural,
                     actions: $0.actions ?? [], canArchive: $0.canArchive ?? false, blurb: $0.blurb ?? "",
-                    createMode: $0.create?.mode)
+                    createMode: $0.create?.mode, background: $0.background)
             }
         }
         return StudioOverview(items: overview.items, kinds: kinds, tags: overview.tags)

@@ -40,6 +40,8 @@ export const RECORDING_KINDS: StudioKind[] = [
     // Dictations start from a composer or a field's microphone.
     create: null,
     canArchive: true,
+    // Kept as a safety net, so they stay out of Studio's All view and Home.
+    background: true,
     blurb: "Your dictations, with audio.",
     agentHint: "Read the transcript with `bb talk transcript <id>`; `bb talk show <id>` has the details.",
   },

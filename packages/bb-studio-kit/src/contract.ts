@@ -118,6 +118,11 @@ export interface StudioKind {
    * screen.
    */
   agentHint?: string;
+  /**
+   * Kept out of the way: the collection's All view and Studio Home skip
+   * these items, while the kind's own filter and search still find them.
+   */
+  background?: boolean;
 }
 
 export interface StudioProviderInfo {
@@ -195,6 +200,7 @@ export function studioSchemas(z: typeof Zod) {
     mentionProviderId: z.string().nullable().optional(),
     blurb: z.string(),
     agentHint: z.string().max(500).optional(),
+    background: z.boolean().optional(),
   });
   const info = z.object({ pluginId: z.string(), version: z.union([z.literal(1), z.literal(2)]), panel: z.string().nullable(), kinds: z.array(kind) });
   const ids = z.array(z.string().min(1).max(200)).min(1).max(500);

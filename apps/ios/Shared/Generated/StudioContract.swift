@@ -702,8 +702,9 @@ public enum Studio {
     public var mentionProviderId: String?
     public var blurb: String?
     public var agentHint: String?
+    public var background: Bool?
 
-    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [OverviewOutputProvidersItemKindsItemColumnsItem]? = nil, actions: [OverviewOutputProvidersItemKindsItemActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: OverviewOutputProvidersItemKindsItemCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil) {
+    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [OverviewOutputProvidersItemKindsItemColumnsItem]? = nil, actions: [OverviewOutputProvidersItemKindsItemActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: OverviewOutputProvidersItemKindsItemCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil, background: Bool? = nil) {
       self.id = id
       self.label = label
       self.plural = plural
@@ -716,6 +717,7 @@ public enum Studio {
       self.mentionProviderId = mentionProviderId
       self.blurb = blurb
       self.agentHint = agentHint
+      self.background = background
     }
   }
 
@@ -2754,8 +2756,9 @@ public enum Studio {
     public var mentionProviderId: String?
     public var blurb: String?
     public var agentHint: String?
+    public var background: Bool?
 
-    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [ItemAtOutputKindColumnsItem]? = nil, actions: [ItemAtOutputKindActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: ItemAtOutputKindCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil) {
+    public init(id: String? = nil, label: String? = nil, plural: String? = nil, icon: String? = nil, columns: [ItemAtOutputKindColumnsItem]? = nil, actions: [ItemAtOutputKindActionsItem]? = nil, create: StudioJSONValue? = nil, canArchive: Bool? = nil, capabilities: ItemAtOutputKindCapabilities? = nil, mentionProviderId: String? = nil, blurb: String? = nil, agentHint: String? = nil, background: Bool? = nil) {
       self.id = id
       self.label = label
       self.plural = plural
@@ -2768,6 +2771,7 @@ public enum Studio {
       self.mentionProviderId = mentionProviderId
       self.blurb = blurb
       self.agentHint = agentHint
+      self.background = background
     }
   }
 

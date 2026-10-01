@@ -756,6 +756,7 @@ struct StudioView: View {
         store.items.filter { item in
             if item.archived != showArchived { return false }
             if let kind = app.studioKind, item.kind != kind { return false }
+            if app.studioKind == nil, query.isEmpty, store.info(item)?.background == true { return false }
             if let tagFilter, item.tags?.contains(tagFilter) != true { return false }
             switch project {
             case "": break

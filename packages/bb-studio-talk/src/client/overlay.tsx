@@ -65,6 +65,28 @@ function useNow(active: boolean): number {
   return now;
 }
 
+const EXPANDED_KEY = "bb-plugin-talk:pill-expanded";
+
+/** Whether the transcript is open, remembered across recordings and reloads. */
+function useExpanded(): [boolean, () => void] {
+  const [expanded, setExpanded] = useState(() => {
+    try {
+      return localStorage.getItem(EXPANDED_KEY) === "1";
+    } catch {
+      return false;
+    }
+  });
+  useEffect(() => {
+    try {
+      localStorage.setItem(EXPANDED_KEY, expanded ? "1" : "0");
+    } catch {
+      // Storage can be unavailable; the choice then lasts for this window.
+    }
+  }, [expanded]);
+  const toggle = () => setExpanded((value) => !value);
+  return [expanded, toggle];
+}
+
 function useOnline(): boolean {
   const [online, setOnline] = useState(() => navigator.onLine);
   useEffect(() => {
@@ -166,7 +188,7 @@ export function TalkOverlay() {
   const state = useTalkState();
   const navigate = useBbNavigate();
   const online = useOnline();
-  const [expanded, setExpanded] = useState(false);
+  const [expanded, toggleExpanded] = useExpanded();
   const drag = useDraggable<HTMLDivElement>();
   const capturing = state.phase === "recording";
   // Ticks whenever the pill shows: the clock runs, and the Back button
@@ -228,7 +250,7 @@ export function TalkOverlay() {
         <LevelMeter live={capturing} />
         <button
           type="button"
-          onClick={() => setExpanded((value) => !value)}
+          onClick={toggleExpanded}
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground"
         >

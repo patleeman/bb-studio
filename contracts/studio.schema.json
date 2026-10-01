@@ -801,6 +801,9 @@
                       "agentHint": {
                         "type": "string",
                         "maxLength": 500
+                      },
+                      "background": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -4266,6 +4269,9 @@
                   "agentHint": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "background": {
+                    "type": "boolean"
                   }
                 },
                 "required": [

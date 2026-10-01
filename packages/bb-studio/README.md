@@ -42,7 +42,8 @@ the matching text with the match in bold.
 - **One collection** (sidebar → Studio): every add-on's items in one list or
   grid, with search over titles and content, kind pills, a project filter,
   and an Archived view. Drawings show thumbnails; recordings show their
-  length and word count.
+  length and word count. Background kinds, such as Talk's dictations, stay
+  out of All and Home; their own pill and search still show them.
 - **Search from anywhere.** Cmd/Ctrl+Shift+K (or **Studio: Search everything**
   in the command palette, Cmd/Ctrl+Shift+P) opens a quick-open box over any
   page. Studio indexes titles and text from current add-ons, then searches BB threads and Studio Teams channels live. The palette also has recent items and commands for creating items, opening Studio, handing work to an agent and opening threads. Titles match as you type; each add-on also searches its content —

@@ -221,13 +221,14 @@ export function CollectionPage({
     const filtered = (items ?? []).filter(
       (item) =>
         item.archived === archived &&
-        (kindFilter === ALL || item.kind === kindFilter) &&
+        // All skips background kinds unless the user is searching.
+        (kindFilter === ALL ? !!text || !kindOf(item)?.background : item.kind === kindFilter) &&
         (project === ALL ? true : project === GLOBAL ? !item.projectId : item.projectId === project) &&
         (!tagging || tagFilter === ALL || (tagFilter === UNTAGGED ? !item.tags?.length : !!item.tags?.includes(tagFilter))) &&
         (!text || untitled(item.title).toLowerCase().includes(text) || contentMatches.has(itemKey(item))),
     );
     return sortItems(filtered, sort, { kindLabel, projectLabel });
-  }, [items, archived, kindFilter, project, tagging, tagFilter, query, contentMatches, sort, kindLabel, projectLabel]);
+  }, [items, archived, kindFilter, kindOf, project, tagging, tagFilter, query, contentMatches, sort, kindLabel, projectLabel]);
 
   const selectable = useCallback((item: CollectionItem) => (isSelectable ? isSelectable(item) : true), [isSelectable]);
   const selectableKeys = useMemo(() => shown.filter((item) => selectable(item) === true).map(itemKey), [shown, selectable]);

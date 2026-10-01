@@ -74,7 +74,8 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
     threads: activeThreads.map((thread) => ({ id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, projectId: thread.projectId })).slice(0, 12),
     bots: roster?.bots.filter((bot) => bot.working && (!projectId || bot.projectId === projectId)).map((bot) => ({ id: bot.id, name: bot.name, projectId: bot.projectId })) ?? null,
   };
-  const recent = overview.items.filter((item) => !item.archived && sameProject(item, projectId)).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((item) => ({ pluginId: item.pluginId, id: item.id, title: item.title, href: item.href, kind: item.kind, updatedAt: item.updatedAt }));
+  const background = new Set(overview.providers.flatMap((provider) => provider.kinds.filter((kind) => kind.background).map((kind) => `${provider.pluginId}:${kind.id}`)));
+  const recent = overview.items.filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && sameProject(item, projectId)).sort((a, b) => b.updatedAt - a.updatedAt).slice(0, 8).map((item) => ({ pluginId: item.pluginId, id: item.id, title: item.title, href: item.href, kind: item.kind, updatedAt: item.updatedAt }));
   const automationLists = available.has("automations") ? await Promise.all((projectId ? [projectId] : projects.map((project) => project.id)).map((id) =>
     call("automations", "automations_list", { projectId: id }, z.array(automation)).catch(() => null))) : null;
   const automations = automationLists?.some((list) => list !== null)

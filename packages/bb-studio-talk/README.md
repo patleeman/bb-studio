@@ -46,6 +46,10 @@ afterwards.
 - **Recordings for meetings.** **New recording** on the Recordings page, or
   the command *Talk: Start or stop a recording*, records for as long as you
   need without inserting anywhere.
+- **Dictations stay in the background.** Every dictation is saved in case
+  something goes wrong, but Studio's All view and Home leave them out. Pick
+  the **Dictations** filter, or search, to find one. Recordings you start
+  from Studio show up as usual.
 - **A table of recordings.** The Recordings page lists everything in a
   table you can search, filter to recordings or dictations, and sort by
   title, date, length, or word count. Tick rows, or shift-click for a range,
@@ -55,7 +59,8 @@ afterwards.
   put as you move between threads and pages. Everything else stays clickable.
   Drag it anywhere in the window and it stays there, even after a reload.
   Away from where you started, a back arrow returns you to that thread or
-  recording. Expand the pill to read the transcript as it arrives.
+  recording. Expand the pill to read the transcript as it arrives; the pill
+  remembers whether you left it expanded or collapsed.
 - **Streaming transcript.** Audio is cut into pieces of about 25 seconds at
   natural pauses. Each piece is transcribed as soon as it is uploaded, so text
   appears while you are still talking.

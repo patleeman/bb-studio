@@ -4,7 +4,7 @@ BB Studio collects the items owned by its add-ons in one searchable, tagged coll
 
 ## Provider contract
 
-A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accepts versions 1 and 2. Version 2 describes each kind's `capabilities` (`create`, `move`, `archive`, `delete`, `rename`, `duplicate`, `export`, `comments`, `versions`, `links`) and `mentionProviderId`. The collection hides actions disabled by capabilities. For version 1, Studio infers the capabilities that the old collection offered and uses no mention provider id.
+A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accepts versions 1 and 2. Version 2 describes each kind's `capabilities` (`create`, `move`, `archive`, `delete`, `rename`, `duplicate`, `export`, `comments`, `versions`, `links`) and `mentionProviderId`. The collection hides actions disabled by capabilities. For version 1, Studio infers the capabilities that the old collection offered and uses no mention provider id. A kind may set `background: true` for items kept only as a safety net, such as Talk's dictations: the collection's All view and Studio Home skip them, while the kind's own pill and search still find them.
 
 | Method | Input | Output |
 |---|---|---|
