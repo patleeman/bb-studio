@@ -21,6 +21,7 @@ To stage it, the capture script:
 - Lets BB's voice service transcribe it.
 
 The capture then presses **Record more** with Chrome's synthetic microphone.
+The updated capture definition waits for and checks the seeded meeting summary.
 The page shows the transcript grouped by session, with timestamps you can
 play from. At the top is the app-wide recording pill with its clock, input
 level, and pause and stop controls. The script deletes the seeded recording
@@ -67,6 +68,14 @@ afterwards.
   that no model is available, Talk uses the transcript's first words and the
   recording date. Titles update as the transcript grows and never replace a
   title you typed.
+- **Meeting notes.** When a recording finishes, Talk asks Studio Decisions for
+  a summary, decisions, and action items. Notes stay on the recording and can
+  be regenerated. Each action item suggests you or an agent as assignee. Press
+  **Create task** to add it to Studio Tasks and link the task to the recording.
+- **Exports.** Download a finished transcript as Markdown or plain text, or
+  download its original audio segments together as a tar archive.
+- **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
+  and read bounded portions of recordings and meeting notes.
 - **Mobile layout.** The pill, Recordings page, and composer mic all work in
   the BB mobile app, with larger touch targets on small screens.
 
@@ -172,6 +181,11 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
   **Resume** when the system needs a tap first.
 - **Voice service required.** Transcription needs BB's voice service turned
   on. Audio recorded without it is kept and transcribed once it is available.
+- **Speaker labels.** BB's current voice transcription API returns text only.
+  Talk does not assign speaker labels without a diarization result.
+- **Meeting notes.** They need Studio Decisions and its configured fallback
+  model. If generation fails, use **Generate** or **Regenerate** on the
+  recording page after the model is available.
 - **Personal project threads.** Titling runs hidden agent threads in BB's
   Personal project.
 

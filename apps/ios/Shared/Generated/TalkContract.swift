@@ -11,6 +11,8 @@ public enum Talk {
     public static let recording_heartbeat = "recording_heartbeat"
     public static let segment_put = "segment_put"
     public static let recording_retry = "recording_retry"
+    public static let meeting_regenerate = "meeting_regenerate"
+    public static let meeting_create_task = "meeting_create_task"
     public static let recording_delete = "recording_delete"
   }
 
@@ -29,6 +31,10 @@ public enum Talk {
   public typealias SegmentPut = SegmentPutOutput
 
   public typealias RecordingRetry = RecordingRetryOutput
+
+  public typealias MeetingRegenerate = MeetingRegenerateOutput
+
+  public typealias MeetingCreateTask = MeetingCreateTaskOutput
 
   public typealias RecordingDelete = RecordingDeleteOutput
 
@@ -126,6 +132,52 @@ public enum Talk {
     }
   }
 
+  public enum RecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordingsListOutputRecordingsItemMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: RecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: RecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct RecordingsListOutputRecordingsItemMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [RecordingsListOutputRecordingsItemMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingsListOutputRecordingsItemMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
   public struct RecordingsListOutputRecordingsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -144,8 +196,9 @@ public enum Talk {
     public var wordCount: Double?
     public var preview: String?
     public var archived: Bool?
+    public var meetingNotes: RecordingsListOutputRecordingsItemMeetingNotes?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingsListOutputRecordingsItemTitleSource? = nil, kind: RecordingsListOutputRecordingsItemKind? = nil, status: RecordingsListOutputRecordingsItemStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingsListOutputRecordingsItemTitleSource? = nil, kind: RecordingsListOutputRecordingsItemKind? = nil, status: RecordingsListOutputRecordingsItemStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: RecordingsListOutputRecordingsItemMeetingNotes? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -163,6 +216,7 @@ public enum Talk {
       self.wordCount = wordCount
       self.preview = preview
       self.archived = archived
+      self.meetingNotes = meetingNotes
     }
   }
 
@@ -266,6 +320,52 @@ public enum Talk {
     }
   }
 
+  public enum RecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordingGetOutputRecordingMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: RecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: RecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct RecordingGetOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [RecordingGetOutputRecordingMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingGetOutputRecordingMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
   public struct RecordingGetOutputRecording: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -284,8 +384,9 @@ public enum Talk {
     public var wordCount: Double?
     public var preview: String?
     public var archived: Bool?
+    public var meetingNotes: RecordingGetOutputRecordingMeetingNotes?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingGetOutputRecordingTitleSource? = nil, kind: RecordingGetOutputRecordingKind? = nil, status: RecordingGetOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingGetOutputRecordingTitleSource? = nil, kind: RecordingGetOutputRecordingKind? = nil, status: RecordingGetOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: RecordingGetOutputRecordingMeetingNotes? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -303,6 +404,7 @@ public enum Talk {
       self.wordCount = wordCount
       self.preview = preview
       self.archived = archived
+      self.meetingNotes = meetingNotes
     }
   }
 
@@ -494,6 +596,52 @@ public enum Talk {
     }
   }
 
+  public enum RecordingCreateOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordingCreateOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: RecordingCreateOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: RecordingCreateOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct RecordingCreateOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [RecordingCreateOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingCreateOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
   public struct RecordingCreateOutput: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -512,8 +660,9 @@ public enum Talk {
     public var wordCount: Double?
     public var preview: String?
     public var archived: Bool?
+    public var meetingNotes: RecordingCreateOutputMeetingNotes?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingCreateOutputTitleSource? = nil, kind: RecordingCreateOutputKind? = nil, status: RecordingCreateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingCreateOutputTitleSource? = nil, kind: RecordingCreateOutputKind? = nil, status: RecordingCreateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: RecordingCreateOutputMeetingNotes? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -531,6 +680,7 @@ public enum Talk {
       self.wordCount = wordCount
       self.preview = preview
       self.archived = archived
+      self.meetingNotes = meetingNotes
     }
   }
 
@@ -628,6 +778,52 @@ public enum Talk {
     }
   }
 
+  public enum RecordingRenameOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordingRenameOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: RecordingRenameOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: RecordingRenameOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct RecordingRenameOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [RecordingRenameOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingRenameOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
   public struct RecordingRenameOutput: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -646,8 +842,9 @@ public enum Talk {
     public var wordCount: Double?
     public var preview: String?
     public var archived: Bool?
+    public var meetingNotes: RecordingRenameOutputMeetingNotes?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRenameOutputTitleSource? = nil, kind: RecordingRenameOutputKind? = nil, status: RecordingRenameOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRenameOutputTitleSource? = nil, kind: RecordingRenameOutputKind? = nil, status: RecordingRenameOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: RecordingRenameOutputMeetingNotes? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -665,6 +862,7 @@ public enum Talk {
       self.wordCount = wordCount
       self.preview = preview
       self.archived = archived
+      self.meetingNotes = meetingNotes
     }
   }
 
@@ -789,6 +987,52 @@ public enum Talk {
     }
   }
 
+  public enum RecordingStateOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordingStateOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: RecordingStateOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: RecordingStateOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct RecordingStateOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [RecordingStateOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingStateOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
   public struct RecordingStateOutput: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -807,8 +1051,9 @@ public enum Talk {
     public var wordCount: Double?
     public var preview: String?
     public var archived: Bool?
+    public var meetingNotes: RecordingStateOutputMeetingNotes?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingStateOutputTitleSource? = nil, kind: RecordingStateOutputKind? = nil, status: RecordingStateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingStateOutputTitleSource? = nil, kind: RecordingStateOutputKind? = nil, status: RecordingStateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: RecordingStateOutputMeetingNotes? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -826,6 +1071,7 @@ public enum Talk {
       self.wordCount = wordCount
       self.preview = preview
       self.archived = archived
+      self.meetingNotes = meetingNotes
     }
   }
 
@@ -998,6 +1244,52 @@ public enum Talk {
     }
   }
 
+  public enum RecordingRetryOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct RecordingRetryOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: RecordingRetryOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: RecordingRetryOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct RecordingRetryOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [RecordingRetryOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [RecordingRetryOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
   public struct RecordingRetryOutput: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
@@ -1016,8 +1308,9 @@ public enum Talk {
     public var wordCount: Double?
     public var preview: String?
     public var archived: Bool?
+    public var meetingNotes: RecordingRetryOutputMeetingNotes?
 
-    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRetryOutputTitleSource? = nil, kind: RecordingRetryOutputKind? = nil, status: RecordingRetryOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, titleSource: RecordingRetryOutputTitleSource? = nil, kind: RecordingRetryOutputKind? = nil, status: RecordingRetryOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: RecordingRetryOutputMeetingNotes? = nil) {
       self.id = id
       self.title = title
       self.titleSource = titleSource
@@ -1035,6 +1328,213 @@ public enum Talk {
       self.wordCount = wordCount
       self.preview = preview
       self.archived = archived
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct MeetingRegenerateInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum MeetingRegenerateOutputRecordingTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum MeetingRegenerateOutputRecordingKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum MeetingRegenerateOutputRecordingStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum MeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct MeetingRegenerateOutputRecordingMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: MeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: MeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct MeetingRegenerateOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [MeetingRegenerateOutputRecordingMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [MeetingRegenerateOutputRecordingMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct MeetingRegenerateOutputRecording: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: MeetingRegenerateOutputRecordingTitleSource?
+    public var kind: MeetingRegenerateOutputRecordingKind?
+    public var status: MeetingRegenerateOutputRecordingStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var meetingNotes: MeetingRegenerateOutputRecordingMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: MeetingRegenerateOutputRecordingTitleSource? = nil, kind: MeetingRegenerateOutputRecordingKind? = nil, status: MeetingRegenerateOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, meetingNotes: MeetingRegenerateOutputRecordingMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct MeetingRegenerateOutput: Sendable, Hashable, Codable {
+    public var recording: MeetingRegenerateOutputRecording?
+
+    public init(recording: MeetingRegenerateOutputRecording? = nil) {
+      self.recording = recording
+    }
+  }
+
+  public struct MeetingCreateTaskInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var index: Int?
+
+    public init(id: String? = nil, index: Int? = nil) {
+      self.id = id
+      self.index = index
+    }
+  }
+
+  public struct MeetingCreateTaskOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+
+    public init(taskId: String? = nil) {
+      self.taskId = taskId
     }
   }
 

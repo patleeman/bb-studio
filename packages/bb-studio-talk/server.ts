@@ -1,5 +1,5 @@
 import { subcommand, takeOption } from "@bb-studio/kit/cli";
-import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
+import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 // bb-studio-talk — durable long-form dictation.
 //
 // The browser captures audio in short segments and uploads each one over RPC
@@ -17,11 +17,13 @@ import { z } from "zod";
 import { rpcContract } from "./src/shared/contract";
 import { RECORDING_CHANGED, formatLength } from "./src/shared/format";
 import { AudioFiles, pluginDataDirectory } from "./src/server/audio-files";
+import { audioArchive } from "./src/server/audio-archive";
 import { MENTION_TRANSCRIPT_CHARS, mentionContext, mentionSubtitle } from "./src/server/mentions";
 import { MIGRATIONS, TalkStore } from "./src/server/store";
 import { registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
+import { generateMeetingNotes } from "./src/server/meetings";
 
 export type { TalkRpcContract } from "./src/shared/contract";
 
@@ -74,6 +76,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
 
   const changed = (id: string) => changeBus.changed(id);
+  const services = studioServices(bb.sdk);
 
   // Empty recordings are never kept: one that finishes without a word
   // (a mic tapped by accident, silence, noise) is deleted with its audio.
@@ -111,6 +114,32 @@ export default async function plugin(bb: BbPluginApi) {
       .finally(() => titling.delete(id));
   }
 
+  const summarizing = new Set<string>();
+  async function meetingNotes(id: string, regenerate = false): Promise<void> {
+    const recording = store.recording(id);
+    if (!recording || recording.kind !== "recording" || recording.status !== "done" || recording.failedCount || !recording.wordCount) return;
+    if (!regenerate && recording.meetingNotes) return;
+    if (summarizing.has(id)) {
+      if (regenerate) throw new Error("Meeting notes are already being generated.");
+      return;
+    }
+    summarizing.add(id);
+    try {
+      const transcript = store.transcript(id);
+      const notes = await generateMeetingNotes(bb, id, transcript, lifetime.signal);
+      // A resumed recording may gain text while the model is working.
+      if (store.transcript(id) === transcript && store.saveMeetingNotes(id, notes)) changed(id);
+    } finally {
+      summarizing.delete(id);
+    }
+  }
+  function maybeSummarize(id: string): void {
+    void meetingNotes(id).catch((error) => {
+      if (!lifetime.signal.aborted) bb.log.warn(`Talk could not summarize ${id}: ${String(error)}`);
+    });
+  }
+  for (const recording of store.list({ includeArchived: true, limit: 10_000 })) maybeSummarize(recording.id);
+
   // ── Transcription ───────────────────────────────────────────────────────
   const transcriber = new Transcriber({
     store,
@@ -127,6 +156,7 @@ export default async function plugin(bb: BbPluginApi) {
       changed(id);
       maybeTitle(id);
       void discardEmpty(id);
+      maybeSummarize(id);
     },
     warn: (message) => bb.log.warn(message),
   });
@@ -168,7 +198,10 @@ export default async function plugin(bb: BbPluginApi) {
       const recording = store.setStatus(id, status);
       if (!recording) throw new Error(`No recording ${id}.`);
       changed(id);
-      if (recording.status === "done") maybeTitle(id);
+      if (recording.status === "done") {
+        maybeTitle(id);
+        maybeSummarize(id);
+      }
       // The caller gets the final state; isEmptyRecording tells it why the
       // recording is about to disappear.
       void discardEmpty(id);
@@ -210,6 +243,34 @@ export default async function plugin(bb: BbPluginApi) {
       changed(id);
       return mustGet(id);
     },
+    meeting_regenerate: async ({ id }) => {
+      const recording = mustGet(id);
+      if (recording.kind !== "recording" || recording.status !== "done" || recording.failedCount || !recording.wordCount) {
+        throw new Error("Finish transcribing the recording before generating notes.");
+      }
+      await meetingNotes(id, true);
+      return { recording: mustGet(id) };
+    },
+    meeting_create_task: async ({ id, index }) => {
+      const recording = mustGet(id);
+      const item = recording.meetingNotes?.actionItems[index];
+      if (!item) throw new Error("Action item not found.");
+      const created = await bb.sdk.plugins.callRpc({
+        pluginId: "studio-tasks", method: "create",
+        input: { title: item.title, description: `From ${recording.title}: /plugins/talk/recordings/${id}`, projectId: recording.projectId, assignee: item.assignee } as never,
+        outputSchema: z.object({ task: z.object({ id: z.string() }) }), signal: lifetime.signal,
+      });
+      const taskId = created.task.id;
+      await bb.sdk.plugins.callRpc({
+        pluginId: "studio-tasks", method: "link",
+        input: { id: taskId, link: { target: "item", pluginId: "talk", itemId: id, label: recording.title, href: `/plugins/talk/recordings/${id}` } } as never,
+        outputSchema: z.object({ ok: z.boolean() }), signal: lifetime.signal,
+      });
+      await services.replaceLinks({ pluginId: "talk", id }, `meeting-task:${taskId}`, [{
+        from: { pluginId: "talk", id }, to: { pluginId: "studio-tasks", id: taskId }, kind: "task-link", source: `meeting-task:${taskId}`,
+      }]).catch(() => { /* Studio is optional. */ });
+      return { taskId };
+    },
     recording_delete: async ({ id }) => {
       // A window is capturing into it; deleting now would strand the audio
       // still on its way. An interrupted one (its window is gone) can go.
@@ -232,7 +293,38 @@ export default async function plugin(bb: BbPluginApi) {
     const entry = store.segmentFile(recordingId, segmentId);
     if (!entry) return context.text("Not found", 404);
     const bytes = await files.read(entry.file);
-    return serveBytes(new Uint8Array(bytes), { "content-type": entry.mimeType.split(";")[0]! });
+    return serveBytes(new Uint8Array(bytes), {
+      "content-type": entry.mimeType.split(";")[0]!,
+      ...(context.req.query("download") === "1" ? { "content-disposition": `attachment; filename="${segmentId.replace(/[^a-zA-Z0-9_-]/g, "")}.${entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : "webm"}"` } : {}),
+    });
+  });
+  bb.http.route("GET", "/transcript", (context) => {
+    const id = context.req.query("recording") ?? "";
+    const recording = store.recording(id);
+    if (!recording || recording.status !== "done") return context.text("Not found", 404);
+    const markdown = context.req.query("format") === "markdown";
+    const transcript = store.transcript(id);
+    const content = markdown ? `# ${recording.title}\n\n${transcript}\n` : `${transcript}\n`;
+    const ext = markdown ? "md" : "txt";
+    return serveBytes(new TextEncoder().encode(content), {
+      "content-type": markdown ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8",
+      "content-disposition": `attachment; filename="${id}.${ext}"`,
+    });
+  });
+  bb.http.route("GET", "/audio-export", async (context) => {
+    const id = context.req.query("recording") ?? "";
+    const recording = store.recording(id);
+    if (!recording || recording.status !== "done") return context.text("Not found", 404);
+    const segments = store.segments(id);
+    const filesToArchive = await Promise.all(segments.map(async (segment, index) => {
+      const entry = store.segmentFile(id, segment.id)!;
+      const extension = entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : entry.mimeType.includes("webm") ? "webm" : "audio";
+      return { name: `${String(index + 1).padStart(4, "0")}.${extension}`, bytes: await files.read(entry.file) };
+    }));
+    return serveBytes(new Uint8Array(audioArchive(filesToArchive)), {
+      "content-type": "application/x-tar",
+      "content-disposition": `attachment; filename="${id}-audio.tar"`,
+    });
   });
 
   // ── @ mentions ──────────────────────────────────────────────────────────
@@ -251,6 +343,45 @@ export default async function plugin(bb: BbPluginApi) {
       return { context: mentionContext(recording, store.transcript(id)) };
     },
   }));
+
+  bb.agents.registerTool({
+    name: "talk_list",
+    description: "List recent Talk recordings and dictations. Search titles and transcripts with `query`.",
+    parameters: z.object({ query: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional() }),
+    execute({ query, limit }) {
+      const rows = store.list({ query, limit: limit ?? 30 });
+      return rows.length ? rows.map((r) => `- ${r.title} (${r.id}), ${r.kind}, ${r.status}, ${r.wordCount} words: /plugins/talk/recordings/${r.id}`).join("\n") : "No recordings match.";
+    },
+  });
+  bb.agents.registerTool({
+    name: "talk_read",
+    description: "Read a Talk recording's transcript and meeting notes. For long transcripts, use offset and limit to read another part.",
+    parameters: z.object({ id: z.string().min(1).max(100), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(20_000).optional() }),
+    execute({ id, offset = 0, limit = 12_000 }) {
+      const recording = store.recording(id);
+      if (!recording) return { content: [{ type: "text", text: `Recording ${id} not found.` }], isError: true };
+      const transcript = store.transcript(id);
+      const notes = recording.meetingNotes;
+      return [`${recording.title} (${id})`, `Status: ${recording.status}`, `Link: /plugins/talk/recordings/${id}`,
+        notes ? `Summary: ${notes.summary}\nDecisions: ${notes.decisions.join("; ") || "None"}\nAction items: ${notes.actionItems.map((item) => item.title).join("; ") || "None"}` : "",
+        `Transcript (${offset}–${Math.min(offset + limit, transcript.length)} of ${transcript.length} characters):\n${transcript.slice(offset, offset + limit) || "(No transcript.)"}`].filter(Boolean).join("\n\n");
+    },
+  });
+  bb.agents.registerTool({
+    name: "talk_search",
+    description: "Search Talk recording titles and transcripts. Returns matching recordings with a short transcript excerpt.",
+    parameters: z.object({ query: z.string().trim().min(1).max(200) }),
+    execute({ query }) {
+      const rows = store.list({ query, limit: 30 });
+      return rows.length ? rows.map((r) => {
+        const transcript = store.transcript(r.id);
+        const at = transcript.toLowerCase().indexOf(query.toLowerCase());
+        const excerpt = at < 0 ? r.preview : transcript.slice(Math.max(0, at - 80), at + query.length + 120);
+        return `- ${r.title} (${r.id}): ${excerpt.replace(/\s+/g, " ")}`;
+      }).join("\n") : "No recordings match.";
+    },
+  });
+  bb.agents.configure(() => ({ tools: ["talk_list", "talk_read", "talk_search"], skills: [] }));
 
   // ── `bb talk` ───────────────────────────────────────────────────────────
   const usage = [

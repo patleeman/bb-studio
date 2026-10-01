@@ -349,6 +349,9 @@ function RecordingDetail({ id }: { id: string }) {
       () => toast.success("Transcript copied"),
       (cause: unknown) => toast.error(errorMessage(cause)),
     );
+  const downloadTranscript = (format: "markdown" | "text") => {
+    window.open(`/api/v1/plugins/talk/http/transcript?recording=${encodeURIComponent(id)}&format=${format}`, "_blank", "noopener");
+  };
 
   return (
     <div className="relative h-full">
@@ -371,6 +374,13 @@ function RecordingDetail({ id }: { id: string }) {
                   <DropdownMenuItem onSelect={() => run(() => rpc.call("recording_retry", { id }))}>
                     <Icon name="RotateCcw" className="size-4" /> Retry {recording.failedCount} failed
                   </DropdownMenuItem>
+                ) : null}
+                {recording.status === "done" ? (
+                  <>
+                    <DropdownMenuItem onSelect={() => downloadTranscript("markdown")}>Download Markdown</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => downloadTranscript("text")}>Download text</DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => window.open(`/api/v1/plugins/talk/http/audio-export?recording=${encodeURIComponent(id)}`, "_blank", "noopener")}>Download audio</DropdownMenuItem>
+                  </>
                 ) : null}
             </ItemMenu>
           </>
@@ -399,6 +409,24 @@ function RecordingDetail({ id }: { id: string }) {
         </div>
 
         <UnsentNotice recordingId={id} className="mt-6" />
+
+        {recording.kind === "recording" && recording.status === "done" ? (
+          <section className="mt-6 rounded-lg border border-border p-4" aria-label="Meeting notes">
+            <div className="flex items-center justify-between gap-3">
+              <h2 className="font-semibold">Meeting notes</h2>
+              <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => rpc.call("meeting_regenerate", { id }))}>
+                <Icon name="RotateCcw" /> {recording.meetingNotes ? "Regenerate" : "Generate"}
+              </button>
+            </div>
+            {recording.meetingNotes ? (
+              <div className="mt-3 space-y-4 text-sm">
+                <p>{recording.meetingNotes.summary}</p>
+                {recording.meetingNotes.decisions.length ? <div><h3 className="font-medium">Decisions</h3><ul className="mt-1 list-disc pl-5">{recording.meetingNotes.decisions.map((decision, index) => <li key={index}>{decision}</li>)}</ul></div> : null}
+                {recording.meetingNotes.actionItems.length ? <div><h3 className="font-medium">Action items</h3><ul className="mt-2 space-y-2">{recording.meetingNotes.actionItems.map((item, index) => <li key={index} className="flex items-center justify-between gap-3"><span>{item.title}{item.assignee ? <span className="text-muted-foreground"> · Suggested: {item.assignee === "me" ? "you" : "agent"}</span> : null}</span><button type="button" className={OUTLINE_BUTTON} onClick={() => run(async () => { const result = await rpc.call("meeting_create_task", { id, index }); toast.success(`Task created: ${result.taskId}`); })}>Create task</button></li>)}</ul></div> : null}
+              </div>
+            ) : <p className="mt-3 text-sm text-muted-foreground">Notes appear after Talk finishes processing the transcript.</p>}
+          </section>
+        ) : null}
 
         {confirmDelete ? (
           <div className="mt-6">

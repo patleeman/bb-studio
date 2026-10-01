@@ -14,7 +14,9 @@ through Codex by default). Every recording is saved, titled, and searchable.
 ## Reading recordings
 
 A mentioned recording arrives as context with its title, link, status, and
-transcript (up to 60,000 characters). For more, use the CLI. Output is bounded.
+transcript (up to 60,000 characters). Use `talk_list`, `talk_search`, and
+`talk_read` to find recordings and read meeting notes or bounded transcript
+pages. The CLI is also available.
 
 ```sh
 bb talk list [--query <text>] [--json]     # 50 most recent, or matches in titles and transcripts

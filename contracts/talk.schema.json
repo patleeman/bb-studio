@@ -101,6 +101,63 @@
                 },
                 "archived": {
                   "type": "boolean"
+                },
+                "meetingNotes": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "summary": {
+                          "type": "string"
+                        },
+                        "decisions": {
+                          "type": "array",
+                          "items": {
+                            "type": "string"
+                          }
+                        },
+                        "actionItems": {
+                          "type": "array",
+                          "items": {
+                            "type": "object",
+                            "properties": {
+                              "title": {
+                                "type": "string"
+                              },
+                              "assignee": {
+                                "anyOf": [
+                                  {
+                                    "type": "string",
+                                    "enum": [
+                                      "me",
+                                      "agent"
+                                    ]
+                                  },
+                                  {
+                                    "type": "null"
+                                  }
+                                ]
+                              }
+                            },
+                            "required": [
+                              "title",
+                              "assignee"
+                            ],
+                            "additionalProperties": false
+                          }
+                        }
+                      },
+                      "required": [
+                        "summary",
+                        "decisions",
+                        "actionItems"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -228,6 +285,63 @@
               },
               "archived": {
                 "type": "boolean"
+              },
+              "meetingNotes": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": {
+                        "type": "string"
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "actionItems": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            },
+                            "assignee": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "me",
+                                    "agent"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "assignee"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "summary",
+                      "decisions",
+                      "actionItems"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
               }
             },
             "required": [
@@ -446,6 +560,63 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -569,6 +740,63 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -695,6 +923,63 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -917,6 +1202,63 @@
           },
           "archived": {
             "type": "boolean"
+          },
+          "meetingNotes": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "summary": {
+                    "type": "string"
+                  },
+                  "decisions": {
+                    "type": "array",
+                    "items": {
+                      "type": "string"
+                    }
+                  },
+                  "actionItems": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "title": {
+                          "type": "string"
+                        },
+                        "assignee": {
+                          "anyOf": [
+                            {
+                              "type": "string",
+                              "enum": [
+                                "me",
+                                "agent"
+                              ]
+                            },
+                            {
+                              "type": "null"
+                            }
+                          ]
+                        }
+                      },
+                      "required": [
+                        "title",
+                        "assignee"
+                      ],
+                      "additionalProperties": false
+                    }
+                  }
+                },
+                "required": [
+                  "summary",
+                  "decisions",
+                  "actionItems"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
           }
         },
         "required": [
@@ -937,6 +1279,223 @@
           "wordCount",
           "preview",
           "archived"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "meeting_regenerate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "recording": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "title": {
+                "type": "string"
+              },
+              "titleSource": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "auto",
+                  "user"
+                ]
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "dictation"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "recording",
+                  "paused",
+                  "interrupted",
+                  "finishing",
+                  "done"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "endedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "durationMs": {
+                "type": "number"
+              },
+              "segmentCount": {
+                "type": "number"
+              },
+              "pendingCount": {
+                "type": "number"
+              },
+              "failedCount": {
+                "type": "number"
+              },
+              "wordCount": {
+                "type": "number"
+              },
+              "preview": {
+                "type": "string"
+              },
+              "archived": {
+                "type": "boolean"
+              },
+              "meetingNotes": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "summary": {
+                        "type": "string"
+                      },
+                      "decisions": {
+                        "type": "array",
+                        "items": {
+                          "type": "string"
+                        }
+                      },
+                      "actionItems": {
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "title": {
+                              "type": "string"
+                            },
+                            "assignee": {
+                              "anyOf": [
+                                {
+                                  "type": "string",
+                                  "enum": [
+                                    "me",
+                                    "agent"
+                                  ]
+                                },
+                                {
+                                  "type": "null"
+                                }
+                              ]
+                            }
+                          },
+                          "required": [
+                            "title",
+                            "assignee"
+                          ],
+                          "additionalProperties": false
+                        }
+                      }
+                    },
+                    "required": [
+                      "summary",
+                      "decisions",
+                      "actionItems"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "title",
+              "titleSource",
+              "kind",
+              "status",
+              "projectId",
+              "threadId",
+              "createdAt",
+              "updatedAt",
+              "endedAt",
+              "durationMs",
+              "segmentCount",
+              "pendingCount",
+              "failedCount",
+              "wordCount",
+              "preview",
+              "archived"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "recording"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "meeting_create_task": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "id",
+          "index"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "taskId"
         ],
         "additionalProperties": false
       }

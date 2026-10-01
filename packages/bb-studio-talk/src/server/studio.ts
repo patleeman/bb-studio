@@ -23,7 +23,7 @@ export const RECORDING_KINDS: StudioKind[] = [
     actions: [COPY_TRANSCRIPT],
     create: { mode: "event", event: NEW_RECORDING_EVENT },
     canArchive: true,
-    capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: false },
+    capabilities: { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: false, versions: false, links: true },
     mentionProviderId: "recordings",
     blurb: "Long voice notes, transcribed.",
     agentHint: "Read the transcript with `bb talk transcript <id>`; `bb talk show <id>` has the details.",
@@ -87,7 +87,12 @@ export function registerStudio(
   createStoreProvider(bb, schemas, {
     studio_describe: () => ({ pluginId: "talk", version: 2, panel: "recordings", kinds: RECORDING_KINDS }),
     studio_get: ({ ids }) => ({ items: ids.flatMap((id) => { const row = store.recording(id); return row ? [toStudioItem(row, store.transcript(id))] : []; }) }),
-    studio_read: ({ id }) => ({ content: store.recording(id) ? store.transcript(id) : null }),
+    studio_read: ({ id }) => {
+      const recording = store.recording(id);
+      if (!recording) return { content: null };
+      const notes = recording.meetingNotes;
+      return { content: [notes?.summary, notes?.decisions.join("\n"), notes?.actionItems.map((item) => item.title).join("\n"), store.transcript(id)].filter(Boolean).join("\n\n") };
+    },
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });
       return {

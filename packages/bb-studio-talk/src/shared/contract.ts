@@ -20,6 +20,13 @@ export type RecordingStatus = z.infer<typeof recordingStatusSchema>;
 export const recordingKindSchema = z.enum(["recording", "dictation"]);
 export type RecordingKind = z.infer<typeof recordingKindSchema>;
 
+export const meetingNotesSchema = z.object({
+  summary: z.string(),
+  decisions: z.array(z.string()),
+  actionItems: z.array(z.object({ title: z.string(), assignee: z.enum(["me", "agent"]).nullable() })),
+});
+export type MeetingNotes = z.infer<typeof meetingNotesSchema>;
+
 export const recordingSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -39,6 +46,7 @@ export const recordingSchema = z.object({
   /** The last few hundred characters of transcript, for list rows. */
   preview: z.string(),
   archived: z.boolean(),
+  meetingNotes: meetingNotesSchema.nullable().optional(),
 });
 export type Recording = z.infer<typeof recordingSchema>;
 
@@ -118,6 +126,14 @@ export const rpcContract = defineRpcContract({
   recording_retry: {
     input: z.object({ id: recordingId }),
     output: recordingSchema,
+  },
+  meeting_regenerate: {
+    input: z.object({ id: recordingId }),
+    output: z.object({ recording: recordingSchema }),
+  },
+  meeting_create_task: {
+    input: z.object({ id: recordingId, index: z.number().int().min(0).max(100) }),
+    output: z.object({ taskId: z.string() }),
   },
   recording_delete: {
     input: z.object({ id: recordingId }),

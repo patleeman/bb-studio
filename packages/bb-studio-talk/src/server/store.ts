@@ -8,6 +8,7 @@ import type {
   RecordingStatus,
   Segment,
   SegmentStatus,
+  MeetingNotes,
 } from "../shared/contract";
 import { countWords, defaultTitle, joinTranscript, tail } from "../shared/format";
 
@@ -50,6 +51,7 @@ export const MIGRATIONS = [
    CREATE INDEX recordings_updated ON recordings(updated_at);`,
   // BB Studio: archiving, as for every Studio item.
   `ALTER TABLE recordings ADD COLUMN archived_at INTEGER;`,
+  `ALTER TABLE recordings ADD COLUMN meeting_notes TEXT;`,
 ];
 
 interface RecordingRow {
@@ -66,6 +68,7 @@ interface RecordingRow {
   ended_at: number | null;
   heartbeat_at: number;
   archived_at: number | null;
+  meeting_notes: string | null;
 }
 
 interface SegmentRow {
@@ -209,6 +212,11 @@ export class TalkStore {
     );
   }
 
+  saveMeetingNotes(id: string, notes: MeetingNotes): boolean {
+    return this.db.prepare(`UPDATE recordings SET meeting_notes = ?, updated_at = ? WHERE id = ? AND status = 'done'`)
+      .run(JSON.stringify(notes), this.now(), id).changes > 0;
+  }
+
   /** Idempotent: re-sending a stored segment (a retried upload) is a no-op. */
   addSegment(segment: NewSegment): boolean {
     const id = `${segment.sessionId}-${segment.index}`;
@@ -232,6 +240,7 @@ export class TalkStore {
         this.now(),
       );
     if (result.changes === 0) return false;
+    this.db.prepare(`UPDATE recordings SET meeting_notes = NULL WHERE id = ?`).run(segment.recordingId);
     this.touch(segment.recordingId, { heartbeat: true });
     return true;
   }
@@ -324,10 +333,11 @@ export class TalkStore {
     const at = this.now();
     this.db
       .prepare(
-        `UPDATE recordings SET status = ?, ended_at = ?, heartbeat_at = ?, updated_at = ?
+        `UPDATE recordings SET status = ?, ended_at = ?, heartbeat_at = ?, updated_at = ?,
+         meeting_notes = CASE WHEN ? = 'recording' THEN NULL ELSE meeting_notes END
          WHERE id = ?`,
       )
-      .run(status, status === "finishing" ? at : null, at, at, id);
+      .run(status, status === "finishing" ? at : null, at, at, status, id);
     if (status === "finishing") this.settle(id);
     return this.recording(id);
   }
@@ -487,6 +497,7 @@ export class TalkStore {
       wordCount: countWords(transcript),
       preview: tail(transcript, 240),
       archived: row.archived_at !== null,
+      meetingNotes: row.meeting_notes ? JSON.parse(row.meeting_notes) as MeetingNotes : null,
     };
   }
 }
