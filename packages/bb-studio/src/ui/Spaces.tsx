@@ -440,6 +440,21 @@ export function SpaceDialog({
   const [project, setProject] = useState(space ? (space.defaultProjectId ?? "") : (defaultProjectId ?? ""));
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [restored, setRestored] = useState<string | null>(null);
+
+  const restore = async () => {
+    if (!space) return;
+    setBusy(true);
+    setError(null);
+    try {
+      const { added } = await rpc.call("restoreSpaceWidgets", { id: space.id });
+      setRestored(added ? `Added ${added} ${added === 1 ? "widget" : "widgets"} to the page.` : "The page has every widget.");
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setBusy(false);
+    }
+  };
 
   const save = async () => {
     setBusy(true);
@@ -500,7 +515,13 @@ export function SpaceDialog({
             <span className="text-xs text-muted-foreground">New items go here, and it joins the space with its items and threads.</span>
           </label>
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
+          {restored ? <p className="text-xs text-muted-foreground">{restored}</p> : null}
           <DialogFooter>
+            {space?.pageId ? (
+              <Button type="button" variant="ghost" className="sm:mr-auto" disabled={busy} onClick={() => void restore()}>
+                Restore missing widgets
+              </Button>
+            ) : null}
             <Button type="button" variant="ghost" onClick={onClose}>
               Cancel
             </Button>

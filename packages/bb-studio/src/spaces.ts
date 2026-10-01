@@ -149,10 +149,22 @@ export class SpaceStore {
     return this.get(id)!;
   }
 
-  /** Sets or clears the space's home page. */
-  setPage(id: string, pageId: string | null): void {
+  /** Sets or clears the space's home page, made from template `template`. */
+  setPage(id: string, pageId: string | null, template = 1): void {
     if (!this.exists(id)) throw new Error("That space no longer exists.");
-    this.db.prepare("INSERT INTO spaces (tag_id, page_id) VALUES (?, ?) ON CONFLICT (tag_id) DO UPDATE SET page_id = excluded.page_id").run(id, pageId);
+    this.db
+      .prepare("INSERT INTO spaces (tag_id, page_id, page_template) VALUES (?, ?, ?) ON CONFLICT (tag_id) DO UPDATE SET page_id = excluded.page_id, page_template = excluded.page_template")
+      .run(id, pageId, template);
+  }
+
+  /** The template version the space's page has caught up with; pages from before versions were kept are 1. */
+  pageTemplate(id: string): number {
+    const row = this.db.prepare("SELECT page_template FROM spaces WHERE tag_id = ?").get(id) as { page_template: number | null } | undefined;
+    return row?.page_template ?? 1;
+  }
+
+  setPageTemplate(id: string, template: number): void {
+    this.db.prepare("UPDATE spaces SET page_template = ? WHERE tag_id = ?").run(template, id);
   }
 
   /** Deletes the space; its members stay where they are. */

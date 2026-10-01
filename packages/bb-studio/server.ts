@@ -26,7 +26,7 @@ import { itemAtPath, TabStore } from "./src/tabs";
 import { TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
-import { PAGES_PLUGIN_ID, pageHref, spacePageMarkdown } from "./src/space-page";
+import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
 import { compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
 import { SearchIndex } from "./src/search-index";
@@ -236,6 +236,24 @@ export default async function plugin(bb: BbPluginApi) {
   const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean() }).nullable() });
   const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
     bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
+  const pageMarkdown = z.object({ markdown: z.string() });
+  /** Appends the widgets in `sections` that the space's page lacks, and says how many. */
+  const addWidgets = async (space: Space, sections: readonly SpaceWidget[]): Promise<number> => {
+    if (!space.pageId || !sections.length) return 0;
+    for (let attempt = 0; ; attempt++) {
+      const { markdown } = await callPages("editableMarkdown", { id: space.pageId }, pageMarkdown);
+      const present = pageWidgets(markdown, space.id);
+      const missing = sections.filter((section) => !present.has(section));
+      if (!missing.length) return 0;
+      try {
+        // Pages appends only if the page is still what was read.
+        await callPages("editBlock", { id: space.pageId, expected: markdown, markdown: widgetsMarkdown(space, missing) }, pageMarkdown);
+        return missing.length;
+      } catch (cause) {
+        if (attempt) throw cause;
+      }
+    }
+  };
   const making = new Map<string, Promise<string | null>>();
   /** A space's home page, made from the space template if it has none, or one was deleted; null without Pages. */
   const spacePage = (id: string): Promise<string | null> => {
@@ -247,7 +265,16 @@ export default async function plugin(bb: BbPluginApi) {
       if (space.pageId) {
         const found = await callPages("get", { id: space.pageId }, pageResult).catch(() => undefined);
         // Pages being down doesn't lose the page.
-        if (found === undefined || (found.page && !found.page.archived)) return space.pageId;
+        if (found === undefined) return space.pageId;
+        if (found.page && !found.page.archived) {
+          // A page from an older template gains the widgets added since, once.
+          const template = spaces.pageTemplate(id);
+          if (template < SPACE_TEMPLATE_VERSION) {
+            const caughtUp = await addWidgets(space, widgetsSince(template)).then(() => true, () => false);
+            if (caughtUp) spaces.setPageTemplate(id, SPACE_TEMPLATE_VERSION);
+          }
+          return space.pageId;
+        }
       }
       const made = await callPages(
         "create",
@@ -255,7 +282,7 @@ export default async function plugin(bb: BbPluginApi) {
         pageResult,
       ).catch(() => null);
       if (!made?.page) return null;
-      spaces.setPage(id, made.page.id);
+      spaces.setPage(id, made.page.id, SPACE_TEMPLATE_VERSION);
       tagsChanged();
       return made.page.id;
     })().finally(() => making.delete(id));
@@ -415,6 +442,10 @@ export default async function plugin(bb: BbPluginApi) {
     spacePage: async ({ id }) => {
       const pageId = await spacePage(id);
       return { href: pageId ? pageHref(pageId) : null };
+    },
+    restoreSpaceWidgets: async ({ id }) => {
+      if (!(await spacePage(id))) throw new Error("Pages isn't available.");
+      return { added: await addWidgets(spaces.get(id)!, SPACE_WIDGETS) };
     },
     spaceWidget: async ({ id }) => {
       const space = spaces.get(id);
