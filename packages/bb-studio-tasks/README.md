@@ -11,11 +11,13 @@ next, such as "Needs your input" or "Ready for review". You mark it done.
 
 ## Staged preview
 
-![Live BB screenshot of the Studio Tasks board](assets/staged-preview.png)
+![Live BB screenshot of a Studio Tasks board](assets/staged-preview.png)
 
-The Tasks board in an isolated staged BB application shows six seeded tasks in
-the "Acme app" project, including a high-priority recurring task and its
-subtask. The header shows the Board, List and Calendar views.
+A board opened from the Boards index in an isolated staged BB application:
+"Fall launch", in the seeded Orbit project, with six seeded tasks across To do,
+In progress, Review and Done, including a high-priority recurring task and its
+subtask. The header has the Boards back link, the board's title and project,
+and the Board, List and Calendar views.
 
 ## What you get
 
