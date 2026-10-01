@@ -18,7 +18,7 @@ export const spaceKind: StudioKind = {
   actions: [],
   create: { mode: "event", event: NEW_SPACE_EVENT },
   canArchive: false,
-  capabilities: { create: true, move: false, archive: false, delete: false, rename: false, duplicate: false, export: false, comments: false, versions: false, links: false },
+  capabilities: { create: true, move: false, archive: false, delete: true, rename: false, duplicate: false, export: false, comments: false, versions: false, links: false },
   mentionProviderId: null,
   blurb: "A home for a piece of work: its documents, projects, threads and channels.",
 };

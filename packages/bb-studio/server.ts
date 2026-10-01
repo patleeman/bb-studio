@@ -23,7 +23,7 @@ import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
-import { TagStore, type ItemRef, type Tag } from "./src/tags";
+import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
 import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
@@ -233,7 +233,7 @@ export default async function plugin(bb: BbPluginApi) {
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
 
-  const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean() }).nullable() });
+  const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean(), title: z.string().optional(), icon: z.string().optional() }).nullable() });
   const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
     bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
   const pageMarkdown = z.object({ markdown: z.string() });
@@ -255,7 +255,7 @@ export default async function plugin(bb: BbPluginApi) {
     }
   };
   const making = new Map<string, Promise<string | null>>();
-  /** A space's home page, made from the space template if it has none, or its page was archived; null without Pages. */
+  /** A space's home page, made from the space template if it has none; null without Pages. */
   const spacePage = (id: string): Promise<string | null> => {
     const pending = making.get(id);
     if (pending) return pending;
@@ -266,7 +266,9 @@ export default async function plugin(bb: BbPluginApi) {
         const found = await callPages("get", { id: space.pageId }, pageResult).catch(() => undefined);
         // Pages being down doesn't lose the page.
         if (found === undefined) return space.pageId;
-        if (found.page && !found.page.archived) {
+        // The page is the space, so an archived one comes back rather than a new one being made.
+        if (found.page?.archived) await callPages("update", { id: space.pageId, archived: false }, pageResult).catch(() => {});
+        if (found.page) {
           // A page from an older template gains the widgets added since, once.
           const template = spaces.pageTemplate(id);
           if (template < SPACE_TEMPLATE_VERSION) {
@@ -290,16 +292,41 @@ export default async function plugin(bb: BbPluginApi) {
     return work;
   };
   /**
-   * A space is its page: deleting the page deletes the space. Checks the space
-   * pages among the changed ids, or all of them when Pages doesn't say which.
-   * Only Pages answering that a page is gone counts, never Pages being down.
+   * A space is its page: deleting the page deletes the space, and renaming it
+   * renames the space. Checks the space pages among the changed ids, or all of
+   * them when Pages doesn't say which. Only Pages answering that a page is
+   * gone counts, never Pages being down.
    */
-  const dropSpacesWithoutPages = async (changed: string[] | null) => {
+  const syncSpacePages = async (changed: string[] | null) => {
     const candidates = spaces.list().filter((space) => space.pageId && (!changed || changed.includes(space.pageId)));
     const found = await Promise.all(candidates.map((space) => callPages("get", { id: space.pageId }, pageResult).catch(() => undefined)));
-    const deleted = candidates.filter((_, index) => found[index] && !found[index]!.page);
-    for (const space of deleted) spaces.remove(space.id);
-    if (deleted.length) tagsChanged();
+    let touched = false;
+    candidates.forEach((space, index) => {
+      const result = found[index];
+      if (!result) return;
+      if (!result.page) {
+        spaces.remove(space.id);
+        touched = true;
+        return;
+      }
+      const name = result.page.title?.replace(/\s+/g, " ").trim().slice(0, MAX_TAG_NAME).trim();
+      const icon = result.page.icon === undefined ? space.icon : result.page.icon || null;
+      if ((!name || name === space.name) && icon === space.icon) return;
+      try {
+        spaces.update(space.id, { ...(name ? { name } : {}), icon });
+        touched = true;
+      } catch {
+        // Another tag or space has that name; the space keeps its own.
+      }
+    });
+    if (touched) tagsChanged();
+  };
+  const deleteSpace = (id: string) => {
+    const pageId = spaces.get(id)?.pageId;
+    spaces.remove(id);
+    // The page may hold the user's writing: archive it rather than delete it.
+    if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
+    tagsChanged();
   };
   /** A space's page keeps its name and icon. */
   const renamePage = (space: Space) => {
@@ -403,6 +430,11 @@ export default async function plugin(bb: BbPluginApi) {
     move: ({ pluginId, ids, projectId }) => hub.call(pluginId, "studio_move", { ids, projectId }),
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
     remove: async ({ pluginId, ids }) => {
+      if (pluginId === STUDIO_PLUGIN_ID) {
+        const done = ids.filter((id) => spaces.get(id));
+        for (const id of done) deleteSpace(id);
+        return { done, failed: ids.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })) };
+      }
       const result = await hub.call(pluginId, "studio_delete", { ids });
       tags.forget(pluginId, result.done);
       if (tabs.forget(pluginId, result.done)) tabsChanged();
@@ -444,11 +476,7 @@ export default async function plugin(bb: BbPluginApi) {
       return { space };
     },
     deleteSpace: ({ id }) => {
-      const pageId = spaces.get(id)?.pageId;
-      spaces.remove(id);
-      // The page may hold the user's writing: archive it rather than delete it.
-      if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
-      tagsChanged();
+      deleteSpace(id);
       return { ok: true };
     },
     spacePage: async ({ id }) => {
@@ -546,7 +574,7 @@ export default async function plugin(bb: BbPluginApi) {
       const byId = new Map(fresh?.map((item) => [item.id, item]));
       for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
       for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
-      if (pluginId === PAGES_PLUGIN_ID) await dropSpacesWithoutPages(ids || removed ? [...(ids ?? []), ...(removed ?? [])] : null);
+      if (pluginId === PAGES_PLUGIN_ID) await syncSpacePages(ids || removed ? [...(ids ?? []), ...(removed ?? [])] : null);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
       return { ok: true };
     },
