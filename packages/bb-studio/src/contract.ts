@@ -39,11 +39,6 @@ const usageLimits = z.object({ turnsPerHour: z.number(), turnsPerDay: z.number()
 const thread = z.object({ threadId: z.string(), ref: itemRef, role: z.string(), state: z.string(), createdAt: z.number(), updatedAt: z.number(), metadata: z.record(z.string(), z.string()) });
 const comment = z.object({ id: z.string(), ref: itemRef, parentId: z.string().nullable(), anchor: z.string().nullable(), actor, body: z.string(), createdAt: z.number(), resolvedAt: z.number().nullable() });
 const version = z.object({ id: z.string(), ref: itemRef, sha256: z.string(), label: z.string(), actor, createdAt: z.number() });
-const playbook = z.object({
-  id: z.string().min(1).max(100), name: z.string().min(1).max(200), description: z.string().max(1000),
-  pages: z.array(z.object({ title: z.string().max(200), markdown: z.string().max(200_000) })).max(30),
-  tasks: z.array(z.object({ title: z.string().max(300), description: z.string().max(20_000), assignee: z.string().optional(), handoffPrompt: z.string().max(10_000).optional() })).max(100),
-});
 export type TagView = z.infer<typeof tag>;
 
 export { TABS_CHANNEL } from "./ids";
@@ -111,10 +106,6 @@ export const rpcContract = defineRpcContract({
   templates: { input: z.null(), output: z.object({ items: z.array(schemas.item.extend({ pluginId })) }) },
   exportItem: { input: z.object({ pluginId, id: z.string().min(1).max(200), format: z.string().min(1).max(30) }), output: schemas.provider.studio_export.output },
   exportBulk: { input: z.object({ items: z.array(itemRef.extend({ format: z.string().min(1).max(30) })).min(1).max(100) }), output: z.object({ name: z.string(), mime: z.string(), data: z.string() }) },
-  playbooks: { input: z.null(), output: z.object({ playbooks: z.array(playbook) }) },
-  savePlaybook: { input: playbook, output: z.object({ playbook }) },
-  deletePlaybook: { input: z.object({ id: z.string().min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
-  runPlaybook: { input: z.object({ id: z.string().min(1).max(100), projectId: z.string().min(1).max(200), variables: z.record(z.string(), z.string()).default({}), startHandoffs: z.boolean().default(false) }), output: z.object({ items: z.array(itemRef), threadIds: z.array(z.string()) }) },
   move: { input: z.object({ pluginId, ids, projectId }), output: schemas.results },
   archive: { input: z.object({ pluginId, ids, archived: z.boolean() }), output: schemas.results },
   remove: { input: z.object({ pluginId, ids }), output: schemas.results },

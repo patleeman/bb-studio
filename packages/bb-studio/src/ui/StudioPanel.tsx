@@ -159,10 +159,8 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const { data, error, refetch, setData } = useOverview(rpc);
   const { sidebar, setVisible } = useSidebar(rpc);
   const [templates, setTemplates] = useState<{ pluginId: string; id: string; title: string }[]>([]);
-  const [playbooks, setPlaybooks] = useState<{ id: string; name: string }[]>([]);
   useEffect(() => {
     rpc.call("templates", null).then(({ items }) => setTemplates(items), () => setTemplates([]));
-    rpc.call("playbooks", null).then(({ playbooks: rows }) => setPlaybooks(rows), () => setPlaybooks([]));
   }, [rpc, data?.items]);
   const [tipDismissed, setTipDismissed] = useState(() => {
     try {
@@ -304,12 +302,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       const name = window.prompt("Name for this template (optional)", "");
       if (name === null) return;
       void rpc.call("instantiateTemplate", { pluginId: item.pluginId, id: item.id, projectId, variables: { name } }).then(({ item: created }) => { refetch(); openAppPath(created.href); }, (cause: unknown) => toast.error(`Couldn't use template: ${errorMessage(cause)}`));
-    } })),
-    ...playbooks.map((book) => ({ id: `playbook:${book.id}`, label: `Playbook: ${book.name}`, icon: "ListTodo", onSelect: (projectId: string | null) => {
-      if (!projectId) { toast.error("Pick a project to run a playbook."); return; }
-      const name = window.prompt("Name for this playbook (optional)", "");
-      if (name === null) return;
-      void rpc.call("runPlaybook", { id: book.id, projectId, variables: { name }, startHandoffs: false }).then(({ items }) => { refetch(); toast.success(`Created ${items.length} items`); }, (cause: unknown) => toast.error(`Couldn't run playbook: ${errorMessage(cause)}`));
     } })),
   ];
 

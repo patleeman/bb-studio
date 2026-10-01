@@ -42,7 +42,7 @@ Studio keeps an SQLite FTS index of every provider's titles and `studio_read` te
 
 `home { projectId?, periodDays }` feeds the Studio panel's Today view. **Needs you** gathers BB approvals and questions, Studio Teams attention requests, tasks in review or due, and open comments, ranked by urgency. `homeRespond` answers a BB approval or question from Home. The other sections list due and in-review tasks, running threads and bots, recent items, upcoming automations, and the activity feed. There is no separate inbox.
 
-Templates, playbooks, and bulk export are described in the [Studio README](../packages/bb-studio/README.md#templates-playbooks-and-export).
+Templates and bulk export are described in the [Studio README](../packages/bb-studio/README.md#templates-and-export).
 
 ## Collection and installation
 

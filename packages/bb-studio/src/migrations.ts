@@ -75,4 +75,6 @@ export const MIGRATIONS = [
    CREATE INDEX item_threads_item ON item_threads (plugin_id, item_id, created_at);
    CREATE INDEX item_threads_thread ON item_threads (thread_id);`,
   `CREATE TABLE studio_playbooks (id TEXT PRIMARY KEY, name TEXT NOT NULL, data TEXT NOT NULL)`,
+  // Playbooks were removed.
+  `DROP TABLE IF EXISTS studio_playbooks`,
 ];
