@@ -84,7 +84,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (checkingThreads.has(thread.id)) { pendingThreads.set(thread.id, thread); return; }
     checkingThreads.add(thread.id);
     try {
-      const events = await bb.sdk.threads.events.list({ threadId: thread.id, order: "asc", limit: "50", types: ["client/turn/requested", "client/turn/start"] });
+      const events = await bb.sdk.threads.events.list({ threadId: thread.id, order: "asc", limit: "50", types: ["client/thread/start", "client/turn/requested", "client/turn/start"] });
       const refs = firstThreadItemRefs(events);
       if (refs === null) return;
       for (const ref of refs) {
