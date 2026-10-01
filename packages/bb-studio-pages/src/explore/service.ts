@@ -4,7 +4,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 // BB specifics (threads, timeline) and page writes come in as deps, so this
 // runs the same in tests against a real in-memory database.
 import type { ExplainerView, JobView } from "./contract";
-import { cleanExplainerMarkdown } from "./markdown";
+import { cleanExplainer } from "./markdown";
 import type { ExplorePages } from "./pages";
 import { workerPrompt } from "./prompt";
 import { STAGES, explainerHref, isActiveJob, parseExploreItem, threadHref, type ExploreItem, type JobStatus } from "./shared";
@@ -254,7 +254,7 @@ export class ExploreService {
         const row = this.store.explainer(active.explainerId);
         if (row) this.deps.changed(row);
       });
-      const cleaned = cleanExplainerMarkdown(output);
+      const cleaned = cleanExplainer(output);
 
       this.stage(active, "saving", "Saving the page.");
       const current = this.store.explainer(active.explainerId)!;

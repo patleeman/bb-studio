@@ -1,7 +1,8 @@
 // An Explore explainer in the Page side-panel tab (`{ explainerId }`
 // params): live progress (with Stop) while it's written, the error with
-// Retry when it failed, and once it's ready the page's live editor under a
-// header (when it was written, Regenerate, Open in Pages) with its follow-up
+// Retry when it failed, and once it's ready the explainer's HTML document (or,
+// for an older Markdown explainer, the page's live editor) under a header
+// (when it was written, Regenerate, Open in Pages) with its follow-up
 // findings below.
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -12,10 +13,33 @@ import { REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
 import { EXPLORE_ICON, explainerEvent, rowState, useMinuteTick, type ExplainerView, type RowState } from "./explore";
 import { ExploreRows } from "./explore-rows";
+import { HtmlFrame } from "./html";
 import { OpenInPages, PanelMessage, PanelShell, usePanelPage } from "./PanelShell";
 import { relativeTime } from "./shared";
 
 const POLL_MS = 2_000;
+/** An explainer is one document, so let its frame grow well past an HTML block's cap. */
+const MAX_DOCUMENT_HEIGHT = 40_000;
+
+/** The explainer's HTML document, refetched when its page changes: undefined while loading, null for Markdown. */
+function useExplainerHtml(explainerId: string, version: string | null): string | null | undefined {
+  const rpc = useRpc<typeof rpcContract>();
+  const [html, setHtml] = useState<{ version: string; html: string | null } | null>(null);
+  useEffect(() => {
+    if (!version) return;
+    let live = true;
+    rpc.call("explainerDocument", { explainerId }).then(
+      (result) => live && setHtml({ version, html: result.html }),
+      () => live && setHtml({ version, html: null }),
+    );
+    return () => {
+      live = false;
+    };
+  }, [rpc, explainerId, version]);
+  if (!version) return null;
+  // Keep showing the last document while a newer version loads.
+  return html ? html.html : undefined;
+}
 
 export function ExplainerPanel({ explainerId }: { explainerId: string }) {
   const rpc = useRpc<typeof rpcContract>();
@@ -48,6 +72,7 @@ export function ExplainerPanel({ explainerId }: { explainerId: string }) {
   }, [state, load]);
 
   const page = usePanelPage(explainer?.pageId ?? null);
+  const html = useExplainerHtml(explainerId, page ? `${page.id}:${page.updatedAt}` : null);
 
   async function run(method: "exploreRegenerate" | "exploreStop") {
     setActing(true);
@@ -103,12 +128,25 @@ export function ExplainerPanel({ explainerId }: { explainerId: string }) {
     />
   ) : null;
 
-  if (explainer.pageId && page) return <PanelShell page={page} header={header} footer={followUps} />;
+  if (explainer.pageId && page && html) {
+    return (
+      <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
+        {header}
+        <div className="min-h-0 flex-1 overflow-auto">
+          <div className="pt-2">
+            <HtmlFrame source={html} title={page.title || explainer.label} maxHeight={MAX_DOCUMENT_HEIGHT} />
+          </div>
+          {followUps ? <div className="px-4 pb-24">{followUps}</div> : <div className="pb-20" />}
+        </div>
+      </div>
+    );
+  }
+  if (explainer.pageId && page && html === null) return <PanelShell page={page} header={header} footer={followUps} />;
 
   return (
     <div className="pages-doc relative flex h-full min-h-0 flex-col overflow-auto bg-background text-foreground">
       {header}
-      {explainer.pageId && page === undefined ? (
+      {explainer.pageId && (page === undefined || (page && html === undefined)) ? (
         <p className="p-4 text-sm text-muted-foreground">Loading…</p>
       ) : state === "idle" ? (
         <p className="p-4 text-sm text-muted-foreground">{explainer.pageId ? "Its page was deleted. Generate it again to write a new one." : "Not written yet."}</p>

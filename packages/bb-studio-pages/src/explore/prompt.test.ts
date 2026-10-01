@@ -44,7 +44,8 @@ describe("the worker prompt", () => {
     expect(prompt).toContain("Files changed in that answer: src/billing.ts");
     expect(prompt).toContain("Files read in that answer: src/queue.ts");
     expect(prompt.indexOf("<explore-data>")).toBeLessThan(prompt.indexOf("Finding:"));
-    expect(prompt).toMatch(/```xml/);
+    expect(prompt).toMatch(/<!doctype html>/);
+    expect(prompt).toMatch(/prefers-color-scheme: dark/);
     expect(prompt).toMatch(/::explore\{items=/);
   });
 
@@ -58,6 +59,17 @@ describe("the worker prompt", () => {
     expect(prompt.match(/<\/explore-data>/g)).toHaveLength(1);
     expect(prompt).toContain("## Old page");
     expect(prompt).toMatch(/write it fresh/);
+  });
+
+  it("briefs a follow-up with the text of an HTML explainer", () => {
+    const prompt = workerPrompt({
+      item: { emoji: "🔗", label: "Next" },
+      hints: { read: [], changed: [], searched: [] },
+      parent: { label: "Parent", markdown: "```html\n<!doctype html><html><body><style>p{color:red}</style><p>Jobs retry.</p></body></html>\n```" },
+      regenerating: false,
+    });
+    expect(prompt).toContain("Jobs retry.");
+    expect(prompt).not.toContain("color:red");
   });
 });
 

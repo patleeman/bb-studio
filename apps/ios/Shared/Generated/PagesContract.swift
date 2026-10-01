@@ -38,6 +38,7 @@ public enum Pages {
     public static let exploreRegenerate = "exploreRegenerate"
     public static let exploreStop = "exploreStop"
     public static let explainer = "explainer"
+    public static let explainerDocument = "explainerDocument"
     public static let explainersForMessage = "explainersForMessage"
     public static let explainers = "explainers"
   }
@@ -115,6 +116,8 @@ public enum Pages {
   public typealias ExploreStop = ExploreStopOutput
 
   public typealias Explainer = ExplainerOutput
+
+  public typealias ExplainerDocument = ExplainerDocumentOutput
 
   public typealias ExplainersForMessage = ExplainersForMessageOutput
 
@@ -2435,6 +2438,22 @@ public enum Pages {
 
     public init(explainer: ExplainerOutputExplainer? = nil) {
       self.explainer = explainer
+    }
+  }
+
+  public struct ExplainerDocumentInput: Sendable, Hashable, Codable {
+    public var explainerId: String?
+
+    public init(explainerId: String? = nil) {
+      self.explainerId = explainerId
+    }
+  }
+
+  public struct ExplainerDocumentOutput: Sendable, Hashable, Codable {
+    public var html: String?
+
+    public init(html: String? = nil) {
+      self.html = html
     }
   }
 

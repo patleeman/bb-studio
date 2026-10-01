@@ -78,6 +78,11 @@ export const exploreMethods = {
     input: z.object({ explainerId }),
     output: z.object({ explainer: explainerSchema.nullable() }),
   },
+  /** The explainer's page as an HTML document, or null when it's Markdown (or not written yet). */
+  explainerDocument: {
+    input: z.object({ explainerId }),
+    output: z.object({ html: z.string().nullable() }),
+  },
   /** The explainers started from one message's findings (or one explainer's follow-ups). */
   explainersForMessage: {
     input: z.object({ threadId, messageId, parentId: explainerId.nullable().optional() }),

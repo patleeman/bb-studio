@@ -3467,6 +3467,38 @@
         "additionalProperties": false
       }
     },
+    "explainerDocument": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "html"
+        ],
+        "additionalProperties": false
+      }
+    },
     "explainersForMessage": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

@@ -21,13 +21,13 @@ export function htmlSrcDoc(source: string): string {
   return `${source}\n${FRAME_SCRIPT}`;
 }
 
-export const clampHeight = (height: number) => Math.min(MAX_HEIGHT, Math.max(MIN_HEIGHT, Math.ceil(height)));
+export const clampHeight = (height: number, max = MAX_HEIGHT) => Math.min(max, Math.max(MIN_HEIGHT, Math.ceil(height)));
 
 /**
  * Same isolation as artifact embeds: scripts run, but in an opaque origin
  * with no access to BB, its cookies or storage, and no popups or navigation.
  */
-function HtmlFrame({ source }: { source: string }) {
+export function HtmlFrame({ source, title = "HTML block", maxHeight = MAX_HEIGHT }: { source: string; title?: string; maxHeight?: number }) {
   const frame = useRef<HTMLIFrameElement>(null);
   const dark = useDarkMode();
   const [height, setHeight] = useState(MIN_HEIGHT * 2);
@@ -42,15 +42,15 @@ function HtmlFrame({ source }: { source: string }) {
       if (!frame.current || event.source !== frame.current.contentWindow) return;
       const data = event.data as { type?: unknown; height?: unknown } | null;
       if (data?.type !== HTML_HEIGHT_MESSAGE || typeof data.height !== "number" || !Number.isFinite(data.height)) return;
-      setHeight(clampHeight(data.height));
+      setHeight(clampHeight(data.height, maxHeight));
     };
     window.addEventListener("message", onMessage);
     return () => window.removeEventListener("message", onMessage);
-  }, []);
+  }, [maxHeight]);
   return (
     <iframe
       ref={frame}
-      title="HTML block"
+      title={title}
       srcDoc={htmlSrcDoc(shown)}
       sandbox="allow-scripts"
       loading="lazy"

@@ -11,6 +11,7 @@ import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import type { BbPluginApi, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { PagesService } from "../service";
+import { explainerHtml } from "./markdown";
 import { explorePages } from "./pages";
 import { exploreInstructions } from "./prompt";
 import { ExploreService } from "./service";
@@ -33,9 +34,10 @@ type CliResult = PluginCliResult;
 export function registerExplore(bb: BbPluginApi, pages: PagesService) {
   const store = new ExploreStore(bb.storage.database());
   const workers = exploreWorkers(bb);
+  const explainerPages = explorePages(pages, bb.sdk.plugins);
   const service = new ExploreService({
     store,
-    pages: explorePages(pages, bb.sdk.plugins),
+    pages: explainerPages,
     collect: workers.collect,
     startWorker: (explainer, prompt, context) => workers.startWorker(explainer, prompt, context),
     awaitWorker: workers.awaitWorker,
@@ -71,6 +73,11 @@ export function registerExplore(bb: BbPluginApi, pages: PagesService) {
     exploreRegenerate: ({ explainerId }: { explainerId: string }) => ({ explainer: service.view(service.regenerate(explainerId)) }),
     exploreStop: ({ explainerId }: { explainerId: string }) => ({ explainer: view(service.stop(explainerId)) }),
     explainer: ({ explainerId }: { explainerId: string }) => ({ explainer: view(store.explainer(explainerId)) }),
+    explainerDocument: async ({ explainerId }: { explainerId: string }) => {
+      const pageId = store.explainer(explainerId)?.page_id;
+      const markdown = pageId ? await explainerPages.markdown(pageId).catch(() => null) : null;
+      return { html: markdown ? explainerHtml(markdown) : null };
+    },
     explainersForMessage: ({ threadId, messageId, parentId }: { threadId: string; messageId: string; parentId?: string | null }) => ({
       explainers: store.forMessage(threadId, messageId, parentId ?? null).map((row) => service.view(row)),
     }),
