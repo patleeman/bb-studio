@@ -34,8 +34,8 @@ The **Work with this page…** composer floats at the bottom right.
 ![The Pages collection listing the seeded pages](assets/collection.png)
 
 The collection is what the **Pages** nav item opens. It shows:
-- the search box
-- the filter pills and the project pill
+- the query bar, filtered to `Kind: Pages`
+- the filter rail, with counts by kind, project and tag
 - the list/grid toggle and **New page**
 - the three seeded pages, with their project and last activity
 

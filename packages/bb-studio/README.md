@@ -10,9 +10,10 @@ kind, project and tag, and hand any of them to an agent. Anything that needs you
 
 ![Live BB screenshot of the Studio collection](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio collection filtered to the seeded Orbit
-project, as cards. It lists a paused Talk recording, a drawing, three pages and
-a Tasks board, with the kind filters and the New menu in the header.
+Captured from a staged BB (`node scripts/staged-bb.mjs start`): the Studio
+collection as cards, with the query bar above it and the filter rail beside it.
+The rail counts the seeded items by kind, project and tag. The cards show a
+paused Talk recording, a drawing, three Orbit pages and the staged bots.
 
 ![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
 
