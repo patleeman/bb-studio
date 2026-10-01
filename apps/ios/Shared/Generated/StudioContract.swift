@@ -25,6 +25,12 @@ public enum Studio {
     public static let renameTag = "renameTag"
     public static let deleteTag = "deleteTag"
     public static let tagItems = "tagItems"
+    public static let createSpace = "createSpace"
+    public static let updateSpace = "updateSpace"
+    public static let deleteSpace = "deleteSpace"
+    public static let spaceMembers = "spaceMembers"
+    public static let spaceThreads = "spaceThreads"
+    public static let recentThreads = "recentThreads"
     public static let studio_changed = "studio_changed"
     public static let sidebar = "sidebar"
     public static let tabs = "tabs"
@@ -97,6 +103,20 @@ public enum Studio {
   public typealias DeleteTag = DeleteTagOutput
 
   public typealias TagItems = TagItemsOutput
+
+  public typealias CreateSpace = CreateSpaceOutput
+
+  public typealias UpdateSpace = UpdateSpaceOutput
+
+  public typealias DeleteSpace = DeleteSpaceOutput
+
+  public typealias SpaceMembers = SpaceMembersOutput
+
+  public typealias SpaceThreads = SpaceThreadsOutput
+
+  public typealias RecentThreadsInput = StudioJSONValue
+
+  public typealias RecentThreads = RecentThreadsOutput
 
   public typealias StudioChanged = StudioChangedOutput
 
@@ -818,8 +838,9 @@ public enum Studio {
     public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
+    public var spaces: [String]?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: OverviewOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [OverviewOutputItemsItemFactsItem]? = nil, badge: OverviewOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil, spaces: [String]? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -838,6 +859,7 @@ public enum Studio {
       self.template = template
       self.pluginId = pluginId
       self.tags = tags
+      self.spaces = spaces
     }
   }
 
@@ -853,15 +875,41 @@ public enum Studio {
     }
   }
 
+  public struct OverviewOutputSpacesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var color: String?
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var threadIds: [String]?
+    public var itemKeys: [String]?
+
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.color = color
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.threadIds = threadIds
+      self.itemKeys = itemKeys
+    }
+  }
+
   public struct OverviewOutput: Sendable, Hashable, Codable {
     public var providers: [OverviewOutputProvidersItem]?
     public var items: [OverviewOutputItemsItem]?
     public var tags: [OverviewOutputTagsItem]?
+    public var spaces: [OverviewOutputSpacesItem]?
 
-    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil) {
+    public init(providers: [OverviewOutputProvidersItem]? = nil, items: [OverviewOutputItemsItem]? = nil, tags: [OverviewOutputTagsItem]? = nil, spaces: [OverviewOutputSpacesItem]? = nil) {
       self.providers = providers
       self.items = items
       self.tags = tags
+      self.spaces = spaces
     }
   }
 
@@ -976,8 +1024,9 @@ public enum Studio {
     public var template: Bool?
     public var pluginId: String?
     public var tags: [String]?
+    public var spaces: [String]?
 
-    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil) {
+    public init(id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, projectId: String? = nil, parentId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: ItemsOutputItemsItemUpdatedBy? = nil, preview: String? = nil, facts: [ItemsOutputItemsItemFactsItem]? = nil, badge: ItemsOutputItemsItemBadge? = nil, thumbnailUrl: String? = nil, href: String? = nil, archived: Bool? = nil, template: Bool? = nil, pluginId: String? = nil, tags: [String]? = nil, spaces: [String]? = nil) {
       self.id = id
       self.kind = kind
       self.title = title
@@ -996,6 +1045,7 @@ public enum Studio {
       self.template = template
       self.pluginId = pluginId
       self.tags = tags
+      self.spaces = spaces
     }
   }
 
@@ -2102,6 +2152,240 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct CreateSpaceInput: Sendable, Hashable, Codable {
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var name: String?
+
+    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, name: String? = nil) {
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.name = name
+    }
+  }
+
+  public struct CreateSpaceOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var color: String?
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var threadIds: [String]?
+    public var itemKeys: [String]?
+
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.color = color
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.threadIds = threadIds
+      self.itemKeys = itemKeys
+    }
+  }
+
+  public struct CreateSpaceOutput: Sendable, Hashable, Codable {
+    public var space: CreateSpaceOutputSpace?
+
+    public init(space: CreateSpaceOutputSpace? = nil) {
+      self.space = space
+    }
+  }
+
+  public struct UpdateSpaceInput: Sendable, Hashable, Codable {
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var id: String?
+    public var name: String?
+
+    public init(icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, id: String? = nil, name: String? = nil) {
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct UpdateSpaceOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var color: String?
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var threadIds: [String]?
+    public var itemKeys: [String]?
+
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.color = color
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.threadIds = threadIds
+      self.itemKeys = itemKeys
+    }
+  }
+
+  public struct UpdateSpaceOutput: Sendable, Hashable, Codable {
+    public var space: UpdateSpaceOutputSpace?
+
+    public init(space: UpdateSpaceOutputSpace? = nil) {
+      self.space = space
+    }
+  }
+
+  public struct DeleteSpaceInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct DeleteSpaceOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct SpaceMembersInputAddItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct SpaceMembersInputRemoveItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct SpaceMembersInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var add: [SpaceMembersInputAddItem]?
+    public var remove: [SpaceMembersInputRemoveItem]?
+
+    public init(id: String? = nil, add: [SpaceMembersInputAddItem]? = nil, remove: [SpaceMembersInputRemoveItem]? = nil) {
+      self.id = id
+      self.add = add
+      self.remove = remove
+    }
+  }
+
+  public struct SpaceMembersOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var color: String?
+    public var icon: String?
+    public var description: String?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var threadIds: [String]?
+    public var itemKeys: [String]?
+
+    public init(id: String? = nil, name: String? = nil, color: String? = nil, icon: String? = nil, description: String? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, threadIds: [String]? = nil, itemKeys: [String]? = nil) {
+      self.id = id
+      self.name = name
+      self.color = color
+      self.icon = icon
+      self.description = description
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.threadIds = threadIds
+      self.itemKeys = itemKeys
+    }
+  }
+
+  public struct SpaceMembersOutput: Sendable, Hashable, Codable {
+    public var space: SpaceMembersOutputSpace?
+
+    public init(space: SpaceMembersOutputSpace? = nil) {
+      self.space = space
+    }
+  }
+
+  public struct SpaceThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct SpaceThreadsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var direct: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, direct: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.direct = direct
+    }
+  }
+
+  public struct SpaceThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [SpaceThreadsOutputThreadsItem]?
+
+    public init(threads: [SpaceThreadsOutputThreadsItem]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public struct RecentThreadsOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var projectId: String?
+    public var updatedAt: Double?
+    public var direct: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, direct: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.projectId = projectId
+      self.updatedAt = updatedAt
+      self.direct = direct
+    }
+  }
+
+  public struct RecentThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [RecentThreadsOutputThreadsItem]?
+
+    public init(threads: [RecentThreadsOutputThreadsItem]? = nil) {
+      self.threads = threads
     }
   }
 
