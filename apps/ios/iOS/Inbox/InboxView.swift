@@ -99,7 +99,6 @@ final class InboxModel: ObservableObject {
             for thread in all { ThreadTitles.set(thread.id, thread.displayTitle) }
             // Titles that mention archived threads: fetch those names too.
             await ThreadTitles.fetchUnknown(in: all.map(\.displayTitle), client: client)
-            LiveItems.sync(all)
             Spotlight.index(self.threads, projectNames: projectNames)
             error = nil
             let snapshot = InboxSnapshot(threads: self.threads, botTeams: botTeams, projectNames: projectNames)

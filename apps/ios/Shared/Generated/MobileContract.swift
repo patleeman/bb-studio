@@ -3,43 +3,16 @@ import Foundation
 
 public enum Mobile {
   public enum Method {
-    public static let live_register = "live_register"
     public static let mute_list = "mute_list"
     public static let notify = "notify"
     public static let mute_set = "mute_set"
   }
-
-  public typealias LiveRegister = LiveRegisterOutput
 
   public typealias MuteList = MuteListOutput
 
   public typealias Notify = NotifyOutput
 
   public typealias MuteSet = MuteSetOutput
-
-  public struct LiveRegisterInput: Sendable, Hashable, Codable {
-    public var threadPushToStartToken: String?
-    public var activityId: String?
-    public var activityToken: String?
-    public var threadId: String?
-    public var endedActivityId: String?
-
-    public init(threadPushToStartToken: String? = nil, activityId: String? = nil, activityToken: String? = nil, threadId: String? = nil, endedActivityId: String? = nil) {
-      self.threadPushToStartToken = threadPushToStartToken
-      self.activityId = activityId
-      self.activityToken = activityToken
-      self.threadId = threadId
-      self.endedActivityId = endedActivityId
-    }
-  }
-
-  public struct LiveRegisterOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
 
   public struct MuteListInput: Sendable, Hashable, Codable {
 

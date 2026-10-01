@@ -1,48 +1,6 @@
 {
   "pluginId": "mobile",
   "methods": {
-    "live_register": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threadPushToStartToken": {
-            "type": "string"
-          },
-          "activityId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          },
-          "activityToken": {
-            "type": "string"
-          },
-          "threadId": {
-            "type": "string",
-            "pattern": "^thr_[A-Za-z0-9]+$"
-          },
-          "endedActivityId": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 200
-          }
-        }
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "ok": {
-            "type": "boolean",
-            "const": true
-          }
-        },
-        "required": [
-          "ok"
-        ],
-        "additionalProperties": false
-      }
-    },
     "mute_list": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

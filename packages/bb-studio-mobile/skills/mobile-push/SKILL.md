@@ -1,6 +1,6 @@
 ---
 name: mobile-push
-description: Check or configure the BB Studio push relay (the Mobile plugin) that sends BB push notifications to the native iOS app over APNs and drives its per-thread Live Activities.
+description: Check or configure the BB Studio push relay (the Mobile plugin) that sends BB push notifications to the native iOS app over APNs.
 ---
 
 # BB Studio push relay
@@ -9,24 +9,6 @@ The Mobile plugin receives the push-notifications plugin's Expo-format batches
 at `POST /api/v1/plugins/mobile/http/push` (token auth). Tokens starting with
 `apns:` go to Apple; every other token is forwarded to Expo unchanged, so the
 official mobile app keeps working.
-
-## Thread Live Activities
-
-BB Studio shows a Live Activity for each top-level thread that is running,
-needs you (a pending approval or question), failed unread, or finished in the
-last 30 minutes and is still unread, up to three at once. Each shows the
-thread's latest reply and what it's asking. Approve/Deny, single-select answer
-choices, and Stop run from the lock screen; Reply opens the thread's composer.
-
-The plugin starts each activity by push, updates it on thread events (text at
-most every 30 seconds; phase and question changes at once, plus every two
-minutes), alerts quietly when a thread newly needs you, fails, or finishes, and
-ends it when the thread settles or is read. A swiped-away activity stays away
-until its thread's phase changes. iOS caps an activity at eight hours, so the
-plugin replaces it at 7.5.
-
-The app reports its push-to-start and per-activity tokens through the
-`live_register` RPC. Live Activity pushes use the same APNs settings below.
 
 ## Actionable notifications
 
@@ -54,7 +36,7 @@ local notification.
 
 ## Commands
 
-- `bb mobile status [--json]` — whether APNs is configured, the last delivery result, and the Live Activity state.
+- `bb mobile status [--json]` — whether APNs is configured, and the last delivery result.
 
 ## Settings (`bb plugin config mobile`)
 

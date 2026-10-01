@@ -278,7 +278,7 @@
     {
       "id": "mobile",
       "displayName": "Studio Mobile",
-      "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions, muted threads, and a status Live Activity.",
+      "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads.",
       "icon": "Smartphone",
       "tags": [
         "mobile",

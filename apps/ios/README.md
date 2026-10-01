@@ -87,7 +87,6 @@ are unchanged, and old `bbgo://` links still open.
 | Spotlight indexes open threads and Studio pages, tasks, recordings, drawings, and artifacts; removed items leave search. Handoff opens the current thread in the Mac browser | `iOS/App/Spotlight.swift` |
 | Share extension: send text, links, images, and files to a new or existing thread | `Share/` |
 | URL scheme `bbstudio://thread/<id>`, `page/<id>`, `automations`, `usage`, `archived`, `studio` (also `talk`, `pages`, `drawings`), `drawing/<id>`, `artifact/<id>`, `new`, `dictate`, `voice[/<id>]`, `web`, `settings`. Links with the old `bbgo://` scheme still open | `AppModel.handle` |
-| A Live Activity for each thread that's running, needs you, or just finished (up to three): its latest reply and what it's asking, with Approve/Deny, answer choices, Stop, and Reply | `Widgets/ItemActivities.swift`, `LiveActivity/ThreadActivityIntents.swift`, `iOS/App/LiveItems.swift`, `packages/bb-studio-mobile/live.ts` |
 | A Live Activity while a Talk recording is in progress | `Widgets/ItemActivities.swift`, `iOS/App/LiveItems.swift` |
 | Shortcuts can select threads, tasks, and pages; add a task, open a page or task, send to a thread, and start a Talk recording | `iOS/App/StudioIntents.swift` |
 | iPad: sidebar tabs, a split view with the inbox beside the thread, a Find button, and a readable width for messages. A Thread menu in the menu bar. Keyboard: ⌘↩ send, ⌘N new thread, ⌘↓ latest, ⇧⌘M model, ⌘. stop; in find, ⌘G / ⇧⌘G step | `iOS/App/RootView.swift` |
@@ -176,9 +175,7 @@ notifications, including through the notification extension.
      "http://127.0.0.1:38886/api/v1/plugins/mobile/http/push?token=$(bb plugin token mobile)"
    ```
    The app registers itself (`apns:<token>`) on its first launch after you
-   grant notification permission. It also registers its Live Activity tokens,
-   so the plugin can start the status activity while the app is closed. Until
-   then, the app keeps the activity current only while it is open.
+   grant notification permission.
 4. **TestFlight** (optional):
    1. Sign in to Xcode with the team's Apple ID (Settings → Accounts). The
       script signs and uploads through that account. An App Store Connect API

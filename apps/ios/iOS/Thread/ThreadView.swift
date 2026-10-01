@@ -776,7 +776,7 @@ struct ThreadView: View {
         .frame(maxWidth: Self.readableWidth)
         .frame(maxWidth: .infinity)
         .background(.bar)
-        // A Reply from a thread's Live Activity lands here.
+        // A `bbstudio://reply/<id>` link lands here.
         .onChange(of: app.replyThreadId, initial: true) { _, id in
             guard id == model.threadId else { return }
             composerFocused = true

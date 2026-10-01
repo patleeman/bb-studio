@@ -7,9 +7,6 @@
 //
 // Plugins without BB's shared notification queue send through `notify`, which
 // reaches the devices this relay has delivered to before.
-//
-// It also drives the app's thread Live Activities (see live.ts): thread events
-// pick which threads get one and push start, update, or end.
 import { readFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
@@ -18,7 +15,6 @@ import {
   APNS_TOKEN_PREFIX,
   deliverApns,
   Http2ApnsSender,
-  isHexToken,
   notificationCategory,
   ProviderToken,
   rememberedDevices,
@@ -27,7 +23,6 @@ import {
   type ExpoMessage,
   type ExpoTicket,
 } from "./apns.js";
-import { activityPayload, askOf, decide, lastText, pick, START_TIMEOUT_MS, threadTitle, type LiveThread, type Phase, type ThreadActivityState, type ThreadRecord } from "./live.js";
 
 const messageSchema = z.object({ to: z.string().min(1) }).passthrough();
 const batchSchema = z.union([z.array(messageSchema).max(100), messageSchema.transform((message) => [message])]);
@@ -36,34 +31,15 @@ type LastDelivery = { at: string; apns: number; expo: number; errors: string[]; 
 const LAST_DELIVERY_KEY = "last-delivery";
 /** Option buttons on a question notification; iOS shows about this many before it gets cramped. */
 const MAX_CHOICES = 6;
-/** The retired one-per-phone status activity; ended once on upgrade. */
-const LEGACY_LIVE_KEY = "live";
-/** The app's push-to-start token for thread activities. */
-const LIVE_START_KEY = "live-start";
-const LIVE_THREADS_KEY = "thread-activities";
+/** Retired Live Activity state: the per-phone status activity, then per-thread ones. Ended once on upgrade. */
+const RETIRED_LIVE_KEYS = ["live", "live-threads", "live-start", "thread-activities"];
 /** Thread ids whose notifications BB Studio shouldn't get. */
 const MUTED_KEY = "muted-threads";
 const MAX_MUTED = 500;
 /** APNs recipients seen on the relay, with when each was last seen. */
 const DEVICES_KEY = "devices";
 
-const hexToken = z
-  .string()
-  .transform((value) => value.toLowerCase())
-  .refine(isHexToken, "Expected a hex APNs token");
-
-export const liveContract = defineRpcContract({
-  live_register: {
-    experimental_description: "BB Studio reports its Live Activity push tokens and activity lifecycle.",
-    input: z.object({
-      threadPushToStartToken: hexToken.optional(),
-      activityId: z.string().min(1).max(200).optional(),
-      activityToken: hexToken.optional(),
-      threadId: z.string().regex(/^thr_[A-Za-z0-9]+$/).optional(),
-      endedActivityId: z.string().min(1).max(200).optional(),
-    }),
-    output: z.object({ ok: z.literal(true) }),
-  },
+export const mobileContract = defineRpcContract({
   mute_list: {
     experimental_description: "Threads muted in BB Studio.",
     input: z.object({}).optional(),
@@ -88,12 +64,6 @@ export const liveContract = defineRpcContract({
     output: z.object({ threadIds: z.array(z.string()) }),
   },
 });
-
-/** Coalesces bursts of thread events into one Live Activity push. */
-const RECONCILE_DELAY_MS = 1500;
-/** Streaming output on a shown thread checks back this often. */
-const OUTPUT_DELAY_MS = 10_000;
-const RECONCILE_INTERVAL_MS = 2 * 60_000;
 
 export default async function plugin(bb: BbPluginApi) {
   const settings = bb.settings.define({
@@ -227,6 +197,7 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   async function deliver(messages: ExpoMessage[]): Promise<ExpoTicket[]> {
+    void retireLiveActivities();
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
@@ -304,170 +275,40 @@ export default async function plugin(bb: BbPluginApi) {
     { auth: "token" },
   );
 
-  // --- Thread Live Activities -----------------------------------------------
-
-  let liveQueue: Promise<void> = Promise.resolve();
-  let reconcileTimer: ReturnType<typeof setTimeout> | null = null;
-  let reconcileAt = Infinity;
-  /** Threads with an activity, so output events elsewhere don't wake us. */
-  let shown = new Set<string>();
-
-  /** Serializes read-modify-write of the activity records. */
-  function withLive(fn: (records: Record<string, ThreadRecord>) => Promise<Record<string, ThreadRecord> | void>): Promise<void> {
-    const run = liveQueue.then(async () => {
-      const records = (await bb.storage.kv.get<Record<string, ThreadRecord>>(LIVE_THREADS_KEY)) ?? {};
-      const next = await fn(records);
-      if (next) await bb.storage.kv.set(LIVE_THREADS_KEY, next);
-      shown = new Set(Object.keys(next ?? records));
-    });
-    liveQueue = run.catch((error: unknown) => {
-      bb.log.warn(`live activity: ${error instanceof Error ? error.message : String(error)}`);
-    });
-    return liveQueue;
-  }
-
-  async function stateFor(thread: LiveThread, phase: Phase, now: number): Promise<ThreadActivityState> {
-    const [output, interactions] = await Promise.all([
-      bb.sdk.threads.output({ threadId: thread.id }).catch(() => null),
-      phase === "needsYou" ? bb.sdk.threads.interactions.list({ threadId: thread.id }).catch(() => []) : [],
-    ]);
-    const pending = interactions.find((interaction) => interaction.status === "pending");
-    return {
-      title: threadTitle(thread),
-      phase,
-      last: lastText(output?.output),
-      ask: pending ? askOf(pending) : null,
-      updatedAt: Math.floor(now / 1000),
-    };
-  }
-
-  /** Ends the status activity earlier versions showed, once. */
-  async function retireStatusActivity(apns: { config: ApnsConfig; token: ProviderToken }) {
-    const legacy = await bb.storage.kv.get<{ activity: { token: string } | null }>(LEGACY_LIVE_KEY);
-    if (!legacy) return;
-    if (legacy.activity) {
-      const payload = JSON.stringify({ aps: { timestamp: Math.floor(Date.now() / 1000), event: "end", "dismissal-date": 0, "content-state": {} } });
-      await sendApns({ deviceToken: legacy.activity.token, payload, pushType: "liveactivity", priority: 10 }, apns.config, apns.token, sender.send);
+  /**
+   * Ends the Live Activities earlier versions showed (one per phone, then one
+   * per thread) and forgets their tokens. Waits for APNs to be configured.
+   */
+  let retired = false;
+  async function retireLiveActivities() {
+    if (retired) return;
+    const apns = await apnsConfig();
+    if ("missing" in apns) return;
+    retired = true;
+    try {
+      await endRetiredActivities(apns);
+    } catch (error) {
+      retired = false;
+      bb.log.warn(`retiring Live Activities: ${error instanceof Error ? error.message : String(error)}`);
     }
-    await bb.storage.kv.delete(LEGACY_LIVE_KEY);
-    await bb.storage.kv.delete("live-threads");
   }
 
-  function reconcile(): Promise<void> {
-    return withLive(async (records) => {
-      const apns = await apnsConfig();
-      if ("missing" in apns) return;
-      await retireStatusActivity(apns);
-      const startToken = await bb.storage.kv.get<string>(LIVE_START_KEY);
-      if (!startToken && !Object.keys(records).length) return;
-      const now = Date.now();
-      const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
-      const threads = await bb.sdk.threads.list({ archived: false, hasParent: false, limit: 200 });
-      const showing = new Set(Object.keys(records).filter((id) => records[id]!.activity || records[id]!.startRequestedAt));
-      const picked = new Map(pick(threads, showing, muted, now).map((entry) => [entry.thread.id, entry]));
-      const push = (deviceToken: string, payload: { payload: string; priority: 5 | 10 }) =>
-        sendApns({ deviceToken, ...payload, pushType: "liveactivity" }, apns.config, apns.token, sender.send);
-      const next: Record<string, ThreadRecord> = {};
-      let later = Infinity;
-      for (const threadId of new Set([...Object.keys(records), ...picked.keys()])) {
-        const record = records[threadId];
-        const entry = picked.get(threadId);
-        const state = entry ? await stateFor(entry.thread, entry.phase, now) : null;
-        const action = decide(record, state, now, Boolean(startToken));
-        switch (action.kind) {
-          case "none": {
-            // Keep a record while it's shown, starting, or dismissed for the current phase.
-            const starting = record?.startRequestedAt != null && now - record.startRequestedAt < START_TIMEOUT_MS;
-            if (record && (record.activity || starting || record.dismissed === state?.phase)) next[threadId] = record;
-            break;
-          }
-          case "later":
-            next[threadId] = record!;
-            later = Math.min(later, action.ms);
-            break;
-          case "end": {
-            const result = await push(record!.activity!.token, activityPayload(action, threadId, record!.state, now));
-            if (result.status !== 200) bb.log.warn(`live activity end failed: ${result.reason ?? result.status}`);
-            break;
-          }
-          case "update": {
-            const result = await push(record!.activity!.token, activityPayload(action, threadId, state!, now));
-            if (result.status === 200) next[threadId] = { ...record!, state, pushedAt: now };
-            // A dead token means the activity is gone; start fresh next time.
-            else if (result.status !== 400 && result.status !== 410) next[threadId] = record!;
-            if (result.status !== 200) bb.log.warn(`live activity update failed: ${result.reason ?? result.status}`);
-            break;
-          }
-          case "restart":
-          case "start": {
-            if (action.kind === "restart") await push(record!.activity!.token, activityPayload({ kind: "end" }, threadId, state!, now));
-            const result = await push(startToken!, activityPayload({ kind: "start", alert: action.alert }, threadId, state!, now));
-            if (result.status === 200) next[threadId] = { activity: null, startRequestedAt: now, state, pushedAt: now };
-            else bb.log.warn(`live activity start failed: ${result.reason ?? result.status}`);
-            break;
-          }
-        }
-      }
-      if (later !== Infinity) scheduleReconcile(later);
-      return next;
-    });
+  async function endRetiredActivities(apns: { config: ApnsConfig; token: ProviderToken }) {
+    const legacy = await bb.storage.kv.get<{ activity: { token: string } | null }>("live");
+    const threads = (await bb.storage.kv.get<Record<string, { activity: { token: string } | null }>>("thread-activities")) ?? {};
+    const tokens = [legacy?.activity?.token, ...Object.values(threads).map((record) => record.activity?.token)].filter(
+      (token): token is string => Boolean(token),
+    );
+    const payload = JSON.stringify({ aps: { timestamp: Math.floor(Date.now() / 1000), event: "end", "dismissal-date": 0, "content-state": {} } });
+    for (const deviceToken of tokens) {
+      const result = await sendApns({ deviceToken, payload, pushType: "liveactivity", priority: 10 }, apns.config, apns.token, sender.send);
+      if (result.status !== 200) bb.log.warn(`ending a retired Live Activity failed: ${result.reason ?? result.status}`);
+    }
+    for (const key of RETIRED_LIVE_KEYS) await bb.storage.kv.delete(key);
   }
+  void retireLiveActivities();
 
-  function scheduleReconcile(delay = RECONCILE_DELAY_MS) {
-    const at = Date.now() + delay;
-    if (reconcileTimer && reconcileAt <= at) return;
-    if (reconcileTimer) clearTimeout(reconcileTimer);
-    reconcileAt = at;
-    reconcileTimer = setTimeout(() => {
-      reconcileTimer = null;
-      void reconcile();
-    }, delay);
-  }
-
-  bb.events.on("thread.active", () => scheduleReconcile());
-  bb.events.on("thread.idle", () => scheduleReconcile());
-  bb.events.on("thread.failed", () => scheduleReconcile());
-  bb.events.on("interaction.pending", () => scheduleReconcile());
-  bb.events.on("thread.archived", () => scheduleReconcile());
-  bb.events.on("thread.deleted", () => scheduleReconcile());
-  bb.events.on("experimental_thread.events", ({ thread }) => {
-    if (shown.has(thread.id)) scheduleReconcile(OUTPUT_DELAY_MS);
-  });
-
-  // Answering an interaction or reading a thread has no event; poll to catch it.
-  const interval = setInterval(() => void reconcile(), RECONCILE_INTERVAL_MS);
-  bb.onDispose(() => {
-    clearInterval(interval);
-    if (reconcileTimer) clearTimeout(reconcileTimer);
-  });
-
-  bb.rpc.register(liveContract, {
-    async live_register(input) {
-      if (input.threadPushToStartToken) await bb.storage.kv.set(LIVE_START_KEY, input.threadPushToStartToken);
-      const { threadId } = input;
-      if (threadId) {
-        await withLive(async (records) => {
-          const record = records[threadId];
-          if (input.activityId && input.activityToken) {
-            const same = record?.activity?.id === input.activityId;
-            records[threadId] = {
-              state: record?.state ?? null,
-              pushedAt: record?.pushedAt ?? 0,
-              activity: { id: input.activityId, token: input.activityToken, startedAt: same ? record!.activity!.startedAt : Date.now() },
-              startRequestedAt: null,
-              dismissed: null,
-            };
-          }
-          // Swiped away: keep it away until the thread moves on.
-          if (input.endedActivityId && record?.activity?.id === input.endedActivityId) {
-            records[threadId] = { ...record, activity: null, dismissed: record.state?.phase ?? null };
-          }
-          return records;
-        });
-      }
-      scheduleReconcile();
-      return { ok: true as const };
-    },
+  bb.rpc.register(mobileContract, {
     async notify(input) {
       const devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {});
       // Without a thread there is nothing to reply to, so leave out the kind that adds a reply box.
@@ -502,18 +343,12 @@ export default async function plugin(bb: BbPluginApi) {
       }
       const apns = await apnsConfig();
       const last = await bb.storage.kv.get<LastDelivery>(LAST_DELIVERY_KEY);
-      const canStart = Boolean(await bb.storage.kv.get<string>(LIVE_START_KEY));
-      const records = Object.values((await bb.storage.kv.get<Record<string, ThreadRecord>>(LIVE_THREADS_KEY)) ?? {});
       const status = {
         apnsReady: !("missing" in apns),
         apnsProblem: "missing" in apns ? apns.missing : null,
         environment: "missing" in apns ? null : apns.config.environment,
         relayPath: "/api/v1/plugins/mobile/http/push?token=<bb plugin token mobile>",
         lastDelivery: last ?? null,
-        liveActivities: {
-          canStart,
-          threads: records.flatMap((record) => (record.activity && record.state ? [{ title: record.state.title, phase: record.state.phase }] : [])),
-        },
       };
       if (argv.includes("--json")) return { exitCode: 0, stdout: JSON.stringify(status) };
       return {
@@ -524,13 +359,6 @@ export default async function plugin(bb: BbPluginApi) {
           last
             ? `Last delivery ${last.at}: ${last.apns} APNs, ${last.expo} Expo${last.categories?.length ? ` (categories: ${last.categories.join(", ")})` : ""}${last.errors.length ? `; errors: ${last.errors.join("; ")}` : ""}`
             : "No deliveries yet.",
-          `Live Activities: ${
-            status.liveActivities.threads.length
-              ? status.liveActivities.threads.map((thread) => `${thread.title} (${thread.phase})`).join(", ")
-              : status.liveActivities.canStart
-                ? "none showing (app registered)"
-                : "app has not registered yet"
-          }`,
         ].join("\n"),
       };
     },
