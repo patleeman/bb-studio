@@ -38,7 +38,7 @@ export function splitItemLinks(text: string): ({ text: string } | { title: strin
   return parts;
 }
 
-export function ItemPill({ href, title, icon = "GridView", onMouseDown }: { href: string; title: string; icon?: string; onMouseDown?(event: MouseEvent): void }) {
+export function ItemPill({ href, title, icon = itemLinkIcon(href), onMouseDown }: { href: string; title: string; icon?: string; onMouseDown?(event: MouseEvent): void }) {
   return (
     <a
       href={href}
@@ -52,7 +52,7 @@ export function ItemPill({ href, title, icon = "GridView", onMouseDown }: { href
         openAppPath(href);
       }}
     >
-      <Icon name={icon} className="size-3.5 shrink-0 opacity-70" />
+      <Icon name={icon} fallback="GridView" className="size-3.5 shrink-0 opacity-70" />
       <span className="truncate">{untitled(title)}</span>
     </a>
   );
@@ -72,18 +72,25 @@ export function ItemLinkText({ text, className, onPillMouseDown }: { text: strin
 const resultSchema = z.array(z.object({ ref: z.object({ pluginId: z.string(), id: z.string() }), kind: z.string(), title: z.string(), href: z.string() }).passthrough());
 type Result = z.infer<typeof resultSchema>[number];
 
-const KIND_ICONS: Record<string, string> = {
-  page: "FileText",
-  task: "CircleCheck",
-  board: "studio-tasks/board",
-  drawing: "Palette",
-  artifact: "File",
-  recording: "Mic",
-  dictation: "Mic",
-  table: "Rows2",
-  space: "Layers",
-  bot: "Bot",
+// Each add-on's item icon, by the plugin and panel its links open.
+const LINK_ICONS: Record<string, string> = {
+  "pages/pages": "pages/pages",
+  "excalidraw/drawings": "excalidraw/draw",
+  "artifacts/artifacts": "artifacts/artifact",
+  "talk/recordings": "talk/talk",
+  "studio-tables/tables": "Rows2",
+  "bot-teams/bots": "Bot",
+  "bot-teams/channels": "Hash",
+  "feed/feed": "feed/feed",
 };
+
+/** The icon for the item a link opens, read from the link itself: /plugins/<plugin>/<panel>/<id>. */
+export function itemLinkIcon(href: string): string {
+  const [, , pluginId = "", panel = "", id = ""] = href.split(/[?#]/)[0]!.split("/");
+  if (pluginId === "studio-tasks" && panel === "tasks") return id.startsWith("brd_") ? "studio-tasks/board" : "studio-tasks/task";
+  if (pluginId === "studio" && id === "space") return "Layers";
+  return LINK_ICONS[`${pluginId}/${panel}`] ?? "GridView";
+}
 
 /** The @ query being typed just before the caret, and where it starts. */
 export function mentionQuery(value: string, caret: number): { start: number; query: string } | null {
@@ -229,7 +236,7 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
               onMouseEnter={() => setActive(index)}
               onClick={() => pick(result)}
             >
-              <Icon name={KIND_ICONS[result.kind] ?? "GridView"} className="size-4 shrink-0 text-muted-foreground" />
+              <Icon name={itemLinkIcon(result.href)} fallback="GridView" className="size-4 shrink-0 text-muted-foreground" />
               <span className="min-w-0 flex-1 truncate">{untitled(result.title)}</span>
               <span className="shrink-0 text-xs text-muted-foreground capitalize">{result.kind}</span>
             </button>

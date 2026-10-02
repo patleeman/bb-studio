@@ -21,6 +21,8 @@ export interface EditorProps {
   initial?: string;
   /** A cell editor sits over the grid; a field editor fills a form row. */
   mode?: "cell" | "field";
+  /** The table being edited, left out of a text cell's @ list. */
+  selfHref?: string;
   onCommit(cell: Cell, exit?: Exit): void;
   onCancel(): void;
 }
@@ -37,7 +39,7 @@ function editText(column: Column, cell: Cell | undefined): string {
   return column.type === "date" || column.type === "number" ? (cell == null ? "" : String(cell)) : cellText(cell);
 }
 
-function TextEditor({ column, cell, host, initial, mode = "cell", onCommit, onCancel }: EditorProps) {
+function TextEditor({ column, cell, host, initial, mode = "cell", selfHref, onCommit, onCancel }: EditorProps) {
   const [draft, setDraft] = useState(initial ?? editText(column, cell));
   const ref = useRef<HTMLTextAreaElement>(null);
   const dateRef = useRef<HTMLInputElement>(null);
@@ -79,6 +81,7 @@ function TextEditor({ column, cell, host, initial, mode = "cell", onCommit, onCa
         aria-label={column.name}
         value={draft}
         rows={1}
+        selfHref={selfHref}
         wrapperClassName={mode === "cell" ? "self-stretch" : undefined}
         className={cn(
           "block w-full resize-none bg-background px-2 py-1.5 text-sm outline-none [field-sizing:content]",

@@ -5,6 +5,7 @@ import { Dialog, DialogContent, DialogDescription, DialogTitle } from "../../ui/
 import { Icon } from "../../ui/icon";
 import { cn } from "../../ui/utils";
 import { COLUMN_TYPE_INFO, titleColumn, type Cell, type Column, type Row, type Table } from "../model";
+import { tableHref } from "../contract";
 import { CellValue } from "./cells";
 import { CellEditor, PICKED_TYPES } from "./editors";
 import type { TableHost } from "./host";
@@ -12,7 +13,7 @@ import type { Change } from "./state";
 
 const TIME = new Intl.DateTimeFormat(undefined, { dateStyle: "medium", timeStyle: "short" });
 
-function Field({ column, cell, host, onChange }: { column: Column; cell: Cell | undefined; host: TableHost; onChange(cell: Cell): void }) {
+function Field({ column, cell, host, selfHref, onChange }: { column: Column; cell: Cell | undefined; host: TableHost; selfHref: string; onChange(cell: Cell): void }) {
   const [editing, setEditing] = useState(false);
   const empty = cell == null || cell === "" || (Array.isArray(cell) && !cell.length);
   return (
@@ -25,6 +26,7 @@ function Field({ column, cell, host, onChange }: { column: Column; cell: Cell | 
         {editing && !PICKED_TYPES.has(column.type) ? (
           <CellEditor
             mode="field"
+            selfHref={selfHref}
             column={column}
             cell={cell}
             host={host}
@@ -47,6 +49,7 @@ function Field({ column, cell, host, onChange }: { column: Column; cell: Cell | 
         {editing && PICKED_TYPES.has(column.type) ? (
           <CellEditor
             mode="field"
+            selfHref={selfHref}
             column={column}
             cell={cell}
             host={host}
@@ -150,7 +153,7 @@ export function RowDialog({
           {table.columns
             .filter((column) => column.id !== (title?.type === "text" ? title.id : null))
             .map((column) => (
-              <Field key={`${row.id}-${column.id}`} column={column} cell={row.values[column.id]} host={host} onChange={(cell) => update(column, cell)} />
+              <Field key={`${row.id}-${column.id}`} column={column} cell={row.values[column.id]} host={host} selfHref={tableHref({ tableId: table.id })} onChange={(cell) => update(column, cell)} />
             ))}
           <p className={cn("pt-4 text-xs text-muted-foreground")}>
             Added {TIME.format(row.createdAt)} · Edited {TIME.format(row.updatedAt)}

@@ -1,6 +1,6 @@
 import { expect, it } from "vitest";
 import { ITEM_REFERENCE_TYPE, itemReferenceFrom, itemReferenceText, parseItemReference } from "./item-reference";
-import { mentionQuery, splitItemLinks } from "./item-links";
+import { itemLinkIcon, mentionQuery, splitItemLinks } from "./item-links";
 
 const clipboard = (data: Record<string, string>) => ({ getData: (type: string) => data[type] ?? "" }) as DataTransfer;
 
@@ -42,4 +42,13 @@ it("finds the @ query before the caret", () => {
   expect(mentionQuery("@", 1)).toEqual({ start: 0, query: "" });
   expect(mentionQuery("mail me@home", 12)).toBeNull();
   expect(mentionQuery("@road map", 9)).toBeNull();
+});
+
+it("picks an item's icon from its link", () => {
+  expect(itemLinkIcon("/plugins/pages/pages/pg_1")).toBe("pages/pages");
+  expect(itemLinkIcon("/plugins/studio-tasks/tasks/brd_1/list")).toBe("studio-tasks/board");
+  expect(itemLinkIcon("/plugins/studio-tasks/tasks/tsk_1")).toBe("studio-tasks/task");
+  expect(itemLinkIcon("/plugins/studio-tables/tables/tbl_1/view/v_1")).toBe("Rows2");
+  expect(itemLinkIcon("/plugins/studio/studio/space/spc_1")).toBe("Layers");
+  expect(itemLinkIcon("/plugins/unknown/things/x_1")).toBe("GridView");
 });

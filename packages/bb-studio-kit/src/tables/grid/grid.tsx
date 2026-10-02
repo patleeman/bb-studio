@@ -10,6 +10,7 @@ import { Icon } from "../../ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
 import { cn } from "../../ui/utils";
 import { COLUMN_TYPE_INFO, DEFAULT_COLUMN_WIDTH, MAX_COLUMN_WIDTH, MIN_COLUMN_WIDTH, parseDelimited, toTsv, type Cell, type Column, type Row, type Table, type Values, type View } from "../model";
+import { tableHref } from "../contract";
 import { CellValue } from "./cells";
 import { ColumnMenu, newColumn, TypeList } from "./column-menu";
 import { CellEditor, type Exit } from "./editors";
@@ -409,6 +410,7 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
                             </div>
                             {isEditing ? (
                               <CellEditor
+                                selfHref={tableHref({ tableId: table.id })}
                                 column={column}
                                 cell={row.values[column.id]}
                                 host={host}
