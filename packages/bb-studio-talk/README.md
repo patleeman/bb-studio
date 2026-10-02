@@ -26,6 +26,11 @@ The page shows the scrubber, playback controls, **Original** and **Cleaned**
 views, and timestamped sections. The script checks that the original transcript
 is unchanged, then deletes the seeded recording afterwards.
 
+![Talk playback and transcript controls on mobile](assets/staged-mobile.png)
+
+The same staged recording at a 390-pixel viewport. The capture checks that
+playback controls fit the screen.
+
 ## What you get
 
 - **Replaces built-in dictation.** The composer's microphone starts a Talk

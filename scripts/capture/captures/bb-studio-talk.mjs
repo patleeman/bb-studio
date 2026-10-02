@@ -1,3 +1,12 @@
+import { resolve } from "node:path";
+
+const scrollToTop = `(() => {
+  for (let node = document.querySelector('h1'); node; node = node.parentElement) {
+    if (node.scrollHeight > node.clientHeight) node.scrollTop = 0;
+  }
+  window.scrollTo(0, 0);
+})()`;
+
 export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
   {
     id: "talk",
@@ -55,8 +64,32 @@ export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
         await client.clickFirstButtonWithAria("Pause playback");
         const paused = await client.evaluate(`window.__talkCaptureAudio?.paused === true`);
         if (!paused) throw new Error("The recording did not pause.");
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await client.evaluate(scrollToTop);
+        await sleep(350);
+        const fits = await client.evaluate(`(() => {
+          const player = document.querySelector('section[aria-label="Audio playback"]');
+          const controls = [...player.querySelectorAll('button, input, select')];
+          return controls.every(control => { const rect = control.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth; });
+        })()`);
+        if (!fits) throw new Error("Playback controls overflow the mobile viewport.");
+        const setPausedPosition = `(() => {
+          const set = (label, value) => {
+            const input = document.querySelector('input[aria-label="' + label + '"]');
+            Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value').set.call(input, value);
+            input.dispatchEvent(new Event('input', { bubbles: true }));
+          };
+          set('Recording position', ${second.offsetMs + 2000});
+          set('Playback volume', 0.5);
+        })()`;
+        await client.evaluate(setPausedPosition);
+        await sleep(350);
+        await client.capture(resolve('packages/bb-studio-talk/assets/staged-mobile.png'));
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+        await sleep(350);
+        await client.evaluate(setPausedPosition);
         // Keep the title and full player in the published frame after follow-scroll.
-        await client.evaluate(`document.querySelector('h1')?.scrollIntoView({ block: 'start' })`);
+        await client.evaluate(scrollToTop);
         await sleep(350);
       } catch (error) {
         await cleanup();
