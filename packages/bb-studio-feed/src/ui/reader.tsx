@@ -441,7 +441,7 @@ function PostContent({ post }: { post: PostView }) {
   return (
     <>
       <Picture src={linkedPicture} className="mb-4 max-h-80 w-full rounded-lg" />
-      {post.body ? <Markdown content={post.body} className="text-[15px] leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-[15px] [&_p]:text-[15px]" /> : null}
+      {post.body ? <Markdown content={post.body} className="text-[15px] leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-[15px] [&_li:has(input[type=checkbox])]:list-none [&_p]:text-[15px]" /> : null}
       {post.embeds.map((embed) => (
         <ItemPreview key={`${embed.pluginId}:${embed.id}`} embed={embed} />
       ))}
@@ -472,7 +472,7 @@ function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
       {content?.type === "markdown" && content.text ? (
         <div className="relative">
           <div className={cn("px-4 py-3", !more && "max-h-72 overflow-hidden")}>
-            <Markdown content={content.text} className="text-sm leading-relaxed [&_img]:max-h-64 [&_img]:rounded-md [&_li]:text-sm [&_p]:text-sm" />
+            <Markdown content={content.text} className="text-sm leading-relaxed [&_img]:max-h-64 [&_img]:rounded-md [&_li]:text-sm [&_li:has(input[type=checkbox])]:list-none [&_p]:text-sm" />
           </div>
           {more ? null : (
             <div className="absolute inset-x-0 bottom-0 flex h-20 items-end justify-center bg-gradient-to-t from-background to-transparent pb-2">
