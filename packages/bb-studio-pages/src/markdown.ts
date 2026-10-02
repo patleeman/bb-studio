@@ -21,6 +21,8 @@ import { EMBED_KINDS, MAX_HTML_CHARS, MENTION_KINDS, type MentionKind } from "./
 //   ```mermaid                        Mermaid diagrams
 //   ```html                           raw HTML, rendered in a sandboxed iframe
 //   > [!NOTE] text                    callouts (NOTE, TIP, WARNING, CAUTION)
+//   <details><summary>…</summary>     expandable toggles; `## …` in the summary
+//   … </details>                      makes a toggle heading
 //   @[Label](bot:bot_…)               mentions (bot, page, thread, date, agent, item)
 //   <!-- ^1a2b3c4d -->                block ids in read output; ignored on input
 
@@ -81,11 +83,69 @@ export function markdownToBlocks(markdown: string): PageBlock[] {
     .split("\n")
     .filter((line) => !ID_COMMENT.test(line))
     .join("\n");
-  const tree = fromMarkdown(source, {
-    extensions: [gfm()],
-    mdastExtensions: [gfmFromMarkdown()],
-  }) as Root;
-  return tree.children.flatMap(convertBlock);
+  return convertBlocks(parseMarkdown(source));
+}
+
+const DETAILS_TAG = /<details\b[^>]*>|<\/details\s*>|<summary\b[^>]*>([\s\S]*?)<\/summary\s*>/gi;
+
+type DetailsToken = { kind: "open" } | { kind: "close" } | { kind: "summary"; text: string } | { kind: "node"; node: RootContent };
+
+/**
+ * Converts sibling nodes, folding `<details>` … `</details>` runs into toggles.
+ * Markdown splits an HTML block at blank lines, so the tags and the content
+ * between them arrive as separate siblings.
+ */
+function convertBlocks(nodes: RootContent[]): PageBlock[] {
+  const root: PageBlock[] = [];
+  const open: { summary: string | null; children: PageBlock[] }[] = [];
+  const target = () => open[open.length - 1]?.children ?? root;
+  const close = () => {
+    const frame = open.pop();
+    if (frame) target().push(toggleBlock(frame.summary ?? "", frame.children));
+  };
+  for (const token of nodes.flatMap(detailsTokens)) {
+    if (token.kind === "open") open.push({ summary: null, children: [] });
+    else if (token.kind === "close") close();
+    else if (token.kind === "summary") {
+      const frame = open[open.length - 1];
+      if (frame && frame.summary === null && !frame.children.length) frame.summary = token.text;
+      else target().push({ type: "paragraph", content: [plain(token.text)] });
+    } else target().push(...convertBlock(token.node));
+  }
+  while (open.length) close();
+  return root;
+}
+
+function detailsTokens(node: RootContent): DetailsToken[] {
+  if (node.type !== "html" || !/<\/?details\b/i.test(node.value)) return [{ kind: "node", node }];
+  const tokens: DetailsToken[] = [];
+  const text = (value: string) => {
+    if (value.trim()) tokens.push(...(parseMarkdown(value) as RootContent[]).flatMap(detailsTokens));
+  };
+  let last = 0;
+  for (const match of node.value.matchAll(DETAILS_TAG)) {
+    text(node.value.slice(last, match.index));
+    last = match.index + match[0].length;
+    const tag = match[0].toLowerCase();
+    tokens.push(tag.startsWith("<summary") ? { kind: "summary", text: match[1]!.trim() } : tag.startsWith("</") ? { kind: "close" } : { kind: "open" });
+  }
+  text(node.value.slice(last));
+  return tokens;
+}
+
+/** A toggle list item, or a toggle heading when the summary is a `#` heading. */
+function toggleBlock(summary: string, children: PageBlock[]): PageBlock {
+  const first = parseMarkdown(summary)[0];
+  const block: PageBlock =
+    first?.type === "heading"
+      ? { type: "heading", props: { level: Math.min(Math.max(first.depth, 1), 6), isToggleable: true }, content: inline(first.children) }
+      : { type: "toggleListItem", content: first?.type === "paragraph" ? inline(first.children) : [] };
+  if (children.length) block.children = children;
+  return block;
+}
+
+function parseMarkdown(source: string): RootContent[] {
+  return (fromMarkdown(source, { extensions: [gfm()], mdastExtensions: [gfmFromMarkdown()] }) as Root).children;
 }
 
 function convertBlock(node: RootContent): PageBlock[] {
@@ -149,7 +209,7 @@ function convertList(list: List): PageBlock[] {
     };
     if (type === "checkListItem") block.props = { checked: item.checked === true };
     const childNodes = first?.type === "paragraph" ? rest : item.children;
-    const children = childNodes.flatMap((child) => convertBlock(child as RootContent));
+    const children = convertBlocks(childNodes as RootContent[]);
     if (children.length) block.children = children;
     return block;
   });
@@ -333,7 +393,7 @@ function renderBlocks(blocks: PageBlock[], indent: string, options: MarkdownOpti
     listRun = null;
   };
   for (const block of blocks) {
-    const isList = ["bulletListItem", "numberedListItem", "checkListItem", "toggleListItem"].includes(block.type);
+    const isList = ["bulletListItem", "numberedListItem", "checkListItem"].includes(block.type);
     number = block.type === "numberedListItem" ? number + 1 : 0;
     const text = renderBlock(block, indent, number, options);
     if (isList) {
@@ -363,12 +423,21 @@ function renderBlock(block: PageBlock, indent: string, number: number, options: 
       .map((line) => `${indent}> ${line}`.trimEnd())
       .join("\n");
   let body: string;
+  // Toggles' children stay at the same indent: they sit between the tags.
+  const toggle = (summary: string) =>
+    [`${indent}<details>\n${indent}<summary>${summary}</summary>`, ...renderBlocks(block.children ?? [], indent, options), `${indent}</details>`].join("\n\n");
   switch (block.type) {
     case "heading":
+      if (props.isToggleable) {
+        body = toggle(`${"#".repeat(Number(props.level ?? 1))} ${text}`);
+        break;
+      }
       body = `${indent}${"#".repeat(Number(props.level ?? 1))} ${text}${nestedChildren}`;
       break;
-    case "bulletListItem":
     case "toggleListItem":
+      body = toggle(text);
+      break;
+    case "bulletListItem":
       body = `${indent}- ${text}${listChildren}`;
       break;
     case "numberedListItem":

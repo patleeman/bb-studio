@@ -47,6 +47,9 @@ while, so the user can roll back from **Version history**.
 Pages reads and writes GitHub-flavoured Markdown plus:
 
 - **Callouts:** `> [!NOTE] text` (also `TIP`, `WARNING`, `CAUTION`, `IMPORTANT`).
+- **Toggles:** `<details>` with a `<summary>` line, the hidden blocks, then
+  `</details>`, each separated by a blank line. The summary takes inline
+  Markdown; start it with `##` for a toggle heading. Toggles can nest.
 - **Charts:** a fenced ` ```chart ` block holding JSON:
   `{"type":"bar|line|area|pie","title":"…","x":"label","series":["Revenue"],"stacked":false,"unit":"$","data":[{"label":"Q1","Revenue":10}]}`.
   `x` and `series` default to the first text column and the numeric columns.

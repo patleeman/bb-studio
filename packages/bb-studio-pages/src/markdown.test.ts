@@ -197,3 +197,73 @@ describe("html blocks", () => {
     expect(atCap!.type).toBe("html");
   });
 });
+
+describe("toggles", () => {
+  const MARKDOWN = `<details>
+<summary>**More** details</summary>
+
+Hidden paragraph
+
+- inside
+
+<details>
+<summary>Nested</summary>
+
+Deep
+
+</details>
+
+</details>
+
+<details>
+<summary>## Section</summary>
+
+Section body
+
+</details>
+
+<details>
+<summary>Empty</summary>
+
+</details>
+`;
+
+  it("reads <details> as toggle list items and toggle headings", () => {
+    const blocks = markdownToBlocks(MARKDOWN);
+    expect(blocks).toMatchObject([
+      {
+        type: "toggleListItem",
+        content: [{ text: "More", styles: { bold: true } }, { text: " details" }],
+        children: [
+          { type: "paragraph", content: [{ text: "Hidden paragraph" }] },
+          { type: "bulletListItem", content: [{ text: "inside" }] },
+          { type: "toggleListItem", content: [{ text: "Nested" }], children: [{ type: "paragraph" }] },
+        ],
+      },
+      { type: "heading", props: { level: 2, isToggleable: true }, content: [{ text: "Section" }], children: [{ type: "paragraph" }] },
+      { type: "toggleListItem", content: [{ text: "Empty" }] },
+    ]);
+  });
+
+  it("round-trips toggles through the Yjs document", () => {
+    const back = throughYjs(markdownToBlocks(MARKDOWN));
+    expect(back.map((block) => block.type)).toEqual(["toggleListItem", "heading", "toggleListItem"]);
+    expect(blocksToMarkdown(back)).toBe(MARKDOWN);
+  });
+
+  it("accepts compact <details> without blank lines, and inside lists", () => {
+    const blocks = markdownToBlocks(
+      "<details><summary>Short</summary>\nBody **text**\n</details>\n\n- Item\n\n  <details>\n  <summary>In list</summary>\n\n  Child\n\n  </details>\n",
+    );
+    expect(blocks).toMatchObject([
+      { type: "toggleListItem", content: [{ text: "Short" }], children: [{ type: "paragraph", content: [{ text: "Body " }, { text: "text", styles: { bold: true } }] }] },
+      { type: "bulletListItem", children: [{ type: "toggleListItem", content: [{ text: "In list" }], children: [{ type: "paragraph" }] }] },
+    ]);
+  });
+
+  it("closes an unclosed <details> at the end", () => {
+    expect(markdownToBlocks("<details>\n<summary>Open</summary>\n\nTail\n")).toMatchObject([
+      { type: "toggleListItem", content: [{ text: "Open" }], children: [{ type: "paragraph", content: [{ text: "Tail" }] }] },
+    ]);
+  });
+});
