@@ -129,6 +129,13 @@ attachment, and pin through Float/workbench/main transfers. The native
 capture exposed and fixed double-encoded main routes and a development proxy
 that did not forward plugin sync sockets. Host release remains required.
 
+Pages' standalone header now uses Chat and New conversation. Its former chat
+card is removed; legacy page chat routes and activity entries open the shared
+companion destination, with ordinary thread navigation when Float is absent.
+Existing page chats and the `pages:<id>` draft key remain in use. Pages' 80
+tests pass, including continuation, project/context forwarding, error retries,
+and stale submissions. Standalone live verification is the next check.
+
 Remaining delivery includes native host live verification and release,
 the SDK/CLI placement controller, Pages standalone migration, embedded composer
 targeting, all suite entry points, compact behavior,

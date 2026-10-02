@@ -1,6 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { ItemHeader, openFloat, useFloatAvailable, useInFloat, useStudioChatPresent } from "@bb-studio/kit/app";
+import { ItemHeader, useFloatAvailable, useInFloat, useStudioChatPresent } from "@bb-studio/kit/app";
 import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -16,7 +16,7 @@ import { cn } from "@bb-studio/kit/ui";
 import type { BotView, PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog, KeepUpdatedDialog } from "./dialogs";
-import { PageChat, type ChatMode } from "./PageChat";
+import { PageChat, openPageConversation } from "./PageChat";
 import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, FLOATING, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
@@ -363,7 +363,7 @@ export function PageView({
   projects: Project[];
   rpc: Rpc;
   requestsVersion: number;
-  /** A chat to show in its card, when the route names one. */
+  /** Existing page chat links still open their conversation. */
   chatThreadId: string | null;
   onCreateInside(): void;
   onDeleted(): void;
@@ -379,7 +379,6 @@ export function PageView({
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [chatThread, setChatThread] = useState<string | null>(chatThreadId);
-  const [chatMode, setChatMode] = useState<ChatMode>(chatThreadId ? "thread" : "closed");
   const [title, setTitle] = useState(page.title);
   const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
   const editingTitle = useRef(false);
@@ -400,23 +399,20 @@ export function PageView({
     if (titleTimer.current) clearTimeout(titleTimer.current);
     titleTimer.current = setTimeout(() => void rpc.call("update", { id: page.id, title: next.trim() }), 400);
   };
-  // With Float installed, the page's chats open in windows instead of Pages'
-  // own card; with Studio Chat, its "Work with this…" bar replaces the box.
-  // A page that is itself in a window leaves its chat alone.
   const floatAvailable = useFloatAvailable();
   const inFloat = useInFloat();
   const studioChat = useStudioChatPresent();
-  const openThread = (threadId: string) => {
-    if (floatAvailable && openFloat({ kind: "thread", threadId })) {
-      setChatMode("closed");
-      return;
-    }
+  const navigate = useBbNavigate();
+  const openThread = useCallback((threadId: string) => {
     setChatThread(threadId);
-    setChatMode("thread");
-  };
+    openPageConversation(threadId, navigate);
+  }, [navigate]);
+  const openedRoute = useRef<string | null>(null);
   useEffect(() => {
-    if (chatThreadId && floatAvailable && !inFloat) openFloat({ kind: "thread", threadId: chatThreadId });
-  }, [chatThreadId, floatAvailable, inFloat]);
+    if (!chatThreadId || openedRoute.current === chatThreadId) return;
+    openedRoute.current = chatThreadId;
+    openThread(chatThreadId);
+  }, [chatThreadId, openThread]);
   // Keeps the windows clear of the comments card.
   const besideComments = sidePanel === "comments";
   useEffect(() => {
@@ -510,6 +506,8 @@ export function PageView({
         trailing={
           <>
           <ConnectionBadge status={status} />
+          {studioChat === false ? <PageChat page={page} rpc={rpc} threadId={chatThread ?? chats[0]?.threadId ?? null}
+            onStarted={(threadId) => { setChatThread(threadId); loadChats(); }} /> : null}
           <ActivityPill
             page={page}
             refreshBot={refreshBot}
@@ -573,20 +571,6 @@ export function PageView({
         }
       />
 
-      {studioChat === false ? (
-        <PageChat
-          page={page}
-          rpc={rpc}
-          threadId={chatThread}
-          mode={chatMode}
-          onMode={setChatMode}
-          besideComments={besideComments}
-          onStarted={(threadId) => {
-            openThread(threadId);
-            loadChats();
-          }}
-        />
-      ) : null}
       <KeepUpdatedDialog open={dialog === "refresh"} onClose={() => setDialog(null)} page={page} bots={bots} rpc={rpc} />
       <HistoryDialog open={dialog === "history"} onClose={() => setDialog(null)} page={page} bots={bots.bots} rpc={rpc} />
     </div>

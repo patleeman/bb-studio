@@ -1,4 +1,7 @@
+import standaloneChat from "./pages-standalone-chat.mjs";
+
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
+  ...(process.env.BB_CAPTURE_STANDALONE_CHAT === "1" ? [standaloneChat({ projectId, seedPages, pluginRpc, bbCli, sleep })] : []),
   {
     id: "pages",
     packageDir: "bb-studio-pages",
@@ -10,7 +13,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForSelector('nav[aria-label="Breadcrumbs"]');
         await client.waitForAriaButton("Comments");
         await client.waitForAriaButton("Page actions");
-        await client.waitForText("Work with this page…");
+        await client.waitForSelector('[data-studio-item-header] button');
+        const chat = await client.evaluate(`Boolean([...document.querySelectorAll('[data-studio-item-header] button')].find(button => button.innerText.trim() === 'Chat'))`);
+        if (!chat) throw new Error("The page has no shared Chat action");
         await client.waitForText("Offline mode launch");
         await client.waitForText("Beta teams");
         await client.waitForText("Crash-free sessions");
