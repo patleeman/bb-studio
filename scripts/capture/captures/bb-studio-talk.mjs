@@ -7,7 +7,88 @@ const scrollToTop = `(() => {
   window.scrollTo(0, 0);
 })()`;
 
-export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
+export default ({ projectId, bbCli, seedTalkRecording, talkRpc, sleep }) => [
+  {
+    id: "talk-composer",
+    packageDir: "bb-studio-talk",
+    fileName: "dictation-message.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const recordingId = await seedTalkRecording(projectId, { kind: "dictation", title: "Launch brain dump" });
+      let threadId;
+      const cleanup = async () => {
+        if (threadId) {
+          await bbCli(["thread", "stop", threadId]).catch(() => {});
+          await bbCli(["thread", "delete", threadId, "--yes"]);
+        }
+        await talkRpc("recording_delete", { id: recordingId });
+      };
+      try {
+        const thread = JSON.parse(await bbCli([
+          "thread", "spawn", "--project", projectId, "--provider", "codex",
+          "--model", "gpt-6.1-sol", "--reasoning-level", "low", "--title", "Onboarding brain dump",
+          "--prompt", "Reply only Ready. Do not use tools.", "--json",
+        ]));
+        threadId = thread.id;
+        // Stable BB resolves saved-item context on follow-up messages. The
+        // initial dictation also carries its spoken text and saved source.
+        await bbCli(["thread", "wait", threadId, "--timeout", "60s", "--json"]);
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForSelector("[data-talk-composer-bridge]");
+        // Exercise the same recovered delivery as finishing a dictation away
+        // from its input. Audio and transcription come from the live seeder.
+        const pending = { [threadId]: {
+          text: "What is the onboarding problem in the attached Talk item? Answer in one sentence using only the supplied context. Do not use tools.",
+          recordings: [{ id: recordingId, title: "Launch brain dump", kind: "dictation" }],
+        } };
+        await client.evaluate(`localStorage.setItem('bb-plugin-talk:pending-inserts', ${JSON.stringify(JSON.stringify(pending))})`);
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        const mentionSelector = `[data-promptbox] [data-prompt-mention-resource*="${recordingId}"]`;
+        await client.waitForSelector(mentionSelector);
+        const source = await client.evaluate(`JSON.parse(document.querySelector(${JSON.stringify(mentionSelector)}).getAttribute('data-prompt-mention-resource'))`);
+        if (source?.pluginId !== "talk" || source.itemId !== `recordings:${recordingId}`) throw new Error("Recovered dictation did not attach its native Talk mention.");
+        // The delivery toast otherwise covers the submit button while hovered.
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1, buttons: 0 });
+        await sleep(5000);
+        await client.clickAriaButtonWithPointer("Submit (Enter)");
+        const linkSelector = `a[href="/plugins/talk/recordings/${recordingId}"]`;
+        await client.waitForSelector(linkSelector);
+        await bbCli(["thread", "wait", threadId, "--timeout", "60s", "--json"]);
+        const events = JSON.parse(await bbCli(["thread", "messages", threadId, "--json"]));
+        const input = events.findLast(event => event.type === "client/turn/requested")?.data.input;
+        if (!input?.some(part => part.mentions?.some(mention => mention.resource.itemId === `recordings:${recordingId}`))) throw new Error("Sent message lost its Talk mention.");
+        const reply = events.findLast(event => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
+        if (!/import/i.test(reply) || !/stall|stuck|struggl|drop|abandon/i.test(reply)) throw new Error(`The agent did not receive the saved onboarding transcript: ${reply}`);
+        await client.waitForText(reply.trim());
+        // The link must open the saved source and remain valid after Keep.
+        await client.evaluate(`document.querySelector(${JSON.stringify(linkSelector)}).click()`);
+        await client.waitForSelector('input[aria-label="Title"]');
+        await client.waitForText("Onboarding is the next focus");
+        await talkRpc("recording_keep", { id: recordingId });
+        const { recording: kept } = await talkRpc("recording_get", { id: recordingId });
+        if (kept.id !== recordingId || kept.kind !== "recording") throw new Error("Keeping a dictation broke its saved reference.");
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForSelector(linkSelector);
+        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await sleep(350);
+        const fits = await client.evaluate(`(() => {
+          const link = document.querySelector(${JSON.stringify(linkSelector)}).getBoundingClientRect();
+          const mention = [...document.querySelectorAll('[data-prompt-mention]')].find(element => element.textContent.includes('Launch brain dump')).getBoundingClientRect();
+          return [link, mention].every(rect => rect.left >= 0 && rect.right <= innerWidth);
+        })()`);
+        if (!fits) throw new Error("Dictation source controls overflow the mobile message.");
+        await client.capture(resolve("packages/bb-studio-talk/assets/dictation-message-mobile.png"));
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
+        await sleep(350);
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
   {
     id: "talk",
     packageDir: "bb-studio-talk",
