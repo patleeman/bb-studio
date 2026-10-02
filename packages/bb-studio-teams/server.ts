@@ -1058,7 +1058,7 @@ export default async function plugin(bb: BbPluginApi) {
     parameters: channelPostInput,
     presentation: {
       label: { pending: "Sending to channel", completed: "Sent to channel" },
-      icon: { glyph: "Send" },
+      icon: { glyph: "Sent" },
       suppress: true,
     },
     async execute({ text, attachments }, context) {

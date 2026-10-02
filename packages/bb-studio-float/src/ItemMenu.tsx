@@ -188,7 +188,7 @@ export function ItemGestures() {
               <CopyReferenceMenuItem item={{ href: target.path, ...(target.title ? { title: target.title } : {}), ...(target.icon ? { icon: target.icon } : {}) }} />
             ) : (
               <DropdownMenuItem onSelect={() => copyLink(target)}>
-                <Icon name="Link" className="size-4" /> Copy link
+                <Icon name="studio/link" fallback="Copy" className="size-4" /> Copy link
               </DropdownMenuItem>
             )}
             {target.kind === "path" ? (

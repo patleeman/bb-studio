@@ -126,8 +126,8 @@ function Row({ icon, glyph, title, sub, aside, href, threadId, onOpen }: {
 }
 
 function threadIcon(thread: SpaceThread) {
-  if (thread.status === "active" || thread.status === "starting") return "Loader";
-  return thread.kind === "channel" ? "Hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
+  if (thread.status === "active" || thread.status === "starting") return "Loading";
+  return thread.kind === "channel" ? "studio/hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
 }
 
 function Actions({ view }: { view: SpaceWidgetView }) {

@@ -33,7 +33,7 @@ export function copyReferenceWithToast(item: StudioItemLink) {
 export function CopyReferenceMenuItem({ item }: { item: StudioItemLink }) {
   return (
     <DropdownMenuItem onSelect={() => copyReferenceWithToast(item)}>
-      <Icon name="Link" fallback="Copy" className="size-4" /> Copy reference
+      <Icon name="studio/link" fallback="Copy" className="size-4" /> Copy reference
     </DropdownMenuItem>
   );
 }

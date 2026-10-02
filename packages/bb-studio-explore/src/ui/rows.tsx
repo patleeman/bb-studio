@@ -125,7 +125,7 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
   return (
     <section aria-label={title} className={cn("my-3 w-full overflow-hidden rounded-lg border border-border/70 bg-background", className)}>
       <header className="flex items-center gap-1.5 px-3 pt-2 pb-1 text-xs text-muted-foreground">
-        <Icon name={EXPLORE_ICON} fallback="Compass" className="size-3.5" />
+        <Icon name={EXPLORE_ICON} fallback="Search" className="size-3.5" />
         {title}
         {settingsHint ? (
           <a
@@ -217,7 +217,7 @@ function ExploreRow({
             state === "running" && "animate-pulse motion-reduce:animate-none",
           )}
         >
-          {pending ? <Icon name="Loading" fallback="Loader2" className="size-3.5 animate-spin motion-reduce:animate-none" /> : null}
+          {pending ? <Icon name="Loading" fallback="Spinner" className="size-3.5 animate-spin motion-reduce:animate-none" /> : null}
           {status}
           {state === "ready" ? <Icon name="ArrowUpRight" className="size-3.5" /> : null}
           {state === "error" ? <Icon name="RotateCcw" className="size-3.5" /> : null}
@@ -249,7 +249,7 @@ function ExploreRow({
           )}
         >
           <Icon
-            name={feed.saving === "busy" ? "Loader2" : feed.saved ? "BookmarkCheck" : "BookmarkPlus"}
+            name={feed.saving === "busy" ? "Loading" : feed.saved ? "explore/bookmark-check" : "explore/bookmark-add"}
             className={cn("size-3.5", feed.saving === "busy" && "animate-spin motion-reduce:animate-none")}
           />
         </button>

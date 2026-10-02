@@ -456,7 +456,7 @@ export function FacetRail({
               key={view.id}
               label={view.name}
               active={view.query === current}
-              glyph={<Icon name="Bookmark" className="size-3.5 shrink-0" />}
+              glyph={<Icon name="studio/bookmark" className="size-3.5 shrink-0" />}
               onClick={() => onChange(view.query === current ? { filters: [], text: "" } : parseQuery(view.query))}
               onRemove={() => onDeleteView(view)}
             />

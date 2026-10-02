@@ -156,7 +156,7 @@ function ExplainerPanel({ explainerId }: { explainerId: string }) {
       ) : null}
       {error ? (
         <div role="alert" className="mx-3 mt-3 flex shrink-0 items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/[0.06] px-3 py-2 text-xs text-destructive">
-          <Icon name="AlertTriangle" fallback="CircleAlert" className="mt-px size-3.5 shrink-0" />
+          <Icon name="AlertTriangle" fallback="AlertCircle" className="mt-px size-3.5 shrink-0" />
           <span className="min-w-0 break-words">{error}</span>
         </div>
       ) : null}
@@ -236,7 +236,7 @@ function ExplainerHeader({
       <div className="min-w-0 flex-1">
         <div className="truncate text-sm font-medium">{title}</div>
         <div className="flex items-center gap-1 truncate text-[11px] text-muted-foreground" title={writtenAt ? shortDateTime(writtenAt) : undefined}>
-          <Icon name={EXPLORE_ICON} fallback="Compass" className="size-3 shrink-0" />
+          <Icon name={EXPLORE_ICON} fallback="Search" className="size-3 shrink-0" />
           {writtenLine(explainer, state)}
         </div>
       </div>
@@ -266,7 +266,7 @@ function Progress({ label, detail, progress, startedAt }: { label: string; detai
     <div className="mx-3 mt-3 shrink-0 rounded-lg border border-border/70 px-3 py-2.5">
       <div className="flex items-center justify-between gap-3 text-sm">
         <span className="flex min-w-0 items-center gap-2 font-medium">
-          <Icon name="Loading" fallback="Loader2" className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
+          <Icon name="Loading" fallback="Spinner" className="size-3.5 shrink-0 animate-spin motion-reduce:animate-none" />
           <span className="truncate">{label}</span>
         </span>
         <span className="shrink-0 text-xs tabular-nums text-muted-foreground">
@@ -304,7 +304,7 @@ function OpenInPages({ onOpen }: { onOpen(): void }) {
 function PanelMessage({ title, detail, children }: { title: string; detail?: string; children?: React.ReactNode }) {
   return (
     <div className="flex h-full flex-col items-center justify-center gap-2 p-6 text-center">
-      <Icon name={EXPLORE_ICON} fallback="Compass" className="size-6 text-muted-foreground" />
+      <Icon name={EXPLORE_ICON} fallback="Search" className="size-6 text-muted-foreground" />
       <p className="text-sm font-medium">{title}</p>
       {detail ? <p className="max-w-xs text-xs text-muted-foreground">{detail}</p> : null}
       {children}

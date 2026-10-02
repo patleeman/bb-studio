@@ -15,7 +15,8 @@
       "icon": "./assets/icon.svg",
       "experimental_icons": {
         "task": "./assets/icon.svg",
-        "board": "./assets/icon-board.svg"
+        "board": "./assets/icon-board.svg",
+        "flag": "./assets/icon-flag.svg"
       }
     },
     "server": "./server.ts",

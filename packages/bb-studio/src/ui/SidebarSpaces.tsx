@@ -89,8 +89,8 @@ const plainClick = (event: MouseEvent, go: () => void) => {
 };
 
 function threadIcon(thread: Thread) {
-  if (thread.status === "active" || thread.status === "starting") return "Loader";
-  return thread.kind === "channel" ? "Hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
+  if (thread.status === "active" || thread.status === "starting") return "Loading";
+  return thread.kind === "channel" ? "studio/hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
 }
 
 /** What an open space tab holds, nested under it: items, sub-items under their parents, then threads. */

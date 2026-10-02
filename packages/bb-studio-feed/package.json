@@ -13,7 +13,8 @@
     "branding": {
       "icon": "./icons/feed.svg",
       "experimental_icons": {
-        "feed": "./icons/feed.svg"
+        "feed": "./icons/feed.svg",
+        "mark-read": "./icons/mark-read.svg"
       }
     },
     "server": "./server.ts",

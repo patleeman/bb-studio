@@ -13,7 +13,7 @@ import { TaskViews } from "./views";
 const VIEW_BUTTONS: [BoardView, string, string][] = [
   ["board", "Board", "GridView"],
   ["list", "List", "ListView"],
-  ["calendar", "Calendar", "CalendarDays"],
+  ["calendar", "Calendar", "Calendar"],
 ];
 
 /** A board's sub path for a view: the board itself has none. */

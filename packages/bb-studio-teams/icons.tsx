@@ -1,5 +1,6 @@
-// BB draws icons from Hugeicons (1.5 stroke, 24 grid) but has no bell or @.
-// These use Hugeicons' own Notification01 and At artwork so they match.
+// BB draws icons from Hugeicons (1.5 stroke, 24 grid) but has no bell, @, #
+// or people. These use Hugeicons' own Notification01, At, Hashtag and
+// UserMultiple02 artwork so they match.
 import type { ExperimentalIconRegistration } from "@get-bb/plugin-sdk/app";
 
 const stroke = {
@@ -34,7 +35,28 @@ function AtSignIcon({ className }: { className?: string }) {
   );
 }
 
+function HashIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path {...stroke} d="M14 21L18 3M6 21L10 3M5 8H21M3 16H19" />
+    </svg>
+  );
+}
+
+function UsersIcon({ className }: { className?: string }) {
+  return (
+    <svg viewBox="0 0 24 24" className={className} aria-hidden="true">
+      <path {...stroke} d="M18.5 7C18.5 9.20914 16.7091 11 14.5 11C12.2909 11 10.5 9.20914 10.5 7C10.5 4.79086 12.2909 3 14.5 3C16.7091 3 18.5 4.79086 18.5 7Z" />
+      <path {...stroke} d="M8 11C6.34315 11 5 9.65685 5 8C5 6.34315 6.34315 5 8 5" />
+      <path {...stroke} d="M14.5 14C9.8125 14 7 16.5 7 19C7 20.1046 7.83947 21 8.875 21H20.125C21.1605 21 22 20.1046 22 19C22 16.5 19.1875 14 14.5 14Z" />
+      <path {...stroke} d="M4 19.9992H3.5C2.67157 19.9992 2 19.2317 2 18.2849C2 16.673 3.27307 15.0612 5.5 14.3613" />
+    </svg>
+  );
+}
+
 export const botTeamsIcons: ExperimentalIconRegistration[] = [
   { name: "BellDot", component: BellDotIcon },
   { name: "AtSign", component: AtSignIcon },
+  { name: "Hash", component: HashIcon },
+  { name: "Users", component: UsersIcon },
 ];

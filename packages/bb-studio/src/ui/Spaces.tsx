@@ -44,8 +44,8 @@ export type ThreadKind = "threads" | "conversations";
 const ofKind = (thread: SpaceThreadView, kind: ThreadKind) => (thread.kind === "thread") === (kind === "threads");
 
 function threadIcon(thread: SpaceThreadView) {
-  if (thread.status === "active" || thread.status === "starting") return "Loader";
-  return thread.kind === "channel" ? "Hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
+  if (thread.status === "active" || thread.status === "starting") return "Loading";
+  return thread.kind === "channel" ? "studio/hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
 }
 
 /** Where a thread lives, or who a direct message is with. */
@@ -424,7 +424,7 @@ export function SpaceMenu({ reference, onEdit, onDelete }: { reference: StudioIt
       <DropdownMenuContent align="end" className="w-48">
         <CopyReferenceMenuItem item={reference} />
         <DropdownMenuItem onSelect={onEdit}>
-          <Icon name="Pencil" className="size-4" /> Edit space
+          <Icon name="Edit" className="size-4" /> Edit space
         </DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem className="text-destructive" onSelect={onDelete}>

@@ -323,12 +323,12 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
           </DropdownMenuItem>
           {main && floatWindowKey(main) !== active.key ? (
             <DropdownMenuItem onSelect={swap}>
-              <Icon name="ArrowLeftRight" fallback="Repeat" className="size-4" /> Swap with main view
+              <Icon name="Repeat" className="size-4" /> Swap with main view
             </DropdownMenuItem>
           ) : null}
           {state.place.kind === "free" ? (
             <DropdownMenuItem onSelect={() => update((next) => placeAt(next, { kind: "dock" }))}>
-              <Icon name="PanelBottom" fallback="ArrowDownToLine" className="size-4" /> Dock at the bottom
+              <Icon name="PanelBottom" fallback="ArrowDown" className="size-4" /> Dock at the bottom
             </DropdownMenuItem>
           ) : null}
           <DropdownMenuSeparator />
@@ -545,7 +545,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
             if (fromHeader(event)) update(toggleCollapsed);
           }}
         >
-          <Icon name="GripVertical" fallback="MoreVertical" className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+          <Icon name="DragDropVertical" className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
           {active.back?.length && !state.collapsed ? (
             <button type="button" aria-label="Back" title="Back" className={HEADER_BUTTON} onClick={() => update((next) => goBack(next, active.key))}>
               <Icon name="ChevronLeft" className="size-4" />

@@ -162,7 +162,7 @@ function FeedReader() {
         <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">Feed</h1>
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread</span> : null}
         <button type="button" className={OUTLINE_BUTTON} disabled={!unread} onClick={markAllRead}>
-          <Icon name="CheckCheck" /> Mark all read
+          <Icon name="feed/mark-read" /> Mark all read
         </button>
       </header>
       <nav className="mb-2 flex gap-5 overflow-x-auto border-b border-border/70 [scrollbar-width:none]" aria-label="Topics">
@@ -429,7 +429,7 @@ function ExploreButton({ post }: { post: PostView }) {
       title={state === "unavailable" ? "Studio Explore isn't installed or couldn't find this finding" : "Write a page explaining this"}
       onClick={explore}
     >
-      <Icon name={state === "working" ? "Loader2" : "Compass"} className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
+      <Icon name={state === "working" ? "Loading" : "explore/explore"} fallback="Search" className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
       {state === "working" ? "Exploring…" : state === "unavailable" ? "Can't explore" : "Explore"}
     </button>
   );
@@ -465,7 +465,7 @@ function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
       {...studioItemProps({ href: embed.href, title: embed.title }, { drag: false })}
     >
       <header className="flex items-center gap-2 border-b border-border/60 py-1.5 pr-1.5 pl-3">
-        {embed.icon ? <span aria-hidden>{embed.icon}</span> : <Icon name={embed.pluginId === "artifacts" ? "FileCode2" : "FileText"} className="size-4 text-muted-foreground" />}
+        {embed.icon ? <span aria-hidden>{embed.icon}</span> : <Icon name={embed.pluginId === "artifacts" ? "Code" : "FileText"} className="size-4 text-muted-foreground" />}
         <span className="min-w-0 truncate text-sm font-semibold">{embed.title}</span>
         <span className="shrink-0 text-xs text-muted-foreground">
           {embed.kind} · {relativeTime(embed.updatedAt)}

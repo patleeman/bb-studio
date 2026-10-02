@@ -19,7 +19,10 @@
       "icon": "./icons/studio.svg",
       "experimental_icons": {
         "studio": "./icons/studio.svg",
-        "tag": "./icons/tag.svg"
+        "tag": "./icons/tag.svg",
+        "hash": "./icons/hash.svg",
+        "link": "./icons/link.svg",
+        "bookmark": "./icons/bookmark.svg"
       }
     },
     "server": "./server.ts",

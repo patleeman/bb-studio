@@ -143,7 +143,7 @@ function deliver(session: Session, text: string, clientRequestId?: ClientTurnReq
 /** Handing a message to the router is bookkeeping: the row stays collapsed. */
 const postPresentation = {
   label: { pending: "Sending to channel", completed: "Sent to channel" },
-  icon: { glyph: "Send" },
+  icon: { glyph: "Sent" },
   suppress: true,
 };
 

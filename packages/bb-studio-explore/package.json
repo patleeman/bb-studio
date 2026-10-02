@@ -13,7 +13,9 @@
     "branding": {
       "icon": "./icons/explore.svg",
       "experimental_icons": {
-        "explore": "./icons/explore.svg"
+        "explore": "./icons/explore.svg",
+        "bookmark-add": "./icons/bookmark-add.svg",
+        "bookmark-check": "./icons/bookmark-check.svg"
       }
     },
     "server": "./server.ts",
