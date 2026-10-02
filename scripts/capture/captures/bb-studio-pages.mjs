@@ -108,7 +108,10 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         if (after.markdown !== original.markdown) throw new Error("Comment dictation changed the page body");
         // The same comment sheet and microphone fit on phones.
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
-        await sleep(700);
+        // Let the no-speech toast from the synthetic microphone dismiss before
+        // clicking the mobile toolbar underneath it.
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 840, buttons: 0 });
+        await sleep(4500);
         await selectThread();
         const fits = await client.evaluate(`(() => {
           const mic = document.querySelector('.pages-comments button[aria-label="Dictate comment"]');

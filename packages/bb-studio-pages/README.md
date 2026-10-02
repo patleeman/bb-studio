@@ -33,6 +33,13 @@ right are the **Dictate**, **Version history**, **Comments** and page menu
 buttons. **Dictate** appears because Talk is installed in the staged app.
 The **Work with this page…** composer floats at the bottom right.
 
+![The Pages Comments panel with a microphone in the reply box](assets/comments.png)
+
+This staged page has an anchored comment and a reply. The capture checks real
+microphone start/stop, dictation delivery into both drafts, explicit Save,
+and an unchanged page body. The reply microphone also fits in the
+[phone comment sheet](assets/comments-mobile.png).
+
 ![The Pages collection listing the seeded pages](assets/collection.png)
 
 The collection is what the **Pages** nav item opens. It shows:
