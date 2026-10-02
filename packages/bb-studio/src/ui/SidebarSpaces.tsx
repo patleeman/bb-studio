@@ -111,6 +111,7 @@ export function SpaceMembers({ tree, spaceId, path, onNavigate }: { tree: SpaceT
       {space.items.map((item) => (
         <SidebarItemRow
           key={`${item.pluginId}:${item.id}`}
+          id={item.id}
           href={item.href}
           title={item.title}
           kindIcon={item.kindIcon}

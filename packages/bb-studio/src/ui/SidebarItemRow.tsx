@@ -5,6 +5,7 @@
 import { Icon, SIDEBAR_ROW, cn, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { useId, useRef, useState, type CSSProperties, type MouseEvent } from "react";
+import { toast } from "sonner";
 
 const ACTION =
   "inline-flex size-7 shrink-0 cursor-pointer items-center justify-center rounded-md text-subtle-foreground outline-none hover:bg-state-hover hover:text-muted-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring aria-expanded:bg-state-hover aria-expanded:text-muted-foreground max-md:pointer-coarse:size-9";
@@ -15,7 +16,15 @@ function openOptions(target: HTMLElement) {
   target.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }));
 }
 
+function copyId(id: string) {
+  navigator.clipboard.writeText(id).then(
+    () => toast.success("ID copied"),
+    () => toast.error("Couldn't copy the ID."),
+  );
+}
+
 export function SidebarItemRow({
+  id,
   href,
   title,
   kindIcon,
@@ -28,6 +37,8 @@ export function SidebarItemRow({
   onToggle,
   rowProps,
 }: {
+  /** The item's own ID, for Copy ID. */
+  id: string;
   href: string;
   title: string;
   kindIcon: string;
@@ -142,6 +153,10 @@ export function SidebarItemRow({
             Float
           </ContextMenuItem>
         ) : null}
+        <ContextMenuItem onSelect={() => copyId(id)}>
+          <Icon name="Copy" />
+          Copy ID
+        </ContextMenuItem>
         {onClose ? (
           <>
             <ContextMenuSeparator />

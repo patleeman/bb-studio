@@ -197,6 +197,7 @@ function TabRow({ tab, selected, spaces, path, onNavigate, onOpen, onClose }: {
   return (
     <>
       <SidebarItemRow
+        id={tab.id}
         href={tab.href}
         title={tab.title}
         kindIcon={tab.kindIcon}
