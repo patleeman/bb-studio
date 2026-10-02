@@ -18,6 +18,24 @@ then the pinned page was selected over the Studio list. The capture also
 checks the real Pages editor and an unsent thread draft through tab switches,
 folding, hiding, and moving Float, and verifies the pin in saved state.
 
+![Live integration capture of a page beside its workbench conversation](assets/native-workbench-preview.png)
+
+The native-host integration capture runs the local BB frontend against an
+isolated staged server with the suite installed from GitHub. It moves the
+real Pages editor and SDK composer through Float, workbench, and main while
+asserting DOM identity, the unsent draft, its file attachment, and the shared
+pin. This is implementation evidence for the pending BB host capability.
+
+```sh
+BB_CAPTURE_NATIVE_COMPANION=1 BB_CAPTURE_ONLY=float-native \
+  BB_CAPTURE_COMPANION_URL=http://127.0.0.1:<frontend-port> \
+  node scripts/capture-plugin-screenshots.mjs --plugin float
+```
+
+Source the staged server's `capture.env` first. Omit the frontend URL once
+the staged BB release includes the native host. The check fails if that
+capability is absent; ordinary stable captures keep using `float`.
+
 ## What you get
 
 - **Float from the sidebar.** **Float** is in the menu of every thread row (with
@@ -93,8 +111,9 @@ into the panel through a portal. The shared kit's `FloatPanels` does this
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 
-[Studio Chat](../bb-studio-chat) puts its New in Float and Open in Float buttons in
-Float's bottom-right corner, and adds a "Viewing" chip to thread tabs.
+[Studio Chat](../bb-studio-chat) provides the shared item-header Chat action
+and adds a "Viewing" chip to conversation tabs. Chat prefers the native
+workbench when available and otherwise opens Float.
 
 More in [docs/float.md](../../docs/float.md).
 

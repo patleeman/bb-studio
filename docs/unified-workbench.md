@@ -50,8 +50,9 @@ can open in the main view. Placement does not create another conversation.
 
 ## Current evidence and remaining work
 
-Stable BB 0.44.0 ships SDK 0.5.29. The compatibility check passes for all 18
-packages, including the shared kit. That SDK exposes owner-scoped fixed
+The original stable BB 0.44.0 captures use SDK 0.5.29. The latest compatibility
+check reports stable BB 0.45.0 with SDK 0.6.15 and passes for all 18 packages,
+including the shared kit, without raising their pins. SDK 0.5.29 exposes owner-scoped fixed
 tabs on plugin pages and thread-scoped panel actions. A general, movable
 companion stack needs further host integration; the current API alone does
 not prove the requested experience.
@@ -120,8 +121,13 @@ moving a tab preserves identity, history and pin, and reopening an existing
 main companion focuses it without relocating it. The Companions nav panel
 receives a retained main view. Plugin-owned item portals update compact/main
 context without unmounting their editor. Focused checks pass: Float 37,
-shared kit 70, and Studio Chat 22 tests. Real host integration captures and
-the released host capability are still required.
+shared kit 70, and Studio Chat 22 tests. The repeatable `float-native` live
+capture now passes against the local BB frontend and an isolated stable
+server. The full suite is installed at pushed commit 41b329c, with Float at
+8a57c1c. It checks the real Pages editor, SDK composer, unsent draft, file
+attachment, and pin through Float/workbench/main transfers. The native
+capture exposed and fixed double-encoded main routes and a development proxy
+that did not forward plugin sync sockets. Host release remains required.
 
 Remaining delivery includes native host live verification and release,
 the SDK/CLI placement controller, Pages standalone migration, embedded composer

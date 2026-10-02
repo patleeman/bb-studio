@@ -1,6 +1,9 @@
+import companionHost from "./companion-host.mjs";
+
 const STATE_KEY = "bb-studio-float:windows";
 
 export default ({ threadId, seedPages, seedDrawing, sleep }) => [
+  ...(process.env.BB_CAPTURE_NATIVE_COMPANION === "1" ? [companionHost({ threadId, seedPages, sleep })] : []),
   {
     id: "float",
     packageDir: "bb-studio-float",
