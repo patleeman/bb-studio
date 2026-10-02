@@ -111,10 +111,6 @@ struct FeedView: View {
                 Label(post.read ? "Unread" : "Read", systemImage: post.read ? "circle.fill" : "circle")
             }
             .tint(.accentColor)
-            Button { Task { await resolve(post) } } label: {
-                Label(post.isResolved ? "Reopen" : "Resolve", systemImage: post.isResolved ? "arrow.uturn.backward" : "checkmark")
-            }
-            .tint(.green)
         }
         .swipeActions(edge: .trailing) {
             Button(role: .destructive) { removing = post } label: { Label("Remove", systemImage: "trash") }
@@ -173,18 +169,6 @@ struct FeedView: View {
         do {
             try await app.client.markFeedSeen()
             for index in posts.indices { posts[index].read = true }
-        } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
-        }
-    }
-
-    private func resolve(_ post: FeedPost) async {
-        do {
-            if let updated = try await app.client.resolveFeedPost(post.id, resolved: !post.isResolved),
-                let index = posts.firstIndex(where: { $0.id == post.id })
-            {
-                posts[index].resolvedAt = updated.resolvedAt
-            }
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
@@ -265,7 +249,7 @@ private struct FeedBadge: View {
     }
 }
 
-/// One post, with Discuss and Resolve and the story's earlier updates.
+/// One post, with Discuss and the story's earlier updates. Agents resolve posts; it shows a badge.
 struct FeedPostView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
@@ -370,12 +354,6 @@ struct FeedPostView: View {
             }
             .buttonStyle(.borderedProminent)
             .accessibilityIdentifier("feedDiscuss")
-            Button {
-                Task { await resolve(post) }
-            } label: {
-                Label(post.isResolved ? "Reopen" : "Resolve", systemImage: post.isResolved ? "arrow.uturn.backward" : "checkmark")
-            }
-            .buttonStyle(.bordered)
         }
         .controlSize(.small)
     }
@@ -406,14 +384,6 @@ struct FeedPostView: View {
         markedRead = true
         do {
             if let updated = try await app.client.markFeedPost(post.id, read: read) { self.post = updated }
-        } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
-        }
-    }
-
-    private func resolve(_ post: FeedPost) async {
-        do {
-            if let updated = try await app.client.resolveFeedPost(post.id, resolved: !post.isResolved) { self.post = updated }
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }

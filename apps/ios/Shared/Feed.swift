@@ -114,13 +114,6 @@ extension BBClient {
         return result.topics.map(\.topic)
     }
 
-    @discardableResult
-    public func resolveFeedPost(_ id: String, resolved: Bool) async throws -> FeedPost? {
-        struct Result: Decodable { var post: FeedPost? }
-        let result: Result = try await rpc("feed", "edit", ["postId": .string(id), "resolved": .bool(resolved)])
-        return result.post
-    }
-
     public func removeFeedPost(_ id: String) async throws {
         let _: JSONValue = try await rpc("feed", "remove", ["postId": .string(id)])
     }
