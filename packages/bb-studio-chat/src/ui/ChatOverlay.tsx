@@ -4,7 +4,8 @@
 // by itself. It's also the kit's item-chat host: the header's thread chip
 // and quotes from item views go through it. Threads show as Float tabs, which
 // this plugin adds a "Viewing" chip to; the buttons sit in Float's
-// bottom-right corner, or on their own without Float.
+// bottom-right corner until a visible float replaces them, or on their own
+// without Float. An open composer or picker still stays beside the float.
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   useBbNavigate,
@@ -291,7 +292,7 @@ export function ChatOverlay() {
             />
           </section>
         ) : (
-          <div className="studio-chat-bar pointer-events-auto mb-2 flex h-10 items-center rounded-lg border border-border bg-background p-1 text-sm shadow-xl">
+          <div className="studio-chat-bar pointer-events-auto mb-2 flex h-10 items-center rounded-lg border border-border bg-background p-1 text-sm shadow-xl [[data-float-occupied=true]_&]:hidden">
             <button
               type="button"
               title={`Start a thread about this ${kindLabel}`}

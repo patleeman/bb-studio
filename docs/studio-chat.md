@@ -25,8 +25,11 @@ All of this is in the stable SDK 0.5.29:
 ## What it looks like
 
 - **Closed:** two buttons, New in Float and Open in Float, in Float's
-  bottom-right corner, right of a docked Float panel. They show on Studio
-  items only. Without Float they read New thread and Open thread.
+  bottom-right corner. A visible Float panel replaces them, including when
+  folded or dragged free; closing all tabs or hiding Float brings them back.
+  An open composer or picker stays beside the panel until dismissed. The
+  buttons show on Studio items only. Without Float they read New thread and
+  Open thread.
 - **New in Float:** the new-thread composer. Sending starts a thread in the item's
   project, with the item's pill already in the message, and opens it in a
   Float tab (or BB's own thread view without Float).

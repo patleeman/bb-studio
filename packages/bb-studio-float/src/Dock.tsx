@@ -43,6 +43,7 @@ export function Dock() {
     <>
       <div
         ref={setCorner}
+        data-float-occupied={!state.hidden && state.tabs.length > 0}
         className="float-corner pointer-events-none fixed bottom-0 z-40 flex items-end empty:hidden"
         style={{ right: `var(${FLOAT_RIGHT_VAR}, 1.5rem)` }}
       />

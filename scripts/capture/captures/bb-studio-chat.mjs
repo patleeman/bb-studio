@@ -33,6 +33,36 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForText("Viewing: Checkout flow");
         const tab = await client.evaluate(`document.querySelector('[data-float-tab="thread:${threadId}"][aria-selected="true"] .float-tab-title')?.innerText ?? ""`);
         if (!tab.includes(title)) throw new Error(`The showing Float tab is "${tab}", not the seeded thread "${title}"`);
+        const expectCorner = async (buttonsVisible) => {
+          const result = await client.evaluate(`(() => {
+            const bar = document.querySelector(".float-corner .studio-chat-bar");
+            const corner = document.querySelector(".float-corner");
+            const panel = document.querySelector(".bb-float-stack");
+            return {
+              visible: !!bar?.checkVisibility(),
+              cornerWidth: corner?.getBoundingClientRect().width ?? 0,
+              right: panel ? innerWidth - panel.getBoundingClientRect().right : null,
+              expectedRight: corner ? innerWidth - corner.getBoundingClientRect().right : null,
+            };
+          })()`);
+          if (result.visible !== buttonsVisible) throw new Error(`Float's corner buttons visible: ${result.visible}, expected ${buttonsVisible}`);
+          if (!buttonsVisible && (result.cornerWidth !== 0 || Math.abs(result.right - result.expectedRight) > 1))
+            throw new Error(`Float still reserves space for the hidden buttons: ${JSON.stringify(result)}`);
+        };
+        await sleep(350);
+        await expectCorner(false);
+        await client.clickAriaButtonWithPointer("Fold floating tabs");
+        await expectCorner(false);
+        await client.clickAriaButtonWithPointer("Open floating tabs");
+        // Hiding Float restores the prompt; showing it replaces the prompt again.
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "j", code: "KeyJ", modifiers: 12 });
+        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "j", code: "KeyJ", modifiers: 12 });
+        await sleep(350);
+        await expectCorner(true);
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "j", code: "KeyJ", modifiers: 12 });
+        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "j", code: "KeyJ", modifiers: 12 });
+        await sleep(350);
+        await expectCorner(false);
         await client.waitForSelector("canvas.excalidraw__canvas");
         await sleep(1500);
       } catch (error) {

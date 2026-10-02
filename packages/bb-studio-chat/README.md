@@ -30,6 +30,9 @@ Checkout flow" chip names the drawing on screen.
 - **Open in Float.** Next to it, Open in Float lists the item's home thread
   and your recent threads; type to search them all. The one you pick opens as
   a Float tab, without changing the home thread.
+- **One corner.** A visible Float panel replaces the buttons, even when
+  folded or dragged free. Closing all tabs or hiding Float brings them back.
+  An open composer or picker stays visible until dismissed.
 - **A home thread per item.** Starting a thread from New in Float makes it
   the item's home thread. Until then, the thread that made the item (an
   agent's saved artifact, say) stands in. The item header names it: click it
