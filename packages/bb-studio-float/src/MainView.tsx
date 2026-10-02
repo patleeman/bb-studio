@@ -9,7 +9,7 @@ export function MainView({ subPath }: { subPath: string }) {
   const navigate = useBbNavigate();
   let key = subPath;
   try { key = decodeURIComponent(subPath); } catch { /* malformed paths do not match a tab */ }
-  const tab = state.tabs.find((candidate) => candidate.key === key);
+  const tab = state.tabs.find((candidate) => candidate.key === subPath) ?? state.tabs.find((candidate) => candidate.key === key);
   if (!tab || tab.placement !== "main" || !companionWorkbenchAvailable()) {
     return <div className="flex h-full flex-col gap-3 p-6">
       <h1 className="text-xl font-semibold">Companions</h1>
@@ -17,7 +17,7 @@ export function MainView({ subPath }: { subPath: string }) {
         onClick={() => {
           if (companionWorkbenchAvailable()) {
             update((next) => moveCompanion(next, candidate.key, "main"));
-            navigate.toPluginPanel("companions", { subPath: encodeURIComponent(candidate.key) });
+            navigate.toPluginPanel("companions", { subPath: candidate.key });
           } else if (candidate.target.kind === "thread") navigate.toThread(candidate.target.threadId);
           else openAppPath(candidate.target.path, { main: true });
         }}><Icon name="AppWindow" className="size-4" /><TabLabel target={candidate.target} /></button>) : <p className="text-sm text-muted-foreground">Open Chat or float a view to keep it beside your work.</p>}

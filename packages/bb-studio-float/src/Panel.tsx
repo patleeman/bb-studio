@@ -307,7 +307,7 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
   const move = (place: "main" | "split") => {
     if (place === "main" && companionWorkbenchAvailable()) {
       update((next) => moveCompanion(next, active.key, "main"));
-      navigate.toPluginPanel("companions", { subPath: encodeURIComponent(active.key) });
+      navigate.toPluginPanel("companions", { subPath: active.key });
       return;
     }
     // BB's own view takes over; the tab would only repeat it.
@@ -489,7 +489,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
   const floatHidden = state.hidden || floatingTabs.length === 0;
   const move = (key: string, placement: CompanionPlacement) => {
     update((next) => moveCompanion(next, key, placement));
-    if (placement === "main") navigate.toPluginPanel("companions", { subPath: encodeURIComponent(key) });
+    if (placement === "main") navigate.toPluginPanel("companions", { subPath: key });
   };
 
   const size = panelSize(state.size, screen);

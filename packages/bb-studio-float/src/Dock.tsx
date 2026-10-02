@@ -19,7 +19,7 @@ function useHost() {
         update((state) => openTab(state, target, options));
         const key = floatWindowKey(target);
         if (!options?.minimized && companionWorkbenchAvailable() && getFloat().tabs.some((tab) => tab.key === key && tab.placement === "main")) {
-          navigate.toPluginPanel("companions", { subPath: encodeURIComponent(key) });
+          navigate.toPluginPanel("companions", { subPath: key });
         }
       },
       navigate: (windowKey, target) => update((state) => navigateTab(state, windowKey, target)),
