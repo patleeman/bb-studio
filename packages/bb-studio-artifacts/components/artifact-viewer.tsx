@@ -1,5 +1,6 @@
 // One artifact: its contents by type under Studio's item header, with its
-// versions, the thread it came from, and Save as page for text.
+// versions, the thread it came from, and Save as page for text. Selected text
+// or an image area can go to the artifact's thread (artifact-quote.tsx).
 import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
@@ -15,6 +16,7 @@ import {
   ItemDeleteConfirm,
   ItemMenu,
   openNewItemThread,
+  useStudioChatPresent,
   cn,
   openAppPath,
   projectName,
@@ -25,8 +27,9 @@ import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../server";
-import { ARTIFACT_UPDATE_TYPE, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../src/shared";
+import { ARTIFACT_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../src/shared";
 import { ArtifactBody, type BodyView } from "./artifact-body";
+import { QuoteCard, useSelectionPick, type Picked } from "./artifact-quote";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
 
@@ -44,6 +47,8 @@ export function ArtifactViewer({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
+  // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
+  const studioChat = useStudioChatPresent();
   const projects = useProjects();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -52,6 +57,21 @@ export function ArtifactViewer({
   const [view, setView] = useState<BodyView>("preview");
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [busy, setBusy] = useState(false);
+  const body = useRef<HTMLDivElement>(null);
+  /** Writing a note for the pick, which then stays put. */
+  const [writing, setWriting] = useState(false);
+  const shownVersion = loaded?.versions.find((each) => each.id === versionId) ?? loaded?.artifact?.version;
+  const [picked, setPicked] = useSelectionPick(body, `version ${shownVersion?.number ?? 1}`, !writing);
+  const pickArea = useCallback((area: Picked) => {
+    setPicked(area);
+    setWriting(true);
+  }, [setPicked]);
+  const closeQuote = useCallback(() => {
+    setPicked(null);
+    setWriting(false);
+  }, [setPicked]);
+  // A pick belongs to the contents it came from.
+  useEffect(closeQuote, [closeQuote, versionId, view]);
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
 
@@ -189,9 +209,11 @@ export function ArtifactViewer({
       </a>
       <ItemMenu reference={thread} projects={projects} projectId={artifact.projectId} onMove={(id) => void move(id)} onDelete={() => setConfirmDelete(true)} busy={busy}>
 
-          <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
-            <Icon name="MessageSquarePlus" className="size-4" /> New thread
-          </DropdownMenuItem>
+          {studioChat === false ? (
+            <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
+              <Icon name="MessageSquarePlus" className="size-4" /> New thread
+            </DropdownMenuItem>
+          ) : null}
           {artifact.sourceThreadId ? (
             <DropdownMenuItem onSelect={() => navigate.toThread(artifact.sourceThreadId!)}>
               <Icon name="MessageSquare" className="size-4" /> Open source thread
@@ -267,9 +289,25 @@ export function ArtifactViewer({
           </button>
         </div>
       ) : null}
-      <div className="min-h-0 flex-1">
-        <ArtifactBody key={`${version.id}:${view}`} artifactId={artifactId} version={version} view={canToggle ? view : "preview"} />
+      <div ref={body} className="min-h-0 flex-1">
+        <ArtifactBody
+          key={`${version.id}:${view}`}
+          artifactId={artifactId}
+          version={version}
+          view={canToggle ? view : "preview"}
+          onArea={confirmDelete ? undefined : pickArea}
+        />
       </div>
+      {picked && !confirmDelete ? (
+        <QuoteCard
+          key={`${picked.rect.left}:${picked.rect.top}:${picked.text?.length ?? 0}`}
+          picked={picked}
+          writing={writing}
+          onWrite={() => setWriting(true)}
+          item={{ pluginId: PLUGIN_ID, id: artifactId, ...thread }}
+          onClose={closeQuote}
+        />
+      ) : null}
     </div>
   );
 }

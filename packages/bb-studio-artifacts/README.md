@@ -17,8 +17,10 @@ agent to save it.
 Captured from a staged BB (`node scripts/staged-bb.mjs start`). It shows an
 HTML report, "Q3 usage report", saved twice from a staged thread's workspace.
 The viewer shows version 2 in its sandboxed frame, under Studio's shared item
-header, with Related, New thread, the Preview/Source toggle, Copy, Download and
-the ⋯ menu.
+header, with Related, the artifact's thread ("Pick a database for the todo
+app", the staged thread that saved it), the Preview/Source toggle, Copy,
+Download and the ⋯ menu. That thread waits as a docked Float tab, beside
+Studio Chat's New in Float and Open in Float.
 
 ## What you get
 
@@ -38,10 +40,18 @@ the ⋯ menu.
   - Code and text use BB's source viewer.
   - Other files offer a download.
 
-  The header has an editable title, **New thread** (which starts a thread that
-  mentions the artifact), Copy (text, or the image), Download, and a menu.
+  The header has an editable title, the artifact's thread (with
+  [Studio Chat](../bb-studio-chat); otherwise **New thread**, which starts a
+  thread that mentions the artifact), Copy (text, or the image), Download,
+  and a menu.
   The menu has Open source thread, Save as page (for Markdown, text and code),
   Versions, Move to, and Delete.
+- **Send to thread.** Select text in a Markdown, HTML, code or text
+  artifact, or drag over an image, and **Send to thread** appears. Add a
+  note and send: the passage (or the area, cropped, with its pixel
+  coordinates) goes to the artifact's thread, which is the thread that made
+  it unless you've picked another. Without Studio Chat, BB's composer opens
+  with the quote. PDFs aren't supported yet.
 - **Save to Studio from a thread.** Each message's action bar has
   **Save to Studio**, which opens a side panel with the files that reply created,
   changed, or generated, with the new ones already ticked. The panel also lists
@@ -75,6 +85,10 @@ the ⋯ menu.
 - The "this reply's files" list comes from the thread's event history:
   generated images and file changes between the reply's turn request and its
   end, with deleted files left out.
+- The viewer's HTML preview asks for `content?…&quote=1`, which adds a small
+  script before `</body>`. It posts the selected text and its position to
+  the viewer, which accepts messages only from its own frame. The page stays
+  sandboxed. A page whose own CSP blocks inline scripts just can't be quoted.
 - Contents are served from `GET /api/v1/plugins/artifacts/http/content`.
   Every response except a real PDF carries a `sandbox allow-scripts` CSP.
   This gives HTML an opaque origin, so it can't call BB's API with your

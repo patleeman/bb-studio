@@ -12,7 +12,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForText("· v2");
         await client.waitForText("Preview");
         await client.waitForText("Source");
-        await client.waitForText("New thread");
+        // Studio Chat names the artifact's thread: the one that saved it.
+        const { thread: saver } = JSON.parse(await bbCli(["thread", "get", process.env.BB_CAPTURE_WORKSPACE_THREAD_ID ?? threadId, "--json"]));
+        await client.waitForSelector(`button[title^=${JSON.stringify(`Quotes and chat go to "${saver.title}"`)}]`);
         await client.waitForAriaButton("Copy");
         await client.waitForAriaButton("More");
         // The report renders in its sandboxed frame from the content route.

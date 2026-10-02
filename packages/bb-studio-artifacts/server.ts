@@ -16,7 +16,7 @@ import { createChangeBus, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
-import { contentHeaders } from "./src/server/content";
+import { contentHeaders, withQuoteScript } from "./src/server/content";
 import { importedFile } from "./src/server/import-file";
 import { pageMarkdown } from "./src/server/page";
 import { displayPath, resolveSource, type ResolvedSource, type SourceRoot } from "./src/server/source";
@@ -449,12 +449,14 @@ export default async function plugin(bb: BbPluginApi) {
 
   // A version's bytes, for images, the HTML and PDF viewers, and Download.
   // Headers (a sandbox CSP on everything that isn't a real PDF) are in
-  // src/server/content.ts.
+  // src/server/content.ts. `quote=1` adds the script that reports selected
+  // text to the viewer, for HTML.
   bb.http.route("GET", "/content", (context) => {
     const version = store.version(context.req.query("artifact") ?? "", context.req.query("version") ?? "");
     const bytes = version ? store.bytes(version.sha256) : null;
     if (!version || !bytes) return context.text("Not found", 404);
-    const body = new Uint8Array(bytes);
+    const quote = context.req.query("quote") === "1" && versionType(version) === "html";
+    const body = quote ? withQuoteScript(new Uint8Array(bytes)) : new Uint8Array(bytes);
     return serveBytes(body, contentHeaders(version, body, { download: context.req.query("download") === "1" }));
   });
 

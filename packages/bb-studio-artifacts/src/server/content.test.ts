@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { SANDBOX_CSP, contentHeaders } from "./content";
+import { SANDBOX_CSP, contentHeaders, withQuoteScript } from "./content";
 
 const text = (value: string) => new Uint8Array(Buffer.from(value));
 
@@ -36,5 +36,18 @@ describe("contentHeaders", () => {
   it("names downloads safely", () => {
     const headers = contentHeaders({ name: 'rapport "été".md', mime: "text/markdown" }, text("#"), { download: true });
     expect(headers["content-disposition"]).toBe(`attachment; filename="rapport __t__.md"; filename*=UTF-8''rapport%20%22%C3%A9t%C3%A9%22.md`);
+  });
+});
+
+describe("withQuoteScript", () => {
+  const html = (bytes: Uint8Array) => Buffer.from(bytes).toString("utf8");
+
+  it("adds the script before the closing body tag", () => {
+    const out = html(withQuoteScript(text("<html><body><p>Hi</p></BODY></html>")));
+    expect(out).toMatch(/<p>Hi<\/p><script>[\s\S]*bb-artifact-selection[\s\S]*<\/script><\/BODY><\/html>$/);
+  });
+
+  it("appends it to a fragment without a body", () => {
+    expect(html(withQuoteScript(text("<h1>x</h1>")))).toMatch(/^<h1>x<\/h1><script>/);
   });
 });

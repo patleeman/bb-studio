@@ -1,12 +1,14 @@
 // An artifact version's contents, shown by type. HTML runs in a sandboxed
 // frame with an opaque origin (the content route also sends a sandbox CSP);
-// images, PDFs and text use the browser's and BB's own viewers.
+// images, PDFs and text use the browser's and BB's own viewers. Dragging over
+// an image picks an area to send to the artifact's thread.
 import { useEffect, useState } from "react";
 import { EmptyState, Icon, OUTLINE_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { Markdown, experimental_SourceCode as SourceCode, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
 import { contentUrl, formatBytes, isTextType, type ArtifactType } from "../src/shared";
+import { AreaBox, useImageArea, type Picked } from "./artifact-quote";
 
 export type ArtifactVersion = {
   id: string;
@@ -41,11 +43,23 @@ function useVersionText(artifactId: string, version: ArtifactVersion, wanted: bo
   return text;
 }
 
-export function ArtifactBody({ artifactId, version, view }: { artifactId: string; version: ArtifactVersion; view: BodyView }) {
+export function ArtifactBody({
+  artifactId,
+  version,
+  view,
+  onArea,
+}: {
+  artifactId: string;
+  version: ArtifactVersion;
+  view: BodyView;
+  /** An area of an image was picked. */
+  onArea?: (picked: Picked) => void;
+}) {
   const src = contentUrl(artifactId, version.id);
   const showText = isTextType(version.type) && (version.type !== "html" || view === "source");
   const text = useVersionText(artifactId, version, showText);
   const [actualSize, setActualSize] = useState(false);
+  const area = useImageArea(`version ${version.number}`, (picked) => onArea?.(picked));
 
   if (version.type === "image") {
     return (
@@ -53,13 +67,16 @@ export function ArtifactBody({ artifactId, version, view }: { artifactId: string
         <img
           src={src}
           alt={version.name}
-          title={actualSize ? "Fit to window" : "Actual size"}
+          title={`${actualSize ? "Click to fit to window" : "Click for actual size"}${onArea ? "; drag to send an area to the thread" : ""}`}
           onClick={() => setActualSize((current) => !current)}
+          {...(onArea ? area.imgProps : {})}
           className={cn(
-            "rounded-sm shadow-sm",
+            "rounded-sm shadow-sm select-none",
             actualSize ? "m-auto max-w-none cursor-zoom-out" : "max-h-full max-w-full cursor-zoom-in object-contain",
+            onArea && area.box && "cursor-crosshair",
           )}
         />
+        <AreaBox box={area.box} />
       </div>
     );
   }
@@ -68,7 +85,7 @@ export function ArtifactBody({ artifactId, version, view }: { artifactId: string
       <iframe
         key={version.id}
         title={version.name}
-        src={src}
+        src={contentUrl(artifactId, version.id, { quote: true })}
         sandbox="allow-scripts"
         referrerPolicy="no-referrer"
         className="size-full border-0 bg-white"

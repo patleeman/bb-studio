@@ -17,9 +17,13 @@ export function artifactHref(id: string): string {
 }
 
 /** A version's bytes. Versions never change, so the response caches forever. */
-export function contentUrl(artifactId: string, versionId: string, options: { download?: boolean } = {}): string {
+/** What an HTML preview's quote script posts to the viewer; `text` is null when nothing is selected. */
+export const SELECTION_MESSAGE = "bb-artifact-selection";
+
+/** `quote` adds, to HTML, the script that tells the viewer what's selected. */
+export function contentUrl(artifactId: string, versionId: string, options: { download?: boolean; quote?: boolean } = {}): string {
   const query = `artifact=${encodeURIComponent(artifactId)}&version=${encodeURIComponent(versionId)}`;
-  return `/api/v1/plugins/${PLUGIN_ID}/http/content?${query}${options.download ? "&download=1" : ""}`;
+  return `/api/v1/plugins/${PLUGIN_ID}/http/content?${query}${options.download ? "&download=1" : ""}${options.quote ? "&quote=1" : ""}`;
 }
 
 const ID = /^art_[0-9a-z]{16}$/;
