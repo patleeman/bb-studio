@@ -85,6 +85,8 @@ test("timeline excludes tools, inter-agent messages, interim replies, and PASS",
     { ...message("pass", "[PASS]", 5), turnId: "turn3" },
   ];
   expect(finalEntries(rows as never).map(e => e.text)).toEqual(["Help", "Done"]);
+  const withFile = { ...rows[0], id: "owner2", attachments: { imageUrls: [], localFilePaths: ["/tmp/a/brief.pdf"], localFiles: 1, localImagePaths: [], localImages: 0, webImages: 1 } };
+  expect(finalEntries([withFile] as never).map(e => e.text)).toEqual(["Help\n\n📎 brief.pdf\n\n📎 Image"]);
 });
 
 test("flat streaming output is hidden until its turn completes", () => {

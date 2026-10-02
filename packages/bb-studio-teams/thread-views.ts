@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { decisionsClient, type Question } from "@bb-studio/kit/decisions";
-import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery, type ViewAttachment } from "./view-contract";
+import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery } from "./view-contract";
 import type { Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
@@ -11,6 +11,10 @@ type Row = Timeline["rows"][number];
 const envelope = /^\[Studio view message ([a-f0-9-]+)\]\n([\s\S]*?)\n\[End owner message\]/;
 
 /** Only owner input and the last completed assistant message in each turn. */
+const baseName = (path: string) => path.split(/[\\/]/).at(-1) || "Attachment";
+/** The owner's text as the view shows it, with a line per attachment. */
+const withNames = (text: string, names: string[]) => [text, ...names.map(name => `📎 ${name}`)].filter(Boolean).join("\n\n");
+export const withAttachmentNames = (input: Pick<ViewSend, "text" | "attachments">) => withNames(input.text, (input.attachments ?? []).map(a => a.type === "image" ? "Image" : a.type === "localFile" && a.name ? a.name : baseName(a.path)));
 export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set()): ViewEntry[] {
   const entries: ViewEntry[] = [], replies = new Map<string, Row & { kind: "conversation"; role: "assistant" }>();
   const completedTurns = new Set(completed), automationTurns = new Set<string>();
@@ -38,7 +42,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
         const match = envelope.exec(row.text);
         if (row.text.trim()) entries.push({
           id: `${row.threadId}:${row.id}`, threadId: row.threadId, role: "user",
-          text: match?.[2] ?? row.text, groupId: match?.[1] ?? null, createdAt: row.createdAt,
+          text: withNames(match?.[2] ?? row.text, [...(row.attachments?.localFilePaths ?? []), ...(row.attachments?.localImagePaths ?? [])].map(baseName).concat(Array(row.attachments?.webImages ?? 0).fill("Image"))), groupId: match?.[1] ?? null, createdAt: row.createdAt,
         });
       } else if (!automationTurns.has(row.turnId ?? "") && (completed || (row.turnId !== null && completedTurns.has(row.turnId)))) {
         const key = row.turnId ?? row.id;
@@ -55,9 +59,6 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
   return entries;
 }
 
-const attachmentName = (a: ViewAttachment) => a.type === "image" ? "Image" : a.type === "localFile" && a.name ? a.name : a.path.split(/[\\/]/).at(-1) || "Attachment";
-/** The owner's text as the view shows it, with a line per attachment. */
-export const withAttachmentNames = (input: Pick<ViewSend, "text" | "attachments">) => [input.text, ...(input.attachments ?? []).map(a => `📎 ${attachmentName(a)}`)].filter(Boolean).join("\n\n");
 type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveries: ViewDelivery[] };
 export class ThreadViews {
   private readonly locks = new Map<string, Promise<unknown>>();

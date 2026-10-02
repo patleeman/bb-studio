@@ -9,7 +9,9 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
    await client.waitForSelector('[data-thread-view]');
    for(const text of launchRoomReplies)await client.waitForText(text);
    await client.evaluate(`(()=>{
-    if(!document.querySelector('textarea[aria-label="Message to view"], textarea#view-message'))throw new Error("Missing view composer");
+    const composer=document.querySelector('[data-view-composer] [data-promptbox]');
+    if(!composer)throw new Error("Missing view composer");
+    if(!composer.querySelector('[aria-label="Prompt actions"]')||!composer.querySelector('[aria-label="Start voice input"]'))throw new Error("View composer lacks attachments or voice input");
     if(document.querySelectorAll('[data-view-entry="assistant"]').length<3)throw new Error("Missing final thread replies");
     if(!document.querySelector('[data-view-entry="user"]'))throw new Error("Missing owner messages");
    })()`);
