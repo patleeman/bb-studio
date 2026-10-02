@@ -305,7 +305,15 @@ function StoryRow({ post, open, showTopic, onToggle, onRead }: { post: PostView;
           <span className={cn("mt-2.5 size-1.5 shrink-0 rounded-full", post.read ? "bg-transparent" : "bg-blue-500")} aria-label={post.read ? undefined : "Unread"} />
           <Avatar post={post} className="mt-0.5" />
           <span className="min-w-0 flex-1">
-            <span className={cn("block leading-snug group-hover:underline", post.read ? "text-sm text-muted-foreground" : "text-[15px] font-semibold text-foreground", dim && "truncate")}>{post.title}</span>
+            <span
+              className={cn(
+                "block leading-snug group-hover:underline",
+                open ? "text-lg font-semibold text-foreground" : post.read ? "text-[15px] text-muted-foreground" : "text-[15px] font-semibold text-foreground",
+                dim && "truncate",
+              )}
+            >
+              {post.title}
+            </span>
             {!post.read && !open && post.preview ? <span className="mt-0.5 line-clamp-2 block text-sm text-muted-foreground">{post.preview}</span> : null}
             <Meta post={post} showTopic={showTopic} className="mt-1" />
           </span>
@@ -404,7 +412,7 @@ function PostContent({ post }: { post: PostView }) {
   return (
     <>
       <Picture src={linkedPicture} className="mb-4 max-h-80 w-full rounded-lg" />
-      {post.body ? <Markdown content={post.body} className="text-[15px] leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg" /> : null}
+      {post.body ? <Markdown content={post.body} className="text-[15px] leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-[15px] [&_p]:text-[15px]" /> : null}
       {post.link?.title ? <LinkCard link={post.link} /> : null}
       <EarlierUpdates post={post} />
     </>
