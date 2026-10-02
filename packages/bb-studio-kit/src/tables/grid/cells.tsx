@@ -3,6 +3,7 @@
 import type { MouseEvent, ReactNode } from "react";
 import { Icon } from "../../ui/icon";
 import { cn } from "../../ui/utils";
+import { ItemLinkText } from "../../app/item-links";
 import { studioItemProps } from "../../app/studio-item";
 import { isRelation, type Cell, type Column } from "../model";
 import { findItem, type TableHost } from "./host";
@@ -125,6 +126,9 @@ export function CellValue({ column, cell, host, wrap = false }: { column: Column
         </button>,
       );
     }
+    case "text":
+      // Item links typed with @ or pasted from Copy reference show as pills.
+      return <ItemLinkText text={String(cell)} className={wrap ? "whitespace-pre-wrap break-words" : "truncate"} onPillMouseDown={stop} />;
     default:
       return <span className={wrap ? "whitespace-pre-wrap break-words" : "truncate"}>{String(cell)}</span>;
   }

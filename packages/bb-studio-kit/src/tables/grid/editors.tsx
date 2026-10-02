@@ -1,6 +1,8 @@
-// Editing a value: a text field over the cell for typed values, and a
-// searchable picker for options, people and Studio items.
+// Editing a value: a text field over the cell for typed values, where @ links
+// a Studio item in text, and a searchable picker for options, people and
+// Studio items.
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { ItemLinkTextarea } from "../../app/item-links";
 import { Icon } from "../../ui/icon";
 import { Popover, PopoverAnchor, PopoverContent } from "../../ui/popover";
 import { cn } from "../../ui/utils";
@@ -72,16 +74,17 @@ function TextEditor({ column, cell, host, initial, mode = "cell", onCommit, onCa
   // Single-line types use an input so the browser offers names and dates.
   const field =
     column.type === "text" ? (
-      <textarea
+      <ItemLinkTextarea
         ref={ref}
         aria-label={column.name}
         value={draft}
         rows={1}
+        wrapperClassName={mode === "cell" ? "self-stretch" : undefined}
         className={cn(
           "block w-full resize-none bg-background px-2 py-1.5 text-sm outline-none [field-sizing:content]",
           mode === "cell" ? "max-h-64 min-h-full" : "min-h-8 rounded-md hover:bg-state-hover focus:bg-state-hover",
         )}
-        onChange={(event) => setDraft(event.target.value)}
+        onValueChange={setDraft}
         onKeyDown={keyDown}
         onBlur={() => commit("stay")}
       />

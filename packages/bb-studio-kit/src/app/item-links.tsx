@@ -1,14 +1,15 @@
 // Links to Studio items in plain-text fields: comments, task descriptions,
-// space descriptions. A link is a Markdown link to the item's view, the same
+// space descriptions, table text cells. A link is a Markdown link to the item's view, the same
 // text Copy reference puts on the clipboard, so pasting one works with no
 // extra handling. Typing @ in an ItemLinkTextarea searches Studio and inserts
 // one; ItemLinkText and ITEM_LINK_PILLS show them as pills.
 import { useSdk } from "@get-bb/plugin-sdk/app";
-import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ComponentProps, type KeyboardEvent, type ReactNode } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useRef, useState, type ComponentProps, type KeyboardEvent, type MouseEvent } from "react";
 import { z } from "zod";
 import { STUDIO_PLUGIN_ID } from "../contract";
 import { untitled } from "../format";
 import { Icon } from "../ui/icon";
+import { Popover, PopoverAnchor, PopoverContent } from "../ui/popover";
 import { cn } from "../ui/utils";
 import { itemReferenceText } from "./item-reference";
 import { openAppPath } from "./nav";
@@ -37,13 +38,15 @@ export function splitItemLinks(text: string): ({ text: string } | { title: strin
   return parts;
 }
 
-export function ItemPill({ href, title, icon = "GridView" }: { href: string; title: string; icon?: string }) {
+export function ItemPill({ href, title, icon = "GridView", onMouseDown }: { href: string; title: string; icon?: string; onMouseDown?(event: MouseEvent): void }) {
   return (
     <a
       href={href}
       className={ITEM_PILL}
       {...studioItemProps({ href, title: untitled(title) })}
+      onMouseDown={onMouseDown}
       onClick={(event) => {
+        event.stopPropagation();
         if (event.metaKey || event.ctrlKey || event.shiftKey) return;
         event.preventDefault();
         openAppPath(href);
@@ -56,11 +59,11 @@ export function ItemPill({ href, title, icon = "GridView" }: { href: string; tit
 }
 
 /** Plain text with its item links shown as pills. */
-export function ItemLinkText({ text, className }: { text: string; className?: string }) {
+export function ItemLinkText({ text, className, onPillMouseDown }: { text: string; className?: string; onPillMouseDown?(event: MouseEvent): void }) {
   return (
     <span className={className}>
       {splitItemLinks(text).map((part, index) =>
-        "href" in part ? <ItemPill key={index} href={part.href} title={part.title} /> : <span key={index}>{part.text}</span>,
+        "href" in part ? <ItemPill key={index} href={part.href} title={part.title} onMouseDown={onPillMouseDown} /> : <span key={index}>{part.text}</span>,
       )}
     </span>
   );
@@ -159,6 +162,7 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
   };
 
   const keyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
+    if (open && ["ArrowDown", "ArrowUp", "Enter", "Tab", "Escape"].includes(event.key)) event.stopPropagation();
     if (open) {
       if (event.key === "ArrowDown" || event.key === "ArrowUp") {
         event.preventDefault();
@@ -172,7 +176,6 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
       }
       if (event.key === "Escape") {
         event.preventDefault();
-        event.stopPropagation();
         setMention(null);
         return;
       }
@@ -181,25 +184,40 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
   };
 
   return (
-    <div className={cn("relative w-full", wrapperClassName)}>
-      <textarea
-        {...props}
-        ref={field}
-        value={value}
-        className={className}
-        onChange={(event) => {
-          onValueChange(event.target.value);
-          track(event.target);
-        }}
-        onSelect={(event) => track(event.currentTarget)}
-        onKeyDown={keyDown}
-        onBlur={(event) => {
-          setMention(null);
-          props.onBlur?.(event);
-        }}
-      />
+    // The list is a popover, so a scrolling grid or a dialog doesn't clip it.
+    <Popover open={open} onOpenChange={(next) => !next && setMention(null)}>
+      <PopoverAnchor asChild>
+        <div className={cn("relative w-full", wrapperClassName)}>
+          <textarea
+            {...props}
+            ref={field}
+            value={value}
+            className={className}
+            onChange={(event) => {
+              onValueChange(event.target.value);
+              track(event.target);
+            }}
+            onSelect={(event) => track(event.currentTarget)}
+            onKeyDown={keyDown}
+            onBlur={(event) => {
+              setMention(null);
+              props.onBlur?.(event);
+            }}
+          />
+        </div>
+      </PopoverAnchor>
       {open ? (
-        <MentionList>
+        <PopoverContent
+          align="start"
+          role="listbox"
+          aria-label="Link a Studio item"
+          className="max-h-64 w-[max(16rem,var(--radix-popover-trigger-width))] overflow-y-auto p-1"
+          onOpenAutoFocus={(event) => event.preventDefault()}
+          onCloseAutoFocus={(event) => event.preventDefault()}
+          onInteractOutside={(event) => {
+            if (event.target === field.current) event.preventDefault();
+          }}
+        >
           {results.map((result, index) => (
             <button
               key={`${result.ref.pluginId}:${result.ref.id}`}
@@ -216,16 +234,8 @@ export const ItemLinkTextarea = forwardRef<HTMLTextAreaElement, TextareaProps>(f
               <span className="shrink-0 text-xs text-muted-foreground capitalize">{result.kind}</span>
             </button>
           ))}
-        </MentionList>
+        </PopoverContent>
       ) : null}
-    </div>
+    </Popover>
   );
 });
-
-function MentionList({ children }: { children: ReactNode }) {
-  return (
-    <div role="listbox" aria-label="Link a Studio item" className="absolute inset-x-0 top-full z-40 mt-1 max-h-64 overflow-y-auto rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-lg">
-      {children}
-    </div>
-  );
-}

@@ -1,6 +1,6 @@
 // Moving Studio items and threads in one gesture, anywhere on screen:
-// - right-click one for Open, Float, Open in split, Copy link, Copy reference
-//   (which pastes into a page as a pill), New thread;
+// - right-click one for Open, Float, Open in split, Copy reference (a thread:
+//   Copy link), New thread;
 // - Mod-click to open it in a split, Shift-click to float it;
 // - drag it onto the floating panel (or the corner, with no panel) to float it.
 // Items are marked with the kit's studioItemProps or studioThreadProps, and
@@ -184,9 +184,13 @@ export function ItemGestures() {
               <span className="ml-auto text-muted-foreground">{MOD_CLICK}</span>
             </DropdownMenuItem>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={() => copyLink(target)}>
-              <Icon name="Link" className="size-4" /> Copy link
-            </DropdownMenuItem>
+            {target.kind === "path" ? (
+              <CopyReferenceMenuItem item={{ href: target.path, ...(target.title ? { title: target.title } : {}), ...(target.icon ? { icon: target.icon } : {}) }} />
+            ) : (
+              <DropdownMenuItem onSelect={() => copyLink(target)}>
+                <Icon name="Link" className="size-4" /> Copy link
+              </DropdownMenuItem>
+            )}
             {target.kind === "path" ? (
               <DropdownMenuItem onSelect={() => openNewItemThread(navigate, { title: target.title ?? "This item", href: target.path })}>
                 <Icon name="MessageSquarePlus" className="size-4" /> New thread with this

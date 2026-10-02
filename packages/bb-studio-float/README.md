@@ -29,9 +29,9 @@ picked, so Pages renders the page inside it.
   into a plugin view or a thread.
   - **Shift-click** floats it, and **⌘-click** (Ctrl-click) opens it in a
     split.
-  - **Right-click** for Open, Float, Open in split, Copy link, Copy reference
-    (which pastes into a page as a pill) and New thread with this. On a
-    collection row, right-click opens the row's whole menu.
+  - **Right-click** for Open, Float, Open in split, Copy reference (which
+    pastes into a page as a pill; a thread has Copy link) and New thread with
+    this. On a collection row, right-click opens the row's whole menu.
   - **Drag** a collection row, Space row or link onto the panel, or onto the
     corner when no panel is open, to float it.
   - Shift+right-click keeps the browser's own menu.
