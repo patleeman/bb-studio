@@ -92,8 +92,8 @@ export function SidebarTabs() {
       return true;
     }
   });
-  const spaces = useSpaceTree(hosted && showSpaces);
-  const spacesShown = showSpaces && !!spaces?.length;
+  const spaceTree = useSpaceTree(hosted && showSpaces);
+  const spacesShown = showSpaces && (!!spaceTree.spaces?.length || spaceTree.failed);
   const toggleSpaces = () => {
     setShowSpaces(!showSpaces);
     try {
@@ -192,7 +192,7 @@ export function SidebarTabs() {
           </>
         }
       >
-        {spacesShown ? <SidebarSpaces spaces={spaces!} path={path} onNavigate={navigated} /> : null}
+        {spacesShown ? <SidebarSpaces tree={spaceTree} path={path} onNavigate={navigated} /> : null}
         {error && !tabs ? <SidebarNote tone="danger">{error}</SidebarNote> : null}
         {tabs && !tabs.length ? <SidebarNote icon="GridView">No open items</SidebarNote> : null}
         {groups.map((group) => (

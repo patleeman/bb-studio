@@ -576,17 +576,20 @@ export default async function plugin(bb: BbPluginApi) {
         itemsHref: `${spacePath(space.id)}/items`,
       };
     },
-    spaceTree: async () => {
+    spaceTree: async ({ threadsFor }) => {
       const all = spaces.list();
       if (!all.length) return { spaces: [] };
-      const known = conversations();
-      const [{ items, providers }, threads] = await Promise.all([hub.overview(), Promise.all(all.map((space) => spaceThreads(space, known).catch(() => [])))]);
+      // Only expanded spaces show threads, and each costs a call per project.
+      const wanted = all.filter((space) => threadsFor.includes(space.id));
+      const known = wanted.length ? conversations() : Promise.resolve(new Map<string, Conversation>());
+      const [{ items, providers }, fetched] = await Promise.all([hub.overview(), Promise.all(wanted.map((space) => spaceThreads(space, known).catch(() => [])))]);
+      const threads = new Map(wanted.map((space, index) => [space.id, fetched[index]!]));
       const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
       const options = { background: backgroundKinds(providers), pagesPluginId: PAGES_PLUGIN_ID, kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
       return {
-        spaces: all.map((space, index) => {
+        spaces: all.map((space) => {
           const tree = spaceTreeItems(space, items, options);
-          const held = threads[index]!;
+          const held = threads.get(space.id);
           return {
             id: space.id,
             name: space.name,
@@ -595,8 +598,8 @@ export default async function plugin(bb: BbPluginApi) {
             href: space.pageId ? pageHref(space.pageId) : spacePath(space.id),
             items: tree.items,
             itemCount: tree.count,
-            threads: held.slice(0, TREE_THREADS).map(({ id, title, status, kind }) => ({ id, title, status, kind })),
-            threadCount: held.length,
+            threads: (held ?? []).slice(0, TREE_THREADS).map(({ id, title, status, kind }) => ({ id, title, status, kind })),
+            threadCount: held ? held.length : null,
           };
         }),
       };

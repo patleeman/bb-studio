@@ -123,8 +123,10 @@ const treeSpace = z.object({
   items: z.array(tab.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
   /** Every item it holds; `items` stops at a cap. */
   itemCount: z.number(),
+  /** Only for the spaces asked for in `threadsFor`, as threads cost a call per project. */
   threads: z.array(spaceThread.pick({ id: true, title: true, status: true, kind: true })),
-  threadCount: z.number(),
+  /** Null when its threads weren't asked for. */
+  threadCount: z.number().nullable(),
 });
 export type SpaceTreeView = z.infer<typeof treeSpace>;
 
@@ -228,7 +230,7 @@ export const rpcContract = defineRpcContract({
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
   /** Every space with what it holds, for the sidebar's tree. */
-  spaceTree: { input: z.null(), output: z.object({ spaces: z.array(treeSpace) }) },
+  spaceTree: { input: z.object({ threadsFor: z.array(spaceId).max(200).default([]) }), output: z.object({ spaces: z.array(treeSpace) }) },
   /** Open tabs, in order; tabs of deleted items are closed. */
   tabs: { input: z.null(), output: z.object({ tabs: z.array(tab) }) },
   /** Opens a tab for the item whose view is at `path`, if any. */

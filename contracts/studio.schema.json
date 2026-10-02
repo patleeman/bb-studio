@@ -4409,7 +4409,19 @@
     "spaceTree": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "null"
+        "type": "object",
+        "properties": {
+          "threadsFor": {
+            "default": [],
+            "maxItems": 200,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        }
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4527,7 +4539,10 @@
                   }
                 },
                 "threadCount": {
-                  "type": "number"
+                  "type": [
+                    "number",
+                    "null"
+                  ]
                 }
               },
               "required": [

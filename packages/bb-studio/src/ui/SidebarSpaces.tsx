@@ -1,10 +1,11 @@
 // The Spaces group of the sidebar's Studio section: each space as a row that
 // expands to what it holds, sub-pages under their pages. A view over
 // membership, so an item in two spaces shows under both; nothing moves here.
-import { Icon, SIDEBAR_ROW, SIDEBAR_ROW_SELECTED, SidebarGroupHeading, cn, openAppPath } from "@bb-studio/kit/app";
+import { Icon, SIDEBAR_ROW, SIDEBAR_ROW_SELECTED, SidebarGroupHeading, SidebarNote, cn, openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type Ref } from "react";
 import type { rpcContract, SpaceTreeView } from "../contract";
 import { itemAtPath } from "../tabs";
 import { SpaceGlyph, spaceHref } from "./Spaces";
@@ -17,16 +18,35 @@ const LEVEL_PX = 12;
 
 type Thread = SpaceTreeView["threads"][number];
 
-export function useSpaceTree(enabled: boolean) {
+export interface SpaceTree {
+  spaces: SpaceTreeView[] | null;
+  /** The last fetch failed; `spaces` is the tree from before, if any. */
+  failed: boolean;
+  retry(): void;
+  expanded: Set<string>;
+  toggle(id: string): void;
+}
+
+export function useSpaceTree(enabled: boolean): SpaceTree {
   const rpc = useRpc<typeof rpcContract>();
   const [spaces, setSpaces] = useState<SpaceTreeView[] | null>(null);
+  const [failed, setFailed] = useState(false);
+  const [expanded, toggle] = useExpanded();
+  // Threads come only for expanded spaces, so expanding one refetches.
+  const threadsFor = useRef<string[]>([]);
+  threadsFor.current = [...expanded];
   const refetch = useCallback(() => {
-    // A failed refresh keeps the last tree; the tabs below show the error.
-    rpc.call("spaceTree", null).then((result) => setSpaces(result.spaces), () => {});
+    rpc.call("spaceTree", { threadsFor: threadsFor.current }).then(
+      (result) => {
+        setSpaces(result.spaces);
+        setFailed(false);
+      },
+      () => setFailed(true),
+    );
   }, [rpc]);
   useEffect(() => {
     if (enabled) refetch();
-  }, [enabled, refetch]);
+  }, [enabled, refetch, expanded]);
   const timer = useRef<ReturnType<typeof setTimeout>>(undefined);
   useEffect(() => () => clearTimeout(timer.current), []);
   // Members, titles and spaces change with any Studio change.
@@ -35,7 +55,7 @@ export function useSpaceTree(enabled: boolean) {
     clearTimeout(timer.current);
     timer.current = setTimeout(refetch, REFETCH_DEBOUNCE_MS);
   });
-  return spaces;
+  return { spaces, failed, retry: refetch, expanded, toggle };
 }
 
 /** Expanded space ids, kept per browser. */
@@ -72,10 +92,11 @@ function threadIcon(thread: Thread) {
   return thread.kind === "channel" ? "Hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
 }
 
-export function SidebarSpaces({ spaces, path, onNavigate }: { spaces: readonly SpaceTreeView[]; path: string; onNavigate(): void }) {
-  const [expanded, toggle] = useExpanded();
+export function SidebarSpaces({ tree, path, onNavigate }: { tree: SpaceTree; path: string; onNavigate(): void }) {
+  const { spaces, failed, retry, expanded, toggle } = tree;
   const navigate = useBbNavigate();
-  if (!spaces.length) return null;
+  if (failed && !spaces?.length) return <FailedNote onRetry={retry} />;
+  if (!spaces?.length) return null;
   const open = (href: string) => {
     openAppPath(href);
     onNavigate();
@@ -83,11 +104,12 @@ export function SidebarSpaces({ spaces, path, onNavigate }: { spaces: readonly S
   return (
     <div className="flex flex-col gap-px">
       <SidebarGroupHeading>Spaces</SidebarGroupHeading>
+      {failed ? <FailedNote onRetry={retry} /> : null}
       {spaces.map((space) => {
         const isOpen = expanded.has(space.id);
         const current = itemAtPath(space.items, path);
         const more = space.itemCount - space.items.length;
-        const moreThreads = space.threadCount - space.threads.length;
+        const moreThreads = (space.threadCount ?? 0) - space.threads.length;
         return (
           <div key={space.id} className="flex flex-col gap-px" data-studio-space={space.id}>
             <div className="relative">
@@ -110,25 +132,29 @@ export function SidebarSpaces({ spaces, path, onNavigate }: { spaces: readonly S
                   <SpaceGlyph space={space} className="text-sm leading-none" />
                 </span>
                 <span className="min-w-0 flex-1 truncate">{space.name}</span>
-                {space.itemCount + space.threadCount ? <span className="shrink-0 text-xs text-subtle-foreground tabular-nums">{space.itemCount + space.threadCount}</span> : null}
+                {space.itemCount ? <span className="shrink-0 text-xs text-subtle-foreground tabular-nums">{space.itemCount}</span> : null}
               </a>
             </div>
             {isOpen ? (
               <>
                 {space.items.map((item) => (
-                  <a
-                    key={`${item.pluginId}:${item.id}`}
-                    href={item.href}
-                    aria-current={item === current ? "page" : undefined}
-                    className={cn(SIDEBAR_ROW, item === current && SIDEBAR_ROW_SELECTED)}
-                    style={{ paddingLeft: INDENT_PX + item.depth * LEVEL_PX }}
-                    onClick={(event) => plainClick(event, () => open(item.href))}
-                  >
-                    <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
-                      {item.icon ? <span className="text-sm leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
-                    </span>
-                    <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                  </a>
+                  <ItemMenu key={`${item.pluginId}:${item.id}`} href={item.href} title={item.title} icon={item.kindIcon} onOpen={() => open(item.href)}>
+                    {(ref) => (
+                      <a
+                        ref={ref}
+                        href={item.href}
+                        aria-current={item === current ? "page" : undefined}
+                        className={cn(SIDEBAR_ROW, item === current && SIDEBAR_ROW_SELECTED)}
+                        style={{ paddingLeft: INDENT_PX + item.depth * LEVEL_PX }}
+                        onClick={(event) => plainClick(event, () => open(item.href))}
+                      >
+                        <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
+                          {item.icon ? <span className="text-sm leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
+                        </span>
+                        <span className="min-w-0 flex-1 truncate">{item.title}</span>
+                      </a>
+                    )}
+                  </ItemMenu>
                 ))}
                 {more > 0 ? <MoreRow label={`${more} more`} href={`${spaceHref(space.id)}/items`} onOpen={open} /> : null}
                 {space.threads.map((thread) => (
@@ -149,7 +175,12 @@ export function SidebarSpaces({ spaces, path, onNavigate }: { spaces: readonly S
                   </a>
                 ))}
                 {moreThreads > 0 ? <MoreRow label={`${moreThreads} more threads`} href={space.href} onOpen={open} /> : null}
-                {!space.items.length && !space.threads.length ? (
+                {space.threadCount === null ? (
+                  <p className="m-0 flex h-7 items-center text-xs text-subtle-foreground/60" style={{ paddingLeft: INDENT_PX + 8 }}>
+                    Loading threads…
+                  </p>
+                ) : null}
+                {!space.items.length && space.threadCount === 0 ? (
                   <p className="m-0 flex h-7 items-center text-xs text-subtle-foreground/60" style={{ paddingLeft: INDENT_PX + 8 }}>
                     Empty
                   </p>
@@ -160,6 +191,45 @@ export function SidebarSpaces({ spaces, path, onNavigate }: { spaces: readonly S
         );
       })}
     </div>
+  );
+}
+
+function FailedNote({ onRetry }: { onRetry(): void }) {
+  return (
+    <SidebarNote tone="danger">
+      Couldn't load spaces.
+      <button type="button" className="underline underline-offset-2 hover:text-foreground" onClick={onRetry}>
+        Retry
+      </button>
+    </SidebarNote>
+  );
+}
+
+/** Right-click a member to float it or open it in a split, as with a tab. */
+function ItemMenu({ href, title, icon, onOpen, children }: { href: string; title: string; icon: string; onOpen(): void; children(ref: Ref<HTMLAnchorElement>): ReactNode }) {
+  const target = { kind: "path" as const, path: href, title, icon };
+  const canFloat = useCanFloat(target);
+  const link = useRef<HTMLAnchorElement>(null);
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{children(link)}</ContextMenuTrigger>
+      <ContextMenuContent aria-label={`${title} options`}>
+        <ContextMenuItem onSelect={onOpen}>
+          <Icon name="ExternalLink" />
+          Open
+        </ContextMenuItem>
+        {canFloat ? (
+          <ContextMenuItem onSelect={() => openFloat(target)}>
+            <Icon name="AppWindow" />
+            Float
+          </ContextMenuItem>
+        ) : null}
+        <ContextMenuItem onSelect={() => openPathInSplit(link.current, href) || onOpen()}>
+          <Icon name="Columns2" />
+          Open in split
+        </ContextMenuItem>
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

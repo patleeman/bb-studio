@@ -154,8 +154,6 @@ public enum Studio {
 
   public typealias Sidebar = SidebarOutput
 
-  public typealias SpaceTreeInput = StudioJSONValue
-
   public typealias SpaceTree = SpaceTreeOutput
 
   public typealias TabsInput = StudioJSONValue
@@ -2887,6 +2885,14 @@ public enum Studio {
 
     public init(panels: [SidebarOutputPanelsItem]? = nil) {
       self.panels = panels
+    }
+  }
+
+  public struct SpaceTreeInput: Sendable, Hashable, Codable {
+    public var threadsFor: [String]?
+
+    public init(threadsFor: [String]? = nil) {
+      self.threadsFor = threadsFor
     }
   }
 

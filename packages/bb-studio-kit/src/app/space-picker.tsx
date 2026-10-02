@@ -110,6 +110,19 @@ export function SpacePicker({ item }: { item: RelatedRef }) {
     clearTimeout(timer.current);
     timer.current = setTimeout(load, REFETCH_DEBOUNCE_MS);
   });
+  // Studio's channel may not reach an add-on's view, so an agent filing the
+  // item elsewhere shows once the user comes back to the window.
+  useEffect(() => {
+    const visible = () => {
+      if (document.visibilityState === "visible") load();
+    };
+    window.addEventListener("focus", load);
+    document.addEventListener("visibilitychange", visible);
+    return () => {
+      window.removeEventListener("focus", load);
+      document.removeEventListener("visibilitychange", visible);
+    };
+  }, [load]);
 
   if (!spaces || !held || spaces.some((space) => space.pageId === item.id && item.pluginId === "pages")) return null;
   const holding = spaces.filter((space) => held.spaces.includes(space.id));
