@@ -13,7 +13,8 @@ import {
 } from "@bb-studio/kit/ui";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
-import { PLUGIN_ID, type BotView, type PageMetaView, type rpcContract } from "../contract";
+import { PLUGIN_ID } from "../constants";
+import type { BotView, PageMetaView, rpcContract } from "../contract";
 
 export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 export { useProjects } from "@bb-studio/kit/app";
