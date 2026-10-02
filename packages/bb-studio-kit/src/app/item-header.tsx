@@ -82,7 +82,7 @@ export function ItemHeader({
   leading?: ReactNode;
   /** The view's buttons, built from ICON_BUTTON and FLOATING_BUTTON. */
   trailing?: ReactNode;
-  /** Adds the standard New thread action for this item, unless Studio Chat's bar offers it. */
+  /** Adds the shared Chat action for this item. */
   thread?: ItemThread;
   /** The item shown, for the Float and split menu; `thread` serves when given. */
   item?: ItemThread;
@@ -90,10 +90,11 @@ export function ItemHeader({
 }) {
   const newThread = useNewItemThread(thread);
   const moved = item ?? thread;
-  // Studio Chat's New in Float bar replaces this button; one place to start a thread.
+  // Studio Chat owns item links and conversation creation across item views.
   const studioChat = useStudioChatPresent();
-  const path = thread?.href.split(/[?#]/)[0]?.split("/") ?? [];
-  const relatedRef = thread?.ref ?? (path[1] === "plugins" && path[2] && path[4]
+  const chatItem = thread ?? item;
+  const path = chatItem?.href.split(/[?#]/)[0]?.split("/") ?? [];
+  const relatedRef = chatItem?.ref ?? (path[1] === "plugins" && path[2] && path[4]
     ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
     : null);
   return (
@@ -120,7 +121,7 @@ export function ItemHeader({
         {relatedRef ? <SpacePicker item={relatedRef} /> : null}
         {relatedRef ? <RelatedPanel ref={relatedRef} /> : null}
         {thread && studioChat === false ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
-          <Icon name="MessageSquarePlus" /> New thread
+          <Icon name="MessageSquare" /> Chat
         </button> : null}
         {relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
         {moved ? <MoveMenu item={moved} onBack={onBack} /> : null}
@@ -134,41 +135,37 @@ export function ItemHeader({
 function HomeThreadChip({ item }: { item: ItemChatRef }) {
   const host = useItemChat();
   const home = useHomeThread(item);
-  if (!host || home === undefined) return null;
-  if (!home) {
-    return (
-      <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} title="Pick the thread this item's chat and quotes go to" onClick={() => host.choose(item)}>
-        <Icon name="MessageSquare" /> No thread
-      </button>
-    );
-  }
+  if (!host) return null;
   return (
-    <div className={cn(FLOATING, "flex h-8 max-w-56 min-w-0 items-center rounded-md text-sm text-muted-foreground max-md:max-w-36")}>
+    <div data-studio-chat-item={`${item.pluginId}:${item.id}`} className={cn(FLOATING, "flex h-8 shrink-0 items-center rounded-md text-sm text-muted-foreground")}>
       <button
         type="button"
-        className="flex h-full min-w-0 items-center gap-1.5 rounded-l-md pr-1.5 pl-2.5 hover:bg-state-hover hover:text-foreground"
-        title={`Quotes and chat go to "${home.title}". Open it.`}
+        className="flex h-full items-center gap-1.5 rounded-l-md pr-2 pl-2.5 hover:bg-state-hover hover:text-foreground disabled:opacity-50"
+        title={home ? `Continue "${home.title}"` : "Start a conversation about this item"}
+        disabled={home === undefined}
         onClick={() => host.open(item)}
       >
-        <Icon name="MessageSquare" className="size-4 shrink-0" />
-        <span className="min-w-0 truncate">{home.title}</span>
+        <Icon name="MessageSquare" className="size-4 shrink-0" /> Chat
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Thread options" className="flex h-full shrink-0 items-center rounded-r-md px-1.5 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
+          <button type="button" aria-label="Chat options" className="flex h-full shrink-0 items-center rounded-r-md px-1.5 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
             <Icon name="ChevronDown" className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
-          <DropdownMenuItem onSelect={() => host.open(item)}>
-            <Icon name="MessageSquare" className="size-4" /> Open thread
-          </DropdownMenuItem>
+          {home ? <DropdownMenuItem onSelect={() => host.open(item)}>
+            <Icon name="MessageSquare" className="size-4" /> <span className="truncate">{home.title}</span>
+          </DropdownMenuItem> : null}
+          {host.start ? <DropdownMenuItem onSelect={() => host.start?.(item)}>
+            <Icon name="MessageSquarePlus" className="size-4" /> New conversation
+          </DropdownMenuItem> : null}
           <DropdownMenuItem onSelect={() => host.choose(item)}>
-            <Icon name="ArrowLeftRight" className="size-4" /> Change thread…
+            <Icon name="ArrowLeftRight" className="size-4" /> Choose conversation…
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => void host.unlink(item)}>
+          {home ? <DropdownMenuItem onSelect={() => void host.unlink(item)}>
             <Icon name="Unlink" className="size-4" /> Unlink
-          </DropdownMenuItem>
+          </DropdownMenuItem> : null}
         </DropdownMenuContent>
       </DropdownMenu>
     </div>

@@ -4,6 +4,7 @@ import Foundation
 public enum Chat {
   public enum Method {
     public static let viewing = "viewing"
+    public static let subject = "subject"
     public static let start = "start"
     public static let home = "home"
     public static let link = "link"
@@ -12,6 +13,8 @@ public enum Chat {
   }
 
   public typealias Viewing = ViewingOutput
+
+  public typealias Subject = SubjectOutput
 
   public typealias Start = StartOutput
 
@@ -59,6 +62,48 @@ public enum Chat {
     public var item: ViewingOutputItem?
 
     public init(item: ViewingOutputItem? = nil) {
+      self.item = item
+    }
+  }
+
+  public struct SubjectInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct SubjectOutputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var kindLabel: String?
+    public var title: String?
+    public var icon: String?
+    public var kindIcon: String?
+    public var projectId: String?
+    public var href: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, kindLabel: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, projectId: String? = nil, href: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.kindLabel = kindLabel
+      self.title = title
+      self.icon = icon
+      self.kindIcon = kindIcon
+      self.projectId = projectId
+      self.href = href
+    }
+  }
+
+  public struct SubjectOutput: Sendable, Hashable, Codable {
+    public var item: SubjectOutputItem?
+
+    public init(item: SubjectOutputItem? = nil) {
       self.item = item
     }
   }

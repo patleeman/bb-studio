@@ -42,8 +42,8 @@ chat from inside the panel.
 ## Other plugins
 
 - `FloatDockPortal` renders in Float's bottom-right corner; Studio Chat's
-  New in Float and Open in Float buttons, composer and thread picker sit
-  there, and a docked panel sits to their left.
+  composer and conversation picker sit there while open; a docked panel
+  sits to their left. Chat itself is in each item's header.
 - `FloatThreadLeading` renders above a thread tab's messages; Studio Chat's
   "Viewing" chip uses it.
 - `openFloat(target, { minimized, tag })`: `minimized` opens the tab behind

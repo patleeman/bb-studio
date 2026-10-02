@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item. Each item has one home thread, shown in its header, that its chat and quotes go to and that comes back when you return.",
+  "description": "Part of BB Studio. One Chat action on Studio items opens their linked conversation or a new composer. Choose or start another conversation from its menu; item quotes keep their own context across main and Float views.",
   "engines": {
     "bb": ">=0.44",
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Studio Chat",
-    "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item. Each item has one home thread, shown in its header, that its chat and quotes go to and that comes back when you return.",
+    "description": "Part of BB Studio. One Chat action on Studio items opens their linked conversation or a new composer. Choose or start another conversation from its menu; item quotes keep their own context across main and Float views.",
     "branding": {
       "icon": "./assets/icon.svg"
     },
@@ -36,6 +36,7 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "clsx": "^2.1.1",
+    "jsdom": "29.0.1",
     "react": "19.2.4",
     "react-dom": "19.2.4",
     "sonner": "^1.7.4",

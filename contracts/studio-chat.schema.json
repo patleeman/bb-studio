@@ -84,6 +84,95 @@
         "additionalProperties": false
       }
     },
+    "subject": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "pluginId",
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "item": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "pluginId": {
+                    "type": "string"
+                  },
+                  "id": {
+                    "type": "string"
+                  },
+                  "kind": {
+                    "type": "string"
+                  },
+                  "kindLabel": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "icon": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "kindIcon": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "pluginId",
+                  "id",
+                  "kind",
+                  "kindLabel",
+                  "title",
+                  "icon",
+                  "kindIcon",
+                  "projectId",
+                  "href"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "item"
+        ],
+        "additionalProperties": false
+      }
+    },
     "start": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

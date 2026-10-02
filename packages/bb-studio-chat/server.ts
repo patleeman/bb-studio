@@ -121,7 +121,13 @@ export default async function plugin(bb: BbPluginApi) {
       const { item, kind } = await itemAt({ path }).catch(() => ({ item: null, kind: null }));
       return { item: item && !item.archived ? toViewed(item, kind) : null };
     },
+    subject: async (ref) => {
+      const { item, kind } = await itemAt(ref);
+      return { item: item && !item.archived ? toViewed(item, kind) : null };
+    },
     start: async ({ item: ref, request }) => {
+      const found = ref ? await itemAt(ref) : null;
+      if (ref && (!found?.item || found.item.archived)) throw new Error("That Studio item is archived or gone.");
       if (ref?.pluginId === PAGES_PLUGIN_ID) {
         const { threadId } = await bb.sdk.plugins.callRpc({
           pluginId: PAGES_PLUGIN_ID,
@@ -133,7 +139,6 @@ export default async function plugin(bb: BbPluginApi) {
         await setLink(ref, threadId);
         return { threadId };
       }
-      const found = ref ? await itemAt(ref).catch(() => null) : null;
       const item = found?.item ?? null;
       const input = item
         ? withItemPill(request.input, {

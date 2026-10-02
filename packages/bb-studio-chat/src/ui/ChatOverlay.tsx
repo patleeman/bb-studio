@@ -1,11 +1,3 @@
-// Studio Chat: over a Studio item, "New in Float" starts a thread about it and
-// "Open in Float" brings back one you have (without Float, "New thread" and
-// "Open thread" open BB's own view), and the item's home thread comes back
-// by itself. It's also the kit's item-chat host: the header's thread chip
-// and quotes from item views go through it. Threads show as Float tabs, which
-// this plugin adds a "Viewing" chip to; the buttons sit in Float's
-// bottom-right corner until a visible float replaces them, or on their own
-// without Float. An open composer or picker still stays beside the float.
 import {
   experimental_NewThreadComposer as NewThreadComposer,
   useBbNavigate,
@@ -34,6 +26,7 @@ import { MENTION_PROVIDER_ID } from "../ids";
 import { itemKey } from "../context";
 import { HEADER_BUTTON } from "./styles";
 import { ThreadPicker } from "./ThreadPicker";
+import { useChatDialog } from "./use-chat-dialog";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -48,15 +41,14 @@ function useViewing(rpc: Rpc, path: string): Viewed | null {
     if (!path.startsWith("/plugins/")) return setViewed({ path, item: null });
     let live = true;
     rpc.call("viewing", { path }).then(
-      ({ item }) => live && setViewed({ path, item }),
+      ({ item }) => live && setViewed({ path, item: item?.pluginId === "bot-teams" && item.kind === "view" ? null : item }),
       () => live && setViewed({ path, item: null }),
     );
     return () => {
       live = false;
     };
   }, [rpc, path]);
-  // Keep the last item while the next path loads, so the bar doesn't blink.
-  return viewed?.item ?? null;
+  return viewed?.path === path ? viewed.item : null;
 }
 
 type HomeCache = Map<string, HomeThread | null>;
@@ -69,7 +61,7 @@ type HomeCache = Map<string, HomeThread | null>;
 function useHomeThreads(
   rpc: Rpc,
   viewed: Viewed | null,
-  actions: { show(threadId: string, tag?: string): void; choose(ref: ItemChatRef): void; compose(ref: ItemChatRef, quote: ItemQuote): void },
+  actions: { show(threadId: string, tag?: string): void; choose(ref: ItemChatRef): void; compose(ref: ItemChatRef, quote?: ItemQuote): void },
 ): { cache: HomeCache; put(key: string, thread: HomeThread | null): void; load(ref: ItemChatRef): void } {
   const floatAvailable = useFloatAvailable();
   const [cache, setCache] = useState<HomeCache>(() => new Map());
@@ -106,7 +98,9 @@ function useHomeThreads(
       open: (ref) => {
         const thread = cacheRef.current.get(itemKey(ref));
         if (thread) actionsRef.current.show(thread.threadId, ITEM_CHAT_TAG);
+        else actionsRef.current.compose(ref);
       },
+      start: (ref) => actionsRef.current.compose(ref),
       choose: (ref) => actionsRef.current.choose(ref),
       unlink: async (ref) => {
         try {
@@ -189,130 +183,86 @@ function Corner({ children }: { children: ReactNode }) {
 export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
-  const path = usePathname();
-  const viewed = useViewing(rpc, path);
-  const floatAvailable = useFloatAvailable();
-  /** "choose" picks the item's home thread; "pick" just opens one. */
-  const [open, setOpen] = useState<"compose" | "pick" | "choose" | null>(null);
+  const viewed = useViewing(rpc, usePathname());
   const [error, setError] = useState<string | null>(null);
-  const [focus, setFocus] = useState(0);
-  /** A quote waiting in the composer because the item has no thread yet. */
-  const [seed, setSeed] = useState<{ key: string; text: string; count: number } | null>(null);
+  const resolve = useCallback(async (ref: ItemChatRef) => (await rpc.call("subject", { pluginId: ref.pluginId, id: ref.id })).item, [rpc]);
+  const reportError = useCallback((cause: unknown) => toast.error(errorMessage(cause)), []);
+  const { dialog, open, close, isCurrent } = useChatDialog(resolve, reportError);
 
-  // Without Float, threads open in BB's own view.
-  const show = (threadId: string, tag?: string) => {
+  const show = (threadId: string, tag?: string, dialogRequest?: number) => {
+    close(dialogRequest);
     if (!openFloat({ kind: "thread", threadId }, tag ? { tag } : {})) navigate.toThread(threadId);
-  };
-  const compose = () => {
-    setFocus((value) => value + 1);
-    setOpen("compose");
   };
   const homes = useHomeThreads(rpc, viewed, {
     show,
-    choose: () => setOpen("choose"),
-    compose: (ref, quote) => {
-      setSeed((current) => ({ key: itemKey(ref), text: quoteMessage(quote), count: (current?.count ?? 0) + 1 }));
-      compose();
-    },
+    choose: (ref) => { setError(null); void open(ref, "choose"); },
+    compose: (ref, quote) => { setError(null); void open(ref, "compose", quote); },
   });
-
   const chip = <FloatThreadLeading render={(threadId) => (viewed ? <ViewingChip threadId={threadId} viewed={viewed} /> : null)} />;
-  if (!viewed) return chip;
+  if (!dialog) return chip;
 
-  const key = itemKey(viewed);
+  const { item, mode, quote, request: focus } = dialog;
+  const key = itemKey(item);
   const home = homes.cache.get(key) ?? null;
-  const kindLabel = viewed.kindLabel.toLowerCase();
-  const quoted = seed?.key === key ? seed : null;
-  const close = () => {
-    setOpen(null);
-    setSeed(null);
-  };
-
+  const kindLabel = item.kindLabel.toLowerCase();
   return (
     <>
       {chip}
       <Corner>
-        {open === "compose" ? (
+        {mode === "compose" ? (
           <section aria-label={`Work with this ${kindLabel}`} className={cn(CARD, "w-[min(460px,calc(100vw-1rem))] mb-2")}>
             <header className="flex items-center gap-2 border-b border-border py-1.5 pr-2 pl-4 text-xs text-muted-foreground">
-              <Icon name={viewed.kindIcon} className="size-3.5 shrink-0" />
+              <Icon name={item.kindIcon} className="size-3.5 shrink-0" />
               <span className="min-w-0 flex-1 truncate">
-                An agent works on "{untitled(viewed.title)}" with you. @mention a bot to hand it off.
+                Chat about "{untitled(item.title)}". @mention a bot to hand it off.
               </span>
-              <button type="button" aria-label="Close composer" className={HEADER_BUTTON} onClick={close}>
+              <button type="button" aria-label="Close composer" className={HEADER_BUTTON} onClick={() => close()}>
                 <Icon name="X" className="size-4" />
               </button>
             </header>
             {error ? <p className="px-4 pt-1 text-xs text-red-500">{error}</p> : null}
             <NewThreadComposer
-              key={quoted ? `${key}:quote:${quoted.count}` : key}
+              key={quote ? `${key}:quote:${focus}` : key}
               className="studio-chat-composer max-h-[60vh] min-h-0"
               layout="document"
               placeholder={`Work with this ${kindLabel}…`}
-              draftKey={quoted ? `studio-chat:${key}:quote:${quoted.count}` : `studio-chat:${key}`}
-              {...(quoted ? { initialPrompt: quoted.text } : {})}
+              draftKey={quote ? `studio-chat:${key}:quote:${focus}` : `studio-chat:${key}`}
+              {...(quote ? { initialPrompt: quoteMessage(quote) } : {})}
               focusRequest={focus}
-              {...(viewed.projectId ? { defaultProjectId: viewed.projectId } : {})}
+              {...(item.projectId ? { defaultProjectId: item.projectId } : {})}
               onSubmit={async (request) => {
                 setError(null);
                 try {
-                  const { threadId } = await rpc.call("start", { item: { pluginId: viewed.pluginId, id: viewed.id }, request });
-                  close();
-                  homes.load(viewed);
-                  show(threadId, ITEM_CHAT_TAG);
+                  const { threadId } = await rpc.call("start", { item: { pluginId: item.pluginId, id: item.id }, request });
+                  homes.load(item);
+                  show(threadId, ITEM_CHAT_TAG, focus);
                 } catch (cause) {
-                  setError(errorMessage(cause));
-                  throw cause; // Keeps the draft for another try.
+                  if (isCurrent(focus)) setError(errorMessage(cause));
+                  throw cause;
                 }
               }}
             />
           </section>
-        ) : open === "pick" || open === "choose" ? (
-          <section aria-label={open === "choose" ? `Choose this ${kindLabel}'s thread` : "Open a thread"} className={cn(CARD, "studio-chat-picker w-[min(380px,calc(100vw-1rem))] mb-2")}>
-            {open === "choose" ? (
-              <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
-                Quotes and chat about "{untitled(viewed.title)}" will go to the thread you pick.
-              </p>
-            ) : null}
+        ) : (
+          <section aria-label={`Choose this ${kindLabel}'s conversation`} className={cn(CARD, "studio-chat-picker w-[min(380px,calc(100vw-1rem))] mb-2")}>
+            <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">
+              Quotes and chat about "{untitled(item.title)}" will go to the conversation you pick.
+            </p>
             <ThreadPicker
               homeThreadId={home?.threadId ?? null}
-              onClose={() => setOpen(null)}
+              onClose={() => close()}
               onPick={(threadId) => {
-                const choosing = open === "choose";
-                setOpen(null);
-                if (!choosing) return show(threadId);
-                rpc.call("link", { pluginId: viewed.pluginId, id: viewed.id, threadId }).then(
+                close();
+                rpc.call("link", { pluginId: item.pluginId, id: item.id, threadId }).then(
                   ({ thread }) => {
                     homes.put(key, thread);
-                    show(threadId, ITEM_CHAT_TAG);
+                    show(threadId, ITEM_CHAT_TAG, focus);
                   },
-                  (cause) => toast.error(errorMessage(cause)),
+                  reportError,
                 );
               }}
             />
           </section>
-        ) : (
-          <div className="studio-chat-bar pointer-events-auto mb-2 flex h-10 items-center rounded-lg border border-border bg-background p-1 text-sm shadow-xl [[data-float-occupied=true]_&]:hidden">
-            <button
-              type="button"
-              title={`Start a thread about this ${kindLabel}`}
-              className="flex h-full items-center gap-2 rounded-md px-3 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-              onClick={compose}
-            >
-              <Icon name="MessageSquarePlus" className="size-4 shrink-0" />
-              {floatAvailable ? "New in Float" : "New thread"}
-            </button>
-            <span aria-hidden className="mx-0.5 h-5 w-px bg-border" />
-            <button
-              type="button"
-              title={floatAvailable ? "Open a thread in Float" : "Open a thread"}
-              className="flex h-full items-center gap-2 rounded-md px-3 text-muted-foreground hover:bg-state-hover hover:text-foreground"
-              onClick={() => setOpen("pick")}
-            >
-              <Icon name="MessageSquare" className="size-4 shrink-0" />
-              {floatAvailable ? "Open in Float" : "Open thread"}
-            </button>
-          </div>
         )}
       </Corner>
     </>

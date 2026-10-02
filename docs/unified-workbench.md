@@ -75,9 +75,19 @@ on malformed Explore fixture output after installing the suite; the Float
 capture reused the verified running staged server and its existing Orbit
 project and thread. Its live assertions were not relaxed.
 
+The shared item header now offers Chat, New conversation, Choose conversation,
+and Unlink. Studio Chat resolves actions by explicit item identity, including
+companion items. Its composer and picker keep that subject during main-pane
+navigation. Tests cover linking, quotes, project selection, missing or archived
+items, overlapping requests and submissions, failed drafts, and fallback
+thread navigation. Teams saved views remain free of item-chat overlays and
+automatic background chat discovery. The old corner bar is removed.
+Targeted staging installs the full suite while seeding only the selected
+capture's required fixtures; its live Chat verification is pending.
+
 Remaining delivery includes the common opening and placement controller,
-native workbench integration, the single Chat action, Pages migration,
-composer targeting, main-view transfers, all suite entry points, compact
-behavior, staged live captures, documentation and marketplace checks, and
-the requirement-by-requirement completion audit. This goal stays active
+native workbench integration, Pages standalone migration, embedded composer
+targeting, main-view transfers, all suite entry points, compact behavior,
+staged live captures, documentation and marketplace checks, and the
+requirement-by-requirement completion audit. This goal stays active
 until those workflows are implemented and verified.

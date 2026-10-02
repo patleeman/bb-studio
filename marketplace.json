@@ -33,7 +33,7 @@
     {
       "id": "studio-chat",
       "displayName": "Studio Chat",
-      "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item. Each item has one home thread, shown in its header, that its chat and quotes go to and that comes back when you return.",
+      "description": "Part of BB Studio. One Chat action on Studio items opens their linked conversation or a new composer. Choose or start another conversation from its menu; item quotes keep their own context across main and Float views.",
       "icon": {
         "url": "./packages/bb-studio-chat/assets/icon.svg"
       },

@@ -2,86 +2,54 @@
 
 > **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), Studio Chat, and [Studio Teams](../bb-studio-teams).
 
-New in Float and Open in Float on every page, drawing and other Studio item.
-New in Float starts a thread that knows which item you're looking at; Open
-in Float brings back one you already have. Each item has one home thread,
-named in its header, where its chat and quotes go. Threads open as
-[Float](../bb-studio-float) tabs.
+One **Chat** action in a Studio item's header opens its linked conversation
+or a new composer. Its menu lets you start another conversation, choose an
+existing one, or unlink it. Chat and quotes target the chosen item, including
+items inside [Float](../bb-studio-float) tabs while the main pane shows
+something else.
 
 ## Staged preview
 
 ![Live BB screenshot of Studio Chat on a drawing](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`): an Excalidraw
-drawing ("Checkout flow") with New in Float and Open in Float in the
-bottom-right corner. The seeded "Draft the ORBIT-42 release notes" thread was
-picked from Open in Float and shows as a docked Float tab, whose "Viewing:
-Checkout flow" chip names the drawing on screen.
+Captured from stable BB with the suite installed from a pushed commit:
+"Checkout flow" has one Chat action, and its chosen "Draft the ORBIT-42
+release notes" conversation opens in Float. The live capture also checks
+unlinked composers, companion-item targeting, preserved context during main
+navigation, conversation selection, and focusing an existing thread.
 
 ## What you get
 
-- **New in Float.** At the bottom right of every Studio item, New in Float
-  opens BB's new-thread composer in the item's project. The message starts with a pill
-  for the item, and the agent gets a note saying what it is and which tools
-  read and change it. The new thread opens as a Float tab, or in BB's own
-  view without Float, where the buttons read New thread and Open thread.
-  The item header drops its own New thread button, so this bar is the one
-  place to start a thread.
-- **Open in Float.** Next to it, Open in Float lists the item's home thread
-  and your recent threads; type to search them all. The one you pick opens as
-  a Float tab, without changing the home thread.
-- **One corner.** A visible Float panel replaces the buttons, even when
-  folded or dragged free. Closing all tabs or hiding Float brings them back.
-  An open composer or picker stays visible until dismissed.
-- **A home thread per item.** Starting a thread from New in Float makes it
-  the item's home thread. Until then, the thread that made the item (an
-  agent's saved artifact, say) stands in. The item header names it: click it
-  to open it, or use its menu to **Change thread…** or **Unlink**. Without
-  one, the header shows **No thread**, which picks one. A thread can be home
-  to several items.
-- **Quotes go there.** An item view can send a quote, such as text selected
-  in an artifact or an area of an image, with a note. It's posted to the home
-  thread, waiting for the thread's current turn, and the thread opens. With
-  no home thread, New in Float opens with the quote in the message.
-- **Chats come back.** Reopening an item brings its home thread back as a
-  Float tab behind the one showing. Moving on to another item swaps that tab
-  for the next item's chat, unless you're looking at it.
-- **Viewing chip.** Every Float thread tab shows which Studio item is on
-  screen.
-- **Pages hands over.** With Studio Chat installed, Studio Pages drops its own
-  "Work with this page…" box. Page chats still start through Pages, so they
-  keep showing in the page's Chats menu.
-
-## How it works
-
-- `viewing` asks Studio's `itemAt` which item a path opens, so any add-on
-  that joins Studio works without changes.
-- `start` spawns the thread. For pages it calls Pages' `work` RPC instead.
-  Other items get a mention pill that this plugin's `item` mention provider
-  resolves when BB creates the thread.
-- The note comes from the item's kind: its `agentHint` in the Studio contract
-  (for example `excalidraw_get_drawing` / `excalidraw_update_drawing`), or a
-  pointer to `studio_list_items`. It points at the item and doesn't copy it,
-  so the agent reads the latest version.
-- Home threads live in the plugin's storage (`link:<plugin>:<id>`); Unlink
-  stores an empty link so the thread that made the item doesn't stand in.
-  For pages, Pages' own chat records count too. The fallback is the newest
-  `created` thread Studio links to the item.
-- Item views reach the home thread through the kit's `useHomeThread` and
-  `useItemChat` (`packages/bb-studio-kit/src/app/item-chat.ts`). Studio Chat
-  registers as their host on `window`, as Float does. `send` posts the quote
-  with `threads.send` in `queue-if-active` mode, with the item's pill and an
-  area's picture; if the provider refuses the picture, it sends the text,
-  which gives the area's coordinates.
+- **Chat.** Continue the item's linked conversation or start one in its
+  project. New messages carry an item pill that tells the agent which tools
+  read and edit it.
+- **Conversation options.** Choose a thread from recent conversations or
+  search. Start another without changing the current link until you send.
+  Unlink prevents the thread that created the item from standing in.
+- **Quotes.** Selected artifact text or an image area goes to the linked
+  conversation and waits behind its active turn. Without a link, the item's
+  composer opens with the quote.
+- **Correct context across panes.** A composer or picker stays bound to its
+  item when you navigate. It uses that item's title, project, and link.
+- **Existing conversations.** Page chats still go through Pages and remain
+  in its Chats menu. Threads that created other items can serve as their
+  linked conversation until you choose one.
+- **Viewing chip.** Float thread tabs name the Studio item in the main pane.
+  That label does not add it to the conversation automatically.
+- **Saved views.** Teams views contain their own chat. Chat leaves their
+  composer unobstructed and does not discover another item conversation.
 
 ## Limits
 
-- The "Viewing" chip can't add the item to a message in a floated thread.
-  A plugin's `ThreadChat` doesn't scope `useComposer()` to its thread on BB's
-  SDK 0.5.29, so the button stays hidden. Type `@` in the chat to mention a
-  Studio item instead. A new chat always carries the item.
-- BB doesn't tell plugins the current route. The buttons follow the Navigation
-  API and poll every 400ms as a fallback.
+The native right workbench and moving live state between main and companion
+presentations remain in the [full-suite delivery work](../../docs/unified-workbench.md).
+Threads currently open in Float, or in BB's main view without Float.
+Pages keeps its standalone chat fallback until that migration is complete.
+
+On stable SDK 0.5.29, embedded `ThreadChat` does not scope `useComposer()` to
+its thread. The Viewing chip only offers **Add to message** when the scope
+matches. Type `@` in the thread to mention an item. Main-pane discovery
+follows BB navigation and polls every 400ms as a fallback.
 
 More in [docs/studio-chat.md](../../docs/studio-chat.md).
 
@@ -92,7 +60,8 @@ pnpm install
 pnpm --filter @bb-studio/studio-chat test
 pnpm --filter @bb-studio/studio-chat typecheck
 bb plugin build packages/bb-studio-chat
+node scripts/staged-bb.mjs start --plugin studio-chat
 ```
 
-Requires [Studio](../bb-studio). Without it, the buttons have no items to
-show on.
+Requires [Studio](../bb-studio) to resolve item context. The item header and
+shared host live in [the kit](../bb-studio-kit/src/app/item-chat.ts).

@@ -1,121 +1,75 @@
 # Studio Chat
 
-Studio Chat takes Pages' "Work with this page…" bar out of Pages and puts
-New in Float and Open in Float on every Studio item in its place. It knows
-what's on screen: on a page it works on that page; on a drawing, that
-drawing. Its threads open in [Float](float.md) tabs. Studio Chat used to have its own floating card; that became the
-Float plugin, so anything can float, several things at once.
+Studio items share one **Chat** action in their header. It opens the item's
+linked conversation, or a new-conversation composer when there is no link.
+The menu offers **New conversation**, **Choose conversation…**, and **Unlink**.
+Chat keeps the same label whether Float is installed or absent.
 
 Plugin id `studio-chat`, display name "Studio Chat", in
 `packages/bb-studio-chat`.
 
-## What BB gives us
+## Item identity and context
 
-All of this is in the stable SDK 0.5.29:
+Each action carries the item's plugin ID and item ID. The `subject` RPC
+resolves its title, kind, project, and link through Studio's `itemAt`. A
+composer or picker stays bound to that item when the main pane navigates
+elsewhere. Actions inside Float therefore target their own item.
 
-| Need | SDK surface |
-|---|---|
-| The buttons on every screen | `app.slots.experimental_appOverlay`, mounted once per window, portalled into Float's bottom-right corner when Float runs |
-| A new thread | `experimental_NewThreadComposer` |
-| Recent threads and search for Open in Float | `useSdk().threads.list` and `threads.search` |
-| Where threads show | Float's tabs, through the kit's `openFloat` |
-| Tell the agent what's on screen | Our own mention provider (`bb.ui.registerMentionProvider`). BB resolves plugin pills in `threads.spawn` input |
-| Find the item on screen | Studio's new `itemAt` RPC, which matches a path against every add-on's item `href`s |
+The `viewing` RPC separately resolves the main pane's route for the
+**Viewing** chip. That label describes what is visible; it does not change
+the item attached to an open composer or add context to a message. Teams
+saved views already contain chat, so they do not trigger item-chat discovery
+or background chat tabs. There is no idle corner bar covering their Send
+button.
 
-## What it looks like
+Sending from a new composer adds the item's mention pill. BB resolves it
+into a pointer with its title, ID, link, and the kind's `agentHint` tools.
+Kinds without a hint use `studio_list_items`. The agent reads fresh content
+with those tools. Page conversations go through Pages' `work` RPC, which
+keeps existing page-chat records and mobile integration intact.
 
-- **Closed:** two buttons, New in Float and Open in Float, in Float's
-  bottom-right corner. A visible Float panel replaces them, including when
-  folded or dragged free; closing all tabs or hiding Float brings them back.
-  An open composer or picker stays beside the panel until dismissed. The
-  buttons show on Studio items only. Without Float they read New thread and
-  Open thread.
-- **New in Float:** the new-thread composer. Sending starts a thread in the item's
-  project, with the item's pill already in the message, and opens it in a
-  Float tab (or BB's own thread view without Float).
-- **Open in Float:** a picker listing the item's home thread, then your 30 most
-  recent threads. Typing two or more letters searches all active threads.
-  Arrow keys and Enter pick; Escape or clicking away closes it. The pick
-  opens as a plain Float tab, without the item's tag, so moving on doesn't
-  swap it out.
+## Linked conversations
 
-Each item has a home thread: the one New in Float started for it or the one
-picked with the header's Change thread…, else the thread that made it. The
-item header names it. Quotes from item views, such as selected artifact text
-or an image area, go there with `send`. Reopening an item brings its home
-thread back as a tab behind the one showing. Those tabs carry a
-tag, so moving to the next item swaps the tab instead of adding one per item,
-unless you're looking at it.
-The item→thread link lives in the plugin's server storage, so a phone could
-find it too.
+The home conversation is the newest explicit link or page-chat record.
+Without one, the newest live thread recorded as creating the item stands in.
+**Unlink** stores an empty link so that fallback does not return.
+A thread can be linked to several items.
 
-## Context awareness
+Quotes from item views use that link and queue behind an active turn.
+Without a link, Chat opens the item's composer with the quote. A missing or
+archived item produces an error rather than borrowing the main pane's item.
+Choosing a conversation changes the item's link; starting another changes
+it only after successful submission.
 
-1. **What's on screen.** The server asks Studio's `itemAt` which item the
-   path opens. The result is the item and its kind. There's no per-kind
-   code, so new add-ons work without changes. Threads, files and settings
-   don't match and get no context.
-2. **Telling the agent.** Sending from the composer puts a pill for the item at
-   the start of the message (for pages, Pages' `work` adds its own context).
-   BB resolves the pill through our provider into a short note: the item's
-   kind, title, id and link, plus which tools read and edit it. The note is
-   a pointer, not the content, since the add-on's own tools always read the
-   latest version.
-3. **Kind hints.** The tool names come from an optional `agentHint` on each
-   kind in the bb-studio-kit contract (additive). Kinds without one get a
-   generic hint to use `studio_list_items`.
-4. **Following you.** A Float thread tab stays when you move to another
-   item, and the "Viewing" chip Studio Chat adds to it updates. The chip's "Add to message" button would
-   put the new item in the next message, but it's hidden for now (see
-   Limits).
+When revisiting an item, its linked thread can return as an unopened Float
+tab behind the active one. Pinned or previously opened tabs stay protected.
+Explicit Chat focuses the existing thread tab. Without Float, it opens BB's
+main thread view. The composer and picker use Float's corner portal while
+open, or the bottom-right overlay without Float.
 
-## Pages
+## Stable SDK integration
 
-- PageView renders its own `PageChat` box only while Studio Chat is absent,
-  the same way add-on collections hand over to Studio.
-- With Float present, opening a page chat (the Chats menu, the box, or the
-  `/chat/<threadId>` route) opens it as a Float tab instead of Pages' card.
-- Pages keeps its `work`, `chats` and `chatPage` RPCs unchanged, since
-  mobile clients use them. Studio Chat starts page chats
-  through `work` and reads `chats` for the item's home thread, so current
-  page chats carry over.
-- While the comments card is open on a wide screen, the page sets
-  `--studio-float-right` so Float's docked panel and corner sit left of it.
+| Responsibility | Surface |
+| --- | --- |
+| Chat button and options | Shared kit `ItemHeader` and item-chat host |
+| Shared controller | `experimental_appOverlay` |
+| Conversation creation | `experimental_NewThreadComposer` |
+| Conversation picker | `threads.list`, `threads.search`, `threads.get` |
+| Thread presentation | Kit `openFloat`, then `navigate.toThread` fallback |
+| Sent context | Registered item mention provider |
+| Main-pane discovery | Kit `usePathname` and Studio `itemAt` |
 
-## Limits
+## Pages and host work still pending
 
-We work around BB's gaps rather than wait on BB features.
+Pages renders its separate `PageChat` only when Studio Chat is absent.
+Its `work`, `chats`, and `chatPage` contracts remain unchanged. Existing
+page chats and linked conversations carry over. Standalone Pages chat and
+its comment-related chat controller still need migration to the shared
+companion system.
 
-- **The current route.** Overlays get no route from BB. The kit's
-  `usePathname()` (`packages/bb-studio-kit/src/app/route.ts`) follows the
-  Navigation API's `currententrychange` and `popstate`, and polls
-  `location.pathname` every 400ms as a fallback. The thread on screen comes
-  from matching `/thr_…/` in the path.
-- **Adding the item to a floated chat.** In SDK 0.5.29, `useComposer()` inside
-  `ThreadChat`'s `leadingContent` reports `scope.kind === "new-thread"`, not
-  the chat's thread, so `insertMention` would write to the wrong draft. The
-  Viewing chip therefore only names the item; typing `@` in the chat finds
-  Studio items. The chip's button shows by itself if a later BB scopes the
-  composer to the chat's thread.
-
-## Decisions
-
-- **Name.** "Studio Chat" (`studio-chat`), part of the suite.
-- **Where the buttons show.** Only on Studio items.
-- **Labels.** With Float the corner's buttons say where the thread goes:
-  New in Float, Open in Float.
-- **One place to start a thread.** With Studio Chat installed, the item
-  header drops its own New thread button and names the home thread instead.
-- **Home thread, not last thread.** Opening another thread doesn't move an
-  item's home; only New in Float, Change thread… and Unlink do. One item has
-  one home thread, but a thread can be home to many items, as when one thread
-  made several artifacts.
-- **Quotes queue.** A quote sent while the thread is working waits for the
-  turn to end instead of steering it.
-- **New and open, not one bar.** One "Work with this…" bar only started
-  threads. New in Float and Open in Float also bring an existing thread into
-  Float next to the item.
-- **Pages without it.** Pages keeps its own chat bar only while Studio Chat
-  isn't installed.
-- **Windows.** Floating moved to the Float plugin; Studio Chat only adds the
-  buttons, the item's chat and the Viewing chip.
+Stable SDK 0.5.29 does not scope `useComposer()` inside a plugin's `ThreadChat`
+to the embedded thread. **Add to message** stays hidden unless the composer
+scope matches that exact thread. Typing `@` in the thread can add Studio
+items. BB's native right-workbench integration and state-preserving moves
+between main, docked, and floating presentations remain part of the active
+[full-suite delivery goal](unified-workbench.md).

@@ -71,6 +71,11 @@ export const rpcContract = defineRpcContract({
     input: z.object({ path: z.string().min(1).max(2000) }),
     output: z.object({ item: viewed.nullable() }),
   },
+  /** Resolves the item a Chat action targets, including items in companion tabs. */
+  subject: {
+    input: ref,
+    output: z.object({ item: viewed.nullable() }),
+  },
   /** Starts a thread about `item`, or a plain one. */
   start: {
     input: z.object({ item: ref.nullable(), request: chatRequestSchema }),
