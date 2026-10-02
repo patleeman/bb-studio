@@ -21,6 +21,7 @@ export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
       };
       const option = async (selector, label) => {
         await client.dragBy(`${selector} [aria-label="Chat options"]`, 0, 0);
+        await client.waitForSelector('[role="menuitem"]');
         await client.clickElementWithTextAndPointer('[role="menuitem"]', label);
       };
       const expectComposer = async (title) => {
@@ -39,7 +40,7 @@ export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
         const oldBar = await client.evaluate('!!document.querySelector(".studio-chat-bar")');
         if (oldBar) throw new Error("The duplicate Float-specific corner bar is still present");
 
-        await option(drawingChat, "Choose conversation");
+        await option(drawingChat, "Choose conversation…");
         await client.waitForSelector(`.studio-chat-picker [data-thread-id="${threadId}"]`);
         await client.dragBy(`.studio-chat-picker [data-thread-id="${threadId}"]`, 0, 0);
         await client.waitForSelector(`[data-float-tab="thread:${threadId}"][aria-selected="true"]`);
@@ -66,7 +67,9 @@ export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
         await expectComposer("Offline mode launch");
         await client.waitForSelector(`[data-studio-tab="pages:${notes.id}"] a`);
         await client.dragBy(`[data-studio-tab="pages:${notes.id}"] a`, 0, 0);
-        await client.waitForText("Release notes: October");
+        await client.waitForSelector(`[data-studio-chat-item="pages:${notes.id}"]`);
+        const route = await client.evaluate("location.pathname");
+        if (route !== `/plugins/pages/pages/${notes.id}`) throw new Error(`The main pane did not navigate: ${route}`);
         await expectComposer("Offline mode launch");
         await client.clickAriaButtonWithPointer("Close composer");
         await client.dragBy(`[data-studio-tab="excalidraw:${drawing.id}"] a`, 0, 0);

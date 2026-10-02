@@ -1,6 +1,6 @@
 // The bar floating over every Studio item view: a back pill on the left,
 // then the view's own breadcrumb or status, and its buttons on the right.
-import type { ReactNode } from "react";
+import { useRef, type ReactNode } from "react";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { mentionPrompt } from "../contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
@@ -135,6 +135,7 @@ export function ItemHeader({
 function HomeThreadChip({ item }: { item: ItemChatRef }) {
   const host = useItemChat();
   const home = useHomeThread(item);
+  const openingDialog = useRef<(() => void) | null>(null);
   if (!host) return null;
   return (
     <div data-studio-chat-item={`${item.pluginId}:${item.id}`} className={cn(FLOATING, "flex h-8 shrink-0 items-center rounded-md text-sm text-muted-foreground")}>
@@ -153,14 +154,20 @@ function HomeThreadChip({ item }: { item: ItemChatRef }) {
             <Icon name="ChevronDown" className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56">
+        <DropdownMenuContent align="end" className="w-56" onCloseAutoFocus={(event) => {
+          const launch = openingDialog.current;
+          openingDialog.current = null;
+          if (!launch) return;
+          event.preventDefault();
+          launch();
+        }}>
           {home ? <DropdownMenuItem onSelect={() => host.open(item)}>
             <Icon name="MessageSquare" className="size-4" /> <span className="truncate">{home.title}</span>
           </DropdownMenuItem> : null}
-          {host.start ? <DropdownMenuItem onSelect={() => host.start?.(item)}>
+          {host.start ? <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.start?.(item); }}>
             <Icon name="MessageSquarePlus" className="size-4" /> New conversation
           </DropdownMenuItem> : null}
-          <DropdownMenuItem onSelect={() => host.choose(item)}>
+          <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.choose(item); }}>
             <Icon name="ArrowLeftRight" className="size-4" /> Choose conversation…
           </DropdownMenuItem>
           {home ? <DropdownMenuItem onSelect={() => void host.unlink(item)}>
