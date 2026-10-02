@@ -181,6 +181,7 @@ function statusLabel(state: TalkState, online: boolean): string {
     case "finalizing":
       return state.pendingUploads > 0 ? `Saving ${state.pendingUploads}…` : "Saving…";
     case "transcribing":
+      if (state.transcribeError) return "Transcription failed";
       return state.cleaning ? "Cleaning up…" : "Transcribing…";
     default:
       if (!online) return "Offline · saving locally";
@@ -296,10 +297,23 @@ export function TalkOverlay() {
         {canStop && !dictation ? (
           <PillButton icon="Square" label="Stop recording" tone="danger" onClick={() => void talk.stop(false)} />
         ) : null}
+        {state.phase === "transcribing" && state.transcribeError ? (
+          <PillButton icon="RotateCcw" label="Retry transcribing" tone="primary" onClick={() => void talk.retryTranscription()} />
+        ) : null}
         {state.phase === "transcribing" ? (
           <PillButton icon="CircleX" label="Stop waiting; keep it in recordings" onClick={() => talk.dismiss()} />
         ) : null}
       </div>
+      {state.phase === "transcribing" && state.transcribeError ? (
+        <div role="alert" className="flex items-start gap-2 border-t border-border px-3 py-2 text-xs text-red-600 dark:text-red-400">
+          <Icon name="AlertTriangle" className="mt-px size-3.5 shrink-0" />
+          <span className="line-clamp-3 break-words">
+            The voice service failed: {state.transcribeError}
+            <br />
+            Your audio is saved. Retry, or close this to keep it in recordings.
+          </span>
+        </div>
+      ) : null}
       {expanded ? (
         <div className="border-t border-border px-3 pb-2 pt-2">
           {title ? <div className="mb-1 truncate text-xs font-medium">{title}</div> : null}

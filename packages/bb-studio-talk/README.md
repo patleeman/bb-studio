@@ -130,7 +130,11 @@ afterwards.
   is marked *Interrupted*. **Resume recording** on its page continues it.
 - **Failed transcription.** Failed pieces retry with backoff for about a day.
   If the voice service is off, they retry every 10 minutes. **Retry** requeues
-  pieces that gave up. Audio is never discarded because of a failure.
+  pieces that gave up and retries waiting ones at once. When a dictation you
+  finished hits a failure, the pill says *Transcription failed*, shows the
+  service's error, and offers **Retry**. Talk inserts nothing until every
+  piece is transcribed, so a failure never leaves a gap in the text. Audio is
+  never discarded because of a failure.
 - **Empty recordings aren't kept.** A dictation or recording that finishes
   with no words is deleted along with its audio, and Talk says so. This
   covers a mic tapped by accident, silence, and noise. A recording with a

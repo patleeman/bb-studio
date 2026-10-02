@@ -325,6 +325,13 @@ export class TalkStore {
          WHERE recording_id = ? AND status = 'failed'`,
       )
       .run(recordingId);
+    // Pieces waiting out a backoff go now too.
+    this.db
+      .prepare(
+        `UPDATE segments SET next_attempt_at = 0
+         WHERE recording_id = ? AND status = 'pending' AND error IS NOT NULL`,
+      )
+      .run(recordingId);
     if (result.changes > 0 && this.row(recordingId)?.status === "done") {
       this.db.prepare(`UPDATE recordings SET status = 'finishing' WHERE id = ?`).run(recordingId);
     }

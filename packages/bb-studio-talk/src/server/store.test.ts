@@ -63,6 +63,15 @@ describe("TalkStore", () => {
     expect(store.due(10)[0]).toMatchObject({ attempts: 0 });
   });
 
+  it("retries a piece waiting out a backoff at once", () => {
+    const { store } = setup();
+    addSegment(store, REC, "sessiona", 0, 100);
+    store.markFailed(REC, "sessiona-0", "HTTP 503", 600_000);
+    expect(store.due(10)).toHaveLength(0);
+    store.retryFailed(REC);
+    expect(store.due(10)).toHaveLength(1);
+  });
+
   it("stays finishing until every segment is transcribed, then is done", () => {
     const { store } = setup();
     addSegment(store, REC, "sessiona", 0, 100);

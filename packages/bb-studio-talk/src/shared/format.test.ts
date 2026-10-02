@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { cleanTitle, formatClock, holdKeyCode, isLongDictation, formatLength, joinTranscript, tail, titleExcerpt } from "./format";
+import { cleanTitle, formatClock, holdKeyCode, isLongDictation, formatLength, joinTranscript, tail, titleExcerpt, transcriptionError } from "./format";
 
 describe("format", () => {
   it("formats clocks and lengths", () => {
@@ -18,6 +18,17 @@ describe("format", () => {
         { sessionId: "b", text: "three" },
       ]),
     ).toBe("one two\n\nthree");
+  });
+
+  it("reports why transcription is stuck, preferring pieces that gave up", () => {
+    expect(transcriptionError([{ status: "done", error: null }, { status: "pending", error: null }])).toBeNull();
+    expect(transcriptionError([{ status: "pending", error: "HTTP 503" }])).toBe("HTTP 503");
+    expect(
+      transcriptionError([
+        { status: "pending", error: "HTTP 503" },
+        { status: "failed", error: "bad audio" },
+      ]),
+    ).toBe("bad audio");
   });
 
   it("cleans model titles", () => {

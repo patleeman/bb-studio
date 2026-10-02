@@ -75,6 +75,19 @@ export function joinTranscript(
   return out;
 }
 
+/**
+ * Why transcription is stuck: the error of a piece that gave up, or of one
+ * waiting to retry. Null while every piece is fine.
+ */
+export function transcriptionError(
+  segments: readonly { status: string; error: string | null }[],
+): string | null {
+  const failing =
+    segments.find((segment) => segment.status === "failed" && segment.error) ??
+    segments.find((segment) => segment.status === "pending" && segment.error);
+  return failing?.error ?? null;
+}
+
 export function tail(text: string, max: number): string {
   if (text.length <= max) return text;
   const cut = text.slice(text.length - max);

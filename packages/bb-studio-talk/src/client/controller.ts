@@ -22,7 +22,7 @@ import type {
   PluginRpcClient,
 } from "@get-bb/plugin-sdk/app";
 import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contract";
-import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, isLongDictation, joinTranscript } from "../shared/format";
+import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, isLongDictation, joinTranscript, transcriptionError } from "../shared/format";
 import { findComposer, insertIntoComposer, type MicState } from "./composer-dom";
 import {
   Outbox,
@@ -98,6 +98,8 @@ export interface TalkState {
   transcript: string;
   /** Dictation only: the transcript is being tidied before it goes in. */
   cleaning: boolean;
+  /** Dictation only: why the voice service failed on a piece; null while it works. */
+  transcribeError: string | null;
 }
 
 interface Persisted {
@@ -160,6 +162,7 @@ const INITIAL: TalkState = {
   recording: null,
   transcript: "",
   cleaning: false,
+  transcribeError: null,
 };
 
 type SetThreadRowStatus = NonNullable<PluginContentScriptContext["experimental_setThreadRowStatus"]>;
@@ -913,7 +916,17 @@ export class TalkController {
       const { recording, segments } = await this.rpc.call("recording_get", { id });
       if (this.state.recordingId !== id) return;
       this.set({ recording, transcript: joinTranscript(segments) });
-      if (this.state.phase === "transcribing" && recording.status === "done") void this.deliver();
+      if (this.state.phase !== "transcribing") return;
+      const error = transcriptionError(segments);
+      if (error && !this.state.transcribeError) {
+        toast.error(`Talk could not transcribe your dictation: ${error}`, {
+          action: { label: "Retry", onClick: () => void this.retryTranscription() },
+        });
+      }
+      this.set({ transcribeError: error });
+      // A piece that gave up would leave a hole in the text; the user retries
+      // or keeps it in recordings instead.
+      if (recording.status === "done" && recording.failedCount === 0) void this.deliver();
     } catch (error) {
       if (/No recording/.test(message(error))) {
         // A dictation deleted while transcribing was discarded as empty.
@@ -1161,6 +1174,19 @@ export class TalkController {
     this.insertOnDone = false;
     this.persist(null);
     this.set({ ...INITIAL, pendingUploads: this.state.pendingUploads, setAside: this.state.setAside });
+  }
+
+  /** Retries the pieces the voice service failed on, now. */
+  async retryTranscription(): Promise<void> {
+    const id = this.state.recordingId;
+    if (this.state.phase !== "transcribing" || !id || !this.rpc) return;
+    try {
+      const recording = await this.rpc.call("recording_retry", { id });
+      if (this.state.recordingId === id) this.set({ recording, transcribeError: null });
+    } catch (error) {
+      toast.error(`Talk could not retry: ${message(error)}`);
+    }
+    await this.refresh();
   }
 
   /** Stops waiting for a dictation's transcript; it stays in recordings. */
