@@ -30,7 +30,7 @@ vi.mock("@bb-studio/kit/app", () => ({
   cn: (...classes: string[]) => classes.join(" "),
   usePathname: () => state.path,
   useFloatAvailable: () => true,
-  openFloat: state.float,
+  openCompanion: state.float,
   itemChatChanged: () => {},
   setItemChatHost: (host: ItemChatHost) => { state.host = host; return () => { state.host = null; }; },
   Icon: () => null,

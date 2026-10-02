@@ -103,9 +103,29 @@ BB checkout; its owner's thread is archived. Stable plugin floors stay
 unchanged, and stable BB still uses the guarded Viewing chip until that host
 fix ships.
 
-Remaining delivery includes the common opening and placement controller,
-native workbench integration, Pages standalone migration, embedded composer
-targeting, main-view transfers, all suite entry points, compact behavior,
+The next host implementation adds `experimental_CompanionView` and
+`experimental_CompanionOutlet`. An overlay owns one persistent portal;
+the native workbench merges its tabs into the existing Browser/Terminal strip
+and a main outlet receives the same DOM. App and SDK typechecks pass, and
+60 relevant app tests pass across the host checks. New regression tests cover editor DOM, draft,
+file input, local state, scroll, route transfer, native tab selection,
+dismissal, explicit reactivation, pin protection, disposal, and plugin
+identity/CSS scoping. Native header/keyboard dismissal and session restoration
+also pass; SDK tests pass (359). This host change is local and has not shipped.
+
+The suite's optional bridge retains stable SDK pins. Shared Chat prefers
+workbench on a capable host; explicit Float actions keep floating placement.
+The persisted tab model now carries placement and explicit activation;
+moving a tab preserves identity, history and pin, and reopening an existing
+main companion focuses it without relocating it. The Companions nav panel
+receives a retained main view. Plugin-owned item portals update compact/main
+context without unmounting their editor. Focused checks pass: Float 37,
+shared kit 70, and Studio Chat 22 tests. Real host integration captures and
+the released host capability are still required.
+
+Remaining delivery includes native host live verification and release,
+the SDK/CLI placement controller, Pages standalone migration, embedded composer
+targeting, all suite entry points, compact behavior,
 staged live captures, documentation and marketplace checks, and the
 requirement-by-requirement completion audit. This goal stays active
 until those workflows are implemented and verified.

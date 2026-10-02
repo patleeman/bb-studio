@@ -8,6 +8,7 @@ import {
   LABELED_TAB_WIDTH,
   MAX_TABS,
   moveTab,
+  moveCompanion,
   goBack,
   navigateTab,
   openTab,
@@ -28,6 +29,39 @@ import {
 
 const thread = (threadId: string) => ({ kind: "thread" as const, threadId });
 const keys = (state: FloatState) => state.tabs.map((tab) => tab.key);
+
+describe("companion placement", () => {
+  it("moves one existing tab without changing its target, identity, history, or pin", () => {
+    let state = openTab(EMPTY, thread("a"), { placement: "workbench" });
+    state = navigateTab(state, "thread:a", thread("b"));
+    state = pinTab(state, "thread:b", true);
+    const original = state.tabs[0]!;
+    state = moveCompanion(state, "thread:b", "main");
+    state = moveCompanion(state, "thread:b", "floating");
+    expect(state.tabs).toHaveLength(1);
+    expect(state.tabs[0]).toMatchObject({ key: original.key, target: original.target, back: original.back, pinned: true, placement: "floating" });
+    expect(state.tabs[0]!.target).toBe(original.target);
+    expect(state.tabs[0]!.back).toBe(original.back);
+    expect(state.tabs[0]!.activation).toBe(original.activation! + 2);
+  });
+
+  it("focuses an existing main companion instead of duplicating or relocating it", () => {
+    let state = moveCompanion(openTab(EMPTY, thread("a")), "thread:a", "main");
+    const activation = state.tabs[0]!.activation!;
+    state = openTab(state, thread("a"), { placement: "workbench" });
+    expect(state.tabs).toHaveLength(1);
+    expect(state.tabs[0]).toMatchObject({ placement: "main", activation: activation + 1 });
+    state = openTab(state, thread("a"), { minimized: true, tag: "item" });
+    expect(state.tabs[0]!.activation).toBe(activation + 1);
+  });
+
+  it("restores placement and rejects malformed activation while preserving older Float sessions", () => {
+    const state = moveCompanion(openTab(EMPTY, thread("a")), "thread:a", "workbench");
+    expect(parseState(JSON.parse(JSON.stringify(state)))).toEqual(state);
+    expect(parseState({ tabs: [{ target: thread("old"), placement: "bogus", activation: -4 }] }).tabs[0]).not.toHaveProperty("placement");
+    expect(parseState({ tabs: [{ target: thread("old"), activation: "one" }] }).tabs[0]).not.toHaveProperty("activation");
+  });
+});
 
 describe("openTab", () => {
   it("adds tabs at the end, shows the new one, and reuses an open tab", () => {

@@ -10,7 +10,7 @@ import {
   FloatThreadLeading,
   Icon,
   itemChatChanged,
-  openFloat,
+  openCompanion,
   setItemChatHost,
   useFloatAvailable,
   usePathname,
@@ -134,7 +134,7 @@ function useHomeThreads(
   }, [key, load]);
   const homeId = home?.threadId ?? null;
   useEffect(() => {
-    if (homeId && floatAvailable) openFloat({ kind: "thread", threadId: homeId }, { minimized: true, tag: ITEM_CHAT_TAG });
+    if (homeId && floatAvailable) openCompanion({ kind: "thread", threadId: homeId }, { minimized: true, tag: ITEM_CHAT_TAG });
   }, [homeId, floatAvailable]);
 
   return { cache, put, load };
@@ -191,7 +191,7 @@ export function ChatOverlay() {
 
   const show = (threadId: string, tag?: string, dialogRequest?: number) => {
     close(dialogRequest);
-    if (!openFloat({ kind: "thread", threadId }, tag ? { tag } : {})) navigate.toThread(threadId);
+    if (!openCompanion({ kind: "thread", threadId }, tag ? { tag } : {})) navigate.toThread(threadId);
   };
   const homes = useHomeThreads(rpc, viewed, {
     show,

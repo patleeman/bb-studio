@@ -1,9 +1,12 @@
 // The panel: a strip of tabs, and the showing tab's thread or view below.
 // Drag a tab to reorder it. Drag the header anywhere on screen; dropped near
 // the bottom, the panel docks again.
-import { ThreadChat, ThreadTitle } from "@get-bb/plugin-sdk/app";
+import { ThreadChat, ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import {
   cn,
+  CompanionView,
+  companionWorkbenchAvailable,
+  type CompanionPlacement,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -37,6 +40,7 @@ import {
   HEADER_HEIGHT,
   ICON_TAB_WIDTH,
   moveTab,
+  moveCompanion,
   panelSize,
   pinTab,
   placeAt,
@@ -99,10 +103,12 @@ function useScreen(): Size {
 function usePublished(publish: typeof publishFloatBody, tab: FloatTab, element: HTMLElement | null) {
   useEffect(() => {
     if (!element) return;
-    publish({ windowKey: tab.key, target: tab.target, element });
-    return () => publish({ windowKey: tab.key, element: null });
+    publish({ windowKey: tab.key, target: tab.target, element, placement: tab.placement });
     // The key decides the target; a new title needn't republish.
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [publish, tab.key, tab.placement, element]);
+  useEffect(() => () => {
+    if (element) publish({ windowKey: tab.key, element: null });
   }, [publish, tab.key, element]);
 }
 
@@ -297,7 +303,13 @@ function mainTarget(): FloatTarget | null {
 
 function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
   const { open, anchor } = useOpenTarget();
+  const navigate = useBbNavigate();
   const move = (place: "main" | "split") => {
+    if (place === "main" && companionWorkbenchAvailable()) {
+      update((next) => moveCompanion(next, active.key, "main"));
+      navigate.toPluginPanel("companions", { subPath: encodeURIComponent(active.key) });
+      return;
+    }
     // BB's own view takes over; the tab would only repeat it.
     update((next) => closeTab(next, active.key));
     open(active.target, place);
@@ -318,6 +330,9 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
+          {companionWorkbenchAvailable() ? <DropdownMenuItem onSelect={() => update((next) => moveCompanion(next, active.key, "workbench"))}>
+            <Icon name="PanelRight" className="size-4" /> Move to workbench
+          </DropdownMenuItem> : null}
           <DropdownMenuItem onSelect={() => update((next) => pinTab(next, active.key, !active.pinned))}>
             <Icon name={active.pinned ? "PinOff" : "Pin"} className="size-4" />
             {active.pinned ? "Unpin tab" : "Pin tab"}
@@ -458,14 +473,24 @@ function ResizeHandles({ docked, panel, screen, onResize }: {
 
 /** The panel. `dockOffset` keeps a docked panel left of the corner content beside it. */
 export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: number }) {
+  const navigate = useBbNavigate();
+  const native = companionWorkbenchAvailable();
+  const floatingTabs = native ? state.tabs.filter((tab) => !tab.placement || tab.placement === "floating") : state.tabs;
+  const floatingActive = floatingTabs.find((tab) => tab.key === state.active) ?? floatingTabs.at(-1);
+  const floatingState = { ...state, tabs: floatingTabs, active: floatingActive?.key ?? null };
   const screen = useScreen();
   const panel = useRef<HTMLElement>(null);
   const drag = useRef<PanelDrag | null>(null);
   const [dragAt, setDragAt] = useState<{ left: number; bottom: number; snap: boolean } | null>(null);
   // The panel's rect while an edge is being dragged, committed on release.
   const [resizing, setResizing] = useState<Rect | null>(null);
-  const active = state.tabs.find((tab) => tab.key === state.active) ?? state.tabs.at(-1);
+  const active = floatingActive ?? state.tabs.at(-1);
   if (!active) return null;
+  const floatHidden = state.hidden || floatingTabs.length === 0;
+  const move = (key: string, placement: CompanionPlacement) => {
+    update((next) => moveCompanion(next, key, placement));
+    if (placement === "main") navigate.toPluginPanel("companions", { subPath: encodeURIComponent(key) });
+  };
 
   const size = panelSize(state.size, screen);
   const width = resizing?.width ?? size.width;
@@ -523,7 +548,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
       ) : null}
       <section
         ref={panel}
-        hidden={state.hidden}
+        hidden={floatHidden}
         aria-label="Floating tabs"
         data-float-place={dragAt ? "dragging" : resizing ? "resizing" : state.place.kind}
         className={cn(
@@ -535,7 +560,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           dragAt && "shadow-2xl",
           resizing && "select-none",
         )}
-        style={{ ...position, width, height, ...(state.hidden ? { display: "none" } : {}) }}
+        style={{ ...position, width, height, ...(floatHidden ? { display: "none" } : {}) }}
       >
         {state.collapsed || dragAt ? null : (
           <ResizeHandles docked={state.place.kind === "dock"} panel={panel} screen={screen} onResize={setResizing} />
@@ -560,7 +585,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
               <Icon name="ChevronLeft" className="size-4" />
             </button>
           ) : null}
-          <TabStrip state={state} />
+          <TabStrip state={floatingState} />
           <button
             type="button"
             aria-label={state.collapsed ? "Open floating tabs" : "Fold floating tabs"}
@@ -569,11 +594,17 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           >
             <Icon name={state.collapsed ? "ChevronUp" : "Minus"} className="size-4" />
           </button>
-          <TabMenu state={state} active={active} />
+          <TabMenu state={floatingState} active={active} />
         </header>
         {state.tabs.map((tab) => (
-          <RetainedView key={tab.key} visible={tab.key === active.key && !state.collapsed && !state.hidden}>
-            <TabWindow tab={tab} />
+          <RetainedView key={tab.key} visible={(native && tab.placement !== undefined && tab.placement !== "floating") || (tab.key === floatingActive?.key && !state.collapsed && !floatHidden)}>
+            <CompanionView id={tab.key} title={tab.target.title ?? (tab.target.kind === "thread" ? "Conversation" : pathTitle(tab.target.path))}
+              icon={tabIcon(tab.target)} placement={tab.placement ?? "floating"} activation={tab.key === state.active ? (tab.activation ?? 0) : 0} pinned={tab.pinned}
+              onPinnedChange={(pinned) => update((next) => pinTab(next, tab.key, pinned))} onSelect={() => update((next) => selectTab(next, tab.key))}
+              onClose={() => update((next) => closeTab(next, tab.key))} onPlacementChange={(placement) => move(tab.key, placement)}
+              onBack={tab.back?.length ? () => update((next) => goBack(next, tab.key)) : undefined}>
+              {tab.opened ? <TabWindow tab={native ? tab : { ...tab, placement: "floating" }} /> : null}
+            </CompanionView>
           </RetainedView>
         ))}
       </section>

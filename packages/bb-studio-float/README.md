@@ -61,6 +61,10 @@ folding, hiding, and moving Float, and verifies the pin in saved state.
   header.
 - **Move a tab.** The ⋯ menu has **Move to main view**, **Move to split**,
   and **Swap with main view**, which trades the tab and the main view.
+  The companion-host integration adds **Move to workbench**, placing the
+  same live tab beside BB's Browser and Terminal. Its **Float** and **Main
+  view** actions move that portal again. The **Companions** page lists open
+  tabs and hosts a tab moved to main.
 - **Pin a companion.** **Pin tab** in ⋯ keeps its conversation or reference
   while you open other items. Links from a pinned tab open another tab.
   Pinned tabs stay through reloads and do not close at the tab limit.
@@ -73,6 +77,11 @@ folding, hiding, and moving Float, and verifies the pin in saved state.
 
 The tabs, where the panel sits and its size are kept per browser window and
 survive a reload.
+
+The native companion host is being implemented in BB as part of the
+[full-suite delivery](../../docs/unified-workbench.md). Until that host ships,
+stable BB keeps the Float and ordinary main-view flows. Plugin SDK pins remain
+compatible with stable; the suite detects native hosting when it is present.
 
 ## How it works
 

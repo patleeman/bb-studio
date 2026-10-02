@@ -1,19 +1,27 @@
 // The panel of floated tabs, docked at the bottom right or wherever it was
 // dragged, and a corner at the bottom right for other plugins (Studio Chat's
 // "Work with this…" bar), and the gestures that move Studio items around.
-import { publishFloatDock, setFloatHost } from "@bb-studio/kit/app";
+import { companionWorkbenchAvailable, floatWindowKey, publishFloatDock, setFloatHost } from "@bb-studio/kit/app";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { FLOAT_RIGHT_VAR, STUDIO_CHAT_FLOAT_EVENT } from "@bb-studio/kit/contract";
 import { useEffect, useState } from "react";
-import { update, useFloatState } from "./store";
+import { getFloat, update, useFloatState } from "./store";
 import { navigateTab, openTab } from "./stack";
 import { ItemGestures } from "./ItemMenu";
 import { Stack, useWidth } from "./Panel";
 
 /** Lets every plugin open tabs, and answers Studio Chat's older event. */
 function useHost() {
+  const navigate = useBbNavigate();
   useEffect(() => {
     setFloatHost({
-      open: (target, options) => update((state) => openTab(state, target, options)),
+      open: (target, options) => {
+        update((state) => openTab(state, target, options));
+        const key = floatWindowKey(target);
+        if (!options?.minimized && companionWorkbenchAvailable() && getFloat().tabs.some((tab) => tab.key === key && tab.placement === "main")) {
+          navigate.toPluginPanel("companions", { subPath: encodeURIComponent(key) });
+        }
+      },
       navigate: (windowKey, target) => update((state) => navigateTab(state, windowKey, target)),
     });
     const onLegacyFloat = (event: Event) => {
@@ -25,7 +33,7 @@ function useHost() {
       setFloatHost(null);
       window.removeEventListener(STUDIO_CHAT_FLOAT_EVENT, onLegacyFloat);
     };
-  }, []);
+  }, [navigate]);
 }
 
 export function Dock() {

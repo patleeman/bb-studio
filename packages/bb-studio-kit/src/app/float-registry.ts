@@ -15,6 +15,8 @@ export type FloatTarget =
   | { kind: "path"; path: string; title?: string; icon?: string };
 
 export interface FloatOpenOptions {
+  /** Native companion placement when supported. Legacy callers still request Float. */
+  placement?: "floating" | "workbench" | "main";
   /** Open as a tab behind the one showing (folded, if it's the only one). */
   minimized?: boolean;
   /**
@@ -42,6 +44,7 @@ export interface FloatAnchor {
   windowKey: string;
   target: FloatTarget;
   element: HTMLElement;
+  placement?: "floating" | "workbench" | "main";
 }
 
 interface Registry {
@@ -109,7 +112,7 @@ export function navigateFromFloat(target: FloatTarget): boolean {
 
 function publish(map: Map<string, FloatAnchor>, anchor: FloatAnchor | { windowKey: string; element: null }): void {
   const current = map.get(anchor.windowKey);
-  if ((current?.element ?? null) === anchor.element) return;
+  if ((current?.element ?? null) === anchor.element && (!anchor.element || current?.placement === anchor.placement)) return;
   if (anchor.element) map.set(anchor.windowKey, anchor as FloatAnchor);
   else map.delete(anchor.windowKey);
   changed();

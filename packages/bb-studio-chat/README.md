@@ -41,9 +41,10 @@ navigation, conversation selection, and focusing an existing thread.
 
 ## Limits
 
-The native right workbench and moving live state between main and companion
-presentations remain in the [full-suite delivery work](../../docs/unified-workbench.md).
-Threads currently open in Float, or in BB's main view without Float.
+The shared companion controller prefers BB's native right workbench when
+the host supports retained companion views. BB's host implementation and its
+live release verification remain in the [full-suite delivery work](../../docs/unified-workbench.md).
+Stable BB currently opens threads in Float, or in the main view without Float.
 Pages keeps its standalone chat fallback until that migration is complete.
 
 On stable SDK 0.5.29, embedded `ThreadChat` does not scope `useComposer()` to

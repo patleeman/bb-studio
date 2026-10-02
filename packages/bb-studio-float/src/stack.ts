@@ -2,9 +2,13 @@
 // to it. Everything floated is a tab in one panel, and one tab shows at a
 // time. The store (store.ts) keeps one stack per browser window; these
 // functions don't touch it, so they're easy to test.
-import type { FloatOpenOptions, FloatTarget } from "@bb-studio/kit/app";
+import type { CompanionPlacement, FloatOpenOptions, FloatTarget } from "@bb-studio/kit/app";
 
 export interface FloatTab {
+  /** Missing in older sessions: the tab lives in Float. */
+  placement?: CompanionPlacement;
+  /** An explicit focus request, independent of title or context changes. */
+  activation?: number;
   key: string;
   target: FloatTarget;
   pinned: boolean;
@@ -86,9 +90,13 @@ export function parseState(raw: unknown): FloatState {
     const tag = (entry as { tag?: unknown }).tag;
     const pinned = (entry as { pinned?: unknown }).pinned === true;
     const opened = (entry as { opened?: unknown }).opened !== false;
+    const placement = (entry as { placement?: unknown }).placement;
+    const activation = (entry as { activation?: unknown }).activation;
     const back = (entry as { back?: unknown }).back;
     tabs.push({
       key, target, pinned, opened,
+      ...(placement === "main" || placement === "workbench" || placement === "floating" ? { placement } : {}),
+      ...(typeof activation === "number" && Number.isSafeInteger(activation) && activation >= 0 ? { activation } : {}),
       ...(typeof tag === "string" ? { tag } : {}),
       ...(Array.isArray(back) ? { back: back.filter(isTarget).slice(-MAX_BACK) } : {}),
     });
@@ -137,10 +145,10 @@ export function openTab(state: FloatState, target: FloatTarget, options: FloatOp
   if (state.tabs.some((tab) => tab.key === key)) {
     tabs = state.tabs.map((tab) =>
       // A tag follows the tab it was last given to.
-      tab.key === key ? { ...tab, opened: tab.opened || !background, target: { ...tab.target, ...target }, ...(tag ? { tag } : {}) } : untag(tab),
+      tab.key === key ? { ...tab, activation: background ? (tab.activation ?? 0) : (tab.activation ?? 0) + 1, opened: tab.opened || !background, target: { ...tab.target, ...target }, ...(tag ? { tag } : {}) } : untag(tab),
     );
   } else {
-    const next: FloatTab = { key, target, pinned: false, opened: !background, ...(tag ? { tag } : {}) };
+    const next: FloatTab = { key, target, pinned: false, opened: !background, placement: options.placement ?? "floating", activation: background ? 0 : 1, ...(tag ? { tag } : {}) };
     const replaced = tag ? state.tabs.find((tab) => tab.tag === tag) : undefined;
     if (replaced && !replaced.pinned && !replaced.opened && !viewing(replaced.key)) {
       tabs = state.tabs.map((tab) => (tab === replaced ? next : tab));
@@ -195,7 +203,7 @@ export function navigateTab(state: FloatState, key: string, target: FloatTarget)
     return { ...state, tabs, active: nextKey, collapsed: false, hidden: false };
   }
   const back = [...(tab.back ?? []), tab.target].slice(-MAX_BACK);
-  const next: FloatTab = { key: nextKey, target, pinned: false, opened: true, back };
+  const next: FloatTab = { key: nextKey, target, pinned: false, opened: true, placement: tab.placement, activation: (tab.activation ?? 0) + 1, back };
   return {
     ...state,
     tabs: state.tabs.map((candidate) => (candidate.key === key ? next : candidate)),
@@ -210,7 +218,7 @@ export function goBack(state: FloatState, key: string): FloatState {
   if (!tab || !previous) return state;
   const previousKey = tabKey(previous);
   if (state.tabs.some((candidate) => candidate.key === previousKey)) return selectTab(closeTab(state, key), previousKey);
-  const next: FloatTab = { key: previousKey, target: previous, pinned: tab.pinned, opened: true, back: tab.back!.slice(0, -1) };
+  const next: FloatTab = { key: previousKey, target: previous, pinned: tab.pinned, opened: true, placement: tab.placement, activation: (tab.activation ?? 0) + 1, back: tab.back!.slice(0, -1) };
   return {
     ...state,
     tabs: state.tabs.map((candidate) => (candidate.key === key ? next : candidate)),
@@ -229,7 +237,13 @@ export function replaceTab(state: FloatState, key: string, target: FloatTarget):
 /** Shows a tab, opening the panel if it's folded or hidden. */
 export function selectTab(state: FloatState, key: string): FloatState {
   if (!state.tabs.some((tab) => tab.key === key)) return state;
-  return { ...state, tabs: state.tabs.map((tab) => tab.key === key ? { ...tab, opened: true } : tab), active: key, collapsed: false, hidden: false };
+  return { ...state, tabs: state.tabs.map((tab) => tab.key === key ? { ...tab, opened: true, activation: (tab.activation ?? 0) + 1 } : tab), active: key, collapsed: false, hidden: false };
+}
+
+/** Move the existing tab without replacing its identity, target, history, or live view. */
+export function moveCompanion(state: FloatState, key: string, placement: CompanionPlacement): FloatState {
+  if (!state.tabs.some((tab) => tab.key === key)) return state;
+  return { ...state, tabs: state.tabs.map((tab) => tab.key === key ? { ...tab, placement, opened: true, activation: (tab.activation ?? 0) + 1 } : tab), active: key, hidden: false, collapsed: false };
 }
 
 /** Moves a tab to `index` in the strip. */

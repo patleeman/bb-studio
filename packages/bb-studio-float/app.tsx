@@ -3,6 +3,7 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { floatPanelFor } from "@bb-studio/kit/app";
 import { Dock } from "./src/Dock";
+import { MainView } from "./src/MainView";
 import { update } from "./src/store";
 import { openTab, toggleHidden } from "./src/stack";
 
@@ -14,6 +15,7 @@ function currentTarget(threadId: string | null) {
 }
 
 export default definePluginApp((app) => {
+  app.slots.navPanel({ id: "companions", path: "companions", title: "Companions", icon: "LayoutPanelLeft", component: ({ subPath }) => <MainView subPath={subPath ?? ""} /> });
   app.slots.experimental_appOverlay({ id: "dock", component: Dock });
   app.commands.register({
     id: "float-view",

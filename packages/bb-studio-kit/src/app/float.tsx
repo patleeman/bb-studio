@@ -63,7 +63,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
   useFloatRevision();
   return (
     <>
-      {floatBodies().map(({ windowKey, target, element }) => {
+      {floatBodies().map(({ windowKey, target, element, placement }) => {
         if (target.kind !== "path") return null;
         const panel = floatPanelFor(target.path);
         if (!panel || panel.pluginId !== pluginId || panel.path !== path) return null;
@@ -71,7 +71,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
         // the plugin's CSS and route links apply.
         return createPortal(
           <div data-bb-portaled-overlay="" data-bb-plugin-root="" data-bb-plugin={pluginId} className="flex h-full min-h-0 flex-col">
-            <InFloatContext.Provider value={true}>{render(panel.subPath)}</InFloatContext.Provider>
+            <InFloatContext.Provider value={placement !== "main"}>{render(panel.subPath)}</InFloatContext.Provider>
           </div>,
           element,
           windowKey,
