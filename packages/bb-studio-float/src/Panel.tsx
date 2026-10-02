@@ -16,25 +16,31 @@ import {
   useCanFloat,
   type FloatTarget,
 } from "@bb-studio/kit/app";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { useOpenInSplit } from "./ItemMenu";
 import { update } from "./store";
 import {
   clampFree,
   closeAll,
   closeTab,
+  DOCK_EDGES,
   dropPlace,
   DOCK_SNAP,
+  FREE_EDGES,
   HEADER_HEIGHT,
   ICON_TAB_WIDTH,
-  MARGIN,
   moveTab,
-  PANEL_WIDTH,
+  panelSize,
   placeAt,
+  resizeRect,
+  resizeTo,
   selectTab,
   stripLayout,
   toggleCollapsed,
+  type Edge,
   type FloatState,
   type FloatTab,
+  type Rect,
   type Size,
 } from "./stack";
 
@@ -243,54 +249,57 @@ function TabStrip({ state }: { state: FloatState }) {
 
 function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
   const actions = experimental_useSidebarThreadActions();
+  const splitPath = useOpenInSplit();
   const openFull = (split: boolean) => {
     // BB's own view takes over; the tab would only repeat it.
     update((next) => closeTab(next, active.key));
     if (active.target.kind === "thread") actions.open(active.target.threadId, { split });
+    else if (split) splitPath.open(active.target.path);
     else openAppPath(active.target.path);
   };
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="Floating tab actions" className={HEADER_BUTTON}>
-          <Icon name="MoreHorizontal" className="size-4" />
-        </button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="w-64">
-        <DropdownMenuItem onSelect={() => openFull(false)}>
-          <Icon name="Maximize2" className="size-4" /> Open full
-        </DropdownMenuItem>
-        {active.target.kind === "thread" ? (
+    <>
+      {splitPath.element}
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Floating tab actions" className={HEADER_BUTTON}>
+            <Icon name="MoreHorizontal" className="size-4" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuItem onSelect={() => openFull(false)}>
+            <Icon name="Maximize2" className="size-4" /> Open full
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => openFull(true)}>
             <Icon name="Columns2" className="size-4" /> Open in split
           </DropdownMenuItem>
-        ) : null}
-        {state.place.kind === "free" ? (
-          <DropdownMenuItem onSelect={() => update((next) => placeAt(next, { kind: "dock" }))}>
-            <Icon name="PanelBottom" fallback="ArrowDownToLine" className="size-4" /> Dock at the bottom
+          {state.place.kind === "free" ? (
+            <DropdownMenuItem onSelect={() => update((next) => placeAt(next, { kind: "dock" }))}>
+              <Icon name="PanelBottom" fallback="ArrowDownToLine" className="size-4" /> Dock at the bottom
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuSeparator />
+          {state.tabs.map((tab) => (
+            <DropdownMenuItem key={tab.key} onSelect={() => update((next) => selectTab(next, tab.key))}>
+              <Icon name={tabIcon(tab.target)} className="size-4" />
+              <span className={cn("min-w-0 flex-1 truncate", tab.key === active.key && "font-medium")}>
+                <TabLabel target={tab.target} />
+              </span>
+              {tab.key === active.key ? <Icon name="Check" className="size-4" /> : null}
+            </DropdownMenuItem>
+          ))}
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={() => update((next) => closeTab(next, active.key))}>
+            <Icon name="X" className="size-4" /> Close tab
           </DropdownMenuItem>
-        ) : null}
-        <DropdownMenuSeparator />
-        {state.tabs.map((tab) => (
-          <DropdownMenuItem key={tab.key} onSelect={() => update((next) => selectTab(next, tab.key))}>
-            <Icon name={tabIcon(tab.target)} className="size-4" />
-            <span className={cn("min-w-0 flex-1 truncate", tab.key === active.key && "font-medium")}>
-              <TabLabel target={tab.target} />
-            </span>
-            {tab.key === active.key ? <Icon name="Check" className="size-4" /> : null}
-          </DropdownMenuItem>
-        ))}
-        <DropdownMenuSeparator />
-        <DropdownMenuItem onSelect={() => update((next) => closeTab(next, active.key))}>
-          <Icon name="X" className="size-4" /> Close tab
-        </DropdownMenuItem>
-        {state.tabs.length > 1 ? (
-          <DropdownMenuItem onSelect={() => update(closeAll)}>
-            <Icon name="X" className="size-4" /> Close all
-          </DropdownMenuItem>
-        ) : null}
-      </DropdownMenuContent>
-    </DropdownMenu>
+          {state.tabs.length > 1 ? (
+            <DropdownMenuItem onSelect={() => update(closeAll)}>
+              <Icon name="X" className="size-4" /> Close all
+            </DropdownMenuItem>
+          ) : null}
+        </DropdownMenuContent>
+      </DropdownMenu>
+    </>
   );
 }
 
@@ -313,19 +322,97 @@ interface PanelDrag {
   moved: boolean;
 }
 
+// Each edge's grab strip, inside the panel's border, and its cursor.
+const EDGE_HANDLE: Record<Edge, string> = {
+  n: "inset-x-3 top-0 h-1.5 cursor-ns-resize",
+  s: "inset-x-3 bottom-0 h-1.5 cursor-ns-resize",
+  e: "inset-y-3 right-0 w-1.5 cursor-ew-resize",
+  w: "inset-y-3 left-0 w-1.5 cursor-ew-resize",
+  ne: "top-0 right-0 size-3 cursor-nesw-resize",
+  sw: "bottom-0 left-0 size-3 cursor-nesw-resize",
+  nw: "top-0 left-0 size-3 cursor-nwse-resize",
+  se: "right-0 bottom-0 size-3 cursor-nwse-resize",
+};
+
+interface PanelResize {
+  edge: Edge;
+  x: number;
+  y: number;
+  rect: Rect;
+}
+
+/**
+ * Drag an edge or corner to resize the panel: docked, its top and left;
+ * free, any side. Double-click one to go back to the default size.
+ */
+function ResizeHandles({ docked, panel, screen, onResize }: {
+  docked: boolean;
+  panel: RefObject<HTMLElement | null>;
+  screen: Size;
+  onResize(rect: Rect | null): void;
+}) {
+  const resize = useRef<PanelResize | null>(null);
+  const rectAt = (event: PointerEvent<HTMLElement>) => {
+    const start = resize.current!;
+    return resizeRect(start.rect, start.edge, event.clientX - start.x, event.clientY - start.y, screen);
+  };
+  return (
+    <>
+      {(docked ? DOCK_EDGES : FREE_EDGES).map((edge) => (
+        <div
+          key={edge}
+          aria-hidden
+          data-float-resize={edge}
+          className={cn("absolute z-10 touch-none", EDGE_HANDLE[edge])}
+          onPointerDown={(event) => {
+            if (event.button !== 0 || !panel.current) return;
+            event.preventDefault();
+            const { left, top, width, height } = panel.current.getBoundingClientRect();
+            resize.current = { edge, x: event.clientX, y: event.clientY, rect: { left, top, width, height } };
+            event.currentTarget.setPointerCapture(event.pointerId);
+          }}
+          onPointerMove={(event) => {
+            if (resize.current) onResize(rectAt(event));
+          }}
+          onPointerUp={(event) => {
+            if (!resize.current) return;
+            const rect = rectAt(event);
+            resize.current = null;
+            onResize(null);
+            const size = { width: rect.width, height: rect.height };
+            update((next) =>
+              resizeTo(next, size, docked ? next.place : { kind: "free", left: rect.left, bottom: screen.height - rect.top - rect.height }),
+            );
+          }}
+          onPointerCancel={() => {
+            resize.current = null;
+            onResize(null);
+          }}
+          onDoubleClick={() => update((next) => resizeTo(next, null))}
+        />
+      ))}
+    </>
+  );
+}
+
 /** The panel. `dockOffset` keeps a docked panel left of the corner content beside it. */
 export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: number }) {
   const screen = useScreen();
   const panel = useRef<HTMLElement>(null);
   const drag = useRef<PanelDrag | null>(null);
   const [dragAt, setDragAt] = useState<{ left: number; bottom: number; snap: boolean } | null>(null);
+  // The panel's rect while an edge is being dragged, committed on release.
+  const [resizing, setResizing] = useState<Rect | null>(null);
   const active = state.tabs.find((tab) => tab.key === state.active) ?? state.tabs.at(-1);
   if (!active) return null;
 
-  const width = Math.min(PANEL_WIDTH, screen.width - MARGIN * 2);
-  const height = state.collapsed ? HEADER_HEIGHT : Math.min(560, screen.height - 96);
+  const size = panelSize(state.size, screen);
+  const width = resizing?.width ?? size.width;
+  const height = state.collapsed ? HEADER_HEIGHT : (resizing?.height ?? size.height);
   const dockRight = `calc(var(--studio-float-right, 1.5rem) + ${dockOffset}px)`;
-  const free = dragAt ?? (state.place.kind === "free" ? clampFree(state.place.left, state.place.bottom, { width, height }, screen) : null);
+  const resized = resizing && state.place.kind === "free" ? { left: resizing.left, bottom: screen.height - resizing.top - resizing.height } : null;
+  const free =
+    dragAt ?? resized ?? (state.place.kind === "free" ? clampFree(state.place.left, state.place.bottom, { width, height }, screen) : null);
   const position: CSSProperties = free ? { left: free.left, bottom: free.bottom } : { right: dockRight, bottom: 0 };
 
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
@@ -376,14 +463,18 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
       <section
         ref={panel}
         aria-label="Floating tabs"
-        data-float-place={dragAt ? "dragging" : state.place.kind}
+        data-float-place={dragAt ? "dragging" : resizing ? "resizing" : state.place.kind}
         className={cn(
           "bb-float-stack pointer-events-auto fixed z-40 flex flex-col overflow-hidden border border-border bg-background shadow-xl",
           free ? "rounded-lg" : "rounded-t-lg border-b-0",
           dragAt && "shadow-2xl",
+          resizing && "select-none",
         )}
         style={{ ...position, width, height }}
       >
+        {state.collapsed || dragAt ? null : (
+          <ResizeHandles docked={state.place.kind === "dock"} panel={panel} screen={screen} onResize={setResizing} />
+        )}
         <header
           className={cn("flex shrink-0 items-center gap-1 border-border pr-1 pl-1", !state.collapsed && "border-b", dragAt ? "cursor-grabbing" : "cursor-grab")}
           style={{ height: HEADER_HEIGHT }}

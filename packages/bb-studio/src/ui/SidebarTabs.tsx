@@ -1,6 +1,7 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
-// and closing the one on screen opens the next. Right-click a tab to float it.
+// and closing the one on screen opens the next. Right-click a tab to float it
+// or open it in a split.
 import {
   DropdownMenuItem,
   Icon,
@@ -14,6 +15,7 @@ import {
   cn,
   openAppPath,
   openFloat,
+  openPathInSplit,
   studioPath,
   useCanFloat,
   useSidebarDisplay,
@@ -177,11 +179,13 @@ export function SidebarTabs() {
 function TabRow({ tab, selected, onOpen, onClose }: { tab: TabView; selected: boolean; onOpen(): void; onClose(): void }) {
   const target = { kind: "path" as const, path: tab.href, title: tab.title, icon: tab.kindIcon };
   const canFloat = useCanFloat(target);
+  const link = useRef<HTMLAnchorElement>(null);
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>
         <div className="group/tab relative" data-studio-tab={`${tab.pluginId}:${tab.id}`}>
           <a
+            ref={link}
             href={tab.href}
             aria-current={selected ? "page" : undefined}
             className={cn(SIDEBAR_ROW, "pr-8", selected && SIDEBAR_ROW_SELECTED)}
@@ -227,6 +231,10 @@ function TabRow({ tab, selected, onOpen, onClose }: { tab: TabView; selected: bo
             Float
           </ContextMenuItem>
         ) : null}
+        <ContextMenuItem onSelect={() => openPathInSplit(link.current, tab.href) || onOpen()}>
+          <Icon name="Columns2" />
+          Open in split
+        </ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={onClose}>
           <Icon name="X" />

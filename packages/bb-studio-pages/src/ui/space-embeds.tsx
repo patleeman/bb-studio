@@ -4,7 +4,7 @@
 // makes a space's page with all of them, and the user writes around them,
 // moves them or removes them. Pages asks Studio for the data; Studio's own
 // overlay shows the dialogs that change the space.
-import { projectName, useProjects } from "@bb-studio/kit/app";
+import { projectName, studioItemProps, useProjects } from "@bb-studio/kit/app";
 import { plural, relativeTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -94,9 +94,23 @@ function Empty({ children }: { children: ReactNode }) {
   return <div className="px-4 py-3 text-xs text-muted-foreground/70">{children}</div>;
 }
 
-function Row({ icon, glyph, title, sub, aside, onOpen }: { icon: string; glyph?: string | null; title: string; sub: string; aside?: string; onOpen(): void }) {
+function Row({ icon, glyph, title, sub, aside, href, onOpen }: {
+  icon: string;
+  glyph?: string | null;
+  title: string;
+  sub: string;
+  aside?: string;
+  /** An item's, for the right-click menu. */
+  href?: string;
+  onOpen(): void;
+}) {
   return (
-    <button type="button" className="flex w-full items-center gap-3 px-3 py-1.5 text-left hover:bg-state-hover" onClick={onOpen}>
+    <button
+      type="button"
+      className="flex w-full items-center gap-3 px-3 py-1.5 text-left hover:bg-state-hover"
+      onClick={onOpen}
+      {...studioItemProps(href ? { href, title, icon } : null)}
+    >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
         {glyph ? <span className="text-base leading-none">{glyph}</span> : <Icon name={icon} className="size-4" />}
       </span>
@@ -176,6 +190,7 @@ function Recent({ view }: { view: SpaceWidgetView }) {
             title={item.title}
             sub={item.kindLabel}
             aside={relativeTime(item.updatedAt)}
+            href={item.href}
             onOpen={() => ui.openPath(item.href)}
           />
         ))}

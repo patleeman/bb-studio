@@ -15,6 +15,7 @@ import {
   PageColumn,
   openAppPath,
   projectName,
+  studioItemProps,
   type CollectionItem,
   type CollectionKind,
   type Project,
@@ -150,7 +151,12 @@ function ThreadRow({ thread, projects, onRemove }: { thread: SpaceThreadView; pr
 function ItemRow({ item, kinds, projects }: { item: CollectionItem; kinds: readonly CollectionKind[]; projects: readonly Project[] }) {
   const kind = kinds.find((each) => each.pluginId === item.pluginId && each.id === item.kind);
   return (
-    <button type="button" className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-state-hover" onClick={() => openAppPath(item.href)}>
+    <button
+      type="button"
+      className="flex w-full items-center gap-2.5 px-3 py-2 text-left hover:bg-state-hover"
+      onClick={() => openAppPath(item.href)}
+      {...studioItemProps({ href: item.href, title: untitled(item.title), icon: kind?.icon })}
+    >
       <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="sm" />
       <span className="min-w-0 flex-1 truncate text-sm">{untitled(item.title)}</span>
       <span className="shrink-0 text-xs text-muted-foreground">

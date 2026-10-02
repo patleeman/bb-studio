@@ -5,7 +5,7 @@
 // or starts a new thread. A rail lists what needs you and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, OUTLINE_BUTTON, PageColumn, cn, openAppPath } from "@bb-studio/kit/app";
+import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, OUTLINE_BUTTON, PageColumn, cn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -458,7 +458,11 @@ function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
   const long = content?.type === "markdown" && (content.text?.length ?? 0) > 900;
   const [more, setMore] = useState(!long);
   return (
-    <section aria-label={`${embed.kind}: ${embed.title}`} className="mt-4 overflow-hidden rounded-lg border border-border/70 bg-background">
+    <section
+      aria-label={`${embed.kind}: ${embed.title}`}
+      className="mt-4 overflow-hidden rounded-lg border border-border/70 bg-background"
+      {...studioItemProps({ href: embed.href, title: embed.title })}
+    >
       <header className="flex items-center gap-2 border-b border-border/60 py-1.5 pr-1.5 pl-3">
         {embed.icon ? <span aria-hidden>{embed.icon}</span> : <Icon name={embed.pluginId === "artifacts" ? "FileCode2" : "FileText"} className="size-4 text-muted-foreground" />}
         <span className="min-w-0 truncate text-sm font-semibold">{embed.title}</span>

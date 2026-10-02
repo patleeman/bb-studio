@@ -60,6 +60,7 @@ export {
   type FloatOpenOptions,
   type FloatTarget,
 } from "./float-registry";
+export { openPathInSplit, pluginViewPath, studioItemAt, studioItemProps, type StudioItemLink } from "./studio-item";
 export { COMPOSER_MORE_ITEM, ComposerMore, useComposerMoreSide } from "./composer-more";
 export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";

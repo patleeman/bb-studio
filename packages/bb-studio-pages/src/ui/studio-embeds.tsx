@@ -3,6 +3,7 @@
 // board its columns, a recording its player and transcript, and the rest a card. Each opens the
 // item in its own add-on.
 import { useEffect, useMemo, useState } from "react";
+import { studioItemProps } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import type { StudioEmbedItem } from "../contract";
@@ -159,9 +160,16 @@ function ItemEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; t
   const ui = usePagesUi();
   const { item, loading } = useStudioItem(kind, target);
   // A task is its own live row; a header would repeat it and go stale.
-  if (item && isEmbedKindItem("task", item.pluginId, item.id)) return <TaskBody id={item.id} onOpen={() => ui.openPath(item.href)} />;
+  const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }) : {};
+  if (item && isEmbedKindItem("task", item.pluginId, item.id)) {
+    return (
+      <div className="contents" {...link}>
+        <TaskBody id={item.id} onOpen={() => ui.openPath(item.href)} />
+      </div>
+    );
+  }
   return (
-    <div className="overflow-hidden">
+    <div className="overflow-hidden" {...link}>
       <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} />
       {item ? <ItemBody item={item} /> : null}
     </div>

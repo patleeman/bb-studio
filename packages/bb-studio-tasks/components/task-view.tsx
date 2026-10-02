@@ -21,6 +21,7 @@ import {
   PageColumn,
   cn,
   openAppPath,
+  studioItemProps,
   useProjects,
 } from "@bb-studio/kit/app";
 
@@ -563,7 +564,12 @@ function Links({
         <ul className="flex flex-col">
           {links.map((link) => (
             <li key={`${link.target}:${link.itemId}`} className="group flex items-center gap-1 rounded-md hover:bg-state-hover">
-              <button type="button" className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm" onClick={() => onOpen(link)}>
+              <button
+                type="button"
+                className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
+                onClick={() => onOpen(link)}
+                {...studioItemProps(link.target !== "thread" && link.href ? { href: link.href, title: link.label } : null)}
+              >
                 <Icon name={link.target === "thread" ? "MessageSquare" : "File"} className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate">{link.label}</span>
                 <span className="shrink-0 text-xs text-muted-foreground">{link.target === "thread" ? "Thread" : (link.pluginId ?? "")}</span>

@@ -27,11 +27,13 @@ export interface FloatState {
   /** Mod+Shift+J puts the panel away and brings it back. */
   hidden: boolean;
   place: FloatPlace;
+  /** The size the panel was resized to; null for the default. */
+  size: Size | null;
 }
 
 const DOCK: FloatPlace = { kind: "dock" };
 
-export const EMPTY: FloatState = { tabs: [], active: null, collapsed: false, hidden: false, place: DOCK };
+export const EMPTY: FloatState = { tabs: [], active: null, collapsed: false, hidden: false, place: DOCK, size: null };
 
 /** More than this and the oldest closes; the tab menu can't usefully list more. */
 export const MAX_TABS = 12;
@@ -56,10 +58,16 @@ function parsePlace(raw: unknown): FloatPlace {
   return DOCK;
 }
 
+function parseSize(raw: unknown): Size | null {
+  const size = raw as { width?: unknown; height?: unknown } | null;
+  if (Number.isFinite(size?.width) && Number.isFinite(size?.height)) return { width: size!.width as number, height: size!.height as number };
+  return null;
+}
+
 /** A saved state, dropping anything malformed. */
 export function parseState(raw: unknown): FloatState {
   if (!raw || typeof raw !== "object") return EMPTY;
-  const saved = raw as { tabs?: unknown; active?: unknown; collapsed?: unknown; hidden?: unknown; place?: unknown };
+  const saved = raw as { tabs?: unknown; active?: unknown; collapsed?: unknown; hidden?: unknown; place?: unknown; size?: unknown };
   const seen = new Set<string>();
   const tabs: FloatTab[] = [];
   for (const entry of Array.isArray(saved.tabs) ? saved.tabs : []) {
@@ -79,6 +87,7 @@ export function parseState(raw: unknown): FloatState {
     collapsed: saved.collapsed === true,
     hidden: saved.hidden === true,
     place: parsePlace(saved.place),
+    size: parseSize(saved.size),
   };
 }
 
@@ -143,8 +152,8 @@ export function closeTab(state: FloatState, key: string): FloatState {
   return { ...state, tabs, active };
 }
 
-/** Closes every tab. The panel keeps its place for next time. */
-export const closeAll = (state: FloatState): FloatState => ({ ...EMPTY, place: state.place });
+/** Closes every tab. The panel keeps its place and size for next time. */
+export const closeAll = (state: FloatState): FloatState => ({ ...EMPTY, place: state.place, size: state.size });
 
 /** Shows a tab, opening the panel if it's folded or hidden. */
 export function selectTab(state: FloatState, key: string): FloatState {
@@ -171,9 +180,15 @@ export const toggleHidden = (state: FloatState): FloatState =>
 
 export const placeAt = (state: FloatState, place: FloatPlace): FloatState => ({ ...state, place });
 
+/** Resizes the panel, null for the default size, and moves it when given a place. */
+export const resizeTo = (state: FloatState, size: Size | null, place: FloatPlace = state.place): FloatState => ({ ...state, size, place });
+
 // Layout.
 
 export const PANEL_WIDTH = 400;
+export const PANEL_HEIGHT = 560;
+/** Resized no smaller than this. */
+export const MIN_SIZE: Size = { width: 300, height: 200 };
 /** The tab strip's height, and all a folded panel shows. */
 export const HEADER_HEIGHT = 40;
 /** How far from the screen's edges a free panel stays. */
@@ -194,6 +209,43 @@ export function clampFree(left: number, bottom: number, panel: Size, screen: Siz
     left: Math.round(Math.min(Math.max(left, MARGIN), maxLeft)),
     bottom: Math.round(Math.min(Math.max(bottom, 0), maxBottom)),
   };
+}
+
+/** The panel's width and open height on `screen`: its own size, or the default. */
+export function panelSize(size: Size | null, screen: Size): Size {
+  return {
+    width: Math.min(size?.width ?? PANEL_WIDTH, screen.width - MARGIN * 2),
+    height: size ? Math.min(size.height, screen.height - MARGIN) : Math.min(PANEL_HEIGHT, screen.height - 96),
+  };
+}
+
+/** A side or corner of the panel, as compass points. */
+export type Edge = "n" | "s" | "e" | "w" | "ne" | "nw" | "se" | "sw";
+
+/** Docked, the panel's bottom and right stay put. */
+export const DOCK_EDGES: readonly Edge[] = ["n", "w", "nw"];
+export const FREE_EDGES: readonly Edge[] = ["n", "s", "e", "w", "ne", "nw", "se", "sw"];
+
+export interface Rect {
+  left: number;
+  top: number;
+  width: number;
+  height: number;
+}
+
+const between = (value: number, low: number, high: number) => Math.round(Math.max(low, Math.min(value, high)));
+
+/** The panel's rect after dragging `edge` by `dx`, `dy`: at least MIN_SIZE, and on the screen. */
+export function resizeRect(start: Rect, edge: Edge, dx: number, dy: number, screen: Size): Rect {
+  let left = start.left;
+  let top = start.top;
+  let right = start.left + start.width;
+  let bottom = start.top + start.height;
+  if (edge.includes("w")) left = between(left + dx, Math.min(MARGIN, left), right - MIN_SIZE.width);
+  if (edge.includes("e")) right = between(right + dx, left + MIN_SIZE.width, Math.max(screen.width - MARGIN, right));
+  if (edge.includes("n")) top = between(top + dy, Math.min(MARGIN, top), bottom - MIN_SIZE.height);
+  if (edge.includes("s")) bottom = between(bottom + dy, top + MIN_SIZE.height, Math.max(screen.height, bottom));
+  return { left, top, width: right - left, height: bottom - top };
 }
 
 /** Where the panel lands when dropped with its bottom-left corner at `left`, `bottom`. */

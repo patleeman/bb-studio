@@ -53,6 +53,7 @@ import {
   type SortKey,
 } from "./selection";
 import { TagChips, TagDot, TagMenuItems, TagNameInput, type CollectionTag } from "./tags";
+import { studioItemProps } from "./studio-item";
 
 export type { CollectionTag } from "./tags";
 export { groupItems, itemKey, sortItems, toggleSelection, type ActionResults, type CollectionItem, type CollectionKind, type GroupBy, type Sort } from "./selection";
@@ -643,6 +644,7 @@ export function CollectionPage({
           gridColumns,
         )}
         style={gridTemplate}
+        {...studioItemProps({ href: item.href, title: untitled(item.title), icon: kind?.icon })}
         onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;

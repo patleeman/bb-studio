@@ -1,11 +1,12 @@
 // The panel of floated tabs, docked at the bottom right or wherever it was
 // dragged, and a corner at the bottom right for other plugins (Studio Chat's
-// "Work with this…" bar).
+// "Work with this…" bar), and the menu a right-click on a Studio item opens.
 import { publishFloatDock, setFloatHost } from "@bb-studio/kit/app";
 import { FLOAT_RIGHT_VAR, STUDIO_CHAT_FLOAT_EVENT } from "@bb-studio/kit/contract";
 import { useEffect, useState } from "react";
 import { update, useFloatState } from "./store";
 import { openTab } from "./stack";
+import { ItemContextMenu } from "./ItemMenu";
 import { Stack, useWidth } from "./Panel";
 
 /** Lets every plugin open tabs, and answers Studio Chat's older event. */
@@ -42,6 +43,7 @@ export function Dock() {
         className="float-corner pointer-events-none fixed bottom-0 z-40 flex items-end empty:hidden"
         style={{ right: `var(${FLOAT_RIGHT_VAR}, 1.5rem)` }}
       />
+      <ItemContextMenu />
       {state.hidden ? null : <Stack state={state} dockOffset={cornerWidth ? cornerWidth + 8 : 0} />}
     </>
   );

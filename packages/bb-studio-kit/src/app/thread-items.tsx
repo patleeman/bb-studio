@@ -10,6 +10,7 @@ import { errorMessage, relativeTime, untitled } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
 import { ItemTile, THUMBNAIL } from "./pieces";
+import { studioItemProps } from "./studio-item";
 
 type Provider = StudioSchemas["provider"];
 type Item = z.output<Provider["studio_list"]["output"]>["items"][number];
@@ -181,7 +182,12 @@ export function ThreadItemsPanel({
 function ItemRow({ item, kind, onOpen }: { item: Item; kind: Kind | null; onOpen(): void }) {
   const [failed, setFailed] = useState(false);
   return (
-    <button type="button" className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-state-hover" onClick={onOpen}>
+    <button
+      type="button"
+      className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left hover:bg-state-hover"
+      onClick={onOpen}
+      {...studioItemProps({ href: item.href, title: untitled(item.title), icon: kind?.icon })}
+    >
       {item.thumbnailUrl && !failed ? (
         <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
           <img src={item.thumbnailUrl} alt="" loading="lazy" className={cn(THUMBNAIL, "p-0.5")} onError={() => setFailed(true)} />

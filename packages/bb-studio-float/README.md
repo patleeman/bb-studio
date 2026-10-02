@@ -23,6 +23,10 @@ picked, so Pages renders the page inside it.
   [Studio Sidebar](../bb-studio-sidebar)), every channel row (with
   [Studio Teams](../bb-studio-teams)), and every Studio tab (with
   [Studio](../bb-studio)).
+- **Right-click any Studio item.** A collection row, a mention or embed on a
+  page, a table's item chip, a task's link, a Feed post's item: right-click
+  it for **Open**, **Float** and **Open in split**. Links into a plugin view
+  get the same menu. Shift+right-click keeps the browser's own menu.
 - **Float this view.** The palette's "Float: float this view" floats the
   Studio item or view on screen, or else the thread.
 - **One panel, many tabs.** Everything you float is a tab in one panel, and
@@ -33,13 +37,15 @@ picked, so Pages renders the page inside it.
   header to pull it off the bottom and drop it anywhere on screen. Drop it
   near the bottom edge (an outline shows where) to dock it again, or pick
   "Dock at the bottom" from ⋯.
+- **Resize it.** Drag an edge or corner. Docked, the top and left edges move;
+  free, every edge does. Double-click an edge to go back to the default size.
 - **Fold it** to its tab strip with the − button or a double-click on the
-  header. The ⋯ menu also opens the tab full, or in a split for threads.
+  header. The ⋯ menu also opens the tab full, or in a split.
 - **Mod+Shift+J** hides the panel and shows it again. You can rebind it in
   BB's keyboard settings.
 
-The tabs and where the panel sits are kept per browser window and survive a
-reload.
+The tabs, where the panel sits and its size are kept per browser window and
+survive a reload.
 
 ## How it works
 

@@ -3,6 +3,7 @@ import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { Icon } from "../ui/icon";
 import { useStudioPresent } from "./presence";
+import { studioItemProps } from "./studio-item";
 
 export interface RelatedRef { pluginId: string; id: string }
 const refSchema = z.object({ pluginId: z.string(), id: z.string() });
@@ -77,7 +78,7 @@ export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
     </button>
     {open ? <div className="absolute top-10 right-0 z-30 max-h-[70vh] w-72 overflow-y-auto rounded-lg border border-border bg-background p-3 shadow-xl">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">Related items</div>
-      {links.length ? links.map((link, index) => <a key={`${link.href}:${index}`} href={link.href} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{link.title}<span className="block text-xs text-muted-foreground">{link.detail}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No related items.</p>}
+      {links.length ? links.map((link, index) => <a key={`${link.href}:${index}`} href={link.href} {...studioItemProps(link)} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{link.title}<span className="block text-xs text-muted-foreground">{link.detail}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No related items.</p>}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Threads about this</div>
       {threads.length ? threads.map((thread) => <a key={thread.threadId} href={`/threads/${thread.threadId}`} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{thread.role}<span className="block text-xs text-muted-foreground">{thread.state}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No threads yet.</p>}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Comments</div>

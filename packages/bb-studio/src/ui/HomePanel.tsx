@@ -1,4 +1,4 @@
-import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, openAppPath } from "@bb-studio/kit/app";
+import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -88,7 +88,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 function Row({ title, detail, href }: { title: string; detail?: string; href?: string }) {
   const content = <><span className="min-w-0 flex-1 truncate">{title}</span>{detail ? <span className="shrink-0 text-xs text-muted-foreground">{detail}</span> : null}</>;
-  return href ? <button type="button" onClick={() => openAppPath(href)} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-state-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring">{content}</button>
+  return href ? <button type="button" onClick={() => openAppPath(href)} {...studioItemProps({ href, title })} className="flex w-full items-center gap-3 px-3 py-2 text-left text-sm hover:bg-state-hover focus-visible:outline-2 focus-visible:outline-offset-[-2px] focus-visible:outline-ring">{content}</button>
     : <div className="flex items-center gap-3 px-3 py-2 text-sm">{content}</div>;
 }
 

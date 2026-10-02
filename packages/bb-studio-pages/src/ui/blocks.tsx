@@ -18,11 +18,13 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
+import { studioItemProps } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
 import { ThreadTitle } from "@get-bb/plugin-sdk/app";
 import { calloutConfig, chartConfig, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";
+import { PLUGIN_ID } from "../constants";
 import { codeBlockSpec } from "./code";
 import { usePagesUi } from "./context";
 import { HtmlBlock } from "./html";
@@ -491,6 +493,7 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
   const page = kind === "page" ? ui.pages.find((candidate) => candidate.id === target) : undefined;
   const { item } = useStudioItem(kind, target);
   const text = kind === "date" ? formatMentionDate(target) : (bot?.name ?? page?.title ?? item?.title ?? label) || target;
+  const href = kind === "page" ? `/plugins/${PLUGIN_ID}/pages/${target}` : item?.href;
   return (
     <span
       className={cn(
@@ -498,6 +501,7 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
         kind === "bot" ? "bg-violet-500/12 text-violet-600 dark:text-violet-300" : "bg-foreground/6 text-foreground",
       )}
       data-kind={kind}
+      {...studioItemProps(href ? { href, title: text, icon: kind === "page" ? MENTION_ICONS.page : item?.kindIcon } : null)}
       onClick={() => {
         if (kind === "page") ui.openPage(target);
         else if (kind === "thread") ui.openThread(target);

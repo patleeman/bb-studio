@@ -9,8 +9,11 @@ import {
   MAX_TABS,
   moveTab,
   openTab,
+  panelSize,
   parseState,
   placeAt,
+  resizeRect,
+  resizeTo,
   selectTab,
   stripLayout,
   toggleCollapsed,
@@ -107,6 +110,7 @@ it("parses saved state, dropping bad entries and duplicates", () => {
     hidden: true,
     active: "thread:gone",
     place: { kind: "free", left: 10, bottom: 300 },
+    size: { width: 520, height: 640 },
     tabs: [
       { target: thread("a"), tag: "item" },
       { target: thread("a") },
@@ -121,7 +125,9 @@ it("parses saved state, dropping bad entries and duplicates", () => {
     collapsed: false,
     hidden: true,
     place: { kind: "free", left: 10, bottom: 300 },
+    size: { width: 520, height: 640 },
   });
+  expect(parseState({ size: { width: 500 } }).size).toBeNull();
   expect(parseState({ place: { kind: "free", left: "x" } }).place).toEqual({ kind: "dock" });
   expect(parseState("garbage")).toBe(EMPTY);
 });
@@ -137,6 +143,31 @@ describe("dropPlace", () => {
   it("keeps a free panel on screen", () => {
     expect(dropPlace(-50, 200, panel, screen)).toEqual({ kind: "free", left: 8, bottom: 200 });
     expect(dropPlace(1300, 800, panel, screen)).toEqual({ kind: "free", left: 992, bottom: 332 });
+  });
+});
+
+describe("resizing", () => {
+  const screen = { width: 1400, height: 900 };
+  const rect = { left: 600, top: 300, width: 400, height: 500 };
+
+  it("moves only the dragged sides", () => {
+    expect(resizeRect(rect, "nw", -100, -50, screen)).toEqual({ left: 500, top: 250, width: 500, height: 550 });
+    expect(resizeRect(rect, "e", 60, 999, screen)).toEqual({ ...rect, width: 460 });
+    expect(resizeRect(rect, "s", 0, 40, screen)).toEqual({ ...rect, height: 540 });
+  });
+
+  it("stays at least the minimum size and on the screen", () => {
+    expect(resizeRect(rect, "w", 300, 0, screen)).toEqual({ ...rect, left: 700, width: 300 });
+    expect(resizeRect(rect, "n", 0, -999, screen)).toEqual({ ...rect, top: 8, height: 792 });
+    expect(resizeRect(rect, "se", 999, 999, screen)).toEqual({ ...rect, width: 792, height: 600 });
+  });
+
+  it("uses its own size, capped by the screen, or the default", () => {
+    expect(panelSize(null, screen)).toEqual({ width: 400, height: 560 });
+    expect(panelSize({ width: 2000, height: 700 }, screen)).toEqual({ width: 1384, height: 700 });
+    const resized = resizeTo(openTab(EMPTY, thread("a")), { width: 500, height: 600 });
+    expect(closeAll(resized).size).toEqual({ width: 500, height: 600 });
+    expect(resizeTo(resized, null).size).toBeNull();
   });
 });
 

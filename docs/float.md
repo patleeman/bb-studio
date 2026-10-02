@@ -13,6 +13,7 @@ float, several things at once.
 | The panel, its tabs and thread tabs | `packages/bb-studio-float` (`experimental_appOverlay` "dock"); state in `src/stack.ts`, UI in `src/Panel.tsx` |
 | The registry between Float and other plugins | `packages/bb-studio-kit/src/app/float-registry.ts`, on `window.__bbStudioFloat_v1` |
 | `openFloat`, `useFloatAvailable`, `useCanFloat`, `FloatPanels`, `FloatThreadLeading`, `FloatDockPortal`, `useInFloat` | `packages/bb-studio-kit/src/app/float.tsx` |
+| The right-click menu on Studio items | `packages/bb-studio-float/src/ItemMenu.tsx`; items are marked with `studioItemProps` from `packages/bb-studio-kit/src/app/studio-item.ts` |
 
 A tab's target is a thread (`{ kind: "thread", threadId }`) or an in-app
 path (`{ kind: "path", path }`, e.g. an item's href). A channel is a BB
@@ -53,6 +54,22 @@ chat from inside the panel.
   panel left; Pages sets it while its comments card is open.
 - The older `bb-studio:chat:float` window event still floats a thread.
 
+## The item menu
+
+Right-clicking a Studio item anywhere opens **Open**, **Float** and **Open in
+split**. Float listens for `contextmenu` on the document, so a plugin only
+marks the element that opens an item:
+`<button {...studioItemProps({ href, title, icon })}>`. A link to
+`/plugins/<id>/<panel>/<more>` needs no mark. The menu stays out of the way
+when the element has its own menu (anything that cancels the event, such as
+Studio's sidebar tabs) and on Shift+right-click.
+
+BB has no API to open a path in a split, but it opens a Mod-clicked link in
+one when the link is inside the clicking plugin's own tree.
+`openPathInSplit(anchor, path)` clicks such an anchor pointed at the path,
+and falls back to opening it in full when BB doesn't take the click (splits
+off, a small screen). Float's ⋯ menu and Studio's sidebar tabs use it too.
+
 ## Layout
 
 - **Tabs.** New tabs join at the end and show. One tab shows at a time, and
@@ -67,8 +84,11 @@ chat from inside the panel.
   above the screen's bottom, so it grows upward when it opens, as it does
   docked, and it's clamped onto the screen when the screen shrinks. Dropped
   less than 48px above the bottom, it docks; an outline shows where.
+- **Size.** 400 by 560 until resized. Drag an edge or corner: docked, the top
+  and left edges, since the bottom and right stay put; free, any edge. At
+  least 300 by 200, and kept on screen. Double-click an edge for the default.
 - **State.** Per browser window in session storage: the tabs and their tags,
-  the tab showing, folded, hidden (Mod+Shift+J), and the place.
+  the tab showing, folded, hidden (Mod+Shift+J), the place and the size.
 
 ## Limits
 
@@ -78,4 +98,6 @@ chat from inside the panel.
   two editors, each saving on its own.
 - **Float actions.** BB has no slot in its own thread menu or next to the
   sidebar toggle, so Float is offered in Studio Sidebar's, Studio Teams' and
-  Studio's own row menus and in the palette.
+  Studio's own row menus, the item menu, and the palette.
+- **Item menu.** Only marked elements and plugin links get it; an item a
+  plugin draws without a mark keeps the browser's menu.
