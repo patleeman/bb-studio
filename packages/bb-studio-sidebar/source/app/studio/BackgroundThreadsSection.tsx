@@ -34,7 +34,7 @@ export function BackgroundThreadsSection({ threads, selectedThreadId, compareThr
       collapseControl={{ isCollapsed: collapsed, onToggleCollapsed: () => setCollapsed(!collapsed) }}
       actionsMobileAlways actions={<DropdownMenu>
         <DropdownMenuTrigger asChild><button type="button" aria-label="Background actions" className="inline-flex size-7 items-center justify-center rounded-md outline-none focus-visible:ring-2"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger>
-        <DropdownMenuContent><BackgroundThreadsMenuItems /></DropdownMenuContent>
+        <DropdownMenuContent><BackgroundThreadsMenuItems leadingSeparator={false} /></DropdownMenuContent>
       </DropdownMenu>}>
       <ProjectThreadTree threadListState={{ status: "ready", threads: visible }} variant="section" compareThreads={compareThreads} selectedThreadId={selectedThreadId}
         collapsedThreadIds={collapsedThreadIds} collapsedEnvironmentIds={collapsedEnvironmentIds} onProjectSelect={onProjectSelect}

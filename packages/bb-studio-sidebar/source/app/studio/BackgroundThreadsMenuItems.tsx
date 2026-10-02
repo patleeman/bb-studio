@@ -3,11 +3,11 @@ import { Icon } from "@/components/ui/icon";
 import { DropdownMenuGroup, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator } from "@/components/ui/dropdown-menu";
 import { sidebarBackgroundCollapsedAtom, sidebarBackgroundThreadsAtom } from "../preferences/atoms.js";
 
-export function BackgroundThreadsMenuItems() {
+export function BackgroundThreadsMenuItems({ leadingSeparator = true }: { leadingSeparator?: boolean } = {}) {
   const [mode, setMode] = useAtom(sidebarBackgroundThreadsAtom);
   const setCollapsed = useSetAtom(sidebarBackgroundCollapsedAtom);
   return <>
-    <DropdownMenuSeparator />
+    {leadingSeparator && <DropdownMenuSeparator />}
     <DropdownMenuGroup aria-label="Background threads">
       <DropdownMenuLabel>Background threads</DropdownMenuLabel>
       {([
