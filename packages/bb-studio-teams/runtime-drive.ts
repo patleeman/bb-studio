@@ -41,6 +41,7 @@ import {
   type RoutingTask,
 } from "./send-mode";
 import type { Runtime } from "./runtime";
+import { advanceTurnClock } from "./turn-clock";
 import { errorText, jobPrompt, jobInput, missingThread, primaryLane } from "./runtime";
 export async function driveRoom(this: Runtime, room: Room) {
     if (room.archived) return;
@@ -170,12 +171,11 @@ export async function driveRoom(this: Runtime, room: Room) {
 export async function driveJob(this: Runtime, bot: Bot, job: Job, forkJob: boolean) {
     if (job.pendingSteer && job.threadId && !job.cancellationPending) {
       await this.startSteer({ jobId: job.id });
-      if (this.store.job(job.id)?.pendingSteer) {
-        if (
-          Date.now() -
-            (job.startedAt ?? job.dispatchStartedAt ?? job.updatedAt) >
-          (bot.limits ?? defaultLimits).minutesPerTurn * 60000
-        )
+      const steering = this.store.job(job.id);
+      if (steering?.pendingSteer) {
+        const clock = advanceTurnClock(steering, Date.now());
+        this.store.setTurnClock(job.id, clock);
+        if (clock.turnMs > (bot.limits ?? defaultLimits).minutesPerTurn * 60000)
           await this.cancel(
             this.store.job(job.id)!,
             "Correction delivery timed out. Inspect the conversation before retrying.",
@@ -217,20 +217,22 @@ export async function driveJob(this: Runtime, bot: Bot, job: Job, forkJob: boole
       const current = this.store.job(job.id)!;
       if (!["dispatching", "running"].includes(current.status)) return;
       current.dispatchStartedAt ??= current.updatedAt;
+      const clock = advanceTurnClock(current, Date.now());
+      Object.assign(current, clock);
+      this.store.setTurnClock(current.id, clock);
       const matching = queued.some((entry) =>
         entry.content.some(
           (block) => block.type === "text" && block.text === jobPrompt(current),
         ),
       );
       const limitMs = (bot.limits ?? defaultLimits).minutesPerTurn * 60000;
-      const startedAt = current.startedAt ?? current.dispatchStartedAt;
+      const turnMs = current.turnMs ?? 0;
       if (
         thread.status !== "error" &&
         (thread.status === "active" || matching) &&
-        startedAt &&
         !current.wrapUpRequestedAt &&
-        Date.now() - startedAt >= limitMs * 0.75 &&
-        Date.now() - startedAt < limitMs
+        turnMs >= limitMs * 0.75 &&
+        turnMs < limitMs
       ) {
         current.pendingSteer = { priorPrompt: jobPrompt(current) };
         current.wrapUpRequestedAt = Date.now();
@@ -335,9 +337,7 @@ export async function driveJob(this: Runtime, bot: Bot, job: Job, forkJob: boole
       const latest = this.store.job(job.id)!;
       if (
         ["dispatching", "running"].includes(latest.status) &&
-        Date.now() -
-          (latest.startedAt ?? latest.dispatchStartedAt ?? latest.updatedAt) >
-          (bot.limits ?? defaultLimits).minutesPerTurn * 60000
+        (latest.turnMs ?? 0) > (bot.limits ?? defaultLimits).minutesPerTurn * 60000
       )
         await this.cancel(
           latest,

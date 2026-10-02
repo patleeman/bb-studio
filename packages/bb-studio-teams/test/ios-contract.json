@@ -1607,6 +1607,12 @@
               "wrapUpRequestedAt": {
                 "type": "number"
               },
+              "turnMs": {
+                "type": "number"
+              },
+              "clockAt": {
+                "type": "number"
+              },
               "automationId": {
                 "type": "string"
               },
@@ -4969,6 +4975,12 @@
                 "additionalProperties": false
               },
               "wrapUpRequestedAt": {
+                "type": "number"
+              },
+              "turnMs": {
+                "type": "number"
+              },
+              "clockAt": {
                 "type": "number"
               },
               "automationId": {

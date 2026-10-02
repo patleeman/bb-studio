@@ -112,6 +112,8 @@ export function complete(this: Runtime, threadId: string, text: string | null, e
       job.status = "queued";
       job.startedAt = null;
       job.dispatchStartedAt = null;
+      job.turnMs = undefined;
+      job.clockAt = undefined;
       job.requiresPromptMatch = false;
       job.error = null;
       this.store.putJob(job);

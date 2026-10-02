@@ -212,6 +212,10 @@ export const jobSchema = z.object({
     .object({ priorPrompt: z.string(), attemptedAt: z.number().optional() })
     .optional(),
   wrapUpRequestedAt: z.number().optional(),
+  /** How long the turn has run, without gaps the runtime didn't see (see turn-clock.ts). */
+  turnMs: z.number().optional(),
+  /** When the runtime last moved `turnMs`. */
+  clockAt: z.number().optional(),
   automationId: z.string().optional(),
   id: z.string(),
   botId: idSchema,

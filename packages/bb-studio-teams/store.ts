@@ -392,6 +392,14 @@ export class Store {
         this.queueNotification(`error:${j.id}`, j.roomId, "error", j.id);
     })();
   }
+  /** Moves a job's turn clock without counting as an update to the job. */
+  setTurnClock(id: string, clock: Pick<Job, "turnMs" | "clockAt">): Job | null {
+    const job = this.job(id);
+    if (!job) return null;
+    Object.assign(job, clock);
+    this.db.prepare("UPDATE jobs SET json=? WHERE id=?").run(JSON.stringify(job), id);
+    return job;
+  }
   replaceGenericJobError(id: string, detail: string): Job | null {
     const job = this.job(id);
     if (job?.status !== "error" || job.error !== "Agent turn failed.") return null;

@@ -548,9 +548,15 @@ test("queue age is excluded from the execution timeout", async () => {
     await x.runtime.drive(x.a);
     assert.equal(x.store.job("old")!.status, "running");
     assert.ok(x.store.job("old")!.dispatchStartedAt! > Date.now() - 5000);
-    const later = x.store.job("old")!;
-    later.dispatchStartedAt = Date.now() - 21 * 60000;
-    x.store.putJob(later);
+    // The computer slept for half an hour: the gap doesn't count against the turn.
+
+    x.store.setTurnClock("old", { turnMs: 60000, clockAt: Date.now() - 30 * 60000 });
+    await x.runtime.drive(x.a);
+    assert.equal(x.store.job("old")!.status, "running");
+    assert.equal(x.store.job("old")!.wrapUpRequestedAt, undefined);
+    assert.ok(x.store.job("old")!.turnMs! < 2 * 60000);
+    // Twenty minutes the runtime watched pass time it out.
+    x.store.setTurnClock("old", { turnMs: 21 * 60000, clockAt: Date.now() });
     await x.runtime.drive(x.a);
     assert.equal(x.store.job("old")!.status, "cancelled");
   } finally {
