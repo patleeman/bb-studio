@@ -195,7 +195,7 @@ function ViewDetail({ id }: { id: string }) {
       {actions}
     </li>;
     const continued = previous?.role === "assistant" && previous.threadId === entry.threadId && entry.createdAt - previous.createdAt < 5 * 60_000;
-    return <li key={entry.id} data-view-entry="assistant" data-replying={replying || undefined} className={`group/message rounded-lg px-2 transition-colors data-[replying]:bg-foreground/[0.04] data-[replying]:py-2 ${continued ? "-mt-4" : ""}`}>
+    return <li key={entry.id} data-view-entry="assistant" data-replying={replying || undefined} className={`group/message rounded-lg px-2 transition-colors data-[replying]:bg-foreground/[0.04] data-[replying]:py-2 ${continued ? "-mt-2" : ""}`}>
       {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => navigate.toThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replying && <span className="text-xs text-subtle-foreground">· Replying</span>}</div>}
       <div className="min-w-0 break-words text-sm leading-relaxed"><Markdown content={entry.text} /></div>
       <div className="mt-1">{actions}</div>
@@ -222,7 +222,7 @@ function ViewDetail({ id }: { id: string }) {
         <p className="text-sm font-medium">{page.view.name}</p>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">{page.view.members.length ? `Message ${page.view.members.map(memberLabel).slice(0, 3).join(", ")}${page.view.members.length > 3 ? ` and ${page.view.members.length - 3} more` : ""} together. Their replies land here.` : "Add bots or threads to this view, then message them together."}</p>
       </div>}
-      <ol className="flex flex-col gap-5">{rootEntries.map((entry, i) => <React.Fragment key={entry.id}>{renderEntry(entry, rootEntries[i - 1])}{lastEntry.get(entry.threadId) === entry.id ? children(entry.threadId) : null}</React.Fragment>)}{page.threads.filter(t => roots.has(t.id) && !lastEntry.has(t.id)).flatMap(t=>children(t.id))}</ol>
+      <ol className="flex flex-col gap-3">{rootEntries.map((entry, i) => <React.Fragment key={entry.id}>{renderEntry(entry, rootEntries[i - 1])}{lastEntry.get(entry.threadId) === entry.id ? children(entry.threadId) : null}</React.Fragment>)}{page.threads.filter(t => roots.has(t.id) && !lastEntry.has(t.id)).flatMap(t=>children(t.id))}</ol>
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
     </div></div>
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
