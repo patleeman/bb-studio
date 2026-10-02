@@ -518,6 +518,9 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
         aria-label="Floating tabs"
         data-float-place={dragAt ? "dragging" : resizing ? "resizing" : state.place.kind}
         className={cn(
+          // BB's page header is a window drag region in the desktop app, and the
+          // OS swallows clicks there. The panel opts out, as BB's own popups do.
+          "[app-region:no-drag] [-webkit-app-region:no-drag]",
           "bb-float-stack pointer-events-auto fixed z-40 flex flex-col overflow-hidden border border-border bg-background shadow-xl",
           free ? "rounded-lg" : "rounded-t-lg border-b-0",
           dragAt && "shadow-2xl",
