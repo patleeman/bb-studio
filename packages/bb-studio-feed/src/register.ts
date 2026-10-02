@@ -444,7 +444,8 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
             ? { ...threadOrigin, author: author || threadOrigin.author }
             : { author: author || "CLI", botId: null, threadId: ctx.threadId ?? "", projectId: ctx.projectId ?? null, channelId: null, channelName: null },
         });
-        return { exitCode: 0, stdout: `${line(service.view(row))}\n` };
+        // Inside a thread, the card line, for the reply to end with.
+        return { exitCode: 0, stdout: `${line(service.view(row))}\n${ctx.threadId ? `\nEnd your reply with this line to show the post as a card:\n${cardLine(row.id)}\n` : ""}` };
       }
       case "edit": {
         const id = positional[0] ?? "";
