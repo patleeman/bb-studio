@@ -135,12 +135,19 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep 
         if (!/import/i.test(reply) || !/stall|stuck|struggl|drop|abandon/i.test(reply)) throw new Error(`The agent did not receive the saved onboarding transcript: ${reply}`);
         await client.waitForText(reply.trim());
         // The pill must open the saved source and remain valid after Keep.
-        await client.evaluate(`document.querySelector(${JSON.stringify(linkSelector)}).click()`);
+        await client.clickElementWithTextAndPointer(linkSelector, "Launch brain dump");
         await client.waitForSelector('input[aria-label="Title"]');
         await client.waitForText("Onboarding is the next focus");
         await talkRpc("recording_keep", { id: recordingId });
         const { recording: kept } = await talkRpc("recording_get", { id: recordingId });
         if (kept.id !== recordingId || kept.kind !== "recording") throw new Error("Keeping a dictation broke its saved reference.");
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForSelector(linkSelector);
+        await client.evaluate(`document.querySelector(${JSON.stringify(linkSelector)}).focus()`);
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Enter", code: "Enter", windowsVirtualKeyCode: 13 });
+        await client.waitForSelector('input[aria-label="Title"]');
+        await client.waitForText("Onboarding is the next focus");
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         await client.waitForSelector(linkSelector);
         await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
