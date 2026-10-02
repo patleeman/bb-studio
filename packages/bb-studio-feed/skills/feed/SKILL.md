@@ -41,6 +41,7 @@ card line.
 | `feed_list` | Posts, newest first, with a story listed once. Filter by `topic`, `query` and `sinceHours`. |
 | `feed_read` | One post by `id`, or every post in a `story`, oldest first. |
 | `feed_edit` | Correct a post's `title`, `body`, `topic` or `priority`; `resolved: true` marks it resolved (with `resolveStory: true`, the whole story). |
+| `feed_remove` | Permanently remove posts by `ids`. Only when the user asks; resolve a finished story with `feed_edit` instead. |
 
 ## CLI
 

@@ -952,7 +952,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_delete_items",
     description:
-      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts, tasks and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove; spaces stay the user's to delete.",
+      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts, tasks, task boards (with their tasks) and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove; spaces stay the user's to delete.",
     parameters: z.object({
       items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
     }),

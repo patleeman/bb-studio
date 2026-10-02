@@ -55,8 +55,8 @@ user asks to group, file or label items; don't invent tags on your own.
 ## Deleting
 
 `studio_delete_items` with `items` (item links) permanently deletes pages,
-recordings, drawings, artifacts, tasks and other add-on items. A page takes
-its sub-pages with it. There's no undo, so delete only what the user asked
+recordings, drawings, artifacts, tasks, task boards and other add-on items.
+A page takes its sub-pages with it, and a board its tasks. There's no undo, so delete only what the user asked
 to remove, and confirm first when the request is vague, like "clean up old
 stuff". It doesn't delete spaces.
 

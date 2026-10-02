@@ -319,6 +319,32 @@ export default function plugin(bb: BbPluginApi) {
       return JSON.stringify(row);
     },
   });
+  bb.agents.registerTool({
+    name: "tables_delete_rows",
+    description: "Permanently delete rows from a table by row ID. Delete only rows the user asked to remove.",
+    parameters: z.object({ id, rowIds: z.array(id).min(1).max(500) }),
+    execute: ({ id, rowIds }) => {
+      const existing = new Set(store.require(id).rows.map((row) => row.id));
+      const remove = rowIds.filter((rowId) => existing.has(rowId));
+      if (remove.length) {
+        store.patchRows(id, { remove });
+        changed(id);
+      }
+      const missing = rowIds.filter((rowId) => !existing.has(rowId));
+      return [`Deleted ${remove.length} row${remove.length === 1 ? "" : "s"}.`, ...(missing.length ? [`Not found: ${missing.join(", ")}`] : [])].join("\n");
+    },
+  });
+  bb.agents.registerTool({
+    name: "tables_delete",
+    description: "Permanently delete a whole table with its rows and views. There's no undo, so delete only a table the user asked to remove.",
+    parameters: z.object({ id }),
+    execute: ({ id }) => {
+      const table = store.require(id);
+      store.delete(id);
+      changed(id);
+      return `Deleted table "${table.title}".`;
+    },
+  });
   bb.agents.configure(() => ({
     tools: [
       "tables_list",
@@ -327,6 +353,8 @@ export default function plugin(bb: BbPluginApi) {
       "tables_query",
       "tables_insert",
       "tables_update",
+      "tables_delete_rows",
+      "tables_delete",
     ],
     skills: [],
   }));

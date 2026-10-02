@@ -19,7 +19,7 @@ import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL
 import { FeedStore, MIGRATIONS, type PostRow } from "./store";
 import { fetchPreview } from "./unfurl";
 
-export const FEED_TOOLS = ["feed_post", "feed_list", "feed_read", "feed_edit"];
+export const FEED_TOOLS = ["feed_post", "feed_list", "feed_read", "feed_edit", "feed_remove"];
 
 const TEAMS_PLUGIN_ID = "bot-teams";
 const MOBILE_PLUGIN_ID = "mobile";
@@ -392,6 +392,18 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
         bb.realtime.publish(REALTIME_CHANNEL, { type: "post", postId: id, story: row.story } satisfies RealtimeEvent);
       }
       return `Edited: ${summary(service.view(store.get(id) ?? edited ?? row))}`;
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "feed_remove",
+    description: "Permanently remove Studio Feed posts by id. There's no undo, so remove only posts the user asked to remove; to close out a story, mark it resolved with feed_edit instead.",
+    presentation: { label: { pending: "Removing posts", completed: "Removed posts" } },
+    parameters: z.object({ ids: z.array(z.string().min(1).max(100)).min(1).max(100) }),
+    async execute({ ids }) {
+      const removed = ids.filter((id) => service.remove(id));
+      const missing = ids.filter((id) => !removed.includes(id));
+      return [`Removed ${removed.length} post${removed.length === 1 ? "" : "s"}.`, ...(missing.length ? [`Not found: ${missing.join(", ")}`] : [])].join("\n");
     },
   });
 
