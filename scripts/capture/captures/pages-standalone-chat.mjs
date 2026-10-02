@@ -1,16 +1,22 @@
-export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
-  id: "pages-standalone-chat",
+export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false }) => ({
+  id: mobile ? "pages-standalone-chat-mobile" : "pages-standalone-chat",
   packageDir: "bb-studio-pages",
-  fileName: "standalone-chat.png",
-  privateSidebar: true,
+  fileName: mobile ? "standalone-chat-mobile.png" : "standalone-chat.png",
+  privateSidebar: !mobile,
   setup: async (client) => {
     const { page, cleanup } = await seedPages();
     let threadId;
     let disabled = false;
+    let sidebarToggle = null;
     const forget = async () => {
+      await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`).catch(() => {});
       if (disabled) await bbCli(["plugin", "enable", "studio-chat", "--json"]);
       if (threadId) await bbCli(["thread", "delete", threadId, "--yes", "--json"]);
       await cleanup();
+      if (mobile) {
+        if (sidebarToggle) await client.evaluate(`document.querySelector('button[aria-label=${JSON.stringify(sidebarToggle)}]')?.click()`);
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+      }
     };
     try {
       await bbCli(["plugin", "disable", "studio-chat", "--json"]);
@@ -25,8 +31,18 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
         },
       });
       threadId = result.threadId;
+      if (mobile) await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       await client.navigate(`/plugins/pages/pages/${page.id}`);
       await client.waitForText("Launch checklist");
+      if (mobile) {
+        sidebarToggle = await client.evaluate(`(() => {
+          const sidebar = document.querySelector('[data-sidebar="sidebar"]');
+          if (['closed', 'collapsed'].includes(sidebar?.closest('[data-state]')?.getAttribute('data-state'))) return null;
+          if (!sidebar?.checkVisibility() || sidebar.getBoundingClientRect().right <= 0) return null;
+          return [...document.querySelectorAll('button')].find(button => /^Toggle sidebar/i.test(button.getAttribute('aria-label') ?? '') && button.checkVisibility())?.getAttribute('aria-label') ?? null;
+        })()`);
+        if (sidebarToggle) await client.clickAriaButtonWithPointer(sidebarToggle);
+      }
       await client.waitForSelector('[data-studio-item-header] button[title="Continue this page\'s conversation"]');
       await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
       await client.waitForSelector(`[data-float-window="thread:${threadId}"] [data-promptbox]`);
@@ -39,14 +55,30 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep }) => ({
       await client.waitForSelector(composer);
       await client.dragBy(composer, 0, 0);
       await client.command("Input.insertText", { text: "Keep this page conversation draft." });
-      await client.clickElementWithTextAndPointer('[role="dialog"] button', "Close");
+      if (mobile) {
+        await client.command("Input.dispatchMouseEvent", { type: "mousePressed", x: 10, y: 10, button: "left", buttons: 1, clickCount: 1 });
+        await client.command("Input.dispatchMouseEvent", { type: "mouseReleased", x: 10, y: 10, button: "left", buttons: 0, clickCount: 1 });
+        await sleep(500);
+      }
+      else await client.clickElementWithTextAndPointer('[role="dialog"] button', "Close");
       await client.clickAriaButtonWithPointer("Chat options");
       await client.clickElementWithTextAndPointer('[role="menuitem"]', "New conversation");
       await client.waitForSelector(composer);
       const draft = await client.evaluate(`document.querySelector(${JSON.stringify(composer)})?.textContent`);
       if (!draft.includes("Keep this page conversation draft.")) throw new Error(`Standalone page draft was lost: ${JSON.stringify(draft)}`);
       await sleep(500);
+      const clipped = await client.evaluate(`(() => {
+        const dialog = document.querySelector('[role="dialog"]');
+        return [...dialog.querySelectorAll('button')].filter(button => {
+          if (!button.checkVisibility()) return false;
+          const rect = button.getBoundingClientRect();
+          return rect.left < 0 || rect.right > innerWidth || rect.top < 0 || rect.bottom > innerHeight;
+        }).map(button => button.getAttribute('aria-label') ?? button.innerText);
+      })()`);
+      if (clipped.length) throw new Error(`The page composer clips controls: ${JSON.stringify(clipped)}`);
     } catch (error) {
+      console.error(await client.evaluate(`JSON.stringify({ path: location.pathname, text: document.body.innerText.slice(-2500), width: innerWidth, chat: [...document.querySelectorAll('[data-studio-item-header] button')].filter(button => button.innerText.trim() === 'Chat').map(button => ({title: button.title, bounds: button.getBoundingClientRect().toJSON()})) })`).catch(() => "Capture context unavailable"));
+      if (process.env.BB_CAPTURE_DEBUG_PATH) await client.capture(process.env.BB_CAPTURE_DEBUG_PATH).catch(() => {});
       await forget();
       throw error;
     }

@@ -28,10 +28,25 @@ The launch page is open. It holds:
 - a stacked bar chart of weekly active teams
 - a launch checklist with two items done
 
-At the top left are the **Pages** back pill and the breadcrumb. At the top
-right are the **Dictate**, **Version history**, **Comments** and page menu
+At the top left are the **Studio** back pill and the breadcrumb. At the top
+right are **Chat**, **Dictate**, **Version history**, **Comments** and page menu
 buttons. **Dictate** appears because Talk is installed in the staged app.
-The **Work with this page…** composer floats at the bottom right.
+
+![Standalone Pages Chat with its retained draft](assets/standalone-chat.png)
+
+The standalone Chat check temporarily disables Studio Chat in the isolated
+staged app. It resumes a legacy page conversation without creating another
+thread, then opens **New conversation**, writes a draft, and verifies it
+survives closing and reopening. The same checks pass in the
+[phone drawer](assets/standalone-chat-mobile.png), with every composer control
+inside the viewport. The seeded thread is scheduled 30 days ahead, so no
+agent runs. The capture restores Studio Chat and removes its fixtures.
+
+```sh
+BB_CAPTURE_STANDALONE_CHAT=1 \
+  BB_CAPTURE_ONLY=pages-standalone-chat,pages-standalone-chat-mobile \
+  node scripts/capture-plugin-screenshots.mjs --plugin pages
+```
 
 ![The Pages Comments panel with a microphone in the reply box](assets/comments.png)
 
@@ -110,16 +125,16 @@ afterwards.
 - **Projects and nesting.** Pages belong to a project or are global, and
   nest to any depth, with a breadcrumb back up. Give a page an emoji icon,
   move it, archive it, or delete it from its ⋯ menu.
-- **Work with this page.** The box at the bottom of every page is BB's
-  new-thread composer. Sending starts an agent thread in the page's project
-  that gets the page as context. The thread opens in a card on the page,
-  and you can minimize it or open it as a full thread. The full thread's
-  header shows the page's name, which takes you back to the page with the
-  chat open. This works without Studio Teams. With
-  [Float](../bb-studio-float) installed, page chats open in Float windows
-  instead of the card, so they stay open while you move around. With
-  [Studio Chat](../bb-studio-chat) installed, its "Work with this…" bar
-  takes over the box.
+- **Chat about a page.** **Chat** continues the page's conversation or opens
+  BB's new-thread composer. **New conversation** starts another. Sending
+  starts an agent thread in the page's project with the page as context.
+  Conversations use the shared companion system: workbench on a capable BB
+  host, Float on stable hosts without that capability, or ordinary thread
+  navigation without Float. Existing page chats and links still work.
+  [Studio Chat](../bb-studio-chat) provides the suite-wide item links and
+  conversation picker when installed. Standalone Pages uses the same
+  destination and preserves its existing composer drafts. This works
+  without Studio Teams.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the
   current page is saved before a restore.

@@ -250,14 +250,14 @@
   }
 }
 
-/* The chat card's title falls back when BB hasn't loaded the thread yet. */
+/* Activity entries fall back while BB loads their thread titles. */
 .pages-thread-title:empty::before,
 .pages-thread-title > :empty::before {
   content: "Chat";
   color: var(--muted-foreground);
 }
 
-/* The floating chat card is the composer's frame, so BB's prompt box inside
+/* The conversation dialog is the composer's frame, so BB's prompt box inside
    it drops its own border and shadow. */
 .pages-composer form {
   border-color: transparent;

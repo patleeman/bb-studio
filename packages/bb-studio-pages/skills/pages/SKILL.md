@@ -97,10 +97,12 @@ GraphQL, and XML.
 
 ## Working from a page
 
-The "Work with this page…" box at the bottom of a page is BB's new-thread
-composer. Sending starts a normal agent thread in the page's project, shown
-in a card on the page. The thread also appears in the sidebar, and its header
-links back to the page. That thread's first message carries the page id and
+The page header's Chat action continues its conversation or opens BB's
+new-thread composer. New conversation starts another. Sending starts a
+normal agent thread in the page's project, shown through the shared
+workbench/Float companion system or ordinary thread navigation when Float
+is absent. Existing page chat links still work. The thread also appears in
+the sidebar, and its header links back to the page. Its first message carries the page id and
 its Markdown with block ids as hidden context. The copy can go stale as the
 user types, so read the page again right before you edit it with
 `pages_edit`. This works without Studio Teams.
@@ -123,7 +125,7 @@ with its configured model and reasoning level.
   now** runs it immediately.
 
 Requests show in the page's **Activity** menu as queued, working, done, or
-failed. Picking one opens its thread in a card on the page.
+failed. Picking one opens its thread through the shared companion system.
 
 When you are a bot handling one of these requests, follow its instructions:
 edit with `pages_edit`, then reply in the named comment thread with

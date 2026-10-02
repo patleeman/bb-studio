@@ -134,10 +134,18 @@ card is removed; legacy page chat routes and activity entries open the shared
 companion destination, with ordinary thread navigation when Float is absent.
 Existing page chats and the `pages:<id>` draft key remain in use. Pages' 80
 tests pass, including continuation, project/context forwarding, error retries,
-and stale submissions. Standalone live verification is the next check.
+and stale submissions. The stable BB 0.44.0 standalone captures at pushed
+commit b070150 pass with Studio Chat temporarily disabled: the actual legacy
+page chat continues without duplication, a draft survives closing and
+reopening, and the phone drawer keeps all composer buttons in the viewport.
+The scheduled fixture never runs an agent. Studio Chat is restored and the
+fixture thread/pages are deleted after capture.
+The phone page header is still crowded; the remaining compact-layout audit
+must cover item-header navigation and overflow menus across the suite, beyond
+the verified conversation drawer.
 
 Remaining delivery includes native host live verification and release,
-the SDK/CLI placement controller, Pages standalone migration, embedded composer
+the SDK/CLI placement controller, embedded composer
 targeting, all suite entry points, compact behavior,
 staged live captures, documentation and marketplace checks, and the
 requirement-by-requirement completion audit. This goal stays active

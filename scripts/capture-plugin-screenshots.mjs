@@ -76,14 +76,22 @@ try {
       // Use BB's real collapsed-sidebar state so publication does not expose
       // unrelated local projects/threads alongside the deterministic fixtures.
       const privateSidebar = capture.privateSidebar !== false && !capture.showSidebar && (capture.privateSidebar || (capture.packageDir === "bb-studio-teams" && capture.id !== "bots-forks"));
-      if (privateSidebar) {
-        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
+      const collapsedSidebar = privateSidebar && await client.evaluate(`(() => {
+        const sidebar = document.querySelector('[data-sidebar="sidebar"]');
+        if (['closed', 'collapsed'].includes(sidebar?.closest('[data-state]')?.getAttribute('data-state'))) return false;
+        if (!sidebar?.checkVisibility() || sidebar.getBoundingClientRect().right <= 0) return false;
+        const button = document.querySelector('button[aria-label^="Toggle sidebar" i]');
+        if (!button) return false;
+        button.click();
+        return true;
+      })()`);
+      if (collapsedSidebar) {
         await sleep(350);
       }
       // A capture may crop the real frame, such as to leave out machine names.
       await client.capture(outputPath, capture.clip ? await capture.clip(client) : undefined);
-      if (privateSidebar) {
-        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
+      if (collapsedSidebar) {
+        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar" i]')?.click()`);
         await sleep(350);
       }
       process.stdout.write(`  ${outputPath}\n`);
