@@ -91,7 +91,8 @@ the matching text with the match in bold.
   dark. Teal-black and pale-teal surfaces, a coral accent, teal file paths.
   Pick **BB Studio** in Settings → Appearance, or run `bb theme set
   plugin:studio:bb-studio`.
-- **For agents**: the `studio_list_items` and `studio_tag_items` tools, the
+- **For agents**: the `studio_list_items`, `studio_tag_items` and
+  `studio_delete_items` tools, the
   `bb studio` CLI, and a `studio` skill.
 
 ```sh

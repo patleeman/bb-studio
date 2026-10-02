@@ -373,6 +373,14 @@ export default async function plugin(bb: BbPluginApi) {
     });
     if (touched) tagsChanged();
   };
+  /** Deletes an add-on's items and forgets their tags and tabs. */
+  const deleteItems = async (pluginId: string, ids: string[]) => {
+    const result = await hub.call(pluginId, "studio_delete", { ids });
+    tags.forget(pluginId, result.done);
+    if (tabs.forget(pluginId, result.done)) tabsChanged();
+    return result;
+  };
+
   const deleteSpace = (id: string) => {
     const pageId = spaces.get(id)?.pageId;
     spaces.remove(id);
@@ -489,10 +497,7 @@ export default async function plugin(bb: BbPluginApi) {
         for (const id of done) deleteSpace(id);
         return { done, failed: ids.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })) };
       }
-      const result = await hub.call(pluginId, "studio_delete", { ids });
-      tags.forget(pluginId, result.done);
-      if (tabs.forget(pluginId, result.done)) tabsChanged();
-      return result;
+      return deleteItems(pluginId, ids);
     },
     action: ({ pluginId, action, ids }) => hub.call(pluginId, "studio_action", { action, ids }),
     createTag: ({ name }) => {
@@ -939,6 +944,46 @@ export default async function plugin(bb: BbPluginApi) {
       const lines = [`Updated ${found.length} item${found.length === 1 ? "" : "s"}.`];
       if (added.length) lines.push(`Added: ${added.map((tag) => `#${tag.name}`).join(" ")}`);
       if (removed.length) lines.push(`Removed: ${removed.map((tag) => `#${tag.name}`).join(" ")}`);
+      if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
+      return lines.join("\n");
+    },
+  });
+
+  bb.agents.registerTool({
+    name: "studio_delete_items",
+    description:
+      "Permanently delete the user's BB Studio items — pages (with their sub-pages), recordings, drawings, artifacts, tasks and other add-on items. Pass items as the links studio_list_items shows. Deletion can't be undone, so delete only what the user asked to remove; spaces stay the user's to delete.",
+    parameters: z.object({
+      items: z.array(z.string().max(500)).min(1).max(100).describe("Item links, e.g. /plugins/pages/pages/pg_x"),
+    }),
+    async execute({ items: refs }) {
+      const { found, missing } = await resolveItems(refs);
+      const { items, providers } = await hub.overview();
+      const deletable = new Set(
+        providers.flatMap((provider) => provider.kinds.filter((kind) => kind.capabilities?.delete).map((kind) => `${provider.pluginId}:${kind.id}`)),
+      );
+      const titles = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, untitled(item.title)]));
+      const kinds = new Map(items.map((item) => [`${item.pluginId}:${item.id}`, item.kind]));
+      const byPlugin = new Map<string, string[]>();
+      const refused: string[] = [];
+      for (const { pluginId, id } of found) {
+        if (pluginId === STUDIO_PLUGIN_ID || !deletable.has(`${pluginId}:${kinds.get(`${pluginId}:${id}`)}`)) refused.push(titles.get(`${pluginId}:${id}`) ?? id);
+        else byPlugin.set(pluginId, [...(byPlugin.get(pluginId) ?? []), id]);
+      }
+      const deleted: string[] = [];
+      const failed: string[] = [];
+      for (const [pluginId, ids] of byPlugin) {
+        try {
+          const result = await deleteItems(pluginId, ids);
+          deleted.push(...result.done.map((id) => titles.get(`${pluginId}:${id}`) ?? id));
+          failed.push(...result.failed.map(({ id, error }) => `${titles.get(`${pluginId}:${id}`) ?? id} (${error})`));
+        } catch (error) {
+          failed.push(...ids.map((id) => `${titles.get(`${pluginId}:${id}`) ?? id} (${errorText(error)})`));
+        }
+      }
+      const lines = [`Deleted ${deleted.length} item${deleted.length === 1 ? "" : "s"}${deleted.length ? `: ${deleted.join(", ")}` : ""}.`];
+      if (refused.length) lines.push(`Can't be deleted here: ${refused.join(", ")}`);
+      if (failed.length) lines.push(`Failed: ${failed.join(", ")}`);
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
       return lines.join("\n");
     },

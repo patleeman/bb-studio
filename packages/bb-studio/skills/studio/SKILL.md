@@ -52,6 +52,14 @@ a task. Studio keeps them; add-ons don't. Use `studio_tag_items` with
 names). Adding a name that doesn't exist yet creates the tag. Tag when the
 user asks to group, file or label items; don't invent tags on your own.
 
+## Deleting
+
+`studio_delete_items` with `items` (item links) permanently deletes pages,
+recordings, drawings, artifacts, tasks and other add-on items. A page takes
+its sub-pages with it. There's no undo, so delete only what the user asked
+to remove, and confirm first when the request is vague, like "clean up old
+stuff". It doesn't delete spaces.
+
 ## Spaces
 
 A space gathers Studio items, whole BB projects and threads into one place,
