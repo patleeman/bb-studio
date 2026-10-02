@@ -250,9 +250,7 @@ final class InboxModel: ObservableObject {
         return botTeams?.bots.first { $0.id == id && $0.retired != true }
     }
 
-    var views: [SavedThreadView] {
-        (botTeams?.views ?? []).filter { !$0.archived }.sorted { $0.updatedAt > $1.updatedAt }
-    }
+
 }
 
 struct InboxView: View {
@@ -260,8 +258,6 @@ struct InboxView: View {
     @StateObject private var model = InboxModel()
     @State private var query = ""
     @State private var renaming: ThreadEntry?
-    @State private var renamingView: SavedThreadView?
-    @State private var creatingView = false
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
     /// The server's running plugins, comma-separated; remembered so plugin rows show offline.
@@ -299,25 +295,6 @@ struct InboxView: View {
                         }
                     }
                 }
-                if query.isEmpty, model.botTeams != nil {
-                    collapsible("views", "Views") {
-                        ForEach(model.views) { view in
-                            NavigationLink(value: Route.savedView(id: view.id)) {
-                                Label(view.name, systemImage: "rectangle.stack")
-                            }
-                            .contextMenu {
-                                Button {
-                                    newTitle = view.name
-                                    renamingView = view
-                                } label: { Label("Rename", systemImage: "pencil") }
-                            }
-                        }
-                        Button { creatingView = true } label: {
-                            Label("New View", systemImage: "plus")
-                        }
-                        .foregroundStyle(.secondary)
-                    }
-                }
                 ForEach(model.groups) { group in threadSection(group) }
             }
         }
@@ -342,29 +319,6 @@ struct InboxView: View {
                 }
             }
         }
-        .sheet(isPresented: $creatingView) {
-            SavedViewEditor { view in
-                Task { await model.load(app.client) }
-                app.push(.savedView(id: view.id))
-            }
-        }
-        .alert("Rename view", isPresented: Binding(get: { renamingView != nil }, set: { if !$0 { renamingView = nil } })) {
-            TextField("Name", text: $newTitle)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") {
-                guard let room = renamingView else { return }
-                let name = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !name.isEmpty, name != room.name else { return }
-                Task {
-                    do {
-                        try await app.client.updateSavedView(room, name: name)
-                        await model.load(app.client)
-                    } catch {
-                        model.error = BBClient.describe(error, server: app.client.baseURL)
-                    }
-                }
-            }
-        }
         .confirmationDialog(
             "Delete \u{201C}\(deleting?.displayTitle ?? "")\u{201D}? This can't be undone.",
             isPresented: Binding(get: { deleting != nil }, set: { if !$0 { deleting = nil } }),
@@ -381,9 +335,6 @@ struct InboxView: View {
                 Button { app.startDictation() } label: { Image(systemName: "mic") }
                 Menu {
                     Button { app.newThread() } label: { Label("New Thread", systemImage: "square.and.pencil") }
-                    if model.botTeams != nil {
-                        Button { creatingView = true } label: { Label("New View", systemImage: "number") }
-                    }
                 } label: {
                     Image(systemName: "square.and.pencil")
                 } primaryAction: {

@@ -357,30 +357,44 @@ export default async function plugin(bb: BbPluginApi) {
     }),
   };
   bb.rpc.register(rpcContract, handlers);
-  // Bots in the Studio collection. Studio hears about a change only when
+  // Bots and saved views in the Studio collection. Studio hears about a change only when
   // something it shows does, not on every message.
   const studio = studioSchemas(z);
   const studioNotifier = createStudioNotifier({ plugins: bb.sdk.plugins, pluginId: STUDIO_PROVIDER_ID, schemas: studio });
   registerStudio(bb, studio, {
     bots: () => store.all(),
     activity: () => store.botActivitySummary(),
+    views: () => views.all(),
+    createView: () => views.create("New view", []),
+    archiveView: async (id, archived) => {
+      const view = views.get(id);
+      return views.handlers().viewUpdate({ ...view, archived, expectedUpdatedAt: view.updatedAt });
+    },
+    deleteView: async (id) => views.handlers().viewDelete({ id }),
+    readView: async (id) => {
+      const page = await views.page(id);
+      return [`# ${page.view.name}`, ...page.entries.map(entry => `${entry.role === "user" ? "You" : "Reply"}: ${entry.text}`)].join("\n\n");
+    },
     retire: (id, retired) => runtime.retire(id, retired),
   });
-  let studioSignature = botsSignature(store.all(), store.botActivitySummary());
+  const itemSignature = () => botsSignature(store.all(), store.botActivitySummary()) + JSON.stringify(views.all());
+  let studioSignature = itemSignature();
   let studioCheck: ReturnType<typeof setTimeout> | undefined;
   const notifyStudio = () => {
     // Changes come in bursts; compare once per burst.
     studioCheck ??= setTimeout(() => {
       studioCheck = undefined;
-      const next = botsSignature(store.all(), store.botActivitySummary());
+      const next = itemSignature();
       if (next === studioSignature) return;
       studioSignature = next;
       studioNotifier.changed();
     }, 500);
   };
   runtime.onChanged.add(notifyStudio);
+  views.onChanged.add(notifyStudio);
   bb.onDispose(() => {
     runtime.onChanged.delete(notifyStudio);
+    views.onChanged.delete(notifyStudio);
     clearTimeout(studioCheck);
     studioNotifier.dispose();
   });

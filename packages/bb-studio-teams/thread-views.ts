@@ -59,7 +59,8 @@ type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveri
 export class ThreadViews {
   private readonly locks = new Map<string, Promise<unknown>>();
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
-  changed() { this.bb.realtime.publish("views-changed", {}); }
+  readonly onChanged = new Set<() => void>();
+  changed() { this.bb.realtime.publish("views-changed", {}); for (const listener of this.onChanged) listener(); }
   all(includeRedirects = false): ThreadView[] {
     return (this.store.db.prepare("SELECT json FROM thread_views").all() as { json: string }[])
       .map(row => threadViewSchema.parse(JSON.parse(row.json)))

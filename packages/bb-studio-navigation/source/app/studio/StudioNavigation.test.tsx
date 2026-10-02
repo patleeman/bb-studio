@@ -99,6 +99,16 @@ describe("Studio Navigation", () => {
     ]);
   });
 
+  it("reaches saved views through Studio, with a standalone fallback", () => {
+    const view = item("bot-teams/views", "Views");
+    renderNavigation([...ITEMS, view]);
+    expect(rowOrder()).not.toContain(view.id);
+    cleanup();
+    render(<SidebarAnchors onNavigate={() => {}} />);
+    renderNavigation([...ITEMS.filter(entry => entry !== STUDIO), view]);
+    expect(rowOrder()).toContain(view.id);
+  });
+
   it("keeps add-on panels while the Studio hub can't open them", () => {
     renderNavigation(ITEMS.filter((entry) => entry !== STUDIO));
     expect(rowOrder()).toContain("pages/pages");

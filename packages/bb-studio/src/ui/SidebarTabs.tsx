@@ -35,7 +35,7 @@ const APP_NAMES: Record<string, string> = {
   excalidraw: "Drawings",
   artifacts: "Artifacts",
   "studio-tasks": "Tasks",
-  "bot-teams": "Bots",
+  "bot-teams": "Teams",
 };
 
 function useTabs(enabled: boolean) {

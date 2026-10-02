@@ -1,9 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { Icon, ItemHeader, ItemTile, PageColumn, SidebarPortal, SidebarSection, useSidebarHosted, useSidebarNavigated } from "@bb-studio/kit/app";
+import { Icon, ItemHeader, ItemTile, PageColumn, AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import { Button, Input } from "@bb-studio/kit/ui";
 import { Modal } from "./channel-controls";
 import { ErrorMessage, message } from "./bot-ui";
+import { PLUGIN_ID, VIEW_KIND } from "./studio-provider";
+import type { StudioSchemas } from "@bb-studio/kit/contract";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import type { ThreadView, ViewEntry, ViewMember, ViewThread } from "./view-contract";
@@ -11,22 +13,6 @@ import type { ThreadView, ViewEntry, ViewMember, ViewThread } from "./view-contr
 type Contract = typeof rpcContract;
 type Page = { view: ThreadView; threads: ViewThread[]; entries: ViewEntry[]; hasOlder: boolean };
 const memberKey = (m: ViewMember) => `${m.kind}:${m.id}`;
-function useViews() {
-  const rpc = useRpc<Contract>();
-  const [views, setViews] = useState<ThreadView[]>([]), [error, setError] = useState<string | null>(null);
-  const load = useCallback(() => { void rpc.call("views", {}).then(setViews, e => setError(message(e))); }, [rpc]);
-  useEffect(load, [load]);
-  useRealtime("views-changed", load);
-  return { views, error, load };
-}
-export function ViewsSidebar() {
-  const hosted = useSidebarHosted(), navigate = useBbNavigate(), navigated = useSidebarNavigated();
-  const { views } = useViews();
-  if (!hosted) return null;
-  return <SidebarPortal id="thread-views" title="Views"><SidebarSection title="Views" trailing={<button type="button" aria-label="New view" onClick={() => { navigate.toPluginPanel("views", { subPath: "new" }); navigated(); }}><Icon name="Plus" className="size-3.5" /></button>}>
-    {views.filter(v => !v.archived).map(v => <button type="button" key={v.id} className="flex min-h-7 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-state-hover" onClick={() => { navigate.toPluginPanel("views", { subPath: v.id }); navigated(); }}><Icon name="MessageSquare" className="size-3.5 shrink-0" /><span className="truncate">{v.name}</span></button>)}
-  </SidebarSection></SidebarPortal>;
-}
 function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView; open: boolean; onClose(): void; onSaved(view: ThreadView): void }) {
   const rpc = useRpc<Contract>(), sdk = useSdk();
   const [name, setName] = useState(initial?.name ?? ""), [members, setMembers] = useState<ViewMember[]>(initial?.members ?? []);
@@ -59,12 +45,18 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
   </Modal>;
 }
 function ViewDetail({ id }: { id: string }) {
-  const rpc = useRpc<Contract>(), navigate = useBbNavigate();
+  const rpc = useRpc<Contract>(), navigate = useBbNavigate(), studio = useStudioPresent();
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
   const [text, setText] = useState(""), [targets, setTargets] = useState<ViewMember[]>([]), [reply, setReply] = useState<string | null>(null);
   const [pending, setPending] = useState(false), [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const generation = useRef(0), retry = useRef<{ requestId: string; signature: string } | null>(null);
+  const initialized = useRef(false);
+  useEffect(() => {
+    if (!page || initialized.current) return;
+    initialized.current = true;
+    if (page.view.name === "New view" && !page.view.members.length) setEditing(true);
+  }, [page]);
   const timeline = useRef<HTMLDivElement>(null), followLatest = useRef(true);
   useLayoutEffect(() => {
     if (followLatest.current && timeline.current) timeline.current.scrollTop = timeline.current.scrollHeight;
@@ -109,7 +101,7 @@ function ViewDetail({ id }: { id: string }) {
   const lastEntry = new Map(rootEntries.map(e=>[e.threadId,e.id]));
   const archive = async () => { try { await rpc.call("viewUpdate", { ...page.view, archived: !page.view.archived, expectedUpdatedAt: page.view.updatedAt }); load(); } catch(e) { setError(message(e)); } };
   return <div className="relative flex h-full min-h-0 flex-col" data-thread-view>
-    <ItemHeader className="relative shrink-0 bg-background view-controls" backLabel="Views" onBack={() => navigate.toPluginPanel("views")} leading={<span className="min-w-0 truncate text-sm font-medium">{page.view.name}</span>} trailing={<><Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit view</Button><Button variant="ghost" size="sm" onClick={() => void archive()}>{page.view.archived ? "Restore" : "Archive"}</Button></>} />
+    <ItemHeader className="relative shrink-0 bg-background view-controls" backLabel={studio ? "Studio" : "Views"} onBack={() => studio ? openAppPath(studioPath(VIEW_KIND.id)) : navigate.toPluginPanel("views")} leading={<span className="min-w-0 truncate text-sm font-medium">{page.view.name}</span>} trailing={<><Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit view</Button><Button variant="ghost" size="sm" onClick={() => void archive()}>{page.view.archived ? "Restore" : "Archive"}</Button></>} />
     <div data-view-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto w-full max-w-5xl px-4 pt-4 pb-6 md:px-10"><h1 className="mb-4 text-2xl font-semibold">{page.view.name}</h1>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">{page.threads.filter(t => !t.parentThreadId).map(t => <button type="button" key={t.id} onClick={() => navigate.toThread(t.id)} className="max-w-64 truncate text-muted-foreground hover:underline">{botFor(t.id)?.name || t.title}{["starting", "active"].includes(t.status) ? " · Working…" : ""}{t.error ? " · Unavailable" : ""}</button>)}</div>
       {page.hasOlder && <Button variant="ghost" size="sm" onClick={() => void rpc.call("view", { id, before: page.entries[0]?.createdAt, beforeId: page.entries[0]?.id }).then(older => setPage(current => current ? { ...current, entries: [...older.entries, ...current.entries], hasOlder: older.hasOlder } : older), e => setError(message(e)))}>Earlier replies</Button>}
@@ -126,14 +118,18 @@ function ViewDetail({ id }: { id: string }) {
   </div>;
 }
 export function ViewsPage({ subPath }: PluginNavPanelProps) {
-  const { views, error } = useViews(), navigate = useBbNavigate();
+  const navigate = useBbNavigate();
   const id = subPath.split("/")[0];
   if (id && id !== "new") return <ViewDetail key={id} id={id} />;
-  return <PageColumn><div className="mb-6 flex items-center justify-between"><h1 className="text-2xl font-semibold">Views</h1><Button onClick={() => navigate.toPluginPanel("views", { subPath: "new" })}>New view</Button></div><ErrorMessage error={error} />
-    {!views.length && <p className="py-8 text-sm text-muted-foreground">Group bots and threads in one timeline.</p>}
-    <ol>{views.map(v => <li key={v.id}><button type="button" className="flex w-full items-center gap-2 border-b border-border py-3 text-left text-sm hover:bg-state-hover" onClick={() => navigate.toPluginPanel("views", { subPath: v.id })}><Icon name="MessageSquare" className="size-4" /><span className="min-w-0 flex-1 truncate">{v.name}</span>{v.archived && <span className="text-muted-foreground">Archived</span>}</button></li>)}</ol>
-    <ViewEditor open={id === "new"} onClose={() => navigate.toPluginPanel("views")} onSaved={v => navigate.toPluginPanel("views", { subPath: v.id })} />
-  </PageColumn>;
+  if (id === "new") return <ViewEditor open onClose={() => navigate.toPluginPanel("views")} onSaved={v => navigate.toPluginPanel("views", { subPath: v.id })} />;
+  return <ViewCollection />;
+}
+function ViewCollection() {
+  const rpc = useRpc<StudioSchemas["provider"]>();
+  const call = useCallback<ProviderCall>((method, input) => rpc.call(method, input as never) as never, [rpc]);
+  const [version, setVersion] = useState(0);
+  useRealtime("views-changed", () => setVersion(value => value + 1));
+  return <AddOnCollection pluginId={PLUGIN_ID} title="Views" kind={VIEW_KIND.id} call={call} refreshKey={version} />;
 }
 export function FormerChannelRedirect({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();

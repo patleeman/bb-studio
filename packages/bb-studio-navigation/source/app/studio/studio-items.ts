@@ -14,10 +14,11 @@ export const HUB_PANELS = [
   "talk/recordings",
   "studio-tasks/tasks",
   "studio-tables/tables",
+  "bot-teams/views",
 ];
 
-/** Panels that a Studio Sidebar section opens: Views has its own creation action. */
-export const SECTION_PANELS = ["bot-teams/channels", "bot-teams/views"];
+/** Legacy channel links are reached through saved Studio items. */
+export const SECTION_PANELS = ["bot-teams/channels"];
 
 export function studioNavigationItems(
   items: readonly ExperimentalSidebarNavigationItem[],

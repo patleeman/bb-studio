@@ -123,6 +123,7 @@ struct SavedViewScreen: View {
                 updated.entries = old + next.entries
                 if !old.isEmpty { updated.hasOlder = previous.hasOlder }
             }
+            if page == nil, next.view.name == "New view", next.view.members.isEmpty { editing = true }
             page = updated
         } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
     }

@@ -335,6 +335,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
         StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
+        StudioKind(id: "view", label: "View", plural: "Views", symbol: "bubble.left.and.bubble.right", tint: .indigo),
         StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
         StudioKind(id: "board", label: "Board", plural: "Boards", symbol: "rectangle.split.3x1", tint: .green),
         StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
@@ -822,7 +823,7 @@ struct StudioView: View {
         case "artifacts": .artifact(id: item.itemId)
         case "studio-tasks": .task(id: item.itemId)
         case "studio-tables": .table(id: item.itemId)
-        case "bot-teams": .bot(id: item.itemId)
+        case "bot-teams": item.kind == "view" ? .savedView(id: item.itemId) : .bot(id: item.itemId)
         case "studio" where item.kind == "space": item.href.flatMap(Route.init(href:)) ?? .space(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }

@@ -2,6 +2,7 @@ import { test } from "vitest";
 import assert from "node:assert/strict";
 import { z } from "zod";
 import { studioSchemas } from "@bb-studio/kit/contract";
+import { threadViewSchema } from "../view-contract";
 import type { Bot } from "../contract";
 import { botsSignature, registerStudio, type BotActivity } from "../studio-provider";
 
@@ -24,12 +25,18 @@ const bot = (patch: Partial<Bot> = {}): Bot =>
     ...patch,
   }) as Bot;
 
-function setup(bots: Bot[], activity = new Map<string, BotActivity>()) {
+const view = threadViewSchema.parse({ id: "33333333-3333-4333-8333-333333333333", name: "Launch room", members: [], createdAt: 1, updatedAt: 2 });
+function setup(bots: Bot[], activity = new Map<string, BotActivity>(), views = [] as typeof view[]) {
   let handlers: Record<string, (input: unknown) => unknown> = {};
   const bb = { rpc: { register: (_contract: unknown, registered: typeof handlers) => (handlers = registered) } };
   const retired: string[] = [];
   registerStudio(bb as never, studioSchemas(z), {
     bots: () => bots,
+    views: () => views,
+    createView: async () => { const created = { ...view, name: "New view" }; views.push(created); return created; },
+    archiveView: async (id, archived) => { views.find(view => view.id === id)!.archived = archived; },
+    deleteView: async (id) => { views.splice(views.findIndex(view => view.id === id), 1); },
+    readView: async () => "# Launch room\n\nYou: Ready?\n\nReply: Ready.",
     activity: () => activity,
     retire: async (id, value) => void retired.push(`${id}:${value}`),
   });
@@ -78,4 +85,33 @@ test("the change signature ignores activity Studio doesn't show", () => {
   assert.equal(quiet, botsSignature([scout], new Map([[scout.id, { working: false, lastActivityAt: 9 }]])));
   assert.notEqual(quiet, botsSignature([scout], new Map([[scout.id, { working: true, lastActivityAt: 9 }]])));
   assert.notEqual(quiet, botsSignature([bot({ name: "Scout 2" })], new Map()));
+});
+
+test("saved views are Studio items with ordinary view links and lifecycle actions", async () => {
+  const { call } = setup([bot()], new Map(), [{ ...view }]);
+  const info = await call("studio_describe", null);
+  const kind = info.kinds.find((kind: any) => kind.id === "view");
+  assert.deepEqual(kind.create, { mode: "rpc" });
+  assert.equal(kind.mentionProviderId, "views");
+  const { items } = await call("studio_list", null);
+  assert.ok(studioSchemas(z).provider.studio_list.output.parse({ items }));
+  assert.equal(items[1].href, `/plugins/bot-teams/views/${view.id}`);
+  assert.equal(items[1].projectId, null);
+  assert.deepEqual((await call("studio_get", { ids: [view.id] })).items, [items[1]]);
+  // Studio indexes the title itself; the content fallback must not duplicate it.
+  assert.deepEqual((await call("studio_search", { query: "Launch" })).ids, []);
+  assert.match((await call("studio_read", { id: view.id })).content, /Reply: Ready/);
+  assert.deepEqual(await call("studio_archive", { ids: [view.id], archived: true }), { done: [view.id], failed: [] });
+  assert.equal((await call("studio_get", { ids: [view.id] })).items[0].archived, true);
+  assert.deepEqual(await call("studio_delete", { ids: [view.id, bot().id] }), { done: [view.id], failed: [{ id: bot().id, error: "Bots can't be deleted. Archive them instead." }] });
+  assert.equal((await call("studio_get", { ids: [view.id] })).items.length, 0);
+});
+
+test("Studio creates an empty view ready for editing", async () => {
+  const { call } = setup([]);
+  const { item } = await call("studio_create", { kind: "view", projectId: "proj_a" });
+  assert.equal(item.kind, "view");
+  assert.equal(item.title, "New view");
+  assert.equal(item.projectId, null);
+  assert.equal((await call("studio_list", null)).items[0].id, item.id);
 });

@@ -1,8 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { z } from "zod";
 import { excerpt, type SearchHit } from "./search-index";
 
-/** Live sources stay in their owner; Studio never copies thread or channel messages. */
+/** Threads stay in their owner; Studio items use the provider index. */
 export async function externalResults(bb: BbPluginApi, query: string, options: { kinds?: string[]; projectId?: string | null; limit: number }): Promise<SearchHit[]> {
   const words = query.toLocaleLowerCase().match(/[\p{L}\p{N}]+/gu) ?? [];
   const allow = (kind: string) => !options.kinds?.length || options.kinds.includes(kind);
@@ -13,7 +12,5 @@ export async function externalResults(bb: BbPluginApi, query: string, options: {
         snippet: excerpt(matches[0]?.text ?? "", words), href: `/threads/${thread.id}`, projectId: thread.projectId,
         updatedAt: thread.updatedAt, score: matches[0]?.sourceKind === "title" ? 8 : 1,
       }))) : Promise.resolve([] as SearchHit[]);
-  const views = allow("view") && options.projectId === undefined ? bb.sdk.plugins.callRpc({pluginId:"bot-teams",method:"views",input:{} as never,outputSchema:z.array(z.object({id:z.string(),name:z.string(),updatedAt:z.number(),archived:z.boolean()}))}).then(rows=>rows.filter(v=>!v.archived && v.name.toLocaleLowerCase().includes(query.toLocaleLowerCase())).map(v=>({ref:{pluginId:"bot-teams",id:v.id},kind:"view",title:v.name,snippet:excerpt(v.name,words),href:`/plugins/bot-teams/views/${v.id}`,projectId:null,updatedAt:v.updatedAt,score:6}))) : Promise.resolve([] as SearchHit[]);
-  const results = await Promise.all([threads.catch(()=>[] as SearchHit[]),views.catch(()=>[] as SearchHit[])]);
-  return results.flat();
+  return threads.catch(() => [] as SearchHit[]);
 }
