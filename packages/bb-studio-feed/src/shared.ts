@@ -24,6 +24,9 @@ export type RealtimeEvent = { type: "post"; postId: string; story: string | null
 export const EXPLORE_STORY_PREFIX = "explore-";
 export const EXPLORE_PLUGIN_ID = "explore";
 
+/** The line a reply ends with to show a post `feed_post` made, as a card. */
+export const cardLine = (postId: string) => `::${DIRECTIVE}{id="${postId}"}`;
+
 export const postHref = (id: string) => `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(id)}`;
 
 export interface PostDirective {

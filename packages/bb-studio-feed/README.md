@@ -31,34 +31,41 @@ each shows "just now".
 
 ## How agents post
 
-An agent posts by ending its reply with a `::post` line:
+An agent posts with the `feed_post` tool: a title, a Markdown body, and
+optionally a topic, a story key and `urgent`. The post is published at once,
+and the tool returns a card line for it:
 
 ```text
-Service is back to normal as of 9:55. The signal at Fordham was repaired.
-
-::post{title="Harlem Line delays cleared" topic="Commute" story="harlem-line"}
+::post{id="post_1a2b3c4d5e6f7a8b"}
 ```
 
-When the thread goes idle, the reply is published. The body is everything
-before the line. The reply stays where it was written, in the thread or the
-channel, and a card shows the post it made.
+The agent ends its reply with that line, and the reply shows the post as a
+card where it was written, in the thread or the channel. The card shows the
+title, an **Urgent** badge, the topic, which update of a story it is, and
+whether you've read it, with **Open in Feed** and **Mark read**.
 
 Agents post when their task, their automation's prompt, or you ask them to.
 They also post the result of a scheduled or automated run on their own when
 it's worth reading later: a digest, report, alert or finding. A run with
-nothing to say, or one that ends in `[PASS]`, leaves the line out, and nothing
-is posted. To steer an automation's posts, end its prompt with the title,
-topic and story to use. Agents are told to lead with a picture when they have
-one and to link the source first, which the feed shows as a card.
+nothing to say, or one that ends in `[PASS]`, doesn't post. To steer an
+automation's posts, end its prompt with the title, topic and story to use.
+Agents are told to lead with a picture when they have one and to link the
+source first, which the feed shows as a card.
 
 - **`title`** is required. **`topic`** is a short section name.
 - **`story`** groups follow-ups. Posts with the same key are one story. The
   feed shows a story once, by its newest post, with its earlier updates
   underneath.
-- **`priority="urgent"`** notifies your phone.
+- **`urgent`** notifies your phone.
 
-A bot's reply reaches BB twice: in the bot's own thread and in its channel.
-It's still one post. The bot's copy fills in its name and channel.
+### The older post line
+
+Before `feed_post`, an agent posted by ending its reply with
+`::post{title="…" topic="…" story="…"}`: the reply became the post when its
+thread went idle. That still works, so older prompts keep posting, but agents
+are no longer told about it, and it will be removed. A bot's reply reaches BB
+twice, in the bot's own thread and in its channel; with the line, it's still
+one post, and the bot's copy fills in its name and channel.
 
 ## Reading
 
@@ -106,11 +113,12 @@ Updates to one story replace each other on your phone.
 
 ## For agents
 
-Agents get three tools. `feed_list` lists posts and filters by topic, words
-and age. `feed_read` reads a post or a whole story. `feed_edit` corrects a
-post or marks it, or its story, resolved. The **Tell agents how to post**
-setting (on by default) adds the `::post` instructions to new sessions. Turn it
-off and agents stop posting from replies, but they can still read the feed.
+Agents get four tools. `feed_post` publishes a post and returns its card
+line. `feed_list` lists posts and filters by topic, words and age.
+`feed_read` reads a post or a whole story. `feed_edit` corrects a post or
+marks it, or its story, resolved. The **Tell agents how to post** setting (on
+by default) gives new sessions `feed_post` and the instructions for it. Turn it
+off and agents stop posting, but they can still read the feed.
 
 ```sh
 bb feed list [--topic <topic>] [--limit <n>] [--all]

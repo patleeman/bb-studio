@@ -22,12 +22,14 @@ export function PostCard({ attributes, source }: PluginMessageDirectiveProps) {
   const [post, setPost] = useState<PostView | null | undefined>(undefined);
   const [tries, setTries] = useState(0);
 
+  // `::post{id="…"}` names a post feed_post made; an older `::post{title="…"}` line published one itself.
+  const postId = attributes.id;
   const load = useCallback(() => {
-    rpc.call("forDirective", { source }).then(
+    (postId ? rpc.call("post", { postId }) : rpc.call("forDirective", { source })).then(
       (result) => setPost(result.post),
       () => setPost(null),
     );
-  }, [rpc, source]);
+  }, [rpc, source, postId]);
   useEffect(load, [load]);
   useEffect(() => {
     if (post !== null || tries >= RETRIES) return;

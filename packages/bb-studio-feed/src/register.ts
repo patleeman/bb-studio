@@ -14,11 +14,11 @@ import { z } from "zod";
 import type { PostView } from "./contract";
 import { feedInstructions } from "./prompt";
 import { FeedService, type NotifyMode, type Origin } from "./service";
-import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, EXPLORE_PLUGIN_ID, firstLink, parseAttributes, studioRefs, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
+import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, EXPLORE_PLUGIN_ID, cardLine, firstLink, parseAttributes, studioRefs, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS, type PostRow } from "./store";
 import { fetchPreview } from "./unfurl";
 
-export const FEED_TOOLS = ["feed_list", "feed_read", "feed_edit"];
+export const FEED_TOOLS = ["feed_post", "feed_list", "feed_read", "feed_edit"];
 
 const TEAMS_PLUGIN_ID = "bot-teams";
 const MOBILE_PLUGIN_ID = "mobile";
@@ -305,6 +305,41 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       .join("\n");
 
   bb.agents.registerTool({
+    name: "feed_post",
+    description:
+      "Publish a post to Studio Feed, which the user reads on desktop and phone. Returns the post's card line: end your reply with it so the post shows where you wrote it. " +
+      "Use it for a result the user would want to find later or act on, never for chat, status or nothing new.",
+    presentation: { label: { pending: "Posting to the feed", completed: "Posted to the feed" } },
+    parameters: z.object({
+      title: z.string().trim().min(1).max(MAX_TITLE).describe("What happened, as a headline."),
+      body: z
+        .string()
+        .max(MAX_BODY)
+        .describe("Markdown: a short lede, then details. Link the source first (shown as a card); lead with a picture of the subject when there is one; link pages or artifacts you made (previewed)."),
+      topic: z.string().trim().max(MAX_TOPIC).optional().describe('A short section name, e.g. "Commute".'),
+      story: z.string().max(MAX_STORY).optional().describe("A stable key for something you report on repeatedly; reuse it so follow-ups group as one story."),
+      urgent: z.boolean().optional().describe("Only when the user must act or know now: it notifies their phone."),
+    }),
+    async execute({ title, body, topic, story, urgent }, context) {
+      const where = await origin(context.threadId).catch(() => null);
+      const row = await service.create({
+        title,
+        body,
+        topic: topic?.trim() || null,
+        story: storyKey(story),
+        priority: urgent ? "urgent" : "normal",
+        origin: where ?? { author: "Agent", botId: null, threadId: context.threadId, projectId: context.projectId ?? null, channelId: null, channelName: null },
+      });
+      const updates = row.story ? store.story(row.story).length : 1;
+      return [
+        `Posted ${row.id}${updates > 1 ? ` (update ${updates} to story ${row.story})` : ""}.`,
+        "End your reply with this line on its own, so the post shows as a card there:",
+        cardLine(row.id),
+      ].join("\n");
+    },
+  });
+
+  bb.agents.registerTool({
     name: "feed_list",
     description:
       "List Studio Feed posts, newest first (a story once, by its newest post). Use it to see what agents have reported, or before posting an update to a story.",
@@ -440,6 +475,6 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     rpc,
     cli,
     /** What `bb.agents.configure` gives a thread: the tools, and the instructions when the setting is on. */
-    configure: (enabled: boolean) => ({ tools: FEED_TOOLS, skills: [], ...(enabled ? { instructions } : {}) }),
+    configure: (enabled: boolean) => ({ tools: enabled ? FEED_TOOLS : FEED_TOOLS.filter((tool) => tool !== "feed_post"), skills: [], ...(enabled ? { instructions } : {}) }),
   };
 }

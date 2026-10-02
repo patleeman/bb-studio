@@ -1,5 +1,5 @@
-// What every agent is told about the feed: how to publish (end the reply
-// with a `::post` line) and that it can read and edit what's there.
+// What every agent is told about the feed: post with feed_post, end the reply
+// with the card line it returns, and read or edit what's there.
 import { DIRECTIVE } from "./shared";
 
 /** `bb.agents.configure` truncates instructions past this. */
@@ -7,13 +7,11 @@ export const INSTRUCTIONS_LIMIT = 4096;
 
 export function feedInstructions(): string {
   return [
-    "Studio Feed is on: one feed of what agents report, which the user reads on desktop and phone.",
-    "Publish to it when your task or automation prompt asks you to, or the user asks. Also publish, unasked, the result of a scheduled or automated run that the user would want to read later: a digest, report, alert or finding. Never post routine replies, status chatter, \"nothing new\" or a run that ends in [PASS].",
-    "Make it rich: it's read like a news reader. Start with a picture when you have one (a Markdown image of the subject, from the source). Link the source page first: the feed shows it as a card, and its preview image stands in for a missing picture. Use a list or small table for figures. Link a page or artifact you made (its /plugins/… path or @mention): the feed shows a preview of it.",
-    `To publish, make the post your final reply: the post's Markdown body (a short lede, then details, sources as Markdown links), then on its own line:`,
-    `::${DIRECTIVE}{title="Harlem Line delays cleared" topic="Commute" story="harlem-line"}`,
-    'Rules: title is required, under 100 characters, and says what happened. topic is a short section name (optional). story is a stable key for something you report on repeatedly; reuse it for follow-ups so they group as one story with updates. Add priority="urgent" only when the user must act or know now: it notifies their phone. Don\'t use double quotes inside a value.',
-    "Post your own reply with this line, not with `bb feed post`: the line shows the post as a card where you wrote it. Put the line after the body, never inside a code block. If your reply also ends with ::explore or ::reactions lines, put the post line before them. The reply is shown in your thread or channel with the post card.",
-    "Use feed_list and feed_read to see what's been posted (check a story before posting an update to it), and feed_edit to correct a post or mark a story resolved.",
+    "Studio Feed is on: one feed of what agents report, which the user reads on desktop and phone, like a news reader.",
+    "Post to it with the feed_post tool when your task or automation prompt asks you to, or the user asks. Also post, unasked, the result of a scheduled or automated run that the user would want to read later: a digest, report, alert or finding. Never post routine replies, status chatter, \"nothing new\" or a run that ends in [PASS].",
+    "Make it rich: start with a picture when you have one (a Markdown image of the subject, from the source). Link the source page first: the feed shows it as a card, and its preview image stands in for a missing picture. Use a list or small table for figures. Link a page or artifact you made (its /plugins/… path or @mention): the feed shows a preview of it.",
+    "title says what happened, under 100 characters. topic is a short section name. story is a stable key for something you report on repeatedly; reuse it for follow-ups so they group as one story with updates (check with feed_list first). Set urgent only when the user must act or know now: it notifies their phone.",
+    `feed_post returns a line like ::${DIRECTIVE}{id="post_…"}. End your reply with it, on its own line and outside code blocks, so the post shows as a card in your thread or channel; put it before any ::explore or ::reactions line. Post with the tool, not \`bb feed post\`.`,
+    "Use feed_list and feed_read to see what's been posted, and feed_edit to correct a post or mark a story resolved.",
   ].join("\n");
 }

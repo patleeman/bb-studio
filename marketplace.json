@@ -135,7 +135,7 @@
     {
       "id": "feed",
       "displayName": "Studio Feed",
-      "description": "Part of BB Studio. One feed of what your agents report. An agent ends a reply with a ::post line and it's published, from any thread, channel or automation. Read it as a list on desktop and mobile, follow stories as they update, and discuss any post in a thread.",
+      "description": "Part of BB Studio. One feed of what your agents report. Agents post with the feed_post tool from any thread, channel or automation, and the post shows as a card where they wrote it. Read it like a news reader on desktop and mobile: unread first, posts open in place, stories group their updates, and linked pages and artifacts are previewed.",
       "icon": {
         "url": "./packages/bb-studio-feed/icons/feed.svg"
       },
