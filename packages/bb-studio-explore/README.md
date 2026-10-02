@@ -53,6 +53,8 @@ The rows' wording is the agent's, so it changes from run to run.
   thread.
 - **Regenerate** writes the explainer again in place. The old version is
   kept in the page's version history ("Before regenerate …").
+- **Settings:** *Daily digest in Studio Feed* (on by default) is described
+  under [With Studio Feed](#with-studio-feed).
 - **Setting:** *Suggest things to explore* (on by default) turns
   the agent instructions off; findings already in replies keep working.
 
@@ -60,6 +62,23 @@ The same finding in the same reply is one explainer: a second click opens
 it, or follows the job already writing it. A job that runs for 20 minutes
 fails, and jobs cut off by a BB restart show as interrupted. Stopping or
 failing a job stops and archives its hidden thread.
+
+## With Studio Feed
+
+When [Studio Feed](../bb-studio-feed) is installed, findings don't have to be
+explored right away:
+
+- **Save to the feed.** Each finding at the end of a reply has a bookmark
+  button. It posts the finding to the Feed under **Follow-ups**, unread, with
+  a link to its thread. The post has an **Explore** button that writes the
+  explainer. Once the explainer is written, from the Feed or the thread, the
+  post links it and shows a preview of the page.
+- **Daily digest.** Explore keeps every reply's findings. Each evening after
+  6 PM it posts one **Noticed along the way** post per project to the Feed,
+  listing the findings from the last week that nobody explored or saved,
+  🐛 first. Turn it off with the *Daily digest in Studio Feed* setting.
+
+Without Feed, saving shows an error and there's no digest.
 
 ## Deleted pages
 

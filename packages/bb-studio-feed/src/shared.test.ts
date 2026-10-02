@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyImage, firstLink, lede, parsePost, plainText, sourceDomains, storyKey } from "./shared";
+import { bodyImage, firstLink, lede, parsePost, plainText, sourceDomains, storyKey, studioRefs } from "./shared";
 
 describe("parsePost", () => {
   it("reads the post line that ends a reply", () => {
@@ -76,5 +76,15 @@ describe("helpers", () => {
   it("lists link domains once", () => {
     expect(sourceDomains("![p](https://upload.wikimedia.org/p.jpg) [a](https://a.com)")).toEqual(["a.com"]);
     expect(sourceDomains("[a](https://www.nytimes.com/x) [b](https://nytimes.com/y) [c](http://mta.info)")).toEqual(["nytimes.com", "mta.info"]);
+  });
+
+  it("finds the Studio items a post links to", () => {
+    const body = [
+      "Wrote [the plan](http://127.0.0.1:38886/plugins/pages/pages/pg_0123456789ab) and @[Report](item:artifacts:art_1).",
+      "Also [same plan](/plugins/pages/pages/pg_0123456789ab), @[Notes](page:pg_aaaaaaaaaaaa), [feed](/plugins/feed/feed/p1) and [web](https://a.com/x).",
+    ].join("\n");
+    expect(studioRefs(body)).toEqual([{ path: "/plugins/pages/pages/pg_0123456789ab" }, { pluginId: "artifacts", id: "art_1" }, { pluginId: "pages", id: "pg_aaaaaaaaaaaa" }]);
+    expect(firstLink(body)).toBe("https://a.com/x");
+    expect(sourceDomains(body)).toEqual(["a.com"]);
   });
 });

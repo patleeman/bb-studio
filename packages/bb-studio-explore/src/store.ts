@@ -42,6 +42,26 @@ export type JobRow = {
   updated_at: number;
 };
 
+/** A finding an agent ended a reply with, kept for the Feed: saved there, or listed in the daily digest. */
+export type FindingRow = {
+  id: string;
+  /** The explainer key it would have. */
+  key: string;
+  thread_id: string;
+  message_id: string;
+  turn_id: string | null;
+  emoji: string;
+  label: string;
+  project_id: string | null;
+  thread_title: string;
+  created_at: number;
+  /** The Feed post it was saved as. */
+  post_id: string | null;
+  /** The explainer page that post links to. */
+  linked_page_id: string | null;
+  digested_at: number | null;
+};
+
 export type JobPatch = Partial<Pick<JobRow, "status" | "label" | "detail" | "progress" | "worker_thread_id" | "error">>;
 
 /** The same finding in the same message (under the same parent) is one explainer. */
@@ -110,6 +130,24 @@ export const MIGRATIONS = [
      page_id TEXT NOT NULL,
      created_at INTEGER NOT NULL
    )`,
+  `CREATE TABLE IF NOT EXISTS explore_findings (
+     id TEXT PRIMARY KEY,
+     key TEXT NOT NULL UNIQUE,
+     thread_id TEXT NOT NULL,
+     message_id TEXT NOT NULL,
+     turn_id TEXT,
+     emoji TEXT NOT NULL,
+     label TEXT NOT NULL,
+     project_id TEXT,
+     thread_title TEXT NOT NULL DEFAULT '',
+     created_at INTEGER NOT NULL,
+     post_id TEXT,
+     linked_page_id TEXT,
+     digested_at INTEGER
+   );
+   CREATE INDEX IF NOT EXISTS explore_findings_digest ON explore_findings (digested_at, created_at);
+   CREATE INDEX IF NOT EXISTS explore_findings_post ON explore_findings (post_id);
+   CREATE TABLE IF NOT EXISTS explore_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);`,
 ];
 
 export class ExploreStore {
@@ -282,6 +320,63 @@ export class ExploreStore {
   }
 
   // ----- the "Explore" parent page per project -----
+
+  // ----- findings, for the Feed -----
+
+  /** Keeps a finding; one already kept is returned as it is. */
+  addFinding(input: { threadId: string; messageId: string; turnId: string | null; emoji: string; label: string; projectId: string | null; threadTitle: string }): FindingRow {
+    const key = explainerKey({ threadId: input.threadId, messageId: input.messageId, label: input.label });
+    this.db
+      .prepare(
+        `INSERT INTO explore_findings (id, key, thread_id, message_id, turn_id, emoji, label, project_id, thread_title, created_at)
+         VALUES (@id, @key, @threadId, @messageId, @turnId, @emoji, @label, @projectId, @threadTitle, @now)
+         ON CONFLICT(key) DO NOTHING`,
+      )
+      .run({ ...input, id: newId("fnd"), key, now: this.now() });
+    return this.findingByKey(key)!;
+  }
+
+  findingByKey(key: string): FindingRow | undefined {
+    return this.db.prepare("SELECT * FROM explore_findings WHERE key = ?").get(key) as FindingRow | undefined;
+  }
+
+  findingByPost(postId: string): FindingRow | undefined {
+    return this.db.prepare("SELECT * FROM explore_findings WHERE post_id = ?").get(postId) as FindingRow | undefined;
+  }
+
+  findingsForMessage(threadId: string, messageId: string): FindingRow[] {
+    return this.db.prepare("SELECT * FROM explore_findings WHERE thread_id = ? AND message_id = ?").all(threadId, messageId) as FindingRow[];
+  }
+
+  setFindingPost(id: string, postId: string | null, linkedPageId: string | null): void {
+    this.db.prepare("UPDATE explore_findings SET post_id = ?, linked_page_id = ? WHERE id = ?").run(postId, linkedPageId, id);
+  }
+
+  /** Findings for the digest: not digested, not saved, not explored, since `since`; oldest first. */
+  undigested(since: number): FindingRow[] {
+    return this.db
+      .prepare(
+        `SELECT f.* FROM explore_findings f
+         WHERE f.digested_at IS NULL AND f.post_id IS NULL AND f.created_at >= ?
+           AND NOT EXISTS (SELECT 1 FROM explore_explainers e WHERE e.key = f.key)
+         ORDER BY f.created_at`,
+      )
+      .all(since) as FindingRow[];
+  }
+
+  markDigested(ids: readonly string[]): void {
+    const mark = this.db.prepare("UPDATE explore_findings SET digested_at = ? WHERE id = ?");
+    const at = this.now();
+    this.db.transaction(() => ids.forEach((id) => mark.run(at, id)))();
+  }
+
+  meta(key: string): string | null {
+    return (this.db.prepare("SELECT value FROM explore_meta WHERE key = ?").get(key) as { value: string } | undefined)?.value ?? null;
+  }
+
+  setMeta(key: string, value: string): void {
+    this.db.prepare("INSERT INTO explore_meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value").run(key, value);
+  }
 
   parentPage(projectId: string | null): string | null {
     const row = this.db.prepare("SELECT page_id FROM explore_parents WHERE project_key = ?").get(projectId ?? "") as { page_id: string } | undefined;

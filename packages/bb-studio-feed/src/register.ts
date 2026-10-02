@@ -7,13 +7,14 @@
 //   - It adds the RPC handlers, the feed_* tools, the instructions for
 //     `bb.agents.configure`, and `bb feed …`.
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
+import { STUDIO_PLUGIN_ID, studioSchemas } from "@bb-studio/kit/contract";
 import { relativeTime } from "@bb-studio/kit/format";
 import type { BbPluginApi, JsonValue, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { PostView } from "./contract";
 import { feedInstructions } from "./prompt";
 import { FeedService, type NotifyMode, type Origin } from "./service";
-import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, firstLink, parseAttributes, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
+import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, EXPLORE_PLUGIN_ID, firstLink, parseAttributes, studioRefs, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS, type PostRow } from "./store";
 import { fetchPreview } from "./unfurl";
 
@@ -40,6 +41,15 @@ const teamsList = z.object({
   rooms: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 const threadBots = z.array(z.object({ threadId: z.string(), botId: z.string() }));
+const studio = studioSchemas(z);
+const ARTIFACTS_PLUGIN_ID = "artifacts";
+const artifactGet = z.object({
+  artifact: z.object({ id: z.string(), version: z.object({ id: z.string(), type: z.enum(["image", "html", "markdown", "code", "text", "pdf", "other"]) }) }).nullable(),
+});
+/** How much of a page or text artifact a post shows. */
+const MAX_EMBED_TEXT = 6_000;
+/** How long an item's preview is trusted before asking its add-on again. */
+const EMBED_CACHE_MS = 60_000;
 
 export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => NotifyMode }) {
   const db = bb.storage.database();
@@ -159,6 +169,54 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     return title;
   }
 
+  // Studio items a post links to: found through Studio, read through their
+  // add-on. Each is cached briefly; one that can't be found is left out.
+  type Embed = PostView["embeds"][number];
+  const embedCache = new Map<string, { at: number; embed: Promise<Embed | null> }>();
+  async function readEmbed(ref: ReturnType<typeof studioRefs>[number]): Promise<Embed | null> {
+    const found = await callRpc(STUDIO_PLUGIN_ID, "itemAt", ref, studio.itemAt.output);
+    const item = found.item;
+    if (!item || item.archived) return null;
+    let content: Embed["content"] = null;
+    if (item.pluginId === ARTIFACTS_PLUGIN_ID) {
+      const { artifact } = await callRpc(ARTIFACTS_PLUGIN_ID, "get", { id: item.id }, artifactGet);
+      const type = artifact?.version.type;
+      if (artifact && (type === "image" || type === "html" || type === "pdf")) {
+        const url = `/api/v1/plugins/artifacts/http/content?artifact=${encodeURIComponent(artifact.id)}&version=${encodeURIComponent(artifact.version.id)}`;
+        content = { type, text: null, url };
+      }
+    }
+    if (!content) {
+      const read = await callRpc(item.pluginId, "studio_read", { id: item.id, format: "markdown" }, studio.provider.studio_read.output).catch(() => ({ content: null }));
+      const text = read.content?.trim();
+      if (text) content = { type: "markdown", text: text.length > MAX_EMBED_TEXT ? `${text.slice(0, MAX_EMBED_TEXT)}\n…` : text, url: null };
+    }
+    return {
+      pluginId: item.pluginId,
+      id: item.id,
+      kind: found.kind?.label ?? item.kind,
+      title: item.title.trim() || "Untitled",
+      icon: item.icon,
+      thumbnailUrl: item.thumbnailUrl,
+      href: item.href,
+      updatedAt: item.updatedAt,
+      content,
+    };
+  }
+  async function embeds(row: PostRow): Promise<Embed[]> {
+    const found = await Promise.all(
+      studioRefs(row.body).map((ref) => {
+        const key = JSON.stringify(ref);
+        const cached = embedCache.get(key);
+        if (cached && Date.now() - cached.at < EMBED_CACHE_MS) return cached.embed;
+        const embed = readEmbed(ref).catch(() => null);
+        embedCache.set(key, { at: Date.now(), embed });
+        return embed;
+      }),
+    );
+    return found.filter((embed): embed is Embed => embed !== null);
+  }
+
   /** Posts for the reader: with a picture, link card, the bot's avatar and the thread's title. */
   async function views(rows: PostRow[]): Promise<PostView[]> {
     const directory = rows.some((row) => row.bot_id) ? await teamsDirectory() : null;
@@ -166,10 +224,13 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       rows.map(async (row) => {
         const post = service.view(row);
         const linked = link(row);
+        const items = await embeds(row);
+        const itemPicture = items.find((each) => each.content?.type === "image")?.content?.url ?? items.find((each) => each.thumbnailUrl)?.thumbnailUrl ?? null;
         return {
           ...post,
-          image: post.image ?? (linked?.image || null),
+          image: post.image ?? (linked?.image || itemPicture),
           link: linked,
+          embeds: items,
           avatar: (row.bot_id && directory?.avatars.get(row.bot_id)) || null,
           threadTitle: post.threadTitle ?? (row.thread_id ? await threadTitle(row.thread_id) : null),
         };
@@ -196,6 +257,22 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       const row = service.edit(postId, { ...patch, ...(patch.topic === "" ? { topic: null } : {}), resolved }, "you");
       return { post: await one(row) };
     },
+    publish: async (input: { title: string; body: string; topic?: string | null; story?: string | null; priority?: (typeof PRIORITIES)[number]; author: string; threadId?: string | null; projectId?: string | null }) => {
+      const row = await service.create({
+        title: input.title,
+        body: input.body,
+        topic: input.topic?.trim() || null,
+        story: storyKey(input.story),
+        priority: input.priority ?? "normal",
+        origin: { author: input.author, botId: null, threadId: input.threadId ?? "", projectId: input.projectId ?? null, channelId: null, channelName: null },
+      });
+      return { post: (await one(row))! };
+    },
+    explore: ({ postId }: { postId: string }) =>
+      callRpc(EXPLORE_PLUGIN_ID, "exploreFeedPost", { postId }, z.object({ status: z.enum(["started", "ready", "unavailable"]), href: z.string().nullable() })).catch(() => ({
+        status: "unavailable" as const,
+        href: null,
+      })),
     read: async ({ postId, read }: { postId: string; read: boolean }) => ({ post: await one(service.markRead(postId, read)) }),
     remove: ({ postId }: { postId: string }) => ({ removed: service.remove(postId) }),
     seen: ({ at }: { at?: number }) => ({ lastSeenAt: service.seen(at) }),

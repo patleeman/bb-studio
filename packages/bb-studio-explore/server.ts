@@ -8,8 +8,6 @@ import { EXPLORE_USAGE, registerExplore } from "./src/register";
 import { isExploreWorker } from "./src/worker";
 
 export default async function plugin(bb: BbPluginApi) {
-  const explore = registerExplore(bb);
-
   const settings = bb.settings.define({
     explore: {
       type: "boolean",
@@ -18,12 +16,22 @@ export default async function plugin(bb: BbPluginApi) {
         "Agents end answers that involved reading code with a few things they noticed along the way. Click one to get a page explaining it. Applies to agent sessions started after the change.",
       default: true,
     },
+    feedDigest: {
+      type: "boolean",
+      label: "Daily digest in Studio Feed",
+      description: "Each evening, post what agents noticed that day and nobody explored or saved: one post per project. Needs Studio Feed.",
+      default: true,
+    },
   });
-  // `bb.agents.configure` is synchronous, so keep the latest value in memory.
-  let enabled = (await settings.get()).explore !== false;
+  // `bb.agents.configure` is synchronous, so keep the latest values in memory.
+  const initial = await settings.get();
+  let enabled = initial.explore !== false;
+  let feedDigest = initial.feedDigest !== false;
   settings.onChange((next) => {
     enabled = next.explore !== false;
+    feedDigest = next.feedDigest !== false;
   });
+  const explore = registerExplore(bb, { feedDigest: () => feedDigest });
 
   bb.rpc.register(rpcContract, explore.rpc);
 

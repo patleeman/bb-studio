@@ -22,6 +22,25 @@ export const postSchema = z.object({
   avatar: z.string().nullable(),
   /** The page the body links to first, with its preview when it has one. */
   link: z.object({ url: z.string(), domain: z.string(), title: z.string(), description: z.string(), image: z.string() }).nullable(),
+  /** Studio items the body links to (pages, artifacts, drawings…), with what they show inline. */
+  embeds: z.array(
+    z.object({
+      pluginId: z.string(),
+      id: z.string(),
+      /** "Page", "Artifact". */
+      kind: z.string(),
+      title: z.string(),
+      icon: z.string().nullable(),
+      thumbnailUrl: z.string().nullable(),
+      /** App path that opens it. */
+      href: z.string(),
+      updatedAt: z.number(),
+      /** Markdown for a page or a text artifact; a URL for an image, HTML or PDF artifact. */
+      content: z.object({ type: z.enum(["markdown", "image", "html", "pdf"]), text: z.string().nullable(), url: z.string().nullable() }).nullable(),
+    }),
+  ),
+  /** A finding Studio Explore saved here: Explore can write a page explaining it. */
+  explorable: z.boolean(),
   /** What the thread it came from is called: "#channel", or the thread's title. */
   threadTitle: z.string().nullable(),
   read: z.boolean(),
@@ -83,6 +102,25 @@ export const rpcContract = defineRpcContract({
   topics: {
     input: z.object({}),
     output: z.object({ topics: z.array(z.object({ topic: z.string(), posts: z.number() })) }),
+  },
+  /** A post from another plugin, such as Studio Explore. */
+  publish: {
+    input: z.object({
+      title: z.string().trim().min(1).max(MAX_TITLE),
+      body: z.string().max(MAX_BODY),
+      topic: z.string().trim().max(MAX_TOPIC).nullable().optional(),
+      story: z.string().max(MAX_STORY).nullable().optional(),
+      priority: z.enum(PRIORITIES).optional(),
+      author: z.string().trim().min(1).max(80),
+      threadId: z.string().max(200).nullable().optional(),
+      projectId: z.string().max(200).nullable().optional(),
+    }),
+    output: z.object({ post: postSchema }),
+  },
+  /** Asks Studio Explore to write a page explaining a finding it saved here; the post links it when it's done. */
+  explore: {
+    input: z.object({ postId }),
+    output: z.object({ status: z.enum(["started", "ready", "unavailable"]), href: z.string().nullable() }),
   },
   edit: {
     input: z.object({

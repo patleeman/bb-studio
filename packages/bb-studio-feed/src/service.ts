@@ -3,7 +3,7 @@
 // notification for an urgent post or a story update. BB specifics (threads,
 // Teams, phones) come in as deps, so this is testable without a host.
 import type { PostView } from "./contract";
-import { bodyImage, lede, parsePost, postHref, sourceDomains, type ParsedPost, type Priority, type RealtimeEvent } from "./shared";
+import { EXPLORE_STORY_PREFIX, bodyImage, lede, parsePost, postHref, sourceDomains, type ParsedPost, type Priority, type RealtimeEvent } from "./shared";
 import { contentKey, directiveKey, FeedStore, type ListedRow, type PostPatch, type PostRow } from "./store";
 
 /** Where a reply came from. */
@@ -57,6 +57,8 @@ export function view(row: PostRow | ListedRow, storyPosts?: number): PostView {
     image: bodyImage(row.body),
     avatar: null,
     link: null,
+    embeds: [],
+    explorable: row.story?.startsWith(EXPLORE_STORY_PREFIX) ?? false,
     threadTitle: row.channel_name ? `#${row.channel_name}` : null,
     read: row.read_at !== null,
     topic: row.topic,

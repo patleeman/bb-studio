@@ -20,6 +20,10 @@ export const MAX_BODY = 20_000;
 /** A post or a story changed. */
 export type RealtimeEvent = { type: "post"; postId: string; story: string | null } | { type: "removed"; postId: string } | { type: "seen" };
 
+/** Stories Studio Explore posts a saved finding under; the reader offers to explore them. */
+export const EXPLORE_STORY_PREFIX = "explore-";
+export const EXPLORE_PLUGIN_ID = "explore";
+
 export const postHref = (id: string) => `/plugins/${PLUGIN_ID}/${PANEL_PATH}/${encodeURIComponent(id)}`;
 
 export interface PostDirective {
@@ -173,16 +177,68 @@ export function bodyImage(markdown: string): string | null {
   return /!\[[^\]]*\]\((https?:\/\/[^)\s]+)/.exec(markdown)?.[1] ?? null;
 }
 
-/** The first page a post's body links to, whose preview picture can stand for the post. */
+/** The first page a post's body links to, whose preview picture can stand for the post. BB's own links are previews of their own. */
 export function firstLink(markdown: string): string | null {
   const text = markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, " ");
-  return /\[[^\]]*\]\((https?:\/\/[^)\s]+)\)|<?(https?:\/\/[^\s>)]+)/.exec(text)?.slice(1).find(Boolean) ?? null;
+  for (const match of text.matchAll(/\[[^\]]*\]\((https?:\/\/[^)\s]+)\)|<?(https?:\/\/[^\s>)]+)/g)) {
+    const url = match.slice(1).find(Boolean)!;
+    if (!itemPath(url)) return url;
+  }
+  return null;
+}
+
+/** A Studio item a post points at: by its app path, or by plugin and id. */
+export type StudioRef = { path: string } | { pluginId: string; id: string };
+
+const ITEM_PATH = /^\/plugins\/([a-z0-9-]+)\/[a-z0-9-]+\/[^\s?#]+/;
+
+/** The app path in a BB link, absolute (any host) or relative; null for anything else and for the feed's own links. */
+function itemPath(url: string): string | null {
+  let path = url;
+  if (/^https?:\/\//.test(url)) {
+    try {
+      path = new URL(url).pathname;
+    } catch {
+      return null;
+    }
+  }
+  const match = ITEM_PATH.exec(path);
+  return match && match[1] !== PLUGIN_ID ? match[0] : null;
+}
+
+/**
+ * The Studio items a post links to, in order, at most `max`: links to their
+ * app paths (`/plugins/pages/pages/pg_…`, absolute or relative) and mentions
+ * (`@[Title](page:pg_…)`, `@[Title](item:artifacts:art_…)`).
+ */
+export function studioRefs(markdown: string, max = 3): StudioRef[] {
+  const refs: StudioRef[] = [];
+  const seen = new Set<string>();
+  const add = (key: string, ref: StudioRef) => {
+    if (seen.has(key) || refs.length >= max) return;
+    seen.add(key);
+    refs.push(ref);
+  };
+  const text = markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, " ");
+  for (const match of text.matchAll(/\]\(([^)\s]+)\)|(https?:\/\/[^\s>)]+)/g)) {
+    const target = (match[1] ?? match[2])!;
+    const mention = /^(?:page:(pg_[A-Za-z0-9]+)|item:([a-z0-9-]+):([^\s]+))$/.exec(target);
+    if (mention) {
+      const ref = mention[1] ? { pluginId: "pages", id: mention[1] } : { pluginId: mention[2]!, id: decodeURIComponent(mention[3]!) };
+      add(`${ref.pluginId}:${ref.id}`, ref);
+      continue;
+    }
+    const path = itemPath(target);
+    if (path) add(path, { path });
+  }
+  return refs;
 }
 
 /** The link domains in a post's body, for the reader's "from" line. */
 export function sourceDomains(markdown: string, max = 3): string[] {
   const domains: string[] = [];
   for (const [, url] of markdown.replace(/!\[[^\]]*\]\([^)]*\)/g, " ").matchAll(/\]\((https?:\/\/[^)\s]+)\)/g)) {
+    if (itemPath(url!)) continue;
     try {
       const host = new URL(url!).hostname.replace(/^www\./, "");
       if (!domains.includes(host)) domains.push(host);

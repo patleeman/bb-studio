@@ -5,7 +5,7 @@
 // or starts a new thread. A rail lists what needs you and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, OUTLINE_BUTTON, PageColumn, cn } from "@bb-studio/kit/app";
+import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, OUTLINE_BUTTON, PageColumn, cn, openAppPath } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -387,6 +387,7 @@ function PostActions({ post, onRead, onRemoved, className }: { post: PostView; o
   const discuss = useDiscuss();
   return (
     <div className={cn("flex flex-wrap items-center gap-2", className)}>
+      {post.explorable && !post.embeds.length ? <ExploreButton post={post} /> : null}
       {post.threadId ? (
         <button type="button" className={cn(OUTLINE_BUTTON, "max-w-80")} onClick={() => discuss.openSource(post)}>
           <Icon name="MessageSquare" /> <span className="truncate">{post.threadTitle ?? "Open thread"}</span>
@@ -405,17 +406,96 @@ function PostActions({ post, onRead, onRemoved, className }: { post: PostView; o
   );
 }
 
-/** The whole post: picture, body, link card, and the story's earlier updates. */
+/** A finding Studio Explore saved: write the page explaining it. The post links the page when it's done. */
+function ExploreButton({ post }: { post: PostView }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const [state, setState] = useState<"idle" | "working" | "unavailable">("idle");
+  const explore = () => {
+    setState("working");
+    rpc.call("explore", { postId: post.id }).then(
+      (result) => {
+        if (result.status === "ready" && result.href) openAppPath(result.href);
+        setState(result.status === "unavailable" ? "unavailable" : result.status === "ready" ? "idle" : "working");
+      },
+      () => setState("unavailable"),
+    );
+  };
+  return (
+    <button
+      type="button"
+      className={OUTLINE_BUTTON}
+      disabled={state !== "idle"}
+      title={state === "unavailable" ? "Studio Explore isn't installed or couldn't find this finding" : "Write a page explaining this"}
+      onClick={explore}
+    >
+      <Icon name={state === "working" ? "Loader2" : "Compass"} className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
+      {state === "working" ? "Exploring…" : state === "unavailable" ? "Can't explore" : "Explore"}
+    </button>
+  );
+}
+
+/** The whole post: picture, body, the Studio items and page it links to, and the story's earlier updates. */
 function PostContent({ post }: { post: PostView }) {
-  // A picture in the body shows where it is; a linked page's shows on top.
-  const linkedPicture = post.image && !post.body.includes(post.image) ? post.image : null;
+  // A picture in the body shows where it is; a linked web page's shows on top. A Studio item's shows in its preview.
+  const linkedPicture = post.image && post.image === post.link?.image && !post.body.includes(post.image) ? post.image : null;
   return (
     <>
       <Picture src={linkedPicture} className="mb-4 max-h-80 w-full rounded-lg" />
       {post.body ? <Markdown content={post.body} className="text-[15px] leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-[15px] [&_p]:text-[15px]" /> : null}
+      {post.embeds.map((embed) => (
+        <ItemPreview key={`${embed.pluginId}:${embed.id}`} embed={embed} />
+      ))}
       {post.link?.title ? <LinkCard link={post.link} /> : null}
       <EarlierUpdates post={post} />
     </>
+  );
+}
+
+/** A page, artifact or other Studio item the post links to, shown in the post. */
+function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
+  const { content } = embed;
+  // Long text is cut to a few paragraphs until asked for.
+  const long = content?.type === "markdown" && (content.text?.length ?? 0) > 900;
+  const [more, setMore] = useState(!long);
+  return (
+    <section aria-label={`${embed.kind}: ${embed.title}`} className="mt-4 overflow-hidden rounded-lg border border-border/70 bg-background">
+      <header className="flex items-center gap-2 border-b border-border/60 py-1.5 pr-1.5 pl-3">
+        {embed.icon ? <span aria-hidden>{embed.icon}</span> : <Icon name={embed.pluginId === "artifacts" ? "FileCode2" : "FileText"} className="size-4 text-muted-foreground" />}
+        <span className="min-w-0 truncate text-sm font-semibold">{embed.title}</span>
+        <span className="shrink-0 text-xs text-muted-foreground">
+          {embed.kind} · {relativeTime(embed.updatedAt)}
+        </span>
+        <button type="button" className={cn(GHOST_BUTTON, "ml-auto shrink-0")} onClick={() => openAppPath(embed.href)}>
+          Open <Icon name="ArrowUpRight" />
+        </button>
+      </header>
+      {content?.type === "markdown" && content.text ? (
+        <div className="relative">
+          <div className={cn("px-4 py-3", !more && "max-h-72 overflow-hidden")}>
+            <Markdown content={content.text} className="text-sm leading-relaxed [&_img]:max-h-64 [&_img]:rounded-md [&_li]:text-sm [&_p]:text-sm" />
+          </div>
+          {more ? null : (
+            <div className="absolute inset-x-0 bottom-0 flex h-20 items-end justify-center bg-gradient-to-t from-background to-transparent pb-2">
+              <button type="button" className={cn(OUTLINE_BUTTON, "bg-background")} onClick={() => setMore(true)}>
+                Show more
+              </button>
+            </div>
+          )}
+        </div>
+      ) : content?.type === "image" && content.url ? (
+        <img src={content.url} alt={embed.title} loading="lazy" className="max-h-96 w-full bg-muted object-contain" />
+      ) : (content?.type === "html" || content?.type === "pdf") && content.url ? (
+        <iframe
+          src={content.url}
+          title={embed.title}
+          loading="lazy"
+          sandbox={content.type === "html" ? "allow-scripts" : undefined}
+          className="h-96 w-full bg-white"
+        />
+      ) : embed.thumbnailUrl ? (
+        <img src={embed.thumbnailUrl} alt="" loading="lazy" className="max-h-64 w-full bg-muted object-contain" />
+      ) : null}
+    </section>
   );
 }
 

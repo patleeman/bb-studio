@@ -66,6 +66,21 @@ export const rpcContract = defineRpcContract({
     }),
     output: z.object({ explainer: explainerSchema, started: z.boolean() }),
   },
+  /** Saves a finding to Studio Feed as its own post, to read or explore later. */
+  saveToFeed: {
+    input: z.object({ threadId, messageId, turnId: z.string().max(200).nullable().optional(), emoji: z.string().max(16).optional(), label: z.string().trim().min(1).max(MAX_LABEL_LENGTH * 2) }),
+    output: z.object({ postId: z.string() }),
+  },
+  /** The labels of a reply's findings saved to the Feed. */
+  savedForMessage: {
+    input: z.object({ threadId, messageId }),
+    output: z.object({ labels: z.array(z.string()) }),
+  },
+  /** For Studio Feed: explore the finding saved as this post. */
+  exploreFeedPost: {
+    input: z.object({ postId: z.string().min(1).max(100) }),
+    output: z.object({ status: z.enum(["started", "ready", "unavailable"]), href: z.string().nullable() }),
+  },
   /** Writes the explainer again, in place; the old page is kept as a version. */
   exploreRegenerate: {
     input: z.object({ explainerId }),
