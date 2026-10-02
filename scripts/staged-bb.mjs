@@ -6,7 +6,7 @@
  * ~/.bb or the BB you work in. Some fixtures are real agent replies on small
  * models, using this machine's Codex sign-in, so start takes a few minutes.
  *
- *   node scripts/staged-bb.mjs start [--ref <pushed commit>]
+ *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>]
  *   . "$TMPDIR/bb-studio-staged/capture.env"
  *   node scripts/capture-plugin-screenshots.mjs --plugin studio-navigation
  *   node scripts/staged-bb.mjs stop
@@ -202,6 +202,10 @@ async function seedTeams(machine) {
 }
 
 async function start() {
+  const { plugins } = JSON.parse(await readFile(join(repoRoot, ".bb/plugins.json"), "utf8"));
+  const pluginFlag = process.argv.indexOf("--plugin");
+  const capturePlugin = pluginFlag >= 0 ? process.argv[pluginFlag + 1] : null;
+  if (pluginFlag >= 0 && !plugins.some(({ name }) => name === capturePlugin)) throw new Error("Use --plugin with an installed plugin ID from .bb/plugins.json.");
   const refFlag = process.argv.indexOf("--ref");
   const ref = await pushedRef(refFlag >= 0 ? process.argv[refFlag + 1] : "HEAD");
   if (await healthy()) throw new Error(`Something already answers at ${serverUrl}. Run stop, or set BB_STAGED_PORT.`);
@@ -228,7 +232,6 @@ async function start() {
   process.stdout.write(`BB ${version} is running at ${serverUrl}\n`);
 
   // Install every plugin as users do, from this repository's Git source.
-  const { plugins } = JSON.parse(await readFile(join(repoRoot, ".bb/plugins.json"), "utf8"));
   for (const { name } of plugins) {
     process.stdout.write(`Installing ${name} from ${repoSource}@${ref.slice(0, 7)}\n`);
     await run(join(binDir, "bb"), ["plugin", "install", `${repoSource}@${ref}`, "--plugin", name, "--yes"], { quiet: true });
@@ -257,10 +260,12 @@ async function start() {
 
   // Talk's meeting notes and Studio Decisions fall back to this model.
   await bb("smart-decisions", "fallback", "codex", "gpt-6-luna", "low");
-  process.stdout.write("Seeding agent replies\n");
-  const smartReactionsThread = await seedSmartReactionsThread(project, machine, orbitDir);
-  const exploreThread = await seedExploreThread(project, machine, orbitDir);
-  await seedTeams(machine);
+  process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
+  const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
+    ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
+  const exploreThread = !capturePlugin || capturePlugin === "explore"
+    ? await seedExploreThread(project, machine, orbitDir) : null;
+  if (!capturePlugin || capturePlugin === "bot-teams") await seedTeams(machine);
 
   const envFile = join(stagedDir, "capture.env");
   await writeFile(
@@ -270,9 +275,14 @@ async function start() {
       `export BB_SERVER_URL=${serverUrl}`,
       `export BB_CAPTURE_PROJECT_ID=${project.id}`,
       `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
-      `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
-      `export BB_CAPTURE_WORKSPACE_THREAD_ID=${smartReactionsThread.id}`,
-      `export BB_CAPTURE_EXPLORE_THREAD_ID=${exploreThread.id}`,
+      "unset BB_CAPTURE_SMART_REACTIONS_THREAD_ID BB_CAPTURE_WORKSPACE_THREAD_ID BB_CAPTURE_EXPLORE_THREAD_ID",
+      ...(smartReactionsThread ? [
+        `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
+        `export BB_CAPTURE_WORKSPACE_THREAD_ID=${smartReactionsThread.id}`,
+      ] : []),
+      ...(exploreThread ? [`export BB_CAPTURE_EXPLORE_THREAD_ID=${exploreThread.id}`] : []),
+      "unset BB_CAPTURE_ONLY BB_CAPTURE_PLUGIN",
+      ...(capturePlugin ? [`export BB_CAPTURE_PLUGIN=${capturePlugin}`] : []),
       `export BB_CAPTURE_CDP_PORT=${port + 2}`,
       `export PATH="${binDir}:$PATH"`,
       "unset BB_CLI BB_HOST_DAEMON_PORT BB_THREAD_ID BB_PROJECT_ID BB_ENVIRONMENT_ID BB_THREAD_STORAGE",
@@ -291,4 +301,4 @@ async function stop() {
 const command = process.argv[2];
 if (command === "start") await start();
 else if (command === "stop") await stop();
-else throw new Error("Usage: node scripts/staged-bb.mjs start [--ref <commit>] | stop");
+else throw new Error("Usage: node scripts/staged-bb.mjs start [--ref <commit>] [--plugin <id>] | stop");
