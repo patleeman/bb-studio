@@ -294,6 +294,16 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
   );
 }
 
+/**
+ * Whether a header event started on the header itself. React bubbles events
+ * from portals (the tab menu) through the header too; grabbing those would
+ * capture the pointer and the menu item would never get its click.
+ */
+function fromHeader(event: { currentTarget: Element; target: EventTarget }): boolean {
+  const target = event.target as Element;
+  return event.currentTarget.contains(target) && !target.closest("button, [role=tab], [role=button]");
+}
+
 interface PanelDrag {
   x: number;
   y: number;
@@ -320,7 +330,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
 
   const onPointerDown = (event: PointerEvent<HTMLElement>) => {
     if (event.button !== 0 || !panel.current) return;
-    if ((event.target as Element).closest("button, [role=tab], [role=button]")) return;
+    if (!fromHeader(event)) return;
     const rect = panel.current.getBoundingClientRect();
     drag.current = {
       x: event.clientX,
@@ -385,7 +395,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
             setDragAt(null);
           }}
           onDoubleClick={(event) => {
-            if (!(event.target as Element).closest("button, [role=tab], [role=button]")) update(toggleCollapsed);
+            if (fromHeader(event)) update(toggleCollapsed);
           }}
         >
           <Icon name="GripVertical" fallback="MoreVertical" className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
