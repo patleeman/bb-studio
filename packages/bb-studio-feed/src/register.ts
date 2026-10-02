@@ -1,7 +1,8 @@
-// Studio Feed's server: replies that end in `::post{…}` are published to the
-// feed, from any thread, Teams channel or automation.
+// Studio Feed's server: agents publish with the feed_post tool (or `bb feed
+// post`), from any thread, Teams channel or automation, and end their reply
+// with the post's card line.
 //
-//   - FeedService (service.ts) publishes, dedupes and notifies; this file
+//   - FeedService (service.ts) publishes and notifies; this file
 //     gives it BB: who a thread is (its bot and channel, from Studio Teams
 //     when it's installed), realtime, and phone notifications (Studio Mobile).
 //   - It adds the RPC handlers, the feed_* tools, the instructions for
@@ -94,13 +95,11 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       projectId: thread.projectId ?? null,
       channelId,
       channelName,
-      channelThread: isChannel,
     };
   }
 
   const service = new FeedService({
     store,
-    origin,
     publish: (event: RealtimeEvent) => bb.realtime.publish(REALTIME_CHANNEL, event),
     notify: async (notification) => {
       if (!notification.projectId) return;
@@ -113,14 +112,6 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     },
     notifyMode: options.notifyMode,
     log: bb.log,
-  });
-
-  bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
-    try {
-      await service.ingest(thread.id, lastAssistantText);
-    } catch (error) {
-      bb.log.warn(`Could not publish a post from ${thread.id}: ${String(error)}`);
-    }
   });
 
   const mustGet = (id: string): PostRow => {
@@ -248,8 +239,11 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     },
     post: async ({ postId }: { postId: string }) => ({ post: await one(store.get(postId)) }),
     story: async ({ story }: { story: string }) => ({ posts: await views(store.story(story)) }),
+    // A card's post: `::post{id="…"}` names it; an older `::post{title="…"}` line published it.
     forDirective: async ({ source }: { source: string }) => {
-      const title = postDirective(parseAttributes(source))?.title;
+      const attributes = parseAttributes(source);
+      if (attributes.id) return { post: await one(store.get(attributes.id)) };
+      const title = postDirective(attributes)?.title;
       return { post: await one(store.byDirective(source) ?? (title ? store.byTitle(title) : null)) };
     },
     topics: () => ({ topics: store.topics() }),

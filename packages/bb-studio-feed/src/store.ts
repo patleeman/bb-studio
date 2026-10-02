@@ -76,9 +76,6 @@ export const MIGRATIONS = [
 /** A linked page's preview; empty strings when it has none. */
 export type LinkPreviewRow = { title: string; description: string; image: string };
 
-/** The same reply arriving again within this long (from the bot's thread and its channel) is one post. */
-export const DUPLICATE_WINDOW_MS = 24 * 60 * 60_000;
-
 const hash = (value: string) => createHash("sha256").update(value).digest("hex");
 export const directiveKey = (source: string) => hash(source.trim());
 export const contentKey = (source: string, body: string) => hash(`${source.trim()}\n${body.trim()}`);
@@ -95,7 +92,7 @@ export interface NewPost {
   projectId?: string | null;
   channelId?: string | null;
   channelName?: string | null;
-  /** The `::post` line it came from; one is made up for a post without one. */
+  /** Identifies the post for its keys; older posts kept the `::post` line they came from. */
   source: string;
   at?: number;
 }
@@ -114,15 +111,6 @@ export class FeedStore {
 
   get(id: string): PostRow | null {
     return (this.db.prepare("SELECT * FROM feed_posts WHERE id = ?").get(id) as PostRow | undefined) ?? null;
-  }
-
-  /** The same reply, recently: the copy a channel shows of a bot's post. */
-  duplicate(key: string, now = Date.now()): PostRow | null {
-    return (
-      (this.db
-        .prepare("SELECT * FROM feed_posts WHERE content_key = ? AND created_at > ? ORDER BY created_at DESC LIMIT 1")
-        .get(key, now - DUPLICATE_WINDOW_MS) as PostRow | undefined) ?? null
-    );
   }
 
   /** The newest post written with this directive line. */
@@ -171,25 +159,6 @@ export class FeedStore {
       )
       .run(row);
     return row;
-  }
-
-  /** Fills in where a post came from when another copy knows more (a bot's name, its channel). */
-  fillOrigin(id: string, origin: Partial<Pick<PostRow, "author" | "bot_id" | "thread_id" | "project_id" | "channel_id" | "channel_name">>): PostRow | null {
-    const row = this.get(id);
-    if (!row) return null;
-    const next = { ...row };
-    for (const key of ["bot_id", "thread_id", "project_id", "channel_id", "channel_name"] as const) {
-      if (!next[key] && origin[key]) next[key] = origin[key]!;
-    }
-    // A bot's name beats the channel thread's title.
-    if (origin.bot_id && !row.bot_id && origin.author) next.author = origin.author;
-    if (JSON.stringify(next) === JSON.stringify(row)) return row;
-    this.db
-      .prepare(
-        "UPDATE feed_posts SET author = @author, bot_id = @bot_id, thread_id = @thread_id, project_id = @project_id, channel_id = @channel_id, channel_name = @channel_name WHERE id = @id",
-      )
-      .run(next);
-    return next;
   }
 
   update(id: string, patch: PostPatch, editedBy: string, now = Date.now()): PostRow | null {

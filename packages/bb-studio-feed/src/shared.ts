@@ -36,16 +36,7 @@ export interface PostDirective {
   priority: Priority;
 }
 
-export interface ParsedPost extends PostDirective {
-  /** The reply without its trailing directive lines. */
-  body: string;
-  /** The directive line as written, which also identifies the post in a reply. */
-  source: string;
-}
-
 const ATTRIBUTE = /([A-Za-z][\w-]*)\s*=\s*"([^"]*)"/g;
-const DIRECTIVE_LINE = /^::([a-z][\w-]*)\{([^\n]*)\}\s*$/;
-const FENCE = /^ {0,3}(`{3,}|~{3,})/;
 
 export function parseAttributes(text: string): Record<string, string> {
   const attributes: Record<string, string> = {};
@@ -84,49 +75,6 @@ export function postDirective(attributes: Readonly<Record<string, string>>): Pos
     story: storyKey(attributes.story),
     priority: priority(attributes.priority),
   };
-}
-
-/** Each line, and whether it's inside fenced code. */
-function fenced(lines: readonly string[]): boolean[] {
-  let open: string | null = null;
-  return lines.map((line) => {
-    const marker = FENCE.exec(line)?.[1];
-    if (!marker) return open !== null;
-    if (!open) open = marker;
-    else if (marker[0] === open[0] && marker.length >= open.length && !line.trim().slice(marker.length).trim()) open = null;
-    return true;
-  });
-}
-
-/**
- * The post in a reply: a `::post{…}` line among the directive lines that end
- * it (`::reactions` and `::explore` may follow it). The rest of the reply,
- * without those lines, is the body. Null when the reply isn't a post.
- */
-export function parsePost(text: string | null | undefined): ParsedPost | null {
-  if (!text) return null;
-  const lines = text.replace(/\r\n?/g, "\n").split("\n");
-  const inCode = fenced(lines);
-  let end = lines.length;
-  let found: { source: string; directive: PostDirective } | null = null;
-  while (end > 0) {
-    const line = lines[end - 1]!.trim();
-    if (!line) {
-      end -= 1;
-      continue;
-    }
-    if (inCode[end - 1]) break;
-    const match = DIRECTIVE_LINE.exec(line);
-    if (!match) break;
-    if (match[1] === DIRECTIVE && !found) {
-      const directive = postDirective(parseAttributes(match[2] ?? ""));
-      if (directive) found = { source: line, directive };
-    }
-    end -= 1;
-  }
-  if (!found) return null;
-  const body = lines.slice(0, end).join("\n").trim().slice(0, MAX_BODY);
-  return { ...found.directive, body, source: found.source };
 }
 
 /** One line of plain text from Markdown, for previews and notifications. */

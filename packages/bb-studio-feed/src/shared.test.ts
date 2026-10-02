@@ -1,51 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { bodyImage, firstLink, lede, parsePost, plainText, sourceDomains, storyKey, studioRefs } from "./shared";
-
-describe("parsePost", () => {
-  it("reads the post line that ends a reply", () => {
-    const post = parsePost('Service is back on the Harlem Line.\n\n::post{title="Harlem Line delays cleared" topic="Commute" story="Harlem Line"}');
-    expect(post).toEqual({
-      title: "Harlem Line delays cleared",
-      topic: "Commute",
-      story: "harlem-line",
-      priority: "normal",
-      body: "Service is back on the Harlem Line.",
-      source: '::post{title="Harlem Line delays cleared" topic="Commute" story="Harlem Line"}',
-    });
-  });
-
-  it("allows other directive lines after it", () => {
-    const post = parsePost('Body\n::post{title="T" priority="URGENT"}\n::explore{items="🐛 A"}\n\n::reactions{items="👍 Ok"}\n');
-    expect(post?.priority).toBe("urgent");
-    expect(post?.body).toBe("Body");
-  });
-
-  it("ignores a post line that isn't at the end", () => {
-    expect(parsePost('::post{title="T"}\n\nThen more text.')).toBeNull();
-  });
-
-  it("ignores a post line inside a code block", () => {
-    expect(parsePost('Example:\n```\n::post{title="T"}\n```')).toBeNull();
-  });
-
-  it("needs a title", () => {
-    expect(parsePost('Body\n::post{topic="News"}')).toBeNull();
-    expect(parsePost('Body\n::post{title="  "}')).toBeNull();
-  });
-
-  it("takes the last post line when there are two", () => {
-    expect(parsePost('Body\n::post{title="First"}\n::post{title="Second"}')?.title).toBe("Second");
-  });
-
-  it("allows an empty body", () => {
-    expect(parsePost('::post{title="Only a title"}')?.body).toBe("");
-  });
-
-  it("is null for ordinary replies", () => {
-    expect(parsePost("Just an answer.")).toBeNull();
-    expect(parsePost(null)).toBeNull();
-  });
-});
+import { bodyImage, firstLink, lede, plainText, sourceDomains, storyKey, studioRefs } from "./shared";
 
 describe("helpers", () => {
   it("makes story keys", () => {
