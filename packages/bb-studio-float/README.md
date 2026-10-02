@@ -12,10 +12,11 @@ right, or drag it anywhere.
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): a Studio
 page ("Offline mode launch"), the seeded "Draft the ORBIT-42 release notes"
-thread and the "#Launch room" channel, each floated from its menu, as three
-tabs in one panel. The panel was pulled off the bottom and dropped over the
-Studio list, the channel's tab dragged to the front, and the page's tab
-picked, so Pages renders the page inside it.
+thread and the "Checkout flow" drawing, each floated from its sidebar menu,
+as three tabs in one panel. The drawing's tab was dragged to the front,
+then the pinned page was selected over the Studio list. The capture also
+checks the real Pages editor and an unsent thread draft through tab switches,
+folding, hiding, and moving Float, and verifies the pin in saved state.
 
 ## What you get
 

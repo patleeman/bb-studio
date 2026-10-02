@@ -61,7 +61,19 @@ folding, and hiding, adds persistent pins, and restores validated back history.
 Regression tests exercise native draft and attachment retention, local editor
 state and scroll, lazy realization and disposal, background item changes,
 duplicate destination focusing, and pin protection during tab-limit trimming
-and reload. Live suite verification remains required.
+and reload. The staged Float capture passes on stable BB 0.44.0 installed
+from the pushed repository commit: a page, drawing, and thread open through
+their actual sidebar menus. It verifies retained Pages and SDK composer DOM
+identity and an unsent draft through switching, folding, hiding, and moving
+Float, plus the persisted pin. The screenshot is Float's staged preview.
+This verifies Float's current bottom/free placements; right-workbench and
+main-view transfers and full suite verification remain required.
+
+Float's capture uses deterministic page and drawing fixtures and does not
+depend on generated Teams or Explore replies. The first staging run failed
+on malformed Explore fixture output after installing the suite; the Float
+capture reused the verified running staged server and its existing Orbit
+project and thread. Its live assertions were not relaxed.
 
 Remaining delivery includes the common opening and placement controller,
 native workbench integration, the single Chat action, Pages migration,
