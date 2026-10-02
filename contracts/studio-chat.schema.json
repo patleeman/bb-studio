@@ -320,7 +320,7 @@
         "additionalProperties": false
       }
     },
-    "lastThread": {
+    "home": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
@@ -345,15 +345,40 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "threadId": {
-            "type": [
-              "string",
-              "null"
+          "thread": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": [
+                      "chosen",
+                      "created"
+                    ]
+                  }
+                },
+                "required": [
+                  "threadId",
+                  "title",
+                  "origin"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
             ]
           }
         },
         "required": [
-          "threadId"
+          "thread"
         ],
         "additionalProperties": false
       }
@@ -389,12 +414,171 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "thread": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "origin": {
+                    "type": "string",
+                    "enum": [
+                      "chosen",
+                      "created"
+                    ]
+                  }
+                },
+                "required": [
+                  "threadId",
+                  "title",
+                  "origin"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "thread"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "unlink": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "pluginId",
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
           "ok": {
             "type": "boolean"
           }
         },
         "required": [
           "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "send": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "item": {
+            "type": "object",
+            "properties": {
+              "pluginId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              }
+            },
+            "required": [
+              "pluginId",
+              "id"
+            ]
+          },
+          "quote": {
+            "type": "object",
+            "properties": {
+              "text": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 20000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "note": {
+                "type": "string",
+                "maxLength": 10000
+              },
+              "where": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 300
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "image": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "maxLength": 4000000,
+                    "pattern": "^data:image\\/(png|jpeg|webp);base64,"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "text",
+              "note",
+              "where",
+              "image"
+            ]
+          }
+        },
+        "required": [
+          "item",
+          "quote"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "threadId"
         ],
         "additionalProperties": false
       }
