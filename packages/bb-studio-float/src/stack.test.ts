@@ -96,8 +96,33 @@ describe("closeTab", () => {
 
   it("empties the stack but keeps its place", () => {
     const free = placeAt(openTab(EMPTY, thread("a")), { kind: "free", left: 20, bottom: 200 });
-    expect(closeTab(free, "thread:a")).toEqual({ ...EMPTY, place: free.place });
+    expect(closeTab(free, "thread:a")).toEqual({ ...EMPTY, dismissed: true, place: free.place });
     expect(closeAll(free).place).toEqual(free.place);
+  });
+});
+
+describe("dismissed panel", () => {
+  const automatic = { minimized: true, tag: "studio-chat:item" };
+
+  it.each(["last tab", "all tabs"])("stays closed after closing %s and visiting other items", (action) => {
+    const opened = openTab(EMPTY, thread("a"));
+    const closed = action === "last tab" ? closeTab(opened, "thread:a") : closeAll(openTab(opened, thread("b")));
+    expect(closed.tabs).toEqual([]);
+    expect(openTab(closed, thread("c"), automatic)).toBe(closed);
+    expect(openTab(closed, thread("d"), automatic)).toBe(closed);
+    // Session storage and a plugin reload must preserve the dismissal.
+    const restored = parseState(JSON.parse(JSON.stringify(closed)));
+    expect(openTab(restored, thread("e"), automatic)).toBe(restored);
+
+    const reopened = openTab(restored, { kind: "path", path: "/plugins/pages/pages/pg_1" });
+    expect(reopened).toMatchObject({ dismissed: false, hidden: false, collapsed: false });
+    expect(keys(openTab(reopened, thread("f"), automatic))).toEqual(["path:/plugins/pages/pages/pg_1", "thread:f"]);
+  });
+
+  it("continues background opens when another tab remains", () => {
+    const opened = openTab(openTab(EMPTY, thread("a")), thread("b"));
+    const closed = closeTab(opened, "thread:b");
+    expect(keys(openTab(closed, thread("c"), automatic))).toEqual(["thread:a", "thread:c"]);
   });
 });
 
@@ -127,6 +152,7 @@ it("parses saved state, dropping bad entries and duplicates", () => {
     active: "thread:a",
     collapsed: false,
     hidden: true,
+    dismissed: false,
     place: { kind: "free", left: 10, bottom: 300 },
     size: { width: 520, height: 640 },
   });

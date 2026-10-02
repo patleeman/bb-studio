@@ -28,6 +28,8 @@ export interface FloatState {
   collapsed: boolean;
   /** Mod+Shift+J puts the panel away and brings it back. */
   hidden: boolean;
+  /** Closing the panel blocks background opens until an explicit Float action. */
+  dismissed: boolean;
   place: FloatPlace;
   /** The size the panel was resized to; null for the default. */
   size: Size | null;
@@ -35,7 +37,7 @@ export interface FloatState {
 
 const DOCK: FloatPlace = { kind: "dock" };
 
-export const EMPTY: FloatState = { tabs: [], active: null, collapsed: false, hidden: false, place: DOCK, size: null };
+export const EMPTY: FloatState = { tabs: [], active: null, collapsed: false, hidden: false, dismissed: false, place: DOCK, size: null };
 
 /** More than this and the oldest closes; the tab menu can't usefully list more. */
 export const MAX_TABS = 12;
@@ -69,7 +71,7 @@ function parseSize(raw: unknown): Size | null {
 /** A saved state, dropping anything malformed. */
 export function parseState(raw: unknown): FloatState {
   if (!raw || typeof raw !== "object") return EMPTY;
-  const saved = raw as { tabs?: unknown; active?: unknown; collapsed?: unknown; hidden?: unknown; place?: unknown; size?: unknown };
+  const saved = raw as { tabs?: unknown; active?: unknown; collapsed?: unknown; hidden?: unknown; dismissed?: unknown; place?: unknown; size?: unknown };
   const seen = new Set<string>();
   const tabs: FloatTab[] = [];
   for (const entry of Array.isArray(saved.tabs) ? saved.tabs : []) {
@@ -88,6 +90,7 @@ export function parseState(raw: unknown): FloatState {
     active,
     collapsed: saved.collapsed === true,
     hidden: saved.hidden === true,
+    dismissed: saved.dismissed === true,
     place: parsePlace(saved.place),
     size: parseSize(saved.size),
   };
@@ -116,6 +119,7 @@ function trim(tabs: FloatTab[], active: string | null): FloatTab[] {
 export function openTab(state: FloatState, target: FloatTarget, options: FloatOpenOptions = {}): FloatState {
   const key = tabKey(target);
   const background = options.minimized === true;
+  if (background && state.dismissed) return state;
   const tag = options.tag;
   const viewing = (candidate: string) => candidate === state.active && !state.collapsed && !state.hidden;
   const untag = (tab: FloatTab) => (tag && tab.tag === tag ? withoutTag(tab) : tab);
@@ -141,7 +145,7 @@ export function openTab(state: FloatState, target: FloatTarget, options: FloatOp
     // Something opened behind can wait for the user to show the panel again.
     return { ...state, tabs: trim(tabs, active), active, collapsed: state.tabs.length ? state.collapsed : true };
   }
-  return { ...state, tabs: trim(tabs, key), active: key, collapsed: false, hidden: false };
+  return { ...state, tabs: trim(tabs, key), active: key, collapsed: false, hidden: false, dismissed: false };
 }
 
 /** Closes a tab; closing the one showing shows its neighbour. */
@@ -154,8 +158,8 @@ export function closeTab(state: FloatState, key: string): FloatState {
   return { ...state, tabs, active };
 }
 
-/** Closes every tab. The panel keeps its place and size for next time. */
-export const closeAll = (state: FloatState): FloatState => ({ ...EMPTY, place: state.place, size: state.size });
+/** Closes every tab and blocks background opens. Keeps the panel's place and size. */
+export const closeAll = (state: FloatState): FloatState => ({ ...EMPTY, dismissed: true, place: state.place, size: state.size });
 
 /** Past this, a tab forgets the oldest place it can go back to. */
 export const MAX_BACK = 20;

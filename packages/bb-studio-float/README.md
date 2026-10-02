@@ -47,6 +47,9 @@ picked, so Pages renders the page inside it.
   one shows at a time. Drag a tab to reorder it, middle-click or × to close
   it. When the tabs don't fit, the panel labels only the one showing and
   shows the rest as icons; the ⋯ menu lists every tab.
+- **Keep it closed.** Closing the last tab or choosing **Close all** keeps
+  the panel closed as you switch threads and Studio items, including after
+  a reload. An explicit Float action opens it again.
 - **Put it anywhere.** The panel docks at the bottom right. Drag it by its
   header to pull it off the bottom and drop it anywhere on screen. Drop it
   near the bottom edge (an outline shows where) to dock it again, or pick

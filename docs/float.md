@@ -50,6 +50,8 @@ chat from inside the panel.
   the one showing (folded, in an empty panel). A tag swaps the tab opened
   under the same tag unless you're looking at it, so Studio Chat bringing
   back each item's chat doesn't add a tab per item.
+  After the last tab or all tabs close, minimized opens are ignored until
+  an explicit Float action opens the panel again.
 - `--studio-float-right` on the root element moves the corner and a docked
   panel left; Pages sets it while its comments card is open.
 - The older `bb-studio:chat:float` window event still floats a thread.
@@ -102,7 +104,7 @@ back stack for its ← button; the stack isn't kept across a reload.
   and left edges, since the bottom and right stay put; free, any edge. At
   least 300 by 200, and kept on screen. Double-click an edge for the default.
 - **State.** Per browser window in session storage: the tabs and their tags,
-  the tab showing, folded, hidden (Mod+Shift+J), the place and the size.
+  the tab showing, folded, hidden (Mod+Shift+J), dismissed, the place and the size.
 
 ## Limits
 
