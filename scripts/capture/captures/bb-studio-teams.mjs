@@ -24,13 +24,16 @@ export default context => {
     if(document.querySelectorAll('[data-view-entry="assistant"]').length<3)throw new Error("Missing final thread replies");
     if(!document.querySelector('[data-view-entry="user"]'))throw new Error("Missing owner messages");
    })()`);
-   // Recipients come from @-mentions: the view's bots must be offered there.
-   await client.evaluate(`document.querySelector('[data-view-composer] .ProseMirror').focus()`);
-   await client.command("Input.insertText",{text:"@"});
-   await client.waitForText("Bots");
-   await client.evaluate(`new Promise((resolve,reject)=>setTimeout(()=>{const list=document.body.innerText;(list.includes("Atlas")&&list.includes("Scribe"))?resolve():reject(new Error("Mentions don't offer the view's bots"))},500))`,true);
-   for(const type of ["keyDown","keyUp"])await client.command("Input.dispatchKeyEvent",{type,key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
-   for(const type of ["keyDown","keyUp"])await client.command("Input.dispatchKeyEvent",{type,key:"Backspace",code:"Backspace",windowsVirtualKeyCode:8});
+   // Recipients come from @-mentions: each of the view's bots must be offered there.
+   const key=async(k,code,vk)=>{for(const type of ["keyDown","keyUp"])await client.command("Input.dispatchKeyEvent",{type,key:k,code,windowsVirtualKeyCode:vk});};
+   for(const [query,name] of [["@Atl","Atlas"],["@Scr","Scribe"]]){
+    await client.evaluate(`document.querySelector('[data-view-composer] .ProseMirror').focus()`);
+    await client.command("Input.insertText",{text:query});
+    await client.waitForText("Bots");
+    await client.evaluate(`(()=>{const heading=[...document.querySelectorAll("body *")].find(e=>e.children.length===0&&e.textContent.trim()==="Bots");const list=heading?.closest('[role="listbox"],[role="menu"],[data-radix-popper-content-wrapper]')??heading?.parentElement?.parentElement;if(!list?.textContent.includes(${JSON.stringify(name)}))throw new Error("Mentions don't offer ${name}");})()`);
+    await key("Escape","Escape",27);
+    for(let i=0;i<query.length;i++)await key("Backspace","Backspace",8);
+   }
    await client.evaluate(`(()=>{if(document.querySelector('[data-view-composer] .ProseMirror').innerText.trim())throw new Error("Composer draft not cleared after the mention check");if(document.querySelector('[aria-label="Choose recipients"]'))throw new Error("Recipient picker is back");document.activeElement?.blur();})()`);
   }
  },
