@@ -32,11 +32,15 @@ struct SavedViewScreen: View {
                     if page.entries.isEmpty { Text("Send a message to start work in this view.").foregroundStyle(.secondary).padding(.vertical, 40) }
                     ForEach(page.entries.filter { entry in page.threads.contains { $0.id == entry.threadId && $0.parentThreadId == nil } }) { entry in
                         entryRow(entry)
+                        if page.entries.last(where: { $0.threadId == entry.threadId })?.id == entry.id {
+                            ForEach(page.threads.filter { $0.parentThreadId == entry.threadId }) { child in
+                                childGroup(child, page: page)
+                            }
+                        }
                     }
-                    ForEach(page.threads.filter { $0.parentThreadId != nil }) { thread in
-                        DisclosureGroup(thread.title) {
-                            NavigationLink("Open thread", value: Route.thread(id: thread.id))
-                            ForEach(page.entries.filter { $0.threadId == thread.id }) { entry in entryRow(entry) }
+                    ForEach(page.threads.filter { thread in thread.parentThreadId == nil && !page.entries.contains { $0.threadId == thread.id } }) { root in
+                        ForEach(page.threads.filter { $0.parentThreadId == root.id }) { child in
+                            childGroup(child, page: page)
                         }
                     }
                 } else { ProgressView() }
@@ -57,6 +61,16 @@ struct SavedViewScreen: View {
             await load()
         }
         .onDisappear { if let listener { app.realtime.removeListener(listener) }; listener = nil }
+    }
+
+    private func childGroup(_ thread: SavedViewThread, page: SavedViewPage) -> AnyView {
+        AnyView(DisclosureGroup(thread.title) {
+            NavigationLink("Open thread", value: Route.thread(id: thread.id))
+            ForEach(page.entries.filter { $0.threadId == thread.id }) { entry in entryRow(entry) }
+            ForEach(page.threads.filter { $0.parentThreadId == thread.id }) { child in
+                childGroup(child, page: page)
+            }
+        })
     }
 
     private func entryRow(_ entry: SavedViewEntry) -> some View {
