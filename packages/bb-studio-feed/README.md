@@ -10,7 +10,7 @@ channel or automation. You read it as one list on desktop and phone.
 
 ## Staged preview
 
-![The Feed reader with unread and read rows, the Harlem Line story open in place, and a Needs you rail](assets/staged-preview.png)
+![The Feed reader with unread and read rows, the morning briefing open in place, and a Needs you rail](assets/staged-preview.png)
 
 This is the **Feed** page in a staged BB (`node scripts/staged-bb.mjs start`).
 The capture seeds nine posts with `bb feed post` from seven authors:
@@ -20,9 +20,10 @@ The capture seeds nine posts with `bb feed post` from seven authors:
 
 Four of them have a picture in their body. The posts are listed under
 **Today** in the margin. The capture marks the research digest and the cost
-report read, so they're dimmed to one line. Then it opens the commute story
-in place: its picture, body, **Earlier updates**, and the **New thread** and
-**Mark unread** buttons. The header counts **4 unread**. The rail shows the
+report read, so they're dimmed to one line. It opens the commute story in
+place and checks its picture, **Earlier updates**, and the **New thread** and
+**Mark unread** buttons. Then it closes it and leaves the morning briefing
+open. The header counts **3 unread**. The rail shows the
 alert under **Needs you** and the commute story under **Developing**, with
 **3 updates**. Every post was made seconds before the capture, so each shows
 "just now".

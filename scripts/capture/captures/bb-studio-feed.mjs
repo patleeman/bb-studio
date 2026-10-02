@@ -1,7 +1,7 @@
 // Studio Feed's reader, seeded with posts through `bb feed post`: a commute
 // story with two earlier updates, an urgent alert, and posts with and
-// without pictures. Two are marked read, and the commute story is open in
-// place.
+// without pictures. Two are marked read, the commute story is opened in place
+// and closed, and the morning briefing is left open.
 const picture = (path) => `![](https://upload.wikimedia.org/wikipedia/commons/thumb/${path}/960px-${path.split("/").pop()})`;
 const POSTS = [
   ["--title", "Metro-North running about 10 minutes late on the Harlem Line", "--topic", "Commute", "--story", "harlem-line", "--author", "Commute Bot",
@@ -66,6 +66,11 @@ export default ({ bbCli, sleep }) => [
         await client.waitForText("New thread");
         await client.waitForText("Mark unread");
         await client.waitForText("4 unread");
+        // Close it, and leave the short briefing open so the stream shows.
+        await client.evaluate(`(${row("Harlem Line delays cleared")}).querySelector("button[aria-expanded]").click()`);
+        await client.evaluate(`(${row("Your Thursday")}).querySelector("button[aria-expanded]").click()`);
+        await client.waitForText("Rain after 4, so take the umbrella.");
+        await client.waitForText("3 unread");
         await client.evaluate(`document.querySelector("main").scrollIntoView()`);
         for (let tries = 0; ; tries += 1) {
           const loaded = await client.evaluate(`[...document.querySelectorAll("main img")].filter((img) => img.complete && img.naturalWidth > 0).length`);
