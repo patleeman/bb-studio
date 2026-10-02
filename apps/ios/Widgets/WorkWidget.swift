@@ -23,13 +23,13 @@ struct WorkProvider: TimelineProvider {
             do {
                 async let tasks = client.tasksBoard()
                 async let threads = client.threads(limit: 100)
-                async let attention = client.attention()
-                async let teams = client.botTeams()
                 let today = StudioTask.day(.now)
                 entry.tasks = try await tasks.filter { !$0.archived && $0.status != "done" && $0.due == today }
-                entry.running = ThreadSummary(try await threads).running
-                entry.attention = (try? await attention.openCount) ?? entry.attention
-                entry.approvals = (try? await teams.approvalCounts?.values.reduce(0, +)) ?? entry.approvals
+                let threadRows = try await threads
+                let summary = ThreadSummary(threadRows)
+                entry.running = summary.running
+                entry.attention = summary.needsYou.count
+                entry.approvals = threadRows.filter { $0.hasPendingInteraction == true }.count
                 entry.stale = false
                 DiskCache.save(WorkCache(tasks: entry.tasks, attention: entry.attention, approvals: entry.approvals, running: entry.running), as: "work-widget")
             } catch { entry.stale = true }

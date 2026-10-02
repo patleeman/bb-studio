@@ -115,7 +115,6 @@ test("idle threads, agent messages, and plugin submissions pass through", async 
     context({ initiator: "agent" }),
     context({ senderThreadId: "thr_other" }),
     context({ experimental_submission: { pluginId: "bot-teams", data: null } }),
-    context({ thread: thread({ originPluginId: "bot-teams" }) }),
     context({ thread: thread({ visibility: "hidden" }) }),
   ])
     assert.deepEqual(await queue.dispatch(ctx), { action: "proceed" });
@@ -447,4 +446,10 @@ test("core rows the owner grouped by hand stay with core", async () => {
   queue.queued(row({ waitingOn: { kind: "thread-busy" }, groupWithNext: true }));
   await settle();
   assert.deepEqual(calls.routed, []);
+});
+
+test("visible bot profile threads use Smart Queue for owner sends", async()=>{
+ const {queue}=harness();
+ const decision=await queue.dispatch(context({thread:thread({originPluginId:"bot-teams"})}));
+ assert.equal(decision.action,"wait");
 });

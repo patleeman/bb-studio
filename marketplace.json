@@ -257,12 +257,12 @@
     {
       "id": "bot-teams",
       "displayName": "Studio Teams",
-      "description": "Part of BB Studio. Persistent bots that collaborate in channels, delegate work, and keep their own workspaces and memory.",
+      "description": "Part of BB Studio. Persistent bot profiles and saved views of ordinary threads, with shared memory and missions.",
       "icon": "Bot",
       "tags": [
         "agents",
         "collaboration",
-        "channels",
+        "views",
         "automation",
         "notifications",
         "bb-studio"
@@ -374,7 +374,7 @@
     {
       "id": "smart-decisions",
       "displayName": "Studio Decisions",
-      "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and it routes Studio Teams channels.",
+      "description": "Part of BB Studio. One place to set up the fast Jev model that makes quick decisions. It runs Smart Queue, which steers or queues a message you send to a busy thread, and it chooses recipients in Studio Teams views.",
       "icon": {
         "url": "./packages/bb-studio-decisions/assets/icon.svg"
       },

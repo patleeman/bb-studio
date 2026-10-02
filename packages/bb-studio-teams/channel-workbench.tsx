@@ -1,26 +1,19 @@
 import { useEffect, useId, useState } from "react";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import type { rpcContract } from "./contract";
+import type { rpcContract } from "./client-contract";
 import { defaultLimits } from "./workspace-contract";
 import { Button } from "@bb-studio/kit/ui";
 import { experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import { IconActionTooltip } from "./channel-controls";
 import { Input } from "@bb-studio/kit/ui";
-import {
-  ActionBar,
-  EmptyNote,
-  ErrorMessage,
-  FormRow,
-  message,
-  Section,
-} from "./bot-ui";
+import { ActionBar, EmptyNote, ErrorMessage, FormRow, message, Section } from "./bot-ui";
 
 export function UsagePanel({
   id,
   kind,
 }: {
   id: string;
-  kind: "bot" | "channel";
+  kind: "bot";
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const controlId = useId();
@@ -75,15 +68,7 @@ export function UsagePanel({
         ["Forks", usage.forks],
         ["Unfinished", usage.active],
         ["Failed", usage.errors],
-        ...(kind === "channel"
-          ? [
-              ["Classifier calls", usage.routingCalls],
-              [
-                "Classifier time",
-                `${Math.round(usage.routingMilliseconds / 1000)}s`,
-              ],
-            ]
-          : []),
+
       ]
     : [];
   return (

@@ -226,7 +226,7 @@ export const rpcContract = defineRpcContract({
     output: z.object({ threadId: z.string() }),
   },
   bots: { input: z.null(), output: z.object({ bots: z.array(z.object({ id: z.string(), name: z.string() })) }) },
-  handOffBot: { input: z.object({ id: idSchema, note: z.string().max(20_000).nullable() }), output: z.object({ roomId: z.string() }) },
+  handOffBot: { input: z.object({ id: idSchema, note: z.string().max(20_000).nullable() }), output: z.object({ threadId: z.string() }) },
   syncCheckbox: { input: z.object({ id: idSchema, checked: z.boolean() }), output: z.object({ ok: z.boolean() }) },
   /** Sends the latest handoff's thread a follow-up, e.g. review feedback. */
   sendBack: {
@@ -790,20 +790,27 @@ export default async function plugin(bb: BbPluginApi) {
       const task = mustGet(id);
       const botId = task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null;
       if (!botId) throw new Error("Assign a Studio Teams bot first.");
-      const { bot } = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "get", input: { id: botId } as never,
-        outputSchema: z.object({ bot: z.object({ handle: z.string() }) }) });
-      const existing = store.links(id).find((link) => link.plugin_id === "bot-teams");
-      const room = existing ? { id: existing.item_id } : await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "createRoom",
-        input: { name: task.title.slice(0, 80) || "Task", memberIds: [botId], responseBehavior: "directed", requestId: crypto.randomUUID() } as never,
-        outputSchema: z.object({ id: z.string() }) });
-      const text = [`@${bot.handle} Work on this Studio task: ${task.title || "Untitled"}`, task.description, `Task: ${taskHref(id)}`, note].filter(Boolean).join("\n\n");
-      await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "send",
-        input: { id: room.id, text, attachmentIds: [], replyTo: null, requestId: crypto.randomUUID() } as never,
-        outputSchema: z.object({ id: z.string() }) });
-      store.link(id, { target: "item", plugin_id: "bot-teams", item_id: room.id, label: `Bot channel: ${task.title || "Task"}`, href: `/plugins/bot-teams/channels/${room.id}` });
+      const existing = store.links(id).find((link) => link.target === "thread" && link.label.startsWith("Bot work:"));
+      let threadId = existing?.item_id;
+      if (threadId) {
+        const profile = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "threadProfile", input: { threadId } as never,
+          outputSchema: z.object({ botId: z.string().nullable() }).nullable() });
+        if (profile?.botId !== botId) threadId = undefined;
+        else {
+          try { await bb.sdk.threads.get({ threadId }); } catch { threadId = undefined; }
+        }
+      }
+      if (!threadId) {
+        const thread = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "newConversation", input: { id: botId } as never,
+          outputSchema: z.object({ threadId: z.string() }) });
+        threadId = thread.threadId;
+      }
+      const text = [`Work on this Studio task: ${task.title || "Untitled"}`, task.description, `Task: ${taskHref(id)}`, note].filter(Boolean).join("\n\n");
+      await bb.sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: "auto" });
+      store.link(id, { target: "thread", plugin_id: null, item_id: threadId, label: `Bot work: ${task.title || "Task"}`, href: `/threads/${threadId}` });
       if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);
-      return { roomId: room.id };
+      return { threadId };
     },
     async syncCheckbox({ id, checked }) {
       const task = store.get(id);

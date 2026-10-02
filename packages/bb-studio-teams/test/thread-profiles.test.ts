@@ -1,10 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import {
-  makeMessageDispatchHookContext,
-  makePluginAgentConfigurationContext,
-  makeThreadResponse,
-} from "@get-bb/plugin-sdk/testing";
+import { makeMessageDispatchHookContext, makePluginAgentConfigurationContext, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import plugin from "../server";
 import { setup } from "./bots-fixture";
 

@@ -185,23 +185,20 @@ async function seedTeams(machine) {
   await bb("bots", "create", "Quinn", "--description", "Review designs for clarity", "--avatar", "🎨", ...profile, "--mission", "Review designs for the owner.");
   await bb("bots", "create", "Relay", "--description", "Hand work between threads", "--avatar", "📡", ...profile, "--mission", "Hand work between threads for the owner.");
   await bb("bots", "memory", "atlas", "--text", "# Memory\n\n- ORBIT-42 ships in the Friday release window.\n- Scribe owns the release-check log.\n");
-  for (const [name, ...bots] of [["Launch room", "atlas", "scribe"], ["Design review", "quinn"]]) {
-    const channel = await bb("bots", "channel", "create", name, ...bots.flatMap((bot) => ["--bot", bot]), "--behavior", "directed");
-    // A channel made from the CLI gets its BB thread when one first opens it.
-    await pluginRpc("bot-teams", "openChannelThread", { id: channel.id });
-  }
+  const { bots } = await pluginRpc("bot-teams", "list", null);
+  const member = handle => ({kind:"bot",id:bots.find(b=>b.handle===handle).id});
+  const launch = await pluginRpc("bot-teams", "viewCreate", {name:"Launch work",members:[member("atlas"),member("scribe")],requestId:crypto.randomUUID()});
+  await pluginRpc("bot-teams", "viewCreate", {name:"Design review",members:[member("quinn")],requestId:crypto.randomUUID()});
+  const send = text => pluginRpc("bot-teams","viewSend",{id:launch.id,text,targets:[],requestId:crypto.randomUUID()});
+  const replied = start => async () => (await pluginRpc("bot-teams","view",{id:launch.id})).entries.some(e=>e.role==="assistant"&&e.text.startsWith(start));
+  await send("@atlas @scribe Here's the ORBIT-42 launch brief. The owner is Atlas, Scribe keeps the release-check log, and release is Friday. Are you both ready?");
+  await until("Atlas to read the brief",replied("Ready. I checked the brief"));
+  await until("Scribe to read the brief",replied("Ready. I'll keep the decision log"));
+  await send("@atlas Please run the release check.");
+  await until("Atlas release check",replied("Release check passed:"));
+  await send("@scribe Atlas asks you to log the release check.");
+  await until("Scribe release log",replied("Logged: release check passed."));
 
-  const replied = (start) => async () =>
-    (await bb("bots", "channel", "messages", "Launch room", "--limit", "50")).messages.some((message) => message.botId && message.text.startsWith(start));
-  await bb("bots", "channel", "send", "Launch room", "--text", "@atlas @scribe Here's the ORBIT-42 launch brief. Are you both ready?",
-    "--attach", join(teams, "launch-brief.txt"), "--machine", machine.id);
-  await until("Atlas to read the brief", replied("Ready. I checked the brief"));
-  await until("Scribe to read the brief", replied("Ready. I'll keep the decision log"));
-  await bb("bots", "channel", "send", "Launch room", "--text", "@atlas Please run the release check.");
-  await until("Scribe to log the release check", replied("Logged: release check passed."));
-  await bb("bots", "channel", "schedule", "Launch room", "--name", "Weekday launch status",
-    "--text", "Post the day's ORBIT-42 launch status and open decisions.",
-    "--bot", "scribe", "--cron", "0 9 * * 1-5", "--timezone", "America/New_York", "--paused");
 }
 
 async function start() {

@@ -386,7 +386,7 @@ export function SpaceHome({
           {plain?.length === 0 ? <Empty>No threads yet. Start one here, or add a project.</Empty> : null}
         </Section>
         <Section
-          title="Channels and messages"
+          title="Bot threads"
           actions={
             <button type="button" className={OUTLINE_BUTTON} onClick={() => onAddThreads("conversations")}>
               <Icon name="Plus" /> Add channel

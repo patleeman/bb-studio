@@ -77,7 +77,8 @@ struct RouteDestination: View {
     var body: some View {
         switch route {
         case .thread(let id): ThreadView(threadId: id).id(id)
-        case .room(let room): ChannelView(room: room)
+        case .savedView(let id): SavedViewScreen(id: id)
+        case .formerChannel(let id): FormerChannelScreen(id: id)
         case .pages: PagesView()
         case .page(let id): PageView(pageId: id).id(id)
         case .automations: AutomationsView()

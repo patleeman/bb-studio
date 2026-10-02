@@ -1554,10 +1554,10 @@ public enum Tasks {
   }
 
   public struct HandOffBotOutput: Sendable, Hashable, Codable {
-    public var roomId: String?
+    public var threadId: String?
 
-    public init(roomId: String? = nil) {
-      self.roomId = roomId
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 

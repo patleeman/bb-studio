@@ -468,59 +468,6 @@ extension BBClient {
         try await rpc("bot-teams", "list")
     }
 
-    public func room(_ id: String, limit: Int = 60) async throws -> RoomPage {
-        try await rpc("bot-teams", "room", ["id": .string(id), "limit": .from(limit)])
-    }
-
-    @discardableResult
-    public func renameRoom(_ id: String, name: String) async throws -> Room {
-        try await rpc("bot-teams", "updateRoom", ["id": .string(id), "name": .string(String(name.prefix(80)))])
-    }
-
-    /// A new channel with these bots, named "New channel" until renamed.
-    public func createRoom(memberIds: [String]) async throws -> Room {
-        try await rpc(
-            "bot-teams", "createRoom",
-            ["memberIds": .array(memberIds.map { .string($0) }), "requestId": .string(UUID().uuidString.lowercased())])
-    }
-
-    public func createRoom(name: String, memberIds: [String]) async throws -> Room {
-        try await rpc(
-            "bot-teams", "createRoom",
-            [
-                "name": .string(String(name.prefix(80))), "memberIds": .array(memberIds.map { .string($0) }),
-                "requestId": .string(UUID().uuidString.lowercased()),
-            ])
-    }
-
-    public func deleteRoom(_ id: String) async throws {
-        let _: JSONValue = try await rpc("bot-teams", "deleteRoom", ["id": .string(id)])
-    }
-
-    /// Adds a bot to a channel or takes it out.
-    public func setRoomMember(_ id: String, bot: String, present: Bool) async throws -> Room {
-        try await rpc("bot-teams", "member", ["id": .string(id), "botId": .string(bot), "present": .bool(present)])
-    }
-
-    /// Changes a channel's settings: `responseBehavior`, `permissionMode` (null for each bot's own), `archived`.
-    /// Choosing a mode is remembered for new channels, like on the web.
-    public func setRoomState(_ id: String, _ fields: [String: JSONValue]) async throws -> Room {
-        var input = fields
-        input["id"] = .string(id)
-        if fields["responseBehavior"] != nil { input["rememberDefault"] = .bool(true) }
-        return try await rpc("bot-teams", "channelState", .object(input))
-    }
-
-    /// Stops routing and cancels every bot's work on the channel.
-    public func stopRoom(_ id: String) async throws {
-        let _: JSONValue = try await rpc("bot-teams", "stopRoom", ["id": .string(id)])
-    }
-
-    /// Routes a message again after the routing model failed on it.
-    public func retryRouting(_ id: String, message: String) async throws {
-        let _: JSONValue = try await rpc("bot-teams", "retryRouting", ["id": .string(id), "requestId": .string(message)])
-    }
-
     /// A bot's MISSION.md or MEMORY.md, with the version a save must match.
     public func botDocument(_ id: String, file: String) async throws -> BotDocument {
         try await rpc("bot-teams", "document", ["id": .string(id), "file": .string(file)])
@@ -580,15 +527,7 @@ extension BBClient {
         return conversation.threadId
     }
 
-    @discardableResult
-    public func sendToRoom(_ id: String, text: String) async throws -> RoomMessage {
-        try await rpc(
-            "bot-teams", "send",
-            [
-                "id": .string(id), "text": .string(text), "requestId": .string(UUID().uuidString.lowercased()),
-                "attachmentIds": [], "replyTo": nil,
-            ])
-    }
+
 }
 
 // MARK: Talk

@@ -4,7 +4,7 @@ import { decisionsClient, type Question } from "@bb-studio/kit/decisions";
 import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery } from "./view-contract";
 import type { Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
-import { missingThread } from "./runtime";
+import { missingThread } from "./mission-runtime";
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
 type Row = Timeline["rows"][number];
@@ -13,18 +13,25 @@ const envelope = /^\[Studio view message ([a-f0-9-]+)\]\n([\s\S]*?)\n\[End owner
 /** Only owner input and the last completed assistant message in each turn. */
 export function finalEntries(rows: Row[]): ViewEntry[] {
   const entries: ViewEntry[] = [], replies = new Map<string, Row & { kind: "conversation"; role: "assistant" }>();
-  const walk = (items: Row[], completed = true) => {
+  const completedTurns = new Set<string>(), automationTurns = new Set<string>();
+  const collect = (items: Row[]) => { for (const row of items) {
+    if (row.kind === "turn") { if (row.status === "completed") completedTurns.add(row.turnId ?? row.id); collect(row.children ?? []); }
+    else if (row.kind === "conversation" && row.role === "user" && row.turnId && /^\[bb automation due:[^\]]+\]\n/.test(row.text)) automationTurns.add(row.turnId);
+  } };
+
+  collect(rows);
+  const walk = (items: Row[], completed = false) => {
     for (const row of items) {
       if (row.kind === "turn") { walk(row.children ?? [], row.status === "completed"); continue; }
       if (row.kind !== "conversation") continue;
       if (row.role === "user") {
-        if (row.initiator !== "user" || row.senderThreadId || row.turnRequest.status === "rejected") continue;
+        if (row.initiator !== "user" || row.senderThreadId || row.turnRequest.status === "rejected" || /^\[bb automation due:[^\]]+\]\n/.test(row.text)) continue;
         const match = envelope.exec(row.text);
         if (row.text.trim()) entries.push({
           id: `${row.threadId}:${row.id}`, threadId: row.threadId, role: "user",
           text: match?.[2] ?? row.text, groupId: match?.[1] ?? null, createdAt: row.createdAt,
         });
-      } else if (completed) {
+      } else if (!automationTurns.has(row.turnId ?? "") && (completed || (row.turnId !== null && completedTurns.has(row.turnId)))) {
         const key = row.turnId ?? row.id;
         const previous = replies.get(key);
         if (!previous || previous.sourceSeqEnd < row.sourceSeqEnd) replies.set(key, row);
@@ -42,7 +49,6 @@ export function finalEntries(rows: Row[]): ViewEntry[] {
 type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveries: ViewDelivery[] };
 export class ThreadViews {
   private readonly locks = new Map<string, Promise<unknown>>();
-  private readonly indexes = new Map<string, Promise<void>>();
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
   changed() { this.bb.realtime.publish("views-changed", {}); }
   all(): ThreadView[] {
@@ -116,49 +122,64 @@ export class ThreadViews {
       const botId = this.store.byThread(id)?.botId;
       if (explicit.has(id) || (botId && allowedBots.has(botId))) await visit(id, null, 0);
     }
+    const included = new Set(result.map(t => t.id));
+    for (const thread of result) {
+      try { const source = await this.bb.sdk.threads.get({ threadId: thread.id }); if (source.parentThreadId && included.has(source.parentThreadId)) thread.parentThreadId = source.parentThreadId; } catch {}
+    }
     return result;
   }
   saveEntry(entry: ViewEntry) {
     this.store.db.prepare("INSERT OR REPLACE INTO view_entries VALUES (?,?,?,?)")
       .run(entry.id, entry.threadId, entry.createdAt, JSON.stringify(entry));
   }
-  async indexThread(threadId: string, before?: number) {
-    if (before === undefined && this.indexes.has(threadId)) return this.indexes.get(threadId);
-    const work = (async () => {
-      let cursor: Timeline["timelinePage"]["olderCursor"] = null;
-      do {
-        const page = await this.bb.sdk.threads.timeline({ threadId, segmentLimit: "60", includeNestedRows: "true", ...(cursor ? { beforeAnchorId: cursor.anchorId, beforeAnchorSeq: String(cursor.anchorSeq) } : {}) });
-        const entries = finalEntries(page.rows);
-        this.store.db.transaction(() => { for (const entry of entries) this.saveEntry(entry); })();
-        cursor = page.timelinePage.olderCursor;
-        if (before === undefined || entries.some(e => e.createdAt < before)) break;
-      } while (cursor);
+  async indexThread(threadId: string, before = Number.MAX_SAFE_INTEGER, limit = 60, beforeId?: string) {
+    // Refresh source rows on every read; edited/deleted replies must disappear.
+    const entries: ViewEntry[] = [];
+    let cursor: Timeline["timelinePage"]["olderCursor"] = null;
+    const cursors = new Set<string>();
+    do {
+      const page = await this.bb.sdk.threads.timeline({ threadId, segmentLimit: "60", includeNestedRows: "true", ...(cursor ? { beforeAnchorId: cursor.anchorId, beforeAnchorSeq: String(cursor.anchorSeq) } : {}) });
+      entries.push(...finalEntries(page.rows));
+      cursor = page.timelinePage.olderCursor;
+      const key = JSON.stringify(cursor);
+      if (cursors.has(key)) throw new Error("BB returned a repeated history cursor.");
+      cursors.add(key);
+      if (entries.filter(e => e.createdAt < before || (e.createdAt === before && beforeId && e.id < beforeId)).length > limit) break;
+    } while (cursor);
+    const oldest = entries.length ? Math.min(...entries.map(e => e.createdAt)) : Number.MAX_SAFE_INTEGER;
+    this.store.db.transaction(() => {
+      // Synthetic owner receipts are retained until BB exposes the matching input.
+      this.store.db.prepare("DELETE FROM view_entries WHERE thread_id=? AND id NOT LIKE 'view:%' AND created_at>=?").run(threadId, cursor ? oldest : 0);
+      for (const entry of entries) this.saveEntry(entry);
     })();
-    if (before === undefined) this.indexes.set(threadId, work);
-    try { await work; } finally { if (this.indexes.get(threadId) === work) this.indexes.delete(threadId); }
+    return !!cursor;
   }
-  async page(id: string, before?: number, limit = 60) {
+  async page(id: string, before?: number, limit = 60, beforeId?: string) {
     const view = this.get(id), threads = await this.threads(view);
+    let sourceHasOlder = false;
     for (const thread of threads) if (!thread.error) {
-      try { await this.indexThread(thread.id, before); }
+      try { sourceHasOlder = (await this.indexThread(thread.id, before, limit, beforeId)) || sourceHasOlder; }
       catch (cause) { thread.error = String(cause); }
     }
     if (!threads.length) return { view, threads, entries: [], hasOlder: false };
-    const rows = this.store.db.prepare(`SELECT json FROM view_entries WHERE thread_id IN (${threads.map(() => "?").join(",")}) AND created_at < ? ORDER BY created_at DESC,id DESC`)
-      .all(...threads.map(t => t.id), before ?? Number.MAX_SAFE_INTEGER) as { json: string }[];
+    const rows = this.store.db.prepare(`SELECT json FROM view_entries WHERE thread_id IN (${threads.map(() => "?").join(",")}) ORDER BY created_at DESC,id DESC`)
+      .all(...threads.map(t => t.id)) as { json: string }[];
     const seen = new Set<string>(), entries: ViewEntry[] = [];
     for (const row of rows) {
       const entry = viewEntrySchema.parse(JSON.parse(row.json));
       const key = entry.groupId ?? entry.id;
-      if (!seen.has(key)) { seen.add(key); entries.push(entry); }
+      if (seen.has(key)) continue;
+      seen.add(key);
+      if (before !== undefined && (entry.createdAt > before || (entry.createdAt === before && (!beforeId || entry.id >= beforeId)))) continue;
+      entries.push(entry);
       if (entries.length > limit) break;
     }
-    return { view, threads, entries: entries.slice(0, limit).reverse(), hasOlder: entries.length > limit };
+    return { view, threads, entries: entries.slice(0, limit).reverse(), hasOlder: entries.length > limit || sourceHasOlder };
   }
   async recipients(view: ThreadView, input: ViewSend) {
     const threads = await this.threads(view);
     const targets = [...input.targets];
-    const tags = [...input.text.matchAll(/(?:^|\s)@([a-zA-Z0-9_-]+)(\+new)?/g)];
+    const tags = [...input.text.matchAll(/(?:^|\s)@(?:thread:)?([a-zA-Z0-9_-]+)(\+new)?/g)];
     for (const [, handle] of tags) {
       const bot = this.store.all().find(b => b.handle === handle);
       if (bot && view.members.some(m => m.kind === "bot" && m.id === bot.id)) targets.push({ kind: "bot", id: bot.id });
@@ -261,7 +282,7 @@ export class ThreadViews {
         this.store.db.prepare("DELETE FROM view_threads WHERE view_id=?").run(id);
         this.changed(); return { deleted };
       }),
-      view: ({ id, before, limit }) => this.page(id, before, limit),
+      view: ({ id, before, limit, beforeId }) => this.page(id, before, limit, beforeId),
       viewSend: input => this.send(input),
     };
   }

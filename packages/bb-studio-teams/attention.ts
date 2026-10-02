@@ -1,11 +1,6 @@
 import { fromMarkdown } from "mdast-util-from-markdown";
 import type { RootContent } from "mdast";
-import {
-  attentionSchema,
-  type Attention,
-  type AttentionView,
-  type RoomMessage,
-} from "./contract";
+import { attentionSchema, type Attention, type AttentionView, type RoomMessage } from "./contract";
 import type { Store } from "./store";
 
 export function mentionsOwner(text: string): boolean {

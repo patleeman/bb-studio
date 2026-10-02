@@ -8,8 +8,8 @@ provider you already use. Enter the keys once here. Two things use them:
 
 - **Smart Queue**, built in, decides what happens when you send a message to a
   thread that is still working.
-- **Studio Teams** asks it to route channel messages and to decide when
-  delegated work should report back.
+- **Studio Teams** asks it to choose recipients for untagged messages in saved
+  views. Busy owner sends use the same Smart Queue as other threads.
 
 ## Smart Queue
 
@@ -160,13 +160,13 @@ logs.
   `requestId`, `hostId`, `prompt`, and `providerId`, the caller's provider for
   when the fallback follows it.
 
-Studio Teams uses these methods for routing and channel titles. Studio Talk
+Studio Teams uses these methods to choose view recipients. Studio Talk
 uses the fallback model for recording titles. Callers share the typed
 `@bb-studio/kit/decisions` client, including its `askTitle` helper.
 
 Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }`.
-`unavailable` means nothing is configured to answer. Studio Teams shows it as a
-setup hint and offers Retry routing.
+`unavailable` means nothing is configured to answer. Studio Teams preserves the composer draft and asks the owner to select
+recipients.
 
 ## Staged preview
 

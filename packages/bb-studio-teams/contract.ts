@@ -1,22 +1,10 @@
-import {
-  revisionSchema,
-  usageLimits,
-  usageSummary,
-} from "./workspace-contract";
+import { revisionSchema, usageLimits, usageSummary } from "./workspace-contract";
 import type { defineRpcContract } from "@get-bb/plugin-sdk";
 import { botSetupThreadRequest } from "./bot-creation-contract";
 import { z } from "zod";
 import { sendModes } from "./send-mode";
 export const sendModeSchema = z.enum(sendModes);
-import {
-  channelAutomationCreate,
-  channelAutomationList,
-  channelAutomationUpdate,
-  channelAutomationAction,
-  channelAutomationView,
-  channelAutomationRuns,
-  channelAutomationRunPage,
-} from "./automation-contract";
+import { channelAutomationCreate, channelAutomationList, channelAutomationUpdate, channelAutomationAction, channelAutomationView, channelAutomationRuns, channelAutomationRunPage } from "./automation-contract";
 export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
@@ -412,28 +400,6 @@ export const rpcContract = {
     input: botSetupThreadRequest,
     output: z.object({ threadId: z.string() }),
   },
-  attentionList: {
-    input: z.object({
-      status: attentionSchema.shape.status.default("open"),
-      channelId: z.string().uuid().optional(),
-      limit: z.number().int().min(1).max(50).default(30),
-      offset: z.number().int().min(0).default(0),
-    }),
-    output: z.object({
-      items: z.array(attentionView),
-      openCount: z.number(),
-      nextOffset: z.number().nullable(),
-    }),
-  },
-  attentionUpdate: {
-    input: z.object({
-      id: z.string().min(1).max(200),
-      action: z.enum(["acknowledge", "snooze", "reopen"]),
-      minutes: z.number().int().min(1).max(43200).optional(),
-    }).refine((v) => v.action === "snooze" ? v.minutes !== undefined : v.minutes === undefined,
-      "Supply minutes only when snoozing."),
-    output: attentionView,
-  },
   documentHistory: {
     input: z.object({
       id: idSchema,
@@ -441,30 +407,6 @@ export const rpcContract = {
       before: z.number().optional(),
     }),
     output: z.array(revisionSchema),
-  },
-  /** Everything the channel thread's header, composer, and panel show; null for other threads. */
-  channelSurface: {
-    input: z.object({ threadId: z.string() }),
-    output: z
-      .object({
-        room: roomSchema,
-        bots: z.array(botSchema),
-        jobs: z.array(jobSchema),
-        runs: z.array(runSchema),
-        approvals: z.array(approvalSchema),
-        /** Open requests a bot raised for the owner in this channel. */
-        attention: z.array(attentionView),
-      })
-      .nullable(),
-  },
-  /** The channel's own BB thread, created on first open. */
-  openChannelThread: {
-    input: z.object({ id: z.string().uuid() }),
-    output: z.object({ threadId: z.string() }),
-  },
-  channelForThread: {
-    input: z.object({ threadId: z.string() }),
-    output: z.string().uuid().nullable(),
   },
   usage: {
     input: z.object({ id: z.string(), kind: z.enum(["bot", "channel"]) }),
@@ -477,30 +419,6 @@ export const rpcContract = {
       limits: usageLimits,
     }),
     output: usageSummary,
-  },
-
-  automationRuns: {
-    input: channelAutomationRuns,
-    output: channelAutomationRunPage,
-  },
-  automationCreate: {
-    input: channelAutomationCreate,
-    output: channelAutomationView,
-  },
-  automationList: {
-    input: channelAutomationList,
-    output: z.object({
-      automations: z.array(channelAutomationView),
-      nextOffset: z.number().nullable(),
-    }),
-  },
-  automationUpdate: {
-    input: channelAutomationUpdate,
-    output: channelAutomationView,
-  },
-  automationAction: {
-    input: channelAutomationAction,
-    output: z.object({ ok: z.literal(true), result: z.unknown() }),
   },
   list: {
     input: z.null(),
@@ -550,24 +468,6 @@ export const rpcContract = {
     output: botSchema,
   },
   retryJob: { input: z.object({ id: z.string() }), output: jobSchema },
-  history: {
-    input: z.object({
-      id: z.string().uuid(),
-      before: z.string().optional(),
-      after: z.string().optional(),
-      through: z.string().optional(),
-      query: z.string().trim().max(500).optional(),
-      limit: z.number().int().min(1).max(100).default(50),
-    }).refine((input) => !(input.before && input.after), "Choose one history cursor.")
-      .refine((input) => !input.through || !!input.after, "A range needs an after cursor.")
-      .refine((input) => !input.after || !input.query, "Search and forward ranges cannot be combined."),
-    output: z.object({
-      messages: z.array(messageSchema),
-      parents: z.array(messageSchema),
-      nextBefore: z.string().nullable(),
-      nextAfter: z.string().nullable(),
-    }),
-  },
   get: {
     input: z.object({ id: idSchema }),
     output: z.object({
@@ -636,13 +536,6 @@ export const rpcContract = {
       updatedAt: z.number(),
     })),
   },
-  createRoom: {
-    input: roomInput.extend({
-      name: roomInput.shape.name.optional(),
-      requestId: z.string().uuid().optional(),
-    }),
-    output: roomSchema,
-  },
   handoffSource: {
     input: z.object({ threadId: z.string().min(1).max(200) }),
     output: z.object({
@@ -651,88 +544,6 @@ export const rpcContract = {
       title: z.string(),
     }),
   },
-  updateRoom: {
-    input: roomInput.extend({
-      id: z.string().uuid(),
-      memberIds: roomInput.shape.memberIds.optional(),
-    }),
-    output: roomSchema,
-  },
-  deleteRoom: {
-    input: z.object({ id: z.string().uuid() }),
-    output: z.object({ deleted: z.boolean() }),
-  },
-  room: {
-    input: z.object({
-      id: z.string().uuid(),
-      start: z.string().optional(),
-      limit: z.number().int().min(1).max(150).default(50),
-    }),
-    output: transcriptPageSchema.extend({
-      room: roomSchema,
-      runs: z.array(runSchema),
-      jobs: z.array(jobSchema),
-      approvals: z.array(approvalSchema).default([]),
-    }),
-  },
-  upload: {
-    input: z.object({
-      id: z.string().uuid(),
-      name: z.string().min(1).max(255),
-      mimeType: z.string().max(150),
-      data: z.string().max(12_000_000),
-    }),
-    output: attachmentSchema,
-  },
-  discardAttachment: {
-    input: z.object({ id: z.string().uuid(), attachmentId: z.string().uuid() }),
-    output: z.object({ ok: z.literal(true) }),
-  },
-  transcribe: {
-    input: z.object({
-      data: z.string().max(12_000_000),
-      mimeType: z.string().max(150),
-      prompt: z.string().max(16000).optional(),
-    }),
-    output: z.object({ text: z.string() }),
-  },
-  send: {
-    input: z.object({
-      sendMode: sendModeSchema.optional(),
-      id: z.string().uuid(),
-      text: z.string().trim().max(16000),
-      attachmentIds: z.array(z.string().uuid()).max(10).default([]),
-      replyTo: z.string().nullable().default(null),
-      requestId: z.string().uuid(),
-    }),
-    output: messageSchema,
-  },
-  member: {
-    input: z.object({
-      id: z.string().uuid(),
-      botId: idSchema,
-      present: z.boolean(),
-    }),
-    output: roomSchema,
-  },
-  channelState: {
-    input: z.object({
-      id: z.string().uuid(),
-      pinned: z.boolean().optional(),
-      archived: z.boolean().optional(),
-      lastReadAt: z.number().optional(),
-      markUnread: z.boolean().optional(),
-      rememberDefault: z.boolean().optional(),
-      responseBehavior: responseBehavior.optional(),
-      permissionMode: permissionModeSchema.nullable().optional(),
-    }),
-    output: roomSchema,
-  },
-  retryRouting: {
-    input: z.object({ id: z.string().uuid(), requestId: z.string().uuid() }),
-    output: z.object({ ok: z.literal(true) }),
-  },
-  stopRoom: { input: z.object({ id: z.string().uuid() }), output: roomSchema },
   cancelJob: {
     input: z.object({ id: z.string() }),
     output: z.object({ cancelled: z.boolean() }),

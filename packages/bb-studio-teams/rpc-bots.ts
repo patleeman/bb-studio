@@ -1,15 +1,15 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { rpcContract } from "./contract";
-import type { Runtime } from "./runtime";
+import type { Runtime } from "./mission-runtime";
 import { document, saveDocument, type Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 
-type BotMethod = "documentHistory" | "history" | "get" | "document" | "saveDocument" | "wake" | "conversation" | "newConversation" | "handoffSource";
+type BotMethod = "documentHistory" | "get" | "document" | "saveDocument" | "wake" | "conversation" | "newConversation" | "handoffSource";
 
 export function botHandlers(
   bb: BbPluginApi,
   store: Store,
-  runtime: Runtime,
+  runtime: Pick<Runtime, "locked" | "data" | "changed" | "wake">,
   profiles: ThreadProfiles,
 ): Pick<PluginRpcHandlers<typeof rpcContract>, BotMethod> {
   return {
@@ -18,10 +18,6 @@ export function botHandlers(
       runtime.data.snapshot(`${id}:${file}`, latest.text, "Observed file");
       return runtime.data.revisions(`${id}:${file}`, before);
     },
-    history: ({ id, before, after, through, query, limit }) =>
-      after
-        ? store.historyAfter(id, after, through, limit)
-        : store.history(id, before, query, limit),
     get: ({ id }) => ({
       bot: store.get(id),
       conversations: store.conversations(id),

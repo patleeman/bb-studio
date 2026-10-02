@@ -1,23 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  experimental_Icon as Icon,
-  useComposer,
-  useComposerView,
-  useRpc,
-} from "@get-bb/plugin-sdk/app";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-  useComposerMoreSide,
-} from "@bb-studio/kit/app";
-import type { Bot, rpcContract } from "./contract";
+import { experimental_Icon as Icon, useComposer, useComposerView, useRpc, useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, useComposerMoreSide } from "@bb-studio/kit/app";
+import type { Bot } from "./contract";
+import type { rpcContract } from "./client-contract";
 import { message } from "./bot-ui";
-import { SettingsItem } from "./channel-settings";
-import { requestChannelHandoff } from "./channel-handoff";
 
 const pendingKey = (projectId: string) => `bb:bots:new-thread-profile:${projectId}`;
 const savedPick = (projectId: string) => sessionStorage.getItem(pendingKey(projectId));
@@ -36,6 +22,7 @@ export function ProfilePicker() {
   const [triggerRef, side] = useComposerMoreSide();
   const view = useComposerView();
   const composer = useComposer();
+  const navigate = useBbNavigate();
   const rpc = useRpc<typeof rpcContract>();
   const threadId = view.scope.kind === "thread" ? view.scope.threadId : null;
   const projectId = view.scope.kind === "new-thread" ? view.scope.projectId : null;
@@ -125,21 +112,13 @@ export function ProfilePicker() {
     }
   };
 
-  // A thread works as one bot. Another bot means a group: a new channel with
-  // both, continuing from this thread or carrying the unsent draft.
-  const handoff = (other: Bot) => {
-    const memberIds = [...(bot ? [bot.id] : []), other.id];
-    if (threadId) {
-      requestChannelHandoff(threadId, memberIds);
-      return;
-    }
-    if (projectId) {
-      savePick(projectId, null);
-      void rpc.call("pendingThreadProfile", { projectId, botId: null });
-    }
-    requestChannelHandoff(null, memberIds, composer.text);
-    composer.setText("");
-    setBotId(null);
+  const handoff = async (other: Bot) => {
+    setPending(true); setError(null);
+    try {
+      const members = threadId ? [{ kind: "thread" as const, id: threadId }, { kind: "bot" as const, id: other.id }] : [...(bot ? [{ kind: "bot" as const, id: bot.id }] : []), { kind: "bot" as const, id: other.id }];
+      const saved = await rpc.call("viewCreate", { name: "Shared work", members, requestId: crypto.randomUUID() });
+      navigate.toPluginPanel("views", { subPath: saved.id });
+    } catch(cause) { setError(message(cause)); } finally { setPending(false); }
   };
 
   const label = bot ? bot.name : current ? "Archived bot" : "Work as bot";
@@ -170,10 +149,10 @@ export function ProfilePicker() {
             {others.length ? (
               <>
                 <DropdownMenuSeparator />
-                <DropdownMenuLabel>Invite to a channel</DropdownMenuLabel>
+                <DropdownMenuLabel>Create a shared view</DropdownMenuLabel>
                 {others.map((b) => (
                   <BotItem key={b.id} bot={b} onSelect={() => handoff(b)}
-                    description={bot ? `New channel with ${bot.name} and ${b.name}` : `New channel with ${b.name}`} />
+                    description={bot ? `Shared view with ${bot.name} and ${b.name}` : `Shared view with ${b.name}`} />
                 ))}
               </>
             ) : null}
@@ -210,4 +189,8 @@ function BotItem({ bot, description, disabled, onSelect }: {
       </span>
     </DropdownMenuItem>
   );
+}
+
+function SettingsItem({selected,label,description,onSelect}:{selected:boolean;label:string;description:string;onSelect():void}) {
+ return <DropdownMenuItem onSelect={onSelect} role="menuitemradio" aria-checked={selected} className="items-start"><span className="channel-settings-check">{selected ? <Icon name="Check"/> : null}</span><span className="flex min-w-0 flex-col"><span>{label}</span><span className="text-xs text-muted-foreground">{description}</span></span></DropdownMenuItem>;
 }

@@ -1,246 +1,65 @@
 import SwiftUI
 
-/// A channel's members, how it picks who answers, and the permissions its bots run with.
-/// Archive and delete are here too.
-struct ChannelDetailsSheet: View {
+struct SavedViewEditor: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
-    @State private var room: Room
-    let bots: [Bot]
-    /// The channel after a change, or nil once it's deleted.
-    let changed: (Room?) -> Void
-    @State private var error: String?
+    let initial: SavedThreadView?
+    let changed: (SavedThreadView) -> Void
+    @State private var name: String
+    @State private var members: Set<SavedViewMember>
+    @State private var bots: [Bot] = []
+    @State private var threads: [ThreadEntry] = []
     @State private var saving = false
-    @State private var confirmingDelete = false
+    @State private var error: String?
+    @State private var requestId = UUID().uuidString.lowercased()
 
-    init(room: Room, bots: [Bot], changed: @escaping (Room?) -> Void) {
-        _room = State(initialValue: room)
-        self.bots = bots
-        self.changed = changed
+    init(initial: SavedThreadView? = nil, changed: @escaping (SavedThreadView) -> Void) {
+        self.initial = initial; self.changed = changed
+        _name = State(initialValue: initial?.name ?? "")
+        _members = State(initialValue: Set(initial?.members ?? []))
     }
-
-    /// Current bots, plus any retired one still in the channel so it can be taken out.
-    private var choices: [Bot] {
-        bots.filter { $0.retired != true || room.memberIds.contains($0.id) }
-    }
-
-    private var mode: String { room.responseBehavior ?? "everyone" }
 
     var body: some View {
         NavigationStack {
             Form {
-                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-                Section {
-                    ChoiceRow(title: "Mode", options: Room.modes.map { ($0.id, $0.name, $0.detail) }, selection: mode) {
-                        update(["responseBehavior": .string($0)])
-                    }
-                    ChoiceRow(title: "Permissions", options: Room.permissions.map { ($0.id ?? "", $0.name, $0.detail) }, selection: room.permissionMode ?? "") {
-                        update(["permissionMode": $0.isEmpty ? .null : .string($0)])
-                    }
-                } footer: {
-                    Text(Room.modes.first { $0.id == mode }?.detail ?? "")
-                }
-                Section("Members") {
-                    ForEach(choices) { bot in
-                        let member = room.memberIds.contains(bot.id)
-                        Button {
-                            Task { await toggle(bot, member: member) }
-                        } label: {
-                            HStack {
-                                BotRow(bot: bot)
-                                if member { Image(systemName: "checkmark").foregroundStyle(.tint) }
-                            }
-                        }
-                        .foregroundStyle(.primary)
-                        .disabled(saving || (!member && room.memberIds.count >= 16))
-                        .accessibilityAddTraits(member ? .isSelected : [])
-                    }
-                    if choices.isEmpty { Text("No bots yet.").foregroundStyle(.secondary) }
-                }
-                Section {
-                    Button {
-                        update(["archived": .bool(true)], close: true)
-                    } label: {
-                        Label("Archive Channel", systemImage: "archivebox")
-                    }
-                    Button(role: .destructive) { confirmingDelete = true } label: {
-                        Label("Delete Channel", systemImage: "trash")
-                    }
+                TextField("View name", text: $name)
+                if let error { Text(error).foregroundStyle(.red) }
+                Section("Bots") { ForEach(bots) { bot in memberRow(SavedViewMember(kind: "bot", id: bot.id), label: bot.name) } }
+                Section("Threads") { ForEach(threads) { thread in memberRow(SavedViewMember(kind: "thread", id: thread.id), label: thread.displayTitle) } }
+                if let initial {
+                    Section { Button(initial.archived ? "Restore view" : "Archive view") { Task { await archive(initial) } } }
                 }
             }
             .disabled(saving)
-            .navigationTitle("#\(room.name)")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
-            }
-            .confirmationDialog("Delete #\(room.name)?", isPresented: $confirmingDelete, titleVisibility: .visible) {
-                Button("Delete Channel", role: .destructive) { Task { await delete() } }
-            } message: {
-                Text("Its messages go too. Bot work threads stay. This can't be undone.")
-            }
-        }
-    }
-
-    private func update(_ fields: [String: JSONValue], close: Bool = false) {
-        Task {
-            saving = true
-            defer { saving = false }
-            do {
-                room = try await app.client.setRoomState(room.id, fields)
-                error = nil
-                changed(room)
-                if close { dismiss() }
-            } catch {
-                self.error = BBClient.describe(error, server: app.client.baseURL)
-            }
-        }
-    }
-
-    private func toggle(_ bot: Bot, member: Bool) async {
-        saving = true
-        defer { saving = false }
-        do {
-            room = try await app.client.setRoomMember(room.id, bot: bot.id, present: !member)
-            error = nil
-            changed(room)
-        } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
-        }
-    }
-
-    private func delete() async {
-        saving = true
-        defer { saving = false }
-        do {
-            try await app.client.deleteRoom(room.id)
-            changed(nil)
-            dismiss()
-        } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
-        }
-    }
-}
-
-/// A setting's current choice; tap for every option with what it does.
-private struct ChoiceRow: View {
-    let title: String
-    let options: [(id: String, name: String, detail: String)]
-    let selection: String
-    let choose: (String) -> Void
-
-    var body: some View {
-        NavigationLink {
-            ChoiceList(title: title, options: options, selection: selection, choose: choose)
-        } label: {
-            LabeledContent(title, value: options.first { $0.id == selection }?.name ?? "")
-        }
-    }
-}
-
-private struct ChoiceList: View {
-    @Environment(\.dismiss) private var dismiss
-    let title: String
-    let options: [(id: String, name: String, detail: String)]
-    let selection: String
-    let choose: (String) -> Void
-
-    var body: some View {
-        List(options, id: \.id) { option in
-            Button {
-                if option.id != selection { choose(option.id) }
-                dismiss()
-            } label: {
-                HStack {
-                    VStack(alignment: .leading, spacing: 2) {
-                        Text(option.name)
-                        Text(option.detail).font(.caption).foregroundStyle(.secondary)
-                    }
-                    Spacer()
-                    if option.id == selection { Image(systemName: "checkmark").foregroundStyle(.tint) }
-                }
-            }
-            .foregroundStyle(.primary)
-            .accessibilityAddTraits(option.id == selection ? .isSelected : [])
-        }
-        .navigationTitle(title)
-        .navigationBarTitleDisplayMode(.inline)
-    }
-}
-
-/// Name a channel and pick who's in it.
-struct NewChannelSheet: View {
-    @EnvironmentObject private var app: AppModel
-    @Environment(\.dismiss) private var dismiss
-    let created: (Room) -> Void
-    @State private var name = ""
-    @State private var members: Set<String> = []
-    @State private var bots: [Bot]?
-    @State private var creating = false
-    @State private var error: String?
-    @FocusState private var focused: Bool
-
-    private var trimmed: String { name.trimmingCharacters(in: .whitespacesAndNewlines) }
-
-    var body: some View {
-        NavigationStack {
-            Form {
-                if let error { Text(error).font(.footnote).foregroundStyle(.red) }
-                Section {
-                    TextField("Channel name", text: $name)
-                        .focused($focused)
-                        .submitLabel(.done)
-                        .accessibilityIdentifier("channelNameField")
-                }
-                Section("Members") {
-                    if let bots {
-                        ForEach(bots.filter { $0.retired != true }) { bot in
-                            let member = members.contains(bot.id)
-                            Button {
-                                if member { members.remove(bot.id) } else if members.count < 16 { members.insert(bot.id) }
-                            } label: {
-                                HStack {
-                                    BotRow(bot: bot)
-                                    if member { Image(systemName: "checkmark").foregroundStyle(.tint) }
-                                }
-                            }
-                            .foregroundStyle(.primary)
-                            .accessibilityAddTraits(member ? .isSelected : [])
-                        }
-                    } else if error == nil {
-                        ProgressView().frame(maxWidth: .infinity)
-                    }
-                }
-            }
-            .navigationTitle("New Channel")
-            .navigationBarTitleDisplayMode(.inline)
+            .navigationTitle(initial == nil ? "New View" : "Edit View")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button("Create") { Task { await create() } }.disabled(trimmed.isEmpty || creating)
-                }
+                ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || members.count > 32) }
             }
             .task {
-                focused = true
-                do {
-                    bots = try await app.client.botTeams().bots
-                } catch {
-                    self.error = BBClient.describe(error, server: app.client.baseURL)
-                }
+                do { bots = try await app.client.profiles(); threads = try await app.client.threads(limit: 100) }
+                catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
             }
         }
-        .interactiveDismissDisabled(!trimmed.isEmpty)
     }
-
-    private func create() async {
-        creating = true
-        defer { creating = false }
+    private func memberRow(_ member: SavedViewMember, label: String) -> some View {
+        Button { if members.contains(member) { members.remove(member) } else { members.insert(member) } } label: {
+            HStack { Text(label).foregroundStyle(.primary); Spacer(); if members.contains(member) { Image(systemName: "checkmark") } }
+        }.accessibilityAddTraits(members.contains(member) ? .isSelected : [])
+    }
+    private func save() async {
+        saving = true
+        defer { saving = false }
         do {
-            let room = try await app.client.createRoom(name: trimmed, memberIds: (bots ?? []).map(\.id).filter(members.contains))
-            dismiss()
-            created(room)
-        } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
-        }
+            let chosen = members.sorted { ($0.kind + $0.id) < ($1.kind + $1.id) }
+            let view: SavedThreadView
+            if let initial { view = try await app.client.updateSavedView(initial, name: name, members: chosen) }
+            else { view = try await app.client.createSavedView(name: name, members: chosen, requestId: requestId) }
+            changed(view); dismiss()
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    }
+    private func archive(_ view: SavedThreadView) async {
+        do { changed(try await app.client.updateSavedView(view, archived: !view.archived)); dismiss() }
+        catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
     }
 }

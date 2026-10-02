@@ -10,8 +10,6 @@ const task = z.object({ id: z.string(), title: z.string(), status: z.string(), d
 const statuses = z.object({ columns: z.array(z.object({ id: z.string(), label: z.string() })) });
 const teams = z.object({
   bots: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), working: z.boolean() })),
-  rooms: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string() })),
-  roomWork: z.record(z.string(), z.object({ running: z.number() })),
   directConversations: z.record(z.string(), z.array(z.object({ botId: z.string(), threadId: z.string() }))),
 });
 const roomJobs = z.object({ jobs: z.array(z.object({ botId: z.string(), startedAt: z.number().nullable(), updatedAt: z.number(), status: z.string(), threadId: z.string().nullable() })) });
@@ -69,7 +67,7 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
   const due = board?.tasks.filter((item) => !item.archived && item.status !== "done" && item.due && item.due <= today && sameProject(item, projectId)).sort((a, b) => (a.due ?? "").localeCompare(b.due ?? "")).slice(0, 8) ?? null;
   const review = board?.tasks.filter((item) => !item.archived && inReview(item) && sameProject(item, projectId)).slice(0, 8) ?? null;
   const needsYou = await needsYouData(sdk, services, providerComments, overview.items,
-    board?.tasks ?? null, roster?.rooms ?? null, projectId, inReview);
+    board?.tasks ?? null, null, projectId, inReview);
   const activeThreads = threadList.filter((thread) => ["active", "starting", "pending", "stopping"].includes(thread.status));
   const working = {
     threads: activeThreads.map((thread) => ({ id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, projectId: thread.projectId })).slice(0, 12),
@@ -92,22 +90,19 @@ export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioService
     const events = await sdk.threads.events.list({ threadId: thread.id, order: "desc", limit: "500", types: ["turn/started", "turn/completed"] }).catch(() => []);
     return { id: thread.id, title: thread.title ?? thread.titleFallback ?? "Untitled thread", status: thread.status, ...summarizeTurns(events.map((event) => ({ type: event.type, createdAt: event.createdAt, data: { status: event.type === "turn/completed" ? event.data.status : undefined } })), since) };
   }));
-  const jobs = roster ? (await Promise.all(roster.rooms.filter((room) => !projectId || room.projectId === projectId).map((room) =>
-    call("bot-teams", "room", { id: room.id, limit: 1 }, roomJobs).then((result) => result.jobs, () => [])))).flat() : [];
   const direct = roster ? Object.values(roster.directConversations).flat() : [];
-  const roomThreadIds = new Set(jobs.map((job) => job.threadId));
-  const directStats = await Promise.all(direct.filter((entry) => !roomThreadIds.has(entry.threadId)).map(async (entry) => {
+  const directStats = await Promise.all(direct.map(async (entry) => {
     const events = await sdk.threads.events.list({ threadId: entry.threadId, order: "desc", limit: "500", types: ["turn/started", "turn/completed"] }).catch(() => []);
     return { botId: entry.botId, ...summarizeTurns(events.map((event) => ({ type: event.type, createdAt: event.createdAt, data: { status: event.type === "turn/completed" ? event.data.status : undefined } })), since) };
   }));
   const bots = roster ? await Promise.all(roster.bots.filter((bot) => !projectId || bot.projectId === projectId).map(async (bot) => {
     const summary = await call("bot-teams", "usage", { id: bot.id, kind: "bot" }, usage).catch(() => null);
-    const botJobs = summarizeBotJobs(jobs.filter((job) => job.botId === bot.id), since);
+
     const botDirect = directStats.filter((entry) => entry.botId === bot.id);
     return { id: bot.id, name: bot.name,
-      turns: botJobs.turns + botDirect.reduce((total, entry) => total + entry.turns, 0),
-      failures: botJobs.failures + botDirect.reduce((total, entry) => total + entry.failures, 0),
-      durationMs: botJobs.durationMs + botDirect.reduce((total, entry) => total + entry.durationMs, 0),
+      turns: botDirect.reduce((total, entry) => total + entry.turns, 0),
+      failures: botDirect.reduce((total, entry) => total + entry.failures, 0),
+      durationMs: botDirect.reduce((total, entry) => total + entry.durationMs, 0),
       active: summary?.active ?? 0, limits: summary?.limits ?? null };
   })) : null;
   return { needsYou, due, review, working, recent, automations, activity, dashboard: { periodDays, threads, bots } };

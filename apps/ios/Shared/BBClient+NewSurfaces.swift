@@ -57,7 +57,7 @@ extension BBClient {
         let result: Tasks.HandOffBotOutput = try await rpc("studio-tasks", Tasks.Method.handOffBot, [
             "id": .string(id), "note": .null,
         ])
-        return result.roomId ?? ""
+        return result.threadId ?? ""
     }
 
     public func recordingNotes(_ id: String) async throws -> Talk.RecordingGetOutputRecordingMeetingNotes? {

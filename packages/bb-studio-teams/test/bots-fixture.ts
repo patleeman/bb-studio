@@ -1,25 +1,20 @@
 import { createTestStore } from "./test-store";
-import { test } from "vitest";
+
 import assert from "node:assert/strict";
 import { randomUUID } from "node:crypto";
-import { mkdtemp, rm, writeFile } from "node:fs/promises";
-import { join } from "node:path";
-import { tmpdir } from "node:os";
-import Database from "better-sqlite3";
-import {
-  createFakePluginHost,
-  makeThreadResponse,
-  makePluginAgentConfigurationContext,
-  makeMessageDispatchHookContext,
-} from "@get-bb/plugin-sdk/testing";
-import plugin from "../server";
-import { agentAuthor, requestStatus } from "../agent-channels";
-import { channelWork } from "../channel-work";
-import { Store, document, saveDocument } from "../store";
-import { Runtime, jobPrompt, mentioned, recipients } from "../runtime";
-import { profileInput, roomSchema, type Bot, type Conversation, type Room } from "../contract";
-import { channelHandoffText } from "../handoff-draft";
-import { directMessageId } from "../direct-messages";
+
+
+
+
+import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
+
+
+
+
+import { Runtime } from "../mission-runtime";
+import { profileInput, type Bot, type Room } from "../contract";
+
+
 
 export const bot = (
   home: string,

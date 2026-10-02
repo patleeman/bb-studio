@@ -60,11 +60,11 @@ struct BotView: View {
                 } footer: {
                     Text("Threads working as \(bot.name). Choose Work as bot in any thread's menu.")
                 }
-                let rooms = teams?.rooms.filter { $0.archived != true && $0.memberIds.contains(id) } ?? []
+                let rooms = teams?.views.filter { !$0.archived && $0.members.contains { $0.kind == "bot" && $0.id == id } } ?? []
                 if !rooms.isEmpty {
-                    Section("Channels") {
+                    Section("Views") {
                         ForEach(rooms) { room in
-                            NavigationLink(value: Route.room(room)) { Label(room.name, systemImage: "number") }
+                            NavigationLink(value: Route.savedView(id: room.id)) { Label(room.name, systemImage: "rectangle.stack") }
                         }
                     }
                 }

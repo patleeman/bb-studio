@@ -9,12 +9,11 @@
   },
   "bb": {
     "name": "Studio Teams",
-    "description": "Part of BB Studio. Persistent bots that collaborate in channels, delegate work, and keep their own workspaces and memory.",
+    "description": "Part of BB Studio. Persistent bot profiles and saved views of ordinary threads, with shared memory and missions.",
     "branding": {
       "icon": "Bot"
     },
     "server": "./server.ts",
-    "host": "./host.ts",
     "app": "./app.tsx"
   },
   "dependencies": {

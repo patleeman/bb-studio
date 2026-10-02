@@ -39,7 +39,7 @@ export const viewContract = {
   },
   viewDelete: { input: z.object({ id: z.string().uuid() }), output: z.object({ deleted: z.boolean() }) },
   view: {
-    input: z.object({ id: z.string().uuid(), before: z.number().optional(), limit: z.number().int().min(1).max(100).default(60) }),
+    input: z.object({ id: z.string().uuid(), before: z.number().optional(), beforeId: z.string().optional(), limit: z.number().int().min(1).max(100).default(60) }),
     output: z.object({ view: threadViewSchema, threads: z.array(viewThreadSchema), entries: z.array(viewEntrySchema), hasOlder: z.boolean() }),
   },
   viewSend: { input: viewSendInput, output: z.object({ requestId: z.string(), deliveries: z.array(viewDeliverySchema) }) },

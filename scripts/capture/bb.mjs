@@ -21,24 +21,21 @@ export async function pluginRpc(pluginId, method, input) {
   return payload.result;
 }
 
-// Studio Teams captures read the seeded "Launch room" channel: Atlas and Scribe
-// with fixed replies from their demo missions (see the Studio Teams README).
+// Saved view fixture seeded by staged-bb.mjs.
 export const launchRoomReplies = [
-  "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
-  "Release check passed: the brief, owner, and Friday window all line up.",
-  "Logged: release check passed. Next step: confirm the Friday release window.",
+ "Ready. I'll keep the decision log for ORBIT-42 and post next steps after each check.",
+ "Release check passed: the brief, owner, and Friday window all line up.",
+ "Logged: release check passed. Next step: confirm the Friday release window.",
 ];
 let launchRoomId = null;
 export async function launchRoomThread() {
-  const { rooms } = await pluginRpc("bot-teams", "list", null);
-  const room = rooms.find((r) => r.name === "Launch room" && !r.archived);
-  if (!room?.threadId) throw new Error("Seed the Launch room channel thread with Atlas and Scribe before capturing.");
-  const { messages } = await pluginRpc("bot-teams", "room", { id: room.id });
-  for (const reply of launchRoomReplies)
-    if (!messages.some((m) => m.botId && m.text.startsWith(reply.slice(0, 40))))
-      throw new Error(`Launch room is missing the seeded reply: ${reply}`);
-  launchRoomId = room.id;
-  return room.threadId;
+ const views = await pluginRpc("bot-teams","views",{});
+ const view=views.find(v=>v.name==="Launch work"&&!v.archived);
+ if(!view)throw new Error("Seed Launch work before capturing.");
+ const page=await pluginRpc("bot-teams","view",{id:view.id});
+ for(const reply of launchRoomReplies)if(!page.entries.some(e=>e.role==="assistant"&&e.text.startsWith(reply.slice(0,40))))throw new Error(`Missing seeded reply: ${reply}`);
+ launchRoomId=view.id;
+ return page.threads[0]?.id;
 }
 
 /** Run the bb CLI as the owner, not as the thread this script may run inside. */

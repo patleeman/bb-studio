@@ -29,7 +29,7 @@ describe("Needs you", () => {
     const comments = { list: async () => [] };
     const tasks = () => [{ id: "task", title: "Task", status: review ? "review" : "done", due: null, projectId: "project", archived: false }];
     const read = () => needsYouData(sdk as never, services as never, comments as never, [], tasks(), [{ id: "r1", projectId: "project" }], "project");
-    expect((await read()).map((entry) => entry.kind)).toEqual(["approval", "review", "attention"]);
+    expect((await read()).map((entry) => entry.kind)).toEqual(["approval", "review"]);
     pending = false; attentionOpen = false; review = false;
     expect(await read()).toEqual([]);
   });

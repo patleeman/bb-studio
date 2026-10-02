@@ -1,271 +1,158 @@
 import SwiftUI
 
-/// A Bot Teams channel. Channels live in the bot-teams plugin's own store,
-/// so this reads and writes through its RPC rather than core threads.
-struct ChannelView: View {
+/// A saved timeline over ordinary BB threads. Work and approvals stay in each thread.
+struct SavedViewScreen: View {
     @EnvironmentObject private var app: AppModel
-    @Environment(\.dismiss) private var dismiss
-    let room: Room
-    /// The channel as last loaded, with its members and settings.
-    @State private var current: Room?
+    let id: String
+    @State private var page: SavedViewPage?
     @State private var bots: [Bot] = []
-    @State private var runs: [RoomRun] = []
-    @State private var activeJobs: [RoomJob] = []
-    @State private var busy = false
-    @State private var stopping = false
-    @State private var retrying: String?
-    @State private var showingDetails = false
-    @State private var name: String?
-    @State private var renaming = false
-    @State private var newName = ""
-    @State private var messages: [RoomMessage] = []
     @State private var draft = ""
+    @State private var targets = Set<SavedViewMember>()
+    @State private var reply: String?
+    @State private var fresh = false
+    @State private var sending = false
     @State private var error: String?
+    @State private var editing = false
     @State private var listener: UUID?
-    @State private var dictating = false
-    @State private var showingAutomations = false
-    @StateObject private var spaces = ThreadSpacesModel()
-    /// Tool approvals and questions from bots working on this channel's jobs.
-    @State private var approvals: [PendingInteraction] = []
+    @State private var retryId = UUID().uuidString.lowercased()
+    @State private var retrySignature: String?
 
     var body: some View {
-        transcript
+        ScrollView {
+            LazyVStack(alignment: .leading, spacing: 16) {
+                if let page {
+                    ForEach(page.threads.filter { $0.parentThreadId == nil }) { thread in
+                        NavigationLink(value: Route.thread(id: thread.id)) {
+                            Label(thread.title + (["active", "starting"].contains(thread.status) ? " · Working…" : ""), systemImage: "bubble.left")
+                        }.font(.caption)
+                    }
+                    if page.hasOlder {
+                        Button("Earlier replies") { Task { await loadOlder() } }
+                    }
+                    if page.entries.isEmpty { Text("Send a message to start work in this view.").foregroundStyle(.secondary).padding(.vertical, 40) }
+                    ForEach(page.entries.filter { entry in page.threads.contains { $0.id == entry.threadId && $0.parentThreadId == nil } }) { entry in
+                        entryRow(entry)
+                    }
+                    ForEach(page.threads.filter { $0.parentThreadId != nil }) { thread in
+                        DisclosureGroup(thread.title) {
+                            NavigationLink("Open thread", value: Route.thread(id: thread.id))
+                            ForEach(page.entries.filter { $0.threadId == thread.id }) { entry in entryRow(entry) }
+                        }
+                    }
+                } else { ProgressView() }
+            }.padding()
+        }
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) { composer }
-        .overlay(alignment: .top) {
-            if let error { Text(error).font(.caption).padding(8).background(.red.opacity(0.15), in: .capsule) }
-        }
-        .sheet(isPresented: $dictating) {
-            DictationView(threadId: nil, autoStart: true) { text in draft += (draft.isEmpty ? "" : " ") + text }
-        }
-        .navigationTitle("#\(name ?? room.name)")
+        .navigationTitle(page?.view.name ?? "View")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar(.hidden, for: .tabBar)
-        .toolbar {
-            ToolbarItem(placement: .topBarTrailing) {
-                Menu {
-                    Button { showingDetails = true } label: { Label("Members & Settings", systemImage: "person.2") }
-                    Button {
-                        newName = name ?? room.name
-                        renaming = true
-                    } label: { Label("Rename channel", systemImage: "pencil") }
-                    Button { showingAutomations = true } label: { Label("Automations", systemImage: "clock.arrow.circlepath") }
-                    if let threadId = (current?.threadId ?? room.threadId) {
-                        ThreadSpacesMenu(model: spaces, threadId: threadId) { error = $0 }
-                    }
-                } label: { Image(systemName: "ellipsis") }
-                .accessibilityLabel("More")
-            }
-        }
-        .sheet(isPresented: $showingAutomations) { ChannelAutomationsSheet(room: room) }
-        .task(id: (current?.threadId ?? room.threadId)) {
-            if let threadId = (current?.threadId ?? room.threadId) { await spaces.load(threadId, client: app.client) }
-        }
-        .sheet(isPresented: $showingDetails) {
-            ChannelDetailsSheet(room: current ?? room, bots: bots) { updated in
-                if let updated {
-                    current = updated
-                    name = updated.name
-                    if updated.archived == true { dismiss() }
-                } else {
-                    dismiss()
-                }
-            }
-        }
-        .alert("Rename channel", isPresented: $renaming) {
-            TextField("Name", text: $newName)
-            Button("Cancel", role: .cancel) {}
-            Button("Rename") {
-                let next = newName.trimmingCharacters(in: .whitespacesAndNewlines)
-                guard !next.isEmpty, next != (name ?? room.name) else { return }
-                Task {
-                    do {
-                        name = try await app.client.renameRoom(room.id, name: next).name
-                    } catch {
-                        self.error = error.localizedDescription
-                    }
-                }
-            }
-        }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Edit view") { editing = true }.disabled(page == nil) } }
+        .sheet(isPresented: $editing) { if let view = page?.view { SavedViewEditor(initial: view) { _ in Task { await load() } } } }
         .task {
-            // A channel opened from a thread's profile starts with a link back to it.
-            if draft.isEmpty, let handoff = ChannelHandoff.take(room.id) { draft = handoff + "\n\n" }
             listener = app.realtime.listen { event in
-                if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" {
-                    Task { await load() }
-                }
+                if case .pluginSignal(let pluginId, _, _) = event, pluginId == "bot-teams" { Task { await load() } }
             }
+            bots = (try? await app.client.profiles()) ?? []
             await load()
-            bots = (try? await app.client.botTeams().bots) ?? bots
         }
-        .onDisappear { if let listener { app.realtime.removeListener(listener) } }
+        .onDisappear { if let listener { app.realtime.removeListener(listener) }; listener = nil }
     }
 
-    private var transcript: some View {
-        ScrollView {
-            LazyVStack(alignment: .leading, spacing: 14) {
-                ForEach(messages) { message in
-                    VStack(alignment: .leading, spacing: 4) {
-                        Text(message.speaker)
-                            .font(.caption.weight(.semibold))
-                            .foregroundStyle(message.isOwner ? Color.accentColor : .secondary)
-                        MarkdownText(message.text).textSelection(.enabled)
-                        if let run = failedRouting[message.id] { routingFailure(run) }
-                    }
-                    .frame(maxWidth: .infinity, alignment: .leading)
-                }
-                ForEach(runs.filter { $0.routing == "error" && !messages.map(\.id).contains($0.id) }) { run in
-                    routingFailure(run)
-                }
-                ForEach(approvals) { interaction in
-                    InteractionCard(
-                        interaction: interaction,
-                        resolve: { value in
-                            do {
-                                try await app.client.settle(interaction, value)
-                                approvals.removeAll { $0.id == interaction.id }
-                                return true
-                            } catch {
-                                self.error = error.localizedDescription
-                                return false
-                            }
-                        },
-                        cancel: {
-                            try? await app.client.cancel(interaction)
-                            approvals.removeAll { $0.id == interaction.id }
-                        },
-                        openWeb: { app.path.append(.thread(id: interaction.threadId)) })
-                }
+    private func entryRow(_ entry: SavedViewEntry) -> some View {
+        VStack(alignment: .leading, spacing: 6) {
+            HStack {
+                NavigationLink(entry.role == "user" ? "You" : label(entry.threadId), value: Route.thread(id: entry.threadId)).font(.subheadline.bold())
+                Spacer()
+                Text(Date(timeIntervalSince1970: entry.createdAt / 1000), style: .time).font(.caption).foregroundStyle(.secondary)
+                Button("Reply") { reply = entry.threadId; targets.removeAll() }.font(.caption)
             }
-            .padding()
-        }
+            MarkdownText(entry.text).textSelection(.enabled)
+        }.padding(.vertical, 6)
     }
 
     private var composer: some View {
-        VStack(spacing: 0) {
-            if busy { workingBar }
-            HStack(alignment: .bottom, spacing: 8) {
-                Button { dictating = true } label: { Image(systemName: "mic.fill").font(.title3) }
-                TextField("Message #\(name ?? room.name)", text: $draft, axis: .vertical)
-                    .lineLimit(1...6)
-                    .padding(.horizontal, 12)
-                    .padding(.vertical, 8)
-                    .background(.fill.tertiary, in: .rect(cornerRadius: 18))
-                Button {
-                    let text = draft.trimmingCharacters(in: .whitespacesAndNewlines)
-                    guard !text.isEmpty else { return }
-                    Task {
-                        do {
-                            try await app.client.sendToRoom(room.id, text: text)
-                            draft = ""
-                            await load()
-                        } catch { self.error = error.localizedDescription }
-                    }
-                } label: { Image(systemName: "arrow.up.circle.fill").font(.title) }
-                .disabled(draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+        VStack(alignment: .leading, spacing: 8) {
+            if let error { Text(error).font(.caption).foregroundStyle(.red) }
+            if let reply {
+                HStack { Text("Replying to \(label(reply))").font(.caption); Spacer(); Button("Cancel") { self.reply = nil } }
             }
-            .padding(.horizontal)
-            .padding(.vertical, 8)
-        }
-        .background(.bar)
-    }
-
-    /// Messages whose routing failed, by message id.
-    private var failedRouting: [String: RoomRun] {
-        Dictionary(runs.filter { $0.routing == "error" }.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-    }
-
-    /// Nobody was picked to answer: the routing model failed. Retry routes the message again.
-    private func routingFailure(_ run: RoomRun) -> some View {
-        HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Label(run.routingError ?? "Couldn't choose which bots answer.", systemImage: "exclamationmark.triangle.fill")
-                .font(.caption)
-                .foregroundStyle(.red)
-            Spacer(minLength: 0)
-            Button {
-                Task {
-                    retrying = run.id
-                    do {
-                        try await app.client.retryRouting(room.id, message: run.id)
-                        await load()
-                    } catch {
-                        self.error = BBClient.describe(error, server: app.client.baseURL)
+            ScrollView(.horizontal) {
+                HStack {
+                    ForEach(page?.view.members ?? [], id: \.self) { member in
+                        Button { if targets.contains(member) { targets.remove(member) } else { targets.insert(member) } } label: {
+                            Label(member.kind == "bot" ? bots.first { $0.id == member.id }?.name ?? "Bot" : label(member.id), systemImage: targets.contains(member) ? "checkmark.circle.fill" : "circle")
+                        }.font(.caption)
                     }
-                    retrying = nil
                 }
-            } label: {
-                if retrying == run.id { ProgressView() } else { Text("Retry Routing") }
             }
-            .font(.caption.weight(.semibold))
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(retrying != nil)
-        }
+            Toggle("New bot threads", isOn: $fresh).font(.caption)
+            HStack(alignment: .bottom) {
+                TextField("Message or @mention members…", text: $draft, axis: .vertical).lineLimit(2...6).textFieldStyle(.roundedBorder)
+                Button { Task { await send() } } label: { if sending { ProgressView() } else { Image(systemName: "arrow.up.circle.fill").font(.title2) } }
+                    .accessibilityLabel("Send message").disabled(sending || draft.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || page?.view.archived == true)
+            }
+        }.padding().background(.bar)
     }
 
-    /// Who's working, and Stop to cancel all of it.
-    private var workingBar: some View {
-        HStack(spacing: 8) {
-            ProgressView().controlSize(.small)
-            Text(workingText)
-                .font(.footnote)
-                .foregroundStyle(.secondary)
-                .lineLimit(1)
-            Spacer(minLength: 0)
-            Button(role: .destructive) {
-                Task {
-                    stopping = true
-                    do {
-                        try await app.client.stopRoom(room.id)
-                        await load()
-                    } catch {
-                        self.error = BBClient.describe(error, server: app.client.baseURL)
-                    }
-                    stopping = false
-                }
-            } label: {
-                Label("Stop", systemImage: "stop.fill")
-            }
-            .font(.footnote.weight(.semibold))
-            .buttonStyle(.bordered)
-            .controlSize(.small)
-            .disabled(stopping)
-        }
-        .padding(.horizontal)
-        .padding(.top, 8)
-    }
-
-    private var workingText: String {
-        let names = Array(Set(activeJobs.map { job in bots.first { $0.id == job.botId }?.name ?? "A bot" })).sorted()
-        switch names.count {
-        case 0: return "Choosing who answers…"
-        case 1: return "\(names[0]) is working…"
-        case 2: return "\(names[0]) and \(names[1]) are working…"
-        default: return "\(names.count) bots are working…"
-        }
+    private func label(_ threadId: String) -> String {
+        let thread = page?.threads.first { $0.id == threadId }
+        return bots.first { $0.id == thread?.botId }?.name ?? thread?.title ?? "Thread"
     }
 
     private func load() async {
         do {
-            let page = try await app.client.room(room.id)
-            messages = page.messages
-            if let room = page.room {
-                current = room
-                name = room.name
+            let next = try await app.client.savedView(id)
+            var updated = next
+            if let previous = page {
+                let old = previous.entries.filter { $0.createdAt < (next.entries.first?.createdAt ?? 0) }
+                updated.entries = old + next.entries
+                if !old.isEmpty { updated.hasOlder = previous.hasOlder }
             }
-            runs = page.runs ?? []
-            activeJobs = page.activeJobs
-            busy = page.busy
-            error = nil
-            let wanted = Set((page.approvals ?? []).map(\.id))
-            var pending: [PendingInteraction] = []
-            for thread in Set((page.approvals ?? []).map(\.threadId)) {
-                pending += (try? await app.client.interactions(thread))?.filter { wanted.contains($0.id) } ?? []
-            }
-            approvals = pending.sorted { $0.id < $1.id }
-        } catch {
-            self.error = error.localizedDescription
-        }
+            page = updated
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    }
+
+    private func loadOlder() async {
+        guard let first = page?.entries.first else { return }
+        do {
+            let older = try await app.client.savedView(id, before: first)
+            page?.entries.insert(contentsOf: older.entries, at: 0)
+            page?.hasOlder = older.hasOlder
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    }
+
+    private func send() async {
+        sending = true
+        defer { sending = false }
+        var text = draft
+        var mode = "auto"
+        for action in ["steer", "followup", "fork"] where text.hasPrefix("/\(action) ") { mode = action; text = String(text.dropFirst(action.count + 2)); break }
+        let selected = targets.sorted { ($0.kind + $0.id) < ($1.kind + $1.id) }
+        let signature = "\(text)|\(selected)|\(reply ?? "")|\(fresh)|\(mode)"
+        if retrySignature != signature { retrySignature = signature; retryId = UUID().uuidString.lowercased() }
+        do {
+            let result = try await app.client.sendToView(id, text: text, targets: selected, replyThreadId: reply, fresh: fresh, mode: mode, requestId: retryId)
+            let failures = result.deliveries.filter { $0.status == "error" }
+            if failures.isEmpty { draft = ""; reply = nil; targets.removeAll(); retrySignature = nil; error = nil }
+            else { error = failures.compactMap(\.error).joined(separator: "\n") }
+            await load()
+        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+    }
+}
+
+struct FormerChannelScreen: View {
+    @EnvironmentObject private var app: AppModel
+    let id: String
+    @State private var page: SavedViewPage?
+    @State private var error: String?
+    var body: some View {
+        Group {
+            if let page {
+                if page.view.members.count == 1, let thread = page.threads.first { ThreadView(threadId: thread.id) }
+                else { SavedViewScreen(id: id) }
+            } else if let error { ContentUnavailableView("View unavailable", systemImage: "exclamationmark.bubble", description: Text(error)) }
+            else { ProgressView() }
+        }.task { do { page = try await app.client.savedView(id) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) } }
     }
 }

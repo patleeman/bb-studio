@@ -250,8 +250,8 @@ final class InboxModel: ObservableObject {
         return botTeams?.bots.first { $0.id == id && $0.retired != true }
     }
 
-    var channels: [Room] {
-        (botTeams?.rooms ?? []).filter { $0.archived != true }.sorted { ($0.updatedAt ?? 0) > ($1.updatedAt ?? 0) }
+    var views: [SavedThreadView] {
+        (botTeams?.views ?? []).filter { !$0.archived }.sorted { $0.updatedAt > $1.updatedAt }
     }
 }
 
@@ -260,8 +260,8 @@ struct InboxView: View {
     @StateObject private var model = InboxModel()
     @State private var query = ""
     @State private var renaming: ThreadEntry?
-    @State private var renamingRoom: Room?
-    @State private var creatingChannel = false
+    @State private var renamingView: SavedThreadView?
+    @State private var creatingView = false
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
     /// The server's running plugins, comma-separated; remembered so plugin rows show offline.
@@ -300,22 +300,20 @@ struct InboxView: View {
                     }
                 }
                 if query.isEmpty, model.botTeams != nil {
-                    collapsible("channels", "Channels") {
-                        ForEach(model.channels) { room in
-                            NavigationLink(value: Route.room(room)) {
-                                ChannelRow(room: room,
-                                           attention: model.botTeams?.attentionCounts?[room.id] ?? 0,
-                                           approvals: model.botTeams?.approvalCounts?[room.id] ?? 0)
+                    collapsible("views", "Views") {
+                        ForEach(model.views) { view in
+                            NavigationLink(value: Route.savedView(id: view.id)) {
+                                Label(view.name, systemImage: "rectangle.stack")
                             }
                             .contextMenu {
                                 Button {
-                                    newTitle = room.name
-                                    renamingRoom = room
+                                    newTitle = view.name
+                                    renamingView = view
                                 } label: { Label("Rename", systemImage: "pencil") }
                             }
                         }
-                        Button { creatingChannel = true } label: {
-                            Label("New Channel", systemImage: "plus")
+                        Button { creatingView = true } label: {
+                            Label("New View", systemImage: "plus")
                         }
                         .foregroundStyle(.secondary)
                     }
@@ -344,22 +342,22 @@ struct InboxView: View {
                 }
             }
         }
-        .sheet(isPresented: $creatingChannel) {
-            NewChannelSheet { room in
+        .sheet(isPresented: $creatingView) {
+            SavedViewEditor { view in
                 Task { await model.load(app.client) }
-                app.push(.room(room))
+                app.push(.savedView(id: view.id))
             }
         }
-        .alert("Rename channel", isPresented: Binding(get: { renamingRoom != nil }, set: { if !$0 { renamingRoom = nil } })) {
+        .alert("Rename view", isPresented: Binding(get: { renamingView != nil }, set: { if !$0 { renamingView = nil } })) {
             TextField("Name", text: $newTitle)
             Button("Cancel", role: .cancel) {}
             Button("Rename") {
-                guard let room = renamingRoom else { return }
+                guard let room = renamingView else { return }
                 let name = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
                 guard !name.isEmpty, name != room.name else { return }
                 Task {
                     do {
-                        try await app.client.renameRoom(room.id, name: name)
+                        try await app.client.updateSavedView(room, name: name)
                         await model.load(app.client)
                     } catch {
                         model.error = BBClient.describe(error, server: app.client.baseURL)
@@ -384,7 +382,7 @@ struct InboxView: View {
                 Menu {
                     Button { app.newThread() } label: { Label("New Thread", systemImage: "square.and.pencil") }
                     if model.botTeams != nil {
-                        Button { creatingChannel = true } label: { Label("New Channel", systemImage: "number") }
+                        Button { creatingView = true } label: { Label("New View", systemImage: "number") }
                     }
                 } label: {
                     Image(systemName: "square.and.pencil")
@@ -683,34 +681,6 @@ struct BotRow: View {
             Text(bot.avatar ?? "🤖").font(.title3)
             Text(bot.name).lineLimit(1)
             Spacer()
-        }
-    }
-}
-
-struct ChannelRow: View {
-    let room: Room
-    var attention = 0
-    var approvals = 0
-
-    var body: some View {
-        let unread = (room.updatedAt ?? 0) > (room.lastReadAt ?? .infinity)
-        HStack {
-            Label(room.name, systemImage: "number")
-                .font(.body.weight(unread ? .semibold : .regular))
-            Spacer()
-            if approvals > 0 {
-                Label("\(approvals)", systemImage: "hand.raised.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.orange)
-                    .accessibilityLabel("\(approvals) waiting for approval")
-            }
-            if attention > 0 {
-                Label("\(attention)", systemImage: "bell.fill")
-                    .font(.caption.weight(.semibold))
-                    .foregroundStyle(.red)
-                    .accessibilityLabel("\(attention) need attention")
-            }
-            if unread { Circle().fill(Color.accentColor).frame(width: 8, height: 8) }
         }
     }
 }

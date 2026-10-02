@@ -311,7 +311,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
         </dl>
 
         <Section title="Agent">
-          {task.assignee?.startsWith("bot:") && !done ? <button type="button" className={OUTLINE_BUTTON} onClick={() => void rpc.call("handOffBot", { id: taskId, note: null }).then(({ roomId }) => openAppPath(`/plugins/bot-teams/channels/${roomId}`), (failure) => toast.error(errorMessage(failure)))}><Icon name="Bot" /> Send to bot</button> : null}
+          {task.assignee?.startsWith("bot:") && !done ? <button type="button" className={OUTLINE_BUTTON} onClick={() => void rpc.call("handOffBot", { id: taskId, note: null }).then(({ threadId }) => openAppPath(`/threads/${threadId}`), (failure) => toast.error(errorMessage(failure)))}><Icon name="Bot" /> Send to bot</button> : null}
           {handingOff ? <HandoffPanel task={task} projects={projects} onClose={() => setHandingOff(false)} /> : null}
           {latest ? (
             <LatestHandoff handoff={latest} task={task} onSendBack={(message) => run(rpc.call("sendBack", { id: taskId, message }), "Couldn't send it")} />

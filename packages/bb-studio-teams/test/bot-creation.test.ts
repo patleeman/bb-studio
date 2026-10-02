@@ -1,11 +1,7 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
 import type { NewThreadRequest } from "@get-bb/plugin-sdk";
-import {
-  createFakePluginHost,
-  makeThreadResponse,
-  makeMessageDispatchHookContext,
-} from "@get-bb/plugin-sdk/testing";
+import { createFakePluginHost, makeThreadResponse, makeMessageDispatchHookContext } from "@get-bb/plugin-sdk/testing";
 import plugin from "../server";
 import { botCreationPrompt } from "../bot-creation";
 

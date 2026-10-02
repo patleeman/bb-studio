@@ -1,76 +1,27 @@
+import { ViewsPage, ViewsSidebar, FormerChannelRedirect } from "./views";
 import { affects } from "./realtime";
-import { threadChannelMenu } from "./thread-channel-menu";
 import { UsagePanel } from "./channel-workbench";
 import { useCallback, useEffect, useRef, useState } from "react";
-import {
-  definePluginApp,
-  useRpc,
-  useRealtime,
-  useBbNavigate,
-  type PluginNavPanelProps,
-} from "@get-bb/plugin-sdk/app";
-import type {
-  Bot,
-  BotListItem,
-  Conversation,
-  Job,
-  Room,
-  rpcContract,
-} from "./contract";
+import { definePluginApp, useRpc, useRealtime, useBbNavigate, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import type { Bot, BotListItem, Conversation, Job } from "./contract";
+import type { rpcContract } from "./client-contract";
 import { AddOnCollection, ComposerMore, CopyReferenceMenuItem, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
-import {
-  TabBar,
-  ProfileForm,
-  DocumentEditor,
-  WorkList,
-  ErrorMessage,
-  message,
-} from "./bot-ui";
-import {
-  ChannelsPage,
-  TeamsSidebar,
-  ChannelRedirect,
-  ChannelLinkNavigation,
-} from "./channels";
+import { TabBar, ProfileForm, DocumentEditor, WorkList, ErrorMessage, message } from "./bot-ui";
+
 import { Modal } from "./channel-controls";
-import { setThreadDraft } from "./channel-drafts";
-import { ChannelSettings } from "./channel-settings";
 import { ProfilePicker } from "./profile-picker";
 import { ThreadBadges } from "./thread-badges";
 import { ProfileThreads } from "./profile-threads";
 import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
 import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID, botHref } from "./studio-provider";
-import {
-  Badge,
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-  FLOATING_BUTTON,
-  ICON_BUTTON,
-  Icon as KitIcon,
-  ItemHeader,
-  ItemTile,
-  openAppPath,
-  PageColumn,
-  studioPath,
-  useStudioPresent,
-} from "@bb-studio/kit/app";
-import {
-  ChannelHandoffController,
-  requestChannelHandoff,
-} from "./channel-handoff";
+import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FLOATING_BUTTON, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
+
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
-import {
-  ChannelComposerBanner,
-  ChannelTranscriptWork,
-  ChannelHandoffPrefill,
-  ChannelThreadHeader,
-} from "./channel-thread-surfaces";
+
 const tabs = ["profile", "mission", "memory", "threads", "activity", "usage"] as const;
 const STATUS_TONES = {
   ready: "success",
@@ -227,7 +178,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
           onOpenChange={setArchiveOpen}
         >
           <p className="text-sm leading-5">
-            This stops the bot’s work and removes it from every channel. Its
+            This stops the bot’s work and stops its mission schedule. Its
             profile, mission, memory, files, and conversation history are
             preserved. You can restore it later.
           </p>
@@ -312,7 +263,6 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
   const [data, setData] = useState<{
       bots: BotListItem[];
-      rooms: Room[];
       botCreateRequests: import("./contract").BotCreateRequestView[];
     } | null>(null),
     [error, setError] = useState<string | null>(null);
@@ -342,9 +292,9 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
   if (id === "new" && section === "space")
     return <BotCreationThread key={`space:${rest}`} spaceId={rest ? decodeURIComponent(rest) : undefined} />;
   if (id === "new")
-    return <BotCreationThread key={section ?? "standalone"} roomId={section} />;
+    return <BotCreationThread key="standalone" />;
   if (id === "new-group" || id === "group")
-    return <ChannelRedirect subPath={id === "group" ? section : "new"} />;
+    return <FormerChannelRedirect subPath={id === "group" ? section ?? "" : ""} />;
   if (id)
     return (
       <BotDetail
@@ -408,59 +358,10 @@ function NewBotListener() {
 }
 export default definePluginApp((app) => {
   for (const icon of botTeamsIcons) app.experimental_icons.register(icon);
-  app.contentScripts.register(threadChannelMenu);
-  app.slots.experimental_appOverlay({
-    id: "channel-links",
-    component: ChannelLinkNavigation,
-  });
-  app.slots.experimental_appOverlay({
-    id: "channel-handoff",
-    component: ChannelHandoffController,
-  });
-  app.composer.customize({
-    id: "channel-handoff",
-    scopes: ["thread"],
-    plusMenu: [
-      {
-        id: "new-channel",
-        label: "Handoff to new channel",
-        icon: "MessageSquarePlus",
-        description: "Open a new channel with a reference to this thread.",
-        run: ({ view }) => {
-          if (view.scope.kind === "thread")
-            requestChannelHandoff(view.scope.threadId);
-        },
-      },
-    ],
-  });
-  app.slots.experimental_threadHeaderAction({
-    id: "channel-members",
-    title: "Channel",
-    component: ChannelThreadHeader,
-  });
   app.composer.customize({
     id: "thread-profile",
     scopes: ["thread", "new-thread"],
     actions: [{ id: "profile", component: () => <ComposerMore pluginId={PLUGIN_ID} order={20}><ProfilePicker /></ComposerMore> }],
-  });
-  app.composer.customize({
-    id: "channel-thread",
-    scopes: ["thread"],
-    actions: [
-      { id: "channel-handoff-prefill", component: ChannelHandoffPrefill },
-      { id: "channel-settings", component: ChannelSettings },
-    ],
-    banners: [
-      { id: "channel-work", chrome: "bare", component: ChannelTranscriptWork },
-      { id: "channel-requests", component: ChannelComposerBanner },
-    ],
-    richText: {
-      onDraftChange: (draft, view) => {
-        if (view.scope.kind === "thread")
-          setThreadDraft(view.scope.threadId,
-            !!draft.text.trim() || view.draft.attachmentCount > 0);
-      },
-    },
   });
   app.slots.navPanel({
     id: "bots",
@@ -469,15 +370,9 @@ export default definePluginApp((app) => {
     path: "bots",
     component: BotsPage,
   });
-  app.slots.navPanel({
-    id: "channels",
-    title: "New channel",
-    icon: "MessageSquare",
-    path: "channels",
-    component: ChannelsPage,
-  });
-  // Channels, as a section of the Studio Sidebar.
-  app.slots.experimental_appOverlay({ id: "sidebar-sections", component: TeamsSidebar });
+  app.slots.navPanel({ id: "views", title: "Views", icon: "MessagesSquare", path: "views", component: ViewsPage });
+  app.slots.navPanel({ id: "former-channels", title: "Views", icon: "MessagesSquare", path: "channels", component: FormerChannelRedirect });
+  app.slots.experimental_appOverlay({ id: "sidebar-sections", component: ViewsSidebar });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
 });

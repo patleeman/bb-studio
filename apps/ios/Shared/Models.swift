@@ -485,12 +485,9 @@ public struct BotDocument: Codable, Sendable, Hashable {
 
 public struct BotTeamsList: Codable, Sendable {
     public var bots: [Bot]
-    public var rooms: [Room]
+    public var views: [SavedThreadView]
     /// Each bot's latest thread with its profile.
     public var directThreads: [String: DirectThread]
-    /// Open attention items and pending approvals per channel id.
-    public var attentionCounts: [String: Int]?
-    public var approvalCounts: [String: Int]?
 }
 
 public struct RoomMessage: Decodable, Identifiable, Hashable, Sendable {
@@ -601,4 +598,55 @@ public struct RecordingDetail: Decodable, Sendable {
         }
         return out
     }
+}
+
+public struct SavedViewMember: Codable, Hashable, Sendable {
+    public var kind: String
+    public var id: String
+    public init(kind: String, id: String) { self.kind = kind; self.id = id }
+}
+
+public struct SavedThreadView: Codable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var name: String
+    public var members: [SavedViewMember]
+    public var archived: Bool
+    public var createdAt: Double
+    public var updatedAt: Double
+}
+
+public struct SavedViewThread: Decodable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var title: String
+    public var botId: String?
+    public var parentThreadId: String?
+    public var status: String
+    public var updatedAt: Double
+    public var error: String?
+}
+
+public struct SavedViewEntry: Decodable, Identifiable, Hashable, Sendable {
+    public var id: String
+    public var threadId: String
+    public var role: String
+    public var text: String
+    public var createdAt: Double
+    public var groupId: String?
+}
+
+public struct SavedViewPage: Decodable, Sendable {
+    public var view: SavedThreadView
+    public var threads: [SavedViewThread]
+    public var entries: [SavedViewEntry]
+    public var hasOlder: Bool
+}
+
+public struct SavedViewSend: Decodable, Sendable {
+    public struct Delivery: Decodable, Sendable {
+        public var threadId: String
+        public var status: String
+        public var error: String?
+    }
+    public var requestId: String
+    public var deliveries: [Delivery]
 }

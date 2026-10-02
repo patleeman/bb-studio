@@ -1,22 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Compartment, EditorState, Annotation } from "@codemirror/state";
-import {
-  EditorView,
-  keymap,
-  lineNumbers,
-  drawSelection,
-  highlightActiveLine,
-} from "@codemirror/view";
-import {
-  defaultKeymap,
-  history,
-  historyKeymap,
-  undo,
-  redo,
-  undoDepth,
-  redoDepth,
-  isolateHistory,
-} from "@codemirror/commands";
+import { EditorView, keymap, lineNumbers, drawSelection, highlightActiveLine } from "@codemirror/view";
+import { defaultKeymap, history, historyKeymap, undo, redo, undoDepth, redoDepth, isolateHistory } from "@codemirror/commands";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { HighlightStyle, syntaxHighlighting } from "@codemirror/language";
 import { search, searchKeymap, openSearchPanel } from "@codemirror/search";
@@ -24,11 +9,7 @@ import { tags } from "@lezer/highlight";
 import { Markdown, experimental_Icon as Icon } from "@get-bb/plugin-sdk/app";
 import { Button } from "@bb-studio/kit/ui";
 import { IconActionTooltip } from "./channel-controls";
-import {
-  wrapMarkdown,
-  prefixMarkdown,
-  insertMarkdownLink,
-} from "./markdown-commands";
+import { wrapMarkdown, prefixMarkdown, insertMarkdownLink } from "./markdown-commands";
 
 const externalValue = Annotation.define<boolean>();
 const highlighting = HighlightStyle.define([

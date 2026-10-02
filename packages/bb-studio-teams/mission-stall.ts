@@ -2,10 +2,22 @@
 // away, so the bot never started on the request. Asking it to wrap up would
 // only get a report that nothing was done. Instead it's stopped and sent
 // again, once; a retry that stalls too times out at the limit and says why.
+// A turn that made no progress: the provider kept failing, or the host went
+// away, so the bot never started on the request. Asking it to wrap up would
+// only get a report that nothing was done. Instead it's stopped and sent
+// again, once; a retry that stalls too times out at the limit and says why.
+// A turn that made no progress: the provider kept failing, or the host went
+// away, so the bot never started on the request. Asking it to wrap up would
+// only get a report that nothing was done. Instead it's stopped and sent
+// again, once; a retry that stalls too times out at the limit and says why.
+// A turn that made no progress: the provider kept failing, or the host went
+// away, so the bot never started on the request. Asking it to wrap up would
+// only get a report that nothing was done. Instead it's stopped and sent
+// again, once; a retry that stalls too times out at the limit and says why.
 import { turnHasProgress } from "./activity";
 import type { Job } from "./contract";
-import type { Runtime } from "./runtime";
-import { errorText, missingThread, primaryLane } from "./runtime";
+import type { Runtime } from "./mission-runtime";
+import { errorText, missingThread, primaryLane } from "./mission-runtime";
 
 const PROGRESS_CHECK_MS = 30_000;
 

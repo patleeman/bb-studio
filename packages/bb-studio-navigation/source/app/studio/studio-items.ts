@@ -16,8 +16,8 @@ export const HUB_PANELS = [
   "studio-tables/tables",
 ];
 
-/** Panels that a Studio Sidebar section opens: Channels has its own New channel. */
-export const SECTION_PANELS = ["bot-teams/channels"];
+/** Panels that a Studio Sidebar section opens: Views has its own creation action. */
+export const SECTION_PANELS = ["bot-teams/channels", "bot-teams/views"];
 
 export function studioNavigationItems(
   items: readonly ExperimentalSidebarNavigationItem[],
@@ -27,6 +27,7 @@ export function studioNavigationItems(
   const hubReachable = hub !== undefined && !hub.isDisabled && !hub.isLoading;
   return items.filter(
     (item) =>
+      item.id !== "bot-teams/former-channels" &&
       !(hubReachable && HUB_PANELS.includes(item.id)) &&
       !(sidebarHosted && SECTION_PANELS.includes(item.id)),
   );

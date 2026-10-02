@@ -39,9 +39,9 @@ struct ThreadProfileSheet: View {
                                     .foregroundStyle(.primary)
                             }
                         } header: {
-                            Text("Invite to a channel")
+                            Text("Create a shared view")
                         } footer: {
-                            Text("A thread works as one bot. Inviting another opens a new channel with both, linked to this thread.")
+                            Text("Keep this thread and another bot together in a saved view.")
                         }
                     }
                 } else if bots.isEmpty {
@@ -104,39 +104,11 @@ struct ThreadProfileSheet: View {
         saving = true
         defer { saving = false }
         do {
-            let room = try await app.client.createRoom(memberIds: (current.map { [$0.id] } ?? []) + [other.id])
-            ChannelHandoff.save(room.id, text: ChannelHandoff.text(for: thread))
+            let view = try await app.client.createSavedView(name: thread.displayTitle, members: [SavedViewMember(kind: "thread", id: thread.id), SavedViewMember(kind: "bot", id: other.id)])
             dismiss()
-            app.push(.room(room))
+            app.push(.savedView(id: view.id))
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
     }
-}
-
-/// A new channel's first draft, linking the thread it continues from. Taken
-/// once by the channel's composer, as the web keeps it until the channel opens.
-enum ChannelHandoff {
-    private static let defaults = UserDefaults.standard
-
-    static func text(for thread: ThreadEntry) -> String {
-        let title = thread.displayTitle
-            .replacingOccurrences(of: #"[\\\[\]<>*_`]"#, with: #"\\$0"#, options: .regularExpression)
-            .replacingOccurrences(of: "\n", with: " ")
-        let path = thread.projectId == "proj_personal"
-            ? "/threads/\(thread.id)"
-            : "/projects/\(thread.projectId)/threads/\(thread.id)"
-        return "Continue from [\(title)](\(path)) (@thread:\(thread.id))"
-    }
-
-    static func save(_ roomId: String, text: String) {
-        defaults.set(text, forKey: key(roomId))
-    }
-
-    static func take(_ roomId: String) -> String? {
-        defer { defaults.removeObject(forKey: key(roomId)) }
-        return defaults.string(forKey: key(roomId))
-    }
-
-    private static func key(_ roomId: String) -> String { "channelHandoff.\(roomId)" }
 }

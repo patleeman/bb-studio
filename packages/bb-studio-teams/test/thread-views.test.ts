@@ -72,3 +72,55 @@ test("timeline excludes tools, inter-agent messages, interim replies, and PASS",
   ];
   expect(finalEntries(rows as never).map(e => e.text)).toEqual(["Help", "Done"]);
 });
+
+test("flat streaming output is hidden until its turn completes", () => {
+  const reply = { id: "reply", kind: "conversation", role: "assistant", threadId: "thr_work", text: "Streaming", turnId: "turn_work", sourceSeqEnd: 2, createdAt: 100 };
+  expect(finalEntries([reply] as never)).toEqual([]);
+  expect(finalEntries([{kind:"turn", id:"turn_work", turnId:"turn_work", status:"pending",children:[]}, reply] as never)).toEqual([]);
+  expect(finalEntries([{kind:"turn", id:"turn_work", turnId:"turn_work", status:"completed",children:[]}, reply] as never).map(e=>e.text)).toEqual(["Streaming"]);
+});
+
+test("scheduled automation prompts and their replies stay out of the view", () => {
+  const base = { threadId: "thr_work", turnId: "turn_auto", createdAt: 100, sourceSeqEnd: 1 };
+  const rows = [
+    { ...base, id: "scheduled", kind: "conversation", role: "user", initiator: "user", senderThreadId: null,
+      turnRequest: { status: "accepted" }, text: "[bb automation due:auto_1]\n\nCheck the release" },
+    { ...base, id: "turn_auto", kind: "turn", status: "completed", children: [
+      { ...base, id: "reply", kind: "conversation", role: "assistant", text: "Posted the report to Feed" },
+    ] },
+  ];
+  expect(finalEntries(rows as never)).toEqual([]);
+});
+
+test("history follows BB cursors past tool-only pages and keeps equal timestamps", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("History", [{kind:"thread",id:"thr_history"}]);
+    const reply = (id: string) => ({kind:"turn",id,turnId:id,status:"completed",children:[{kind:"conversation",id,role:"assistant",threadId:"thr_history",text:id,turnId:id,sourceSeqEnd:1,createdAt:100}]});
+    x.harness.inspection.sdk.stub("threads.timeline", async ({beforeAnchorId}) => beforeAnchorId ? {rows:[reply("a"),reply("b"),reply("c")],timelinePage:{hasOlderRows:false,olderCursor:null}} : {rows:[],timelinePage:{hasOlderRows:true,olderCursor:{anchorId:"tools",anchorSeq:1}}});
+    const first = await x.views.page(view.id, undefined, 2);
+    expect(first.entries.map(e=>e.text)).toEqual(["b","c"]);
+    expect(first.hasOlder).toBe(true);
+    const older = await x.views.page(view.id, 100, 2, first.entries[0]!.id);
+    expect(older.entries.map(e=>e.text)).toEqual(["a"]);
+    expect(older.hasOlder).toBe(false);
+    // Source deletion is reflected on the next read.
+    x.harness.inspection.sdk.stub("threads.timeline", async()=>({rows:[],timelinePage:{hasOlderRows:false,olderCursor:null}}));
+    expect((await x.views.page(view.id)).entries).toEqual([]);
+  } finally { await x.close(); }
+});
+
+test("reply, explicit steer, and @bot+new select real threads", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Work", [{kind:"bot",id:x.a.id}]);
+    const send = (text:string, extra={})=>x.views.send(viewSendInput.parse({id:view.id,requestId:crypto.randomUUID(),text,...extra}));
+    await send("First"); await send("Again");
+    expect(x.harness.inspection.sdk.callsTo("threads.spawn")).toHaveLength(1);
+    await send("@atlas+new Separate work");
+    expect(x.harness.inspection.sdk.callsTo("threads.spawn")).toHaveLength(2);
+    await send("@thread:thr_bot_1 Correction", {mode:"steer"});
+    const last = x.harness.inspection.sdk.callsTo("threads.send").at(-1)![0] as {threadId:string;mode:string};
+    expect(last.threadId).toBe("thr_bot_1"); expect(last.mode).toBe("steer-if-active");
+  } finally { await x.close(); }
+});

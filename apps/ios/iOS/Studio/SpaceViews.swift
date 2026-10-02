@@ -394,11 +394,7 @@ struct SpaceWidgetCard: View {
 
     /// A channel opens as its channel when Bot Teams knows it, and as a thread otherwise.
     private func openThread(_ id: String, channel: Bool) async {
-        if channel, let room = try? await app.client.botTeams().rooms.first(where: { $0.threadId == id }) {
-            app.push(.room(room))
-        } else {
-            app.push(.thread(id: id))
-        }
+        app.push(.thread(id: id))
     }
 
     /// The phone has no project view; Studio shows what the project holds.

@@ -39,7 +39,6 @@ export const FEED_USAGE = "bb feed <list|show|post|edit|remove> …";
 
 const teamsList = z.object({
   bots: z.array(z.object({ id: z.string(), name: z.string(), avatar: z.string().optional() })),
-  rooms: z.array(z.object({ id: z.string(), name: z.string() })),
 });
 const threadBots = z.array(z.object({ threadId: z.string(), botId: z.string() }));
 const studio = studioSchemas(z);
@@ -63,7 +62,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
   // Studio Teams, when installed: which bot a thread belongs to, and names.
   let teams: {
     at: number;
-    value: Promise<{ bots: Map<string, string>; avatars: Map<string, string>; rooms: Map<string, string>; threads: Map<string, string> } | null>;
+    value: Promise<{ bots: Map<string, string>; avatars: Map<string, string>; threads: Map<string, string> } | null>;
   } | null = null;
   function teamsDirectory() {
     if (teams && Date.now() - teams.at < TEAMS_CACHE_MS) return teams.value;
@@ -71,7 +70,6 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       .then(([list, links]) => ({
         bots: new Map(list.bots.map((bot) => [bot.id, bot.name])),
         avatars: new Map(list.bots.flatMap((bot) => (bot.avatar ? [[bot.id, bot.avatar] as const] : []))),
-        rooms: new Map(list.rooms.map((room) => [room.id, room.name])),
         threads: new Map(links.map((link) => [link.threadId, link.botId])),
       }))
       .catch(() => null);
@@ -83,18 +81,14 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
     const thread = await bb.sdk.threads.get({ threadId });
     const directory = await teamsDirectory();
     const botId = directory?.threads.get(threadId) ?? null;
-    const isChannel = thread.providerId === CHANNEL_PROVIDER_ID;
-    const channelId =
-      directory && (botId || isChannel) ? await callRpc(TEAMS_PLUGIN_ID, "channelForThread", { threadId }, z.string().nullable()).catch(() => null) : null;
-    const channelName = channelId ? (directory?.rooms.get(channelId) ?? null) : null;
     const title = thread.title?.trim() || thread.titleFallback?.trim() || null;
     return {
-      author: (botId && directory?.bots.get(botId)) || (isChannel && channelName) || title || "Agent",
+      author: (botId && directory?.bots.get(botId)) || title || "Agent",
       botId,
       threadId,
       projectId: thread.projectId ?? null,
-      channelId,
-      channelName,
+      channelId: null,
+      channelName: null,
     };
   }
 

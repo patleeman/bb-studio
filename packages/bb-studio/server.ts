@@ -208,7 +208,6 @@ export default async function plugin(bb: BbPluginApi) {
     botName: conversation?.kind === "dm" ? conversation.name : null,
   });
   const conversationList = z.object({
-    channels: z.array(z.object({ threadId: z.string(), name: z.string(), archived: z.boolean() })),
     direct: z.array(z.object({ threadId: z.string(), botName: z.string() })),
   });
   /** Studio Teams' channels and direct messages by thread; none without it. */
@@ -217,7 +216,6 @@ export default async function plugin(bb: BbPluginApi) {
     const result = await bb.sdk.plugins
       .callRpc({ pluginId: "bot-teams", method: "spaceConversations", input: null as never, outputSchema: conversationList, signal: AbortSignal.timeout(10_000) })
       .catch(() => null);
-    for (const channel of result?.channels ?? []) if (!channel.archived) found.set(channel.threadId, { kind: "channel", name: channel.name });
     for (const direct of result?.direct ?? []) found.set(direct.threadId, { kind: "dm", name: direct.botName });
     return found;
   };

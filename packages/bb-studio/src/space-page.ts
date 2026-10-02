@@ -20,7 +20,7 @@ const WIDGET_HEADINGS: Record<SpaceWidget, string | null> = {
   actions: null,
   recent: "Recent",
   threads: "Threads",
-  channels: "Channels and messages",
+  channels: "Bot threads",
   projects: "Projects",
 };
 

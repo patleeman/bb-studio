@@ -3,7 +3,8 @@ import SwiftUI
 
 enum Route: Hashable {
     case thread(id: String)
-    case room(Room)
+    case savedView(id: String)
+    case formerChannel(id: String)
     case pages
     case page(id: String)
     case automations
@@ -47,6 +48,8 @@ extension Route {
         case ("studio-tasks", "tasks"): self = .task(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"): self = .bot(id: id)
+        case ("bot-teams", "views"): self = .savedView(id: id)
+        case ("bot-teams", "channels"): self = .formerChannel(id: id)
         case ("feed", "feed"): self = .feedPost(id: id)
         default: return nil
         }

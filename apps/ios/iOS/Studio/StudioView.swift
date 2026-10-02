@@ -384,7 +384,7 @@ struct StudioView: View {
                 ForEach(["thread", "channel"], id: \.self) { kind in
                     let matches = externalMatches.filter { $0.kind == kind }
                     if !matches.isEmpty {
-                        Section(kind == "thread" ? "Threads" : "Channels and messages") {
+                        Section(kind == "thread" ? "Threads" : "Bot threads") {
                             ForEach(Array(matches.enumerated()), id: \.offset) { _, match in
                                 if let id = match.ref?.id, kind == "thread" {
                                     NavigationLink(value: Route.thread(id: id)) {

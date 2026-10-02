@@ -3,37 +3,12 @@ import { errorMessage } from "@bb-studio/kit/format";
 import { RevisionList, type Revision } from "./revision-list";
 import { MarkdownEditor } from "./markdown-editor";
 import { isForkConversation } from "./send-mode";
-import {
-  useCallback,
-  useEffect,
-  useId,
-  useRef,
-  useState,
-  type FormEvent,
-  type ReactNode,
-} from "react";
-import {
-  useBbNavigate,
-  useRpc,
-  experimental_Icon as Icon,
-  experimental_ProviderModelPicker as ProviderModelPicker,
-  experimental_PermissionModePicker as PermissionModePicker,
-} from "@get-bb/plugin-sdk/app";
+import { useCallback, useEffect, useId, useRef, useState, type FormEvent, type ReactNode } from "react";
+import { useBbNavigate, useRpc, experimental_Icon as Icon, experimental_ProviderModelPicker as ProviderModelPicker, experimental_PermissionModePicker as PermissionModePicker } from "@get-bb/plugin-sdk/app";
 import type { Bot, Job, ProfileInput, rpcContract } from "./contract";
 import { Button, Input } from "@bb-studio/kit/ui";
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@bb-studio/kit/ui";
-import {
-  readConfigDraft,
-  writeConfigDraft,
-  profileDraft,
-  documentDraft,
-} from "./config-draft";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@bb-studio/kit/ui";
+import { readConfigDraft, writeConfigDraft, profileDraft, documentDraft } from "./config-draft";
 import { Modal } from "./channel-controls";
 import { COARSE_POINTER_HEADER_ICON_BUTTON_CLASS } from "@bb-studio/kit/ui";
 import "./styles.css";
@@ -324,7 +299,7 @@ export function ProfileForm({
               routing={{ kind: "host", hostId: bot.hostId }}
             />
           </FormRow>
-          <FormRow label="Fallback model" hint="If a provider error ends a channel or mission response, the bot retries once with this model in a new thread.">
+          <FormRow label="Fallback model" hint="If a provider error ends a mission response, the bot retries once with this model in a new thread.">
             {draft.fallbackProviderId ? <div className="space-y-2">
               <ProviderModelPicker
                 disabled={pending}
@@ -464,7 +439,7 @@ export function ProfileForm({
             <p className="text-xs leading-normal text-muted-foreground">
               {bot.retired
                 ? "This bot is archived. Restore it to make it available again."
-                : "Archiving stops this bot and removes it from every channel. Its workspace and history are preserved."}
+                : "Archiving stops this bot and turns off its mission schedule. Its workspace and history are preserved."}
             </p>
             <Button
               type="button"

@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Bot, Conversation } from "./contract";
-import { missingThread, type Runtime } from "./runtime";
+import { missingThread, type Runtime } from "./mission-runtime";
 import type { Store } from "./store";
 
 const pendingForMs = 10 * 60_000;
@@ -20,7 +20,7 @@ export class ThreadProfiles {
   constructor(
     private readonly bb: BbPluginApi,
     private readonly store: Store,
-    private readonly runtime: Runtime,
+    private readonly runtime: Pick<Runtime, "conversation" | "changed">,
     /** False for threads this plugin runs itself, such as channels and routing. */
     private readonly eligible: (threadId: string) => boolean,
   ) {}

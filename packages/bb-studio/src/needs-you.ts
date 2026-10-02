@@ -99,20 +99,6 @@ export async function needsYouData(sdk: Sdk, services: StudioServices, providerC
     entries.push(...rows.flat());
     if (page.length < 200) break;
   }
-  if (rooms) {
-    const roomProjects = new Map(rooms.map((room) => [room.id, room.projectId]));
-    for (let offset = 0; ; ) {
-      const page = await sdk.plugins.callRpc({ pluginId: "bot-teams", method: "attentionList", input: { status: "open", limit: 50, offset } as never, outputSchema: attentionPage, signal: AbortSignal.timeout(5000) }).catch(() => null);
-      if (!page) break;
-      entries.push(...page.items.filter((attention) => !projectId || roomProjects.get(attention.roomId) === projectId).map((attention) => ({
-        id: `attention:${attention.id}`, source: "bot-teams", kind: "attention" as const,
-        title: `${attention.channelName}: ${attention.reason}`, body: attention.message.text.slice(0, 500),
-        href: `/plugins/bot-teams/channels/${attention.roomId}/message/${attention.message.id}`, createdAt: attention.createdAt, priority: attention.reason === "blocker" ? 90 : 70,
-      })));
-      if (page.nextOffset === null) break;
-      offset = page.nextOffset;
-    }
-  }
   const visible = items.filter((item) => !item.archived && (!projectId || item.projectId === projectId || item.projectId === null));
   const local = services.openComments();
   const localByItem = new Map<string, ItemComment[]>();

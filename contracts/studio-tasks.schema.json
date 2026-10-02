@@ -2071,12 +2071,12 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
-          "roomId": {
+          "threadId": {
             "type": "string"
           }
         },
         "required": [
-          "roomId"
+          "threadId"
         ],
         "additionalProperties": false
       }
