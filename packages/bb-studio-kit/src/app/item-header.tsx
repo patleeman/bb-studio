@@ -8,7 +8,9 @@ import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
 import { openFloat, useCanFloat, useInFloat } from "./float";
 import { useOpenTarget } from "./move";
+import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
 import { FLOATING, FLOATING_BUTTON } from "./pieces";
+import { useStudioChatPresent } from "./presence";
 import { RelatedPanel, type RelatedRef } from "./related-panel";
 import { SpacePicker } from "./space-picker";
 
@@ -80,7 +82,7 @@ export function ItemHeader({
   leading?: ReactNode;
   /** The view's buttons, built from ICON_BUTTON and FLOATING_BUTTON. */
   trailing?: ReactNode;
-  /** Adds the standard New thread action for this item. */
+  /** Adds the standard New thread action for this item, unless Studio Chat's bar offers it. */
   thread?: ItemThread;
   /** The item shown, for the Float and split menu; `thread` serves when given. */
   item?: ItemThread;
@@ -88,6 +90,8 @@ export function ItemHeader({
 }) {
   const newThread = useNewItemThread(thread);
   const moved = item ?? thread;
+  // Studio Chat's New in Float bar replaces this button; one place to start a thread.
+  const studioChat = useStudioChatPresent();
   const path = thread?.href.split(/[?#]/)[0]?.split("/") ?? [];
   const relatedRef = thread?.ref ?? (path[1] === "plugins" && path[2] && path[4]
     ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
@@ -115,12 +119,58 @@ export function ItemHeader({
       {trailing || thread || moved ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
         {relatedRef ? <SpacePicker item={relatedRef} /> : null}
         {relatedRef ? <RelatedPanel ref={relatedRef} /> : null}
-        {thread ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
+        {thread && studioChat === false ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
           <Icon name="MessageSquarePlus" /> New thread
         </button> : null}
+        {relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
         {moved ? <MoveMenu item={moved} onBack={onBack} /> : null}
         {trailing}
       </div> : null}
+    </div>
+  );
+}
+
+/** The thread this item's chat and quotes go to, from Studio Chat. */
+function HomeThreadChip({ item }: { item: ItemChatRef }) {
+  const host = useItemChat();
+  const home = useHomeThread(item);
+  if (!host || home === undefined) return null;
+  if (!home) {
+    return (
+      <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} title="Pick the thread this item's chat and quotes go to" onClick={() => host.choose(item)}>
+        <Icon name="MessageSquare" /> No thread
+      </button>
+    );
+  }
+  return (
+    <div className={cn(FLOATING, "flex h-8 max-w-56 min-w-0 items-center rounded-md text-sm text-muted-foreground max-md:max-w-36")}>
+      <button
+        type="button"
+        className="flex h-full min-w-0 items-center gap-1.5 rounded-l-md pr-1.5 pl-2.5 hover:bg-state-hover hover:text-foreground"
+        title={`Quotes and chat go to "${home.title}". Open it.`}
+        onClick={() => host.open(item)}
+      >
+        <Icon name="MessageSquare" className="size-4 shrink-0" />
+        <span className="min-w-0 truncate">{home.title}</span>
+      </button>
+      <DropdownMenu>
+        <DropdownMenuTrigger asChild>
+          <button type="button" aria-label="Thread options" className="flex h-full shrink-0 items-center rounded-r-md px-1.5 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
+            <Icon name="ChevronDown" className="size-3.5" />
+          </button>
+        </DropdownMenuTrigger>
+        <DropdownMenuContent align="end" className="w-56">
+          <DropdownMenuItem onSelect={() => host.open(item)}>
+            <Icon name="MessageSquare" className="size-4" /> Open thread
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => host.choose(item)}>
+            <Icon name="ArrowLeftRight" className="size-4" /> Change thread…
+          </DropdownMenuItem>
+          <DropdownMenuItem onSelect={() => void host.unlink(item)}>
+            <Icon name="Unlink" className="size-4" /> Unlink
+          </DropdownMenuItem>
+        </DropdownMenuContent>
+      </DropdownMenu>
     </div>
   );
 }

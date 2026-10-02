@@ -10,7 +10,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForInputValue("Drawing name", "Checkout flow");
         await client.waitForAriaButton("Copy image");
         await client.waitForAriaButton("More");
-        await client.waitForText("New thread");
+        // Studio Chat's chip for the drawing's thread; the seeded drawing has none yet.
+        await client.waitForSelector(`button[title^="Pick the thread this item's chat"], button[title^="Quotes and chat go to"]`);
         await client.waitForText("Saved");
         await client.waitForSelector("canvas.excalidraw__canvas");
         // The staged scene is on the canvas, not a blank one.

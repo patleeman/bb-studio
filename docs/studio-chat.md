@@ -30,14 +30,17 @@ All of this is in the stable SDK 0.5.29:
 - **New in Float:** the new-thread composer. Sending starts a thread in the item's
   project, with the item's pill already in the message, and opens it in a
   Float tab (or BB's own thread view without Float).
-- **Open in Float:** a picker listing the item's last chat, then your 30 most
+- **Open in Float:** a picker listing the item's home thread, then your 30 most
   recent threads. Typing two or more letters searches all active threads.
   Arrow keys and Enter pick; Escape or clicking away closes it. The pick
   opens as a plain Float tab, without the item's tag, so moving on doesn't
   swap it out.
 
-The plugin remembers the last thread used on each item, so reopening a page
-brings its chat back as a tab behind the one showing. Those tabs carry a
+Each item has a home thread: the one New in Float started for it or the one
+picked with the header's Change thread…, else the thread that made it. The
+item header names it. Quotes from item views, such as selected artifact text
+or an image area, go there with `send`. Reopening an item brings its home
+thread back as a tab behind the one showing. Those tabs carry a
 tag, so moving to the next item swaps the tab instead of adding one per item,
 unless you're looking at it.
 The item→thread link lives in the plugin's server storage, so a phone could
@@ -71,7 +74,7 @@ find it too.
   `/chat/<threadId>` route) opens it as a Float tab instead of Pages' card.
 - Pages keeps its `work`, `chats` and `chatPage` RPCs unchanged, since
   mobile clients use them. Studio Chat starts page chats
-  through `work` and reads `chats` for the item's last thread, so current
+  through `work` and reads `chats` for the item's home thread, so current
   page chats carry over.
 - While the comments card is open on a wide screen, the page sets
   `--studio-float-right` so Float's docked panel and corner sit left of it.
@@ -96,9 +99,16 @@ We work around BB's gaps rather than wait on BB features.
 
 - **Name.** "Studio Chat" (`studio-chat`), part of the suite.
 - **Where the buttons show.** Only on Studio items.
-- **Labels.** The item header already has a New thread button that opens
-  BB's full composer, so with Float the corner's buttons say where the
-  thread goes: New in Float, Open in Float.
+- **Labels.** With Float the corner's buttons say where the thread goes:
+  New in Float, Open in Float.
+- **One place to start a thread.** With Studio Chat installed, the item
+  header drops its own New thread button and names the home thread instead.
+- **Home thread, not last thread.** Opening another thread doesn't move an
+  item's home; only New in Float, Change thread… and Unlink do. One item has
+  one home thread, but a thread can be home to many items, as when one thread
+  made several artifacts.
+- **Quotes queue.** A quote sent while the thread is working waits for the
+  turn to end instead of steering it.
 - **New and open, not one bar.** One "Work with this…" bar only started
   threads. New in Float and Open in Float also bring an existing thread into
   Float next to the item.

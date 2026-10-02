@@ -1,5 +1,6 @@
 import { defineItemMention } from "@bb-studio/kit/server";
 import { studioServices } from "@bb-studio/kit/server";
+import { quoteMessage } from "@bb-studio/kit/format";
 // bb-studio-chat server.
 //
 // - `viewing` asks Studio which item a path opens, so the chat knows what's
@@ -7,7 +8,9 @@ import { studioServices } from "@bb-studio/kit/server";
 // - `start` begins a thread about that item. Pages keeps its own page chats,
 //   so a page goes through Pages' `work`; other items get a pill that our
 //   mention provider resolves into a pointer note (src/context.ts).
-// - Each item remembers the last thread used on it (kv `link:<plugin>:<id>`).
+// - Each item has a home thread for its chat and quotes (kv
+//   `link:<plugin>:<id>`): the one started or picked for it, else the thread
+//   that made it, as Studio records. `send` posts a quote there.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { STUDIO_ITEM_AT_METHOD, STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import { MENTION_PROVIDER_ID, pagesSchemas, rpcContract, schemas, type ItemRef } from "./src/contract";
@@ -20,8 +23,15 @@ const CALL_TIMEOUT_MS = 10_000;
 const START_TIMEOUT_MS = 60_000;
 
 interface Link {
-  threadId: string;
+  /** null: unlinked on purpose, so the thread that made the item doesn't stand in. */
+  threadId: string | null;
   at: number;
+}
+
+interface HomeThread {
+  threadId: string;
+  title: string;
+  origin: "chosen" | "created";
 }
 
 export default async function plugin(bb: BbPluginApi) {
@@ -39,7 +49,7 @@ export default async function plugin(bb: BbPluginApi) {
   for (const key of await bb.storage.kv.list("link:")) {
     const ref = parseItemKey(key.slice("link:".length));
     const link = ref ? await bb.storage.kv.get<Link>(key) : null;
-    if (ref && link) void services.linkThread({ threadId: link.threadId, ref, role: "chat", state: "idle", createdAt: link.at, updatedAt: link.at, metadata: {} }).catch(() => { /* Studio is optional. */ });
+    if (ref && link?.threadId) void services.linkThread({ threadId: link.threadId, ref, role: "chat", state: "idle", createdAt: link.at, updatedAt: link.at, metadata: {} }).catch(() => { /* Studio is optional. */ });
   }
   const setLink = async (ref: ItemRef, threadId: string) => {
     const at = Date.now();
@@ -64,13 +74,32 @@ export default async function plugin(bb: BbPluginApi) {
     }
   };
 
-  const threadExists = async (threadId: string) => {
+  /** The thread's title, or null when it's gone or archived. */
+  const liveThread = async (threadId: string): Promise<string | null> => {
     try {
-      const thread = await bb.sdk.threads.get({ threadId });
-      return !thread.archivedAt;
+      const thread = (await bb.sdk.threads.get({ threadId })) as { archivedAt?: number | null; title?: string | null; titleFallback?: string | null };
+      if (thread.archivedAt) return null;
+      return thread.title?.trim() || thread.titleFallback?.trim() || "Untitled thread";
     } catch {
-      return false;
+      return null;
     }
+  };
+
+  const home = async (ref: ItemRef): Promise<HomeThread | null> => {
+    const own = await bb.storage.kv.get<Link>(linkKey(ref));
+    const pages = ref.pluginId === PAGES_PLUGIN_ID ? await lastPageChat(ref.id) : null;
+    const newest = [own, pages].filter((link): link is Link => !!link).sort((a, b) => b.at - a.at)[0];
+    if (newest && !newest.threadId) return null;
+    if (newest?.threadId) {
+      const title = await liveThread(newest.threadId);
+      if (title) return { threadId: newest.threadId, title, origin: "chosen" };
+    }
+    const { threads } = await services.threads(ref).catch(() => ({ threads: [] }));
+    for (const made of threads.filter((thread) => thread.role === "created").sort((a, b) => b.createdAt - a.createdAt)) {
+      const title = await liveThread(made.threadId);
+      if (title) return { threadId: made.threadId, title, origin: "created" };
+    }
+    return null;
   };
 
   bb.ui.registerMentionProvider(defineItemMention({
@@ -118,18 +147,42 @@ export default async function plugin(bb: BbPluginApi) {
       if (ref) await setLink(ref, thread.id);
       return { threadId: thread.id };
     },
-    lastThread: async (ref) => {
-      const own = await bb.storage.kv.get<Link>(linkKey(ref));
-      const pages = ref.pluginId === PAGES_PLUGIN_ID ? await lastPageChat(ref.id) : null;
-      const newest = [own, pages].filter((link): link is Link => !!link).sort((a, b) => b.at - a.at)[0];
-      if (!newest) return { threadId: null };
-      if (!(await threadExists(newest.threadId))) return { threadId: null };
-      void services.linkThread({ threadId: newest.threadId, ref, role: "chat", state: "idle", createdAt: newest.at, updatedAt: newest.at, metadata: {} }).catch(() => { /* Studio is optional. */ });
-      return { threadId: newest.threadId };
-    },
+    home: async (ref) => ({ thread: await home(ref) }),
     link: async ({ threadId, ...ref }) => {
+      const title = await liveThread(threadId);
+      if (!title) throw new Error("That thread is archived or gone.");
       await setLink(ref, threadId);
+      return { thread: { threadId, title, origin: "chosen" as const } };
+    },
+    unlink: async (ref) => {
+      await bb.storage.kv.set(linkKey(ref), { threadId: null, at: Date.now() } satisfies Link);
       return { ok: true };
+    },
+    send: async ({ item: ref, quote }) => {
+      const thread = await home(ref);
+      if (!thread) return { threadId: null };
+      const found = await itemAt(ref).catch(() => null);
+      // On its own line after the item's pill, so a quoted passage reads as a quote.
+      const text = { type: "text" as const, text: `\n${quoteMessage(quote)}`, mentions: [] };
+      const input = found?.item
+        ? withItemPill([text], {
+            pluginId: PLUGIN_ID,
+            wireId: `${MENTION_PROVIDER_ID}:${itemKey(found.item)}`,
+            label: found.item.title,
+            icon: found.kind?.icon ?? null,
+          })
+        : [text];
+      // A comment waits for the thread's current turn instead of cutting in.
+      const post = (withImage: boolean) =>
+        bb.sdk.threads.send({
+          threadId: thread.threadId,
+          input: withImage && quote.image ? [...input, { type: "image", url: quote.image }] : input,
+          mode: "queue-if-active",
+        });
+      // The area's coordinates are in the text, so the quote still lands if
+      // the thread's provider won't take the picture.
+      await post(true).catch((error: unknown) => (quote.image ? post(false) : Promise.reject(error)));
+      return { threadId: thread.threadId };
     },
   });
 }

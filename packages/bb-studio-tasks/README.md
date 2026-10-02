@@ -40,8 +40,9 @@ and the Board, List and Calendar views.
   assignee, due day, priority, labels, recurrence, reminder, board and project; a Markdown description; links to threads,
   pages, artifacts, drawings and recordings; and the agent section. The
   header has **Hand off**, **Mark done** / **Reopen**, and a menu with Mark
-  done and archive threads, New thread about this, Archive threads, Move to
-  project, Archive task and Delete.
+  done and archive threads, New thread about this (without
+  [Studio Chat](../bb-studio-chat), whose New in Float starts threads),
+  Archive threads, Move to project, Archive task and Delete.
 - **In a thread's side panel** the **Tasks** tab lists the tasks made in that
   thread, then the project's recent ones. **New** makes a task in the
   thread's project and links it to the thread in Studio. In the narrow panel,

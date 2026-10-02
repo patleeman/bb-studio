@@ -4,8 +4,9 @@
 
 New in Float and Open in Float on every page, drawing and other Studio item.
 New in Float starts a thread that knows which item you're looking at; Open
-in Float brings back one you already have. The item's last chat comes back when
-you return to it. Threads open as [Float](../bb-studio-float) tabs.
+in Float brings back one you already have. Each item has one home thread,
+named in its header, where its chat and quotes go. Threads open as
+[Float](../bb-studio-float) tabs.
 
 ## Staged preview
 
@@ -24,14 +25,24 @@ Checkout flow" chip names the drawing on screen.
   for the item, and the agent gets a note saying what it is and which tools
   read and change it. The new thread opens as a Float tab, or in BB's own
   view without Float, where the buttons read New thread and Open thread.
-  (The item header's own New thread button opens BB's full composer.)
-- **Open in Float.** Next to it, Open in Float lists the item's last chat and
-  your recent threads; type to search them all. The one you pick opens as a
-  Float tab.
-- **Chats come back.** Each item remembers the last thread used on it, so
-  reopening it brings its chat back as a Float tab behind the one showing.
-  Moving on to another item swaps that tab for the next item's chat, unless
-  you're looking at it.
+  The item header drops its own New thread button, so this bar is the one
+  place to start a thread.
+- **Open in Float.** Next to it, Open in Float lists the item's home thread
+  and your recent threads; type to search them all. The one you pick opens as
+  a Float tab, without changing the home thread.
+- **A home thread per item.** Starting a thread from New in Float makes it
+  the item's home thread. Until then, the thread that made the item (an
+  agent's saved artifact, say) stands in. The item header names it: click it
+  to open it, or use its menu to **Change thread…** or **Unlink**. Without
+  one, the header shows **No thread**, which picks one. A thread can be home
+  to several items.
+- **Quotes go there.** An item view can send a quote, such as text selected
+  in an artifact or an area of an image, with a note. It's posted to the home
+  thread, waiting for the thread's current turn, and the thread opens. With
+  no home thread, New in Float opens with the quote in the message.
+- **Chats come back.** Reopening an item brings its home thread back as a
+  Float tab behind the one showing. Moving on to another item swaps that tab
+  for the next item's chat, unless you're looking at it.
 - **Viewing chip.** Every Float thread tab shows which Studio item is on
   screen.
 - **Pages hands over.** With Studio Chat installed, Studio Pages drops its own
@@ -49,8 +60,16 @@ Checkout flow" chip names the drawing on screen.
   (for example `excalidraw_get_drawing` / `excalidraw_update_drawing`), or a
   pointer to `studio_list_items`. It points at the item and doesn't copy it,
   so the agent reads the latest version.
-- Links from items to threads live in the plugin's storage
-  (`link:<plugin>:<id>`). For pages, Pages' own chat records count too.
+- Home threads live in the plugin's storage (`link:<plugin>:<id>`); Unlink
+  stores an empty link so the thread that made the item doesn't stand in.
+  For pages, Pages' own chat records count too. The fallback is the newest
+  `created` thread Studio links to the item.
+- Item views reach the home thread through the kit's `useHomeThread` and
+  `useItemChat` (`packages/bb-studio-kit/src/app/item-chat.ts`). Studio Chat
+  registers as their host on `window`, as Float does. `send` posts the quote
+  with `threads.send` in `queue-if-active` mode, with the item's pill and an
+  area's picture; if the provider refuses the picture, it sends the text,
+  which gives the area's coordinates.
 
 ## Limits
 

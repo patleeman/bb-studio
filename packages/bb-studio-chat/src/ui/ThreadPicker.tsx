@@ -1,4 +1,4 @@
-// "Open thread": the item's last chat first, then recent threads, or what a
+// "Open thread": the item's home thread first, then recent threads, or what a
 // search finds once you type. Picking one hands its id back.
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { cn, Icon } from "@bb-studio/kit/app";
@@ -28,8 +28,8 @@ const picked = (thread: ThreadLike): PickedThread => ({
   updatedAt: thread.updatedAt ?? null,
 });
 
-/** Recent threads with the item's last chat first, or search hits for `query`; null while loading. */
-function useThreads(query: string, lastThreadId: string | null): PickedThread[] | null {
+/** Recent threads with the item's home thread first, or search hits for `query`; null while loading. */
+function useThreads(query: string, homeThreadId: string | null): PickedThread[] | null {
   const sdk = useSdk();
   const [found, setFound] = useState<{ query: string; threads: PickedThread[] } | null>(null);
   useEffect(() => {
@@ -38,9 +38,9 @@ function useThreads(query: string, lastThreadId: string | null): PickedThread[] 
     const load = async () => {
       if (term.length < 2) {
         const threads = ((await sdk.threads.list({ archived: false, limit: RECENT_LIMIT })) as ThreadLike[]).map(picked);
-        if (!lastThreadId) return threads;
-        const listed = threads.find((thread) => thread.id === lastThreadId);
-        const last = listed ?? (await sdk.threads.get({ threadId: lastThreadId }).then((thread) => picked(thread as ThreadLike), () => null));
+        if (!homeThreadId) return threads;
+        const listed = threads.find((thread) => thread.id === homeThreadId);
+        const last = listed ?? (await sdk.threads.get({ threadId: homeThreadId }).then((thread) => picked(thread as ThreadLike), () => null));
         return last ? [last, ...threads.filter((thread) => thread !== listed)] : threads;
       }
       const result = await sdk.threads.search({ query: term, limitPerGroup: String(RECENT_LIMIT) });
@@ -58,23 +58,23 @@ function useThreads(query: string, lastThreadId: string | null): PickedThread[] 
       live = false;
       clearTimeout(timer);
     };
-  }, [sdk, query, lastThreadId]);
+  }, [sdk, query, homeThreadId]);
   return found?.query === query ? found.threads : null;
 }
 
 export function ThreadPicker({
-  lastThreadId,
+  homeThreadId,
   onPick,
   onClose,
 }: {
-  /** The thread last used on the item, listed first. */
-  lastThreadId: string | null;
+  /** The item's home thread, listed first. */
+  homeThreadId: string | null;
   onPick: (threadId: string) => void;
   onClose: () => void;
 }) {
   const [query, setQuery] = useState("");
   const [cursor, setCursor] = useState(0);
-  const threads = useThreads(query, lastThreadId);
+  const threads = useThreads(query, homeThreadId);
   const input = useRef<HTMLInputElement>(null);
   useEffect(() => input.current?.focus(), []);
 
@@ -127,7 +127,7 @@ export function ThreadPicker({
             <Icon name="MessageSquare" className="size-3.5 shrink-0 text-muted-foreground" />
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
             <span className="shrink-0 text-xs text-muted-foreground">
-              {thread.id === lastThreadId ? "Last used here" : thread.updatedAt ? relativeTime(thread.updatedAt) : null}
+              {thread.id === homeThreadId ? "This item's thread" : thread.updatedAt ? relativeTime(thread.updatedAt) : null}
             </span>
           </li>
         ))}

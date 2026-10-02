@@ -9,6 +9,17 @@ export { MENTION_PROVIDER_ID } from "./ids";
 const ref = z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) });
 export type ItemRef = z.infer<typeof ref>;
 
+const homeThread = z.object({ threadId: z.string(), title: z.string(), origin: z.enum(["chosen", "created"]) });
+
+/** A passage or an image area sent to the item's thread (ItemQuote in the kit). */
+const quote = z.object({
+  text: z.string().max(20_000).nullable(),
+  note: z.string().max(10_000),
+  where: z.string().max(300).nullable(),
+  /** A cropped area as a data URL; large crops are scaled down before sending. */
+  image: z.string().max(4_000_000).regex(/^data:image\/(png|jpeg|webp);base64,/).nullable(),
+}).refine((value) => value.text?.trim() || value.image || value.note.trim(), "Select something or write a note.");
+
 /** The Studio item on screen, as the chat shows it. */
 const viewed = z.object({
   pluginId: z.string(),
@@ -65,14 +76,27 @@ export const rpcContract = defineRpcContract({
     input: z.object({ item: ref.nullable(), request: chatRequestSchema }),
     output: z.object({ threadId: z.string() }),
   },
-  /** The thread last used on an item, so reopening it brings its chat back. */
-  lastThread: {
+  /**
+   * The item's home thread, where its chat and quotes go: the one started or
+   * picked for it, else the thread that made it.
+   */
+  home: {
     input: ref,
-    output: z.object({ threadId: z.string().nullable() }),
+    output: z.object({ thread: homeThread.nullable() }),
   },
-  /** Remembers the thread in use on an item. */
+  /** Makes `threadId` the item's home thread. */
   link: {
     input: ref.extend({ threadId: z.string().min(1).max(200) }),
+    output: z.object({ thread: homeThread.nullable() }),
+  },
+  /** Leaves the item without a home thread, until one is started or picked. */
+  unlink: {
+    input: ref,
     output: z.object({ ok: z.boolean() }),
+  },
+  /** Sends a quote to the item's home thread; null when it has none. */
+  send: {
+    input: z.object({ item: ref, quote }),
+    output: z.object({ threadId: z.string().nullable() }),
   },
 });

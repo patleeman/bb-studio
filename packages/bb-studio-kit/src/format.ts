@@ -82,3 +82,26 @@ export function snippets<T extends { id: string }>(
   }
   return found;
 }
+
+/** Part of a Studio item someone points a thread at: a passage, or an area of an image. */
+export interface ItemQuote {
+  /** The selected text, or null for an area. */
+  text: string | null;
+  /** What they wrote about it; may be empty. */
+  note: string;
+  /** Where in the item, e.g. "version 3" or "area 120,40 to 380,200 px of version 2". */
+  where: string | null;
+  /** The area cropped out, as a data URL. */
+  image: string | null;
+}
+
+/** A quote as message text: the passage quoted, where it is, then the note. */
+export function quoteMessage(quote: Pick<ItemQuote, "text" | "note" | "where">): string {
+  const parts: string[] = [];
+  const text = quote.text?.trim();
+  if (text) parts.push(text.split("\n").map((line) => `> ${line}`.trimEnd()).join("\n"));
+  if (quote.where) parts.push(text ? `(${quote.where})` : `About the ${quote.where}:`);
+  const note = quote.note.trim();
+  if (note) parts.push(note);
+  return parts.join("\n\n");
+}

@@ -103,6 +103,15 @@ export {
   type SidebarDisplay,
   type SidebarSectionAction,
 } from "./sidebar";
+export {
+  setItemChatHost,
+  itemChatChanged,
+  useHomeThread,
+  useItemChat,
+  type HomeThread,
+  type ItemChatHost,
+  type ItemChatRef,
+} from "./item-chat";
 export { publishThreadBadges, useThreadBadge, type ThreadBadge } from "./thread-badges";
 export {
   DropdownMenu,

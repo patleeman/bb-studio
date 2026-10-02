@@ -3,14 +3,14 @@
   "version": "0.1.0",
   "license": "MIT",
   "type": "module",
-  "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item: start a thread that knows what you're looking at, or open one you have, as a Float tab. The item's last chat comes back when you return.",
+  "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item. Each item has one home thread, shown in its header, that its chat and quotes go to and that comes back when you return.",
   "engines": {
     "bb": ">=0.44",
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Studio Chat",
-    "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item: start a thread that knows what you're looking at, or open one you have, as a Float tab. The item's last chat comes back when you return.",
+    "description": "Part of BB Studio. New in Float and Open in Float on every page, drawing and other Studio item. Each item has one home thread, shown in its header, that its chat and quotes go to and that comes back when you return.",
     "branding": {
       "icon": "./assets/icon.svg"
     },

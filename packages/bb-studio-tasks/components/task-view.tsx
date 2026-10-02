@@ -20,6 +20,7 @@ import {
   ItemMenu,
   openNewItemThread,
   OUTLINE_BUTTON,
+  useStudioChatPresent,
   PageColumn,
   cn,
   openAppPath,
@@ -63,6 +64,9 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
   const rpc = useTasksRpc();
   const navigate = useBbNavigate();
   const projects = useProjects();
+  // Studio Chat's New in Float bar starts threads on the task's own page, so
+  // there the menu only offers New thread without it.
+  const studioChat = useStudioChatPresent();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [columns, setColumns] = useState<{ id: string; label: string }[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
   const [bots, setBots] = useState<{ id: string; name: string }[]>([]);
@@ -195,9 +199,11 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
               <Icon name="Bot" className="size-4" /> Hand off
             </DropdownMenuItem>
           ) : null}
-          <DropdownMenuItem className={compact ? undefined : "md:hidden"} onSelect={() => openNewItemThread(navigate, thread)}>
-            <Icon name="MessageSquarePlus" className="size-4" /> New thread about this
-          </DropdownMenuItem>
+          {compact || studioChat === false ? (
+            <DropdownMenuItem className={compact ? undefined : "md:hidden"} onSelect={() => openNewItemThread(navigate, thread)}>
+              <Icon name="MessageSquarePlus" className="size-4" /> New thread about this
+            </DropdownMenuItem>
+          ) : null}
           {openThreads ? (
             <DropdownMenuItem onSelect={() => void archiveThreads()}>
               <Icon name="Archive" className="size-4" /> Archive {openThreads === 1 ? "thread" : `${openThreads} threads`}

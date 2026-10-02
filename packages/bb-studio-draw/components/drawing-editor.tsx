@@ -25,6 +25,7 @@ import {
   ItemDeleteConfirm,
   ItemMenu,
   openNewItemThread,
+  useStudioChatPresent,
   cn,
 } from "@bb-studio/kit/app";
 
@@ -64,6 +65,8 @@ export function DrawingEditor({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
+  // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
+  const studioChat = useStudioChatPresent();
   const isDark = useIsDark();
   const [name, setName] = useState("");
   const [confirmDelete, setConfirmDelete] = useState(false);
@@ -432,7 +435,7 @@ export function DrawingEditor({
       </button>
       <ItemMenu reference={thread} onDelete={() => setConfirmDelete(true)} className="w-52">
 
-          {threadId ? null : (
+          {threadId || studioChat !== false ? null : (
             <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
               <Icon name="MessageSquarePlus" className="size-4" /> New thread
             </DropdownMenuItem>

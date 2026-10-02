@@ -12,7 +12,10 @@ plugin id stays `excalidraw`, so existing installs and drawings carry over.
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded "Checkout flow" drawing open in the Draw
 editor, under Studio's shared item header. Cart, Payment and Confirmation boxes
-are joined by arrows, with a "Retry payment on failure" note.
+are joined by arrows, with a "Retry payment on failure" note. The header shows
+**No thread**, Studio Chat's chip for a drawing no thread has been started
+or picked for, and Studio Chat's New in Float and Open in Float sit in the
+corner.
 
 ## What you get
 
@@ -23,8 +26,9 @@ are joined by arrows, with a "Retry payment on failure" note.
   panel shows the same collection on its own.
 - **The editor** (`/plugins/excalidraw/drawings/<id>`) autosaves as you work.
   Its header matches every Studio item: back, an editable name, live sync
-  status, **New thread** (starts a conversation that links the drawing), copy
-  image, and a menu with Download PNG and Delete.
+  status, the drawing's thread (with [Studio Chat](../bb-studio-chat);
+  otherwise **New thread**, which starts a conversation that links the
+  drawing), copy image, and a menu with Download PNG and Delete.
 - **In a thread's side panel.** The **Drawings** tab lists the drawings made
   in that thread, then the project's recent ones. **New** makes a drawing in
   the thread's project and links it to the thread in Studio. In the editor,
