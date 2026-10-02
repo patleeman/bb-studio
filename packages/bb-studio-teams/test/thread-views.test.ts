@@ -90,6 +90,7 @@ test("scheduled automation prompts and their replies stay out of the view", () =
     ] },
   ];
   expect(finalEntries(rows as never)).toEqual([]);
+  expect(finalEntries([{ ...rows[0], turnId: null }, rows[1]] as never)).toEqual([]);
 });
 
 test("history follows BB cursors past tool-only pages and keeps equal timestamps", async () => {

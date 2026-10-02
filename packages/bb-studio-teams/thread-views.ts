@@ -14,9 +14,18 @@ const envelope = /^\[Studio view message ([a-f0-9-]+)\]\n([\s\S]*?)\n\[End owner
 export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set()): ViewEntry[] {
   const entries: ViewEntry[] = [], replies = new Map<string, Row & { kind: "conversation"; role: "assistant" }>();
   const completedTurns = new Set(completed), automationTurns = new Set<string>();
+  let unassignedAutomation = false;
   const collect = (items: Row[]) => { for (const row of items) {
+    if (row.kind === "conversation" && row.role === "user") {
+      const scheduled = /^\[bb automation due:[^\]]+\]\n/.test(row.text);
+      if (scheduled && row.turnId) automationTurns.add(row.turnId);
+      // BB's initial input is stored before a turn ID has been assigned.
+      unassignedAutomation = scheduled && !row.turnId;
+    } else if (unassignedAutomation && row.turnId) {
+      automationTurns.add(row.turnId);
+      unassignedAutomation = false;
+    }
     if (row.kind === "turn") { if (row.status === "completed") completedTurns.add(row.turnId ?? row.id); collect(row.children ?? []); }
-    else if (row.kind === "conversation" && row.role === "user" && row.turnId && /^\[bb automation due:[^\]]+\]\n/.test(row.text)) automationTurns.add(row.turnId);
   } };
 
   collect(rows);
