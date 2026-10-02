@@ -8,13 +8,20 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
    await client.navigate(`/plugins/bot-teams/views/${id}`);
    await client.waitForSelector('[data-thread-view]');
    for(const text of launchRoomReplies)await client.waitForText(text);
-   await client.waitForText("New bot threads");
    await client.evaluate(`(()=>{
     if(!document.querySelector('textarea[aria-label="Message to view"], textarea#view-message'))throw new Error("Missing view composer");
     if(document.querySelectorAll('[data-view-entry="assistant"]').length<3)throw new Error("Missing final thread replies");
+    if(!document.querySelector('[data-view-entry="user"]'))throw new Error("Missing owner messages");
+   })()`);
+   await client.clickAriaButtonWithPointer("Choose recipients");
+   await client.waitForText("New bot threads");
+   await client.evaluate(`(()=>{
     const names=document.querySelector('[role="group"][aria-label="Recipients"]')?.textContent;
     if(!names?.includes("Atlas")||!names.includes("Scribe"))throw new Error("Missing recipient controls");
    })()`);
+   await client.command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+   await client.command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
+   await client.evaluate(`new Promise((resolve,reject)=>setTimeout(()=>document.querySelector('[role="group"][aria-label="Recipients"]')?reject(new Error("Recipient menu stayed open")):resolve(),400))`,true);
   }
  },
  {

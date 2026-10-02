@@ -8,7 +8,7 @@ Create a bot from **Teams → New bot**. Describe its purpose in the prefilled c
 
 Open **Studio → New → View** and select bots or existing threads. Views are Studio items: find them in the collection, add tags or spaces, and open them as tabs under **Studio** in the sidebar. A view combines owner input and final replies from its members, including replies sent directly in a member thread. It hides tools, inter-agent input, unfinished output and `[PASS]`. Spawned child threads are folded beneath their parents. A thread can belong to several views; deleting a view leaves its threads intact.
 
-Mention `@handle`, select recipients, or choose **Reply** on a message. A bot continues its latest thread in this view. `@handle+new` or **New bot threads** creates a fresh one. All recipients receive the same addressed thread roster and recent context, with real thread IDs allocated before delivery. Untagged input asks Studio Decisions to choose recipients; if it is uncertain, the draft stays in the composer for you to address. Retry preserves successful deliveries when another recipient failed.
+Mention `@handle`, pick recipients from the composer's **To** menu, or choose **Reply** on a message. A bot continues its latest thread in this view. `@handle+new` or **New bot threads** creates a fresh one. All recipients receive the same addressed thread roster and recent context, with real thread IDs allocated before delivery. Untagged input asks Studio Decisions to choose recipients; if it is uncertain, the draft stays in the composer for you to address. Retry preserves successful deliveries when another recipient failed.
 
 Busy messages use your global Smart Queue settings. Prefix a message with `/steer`, `/followup` or `/fork` to choose explicitly. Open a member thread for tools, approvals, queues, stopping work and model controls. The iOS app uses the same views and composer behavior.
 
@@ -28,6 +28,6 @@ The public RPC contract is [client-contract.ts](client-contract.ts); saved view 
 
 ![A saved view over Atlas and Scribe's ordinary threads](assets/staged-preview.png)
 
-Captured from an isolated stable BB installed from the pushed Git revision. The Launch work view shows deterministic ORBIT-42 replies from Atlas and Scribe, with member chips that link to their ordinary threads and a composer whose recipient pills pick who receives the next message.
+Captured from an isolated stable BB installed from the pushed Git revision. The Launch work view shows deterministic ORBIT-42 replies from Atlas and Scribe, laid out like a regular BB thread: your messages on the right, each bot's reply under its name (which links to its ordinary thread), and BB's prompt box with a **To** menu for recipients.
 
 The [compact preview](assets/staged-preview-mobile.png) shows the same live view at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) and [sidebar](assets/studio-sidebar.png) show profile settings and a saved view open under Studio.
