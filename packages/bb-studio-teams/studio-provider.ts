@@ -20,6 +20,7 @@ export const BOT_KIND: StudioKind = {
   canArchive: true,
   capabilities: { create: true, move: false, archive: true, delete: false, rename: true, duplicate: false, export: false, comments: false, versions: false, links: false },
   mentionProviderId: "bot",
+  hasOwnChat: true,
 
   blurb: "Persistent teammates with their own workspace and memory.",
   agentHint: "It's a bot: @mention it by name to hand it work; `bb bots show <id>` and `bb bots memory <id>` describe it.",
@@ -30,6 +31,7 @@ export const VIEW_KIND: StudioKind = {
   columns: [], actions: [], create: { mode: "rpc" }, canArchive: true,
   capabilities: { create: true, move: false, archive: true, delete: true, rename: false, duplicate: false, export: false, comments: false, versions: false, links: false },
   mentionProviderId: "views",
+  hasOwnChat: true,
   blurb: "Bots and ordinary threads gathered in one timeline.",
   agentHint: "Read this saved thread view with `bb bots view-read <id>`. Work and approvals belong to its ordinary threads.",
 };

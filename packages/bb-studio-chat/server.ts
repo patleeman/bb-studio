@@ -119,7 +119,7 @@ export default async function plugin(bb: BbPluginApi) {
     viewing: async ({ path }) => {
       if (!path.startsWith("/plugins/")) return { item: null };
       const { item, kind } = await itemAt({ path }).catch(() => ({ item: null, kind: null }));
-      return { item: item && !item.archived ? toViewed(item, kind) : null };
+      return { item: item && !item.archived && !kind?.hasOwnChat ? toViewed(item, kind) : null };
     },
     subject: async (ref) => {
       const { item, kind } = await itemAt(ref);

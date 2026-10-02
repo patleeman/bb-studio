@@ -6,6 +6,8 @@ BB Studio collects the items owned by its add-ons in one searchable, tagged coll
 
 A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accepts versions 1 and 2. Version 2 describes each kind's `capabilities` (`create`, `move`, `archive`, `delete`, `rename`, `duplicate`, `export`, `comments`, `versions`, `links`) and `mentionProviderId`. The collection hides actions disabled by capabilities. For version 1, Studio infers the capabilities that the old collection offered and uses no mention provider id. A kind may set `background: true` for items kept only as a safety net, such as Talk's dictations: the collection's All view and Studio Home skip them, while the kind's own pill and search still find them.
 
+A kind can set `hasOwnChat: true` when it owns its conversation UI. Studio Chat then skips automatic chat discovery for that kind, while explicit item mentions remain available. Its header can pass `chatAction` to `ItemHeader` to supply its primary Chat button, or `null` to omit one. Register its routes with `FloatPanels` so the same view can open as a companion. `useCompanionNavigate()` routes asynchronous actions inside that companion; it returns false outside a companion so the caller can use normal navigation.
+
 | Method | Input | Output |
 |---|---|---|
 | `studio_describe` | `null` | Plugin id, contract version, panel, kinds and their capabilities |

@@ -802,6 +802,9 @@
                         "type": "string",
                         "maxLength": 500
                       },
+                      "hasOwnChat": {
+                        "type": "boolean"
+                      },
                       "background": {
                         "type": "boolean"
                       }
@@ -5158,6 +5161,9 @@
                   "agentHint": {
                     "type": "string",
                     "maxLength": 500
+                  },
+                  "hasOwnChat": {
+                    "type": "boolean"
                   },
                   "background": {
                     "type": "boolean"

@@ -41,7 +41,6 @@
     "zod": "^4.3.6"
   },
   "devDependencies": {
-    "vitest": "4.1.1",
     "@radix-ui/react-alert-dialog": "^1.1.19",
     "@radix-ui/react-hover-card": "^1.1.19",
     "@radix-ui/react-menubar": "^1.1.20",
@@ -52,9 +51,13 @@
     "@types/react": "^19.0.0",
     "@types/react-dom": "^19.0.0",
     "better-sqlite3": "^12.11.1",
+    "jsdom": "29.0.1",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
     "tsx": "^4.20.0",
     "typescript": "^5.7.0",
-    "vaul": "^1.1.2"
+    "vaul": "^1.1.2",
+    "vitest": "4.1.1"
   },
   "scripts": {
     "typecheck": "tsc --noEmit",

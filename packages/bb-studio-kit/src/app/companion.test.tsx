@@ -3,7 +3,7 @@ import React, { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { CompanionView, companionWorkbenchAvailable, openCompanion, type CompanionViewProps } from "./companion";
-import { FloatPanels, useInFloat } from "./float";
+import { FloatPanels, useCompanionNavigate, useInFloat } from "./float";
 import { publishFloatBody, setFloatHost } from "./float-registry";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages" }));
@@ -28,6 +28,20 @@ afterEach(() => {
 });
 
 describe("optional native companion host", () => {
+  it("navigates the originating companion after a request completes without a current click event", async () => {
+    const navigate = vi.fn();
+    setFloatHost({ open: () => {}, navigate });
+    let go: ReturnType<typeof useCompanionNavigate>;
+    function Editor() { go = useCompanionNavigate(); return <textarea defaultValue="Unsent" />; }
+    act(() => root.render(<FloatPanels path="pages" render={() => <Editor />} />));
+    act(() => publishFloatBody({ windowKey: "page", target: { kind: "path", path: "/plugins/pages/pages/one" }, element: body, placement: "main" }));
+    await Promise.resolve();
+    const target = { kind: "thread" as const, threadId: "source" };
+    expect(go!(target)).toBe(true);
+    expect(navigate).toHaveBeenCalledWith("page", target);
+    expect(go!({ kind: "path", path: "/unregistered" })).toBe(false);
+    expect(navigate).toHaveBeenCalledTimes(1);
+  });
   it("keeps Chat usable on stable BB and only selects native placement when the complete host capability exists", () => {
     const open = vi.fn();
     setFloatHost({ open });

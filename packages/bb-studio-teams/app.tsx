@@ -16,8 +16,9 @@ import { ThreadBadges } from "./thread-badges";
 import { ProfileThreads } from "./profile-threads";
 import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
+import { BotChat } from "./bot-chat";
 import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID, botHref } from "./studio-provider";
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FLOATING_BUTTON, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
+import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FloatPanels, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
 
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
@@ -32,7 +33,6 @@ const STATUS_TONES = {
 
 function BotDetail({ id, tab }: { id: string; tab: string }) {
   const rpc = useRpc<typeof rpcContract>(),
-    navigate = useBbNavigate(),
     studio = useStudioPresent();
   const [archiveOpen, setArchiveOpen] = useState(false);
   const [data, setData] = useState<{
@@ -101,29 +101,18 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
       : botStatus === "working"
           ? "Working"
           : "Ready";
-  const startThread = async () => {
-    try {
-      const conversation = await rpc.call("newConversation", { id });
-      navigate.toThread(conversation.threadId);
-    } catch (cause) {
-      setError(message(cause));
-    }
-  };
   return (
     <div className="relative h-full min-h-0">
       <ItemHeader
+        item={{ href: botHref(id), title: bot.name }}
+        chatAction={bot.retired ? null : <BotChat key={id} id={id} disabled={pending} onError={setError} />}
         backLabel={studio ? "Studio" : "Bots"}
         onBack={() =>
-          studio ? openAppPath(studioPath("bot")) : navigate.toPluginPanel("bots")
+          openAppPath(studio ? studioPath("bot") : `/plugins/${PLUGIN_ID}/bots`)
         }
         leading={<Badge label={statusLabel} tone={STATUS_TONES[botStatus]} />}
         trailing={
           <>
-            {bot.retired ? null : (
-              <button type="button" className={FLOATING_BUTTON} disabled={pending} onClick={() => void startThread()}>
-                <KitIcon name="MessageSquarePlus" /> Message
-              </button>
-            )}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
                 <button type="button" aria-label="Bot options" className={ICON_BUTTON}>
@@ -169,7 +158,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
           selected={tab}
           label="Bot sections"
           onSelect={(t) =>
-            navigate.toPluginPanel("bots", { subPath: `${id}/${t}` })
+            openAppPath(`${botHref(id)}/${t}`)
           }
         />
         <Modal
@@ -374,4 +363,9 @@ export default definePluginApp((app) => {
   app.slots.navPanel({ id: "former-channels", title: "Views", icon: "MessageSquare", path: "channels", component: FormerChannelRedirect });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
+  app.slots.experimental_appOverlay({ id: "companions", component: () => <>
+    <FloatPanels path="bots" render={subPath => <BotsPage subPath={subPath} />} />
+    <FloatPanels path="views" render={subPath => <div className="flex h-full min-h-0 flex-col"><div className="flex shrink-0 items-center px-3 py-2"><ViewHeader subPath={subPath} /></div><div className="min-h-0 flex-1"><ViewsPage subPath={subPath} /></div></div>} />
+    <FloatPanels path="channels" render={subPath => <FormerChannelRedirect subPath={subPath} />} />
+  </> });
 });

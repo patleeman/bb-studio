@@ -46,6 +46,18 @@ export function useCanFloat(target: FloatTarget | null): boolean {
 }
 
 const InFloatContext = createContext(false);
+const CompanionKeyContext = createContext<string | null>(null);
+
+/** Navigates the current companion, including after an asynchronous action. */
+export function useCompanionNavigate(): (target: FloatTarget) => boolean {
+  const key = useContext(CompanionKeyContext);
+  return (target) => {
+    const host = floatHost();
+    if (!key || !host?.navigate || (target.kind === "path" && !floatPanelFor(target.path))) return false;
+    host.navigate(key, target);
+    return true;
+  };
+}
 
 /**
  * True inside a window. A view rendered there skips what only makes sense on
@@ -71,7 +83,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
         // the plugin's CSS and route links apply.
         return createPortal(
           <div data-bb-portaled-overlay="" data-bb-plugin-root="" data-bb-plugin={pluginId} className="flex h-full min-h-0 flex-col">
-            <InFloatContext.Provider value={placement !== "main"}>{render(panel.subPath)}</InFloatContext.Provider>
+            <CompanionKeyContext.Provider value={windowKey}><InFloatContext.Provider value={placement !== "main"}>{render(panel.subPath)}</InFloatContext.Provider></CompanionKeyContext.Provider>
           </div>,
           element,
           windowKey,

@@ -9,6 +9,10 @@ const kind = {
 };
 
 describe("Studio provider contract", () => {
+  it("preserves a kind's own-chat opt-out across provider RPC validation", () => {
+    expect(schemas.kind.parse({ ...kind, hasOwnChat: true }).hasOwnChat).toBe(true);
+    expect(schemas.kind.parse(kind).hasOwnChat).toBeUndefined();
+  });
   it("accepts v1 descriptions and v2 capabilities", () => {
     expect(schemas.info.parse({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }).kinds[0]?.capabilities).toBeUndefined();
     const capabilities = { create: true, move: true, archive: true, delete: true, rename: true, duplicate: false, export: true, comments: true, versions: true, links: true };

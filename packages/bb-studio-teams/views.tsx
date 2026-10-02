@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { Icon, ItemTile, PageColumn, AddOnCollection, type ProviderCall } from "@bb-studio/kit/app";
+import { Icon, ItemTile, PageColumn, AddOnCollection, openAppPath, openCompanion, useCompanionNavigate, type ProviderCall } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { Button, Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
 import { Modal } from "./channel-controls";
 import { ErrorMessage, message } from "./bot-ui";
-import { PLUGIN_ID, VIEW_KIND } from "./studio-provider";
+import { PLUGIN_ID, VIEW_KIND, viewHref } from "./studio-provider";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
@@ -113,6 +113,7 @@ export function ViewHeader({ subPath }: PluginNavPanelProps) {
 }
 function ViewDetail({ id }: { id: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
+  const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
   const [targets, setTargets] = useState<ViewMember[]>([]), [reply, setReply] = useState<string | null>(null);
   const [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false), [focus, setFocus] = useState(0);
@@ -187,7 +188,7 @@ function ViewDetail({ id }: { id: string }) {
     const actions = <div className={`flex h-5 items-center gap-2 ${entry.role === "user" ? "justify-end pr-[13px]" : ""}`}>
       {action("Copy message", "Copy", () => void navigator.clipboard.writeText(entry.text).then(() => toast.success("Copied"), e => toast.error(message(e))))}
       {action(`Reply to ${entry.role === "user" ? thread?.title || "thread" : bot?.name || thread?.title || "thread"}`, "ArrowTurnBackward", () => { setReply(entry.threadId); setTargets([]); setFocus(value => value + 1); })}
-      {entry.role === "assistant" && action("Open thread", "ArrowUpRight", () => navigate.toThread(entry.threadId))}
+      {entry.role === "assistant" && action("Open thread", "ArrowUpRight", () => openThread(entry.threadId))}
     </div>;
     if (entry.role === "user") return <li key={entry.id} data-view-entry="user" className="group/message ml-auto flex w-fit max-w-[70%] flex-col items-end gap-1">
       <time className="text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>
@@ -196,7 +197,7 @@ function ViewDetail({ id }: { id: string }) {
     </li>;
     const continued = previous?.role === "assistant" && previous.threadId === entry.threadId && entry.createdAt - previous.createdAt < 5 * 60_000;
     return <li key={entry.id} data-view-entry="assistant" data-replying={replying || undefined} className={`group/message rounded-lg px-2 transition-colors data-[replying]:bg-foreground/[0.04] data-[replying]:py-2 ${continued ? "-mt-2" : ""}`}>
-      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => navigate.toThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replying && <span className="text-xs text-subtle-foreground">· Replying</span>}</div>}
+      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => openThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replying && <span className="text-xs text-subtle-foreground">· Replying</span>}</div>}
       <div className="min-w-0 break-words text-sm leading-relaxed"><Markdown content={entry.text} /></div>
       <div className="mt-1">{actions}</div>
     </li>;
@@ -255,10 +256,11 @@ function ViewDetail({ id }: { id: string }) {
   </div>;
 }
 export function ViewsPage({ subPath }: PluginNavPanelProps) {
-  const navigate = useBbNavigate();
+  const companionNavigate = useCompanionNavigate();
+  const open = (path: string) => { if (!companionNavigate({ kind: "path", path })) openAppPath(path); };
   const id = subPath.split("/")[0];
   if (id && id !== "new") return <ViewDetail key={id} id={id} />;
-  if (id === "new") return <ViewEditor open onClose={() => navigate.toPluginPanel("views")} onSaved={v => navigate.toPluginPanel("views", { subPath: v.id })} />;
+  if (id === "new") return <ViewEditor open onClose={() => open(`/plugins/${PLUGIN_ID}/views`)} onSaved={v => open(viewHref(v.id))} />;
   return <ViewCollection />;
 }
 function ViewCollection() {
@@ -270,15 +272,18 @@ function ViewCollection() {
 }
 export function FormerChannelRedirect({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
+  const companionNavigate = useCompanionNavigate();
+  const currentNavigate = useRef(companionNavigate);
+  currentNavigate.current = companionNavigate;
   const [error, setError] = useState<string | null>(null);
   useEffect(() => {
     const id = subPath.split("/")[0];
-    if (!id) { navigate.toPluginPanel("views", { replace: true }); return; }
+    if (!id) { const path = `/plugins/${PLUGIN_ID}/views`; if (!currentNavigate.current({ kind: "path", path })) openAppPath(path, { replace: true }); return; }
     let active = true;
     void rpc.call("view", { id }).then(page => {
       if (!active) return;
-      if (page.view.members.length === 1 && page.threads[0]) navigate.toThread(page.threads[0].id);
-      else navigate.toPluginPanel("views", { subPath: id, replace: true });
+      if (page.view.members.length === 1 && page.threads[0]) { const threadId = page.threads[0].id; if (!currentNavigate.current({ kind: "thread", threadId })) navigate.toThread(threadId); }
+      else { const path = viewHref(id); if (!currentNavigate.current({ kind: "path", path })) openAppPath(path, { replace: true }); }
     }, e => { if (active) setError(message(e)); });
     return () => { active = false; };
   }, [subPath, rpc, navigate]);

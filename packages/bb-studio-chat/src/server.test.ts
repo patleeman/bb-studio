@@ -27,6 +27,13 @@ beforeEach(async () => {
 });
 
 describe("Chat item resolution and submission", () => {
+  it("leaves views with their own chat UI out of the automatic overlay while keeping their explicit context available", async () => {
+    rpc.mockResolvedValue({ item, kind: { hasOwnChat: true } });
+    expect(await handlers.viewing({ path: item.href })).toEqual({ item: null });
+    expect((await handlers.subject(ref)).item).toMatchObject(ref);
+    rpc.mockResolvedValue({ item, kind: null });
+    expect((await handlers.viewing({ path: item.href })).item).toMatchObject(ref);
+  });
   it("resolves the explicit companion ref through Studio", async () => {
     expect((await handlers.subject(ref)).item).toMatchObject({ ...ref, title: item.title, projectId: item.projectId });
     expect(rpc).toHaveBeenCalledWith(expect.objectContaining({ pluginId: "studio", method: "itemAt", input: ref }));

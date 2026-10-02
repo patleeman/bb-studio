@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "./contract";
-import { EmptyState } from "@bb-studio/kit/app";
+import { EmptyState, openCompanion } from "@bb-studio/kit/app";
 import { ErrorMessage, message } from "./bot-ui";
 import { affects } from "./realtime";
 
@@ -33,7 +33,7 @@ export function ProfileThreads({ id }: { id: string }) {
   if (!threads.length)
     return (
       <EmptyState icon="MessageSquare" title="No threads yet">
-        Choose Work as bot in any thread's composer, or use Message.
+        Choose Work as bot in any thread's composer, or use Chat.
       </EmptyState>
     );
   return (
@@ -44,7 +44,7 @@ export function ProfileThreads({ id }: { id: string }) {
           <button
             type="button"
             className="flex min-h-7 w-full items-baseline gap-2 rounded-md px-2 py-1 text-left text-sm hover:bg-state-hover focus-visible:bg-state-hover"
-            onClick={() => navigate.toThread(thread.threadId)}
+            onClick={() => { if (!openCompanion({ kind: "thread", threadId: thread.threadId })) navigate.toThread(thread.threadId); }}
           >
             <span className="min-w-0 flex-1 truncate">{thread.title}</span>
             {thread.archived && <span className="text-xs text-muted-foreground">Archived</span>}

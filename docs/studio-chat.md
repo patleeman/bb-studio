@@ -18,8 +18,9 @@ elsewhere. Actions inside Float therefore target their own item.
 The `viewing` RPC separately resolves the main pane's route for the
 **Viewing** chip. That label describes what is visible; it does not change
 the item attached to an open composer or add context to a message. Teams
-saved views already contain chat, so they do not trigger item-chat discovery
-or background chat tabs. There is no idle corner bar covering their Send
+bot profiles and saved views own their conversation UI. Their kinds set
+`hasOwnChat: true`, so they do not trigger item-chat discovery or background
+chat tabs. There is no idle corner bar covering their Send
 button.
 
 Sending from a new composer adds the item's mention pill. BB resolves it

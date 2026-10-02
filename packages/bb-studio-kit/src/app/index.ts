@@ -53,6 +53,7 @@ export {
   useCanFloat,
   useFloatAvailable,
   useInFloat,
+  useCompanionNavigate,
 } from "./float";
 export {
   FLOAT_WINDOW_ATTRIBUTE,

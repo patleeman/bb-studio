@@ -124,6 +124,8 @@ export interface StudioKind {
    * screen.
    */
   agentHint?: string;
+  /** The item owns its conversation UI; Studio Chat must not add an automatic chat. */
+  hasOwnChat?: boolean;
   /**
    * Kept out of the way: the collection's All view and Studio Home skip
    * these items, while the kind's own filter and search still find them.
@@ -206,6 +208,7 @@ export function studioSchemas(z: typeof Zod) {
     mentionProviderId: z.string().nullable().optional(),
     blurb: z.string(),
     agentHint: z.string().max(500).optional(),
+    hasOwnChat: z.boolean().optional(),
     background: z.boolean().optional(),
   });
   const info = z.object({ pluginId: z.string(), version: z.union([z.literal(1), z.literal(2)]), panel: z.string().nullable(), kinds: z.array(kind) });

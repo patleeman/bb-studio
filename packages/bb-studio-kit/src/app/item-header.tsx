@@ -74,6 +74,7 @@ export function ItemHeader({
   trailing,
   thread,
   item,
+  chatAction,
   className,
 }: {
   backLabel: string;
@@ -86,6 +87,8 @@ export function ItemHeader({
   thread?: ItemThread;
   /** The item shown, for the Float and split menu; `thread` serves when given. */
   item?: ItemThread;
+  /** Replaces the shared item chat when a view owns its conversation. Null hides it. */
+  chatAction?: ReactNode;
   className?: string;
 }) {
   const newThread = useNewItemThread(thread);
@@ -122,10 +125,11 @@ export function ItemHeader({
       {trailing || thread || moved ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
         {relatedRef ? <SpacePicker item={relatedRef} /> : null}
         {relatedRef ? <RelatedPanel ref={relatedRef} compact={inFloat} /> : null}
-        {thread && studioChat === false ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
+        {chatAction}
+        {chatAction === undefined && thread && studioChat === false ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
           <Icon name="MessageSquare" /> Chat
         </button> : null}
-        {relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
+        {chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
         {moved ? <MoveMenu item={moved} onBack={onBack} /> : null}
         {trailing}
       </div> : null}

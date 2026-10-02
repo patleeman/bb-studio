@@ -56,6 +56,14 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); state.launch = null; });
 
 describe("Chat menu focus", () => {
+  it("lets a conversation-owning view supply one Chat action or opt out", async () => {
+    const item = { title: "Atlas", href: "/plugins/bot-teams/bots/atlas" };
+    await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={item} chatAction={<button>Chat with Atlas</button>} />));
+    expect(container.textContent).toBe("Chat with Atlas");
+    expect(container.querySelector('[data-studio-chat-item]')).toBeNull();
+    await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={item} chatAction={null} />));
+    expect(container.querySelector("button")).toBeNull();
+  });
   it("uses the companion's navigation chrome inside Float", () => {
     expect([...container.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Studio")).toBe(false);
     expect(container.querySelector('[data-studio-chat-item="pages:launch"] > button')?.textContent?.trim()).toBe("Chat");
