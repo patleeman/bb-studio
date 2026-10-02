@@ -29,3 +29,5 @@ The public RPC contract is [client-contract.ts](client-contract.ts); saved view 
 ![A saved view over Atlas and Scribe's ordinary threads](assets/staged-preview.png)
 
 Captured from an isolated stable BB installed from the pushed Git revision. The Launch work view shows deterministic ORBIT-42 replies from Atlas and Scribe, with the owner composer and links to their ordinary threads.
+
+The [compact preview](assets/staged-preview-mobile.png) shows the same live view at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) and [sidebar](assets/studio-sidebar.png) show profile settings and global saved views.
