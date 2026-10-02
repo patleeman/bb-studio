@@ -13,7 +13,7 @@ export async function migrateViews(bb: BbPluginApi, store: Store, runtime: Runti
   for (const room of store.rooms()) {
     if (store.db.prepare("SELECT 1 FROM view_migrations WHERE room_id=?").get(room.id)) continue;
     const members = room.memberIds.filter(id => { const b = store.findBot(id); return b && !b.retired; });
-    let view = views.all().find(v => v.id === room.id);
+    let view = views.all(true).find(v => v.id === room.id);
     if (!view) {
       view = await views.create(room.name, members.map(id => ({ kind: "bot", id })), room.id);
       views.put({ ...view, archived: !!room.archived });

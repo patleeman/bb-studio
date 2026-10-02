@@ -126,6 +126,23 @@ test("text-only replies use BB completion events when no turn wrapper exists", a
   } finally { await x.close(); }
 });
 
+test("source owner messages replace send receipts and reflect edits and deletion", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Owner messages", [{ kind: "thread", id: "thr_owner" }]);
+    const requestId = crypto.randomUUID();
+    await x.views.send(viewSendInput.parse({ id: view.id, requestId, text: "Original" }));
+    const owner = { id: "owner", threadId: "thr_owner", kind: "conversation", role: "user", initiator: "user", senderThreadId: null,
+      turnId: null, createdAt: 100, sourceSeqStart: 1, sourceSeqEnd: 1, turnRequest: { status: "accepted" }, text: `[Studio view message ${requestId}]\nOriginal\n[End owner message]` };
+    x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [owner], timelinePage: { olderCursor: null, hasOlderRows: false } }) as never);
+    expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual(["Original"]);
+    owner.text = "Edited in the thread";
+    expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual(["Edited in the thread"]);
+    x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
+    expect((await x.views.page(view.id)).entries).toEqual([]);
+  } finally { await x.close(); }
+});
+
 test("reply, explicit steer, and @bot+new select real threads", async () => {
   const x = fixture();
   try {

@@ -60,9 +60,12 @@ export class ThreadViews {
   private readonly locks = new Map<string, Promise<unknown>>();
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
   changed() { this.bb.realtime.publish("views-changed", {}); }
-  all(): ThreadView[] {
+  all(includeRedirects = false): ThreadView[] {
     return (this.store.db.prepare("SELECT json FROM thread_views").all() as { json: string }[])
-      .map(row => threadViewSchema.parse(JSON.parse(row.json))).sort((a, b) => b.updatedAt - a.updatedAt);
+      .map(row => threadViewSchema.parse(JSON.parse(row.json)))
+      // Single-bot legacy records only resolve old links to their fresh thread.
+      .filter(view => includeRedirects || view.members.length !== 1 || !this.store.db.prepare("SELECT 1 FROM view_migrations WHERE room_id=?").get(view.id))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   }
   get(id: string) {
     const row = this.store.db.prepare("SELECT json FROM thread_views WHERE id=?").get(id) as { json: string } | undefined;
@@ -93,7 +96,7 @@ export class ThreadViews {
   }
   async create(name: string, members: ViewMember[], id: string = randomUUID()) {
     return this.locked(id, async () => {
-      const existing = this.all().find(v => v.id === id);
+      const existing = this.all(true).find(v => v.id === id);
       if (existing) {
         if (existing.name !== name || JSON.stringify(existing.members) !== JSON.stringify(members)) throw new Error("This request ID was already used for another view.");
         return existing;
@@ -140,6 +143,8 @@ export class ThreadViews {
   saveEntry(entry: ViewEntry) {
     this.store.db.prepare("INSERT OR REPLACE INTO view_entries VALUES (?,?,?,?)")
       .run(entry.id, entry.threadId, entry.createdAt, JSON.stringify(entry));
+    if (entry.role === "user" && entry.groupId && !entry.id.startsWith("view:"))
+      this.store.db.prepare("DELETE FROM view_entries WHERE id=?").run(`view:${entry.groupId}:${entry.threadId}`);
   }
   async indexThread(threadId: string, before = Number.MAX_SAFE_INTEGER, limit = 60, beforeId?: string) {
     // Refresh source rows on every read; edited/deleted replies must disappear.

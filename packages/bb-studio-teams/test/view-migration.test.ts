@@ -18,6 +18,7 @@ test("legacy single-bot channels become fresh threads without replaying retained
     expect(x.harness.inspection.sdk.callsTo("threads.send")).toHaveLength(0);
     expect(x.store.messages(x.room.id)[0]?.text).toBe("Private old history");
     expect((await views.threads(views.get(x.room.id)))[0]?.id).toBe("thr_bot_1");
+    expect(views.all()).toEqual([]);
   } finally { await x.close(); }
 });
 
