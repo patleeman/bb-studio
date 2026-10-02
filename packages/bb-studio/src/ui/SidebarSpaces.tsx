@@ -1,13 +1,13 @@
 // The Spaces group of the sidebar's Studio section: each space as a row that
 // expands to what it holds, sub-pages under their pages. A view over
 // membership, so an item in two spaces shows under both; nothing moves here.
-import { Icon, SIDEBAR_ROW, SIDEBAR_ROW_SELECTED, SidebarGroupHeading, SidebarNote, cn, openAppPath, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
+import { Icon, SIDEBAR_ROW, SIDEBAR_ROW_SELECTED, SidebarGroupHeading, SidebarNote, cn, openAppPath } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useRef, useState, type MouseEvent, type ReactNode, type Ref } from "react";
+import { useCallback, useEffect, useRef, useState, type MouseEvent } from "react";
 import type { rpcContract, SpaceTreeView } from "../contract";
 import { itemAtPath } from "../tabs";
+import { SidebarItemRow } from "./SidebarItemRow";
 import { SpaceGlyph, spaceHref } from "./Spaces";
 
 const EXPANDED_KEY = "studio:sidebar-spaces-expanded";
@@ -138,23 +138,16 @@ export function SidebarSpaces({ tree, path, onNavigate }: { tree: SpaceTree; pat
             {isOpen ? (
               <>
                 {space.items.map((item) => (
-                  <ItemMenu key={`${item.pluginId}:${item.id}`} href={item.href} title={item.title} icon={item.kindIcon} onOpen={() => open(item.href)}>
-                    {(ref) => (
-                      <a
-                        ref={ref}
-                        href={item.href}
-                        aria-current={item === current ? "page" : undefined}
-                        className={cn(SIDEBAR_ROW, item === current && SIDEBAR_ROW_SELECTED)}
-                        style={{ paddingLeft: INDENT_PX + item.depth * LEVEL_PX }}
-                        onClick={(event) => plainClick(event, () => open(item.href))}
-                      >
-                        <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
-                          {item.icon ? <span className="text-sm leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
-                        </span>
-                        <span className="min-w-0 flex-1 truncate">{item.title}</span>
-                      </a>
-                    )}
-                  </ItemMenu>
+                  <SidebarItemRow
+                    key={`${item.pluginId}:${item.id}`}
+                    href={item.href}
+                    title={item.title}
+                    kindIcon={item.kindIcon}
+                    glyph={item.icon}
+                    selected={item === current}
+                    style={{ paddingLeft: INDENT_PX + item.depth * LEVEL_PX }}
+                    onOpen={() => open(item.href)}
+                  />
                 ))}
                 {more > 0 ? <MoreRow label={`${more} more`} href={`${spaceHref(space.id)}/items`} onOpen={open} /> : null}
                 {space.threads.map((thread) => (
@@ -202,34 +195,6 @@ function FailedNote({ onRetry }: { onRetry(): void }) {
         Retry
       </button>
     </SidebarNote>
-  );
-}
-
-/** Right-click a member to float it or open it in a split, as with a tab. */
-function ItemMenu({ href, title, icon, onOpen, children }: { href: string; title: string; icon: string; onOpen(): void; children(ref: Ref<HTMLAnchorElement>): ReactNode }) {
-  const target = { kind: "path" as const, path: href, title, icon };
-  const canFloat = useCanFloat(target);
-  const link = useRef<HTMLAnchorElement>(null);
-  return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>{children(link)}</ContextMenuTrigger>
-      <ContextMenuContent aria-label={`${title} options`}>
-        <ContextMenuItem onSelect={onOpen}>
-          <Icon name="ExternalLink" />
-          Open
-        </ContextMenuItem>
-        {canFloat ? (
-          <ContextMenuItem onSelect={() => openFloat(target)}>
-            <Icon name="AppWindow" />
-            Float
-          </ContextMenuItem>
-        ) : null}
-        <ContextMenuItem onSelect={() => openPathInSplit(link.current, href) || onOpen()}>
-          <Icon name="Columns2" />
-          Open in split
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
   );
 }
 

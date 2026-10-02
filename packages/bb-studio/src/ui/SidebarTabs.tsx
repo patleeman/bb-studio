@@ -1,37 +1,31 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
-// and closing the one on screen opens the next. Right-click a tab to float it
-// or open it in a split. Above the tabs, the spaces expand to what they hold
+// and closing the one on screen opens the next. A tab's ⋯ or right-click
+// floats it or opens it in a split. Above the tabs, the spaces expand to what they hold
 // (SidebarSpaces).
 import {
   DropdownMenuItem,
   Icon,
-  SIDEBAR_ROW,
-  SIDEBAR_ROW_SELECTED,
   SidebarDisplayMenuItems,
   SidebarGroupHeading,
   SidebarNote,
   SidebarPortal,
   SidebarSection,
-  cn,
   openAppPath,
-  openFloat,
-  openPathInSplit,
   studioPath,
-  useCanFloat,
   useSidebarDisplay,
   useSidebarHosted,
   useSidebarNavigated,
   usePathname,
 } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
-import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
 import type { rpcContract, TabView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
+import { SidebarItemRow } from "./SidebarItemRow";
 import { SidebarSpaces, useSpaceTree } from "./SidebarSpaces";
 
 const SHOW_SPACES_KEY = "studio:sidebar-show-spaces";
@@ -209,70 +203,16 @@ export function SidebarTabs() {
 }
 
 function TabRow({ tab, selected, onOpen, onClose }: { tab: TabView; selected: boolean; onOpen(): void; onClose(): void }) {
-  const target = { kind: "path" as const, path: tab.href, title: tab.title, icon: tab.kindIcon };
-  const canFloat = useCanFloat(target);
-  const link = useRef<HTMLAnchorElement>(null);
   return (
-    <ContextMenu>
-      <ContextMenuTrigger asChild>
-        <div className="group/tab relative" data-studio-tab={`${tab.pluginId}:${tab.id}`}>
-          <a
-            ref={link}
-            href={tab.href}
-            aria-current={selected ? "page" : undefined}
-            className={cn(SIDEBAR_ROW, "pr-8", selected && SIDEBAR_ROW_SELECTED)}
-            onClick={(event) => {
-              if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
-              event.preventDefault();
-              onOpen();
-            }}
-            onAuxClick={(event) => {
-              // Middle-click closes, as in a browser.
-              if (event.button !== 1) return;
-              event.preventDefault();
-              onClose();
-            }}
-          >
-            <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
-              {tab.icon ? <span className="text-sm leading-none">{tab.icon}</span> : <Icon name={tab.kindIcon} className="size-4" />}
-            </span>
-            <span className="min-w-0 flex-1 truncate">{tab.title}</span>
-          </a>
-          <button
-            type="button"
-            aria-label={`Close ${tab.title}`}
-            title="Close tab"
-            className={cn(
-              "absolute top-1/2 right-0.5 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle-foreground opacity-0 outline-none hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/tab:opacity-100 pointer-coarse:opacity-100",
-              selected && "opacity-100",
-            )}
-            onClick={onClose}
-          >
-            <Icon name="X" className="size-3.5" />
-          </button>
-        </div>
-      </ContextMenuTrigger>
-      <ContextMenuContent aria-label={`${tab.title} options`}>
-        <ContextMenuItem onSelect={onOpen}>
-          <Icon name="ExternalLink" />
-          Open
-        </ContextMenuItem>
-        {canFloat ? (
-          <ContextMenuItem onSelect={() => openFloat(target)}>
-            <Icon name="AppWindow" />
-            Float
-          </ContextMenuItem>
-        ) : null}
-        <ContextMenuItem onSelect={() => openPathInSplit(link.current, tab.href) || onOpen()}>
-          <Icon name="Columns2" />
-          Open in split
-        </ContextMenuItem>
-        <ContextMenuSeparator />
-        <ContextMenuItem onSelect={onClose}>
-          <Icon name="X" />
-          Close tab
-        </ContextMenuItem>
-      </ContextMenuContent>
-    </ContextMenu>
+    <SidebarItemRow
+      href={tab.href}
+      title={tab.title}
+      kindIcon={tab.kindIcon}
+      glyph={tab.icon}
+      selected={selected}
+      onOpen={onOpen}
+      onClose={onClose}
+      rowProps={{ "data-studio-tab": `${tab.pluginId}:${tab.id}` }}
+    />
   );
 }
