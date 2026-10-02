@@ -144,7 +144,7 @@ export function ItemHeader({
       ref={header}
       data-studio-item-header=""
       className={cn(
-        "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 max-md:p-2",
+        "pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-2 p-3 max-md:p-2",
         className,
       )}
     >

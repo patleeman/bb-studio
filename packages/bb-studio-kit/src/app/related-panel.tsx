@@ -80,7 +80,7 @@ export function RelatedPanel({ ref: item, compact = false }: { ref: RelatedRef; 
     <PopoverTrigger asChild><button type="button" aria-label="Related" title={compact ? "Related items" : undefined} className="flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-sm shadow-sm hover:bg-state-hover">
       <Icon name="Layers" className="size-4" /> {compact ? null : "Related"}
     </button></PopoverTrigger>
-    <PopoverContent data-studio-related-panel="" aria-label="Related items" align="end" sideOffset={8} className="max-h-[min(70vh,var(--radix-popover-content-available-height))] w-72 max-w-[calc(100vw-1rem)] rounded-lg bg-background p-3 shadow-xl">
+    <PopoverContent data-studio-related-panel="" aria-label="Related items" align="end" sideOffset={8} hideWhenDetached className="max-h-[min(70vh,var(--radix-popover-content-available-height))] w-72 max-w-[calc(100vw-1rem)] rounded-lg bg-background p-3 shadow-xl">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">Related items</div>
       {links.length ? links.map((link, index) => <a key={`${link.href}:${index}`} href={link.href} {...studioItemProps(link)} onClick={event => { if (!event.metaKey && !event.ctrlKey && !event.shiftKey && !event.altKey && companionNavigate({ kind: "path", path: link.href })) event.preventDefault(); }} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{link.title}<span className="block text-xs text-muted-foreground">{link.detail}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No related items.</p>}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Threads about this</div>
