@@ -187,9 +187,11 @@ export function SidebarTabs() {
         }
       >
         {spacesShown ? <SidebarSpaces tree={spaceTree} path={path} onNavigate={navigated} /> : null}
+        {/* With no tabs, the heading still separates the note from the spaces above. */}
+        {spacesShown && !tabs?.length ? <SidebarGroupHeading>Open</SidebarGroupHeading> : null}
         {error && !tabs ? <SidebarNote tone="danger">{error}</SidebarNote> : null}
         {tabs && !tabs.length ? <SidebarNote icon="GridView">No open items</SidebarNote> : null}
-        {groups.map((group) => (
+        {groups.filter((group) => group.tabs.length).map((group) => (
           <div key={group.label ?? "all"} className="flex flex-col gap-px">
             {group.label ? <SidebarGroupHeading>{group.label}</SidebarGroupHeading> : null}
             {group.tabs.map((tab) => (
