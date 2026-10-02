@@ -17,7 +17,7 @@ import type {
   Room,
   rpcContract,
 } from "./contract";
-import { AddOnCollection, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, ComposerMore, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
 import {
@@ -37,7 +37,6 @@ import {
 import { Modal } from "./channel-controls";
 import { setThreadDraft } from "./channel-drafts";
 import { ChannelSettings } from "./channel-settings";
-import { ComposerFooter } from "./composer-footer";
 import { ProfilePicker } from "./profile-picker";
 import { ThreadBadges } from "./thread-badges";
 import { ProfileThreads } from "./profile-threads";
@@ -441,7 +440,7 @@ export default definePluginApp((app) => {
   app.composer.customize({
     id: "thread-profile",
     scopes: ["thread", "new-thread"],
-    actions: [{ id: "profile", component: () => <ComposerFooter><ProfilePicker /></ComposerFooter> }],
+    actions: [{ id: "profile", component: () => <ComposerMore pluginId={PLUGIN_ID} order={20}><ProfilePicker /></ComposerMore> }],
   });
   app.composer.customize({
     id: "channel-thread",

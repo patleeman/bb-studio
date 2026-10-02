@@ -12,6 +12,7 @@ import {
   DropdownMenuLabel,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  useComposerMoreSide,
 } from "@bb-studio/kit/app";
 import type { Bot, rpcContract } from "./contract";
 import { message } from "./bot-ui";
@@ -32,6 +33,7 @@ const savePick = (projectId: string, botId: string | null) =>
  * and attaches when the first message is sent.
  */
 export function ProfilePicker() {
+  const [triggerRef, side] = useComposerMoreSide();
   const view = useComposerView();
   const composer = useComposer();
   const rpc = useRpc<typeof rpcContract>();
@@ -145,7 +147,7 @@ export function ProfilePicker() {
   return (
     <DropdownMenu onOpenChange={(open) => open && loadBots()}>
       <DropdownMenuTrigger asChild>
-        <button type="button" className="channel-settings-trigger" disabled={pending}
+        <button ref={triggerRef} type="button" className="channel-settings-trigger" disabled={pending}
           data-profile={current ? "" : undefined}
           aria-label={current ? `Working as ${label}` : "Work as a bot"}
           title={error ?? (current ? `Working as ${label}` : "Work as a bot")}>
@@ -154,7 +156,7 @@ export function ProfilePicker() {
           <Icon name="ChevronDown" />
         </button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="start" className="w-72">
+      <DropdownMenuContent side={side} align="start" className="w-72">
         {current ? (
           <>
             <DropdownMenuLabel>Working as</DropdownMenuLabel>
