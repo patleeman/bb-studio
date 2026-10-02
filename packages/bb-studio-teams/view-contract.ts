@@ -18,12 +18,19 @@ export const viewEntrySchema = z.object({
   id: z.string(), threadId: z.string(), role: z.enum(["user", "assistant"]),
   text: z.string(), createdAt: z.number(), groupId: z.string().nullable().default(null),
 });
+/** Files and images from BB's composer, forwarded unchanged to every recipient thread. */
+export const viewAttachmentSchema = z.discriminatedUnion("type", [
+  z.object({ type: z.literal("image"), url: z.string().min(1) }),
+  z.object({ type: z.literal("localImage"), path: z.string().min(1) }),
+  z.object({ type: z.literal("localFile"), path: z.string().min(1), name: z.string().optional(), mimeType: z.string().optional(), sizeBytes: z.number().optional() }),
+]);
 export const viewSendInput = z.object({
-  id: z.string().uuid(), requestId: z.string().uuid(), text: z.string().trim().min(1).max(16000),
+  id: z.string().uuid(), requestId: z.string().uuid(), text: z.string().trim().max(16000).default(""),
+  attachments: z.array(viewAttachmentSchema).max(20).default([]),
   targets: z.array(viewMemberSchema).max(32).default([]),
   replyThreadId: z.string().nullable().default(null), fresh: z.boolean().default(false),
   mode: z.enum(["auto", "steer", "followup", "fork"]).default("auto"),
-});
+}).refine(input => input.text || input.attachments.length, { message: "Write a message or attach a file.", path: ["text"] });
 export const viewDeliverySchema = z.object({
   threadId: z.string(), status: z.enum(["sent", "queued", "error"]), error: z.string().nullable(),
 });
@@ -49,4 +56,5 @@ export type ViewMember = z.infer<typeof viewMemberSchema>;
 export type ViewThread = z.infer<typeof viewThreadSchema>;
 export type ViewEntry = z.infer<typeof viewEntrySchema>;
 export type ViewSend = z.infer<typeof viewSendInput>;
+export type ViewAttachment = z.infer<typeof viewAttachmentSchema>;
 export type ViewDelivery = z.infer<typeof viewDeliverySchema>;

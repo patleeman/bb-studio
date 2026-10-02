@@ -1,5 +1,5 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
-import { Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemHeader, ItemTile, PageColumn, AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
 import { Modal } from "./channel-controls";
@@ -8,7 +8,8 @@ import { PLUGIN_ID, VIEW_KIND } from "./studio-provider";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
-import type { ThreadView, ViewEntry, ViewMember, ViewThread } from "./view-contract";
+import type { ThreadView, ViewAttachment, ViewEntry, ViewMember, ViewThread } from "./view-contract";
+import type { NewThreadRequest } from "@get-bb/plugin-sdk/app";
 
 type Contract = typeof rpcContract;
 type Page = { view: ThreadView; threads: ViewThread[]; entries: ViewEntry[]; hasOlder: boolean };
@@ -47,8 +48,8 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
 function ViewDetail({ id }: { id: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate(), studio = useStudioPresent();
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
-  const [text, setText] = useState(""), [targets, setTargets] = useState<ViewMember[]>([]), [reply, setReply] = useState<string | null>(null);
-  const [pending, setPending] = useState(false), [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false);
+  const [targets, setTargets] = useState<ViewMember[]>([]), [reply, setReply] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false), [focus, setFocus] = useState(0);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const generation = useRef(0), retry = useRef<{ requestId: string; signature: string } | null>(null);
   const initialized = useRef(false);
@@ -70,21 +71,38 @@ function ViewDetail({ id }: { id: string }) {
   }, [rpc, id]);
   useEffect(() => { load(); void rpc.call("profiles", {}).then(setBots, e => setError(message(e))); return () => { generation.current++; }; }, [load, rpc]);
   useRealtime("views-changed", load);
-  const send = async () => {
-    if (!text.trim() || pending) return;
-    setPending(true); setError(null);
+  /** BB's composer submits rich input: bot mentions become recipients and files ride along. Throwing keeps the draft. */
+  const send = async (request: NewThreadRequest) => {
+    if (!page) return;
+    setError(null);
+    const attachments = request.input.filter((part): part is ViewAttachment => part.type !== "text");
+    const mentioned: ViewMember[] = [];
+    const text = request.input.flatMap(part => {
+      if (part.type !== "text") return [];
+      let out = part.text;
+      for (const m of [...(part.mentions ?? [])].sort((x, y) => y.start - x.start)) {
+        const r = m.resource, label = r.label.replace(/^@/, "");
+        const bot = r.kind === "plugin" && r.pluginId === PLUGIN_ID ? bots.find(b => b.id === r.itemId.replace(/^bots:/, "")) : undefined;
+        if (bot && page.view.members.some(v => v.kind === "bot" && v.id === bot.id)) mentioned.push({ kind: "bot", id: bot.id });
+        if (r.kind === "thread" && page.threads.some(t => t.id === r.threadId)) mentioned.push({ kind: "thread", id: r.threadId });
+        out = out.slice(0, m.start) + (bot ? `@${bot.handle}` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label) + out.slice(m.end);
+      }
+      return [out];
+    }).join("\n").trim();
     const command = /^\/(steer|followup|fork)\s+/.exec(text);
-    const input = { id, text: command ? text.slice(command[0].length) : text, targets, replyThreadId: reply, fresh, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork" };
+    const recipients = [...new Map([...targets, ...mentioned].map(m => [memberKey(m), m])).values()];
+    const input = { id, text: command ? text.slice(command[0].length) : text, attachments, targets: recipients, replyThreadId: reply, fresh, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork" };
     const signature = JSON.stringify(input);
     if (retry.current?.signature !== signature) retry.current = { signature, requestId: crypto.randomUUID() };
+    let failure: string | null = null;
     try {
       const result = await rpc.call("viewSend", { ...input, requestId: retry.current!.requestId });
       const failures = result.deliveries.filter(d => d.status === "error");
-      if (failures.length) setError(failures.map(d => d.error).join("\n"));
-      else { setText(""); setReply(null); retry.current = null; setTargets([]); }
+      if (failures.length) failure = failures.map(d => d.error).join("\n");
+      else { setReply(null); retry.current = null; setTargets([]); followLatest.current = true; }
       load();
-    } catch (e) { setError(message(e)); }
-    finally { setPending(false); }
+    } catch (e) { failure = message(e); }
+    if (failure) { setError(failure); throw new Error(failure); }
   };
   if (!page) return <PageColumn><ErrorMessage error={error} /><p role="status">Loading view…</p></PageColumn>;
   const botFor = (threadId: string) => bots.find(b => b.id === page.threads.find(t => t.id === threadId)?.botId);
@@ -92,7 +110,7 @@ function ViewDetail({ id }: { id: string }) {
   const time = (at: number) => new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(at);
   const renderEntry = (entry: ViewEntry, previous?: ViewEntry) => {
     const bot = botFor(entry.threadId), thread = page.threads.find(t => t.id === entry.threadId);
-    const replyButton = <button type="button" className="text-xs text-subtle-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/message:opacity-100" onClick={() => { setReply(entry.threadId); setTargets([]); }}>Reply</button>;
+    const replyButton = <button type="button" className="text-xs text-subtle-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/message:opacity-100" onClick={() => { setReply(entry.threadId); setTargets([]); setFocus(value => value + 1); }}>Reply</button>;
     if (entry.role === "user") return <li key={entry.id} data-view-entry="user" className="group/message ml-auto flex w-fit max-w-[70%] flex-col items-end gap-1">
       <div className="flex items-center gap-2 text-xs text-subtle-foreground">{replyButton}<time dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time></div>
       <div className="max-w-full break-words rounded-xl border border-border-seam bg-surface-recessed px-4 py-2.5 text-sm leading-relaxed text-foreground"><Markdown content={entry.text} /></div>
@@ -127,20 +145,18 @@ function ViewDetail({ id }: { id: string }) {
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
     </div></div>
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
-    <form className="relative w-full rounded-xl border border-border bg-background shadow-lift" onSubmit={e => { e.preventDefault(); void send(); }}>
-      {reply && <div className="flex items-center gap-2 border-b border-border px-4 py-1.5 text-xs text-muted-foreground"><Icon name="Reply" className="size-3.5" /><span className="min-w-0 truncate">Replying to <span className="text-foreground">{botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title}</span></span><button type="button" aria-label="Cancel reply" className="ml-auto rounded p-0.5 hover:bg-state-hover hover:text-foreground" onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></div>}
-      <label className="sr-only" htmlFor="view-message">Message to view</label><textarea id="view-message" className="block max-h-[calc(50dvh-3rem)] min-h-[68px] w-full resize-none bg-transparent px-4 pt-3 pb-1 text-sm leading-relaxed outline-none [field-sizing:content] placeholder:text-subtle-foreground disabled:cursor-not-allowed max-md:pointer-coarse:text-base" value={text} onChange={e => setText(e.target.value)} placeholder={page.view.archived ? "This view is archived." : `Message ${page.view.name}. @ to mention members.`} disabled={page.view.archived} onKeyDown={e => { if (e.key === "Enter" && !e.shiftKey && !e.nativeEvent.isComposing) { e.preventDefault(); void send(); } }} />
-      <div className="flex items-center gap-1 px-2 pb-2">
-        <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Choose recipients" className="flex h-8 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><span className="text-subtle-foreground">To</span>{chosen.length ? <><span className="max-sm:hidden">{avatars(chosen)}</span><span className="min-w-0 truncate text-foreground">{chosen.map(memberLabel).join(", ")}</span></> : <span className="text-foreground">{reply ? "Reply thread" : "Auto"}</span>}{fresh && <span className="rounded bg-foreground/[0.08] px-1 text-[11px]">New threads</span>}<Icon name="ChevronDown" className="size-3.5 shrink-0" /></button></DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="top" className="w-64">
-            <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Leave empty to route by @mention</DropdownMenuLabel>
-            <div role="group" aria-label="Recipients">{page.view.members.map(m => <DropdownMenuItem key={memberKey(m)} onSelect={e => { e.preventDefault(); toggleTarget(m); }} role="menuitemcheckbox" aria-checked={isTarget(m)}><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span>{isTarget(m) && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="SquarePen" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
-          </DropdownMenuContent></DropdownMenu>
-        <div className="ml-auto flex shrink-0 items-center"><button type="submit" aria-label={retry.current && error ? "Retry send" : "Send"} title="Send (Enter)" disabled={pending || !text.trim() || page.view.archived} className="inline-flex h-8 items-center justify-center gap-1.5 rounded-md bg-foreground px-2 text-xs font-medium text-background transition-colors hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 max-md:pointer-coarse:h-10 max-md:pointer-coarse:px-3">{pending ? "Sending…" : retry.current && error ? "Retry send" : <Icon name="CornerDownLeft" className="size-4" />}</button></div>
-      </div>
-    </form>
+    <div className="flex min-w-0 items-center gap-1 pb-1.5">
+      <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Choose recipients" className="flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><span className="text-subtle-foreground">To</span>{chosen.length ? <><span className="max-sm:hidden">{avatars(chosen)}</span><span className="min-w-0 truncate text-foreground">{chosen.map(memberLabel).join(", ")}</span></> : <span className="text-foreground">{reply ? botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title || "Reply thread" : "Auto"}</span>}{fresh && <span className="rounded bg-foreground/[0.08] px-1 text-[11px]">New threads</span>}<Icon name="ChevronDown" className="size-3.5 shrink-0" /></button></DropdownMenuTrigger>
+        <DropdownMenuContent align="start" side="top" className="w-64">
+          <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Leave empty to route by @mention</DropdownMenuLabel>
+          <div role="group" aria-label="Recipients">{page.view.members.map(m => <DropdownMenuItem key={memberKey(m)} onSelect={e => { e.preventDefault(); toggleTarget(m); }} role="menuitemcheckbox" aria-checked={isTarget(m)}><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span>{isTarget(m) && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</div>
+          <DropdownMenuSeparator />
+          <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="SquarePen" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
+        </DropdownMenuContent></DropdownMenu>
+      {reply && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><Icon name="Reply" className="size-3.5 shrink-0" /><span className="truncate">Replying</span><button type="button" aria-label="Cancel reply" className="rounded p-0.5 hover:bg-state-hover hover:text-foreground" onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></span>}
+    </div>
+    {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This view is archived. Restore it to send messages.</p>
+      : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @ to mention members.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}
     {error && <div className="mt-2"><ErrorMessage error={error} /></div>}
     </div><ViewEditor key={page.view.updatedAt} initial={page.view} open={editing} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />
   </div>;

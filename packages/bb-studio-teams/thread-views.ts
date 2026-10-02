@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { decisionsClient, type Question } from "@bb-studio/kit/decisions";
-import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery } from "./view-contract";
+import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery, type ViewAttachment } from "./view-contract";
 import type { Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
@@ -55,6 +55,9 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
   return entries;
 }
 
+const attachmentName = (a: ViewAttachment) => a.type === "image" ? "Image" : a.type === "localFile" && a.name ? a.name : a.path.split(/[\\/]/).at(-1) || "Attachment";
+/** The owner's text as the view shows it, with a line per attachment. */
+export const withAttachmentNames = (input: Pick<ViewSend, "text" | "attachments">) => [input.text, ...(input.attachments ?? []).map(a => `📎 ${attachmentName(a)}`)].filter(Boolean).join("\n\n");
 type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveries: ViewDelivery[] };
 export class ThreadViews {
   private readonly locks = new Map<string, Promise<unknown>>();
@@ -289,9 +292,9 @@ export class ThreadViews {
         if (record.deliveries.some(d => d.threadId === threadId && d.status !== "error")) continue;
         let delivery: ViewDelivery;
         try {
-          const sent = await this.bb.sdk.threads.send({ threadId, input: [{ type: "text", text: record.prompt, mentions: [] }], mode: input.mode === "followup" ? "queue-if-active" : input.mode === "steer" ? "steer-if-active" : "auto" });
+          const sent = await this.bb.sdk.threads.send({ threadId, input: [{ type: "text", text: record.prompt, mentions: [] }, ...(record.input.attachments ?? [])], mode: input.mode === "followup" ? "queue-if-active" : input.mode === "steer" ? "steer-if-active" : "auto" });
           delivery = { threadId, status: sent.delivery, error: null };
-          this.saveEntry({ id: `view:${input.requestId}:${threadId}`, threadId, role: "user", text: input.text, groupId: input.requestId, createdAt: Date.now() });
+          this.saveEntry({ id: `view:${input.requestId}:${threadId}`, threadId, role: "user", text: withAttachmentNames(input), groupId: input.requestId, createdAt: Date.now() });
         } catch (cause) { delivery = { threadId, status: "error", error: String(cause) }; }
         record.deliveries = [...record.deliveries.filter(d => d.threadId !== threadId), delivery];
         this.store.db.prepare("UPDATE view_sends SET json=? WHERE id=?").run(JSON.stringify(record), input.requestId);

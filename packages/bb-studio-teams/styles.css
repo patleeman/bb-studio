@@ -1207,3 +1207,9 @@
 /* Bot work at the end of a channel's transcript, under the last message. */
 .channel-transcript-end:empty { display: none; }
 .channel-transcript-work { padding: 2px 8px; }
+
+/* A saved view embeds BB's composer for its editor, files and voice. Each
+   recipient runs its own thread, so the new-thread pickers don't apply. */
+[data-view-composer] [aria-label^="Provider, model and reasoning"],
+[data-view-composer] [aria-label="Send options"],
+[data-view-composer] [data-promptbox-shell] > form ~ div { display: none; }

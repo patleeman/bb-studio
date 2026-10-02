@@ -37,6 +37,20 @@ test("fanout creates all normal threads before sending the shared roster; retrie
     await expect(x.views.send({ ...input, text: "Different request" })).rejects.toThrow("already used");
   } finally { await x.close(); }
 });
+test("attachments from the composer reach every recipient and show by name in the view", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Files", [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }]);
+    x.harness.inspection.sdk.stub("threads.send", async () => ({ ok: true, delivery: "sent" }));
+    const file = { type: "localFile" as const, path: "/tmp/uploads/brief.pdf", name: "brief.pdf" };
+    const image = { type: "localImage" as const, path: "/tmp/uploads/screen.png" };
+    const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: "", attachments: [file, image], targets: [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }] });
+    expect((await x.views.send(input)).deliveries.map(d => d.status)).toEqual(["sent", "sent"]);
+    for (const call of x.harness.inspection.sdk.callsTo("threads.send")) expect((call as [{ input: unknown[] }])[0].input.slice(1)).toEqual([file, image]);
+    expect((await x.views.page(view.id)).entries[0]?.text).toBe("📎 brief.pdf\n\n📎 screen.png");
+    expect(() => viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: " " })).toThrow("Write a message or attach a file.");
+  } finally { await x.close(); }
+});
 test("views share references, include descendants, and deleting a view leaves threads intact", async () => {
   const x = fixture();
   try {
