@@ -66,6 +66,8 @@ export const segmentSchema = z.object({
   bytes: z.number(),
   status: segmentStatusSchema,
   text: z.string().nullable(),
+  /** A saved cleanup; the original text and audio stay intact. */
+  cleanedText: z.string().nullable().optional(),
   error: z.string().nullable(),
   attempts: z.number(),
 });
@@ -141,6 +143,11 @@ export const rpcContract = defineRpcContract({
   dictation_cleanup: {
     input: z.object({ id: recordingId }),
     output: z.object({ text: z.string().nullable() }),
+  },
+  /** Cleans one finished segment so long recordings keep their audio alignment. */
+  recording_cleanup: {
+    input: z.object({ id: recordingId, segmentId: z.string().min(1).max(100) }),
+    output: z.object({ text: z.string() }),
   },
   /** Turns a dictation into a recording: out of the background, titled, with meeting notes. */
   recording_keep: {

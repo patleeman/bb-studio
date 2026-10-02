@@ -21,11 +21,12 @@ pages. The CLI is also available.
 ```sh
 bb talk list [--query <text>] [--json]     # 50 most recent, or matches in titles and transcripts
 bb talk show <recording-id> [--json]       # status, length, words, segment counts, link
-bb talk transcript <recording-id> [--offset <chars>] [--limit <chars>]
+bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]
 ```
 
 `transcript` prints 20,000 characters by default (at most 60,000) and ends
-with the command for the next page. Paragraph breaks mark where the speaker
+with the command for the next page. It prints the original transcript;
+`--cleaned` reads the complete saved cleaned version instead. Paragraph breaks mark where the speaker
 paused, resumed, or reloaded the page.
 
 Link to a recording as `[Title](/plugins/talk/recordings/<recording-id>)`.
@@ -54,7 +55,18 @@ or failed. Say so instead of guessing at the missing part.
   contract for plugin authors.
 - **Recordings.** *New recording* on the Recordings page, or the command
   "Talk: Start or stop a recording", records without inserting anywhere.
-  Suited to meetings and hours-long sessions.
+  Use it like a note for brain dumps, ideas, meetings, or hours-long sessions.
+  **Clean up transcript** saves a separate cleaned version, with **Original**
+  and **Cleaned** views. The original text and audio stay intact. Copy and
+  text downloads use the selected version. **Send to agent** opens a thread
+  attached to the recording. Mentions and `talk_read` prefer a complete saved
+  cleaned version; use `talk_read` with `version: "original"` for raw text.
+  Meeting notes are optional, generated from the recording menu or through
+  the **Automatically generate meeting notes** setting (off by default).
+- **Playback.** The recording page has a scrubber, play/pause, volume, speed,
+  and 10-second skips. Clicking transcript text or its timestamp starts audio
+  at that section. The current section is highlighted; **Follow transcript**
+  keeps it visible. Timing is per audio section, not per word.
 - **Recordings page.** A table the user can search, filter by kind, and sort.
   Selected rows can start one thread that mentions them all, have their
   transcripts copied as one Markdown document, have failed pieces retried,
@@ -89,6 +101,7 @@ or failed. Say so instead of guessing at the missing part.
 | --- | --- | --- |
 | Replace built-in dictation | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
 | Segment length (seconds) | 25 | Target piece length, 8–60. Shorter shows text sooner. |
+| Automatically generate meeting notes | off | Generates meeting notes on completion; the recording menu can generate them on demand. |
 | Auto-title recordings | on | Titles a recording from its transcript through a hidden, short-lived agent thread. |
 | Title provider | automatic | Provider id for titling (for example `codex` or `claude-code`). |
 | Title model | provider default | Model for titling. |

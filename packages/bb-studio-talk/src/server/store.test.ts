@@ -203,3 +203,42 @@ describe("TalkStore", () => {
     expect(store.recording(REC)!.kind).toBe("dictation");
   });
 });
+
+
+describe("saved recording cleanup", () => {
+  it("keeps raw text and segment timing, and exposes only a complete cleaned version", () => {
+    const { store } = setup();
+    addSegment(store, REC, "sessiona", 0, 100, 25_000);
+    addSegment(store, REC, "sessiona", 1, 200, 25_000);
+    store.markTranscribed(REC, "sessiona-0", "um first idea");
+    store.markTranscribed(REC, "sessiona-1", "uh second idea");
+    expect(store.saveCleanup(REC, "sessiona-0", "um first idea", "First idea.")).toBe(false);
+    store.setStatus(REC, "finishing");
+    expect(store.saveCleanup(REC, "sessiona-0", "um first idea", "First idea.")).toBe(true);
+    expect(store.cleanedTranscript(REC)).toBeNull();
+    expect(store.saveCleanup(REC, "sessiona-1", "uh second idea", "Second idea.")).toBe(true);
+    expect(store.cleanedTranscript(REC)).toBe("First idea. Second idea.");
+    expect(store.transcript(REC)).toBe("um first idea uh second idea");
+    expect(store.segments(REC)[1]).toMatchObject({ offsetMs: 25_000, durationMs: 25_000, text: "uh second idea", cleanedText: "Second idea." });
+    expect(store.segmentFile(REC, "sessiona-0")).not.toBeNull();
+  });
+  it("rejects stale cleanup and keeps the cleaned version incomplete after more audio arrives", () => {
+    const { store } = setup();
+    addSegment(store, REC, "sessiona", 0, 100);
+    store.markTranscribed(REC, "sessiona-0", "one idea");
+    store.setStatus(REC, "finishing");
+    expect(store.saveCleanup(REC, "sessiona-0", "outdated", "Wrong.")).toBe(false);
+    store.saveCleanup(REC, "sessiona-0", "one idea", "One idea.");
+    store.setStatus(REC, "recording");
+    expect(store.saveCleanup(REC, "sessiona-0", "one idea", "Changed.")).toBe(false);
+    addSegment(store, REC, "sessionb", 0, 500);
+    store.markTranscribed(REC, "sessionb-0", "another thought");
+    store.setStatus(REC, "finishing");
+    expect(store.cleanedTranscript(REC)).toBeNull();
+    store.saveCleanup(REC, "sessionb-0", "another thought", "Another thought.");
+    expect(store.cleanedTranscript(REC)).toBe("One idea.\n\nAnother thought.");
+    store.markTranscribed(REC, "sessiona-0", "revised transcription");
+    expect(store.segments(REC)[0]!.cleanedText).toBeNull();
+    expect(store.cleanedTranscript(REC)).toBeNull();
+  });
+});

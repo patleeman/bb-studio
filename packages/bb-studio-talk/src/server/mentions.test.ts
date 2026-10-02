@@ -29,6 +29,12 @@ describe("mentions", () => {
     expect(mentionSubtitle({ ...recording, status: "recording" })).toMatch(/recording now$/);
   });
 
+  it("points long cleaned transcripts at the same saved version", () => {
+    const long = mentionContext(recording, "a".repeat(MENTION_TRANSCRIPT_CHARS + 10), true);
+    expect(long).toContain("original transcript and audio remain");
+    expect(long).toContain(`bb talk transcript ${recording.id} --cleaned --offset ${MENTION_TRANSCRIPT_CHARS}`);
+  });
+
   it("gives agents the link and transcript, pointing at the CLI past the budget", () => {
     const short = mentionContext(recording, "We agreed to ship.");
     expect(short).toContain("/plugins/talk/recordings/rec_dddddddddddddddd");

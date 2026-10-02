@@ -24,7 +24,7 @@ export function mentionSubtitle(recording: Recording): string {
   return parts.join(" · ");
 }
 
-export function mentionContext(recording: Recording, transcript: string): string {
+export function mentionContext(recording: Recording, transcript: string, cleaned = false): string {
   const started = new Date(recording.createdAt).toISOString();
   const header = [
     `Talk recording "${recording.title}" — ${recordingHref(recording.id)}`,
@@ -36,11 +36,12 @@ export function mentionContext(recording: Recording, transcript: string): string
     );
   }
   header.push(`Link to it in replies as [${recording.title}](${recordingHref(recording.id)}).`);
+  if (cleaned) header.push("This is the saved cleaned transcript. The original transcript and audio remain on the recording.");
   let body = transcript.trim() === "" ? "(No transcript yet.)" : transcript;
   if (body.length > MENTION_TRANSCRIPT_CHARS) {
     body =
       `${body.slice(0, MENTION_TRANSCRIPT_CHARS)}\n\n[Transcript truncated at ${MENTION_TRANSCRIPT_CHARS} of ${transcript.length} characters. ` +
-      `Read the rest with: bb talk transcript ${recording.id} --offset ${MENTION_TRANSCRIPT_CHARS}]`;
+      `Read the rest with: bb talk transcript ${recording.id}${cleaned ? " --cleaned" : ""} --offset ${MENTION_TRANSCRIPT_CHARS}]`;
   }
   return `${header.join("\n")}\n\nTranscript:\n${body}`;
 }

@@ -10,7 +10,7 @@ can link to and @-mention.
 
 ## Staged preview
 
-![Talk recording page with the live recording pill](assets/staged-preview.png)
+![Talk recording page with cleanup and audio playback](assets/staged-preview.png)
 
 This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. It shows a
 seeded recording called "Weekly product sync".
@@ -20,12 +20,11 @@ To stage it, the capture script:
 - Uploads the audio to the live plugin in two sessions.
 - Lets BB's voice service transcribe it.
 
-The capture then presses **Record more** with Chrome's synthetic microphone.
-The updated capture definition waits for and checks the seeded meeting summary.
-The page shows the transcript grouped by session, with timestamps you can
-play from. At the top is the app-wide recording pill with its clock, input
-level, and pause and stop controls. The script deletes the seeded recording
-afterwards.
+The capture generates optional meeting notes and a saved cleaned transcript.
+It plays the audio, seeks to the second section, adjusts volume, and pauses.
+The page shows the scrubber, playback controls, **Original** and **Cleaned**
+views, and timestamped sections. The script checks that the original transcript
+is unchanged, then deletes the seeded recording afterwards.
 
 ## What you get
 
@@ -53,9 +52,20 @@ afterwards.
   dictation field, as [Pages](../bb-studio-pages) does for its editor. Talk
   dictates into it with the same pill, durability, and **Go back** handling
   as a composer. *Talk: Start or finish dictation* works in a focused field.
-- **Recordings for meetings.** **New recording** on the Recordings page, or
+- **Recordings as spoken notes.** **New recording** on the Recordings page, or
   the command *Talk: Start or stop a recording*, records for as long as you
-  need without inserting anywhere.
+  need without inserting anywhere. Use recordings for brain dumps, ideas,
+  personal notes, or meetings. **Send to agent** opens a thread with the
+  recording attached; mentions include its saved cleaned version when available.
+- **Clean up a recording.** **Clean up transcript** on a finished recording
+  creates a saved cleaned version while retaining the original transcript and
+  audio. Switch between **Cleaned** and **Original**; copy and text downloads
+  use the version shown. Cleanup works section by section, so long recordings
+  keep their audio alignment. If it stops, press the button again to continue.
+- **Audio playback.** Play or pause, scrub across the recording, skip 10 seconds,
+  change speed, and adjust volume. Click a timestamp or transcript section to
+  play from there. Highlighting follows the audio; **Follow transcript** keeps
+  the current section visible. Timing is per audio section, rather than per word.
 - **Dictations stay in the background.** Every dictation is saved in case
   something goes wrong, but Studio's All view and Home leave them out. Pick
   the **Dictations** filter, or search, to find one. Recordings you start
@@ -92,8 +102,10 @@ afterwards.
   that no model is available, Talk uses the transcript's first words and the
   recording date. Titles update as the transcript grows and never replace a
   title you typed.
-- **Meeting notes.** When a recording finishes, Talk asks Studio Decisions for
-  a summary, decisions, and action items. Notes stay on the recording and can
+- **Optional meeting notes.** Choose **Generate meeting notes** in the
+  recording menu for a summary, decisions, and action items. Enable
+  **Automatically generate meeting notes** in settings to generate them when
+  recordings finish. Saved notes stay collapsed until you open them and can
   be regenerated. Each action item suggests you or an agent as assignee. Press
   **Create task** to add it to Studio Tasks and link the task to the recording.
 - **Exports.** Download a finished transcript as Markdown or plain text, or
@@ -148,6 +160,7 @@ afterwards.
 | Replace built-in dictation | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
 | Segment length (seconds) | 25 | Target piece length, 8–60. Shorter pieces show text sooner. |
 | Auto-title recordings | on | Titles recordings from their transcripts. |
+| Automatically generate meeting notes | off | Generates meeting notes on completion; the recording menu can generate them on demand. |
 | Title provider | automatic | Provider for titling, such as `codex` or `claude-code`. |
 | Title model | provider default | Model for titling. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
@@ -164,7 +177,7 @@ From a terminal or an agent:
 ```sh
 bb talk list [--query <text>] [--json]
 bb talk show <recording-id> [--json]
-bb talk transcript <recording-id> [--offset <chars>] [--limit <chars>]
+bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]
 ```
 
 The bundled `talk` skill documents these for agents.
@@ -215,7 +228,7 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
   Talk does not assign speaker labels without a diarization result.
 - **Meeting notes.** They need Studio Decisions and its configured fallback
   model. If generation fails, use **Generate** or **Regenerate** on the
-  recording page after the model is available.
+  recording page in the recording menu after the model is available.
 - **Personal project threads.** Titling runs hidden agent threads in BB's
   Personal project.
 

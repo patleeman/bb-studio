@@ -46,6 +46,7 @@ import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState } from "./controller";
 import { sameKey, type SetAsideSegment } from "./outbox";
+import { RecordingPlayer, type PlaybackState } from "./playback";
 
 function useChangedSignal(onChange: (id: string) => void): void {
   useRealtime(RECORDING_CHANGED, (payload) => {
@@ -229,60 +230,14 @@ function useRecording(id: string) {
   return { rpc, data, error, refetch };
 }
 
-/** Plays segment files back to back, starting from any one of them. */
 function usePlayer(recordingId: string, segments: readonly Segment[]) {
-  const audio = useRef<HTMLAudioElement | null>(null);
-  const [playing, setPlaying] = useState<string | null>(null);
-  const order = useRef(segments);
-  order.current = segments;
-
-  const stop = useCallback(() => {
-    audio.current?.pause();
-    audio.current = null;
-    setPlaying(null);
-  }, []);
-
-  const play = useCallback(
-    (segmentId: string) => {
-      audio.current?.pause();
-      const element = new Audio(
-        `/api/v1/plugins/talk/http/audio?recording=${encodeURIComponent(recordingId)}&segment=${encodeURIComponent(segmentId)}`,
-      );
-      audio.current = element;
-      setPlaying(segmentId);
-      element.addEventListener("ended", () => {
-        if (audio.current !== element) return;
-        const list = order.current;
-        const next = list[list.findIndex((segment) => segment.id === segmentId) + 1];
-        if (next) play(next.id);
-        else stop();
-      });
-      element.play().catch((error: unknown) => {
-        if (audio.current === element) stop();
-        toast.error(`Could not play audio: ${errorMessage(error)}`);
-      });
-    },
-    [recordingId, stop],
-  );
-
-  useEffect(() => stop, [stop, recordingId]);
-  return { playing, play, stop };
-}
-
-interface Paragraph {
-  sessionId: string;
-  offsetMs: number;
-  segments: Segment[];
-}
-
-function paragraphs(segments: readonly Segment[]): Paragraph[] {
-  const out: Paragraph[] = [];
-  for (const segment of segments) {
-    const last = out.at(-1);
-    if (last && last.sessionId === segment.sessionId) last.segments.push(segment);
-    else out.push({ sessionId: segment.sessionId, offsetMs: segment.offsetMs, segments: [segment] });
-  }
-  return out;
+  const [state, setState] = useState<PlaybackState>({ positionMs: 0, segmentId: null, playing: false, rate: 1, volume: 1 });
+  const player = useMemo(() => new RecordingPlayer(recordingId, setState,
+    (cause) => toast.error(`Could not play audio: ${errorMessage(cause)}`)), [recordingId]);
+  player.segments = segments;
+  useEffect(() => { setState(player.state); return () => player.dispose(); }, [player]);
+  return { ...state, durationMs: player.durationMs, seek: (ms: number, play?: boolean) => player.seek(ms, play),
+    toggle: () => player.toggle(), pause: () => player.pause(), setRate: (rate: number) => player.setRate(rate), setVolume: (volume: number) => player.setVolume(volume) };
 }
 
 function RecordingDetail({ id }: { id: string }) {
@@ -293,8 +248,39 @@ function RecordingDetail({ id }: { id: string }) {
   const segments = data?.segments ?? [];
   const player = usePlayer(id, segments);
   const [confirmDelete, setConfirmDelete] = useState(false);
-  const transcript = useMemo(() => joinTranscript(segments), [segments]);
-  const groups = useMemo(() => paragraphs(segments), [segments]);
+  const [version, setVersion] = useState<"original" | "cleaned">("cleaned");
+  const [cleaning, setCleaning] = useState<string | null>(null);
+  const cleanupRun = useRef(0);
+  useEffect(() => { setVersion("cleaned"); setCleaning(null); return () => { cleanupRun.current++; }; }, [id]);
+  const spoken = segments.filter((segment) => segment.status !== "empty");
+  const hasCleaned = spoken.length > 0 && spoken.every((segment) => segment.status === "done" && segment.cleanedText != null);
+  const showCleaned = version === "cleaned" && hasCleaned;
+  const shownSegments = useMemo(() => showCleaned ? segments.map((segment) => ({ ...segment, text: segment.cleanedText ?? segment.text })) : segments, [segments, showCleaned]);
+  const transcript = useMemo(() => joinTranscript(shownSegments), [shownSegments]);
+  const cleanUp = async () => {
+    if (cleaning !== null) return;
+    const runId = ++cleanupRun.current;
+    const pending = segments.filter((segment) => segment.status === "done" && segment.text && segment.cleanedText == null);
+    try {
+      for (let index = 0; index < pending.length; index++) {
+        if (cleanupRun.current !== runId) return;
+        setCleaning(`Cleaning section ${index + 1} of ${pending.length}…`);
+        await rpc.call("recording_cleanup", { id, segmentId: pending[index]!.id });
+      }
+      if (cleanupRun.current === runId) { setVersion("cleaned"); toast.success("Cleaned transcript saved. Original text and audio kept."); }
+    } catch (cause) {
+      if (cleanupRun.current === runId) toast.error(errorMessage(cause));
+    } finally {
+      if (cleanupRun.current === runId) { setCleaning(null); refetch(); }
+    }
+  };
+  const [follow, setFollow] = useState(true);
+  const transcriptRows = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (follow && player.playing && player.segmentId) {
+      transcriptRows.current?.querySelector('[aria-current="true"]')?.scrollIntoView({ block: "nearest" });
+    }
+  }, [follow, player.playing, player.segmentId]);
   // Tells the recording pill this page is where the recording lives.
   useEffect(() => {
     talk.setViewing(id);
@@ -350,7 +336,7 @@ function RecordingDetail({ id }: { id: string }) {
       (cause: unknown) => toast.error(errorMessage(cause)),
     );
   const downloadTranscript = (format: "markdown" | "text") => {
-    window.open(`/api/v1/plugins/talk/http/transcript?recording=${encodeURIComponent(id)}&format=${format}`, "_blank", "noopener");
+    window.open(`/api/v1/plugins/talk/http/transcript?recording=${encodeURIComponent(id)}&format=${format}${showCleaned ? "&version=cleaned" : ""}`, "_blank", "noopener");
   };
 
   return (
@@ -380,6 +366,11 @@ function RecordingDetail({ id }: { id: string }) {
                 {recording.failedCount > 0 ? (
                   <DropdownMenuItem onSelect={() => run(() => rpc.call("recording_retry", { id }))}>
                     <Icon name="RotateCcw" className="size-4" /> Retry {recording.failedCount} failed
+                  </DropdownMenuItem>
+                ) : null}
+                {recording.kind === "recording" && recording.status === "done" ? (
+                  <DropdownMenuItem onSelect={() => run(() => rpc.call("meeting_regenerate", { id }))}>
+                    <Icon name="List" className="size-4" /> {recording.meetingNotes ? "Regenerate meeting notes" : "Generate meeting notes"}
                   </DropdownMenuItem>
                 ) : null}
                 {recording.status === "done" ? (
@@ -425,10 +416,10 @@ function RecordingDetail({ id }: { id: string }) {
 
         <UnsentNotice recordingId={id} className="mt-6" />
 
-        {recording.kind === "recording" && recording.status === "done" ? (
-          <section className="mt-6 rounded-lg border border-border p-4" aria-label="Meeting notes">
-            <div className="flex items-center justify-between gap-3">
-              <h2 className="font-semibold">Meeting notes</h2>
+        {recording.kind === "recording" && recording.meetingNotes ? (
+          <details className="mt-6 rounded-lg border border-border p-4" aria-label="Meeting notes">
+            <summary className="cursor-pointer font-semibold">Meeting notes</summary>
+            <div className="mt-3 flex items-center justify-end gap-3">
               <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => rpc.call("meeting_regenerate", { id }))}>
                 <Icon name="RotateCcw" /> {recording.meetingNotes ? "Regenerate" : "Generate"}
               </button>
@@ -440,7 +431,7 @@ function RecordingDetail({ id }: { id: string }) {
                 {recording.meetingNotes.actionItems.length ? <div><h3 className="font-medium">Action items</h3><ul className="mt-2 space-y-2">{recording.meetingNotes.actionItems.map((item, index) => <li key={index} className="flex items-center justify-between gap-3"><span>{item.title}{item.assignee ? <span className="text-muted-foreground"> · Suggested: {item.assignee === "me" ? "you" : "agent"}</span> : null}</span><button type="button" className={OUTLINE_BUTTON} onClick={() => run(async () => { const result = await rpc.call("meeting_create_task", { id, index }); toast.success(`Task created: ${result.taskId}`); })}>Create task</button></li>)}</ul></div> : null}
               </div>
             ) : <p className="mt-3 text-sm text-muted-foreground">Notes appear after Talk finishes processing the transcript.</p>}
-          </section>
+          </details>
         ) : null}
 
         {confirmDelete ? (
@@ -448,7 +439,7 @@ function RecordingDetail({ id }: { id: string }) {
             <ItemDeleteConfirm
               label="Delete this recording and its audio? This can't be undone."
               onDelete={() => {
-                player.stop();
+                player.pause();
                 void rpc.call("recording_delete", { id }).then(
                   () => toCollection(true),
                   (cause) => toast.error(errorMessage(cause)),
@@ -490,41 +481,55 @@ function RecordingDetail({ id }: { id: string }) {
           ) : null}
         </div>
 
-        {groups.length === 0 ? (
-          <div className="mt-8 rounded-lg border border-dashed border-border px-6 py-10 text-center text-sm text-muted-foreground">
-            {activeHere ? "Text appears here as each piece is transcribed." : "This recording has no audio."}
+        {segments.length > 0 && !recording.audioRemoved ? (
+          <section aria-label="Audio playback" className="sticky top-0 z-10 mt-6 border-y border-border bg-background py-3">
+            <div className="flex items-center gap-2">
+              <button type="button" className={OUTLINE_BUTTON} aria-label={player.playing ? "Pause playback" : "Play recording"} onClick={player.toggle}>
+                <Icon name={player.playing ? "Pause" : "Play"} /> {player.playing ? "Pause" : "Play"}
+              </button>
+              <button type="button" className={ICON_BUTTON} aria-label="Back 10 seconds" title="Back 10 seconds" onClick={() => player.seek(player.positionMs - 10_000)}><Icon name="RotateCcw" /></button>
+              <button type="button" className={ICON_BUTTON} aria-label="Forward 10 seconds" title="Forward 10 seconds" onClick={() => player.seek(player.positionMs + 10_000)}><Icon name="RotateCw" /></button>
+              <span className="ml-auto text-sm tabular-nums">{formatClock(player.positionMs)} / {formatClock(player.durationMs)}</span>
+              <select aria-label="Playback speed" className="rounded border border-border bg-background px-1 py-1 text-sm" value={player.rate} onChange={(event) => player.setRate(Number(event.target.value))}>
+                {[0.75, 1, 1.25, 1.5, 2].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
+              </select>
+            </div>
+            <input type="range" aria-label="Recording position" aria-valuetext={`${formatClock(player.positionMs)} of ${formatClock(player.durationMs)}`} min={0} max={player.durationMs} step={100} value={player.positionMs} onChange={(event) => player.seek(Number(event.target.value))} className="mt-3 block w-full cursor-pointer accent-primary" />
+            <div className="mt-2 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
+              <label className="flex items-center gap-2"><input type="checkbox" checked={follow} onChange={(event) => setFollow(event.target.checked)} /> Follow transcript</label>
+              <label className="flex items-center gap-2">Volume <input type="range" aria-label="Playback volume" min={0} max={1} step={0.05} value={player.volume} onChange={(event) => player.setVolume(Number(event.target.value))} className="w-24 accent-primary" /></label>
+            </div>
+          </section>
+        ) : null}
+
+        <div className="mt-8 flex flex-wrap items-center gap-2">
+          <h2 className="mr-auto font-semibold">Transcript</h2>
+          <button type="button" className={OUTLINE_BUTTON} disabled={cleaning !== null || recording.status !== "done" || recording.pendingCount > 0 || recording.failedCount > 0 || !recording.wordCount || hasCleaned} onClick={() => void cleanUp()}>
+            <Icon name={cleaning !== null ? "Loading" : "Sparkles"} className={cleaning !== null ? "animate-spin motion-reduce:animate-none" : undefined} /> {cleaning !== null ? "Cleaning…" : hasCleaned ? "Cleanup saved" : "Clean up transcript"}
+          </button>
+          <button type="button" className={OUTLINE_BUTTON} disabled={!transcript} onClick={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}><Icon name="MessageSquarePlus" /> Send to agent</button>
+        </div>
+        {cleaning !== null ? <p role="status" className="mt-2 text-sm text-muted-foreground">{cleaning}</p> : null}
+        {hasCleaned ? (
+          <div className="mt-3 flex items-center gap-2 text-sm">
+            <button type="button" aria-pressed={showCleaned} className={showCleaned ? OUTLINE_BUTTON : GHOST_BUTTON} onClick={() => setVersion("cleaned")}>Cleaned</button>
+            <button type="button" aria-pressed={!showCleaned} className={!showCleaned ? OUTLINE_BUTTON : GHOST_BUTTON} onClick={() => setVersion("original")}>Original</button>
+            <span className="text-xs text-muted-foreground">Original text and audio kept</span>
           </div>
+        ) : null}
+        {segments.length === 0 ? (
+          <p className="mt-4 text-sm text-muted-foreground">{activeHere ? "Text appears here as each piece is transcribed." : "This recording has no audio."}</p>
         ) : (
-          <div className="mt-8 flex flex-col gap-5">
-            {groups.map((group) => (
-              <section key={group.sessionId} className="flex gap-3">
+          <div ref={transcriptRows} className="mt-4 flex flex-col gap-3">
+            {shownSegments.map((segment) => (
+              <section key={segment.id} aria-current={player.segmentId === segment.id ? "true" : undefined} className={cn("flex scroll-mt-40 gap-3 rounded px-2 py-2", player.segmentId === segment.id && "bg-primary/10")}>
                 {recording.audioRemoved ? (
-                  <span className="mt-0.5 h-6 shrink-0 px-1 font-mono text-xs leading-6 tabular-nums text-muted-foreground">
-                    {formatClock(group.offsetMs)}
-                  </span>
+                  <span className="mt-0.5 shrink-0 font-mono text-xs leading-6 tabular-nums text-muted-foreground">{formatClock(segment.offsetMs)}</span>
                 ) : (
-                  <button
-                    type="button"
-                    onClick={() => player.play(group.segments[0]!.id)}
-                    className="mt-0.5 h-6 shrink-0 cursor-pointer rounded px-1 font-mono text-xs tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground"
-                    title="Play from here"
-                  >
-                    {formatClock(group.offsetMs)}
-                  </button>
+                  <button type="button" onClick={() => player.seek(segment.offsetMs, true)} className="mt-0.5 h-6 shrink-0 rounded px-1 font-mono text-xs tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2" aria-label={`Play from ${formatClock(segment.offsetMs)}`} title="Play from here">{formatClock(segment.offsetMs)}</button>
                 )}
-                <p className="min-w-0 flex-1 text-[15px] leading-relaxed">
-                  {group.segments.map((segment) => (
-                    <SegmentText
-                      key={segment.id}
-                      segment={segment}
-                      playing={player.playing === segment.id}
-                      onPlay={
-                        recording.audioRemoved
-                          ? undefined
-                          : () => (player.playing === segment.id ? player.stop() : player.play(segment.id))
-                      }
-                    />
-                  ))}
+                <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
+                  <SegmentText segment={segment} playing={player.segmentId === segment.id} onPlay={recording.audioRemoved ? undefined : () => player.seek(segment.offsetMs, true)} />
                 </p>
               </section>
             ))}
@@ -538,7 +543,7 @@ function RecordingDetail({ id }: { id: string }) {
 /** Without `onPlay` (the audio is gone) the text is plain. */
 function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: boolean; onPlay?: () => void }) {
   const at = formatClock(segment.offsetMs);
-  if (segment.status === "empty") return null;
+  if (segment.status === "empty") return <span className="text-sm text-muted-foreground">No speech detected</span>;
   if (segment.status === "pending") {
     return (
       <span className="mr-1 inline-flex items-center gap-1 text-sm text-muted-foreground" title={`${at} — transcribing`}>
@@ -561,24 +566,17 @@ function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: 
   }
   if (!onPlay) return <span>{segment.text} </span>;
   return (
-    <span
-      role="button"
-      tabIndex={0}
+    <button
+      type="button"
       onClick={onPlay}
-      onKeyDown={(event) => {
-        if (event.key === "Enter" || event.key === " ") {
-          event.preventDefault();
-          onPlay();
-        }
-      }}
       title={`${at} — play`}
       className={cn(
-        "cursor-pointer rounded-sm hover:bg-state-hover",
+        "cursor-pointer rounded-sm text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2",
         playing && "bg-primary/15 hover:bg-primary/20",
       )}
     >
       {segment.text}{" "}
-    </span>
+    </button>
   );
 }
 

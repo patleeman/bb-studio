@@ -53,6 +53,7 @@ export const MIGRATIONS = [
   `ALTER TABLE recordings ADD COLUMN archived_at INTEGER;`,
   `ALTER TABLE recordings ADD COLUMN meeting_notes TEXT;`,
   `ALTER TABLE recordings ADD COLUMN audio_removed_at INTEGER;`,
+  `ALTER TABLE segments ADD COLUMN cleaned_text TEXT;`,
 ];
 
 interface RecordingRow {
@@ -85,6 +86,7 @@ interface SegmentRow {
   file: string;
   status: SegmentStatus;
   text: string | null;
+  cleaned_text: string | null;
   error: string | null;
   attempts: number;
   next_attempt_at: number;
@@ -188,12 +190,29 @@ export class TalkStore {
         bytes: row.bytes,
         status: row.status,
         text: row.text,
+        cleanedText: row.cleaned_text,
         error: row.error,
         attempts: row.attempts,
       };
       offset += row.duration_ms;
       return segment;
     });
+  }
+
+  /** Only expose a complete cleaned version, including after Record more. */
+  cleanedTranscript(recordingId: string): string | null {
+    const segments = this.segments(recordingId).filter((segment) => segment.status !== "empty");
+    if (!segments.length || segments.some((segment) => segment.status !== "done" || segment.cleanedText == null)) return null;
+    return joinTranscript(segments.map((segment) => ({ ...segment, text: segment.cleanedText ?? segment.text })));
+  }
+
+  saveCleanup(recordingId: string, segmentId: string, original: string, cleaned: string): boolean {
+    const result = this.db.prepare(`UPDATE segments SET cleaned_text = ?
+      WHERE recording_id = ? AND id = ? AND text = ? AND status = 'done'
+      AND EXISTS (SELECT 1 FROM recordings WHERE id = ? AND status = 'done')`)
+      .run(cleaned, recordingId, segmentId, original, recordingId);
+    if (result.changes) this.touch(recordingId);
+    return result.changes > 0;
   }
 
   segmentFile(recordingId: string, segmentId: string): { file: string; mimeType: string } | null {
@@ -289,7 +308,7 @@ export class TalkStore {
     const trimmed = text.trim();
     this.db
       .prepare(
-        `UPDATE segments SET status = ?, text = ?, error = NULL,
+        `UPDATE segments SET status = ?, text = ?, cleaned_text = NULL, error = NULL,
            attempts = attempts + 1 WHERE recording_id = ? AND id = ?`,
       )
       .run(trimmed === "" ? "empty" : "done", trimmed === "" ? null : trimmed, recordingId, segmentId);

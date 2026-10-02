@@ -14,6 +14,7 @@ public enum Talk {
     public static let meeting_regenerate = "meeting_regenerate"
     public static let meeting_create_task = "meeting_create_task"
     public static let dictation_cleanup = "dictation_cleanup"
+    public static let recording_cleanup = "recording_cleanup"
     public static let recording_keep = "recording_keep"
     public static let recording_delete = "recording_delete"
   }
@@ -39,6 +40,8 @@ public enum Talk {
   public typealias MeetingCreateTask = MeetingCreateTaskOutput
 
   public typealias DictationCleanup = DictationCleanupOutput
+
+  public typealias RecordingCleanup = RecordingCleanupOutput
 
   public typealias RecordingKeep = RecordingKeepOutput
 
@@ -458,10 +461,11 @@ public enum Talk {
     public var bytes: Double?
     public var status: RecordingGetOutputSegmentsItemStatus?
     public var text: String?
+    public var cleanedText: String?
     public var error: String?
     public var attempts: Double?
 
-    public init(id: String? = nil, sessionId: String? = nil, startedAt: Double? = nil, offsetMs: Double? = nil, durationMs: Double? = nil, mimeType: String? = nil, bytes: Double? = nil, status: RecordingGetOutputSegmentsItemStatus? = nil, text: String? = nil, error: String? = nil, attempts: Double? = nil) {
+    public init(id: String? = nil, sessionId: String? = nil, startedAt: Double? = nil, offsetMs: Double? = nil, durationMs: Double? = nil, mimeType: String? = nil, bytes: Double? = nil, status: RecordingGetOutputSegmentsItemStatus? = nil, text: String? = nil, cleanedText: String? = nil, error: String? = nil, attempts: Double? = nil) {
       self.id = id
       self.sessionId = sessionId
       self.startedAt = startedAt
@@ -471,6 +475,7 @@ public enum Talk {
       self.bytes = bytes
       self.status = status
       self.text = text
+      self.cleanedText = cleanedText
       self.error = error
       self.attempts = attempts
     }
@@ -1567,6 +1572,24 @@ public enum Talk {
   }
 
   public struct DictationCleanupOutput: Sendable, Hashable, Codable {
+    public var text: String?
+
+    public init(text: String? = nil) {
+      self.text = text
+    }
+  }
+
+  public struct RecordingCleanupInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var segmentId: String?
+
+    public init(id: String? = nil, segmentId: String? = nil) {
+      self.id = id
+      self.segmentId = segmentId
+    }
+  }
+
+  public struct RecordingCleanupOutput: Sendable, Hashable, Codable {
     public var text: String?
 
     public init(text: String? = nil) {

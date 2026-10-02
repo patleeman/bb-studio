@@ -17,6 +17,7 @@ import { z } from "zod";
 import { rpcContract } from "./src/shared/contract";
 import { RECORDING_CHANGED, formatLength } from "./src/shared/format";
 import { AudioFiles, pluginDataDirectory } from "./src/server/audio-files";
+import { audioResponse } from "./src/server/audio-response";
 import { audioArchive } from "./src/server/audio-archive";
 import { MENTION_TRANSCRIPT_CHARS, mentionContext, mentionSubtitle } from "./src/server/mentions";
 import { MIGRATIONS, TalkStore } from "./src/server/store";
@@ -58,6 +59,12 @@ export default async function plugin(bb: BbPluginApi) {
       label: "Auto-title recordings",
       description: "Ask Studio Decisions for a short title once a recording has some text.",
       default: true,
+    },
+    autoMeetingNotes: {
+      type: "boolean",
+      label: "Automatically generate meeting notes",
+      description: "Generate a summary, decisions, and action items when a recording finishes. You can also generate them from a recording's menu.",
+      default: false,
     },
     holdToTalkKey: {
       type: "select",
@@ -154,6 +161,7 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
   function maybeSummarize(id: string): void {
+    if (!config.autoMeetingNotes) return;
     void meetingNotes(id).catch((error) => {
       if (!lifetime.signal.aborted) bb.log.warn(`Talk could not summarize ${id}: ${String(error)}`);
     });
@@ -319,6 +327,19 @@ export default async function plugin(bb: BbPluginApi) {
       const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)]);
       return { text: await cleanTranscript(bb, { recordingId: id, transcript: store.transcript(id) }, signal) };
     },
+    recording_cleanup: async ({ id, segmentId }) => {
+      const recording = mustGet(id);
+      if (recording.status !== "done" || recording.pendingCount || recording.failedCount) throw new Error("Finish transcription before cleaning up the recording.");
+      const segment = store.segments(id).find((item) => item.id === segmentId);
+      if (!segment || segment.status !== "done" || !segment.text) throw new Error("This section has no finished transcript.");
+      if (segment.cleanedText != null) return { text: segment.cleanedText };
+      const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)]);
+      const text = await cleanTranscript(bb, { recordingId: id, transcript: segment.text, segmentId }, signal);
+      if (text === null) throw new Error("Cleanup could not finish this section. Check Studio Decisions and try again; your original transcript is saved.");
+      if (!store.saveCleanup(id, segmentId, segment.text, text)) throw new Error("The recording changed during cleanup. Try again after it finishes.");
+      changed(id);
+      return { text };
+    },
     recording_keep: ({ id }) => {
       mustGet(id);
       if (store.setKind(id, "recording")) {
@@ -350,20 +371,23 @@ export default async function plugin(bb: BbPluginApi) {
     const entry = store.segmentFile(recordingId, segmentId);
     if (!entry) return context.text("Not found", 404);
     const bytes = await files.read(entry.file);
-    return serveBytes(new Uint8Array(bytes), {
-      "content-type": entry.mimeType.split(";")[0]!,
-      ...(context.req.query("download") === "1" ? { "content-disposition": `attachment; filename="${segmentId.replace(/[^a-zA-Z0-9_-]/g, "")}.${entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : "webm"}"` } : {}),
-    });
+    const downloadName = context.req.query("download") === "1"
+      ? `${segmentId.replace(/[^a-zA-Z0-9_-]/g, "")}.${entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : "webm"}`
+      : undefined;
+    return audioResponse(new Uint8Array(bytes), entry.mimeType, context.req.header("range"), downloadName);
   });
   bb.http.route("GET", "/transcript", (context) => {
     const id = context.req.query("recording") ?? "";
     const recording = store.recording(id);
     if (!recording || recording.status !== "done") return context.text("Not found", 404);
     const markdown = context.req.query("format") === "markdown";
-    const transcript = store.transcript(id);
+    const cleaned = context.req.query("version") === "cleaned";
+    const transcript = cleaned ? store.cleanedTranscript(id) : store.transcript(id);
+    if (transcript === null) return context.text("No complete cleaned transcript yet", 404);
     const content = markdown ? `# ${recording.title}\n\n${transcript}\n` : `${transcript}\n`;
     const ext = markdown ? "md" : "txt";
     return serveBytes(new TextEncoder().encode(content), {
+      "cache-control": "private, no-store",
       "content-type": markdown ? "text/markdown; charset=utf-8" : "text/plain; charset=utf-8",
       "content-disposition": `attachment; filename="${id}.${ext}"`,
     });
@@ -398,7 +422,8 @@ export default async function plugin(bb: BbPluginApi) {
       })),
     resolve: (id) => {
       const recording = mustGet(id);
-      return { context: mentionContext(recording, store.transcript(id)) };
+      const cleaned = store.cleanedTranscript(id);
+      return { context: mentionContext(recording, cleaned ?? store.transcript(id), cleaned !== null) };
     },
   }));
 
@@ -413,16 +438,19 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.agents.registerTool({
     name: "talk_read",
-    description: "Read a Talk recording's transcript and meeting notes. For long transcripts, use offset and limit to read another part.",
-    parameters: z.object({ id: z.string().min(1).max(100), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(20_000).optional() }),
-    execute({ id, offset = 0, limit = 12_000 }) {
+    description: "Read a Talk recording's saved cleaned transcript when available, otherwise its original, plus optional meeting notes. Set version to original to read the raw text. For long transcripts, use offset and limit.",
+    parameters: z.object({ id: z.string().min(1).max(100), version: z.enum(["original", "cleaned"]).optional(), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(20_000).optional() }),
+    execute({ id, version, offset = 0, limit = 12_000 }) {
       const recording = store.recording(id);
       if (!recording) return { content: [{ type: "text", text: `Recording ${id} not found.` }], isError: true };
-      const transcript = store.transcript(id);
+      const cleaned = store.cleanedTranscript(id);
+      if (version === "cleaned" && cleaned === null) return { content: [{ type: "text", text: "No complete cleaned transcript yet." }], isError: true };
+      const useCleaned = version !== "original" && cleaned !== null;
+      const transcript = useCleaned ? cleaned! : store.transcript(id);
       const notes = recording.meetingNotes;
       return [`${recording.title} (${id})`, `Status: ${recording.status}`, `Link: /plugins/talk/recordings/${id}`,
         notes ? `Summary: ${notes.summary}\nDecisions: ${notes.decisions.join("; ") || "None"}\nAction items: ${notes.actionItems.map((item) => item.title).join("; ") || "None"}` : "",
-        `Transcript (${offset}–${Math.min(offset + limit, transcript.length)} of ${transcript.length} characters):\n${transcript.slice(offset, offset + limit) || "(No transcript.)"}`].filter(Boolean).join("\n\n");
+        `Transcript (${useCleaned ? "cleaned; original retained" : "original"}, ${offset}–${Math.min(offset + limit, transcript.length)} of ${transcript.length} characters):\n${transcript.slice(offset, offset + limit) || "(No transcript.)"}`].filter(Boolean).join("\n\n");
     },
   });
   bb.agents.registerTool({
@@ -446,7 +474,7 @@ export default async function plugin(bb: BbPluginApi) {
     "Usage:",
     "  bb talk list [--query <text>] [--json]",
     "  bb talk show <recording-id> [--json]",
-    "  bb talk transcript <recording-id> [--offset <chars>] [--limit <chars>]",
+    "  bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]",
   ].join("\n");
   bb.cli.register({
     name: "talk",
@@ -457,12 +485,13 @@ export default async function plugin(bb: BbPluginApi) {
       {
         name: "transcript",
         summary: "Print a recording's transcript (paged by characters)",
-        usage: "bb talk transcript <recording-id> [--offset <chars>] [--limit <chars>]",
+        usage: "bb talk transcript <recording-id> [--cleaned] [--offset <chars>] [--limit <chars>]",
       },
     ],
     async run(argv) {
       const json = argv.includes("--json");
-      const args = argv.filter((arg) => arg !== "--json");
+      const cleaned = argv.includes("--cleaned");
+      const args = argv.filter((arg) => arg !== "--json" && arg !== "--cleaned");
       const option = (name: string) => takeOption(args, name);
       const query = option("--query");
       const offset = Number(option("--offset") ?? 0);
@@ -509,11 +538,12 @@ export default async function plugin(bb: BbPluginApi) {
         case "transcript": {
           if (!id || !Number.isFinite(offset) || !Number.isFinite(limit) || offset < 0 || limit < 1) break;
           if (!store.recording(id)) return missing(id);
-          const text = store.transcript(id);
+          const text = cleaned ? store.cleanedTranscript(id) : store.transcript(id);
+          if (text === null) return { exitCode: 1, stderr: "No complete cleaned transcript yet." };
           const page = text.slice(offset, offset + limit);
           const more =
             offset + limit < text.length
-              ? `\n\n[${text.length - offset - limit} more characters: bb talk transcript ${id} --offset ${offset + limit}]`
+              ? `\n\n[${text.length - offset - limit} more characters: bb talk transcript ${id}${cleaned ? " --cleaned" : ""} --offset ${offset + limit}]`
               : "";
           return { exitCode: 0, stdout: page === "" ? "(No transcript.)" : page + more };
         }

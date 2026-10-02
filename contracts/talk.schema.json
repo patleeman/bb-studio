@@ -414,6 +414,12 @@
                     "null"
                   ]
                 },
+                "cleanedText": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
                 "error": {
                   "type": [
                     "string",
@@ -1551,6 +1557,40 @@
               "string",
               "null"
             ]
+          }
+        },
+        "required": [
+          "text"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recording_cleanup": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "pattern": "^rec_[a-z0-9]{8,32}$"
+          },
+          "segmentId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "id",
+          "segmentId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "text": {
+            "type": "string"
           }
         },
         "required": [
