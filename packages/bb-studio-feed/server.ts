@@ -15,7 +15,7 @@ export default async function plugin(bb: BbPluginApi) {
       type: "boolean",
       label: "Tell agents how to post",
       description:
-        "Agents learn the ::post line and post when their task or automation asks them to. Turn off to stop new posts from replies. Applies to agent sessions started after the change.",
+        "Agents get the feed_post tool and post when their task or automation asks them to, or a run has a result worth reading later. Turn off to stop agents posting. Applies to agent sessions started after the change.",
       default: true,
     },
     notify: {

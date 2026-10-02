@@ -38,7 +38,7 @@ struct FeedView: View {
                 } else {
                     ContentUnavailableView(
                         "Nothing posted yet", systemImage: "newspaper",
-                        description: Text("Agents post here when a reply ends with a ::post line."))
+                        description: Text("Agents post here when a task or automation asks them to."))
                 }
             }
         }
@@ -399,7 +399,7 @@ struct FeedPostView: View {
     }
 }
 
-/// `::post{title="…"}` in a reply: the feed post it made.
+/// `::post{id="…"}` in a reply (older replies: `::post{title="…"}`): the feed post it made.
 struct FeedPostCard: View {
     @EnvironmentObject private var app: AppModel
     /// The directive line.

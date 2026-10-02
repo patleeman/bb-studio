@@ -3,7 +3,7 @@
 // Surfaces:
 //   - navPanel "Feed": every post, newest first, and a post's page at
 //     feed/<id>. New stories since you last looked show next to it.
-//   - messageDirective `::post{title="…"}`: the post a reply published, as a
+//   - messageDirective `::post{id="…"}`: the post a reply made, as a
 //     card in its thread or channel.
 import { FloatPanels } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";

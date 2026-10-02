@@ -6,7 +6,7 @@ export const PANEL_PATH = "feed";
 export const REALTIME_CHANNEL = "feed";
 export const FEED_ICON = "feed/feed";
 
-/** The directive: `::post{title="Harlem Line delays cleared" topic="Commute" story="harlem-line"}`. */
+/** The card directive a reply ends with: `::post{id="post_…"}` (older replies: `::post{title="…"}`). */
 export const DIRECTIVE = "post";
 
 export const PRIORITIES = ["urgent", "normal", "low"] as const;
