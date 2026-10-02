@@ -29,7 +29,11 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
  {
   id:"bots-sidebar",packageDir:"bb-studio-teams",fileName:"studio-sidebar.png",showSidebar:true,
   setup:async client=>{
-   await launchRoomThread();await client.navigate(`/plugins/bot-teams/views/${getLaunchRoomId()}`);
+   await launchRoomThread();
+   await client.navigate("/plugins/studio/studio/view");
+   await client.waitForSelector(`[data-studio-item="/plugins/bot-teams/views/${getLaunchRoomId()}"]`);
+   await client.evaluate(`document.querySelector('[data-studio-item="/plugins/bot-teams/views/${getLaunchRoomId()}"]').click()`);
+   await client.waitForSelector('[data-thread-view]');
    await client.waitForSelector('section[aria-label="Studio"]');
    await client.waitForSelector(`section[aria-label="Studio"] a[href="/plugins/bot-teams/views/${getLaunchRoomId()}"]`);
    await client.evaluate(`(()=>{if(document.querySelector('section[aria-label="Views"]'))throw new Error("Saved views still have a separate sidebar section");})()`);
