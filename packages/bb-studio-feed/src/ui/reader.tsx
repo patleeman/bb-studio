@@ -159,7 +159,7 @@ function FeedReader() {
   return (
     <PageColumn className="max-w-6xl">
       <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="mr-auto text-[28px] leading-tight font-bold">Feed</h1>
+        <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">Feed</h1>
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread</span> : null}
         <button type="button" className={OUTLINE_BUTTON} disabled={!unread} onClick={markAllRead}>
           <Icon name="CheckCheck" /> Mark all read
@@ -308,7 +308,7 @@ function StoryRow({ post, open, showTopic, onToggle, onRead }: { post: PostView;
             <span
               className={cn(
                 "block leading-snug group-hover:underline",
-                open ? "text-lg font-semibold text-foreground" : post.read ? "text-[15px] text-muted-foreground" : "text-[15px] font-semibold text-foreground",
+                open || !post.read ? "text-sm font-semibold text-foreground" : "text-sm text-muted-foreground",
                 dim && "truncate",
               )}
             >
@@ -441,7 +441,7 @@ function PostContent({ post }: { post: PostView }) {
   return (
     <>
       <Picture src={linkedPicture} className="mb-4 max-h-80 w-full rounded-lg" />
-      {post.body ? <Markdown content={post.body} className="text-[15px] leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-[15px] [&_li:has(input[type=checkbox])]:list-none [&_p]:text-[15px]" /> : null}
+      {post.body ? <Markdown content={post.body} className="text-sm leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-sm [&_li:has(input[type=checkbox])]:list-none [&_p]:text-sm" /> : null}
       {post.embeds.map((embed) => (
         <ItemPreview key={`${embed.pluginId}:${embed.id}`} embed={embed} />
       ))}
@@ -610,7 +610,7 @@ function PostPage({ postId }: { postId: string }) {
         <EmptyState icon={FEED_ICON} title="This post was removed" />
       ) : (
         <article>
-          <h1 className="text-3xl leading-tight font-bold text-balance">{post.title}</h1>
+          <h1 className="text-2xl leading-tight font-semibold text-balance">{post.title}</h1>
           <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-muted-foreground">
             <Avatar post={post} />
             <span className="font-medium text-foreground">{from(post)}</span>
