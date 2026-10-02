@@ -7,7 +7,76 @@ const scrollToTop = `(() => {
   window.scrollTo(0, 0);
 })()`;
 
-export default ({ projectId, bbCli, seedTalkRecording, talkRpc, sleep }) => [
+export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep }) => [
+  {
+    id: "talk-inline",
+    packageDir: "bb-studio-talk",
+    fileName: "inline-dictation.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      let recordingId;
+      const cleanup = async () => {
+        if (await client.evaluate(`!!document.querySelector('button[aria-label="Stop without inserting"]')`)) await client.clickAriaButtonWithPointer("Stop without inserting");
+        if (recordingId) await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
+      };
+      const checkInline = async () => {
+        await client.waitForSelector("[data-promptbox] [data-talk-inline]");
+        if (await client.evaluate(`!!document.querySelector('[data-talk-overlay]')`)) throw new Error("Dictation has duplicate floating controls while docked.");
+        const fits = await client.evaluate(`(() => {
+          const root = document.querySelector('[data-talk-inline]');
+          const composer = root.closest('[data-promptbox]').getBoundingClientRect();
+          return [...root.querySelectorAll('button')].every(button => {
+            const r = button.getBoundingClientRect();
+            return r.width >= 24 && r.left >= composer.left && r.right <= composer.right && r.top >= 0 && r.bottom <= innerHeight;
+          });
+        })()`);
+        if (!fits) throw new Error("Inline dictation controls overflow their input or viewport.");
+      };
+      try {
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForSelector('[data-promptbox] [contenteditable="true"]');
+        await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').focus()`);
+        await client.command("Input.insertText", { text: "Turn this brain dump into a short plan." });
+        await client.clickAriaButtonWithPointer("Start voice input");
+        await checkInline();
+        await client.waitForAriaButton("Pause");
+        recordingId = await client.evaluate(`JSON.parse(localStorage.getItem('bb-plugin-talk:active')).recordingId`);
+        await client.clickAriaButtonWithPointer("Pause");
+        await client.waitForAriaButton("Resume recording");
+        await checkInline();
+        await client.clickAriaButtonWithPointer("Resume recording");
+        await client.waitForAriaButton("Pause");
+        await client.clickAriaButtonWithPointer("Expand dictation transcript");
+        await client.waitForSelector("[data-talk-overlay]");
+        await client.waitForText("Text appears here as each piece is transcribed.");
+        if (await client.evaluate(`!!document.querySelector('[data-talk-inline]')`)) throw new Error("Expanded dictation stayed inside the input.");
+        await client.clickAriaButtonWithPointer("Collapse dictation transcript");
+        await checkInline();
+        if (!await client.evaluate(`!!document.activeElement?.closest('[data-talk-inline]')`)) throw new Error("Collapsing the transcript lost keyboard focus.");
+        // Use the native nav without reloading the recorder's window.
+        await client.clickButtonText("Studio");
+        await client.waitForSelector("[data-talk-overlay]");
+        await client.waitForAriaButton("Back to where you're dictating");
+        if (await client.evaluate(`JSON.parse(localStorage.getItem('bb-plugin-talk:active')).recordingId !== ${JSON.stringify(recordingId)}`)) throw new Error("Navigation replaced the ongoing dictation.");
+        await client.clickAriaButtonWithPointer("Back to where you're dictating");
+        await checkInline();
+        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        await sleep(500);
+        await checkInline();
+        await client.capture(resolve("packages/bb-studio-talk/assets/inline-dictation-mobile.png"));
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+        await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);
+        await sleep(500);
+        await checkInline();
+      } catch (error) {
+        await client.capture(`${process.env.TMPDIR ?? "/tmp/"}talk-inline-error.png`);
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
   {
     id: "talk-composer",
     packageDir: "bb-studio-talk",

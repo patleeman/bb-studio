@@ -253,7 +253,7 @@ export function TalkOverlay() {
         title={dock ? undefined : "Drag to move"}
         className={cn(
           "flex select-none items-center",
-          dock ? "gap-1" : "touch-none gap-2 py-1 pl-3 pr-1",
+          dock ? "gap-0.5 sm:gap-1" : "touch-none gap-2 py-1 pl-3 pr-1",
           !dock && (drag.dragging ? "cursor-grabbing" : "cursor-grab"),
         )}
       >
@@ -267,10 +267,14 @@ export function TalkOverlay() {
         <LevelMeter live={capturing} />
         <button
           type="button"
-          onClick={toggleExpanded}
+          onClick={() => {
+            toggleExpanded();
+            // Moving between the portal and overlay remounts this button.
+            requestAnimationFrame(() => document.querySelector<HTMLElement>('[data-talk-inline] button[aria-expanded], [data-talk-overlay] button[aria-expanded]')?.focus());
+          }}
           aria-label={`${expanded ? "Collapse" : "Expand"} ${dictation ? "dictation" : "recording"} transcript`}
           aria-expanded={expanded}
-          className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground"
+          className={cn("flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground", dock && "min-w-6")}
         >
           <span className={cn("truncate", dock && canStop && "max-sm:hidden")}>{statusLabel(state, online)}</span>
           <Icon name={expanded ? "ChevronUp" : "ChevronDown"} className="size-3.5 shrink-0" />
