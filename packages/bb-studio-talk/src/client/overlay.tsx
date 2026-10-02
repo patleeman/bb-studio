@@ -1,7 +1,8 @@
 // The app-wide recording pill. BB mounts it once per window, outside every
 // route, so it stays put while the user moves between threads, and it is the
 // component that connects the controller to RPC, settings, and realtime.
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import {
   useBbContext,
   useBbNavigate,
@@ -15,6 +16,7 @@ import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { useDraggable } from "./draggable";
+import { useInlineDictation } from "./inline-dictation";
 
 // BB's page header is a window drag region in the desktop app, and the OS
 // swallows clicks there. The pill opts out, as BB's own popups do.
@@ -69,7 +71,7 @@ function useNow(active: boolean): number {
 const EXPANDED_KEY = "bb-plugin-talk:pill-expanded";
 
 /** Whether the transcript is open, remembered across recordings and reloads. */
-function useExpanded(): [boolean, () => void] {
+function useExpanded(state: TalkState): [boolean, () => void] {
   const [expanded, setExpanded] = useState(() => {
     try {
       return localStorage.getItem(EXPANDED_KEY) === "1";
@@ -77,6 +79,11 @@ function useExpanded(): [boolean, () => void] {
       return false;
     }
   });
+  useLayoutEffect(() => {
+    // Each new dictation starts at its input. Expanded recordings keep their
+    // preference, and an in-progress dictation retains it after a reload.
+    if (state.kind === "dictation" && state.phase === "starting" && !state.recordingId) setExpanded(false);
+  }, [state.kind, state.phase, state.recordingId]);
   useEffect(() => {
     try {
       localStorage.setItem(EXPANDED_KEY, expanded ? "1" : "0");
@@ -195,7 +202,8 @@ export function TalkOverlay() {
   const state = useTalkState();
   const navigate = useBbNavigate();
   const online = useOnline();
-  const [expanded, toggleExpanded] = useExpanded();
+  const [expanded, toggleExpanded] = useExpanded(state);
+  const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError);
   const drag = useDraggable<HTMLDivElement>();
   const capturing = state.phase === "recording";
   // Ticks whenever the pill shows: the clock runs, and the Back button
@@ -226,25 +234,27 @@ export function TalkOverlay() {
   const away = !talk.isAtSource();
   const text = state.transcript.trim();
 
-  return (
+  const pill = (
     <div
-      ref={drag.ref}
+      ref={dock ? undefined : drag.ref}
       role="region"
-      aria-label="Talk recording"
-      data-talk-overlay=""
-      style={drag.style}
+      aria-label={dock ? "Talk dictation" : "Talk recording"}
+      data-talk-overlay={dock ? undefined : ""}
+      data-talk-inline={dock ? "" : undefined}
+      style={dock ? undefined : drag.style}
       className={cn(
         NO_DRAG,
-        "z-[70] flex w-[calc(100vw-16px)] max-w-[420px] flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl sm:w-auto sm:min-w-[300px]",
-        drag.dragging && "shadow-2xl",
+        dock ? "flex min-w-0 flex-1 flex-col text-foreground" : "z-[70] flex w-[calc(100vw-16px)] max-w-[420px] flex-col overflow-hidden rounded-2xl border border-border bg-popover text-popover-foreground shadow-xl sm:w-auto sm:min-w-[300px]",
+        !dock && drag.dragging && "shadow-2xl",
       )}
     >
       <div
-        {...drag.handleProps}
-        title="Drag to move"
+        {...(dock ? {} : drag.handleProps)}
+        title={dock ? undefined : "Drag to move"}
         className={cn(
-          "flex touch-none select-none items-center gap-2 py-1 pl-3 pr-1",
-          drag.dragging ? "cursor-grabbing" : "cursor-grab",
+          "flex select-none items-center",
+          dock ? "gap-1" : "touch-none gap-2 py-1 pl-3 pr-1",
+          !dock && (drag.dragging ? "cursor-grabbing" : "cursor-grab"),
         )}
       >
         <span
@@ -258,10 +268,11 @@ export function TalkOverlay() {
         <button
           type="button"
           onClick={toggleExpanded}
+          aria-label={`${expanded ? "Collapse" : "Expand"} ${dictation ? "dictation" : "recording"} transcript`}
           aria-expanded={expanded}
           className="flex min-w-0 flex-1 cursor-pointer items-center gap-1 rounded-md px-1 text-left text-xs text-muted-foreground hover:text-foreground"
         >
-          <span className="truncate">{statusLabel(state, online)}</span>
+          <span className={cn("truncate", dock && canStop && "max-sm:hidden")}>{statusLabel(state, online)}</span>
           <Icon name={expanded ? "ChevronUp" : "ChevronDown"} className="size-3.5 shrink-0" />
         </button>
         {state.uploadError && online ? (
@@ -340,4 +351,5 @@ export function TalkOverlay() {
       ) : null}
     </div>
   );
+  return dock ? createPortal(pill, dock) : pill;
 }

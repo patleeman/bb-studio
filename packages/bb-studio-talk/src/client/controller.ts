@@ -351,6 +351,9 @@ export class TalkController {
     return found;
   }
 
+  /** The exact input whose mic can host the compact dictation controls. */
+  dictationComposer = (): HTMLElement | null => this.sourceComposer();
+
   /** Whether the user is looking at the page the capture started from. */
   isAtSource(): boolean {
     const { kind, phase, threadId, recordingId } = this.state;
