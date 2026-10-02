@@ -5,17 +5,23 @@ public enum Chat {
   public enum Method {
     public static let viewing = "viewing"
     public static let start = "start"
-    public static let lastThread = "lastThread"
+    public static let home = "home"
     public static let link = "link"
+    public static let unlink = "unlink"
+    public static let send = "send"
   }
 
   public typealias Viewing = ViewingOutput
 
   public typealias Start = StartOutput
 
-  public typealias LastThread = LastThreadOutput
+  public typealias Home = HomeOutput
 
   public typealias Link = LinkOutput
+
+  public typealias Unlink = UnlinkOutput
+
+  public typealias Send = SendOutput
 
   public struct ViewingInput: Sendable, Hashable, Codable {
     public var path: String?
@@ -340,7 +346,7 @@ public enum Chat {
     }
   }
 
-  public struct LastThreadInput: Sendable, Hashable, Codable {
+  public struct HomeInput: Sendable, Hashable, Codable {
     public var pluginId: String?
     public var id: String?
 
@@ -350,11 +356,47 @@ public enum Chat {
     }
   }
 
-  public struct LastThreadOutput: Sendable, Hashable, Codable {
-    public var threadId: String?
+  public enum HomeOutputThreadOrigin: Sendable, Hashable, Codable {
+    case chosen
+    case created
+    case unknown(String)
 
-    public init(threadId: String? = nil) {
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "chosen": self = .chosen
+      case "created": self = .created
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .chosen: try container.encode("chosen")
+      case .created: try container.encode("created")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct HomeOutputThread: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var origin: HomeOutputThreadOrigin?
+
+    public init(threadId: String? = nil, title: String? = nil, origin: HomeOutputThreadOrigin? = nil) {
       self.threadId = threadId
+      self.title = title
+      self.origin = origin
+    }
+  }
+
+  public struct HomeOutput: Sendable, Hashable, Codable {
+    public var thread: HomeOutputThread?
+
+    public init(thread: HomeOutputThread? = nil) {
+      self.thread = thread
     }
   }
 
@@ -370,11 +412,107 @@ public enum Chat {
     }
   }
 
+  public enum LinkOutputThreadOrigin: Sendable, Hashable, Codable {
+    case chosen
+    case created
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "chosen": self = .chosen
+      case "created": self = .created
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .chosen: try container.encode("chosen")
+      case .created: try container.encode("created")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct LinkOutputThread: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var origin: LinkOutputThreadOrigin?
+
+    public init(threadId: String? = nil, title: String? = nil, origin: LinkOutputThreadOrigin? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.origin = origin
+    }
+  }
+
   public struct LinkOutput: Sendable, Hashable, Codable {
+    public var thread: LinkOutputThread?
+
+    public init(thread: LinkOutputThread? = nil) {
+      self.thread = thread
+    }
+  }
+
+  public struct UnlinkInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct UnlinkOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public struct SendInputItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+
+    public init(pluginId: String? = nil, id: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+    }
+  }
+
+  public struct SendInputQuote: Sendable, Hashable, Codable {
+    public var text: String?
+    public var note: String?
+    public var `where`: String?
+    public var image: String?
+
+    public init(text: String? = nil, note: String? = nil, `where`: String? = nil, image: String? = nil) {
+      self.text = text
+      self.note = note
+      self.`where` = `where`
+      self.image = image
+    }
+  }
+
+  public struct SendInput: Sendable, Hashable, Codable {
+    public var item: SendInputItem?
+    public var quote: SendInputQuote?
+
+    public init(item: SendInputItem? = nil, quote: SendInputQuote? = nil) {
+      self.item = item
+      self.quote = quote
+    }
+  }
+
+  public struct SendOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 }
