@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from
 import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemTile, PageColumn, AddOnCollection, type ProviderCall } from "@bb-studio/kit/app";
 import { toast } from "sonner";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
+import { Button, Checkbox, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
 import { Modal } from "./channel-controls";
 import { ErrorMessage, message } from "./bot-ui";
 import { PLUGIN_ID, VIEW_KIND } from "./studio-provider";
@@ -31,24 +31,44 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
     return () => { alive = false; };
   }, [rpc, sdk, open]);
   const toggle = (m: ViewMember) => setMembers(current => current.some(v => memberKey(v) === memberKey(m)) ? current.filter(v => memberKey(v) !== memberKey(m)) : [...current, m]);
-  const candidates = [...bots.map(b => ({ member: { kind: "bot" as const, id: b.id }, label: b.name, detail: `@${b.handle}` })), ...threads.map(t => ({ member: { kind: "thread" as const, id: t.id }, label: t.title, detail: "Thread" }))];
+  // Members picked when the dialog opened stay on top, so rows don't jump while toggling.
+  const [pinned] = useState(() => new Set((initial?.members ?? []).map(memberKey)));
+  const isMember = (m: ViewMember) => members.some(v => memberKey(v) === memberKey(m));
+  const matches = (text: string) => text.toLowerCase().includes(query.trim().toLowerCase());
+  const ordered = <T extends { member: ViewMember }>(rows: T[]) => [...rows].sort((x, y) => Number(pinned.has(memberKey(y.member))) - Number(pinned.has(memberKey(x.member))));
+  const sections = [
+    { label: "Bots", rows: ordered(bots.filter(b => !b.retired || pinned.has(`bot:${b.id}`)).map(b => ({ member: { kind: "bot" as const, id: b.id }, label: b.name, detail: `@${b.handle}`, icon: b.avatar || null, kindIcon: "Bot" })).filter(c => matches(`${c.label} ${c.detail}`))) },
+    { label: "Threads", rows: ordered(threads.map(t => ({ member: { kind: "thread" as const, id: t.id }, label: t.title, detail: "", icon: null, kindIcon: "MessageSquare" })).filter(c => matches(c.label))) },
+  ].filter(section => section.rows.length);
   const save = async () => {
     setPending(true); setError(null);
     try { onSaved(initial ? await rpc.call("viewUpdate", { ...initial, name, members, expectedUpdatedAt: initial.updatedAt }) : await rpc.call("viewCreate", { name, members, requestId: requestId.current })); }
     catch (e) { setError(message(e)); } finally { setPending(false); }
   };
   return <Modal title={initial ? "Edit view" : "New view"} open={open} onOpenChange={value => { if (!value) onClose(); }}>
-    <form onSubmit={event => { event.preventDefault(); void save(); }} className="space-y-4">
-      <label className="block text-sm">Name<Input aria-label="View name" value={name} maxLength={80} onChange={e => setName(e.target.value)} autoFocus /></label>
-      <label className="block text-sm">Members<Input aria-label="Find bots and threads" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find bots and threads" /></label>
-      <div className="max-h-64 overflow-auto" role="group" aria-label="View members">{candidates.filter(c => `${c.label} ${c.detail}`.toLowerCase().includes(query.toLowerCase())).map(c => <label key={memberKey(c.member)} className="flex min-w-0 items-center gap-2 py-1 text-sm"><input type="checkbox" checked={members.some(m => memberKey(m) === memberKey(c.member))} onChange={() => toggle(c.member)} /><span className="min-w-0 flex-1 truncate">{c.label}</span><span className="text-xs text-muted-foreground">{c.detail}</span></label>)}</div>
-      <ErrorMessage error={error} /><div className="flex justify-end gap-2"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={pending || !name.trim() || members.length > 32}>{pending ? "Saving…" : "Save view"}</Button></div>
+    <form onSubmit={event => { event.preventDefault(); void save(); }} className="flex flex-col gap-4">
+      <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">Name</span><Input aria-label="View name" value={name} maxLength={80} onChange={e => setName(e.target.value)} placeholder="Command Center" autoFocus /></label>
+      <div className="flex flex-col gap-1.5">
+        <div className="flex items-baseline justify-between"><span className="text-xs font-medium text-muted-foreground">Members</span><span className={`text-xs ${members.length > 32 ? "text-destructive" : "text-subtle-foreground"}`}>{members.length > 32 ? `${members.length} of 32 allowed` : `${members.length} selected`}</span></div>
+        <div className="relative"><Icon name="Search" className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle-foreground" /><Input aria-label="Find bots and threads" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find bots and threads" className="pl-8" /></div>
+        <div className="-mx-1 max-h-72 overflow-auto px-1" role="group" aria-label="View members">
+          {sections.map(section => <section key={section.label} aria-label={section.label} className="pt-2 first:pt-1">
+            <h3 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-subtle-foreground uppercase">{section.label}</h3>
+            {section.rows.map(c => <label key={memberKey(c.member)} className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-state-hover"><Checkbox checked={isMember(c.member)} onCheckedChange={() => toggle(c.member)} aria-label={c.label} /><ItemTile icon={c.icon} kindIcon={c.kindIcon} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>{c.detail && <span className="max-w-40 shrink-0 truncate text-xs text-subtle-foreground">{c.detail}</span>}</label>)}
+          </section>)}
+          {!sections.length && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{bots.length || threads.length ? `Nothing matches "${query.trim()}".` : "Loading bots and threads…"}</p>}
+        </div>
+      </div>
+      <ErrorMessage error={error} />
+      <div className="flex justify-end gap-2 border-t border-border pt-3"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={pending || !name.trim() || members.length > 32}>{pending ? "Saving…" : initial ? "Save view" : "Create view"}</Button></div>
     </form>
   </Modal>;
 }
 const ROW_BUTTON = "flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active";
 const ROW_ICON_BUTTON = "inline-flex h-6 shrink-0 items-center justify-center rounded-md px-1 text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground";
 const EDIT_VIEW_EVENT = "bot-teams:edit-view";
+/** A thread's per-message hover actions. */
+const MESSAGE_ACTION = "inline-flex size-5 items-center justify-center text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/message:opacity-100 group-focus-within/message:opacity-100 max-md:pointer-coarse:opacity-100";
 /** BB's own approval-mode names, plus leaving each thread as it is. */
 const MODE_CHOICES: { id: ViewPermissionMode | undefined; label: string; detail: string }[] = [
   { id: undefined, label: "Each bot's own", detail: "Every thread keeps the approval mode it already has." },
@@ -162,15 +182,23 @@ function ViewDetail({ id }: { id: string }) {
   const time = (at: number) => new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(at);
   const renderEntry = (entry: ViewEntry, previous?: ViewEntry) => {
     const bot = botFor(entry.threadId), thread = page.threads.find(t => t.id === entry.threadId);
-    const replyButton = <button type="button" className="text-xs text-subtle-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/message:opacity-100" onClick={() => { setReply(entry.threadId); setTargets([]); setFocus(value => value + 1); }}>Reply</button>;
+    const replying = reply === entry.threadId && entry.role === "assistant";
+    const action = (label: string, icon: string, run: () => void) => <button type="button" aria-label={label} title={label} onClick={run} className={MESSAGE_ACTION}><Icon name={icon} className="size-3.5" /></button>;
+    const actions = <div className={`flex h-5 items-center gap-2 ${entry.role === "user" ? "justify-end pr-[13px]" : ""}`}>
+      {action("Copy message", "Copy", () => void navigator.clipboard.writeText(entry.text).then(() => toast.success("Copied"), e => toast.error(message(e))))}
+      {action(`Reply to ${entry.role === "user" ? thread?.title || "thread" : bot?.name || thread?.title || "thread"}`, "ArrowTurnBackward", () => { setReply(entry.threadId); setTargets([]); setFocus(value => value + 1); })}
+      {entry.role === "assistant" && action("Open thread", "ArrowUpRight", () => navigate.toThread(entry.threadId))}
+    </div>;
     if (entry.role === "user") return <li key={entry.id} data-view-entry="user" className="group/message ml-auto flex w-fit max-w-[70%] flex-col items-end gap-1">
-      <div className="flex items-center gap-2 text-xs text-subtle-foreground">{replyButton}<time dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time></div>
+      <time className="text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>
       <div className="max-w-full break-words rounded-xl border border-border-seam bg-surface-recessed px-4 py-2.5 text-sm leading-relaxed text-foreground"><Markdown content={entry.text} /></div>
+      {actions}
     </li>;
     const continued = previous?.role === "assistant" && previous.threadId === entry.threadId && entry.createdAt - previous.createdAt < 5 * 60_000;
-    return <li key={entry.id} data-view-entry="assistant" className={`group/message px-2 ${continued ? "-mt-3" : ""}`}>
-      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => navigate.toThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replyButton}</div>}
-      <div className="min-w-0 break-words text-sm leading-relaxed">{continued && <div className="float-right ml-2">{replyButton}</div>}<Markdown content={entry.text} /></div>
+    return <li key={entry.id} data-view-entry="assistant" data-replying={replying || undefined} className={`group/message rounded-lg px-2 transition-colors data-[replying]:bg-foreground/[0.04] data-[replying]:py-2 ${continued ? "-mt-4" : ""}`}>
+      {!continued && <div className="mb-1.5 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={bot?.avatar || null} kindIcon="Bot" size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => navigate.toThread(entry.threadId)}>{bot?.name || thread?.title || "Thread"}</button><time className="shrink-0 text-xs text-subtle-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{time(entry.createdAt)}</time>{replying && <span className="text-xs text-subtle-foreground">· Replying</span>}</div>}
+      <div className="min-w-0 break-words text-sm leading-relaxed"><Markdown content={entry.text} /></div>
+      <div className="mt-1">{actions}</div>
     </li>;
   };
   const children = (parentId: string): React.ReactNode => page.threads.filter(t => t.parentThreadId === parentId).map(t => <li key={t.id} className="px-2"><details open={expanded.has(t.id)} onToggle={event => { const open = event.currentTarget.open; setExpanded(current => { const next = new Set(current); if(open) next.add(t.id); else next.delete(t.id); return next; }); }} className="ml-8 border-l border-border pl-4"><summary className="cursor-pointer text-xs text-subtle-foreground hover:text-foreground">{t.title}{["active", "starting"].includes(t.status) ? " · Working…" : ""}</summary><ol className="mt-3 space-y-5">{page.entries.filter(e => e.threadId === t.id).map((e, i, all) => renderEntry(e, all[i - 1]))}{children(t.id)}</ol></details></li>);
@@ -194,7 +222,7 @@ function ViewDetail({ id }: { id: string }) {
         <p className="text-sm font-medium">{page.view.name}</p>
         <p className="mt-1 max-w-sm text-sm text-muted-foreground">{page.view.members.length ? `Message ${page.view.members.map(memberLabel).slice(0, 3).join(", ")}${page.view.members.length > 3 ? ` and ${page.view.members.length - 3} more` : ""} together. Their replies land here.` : "Add bots or threads to this view, then message them together."}</p>
       </div>}
-      <ol className="flex flex-col gap-6">{rootEntries.map((entry, i) => <React.Fragment key={entry.id}>{renderEntry(entry, rootEntries[i - 1])}{lastEntry.get(entry.threadId) === entry.id ? children(entry.threadId) : null}</React.Fragment>)}{page.threads.filter(t => roots.has(t.id) && !lastEntry.has(t.id)).flatMap(t=>children(t.id))}</ol>
+      <ol className="flex flex-col gap-5">{rootEntries.map((entry, i) => <React.Fragment key={entry.id}>{renderEntry(entry, rootEntries[i - 1])}{lastEntry.get(entry.threadId) === entry.id ? children(entry.threadId) : null}</React.Fragment>)}{page.threads.filter(t => roots.has(t.id) && !lastEntry.has(t.id)).flatMap(t=>children(t.id))}</ol>
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
     </div></div>
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
@@ -207,7 +235,7 @@ function ViewDetail({ id }: { id: string }) {
             <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Send to. Leave empty to route by @mention.</DropdownMenuLabel>
             <div role="group" aria-label="Recipients">{page.view.members.map(m => <DropdownMenuItem key={memberKey(m)} onSelect={e => { e.preventDefault(); toggleTarget(m); }} role="menuitemcheckbox" aria-checked={isTarget(m)}><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span>{isTarget(m) && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</div>
             <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="SquarePen" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
+            <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="MessageSquarePlus" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
           </DropdownMenuContent></DropdownMenu>
         {reply && <button type="button" aria-label="Cancel reply" title="Cancel reply" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}
       </div>
