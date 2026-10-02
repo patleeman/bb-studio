@@ -74,8 +74,10 @@ export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
         })()`);
         if (!fits) throw new Error("Playback controls overflow the mobile viewport.");
         const titleClear = await client.evaluate(`(() => {
-          const title = document.querySelector('input[aria-label="Title"]').getBoundingClientRect();
-          const back = [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Studio').getBoundingClientRect();
+          const input = document.querySelector('input[aria-label="Title"]');
+          const title = input.getBoundingClientRect();
+          const surface = input.closest('.studio-root').parentElement;
+          const back = [...surface.querySelectorAll('button')].find(button => button.textContent.trim() === 'Studio').getBoundingClientRect();
           return title.top >= back.bottom + 8;
         })()`);
         if (!titleClear) throw new Error("The mobile recording title is covered by the toolbar.");
