@@ -84,14 +84,15 @@ thread navigation. Teams saved views remain free of item-chat overlays and
 automatic background chat discovery. The old corner bar is removed.
 Targeted staging installs the full suite while seeding only the selected
 capture's required fixtures. Stable BB 0.44.0 captures pass with the full suite
-installed from pushed commit 5b1d128: Chat opens an unlinked composer, chooses
+installed from pushed commit e7ed8a3: Chat opens an unlinked composer, chooses
 and focuses a linked thread without duplication, starts another composer
 without changing the link, and targets a floated page while the main pane
 navigates between a drawing and another page. Float's retention and pin
 assertions also pass. Screenshot review identified crowded narrow headers;
 the shared header now delegates Back to the companion chrome, uses a compact
-Related action, and removes Pages' duplicate floated breadcrumb. Its live
-bounds assertion remains to be verified at the next pushed commit.
+Related action, and removes Pages' duplicate floated breadcrumb. The final
+stable capture verifies every visible page-header button stays within the
+400px companion body. Both staged previews are visually checked.
 
 BB core commit f865c4e38 locally scopes embedded chat leading content to its
 own bottom composer and composer view. Its 18 embedded-chat tests and app
