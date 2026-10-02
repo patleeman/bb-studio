@@ -27,6 +27,7 @@ import {
   type ExpoTicket,
 } from "./apns.js";
 import { CLEAR_BATCH, clearPayload, noteNotified, partition, type Notified, type ThreadReadState } from "./clear.js";
+import { isQuietCompletion } from "./notifications.js";
 
 const messageSchema = z.object({ to: z.string().min(1) }).passthrough();
 const batchSchema = z.union([z.array(messageSchema).max(100), messageSchema.transform((message) => [message])]);
@@ -211,9 +212,14 @@ export default async function plugin(bb: BbPluginApi) {
     const tickets: ExpoTicket[] = new Array(messages.length);
     const expoIndexes: number[] = [];
     const apnsIndexes: number[] = [];
-    messages.forEach((message, index) =>
-      (message.to.startsWith(APNS_TOKEN_PREFIX) ? apnsIndexes : expoIndexes).push(index),
-    );
+    messages.forEach((message, index) => {
+      if (isQuietCompletion(message)) {
+        tickets[index] = { status: "ok" };
+        return;
+      }
+      (message.to.startsWith(APNS_TOKEN_PREFIX) ? apnsIndexes : expoIndexes).push(index);
+    });
+    const deliveryIndexes = [...apnsIndexes, ...expoIndexes];
 
     // Muted threads are dropped for the app only; other subscribers still get them.
     const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
@@ -247,7 +253,8 @@ export default async function plugin(bb: BbPluginApi) {
       });
     }
 
-    await rememberDevices(messages, tickets);
+    // Quiet completions must not refresh device tokens as if they were delivered.
+    await rememberDevices(deliveryIndexes.map((index) => messages[index]!), deliveryIndexes.map((index) => tickets[index]!));
     await rememberNotified(apnsIndexes.flatMap((index) => {
       const threadId = messages[index]!.data?.threadId;
       return tickets[index]?.status === "ok" && typeof threadId === "string" ? [threadId] : [];
@@ -397,6 +404,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.rpc.register(mobileContract, {
     async notify(input) {
+      if (isQuietCompletion({ body: input.body, data: { kind: input.kind } })) return { ok: true as const, sent: 0 };
       const devices = Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {});
       // Without a thread there is nothing to reply to, so leave out the kind that adds a reply box.
       const data = input.threadId

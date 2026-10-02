@@ -10,6 +10,11 @@ at `POST /api/v1/plugins/mobile/http/push` (token auth). Tokens starting with
 `apns:` go to Apple; every other token is forwarded to Expo unchanged, so the
 official mobile app keeps working.
 
+Completion pushes containing only `[PASS]` are suppressed for APNs and Expo,
+including case and Markdown variants. The relay returns a successful ticket
+without sending an alert. Questions, errors, and useful completion replies
+still notify normally.
+
 ## Actionable notifications
 
 Before delivering a `pending-interaction` push, the relay looks up the
