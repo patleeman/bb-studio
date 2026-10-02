@@ -1,7 +1,7 @@
 import { resolve } from "node:path";
 
 const scrollToTop = `(() => {
-  for (let node = document.querySelector('h1'); node; node = node.parentElement) {
+  for (let node = document.querySelector('input[aria-label="Title"]'); node; node = node.parentElement) {
     if (node.scrollHeight > node.clientHeight) node.scrollTop = 0;
   }
   window.scrollTo(0, 0);
@@ -73,6 +73,12 @@ export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
           return controls.every(control => { const rect = control.getBoundingClientRect(); return rect.left >= 0 && rect.right <= innerWidth; });
         })()`);
         if (!fits) throw new Error("Playback controls overflow the mobile viewport.");
+        const titleClear = await client.evaluate(`(() => {
+          const title = document.querySelector('input[aria-label="Title"]').getBoundingClientRect();
+          const back = [...document.querySelectorAll('button')].find(button => button.textContent.trim() === 'Studio').getBoundingClientRect();
+          return title.top >= back.bottom + 8;
+        })()`);
+        if (!titleClear) throw new Error("The mobile recording title is covered by the toolbar.");
         const setPausedPosition = `(() => {
           const set = (label, value) => {
             const input = document.querySelector('input[aria-label="' + label + '"]');

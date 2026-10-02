@@ -121,7 +121,7 @@ function UnsentAudio() {
   return (
     <div className="relative h-full">
       <ItemHeader backLabel={studio ? "Studio" : "Recordings"} onBack={toCollection} />
-      <PageColumn className="max-w-3xl">
+      <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
         <h1 className="text-2xl font-semibold tracking-tight">Unsent audio</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The server refused these pieces of audio, so Talk kept them on this device instead of losing them. Retry
@@ -308,7 +308,7 @@ function RecordingDetail({ id }: { id: string }) {
     return (
       <div className="relative h-full">
         <ItemHeader backLabel={backLabel} onBack={() => toCollection()} />
-        <PageColumn className="max-w-3xl">
+        <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
           <p className="text-sm text-destructive">{error}</p>
         </PageColumn>
       </div>
@@ -318,7 +318,7 @@ function RecordingDetail({ id }: { id: string }) {
     return (
       <div className="relative h-full">
         <ItemHeader backLabel={backLabel} onBack={() => toCollection()} />
-        <PageColumn className="max-w-3xl">
+        <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
           <p className="text-sm text-muted-foreground">Loading…</p>
         </PageColumn>
       </div>
@@ -386,7 +386,7 @@ function RecordingDetail({ id }: { id: string }) {
           </>
         }
       />
-      <PageColumn className="max-w-3xl">
+      <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
         <EditableTitle
           title={recording.title}
           placeholder="Untitled recording"
@@ -482,7 +482,7 @@ function RecordingDetail({ id }: { id: string }) {
         </div>
 
         {segments.length > 0 && !recording.audioRemoved ? (
-          <section aria-label="Audio playback" className="sticky top-0 z-10 mt-6 border-y border-border bg-background py-3">
+          <section aria-label="Audio playback" className="sticky top-14 z-10 mt-6 border-y border-border bg-background py-3">
             <div className="flex flex-wrap items-center gap-2">
               <button type="button" className={OUTLINE_BUTTON} aria-label={player.playing ? "Pause playback" : "Play recording"} onClick={player.toggle}>
                 <Icon name={player.playing ? "Pause" : "Play"} /> {player.playing ? "Pause" : "Play"}
