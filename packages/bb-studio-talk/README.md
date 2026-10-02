@@ -10,6 +10,18 @@ can link to and @-mention.
 
 ## Staged preview
 
+![Dictation controls inline at the active input](assets/inline-dictation.png)
+
+The real staged composer shows the timer, level meter, cleanup toggle, pause,
+cancel, and finish controls in place of its microphone. The capture uses a synthetic
+microphone and checks pause/resume, expansion, navigation away, and returning to
+the same dictation. Expanding and collapsing also retains keyboard focus.
+
+![Inline dictation controls on mobile](assets/inline-dictation-mobile.png)
+
+At a 390-pixel viewport, the controls use a second toolbar row and fit inside the
+input, including a tappable transcript expansion button.
+
 ![Talk recording page with cleanup and audio playback](assets/staged-preview.png)
 
 This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. It shows a
@@ -104,7 +116,13 @@ The same message at a 390-pixel viewport, with both source controls in view.
   title, date, length, or word count. Tick rows, or shift-click for a range,
   to start one thread that mentions them all, copy their transcripts as one
   document, retry failed pieces, or delete them together.
-- **A pill that follows you.** A small overlay at the top of the window stays
+- **Dictation at its input.** While its chat input is on screen, a dictation's
+  compact controls replace the mic. Expand to read the transcript and it
+  becomes a floating pill. Collapse it to dock again. Navigating away also
+  floats the controls; returning to the input docks them. Each new dictation
+  starts collapsed. Dictation into other plugins' fields uses the floating pill.
+- **A pill that follows you.** Recordings and dictations away from their input
+  use a small overlay at the top of the window. It stays
   put as you move between threads and pages. Everything else stays clickable.
   Drag it anywhere in the window and it stays there, even after a reload.
   Away from where you started, a back arrow returns you to that thread or

@@ -34,6 +34,9 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep 
       };
       try {
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await client.waitForSelector('[data-talk-composer-bridge]');
+        await client.waitForSelector('html[data-bb-talk="idle"]');
+        await client.waitForSelector('[data-promptbox] button[data-talk-mic]');
         await client.waitForSelector('[data-promptbox] [contenteditable="true"]');
         await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').focus()`);
         await client.command("Input.insertText", { text: "Turn this brain dump into a short plan." });
