@@ -42,6 +42,14 @@ notes: October", were opened, so the Studio section lists them as tabs above
 the Threads list. The capture asserts that both tabs are present, that the
 section sits above Threads, and that it has no scroll area of its own.
 
+![Recurring threads grouped below regular work](assets/background-threads.png)
+
+The Background capture uses 2 existing threads attached to paused automations:
+"Release digest" and "Build health watch". The live check verifies that the
+section starts collapsed, expands to show each thread once, and hides through
+its menu. The screenshot shows the expanded section below 3 regular threads.
+No automation or agent runs during this capture.
+
 ![New project folder dialog](assets/project-dialog.png)
 
 The dialog capture opens **New project** from the live **Threads ⋯** menu and
