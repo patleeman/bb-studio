@@ -996,7 +996,7 @@ export class TalkController {
   /** A long dictation is probably a session: offer to keep it with the recordings. */
   private offerToKeep(recording: Recording): void {
     toast("That was a long dictation. Keep it as a recording?", {
-      description: "It gets a title and meeting notes, and shows in Studio.",
+      description: "It keeps its audio and shows in Studio. You can clean it up or summarize it.",
       duration: 15_000,
       action: { label: "Keep", onClick: () => void this.keepAsRecording(recording.id) },
     });

@@ -93,7 +93,7 @@ export function registerStudio(
       const recording = store.recording(id);
       if (!recording) return { content: null };
       const notes = recording.meetingNotes;
-      return { content: [notes?.summary, notes?.decisions.join("\n"), notes?.actionItems.map((item) => item.title).join("\n"), store.transcript(id)].filter(Boolean).join("\n\n") };
+      return { content: [notes?.summary, store.transcript(id)].filter(Boolean).join("\n\n") };
     },
     studio_list: () => {
       const rows = store.list({ includeArchived: true, limit: LIST_LIMIT });

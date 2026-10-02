@@ -16,11 +16,11 @@ This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs 
 seeded recording called "Weekly product sync".
 
 To stage it, the capture script:
-- Speaks four meeting notes with macOS `say`.
+- Speaks four recording sections with macOS `say`.
 - Uploads the audio to the live plugin in two sessions.
 - Lets BB's voice service transcribe it.
 
-The capture generates optional meeting notes and a saved cleaned transcript.
+The capture generates an optional summary and a saved cleaned transcript.
 It plays the audio, seeks to the second section, adjusts volume, and pauses.
 The page shows the scrubber, playback controls, **Original** and **Cleaned**
 views, and timestamped sections. The script checks that the original transcript
@@ -78,7 +78,7 @@ playback controls fit the screen.
 - **Keep a long dictation as a recording.** After a dictation of five
   minutes or 800 words, a toast offers **Keep**. **Keep as a recording** on
   the dictation's page does the same. It moves the dictation out of the
-  background and gives it a title and meeting notes. The text is still
+  background and gives it a title; you can summarize it from its page. The text is still
   inserted.
 - **Dictation audio expires.** After a day, a dictation's audio is
   deleted and its transcript is kept. Recordings keep their audio. A
@@ -107,16 +107,16 @@ playback controls fit the screen.
   that no model is available, Talk uses the transcript's first words and the
   recording date. Titles update as the transcript grows and never replace a
   title you typed.
-- **Optional meeting notes.** Choose **Generate meeting notes** in the
-  recording menu for a summary, decisions, and action items. Enable
-  **Automatically generate meeting notes** in settings to generate them when
-  recordings finish. Saved notes stay collapsed until you open them and can
-  be regenerated. Each action item suggests you or an agent as assignee. Press
-  **Create task** to add it to Studio Tasks and link the task to the recording.
+- **Optional summary.** Choose **Generate summary** in the recording menu
+  for a concise paragraph covering the recording's main ideas. It works for
+  brain dumps, personal notes, ideas, conversations, and meetings. Enable
+  **Automatically summarize recordings** in settings to summarize when a
+  recording finishes. Saved summaries stay collapsed until you open them and
+  can be regenerated.
 - **Exports.** Download a finished transcript as Markdown or plain text, or
   download its original audio segments together as a tar archive.
 - **Agent tools.** `talk_list`, `talk_read`, and `talk_search` let agents find
-  and read bounded portions of recordings and meeting notes.
+  and read bounded portions of recordings and summaries.
 - **Mobile layout.** The pill, Recordings page, and composer mic all work in
   the BB mobile app, with larger touch targets on small screens.
 
@@ -165,7 +165,7 @@ playback controls fit the screen.
 | Replace built-in dictation | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
 | Segment length (seconds) | 25 | Target piece length, 8–60. Shorter pieces show text sooner. |
 | Auto-title recordings | on | Titles recordings from their transcripts. |
-| Automatically generate meeting notes | off | Generates meeting notes on completion; the recording menu can generate them on demand. |
+| Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
 | Title provider | automatic | Provider for titling, such as `codex` or `claude-code`. |
 | Title model | provider default | Model for titling. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
@@ -231,9 +231,9 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
   on. Audio recorded without it is kept and transcribed once it is available.
 - **Speaker labels.** BB's current voice transcription API returns text only.
   Talk does not assign speaker labels without a diarization result.
-- **Meeting notes.** They need Studio Decisions and its configured fallback
-  model. If generation fails, use **Generate** or **Regenerate** on the
-  recording page in the recording menu after the model is available.
+- **Summaries.** They need Studio Decisions and its configured fallback
+  model. If generation fails, use **Generate** or **Regenerate** in the
+  recording menu after the model is available.
 - **Personal project threads.** Titling runs hidden agent threads in BB's
   Personal project.
 

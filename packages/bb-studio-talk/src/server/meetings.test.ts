@@ -1,12 +1,21 @@
 import { describe, expect, it } from "vitest";
 import { addSegment, memoryStore } from "../test/db";
-import { parseMeetingNotes } from "./meetings";
+import { parseRecordingSummary, recordingSummaryPrompt } from "./meetings";
 
-describe("meeting notes", () => {
-  it("parses a model response and keeps assignee suggestions", () => {
-    expect(parseMeetingNotes('```json\n{"summary":"  Plan agreed. ","decisions":["Ship beta"],"actionItems":[{"title":" Draft launch note ","assignee":"agent"}]}\n```'))
-      .toEqual({ summary: "Plan agreed.", decisions: ["Ship beta"], actionItems: [{ title: "Draft launch note", assignee: "agent" }] });
-    expect(() => parseMeetingNotes('{"summary":"","decisions":[],"actionItems":[]}')).toThrow();
+describe("recording summaries", () => {
+  it("parses a general summary without a meeting template", () => {
+    expect(parseRecordingSummary('```json\n{"summary":"  I want to prototype the garden planner. "}\n```'))
+      .toEqual({ summary: "I want to prototype the garden planner.", decisions: [], actionItems: [] });
+    expect(() => parseRecordingSummary('{"summary":"  "}')).toThrow("recording summary was empty");
+    expect(() => parseRecordingSummary('{"decisions":[]}')).toThrow();
+  });
+
+  it("treats a brain dump as data without assuming a meeting", () => {
+    const prompt = recordingSummaryPrompt("I wonder if a garden planner would help me.");
+    expect(prompt).toContain("brain dump, personal note, idea");
+    expect(prompt).toContain("without assuming a meeting took place");
+    expect(prompt).toContain("Do not force decisions, action items, or task assignments");
+    expect(prompt).toContain('"""\nI wonder if a garden planner would help me.\n"""');
   });
 
   it("persists notes only for a finished recording", () => {

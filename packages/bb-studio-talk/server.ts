@@ -24,7 +24,7 @@ import { MIGRATIONS, TalkStore } from "./src/server/store";
 import { registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
-import { generateMeetingNotes } from "./src/server/meetings";
+import { generateRecordingSummary } from "./src/server/meetings";
 import { cleanTranscript } from "./src/server/cleanup";
 import { HOLD_KEY_OPTIONS } from "./src/shared/format";
 
@@ -62,8 +62,8 @@ export default async function plugin(bb: BbPluginApi) {
     },
     autoMeetingNotes: {
       type: "boolean",
-      label: "Automatically generate meeting notes",
-      description: "Generate a summary, decisions, and action items when a recording finishes. You can also generate them from a recording's menu.",
+      label: "Automatically summarize recordings",
+      description: "Generate a concise summary when a recording finishes. You can also summarize a recording from its menu.",
       default: false,
     },
     holdToTalkKey: {
@@ -147,13 +147,13 @@ export default async function plugin(bb: BbPluginApi) {
     if (!recording || recording.kind !== "recording" || recording.status !== "done" || recording.failedCount || !recording.wordCount) return;
     if (!regenerate && recording.meetingNotes) return;
     if (summarizing.has(id)) {
-      if (regenerate) throw new Error("Meeting notes are already being generated.");
+      if (regenerate) throw new Error("A summary is already being generated.");
       return;
     }
     summarizing.add(id);
     try {
       const transcript = store.transcript(id);
-      const notes = await generateMeetingNotes(bb, id, transcript, lifetime.signal);
+      const notes = await generateRecordingSummary(bb, id, transcript, lifetime.signal);
       // A resumed recording may gain text while the model is working.
       if (store.transcript(id) === transcript && store.saveMeetingNotes(id, notes)) changed(id);
     } finally {
@@ -296,7 +296,7 @@ export default async function plugin(bb: BbPluginApi) {
     meeting_regenerate: async ({ id }) => {
       const recording = mustGet(id);
       if (recording.kind !== "recording" || recording.status !== "done" || recording.failedCount || !recording.wordCount) {
-        throw new Error("Finish transcribing the recording before generating notes.");
+        throw new Error("Finish transcribing the recording before generating a summary.");
       }
       await meetingNotes(id, true);
       return { recording: mustGet(id) };
@@ -438,7 +438,7 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.agents.registerTool({
     name: "talk_read",
-    description: "Read a Talk recording's saved cleaned transcript when available, otherwise its original, plus optional meeting notes. Set version to original to read the raw text. For long transcripts, use offset and limit.",
+    description: "Read a Talk recording's saved cleaned transcript when available, otherwise its original, plus an optional summary. Set version to original to read the raw text. For long transcripts, use offset and limit.",
     parameters: z.object({ id: z.string().min(1).max(100), version: z.enum(["original", "cleaned"]).optional(), offset: z.number().int().nonnegative().optional(), limit: z.number().int().min(1).max(20_000).optional() }),
     execute({ id, version, offset = 0, limit = 12_000 }) {
       const recording = store.recording(id);
@@ -449,7 +449,7 @@ export default async function plugin(bb: BbPluginApi) {
       const transcript = useCleaned ? cleaned! : store.transcript(id);
       const notes = recording.meetingNotes;
       return [`${recording.title} (${id})`, `Status: ${recording.status}`, `Link: /plugins/talk/recordings/${id}`,
-        notes ? `Summary: ${notes.summary}\nDecisions: ${notes.decisions.join("; ") || "None"}\nAction items: ${notes.actionItems.map((item) => item.title).join("; ") || "None"}` : "",
+        notes ? `Summary: ${notes.summary}` : "",
         `Transcript (${useCleaned ? "cleaned; original retained" : "original"}, ${offset}–${Math.min(offset + limit, transcript.length)} of ${transcript.length} characters):\n${transcript.slice(offset, offset + limit) || "(No transcript.)"}`].filter(Boolean).join("\n\n");
     },
   });

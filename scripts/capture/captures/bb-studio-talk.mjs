@@ -17,15 +17,15 @@ export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
       const original = await talkRpc("recording_get", { id: recordingId });
       const cleanup = async () => { await talkRpc("recording_delete", { id: recordingId }); };
       try {
-        // Meetings are optional. Generate this fixture's notes explicitly.
+        // Summaries are optional. Generate this fixture's summary explicitly.
         await talkRpc("meeting_regenerate", { id: recordingId });
         await client.navigate(`/plugins/talk/recordings/${recordingId}`);
         await client.waitForText("Weekly product sync");
         await client.waitForText("offline mode beta");
         await client.waitForText("guided import spec");
-        await client.waitForText("Meeting notes");
-        const notes = await client.evaluate(`document.querySelector('details[aria-label="Meeting notes"] p')?.textContent?.trim() ?? ""`);
-        if (!notes || notes.startsWith("Notes appear")) throw new Error("Seeded meeting summary is missing.");
+        await client.waitForText("Summary");
+        const notes = await client.evaluate(`document.querySelector('details[aria-label="Summary"] p')?.textContent?.trim() ?? ""`);
+        if (!notes || notes.startsWith("Notes appear")) throw new Error("Seeded recording summary is missing.");
         await client.waitForSelector('input[aria-label="Recording position"]');
         await client.waitForSelector('input[aria-label="Playback volume"]');
         await client.waitForText("Send to agent");

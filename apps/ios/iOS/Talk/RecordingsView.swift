@@ -44,32 +44,19 @@ struct RecordingDetailView: View {
                 if let meetingNotes {
                     VStack(alignment: .leading, spacing: 12) {
                         HStack {
-                            Text("Meeting notes").font(.headline)
+                            Text("Summary").font(.headline)
                             Spacer()
                             Button("Regenerate") { Task { await regenerateNotes() } }
                                 .disabled(generatingNotes)
                         }
                         if let summary = meetingNotes.summary, !summary.isEmpty { Text(summary).textSelection(.enabled) }
-                        if let decisions = meetingNotes.decisions, !decisions.isEmpty {
-                            Text("Decisions").font(.subheadline.weight(.semibold))
-                            ForEach(decisions, id: \.self) { Text("• \($0)").textSelection(.enabled) }
-                        }
-                        if let actions = meetingNotes.actionItems, !actions.isEmpty {
-                            Text("Action items").font(.subheadline.weight(.semibold))
-                            ForEach(Array(actions.enumerated()), id: \.offset) { index, action in
-                                HStack {
-                                    Text(action.title ?? "Action item")
-                                    Spacer()
-                                    Button("Create task") { Task { await createTask(index) } }
-                                }
-                            }
-                        }
+
                     }
                     .padding(12)
                     .background(.fill.quaternary, in: .rect(cornerRadius: 12))
                     .accessibilityIdentifier("recordingMeetingNotes")
                 } else if recording?.status == "complete" {
-                    Button("Generate meeting notes") { Task { await regenerateNotes() } }
+                    Button("Generate summary") { Task { await regenerateNotes() } }
                         .disabled(generatingNotes)
                 }
                 if segments.contains(where: { $0.offsetMs != nil }) {

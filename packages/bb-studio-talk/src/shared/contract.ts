@@ -149,7 +149,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: recordingId, segmentId: z.string().min(1).max(100) }),
     output: z.object({ text: z.string() }),
   },
-  /** Turns a dictation into a recording: out of the background, titled, with meeting notes. */
+  /** Turns a dictation into a recording: out of the background, titled, with optional summarization. */
   recording_keep: {
     input: z.object({ id: recordingId }),
     output: recordingSchema,

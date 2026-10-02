@@ -34,7 +34,7 @@ are unchanged, and old `bbgo://` links still open.
 | Studio opens on the collection. Today (the sun button) shows Needs you with inline approvals and answers, due and review tasks, working agents, recent items, and activity | `iOS/Studio/StudioHomeView.swift` |
 | Studio search across items, threads, and channel messages, with legacy search fallback | `iOS/Studio/StudioView.swift` |
 | Tasks: project columns, priority, labels, due dates, reminders, recurrence, subtasks, and bot handoff | `iOS/Studio/TasksView.swift`, `iOS/Studio/TaskFieldsView.swift` |
-| Talk meeting notes: summary, decisions, action items, task creation, and regeneration | `iOS/Talk/RecordingsView.swift` |
+| Talk recording summaries: generation and regeneration for voice notes, ideas, and meetings | `iOS/Talk/RecordingsView.swift` |
 | Related links, item threads, and comments with reply and resolve on Studio items | `iOS/Studio/RelatedSection.swift` |
 | Studio Tables: read-only list and grid views | `iOS/Studio/TableView.swift` |
 | Edit the whole page as one continuous Markdown text, styled as you type: headings stand out, checkboxes toggle on tap, and Return continues lists. Heading, list, checklist, link, and dictation controls sit above the keyboard. Edits autosave a moment after typing stops; the server rewrites only changed blocks through the live Yjs document, keeps blocks with comments intact, and asks for a reload if the page changed elsewhere. Empty pages open in the editor. Keep updated status and agent activity are visible on the page | `iOS/Pages/PageEditor.swift`, `iOS/Pages/PageTextView.swift`, `iOS/Pages/PageActivity.swift` |

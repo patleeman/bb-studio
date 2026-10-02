@@ -1,6 +1,6 @@
 ---
 name: talk
-description: Use when the user refers to a Talk recording or dictation — a mention like "Talk recording …", a /plugins/talk/recordings/<id> link, meeting notes they recorded, or "what did I say in …" — or asks how Talk's recording, dictation, or settings work.
+description: Use when the user refers to a Talk recording or dictation — a mention like "Talk recording …", a /plugins/talk/recordings/<id> link, a recorded summary, or "what did I say in …" — or asks how Talk's recording, dictation, or settings work.
 ---
 
 # Talk
@@ -15,7 +15,7 @@ through Codex by default). Every recording is saved, titled, and searchable.
 
 A mentioned recording arrives as context with its title, link, status, and
 transcript (up to 60,000 characters). Use `talk_list`, `talk_search`, and
-`talk_read` to find recordings and read meeting notes or bounded transcript
+`talk_read` to find recordings and read summaries or bounded transcript
 pages. The CLI is also available.
 
 ```sh
@@ -61,8 +61,10 @@ or failed. Say so instead of guessing at the missing part.
   text downloads use the selected version. **Send to agent** opens a thread
   attached to the recording. Mentions and `talk_read` prefer a complete saved
   cleaned version; use `talk_read` with `version: "original"` for raw text.
-  Meeting notes are optional, generated from the recording menu or through
-  the **Automatically generate meeting notes** setting (off by default).
+  A **Summary** is optional: a concise paragraph of the recording's main ideas,
+  without a meeting template or automatic task assignments. Generate it from
+  the recording menu or enable **Automatically summarize recordings** (off by
+  default).
 - **Playback.** The recording page has a scrubber, play/pause, volume, speed,
   and 10-second skips. Clicking transcript text or its timestamp starts audio
   at that section. The current section is highlighted; **Follow transcript**
@@ -101,7 +103,7 @@ or failed. Say so instead of guessing at the missing part.
 | --- | --- | --- |
 | Replace built-in dictation | on | The composer mic starts Talk. Off restores BB's one-shot dictation. |
 | Segment length (seconds) | 25 | Target piece length, 8–60. Shorter shows text sooner. |
-| Automatically generate meeting notes | off | Generates meeting notes on completion; the recording menu can generate them on demand. |
+| Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
 | Auto-title recordings | on | Titles a recording from its transcript through a hidden, short-lived agent thread. |
 | Title provider | automatic | Provider id for titling (for example `codex` or `claude-code`). |
 | Title model | provider default | Model for titling. |

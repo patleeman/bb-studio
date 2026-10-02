@@ -370,7 +370,7 @@ function RecordingDetail({ id }: { id: string }) {
                 ) : null}
                 {recording.kind === "recording" && recording.status === "done" ? (
                   <DropdownMenuItem onSelect={() => run(() => rpc.call("meeting_regenerate", { id }))}>
-                    <Icon name="List" className="size-4" /> {recording.meetingNotes ? "Regenerate meeting notes" : "Generate meeting notes"}
+                    <Icon name="List" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
                   </DropdownMenuItem>
                 ) : null}
                 {recording.status === "done" ? (
@@ -417,20 +417,14 @@ function RecordingDetail({ id }: { id: string }) {
         <UnsentNotice recordingId={id} className="mt-6" />
 
         {recording.kind === "recording" && recording.meetingNotes ? (
-          <details className="mt-6 rounded-lg border border-border p-4" aria-label="Meeting notes">
-            <summary className="cursor-pointer font-semibold">Meeting notes</summary>
+          <details className="mt-6 rounded-lg border border-border p-4" aria-label="Summary">
+            <summary className="cursor-pointer font-semibold">Summary</summary>
             <div className="mt-3 flex items-center justify-end gap-3">
               <button type="button" className={OUTLINE_BUTTON} onClick={() => run(() => rpc.call("meeting_regenerate", { id }))}>
                 <Icon name="RotateCcw" /> {recording.meetingNotes ? "Regenerate" : "Generate"}
               </button>
             </div>
-            {recording.meetingNotes ? (
-              <div className="mt-3 space-y-4 text-sm">
-                <p>{recording.meetingNotes.summary}</p>
-                {recording.meetingNotes.decisions.length ? <div><h3 className="font-medium">Decisions</h3><ul className="mt-1 list-disc pl-5">{recording.meetingNotes.decisions.map((decision, index) => <li key={index}>{decision}</li>)}</ul></div> : null}
-                {recording.meetingNotes.actionItems.length ? <div><h3 className="font-medium">Action items</h3><ul className="mt-2 space-y-2">{recording.meetingNotes.actionItems.map((item, index) => <li key={index} className="flex items-center justify-between gap-3"><span>{item.title}{item.assignee ? <span className="text-muted-foreground"> · Suggested: {item.assignee === "me" ? "you" : "agent"}</span> : null}</span><button type="button" className={OUTLINE_BUTTON} onClick={() => run(async () => { const result = await rpc.call("meeting_create_task", { id, index }); toast.success(`Task created: ${result.taskId}`); })}>Create task</button></li>)}</ul></div> : null}
-              </div>
-            ) : <p className="mt-3 text-sm text-muted-foreground">Notes appear after Talk finishes processing the transcript.</p>}
+            <p className="mt-3 whitespace-pre-wrap text-sm">{recording.meetingNotes.summary}</p>
           </details>
         ) : null}
 
