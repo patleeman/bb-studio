@@ -246,7 +246,7 @@ export async function runText(command, args) {
  * `transcribe: false` uploads the audio and pauses the recording instead, for
  * captures that only need it listed where no voice service is configured.
  */
-export async function seedTalkRecording(projectId, { transcribe = true } = {}) {
+export async function seedTalkRecording(projectId, { transcribe = true, kind = "recording", title = "Weekly product sync" } = {}) {
   const pieces = [
     ["sync", "Welcome to the weekly product sync. First up, the offline mode beta shipped to forty teams on Monday, and crash reports are down by half since the storage fix."],
     ["sync", "Onboarding is the next focus. New users still stall at the import step, so design will prototype a guided import this sprint."],
@@ -254,9 +254,9 @@ export async function seedTalkRecording(projectId, { transcribe = true } = {}) {
     ["after", "Action items. Priya drafts the guided import spec. Sam shares the crash dashboard. Everyone reviews the roadmap before Friday."],
   ];
   const dir = await mkdtemp(join(tmpdir(), "bb-talk-seed-"));
-  const recording = await talkRpc("recording_create", { kind: "recording", projectId, threadId: null });
+  const recording = await talkRpc("recording_create", { kind, projectId, threadId: null });
   try {
-    await talkRpc("recording_rename", { id: recording.id, title: "Weekly product sync" });
+    await talkRpc("recording_rename", { id: recording.id, title });
     let startedAt = Date.now() - 20 * 60_000;
     const sessions = { sync: "captureseed1", after: "captureseed2" };
     const indexes = { sync: 0, after: 0 };
