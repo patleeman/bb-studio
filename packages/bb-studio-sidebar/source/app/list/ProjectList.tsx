@@ -45,6 +45,9 @@ import { cn } from "@/lib/utils";
 import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 import { useProjectCreation } from "../studio/useProjectCreation.js";
 import { visibleProjects } from "../studio/visibleProjects.js";
+import { useBackgroundThreads } from "../studio/useBackgroundThreads.js";
+import { BackgroundThreadsSection } from "../studio/BackgroundThreadsSection.js";
+import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
 import {
   ConfirmDeleteDialog,
   ConfirmDeleteDialogContent,
@@ -1405,8 +1408,9 @@ function ProjectListComponent({
   const sdk = useSdk();
   const projectCreation = useProjectCreation(onProjectSelect);
   const sidebarActions = experimental_useSidebarThreadActions();
-  const { status, sections, projects, personalProject, archived } =
+  const { status, sections, projects: allProjects, personalProject, archived } =
     useSidebarData();
+  const { projects, background } = useBackgroundThreads(allProjects);
   const personalProjectId = personalProject?.id ?? null;
   const threads = useMemo<SidebarThread[]>(
     () => projects.flatMap((project) => project.threads),
@@ -1416,6 +1420,16 @@ function ProjectListComponent({
   const preferencesReady = usePreferencesReady();
   const threadListStatus = toThreadListStatus(status);
   const selectedThreadId = activeThreadId ?? undefined;
+  const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
+  const backgroundIds = useMemo(() => new Set(background.map((thread) => thread.id)), [background]);
+  useSidebarThreadRevealCore({
+    selectedThreadId,
+    threads: allThreads,
+    threadsReady: status === "ready",
+    preferencesReady,
+    personalProjectId,
+    backgroundThreadIds: backgroundIds,
+  });
   const [isPinnedReorderPending, setIsPinnedReorderPending] = useState(false);
   const [isCreateThreadSectionPending, setIsCreateThreadSectionPending] =
     useState(false);
@@ -1890,6 +1904,16 @@ function ProjectListComponent({
               onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
             />
           )}
+        />
+        <BackgroundThreadsSection
+          threads={background}
+          selectedThreadId={selectedThreadId}
+          compareThreads={sidebarThreadComparator}
+          collapsedThreadIds={collapsedThreadIds}
+          collapsedEnvironmentIds={collapsedEnvironmentIds}
+          onProjectSelect={onProjectSelect}
+          onToggleThreadCollapsed={toggleThreadCollapsed}
+          onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
         />
         {archived !== null && (
           <>

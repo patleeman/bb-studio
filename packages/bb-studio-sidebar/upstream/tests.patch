@@ -1,125 +1,71 @@
---- a/source/app/dnd/sidebarNestPreviewPlacement.test.ts
-+++ b/source/app/dnd/sidebarNestPreviewPlacement.test.ts
-@@ -7 +7 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/dnd/useSectionThreadDnd.projection.test.tsx
-+++ b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
-@@ -15 +15 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/dnd/useSectionThreadDnd.test.ts
-+++ b/source/app/dnd/useSectionThreadDnd.test.ts
-@@ -5 +5 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/list/ProjectList.modes.test.tsx
-+++ b/source/app/list/ProjectList.modes.test.tsx
-@@ -46 +46 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/list/ProjectList.sectionCreate.test.tsx
-+++ b/source/app/list/ProjectList.sectionCreate.test.tsx
-@@ -16 +16 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/list/ProjectListSectionHeader.test.tsx
-+++ b/source/app/list/ProjectListSectionHeader.test.tsx
-@@ -17 +17 @@
--import { makeSidebarThread } from "../model/fixtures.js";
-+import { makeSidebarThread } from "../testing/fixtures.js";
---- a/source/app/list/ProjectRow.interactions.test.tsx
-+++ b/source/app/list/ProjectRow.interactions.test.tsx
-@@ -31 +31 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/list/ProjectThreadTree.disclosure.test.tsx
-+++ b/source/app/list/ProjectThreadTree.disclosure.test.tsx
-@@ -12 +12 @@
--import { makeSidebarThread } from "../model/fixtures.js";
-+import { makeSidebarThread } from "../testing/fixtures.js";
---- a/source/app/list/SidebarHeaderControls.test.tsx
-+++ b/source/app/list/SidebarHeaderControls.test.tsx
-@@ -23,0 +24 @@
-+  sidebarHideEmptyProjectsAtom,
-@@ -50,0 +52 @@
-+  store.set(sidebarHideEmptyProjectsAtom, false);
-@@ -92,0 +95,12 @@
-+  it("toggles Hide empty projects in Filter", async () => {
-+    const { store } = setup();
-+    await openMenu();
-+    await openSubmenu("Filter");
-+    const toggle = await screen.findByRole("menuitemcheckbox", {
-+      name: "Hide empty projects",
-+    });
-+    expect(toggle.getAttribute("aria-checked")).toBe("false");
-+    fireEvent.click(toggle);
-+    expect(store.get(sidebarHideEmptyProjectsAtom)).toBe(true);
-+    expect(toggle.getAttribute("aria-checked")).toBe("true");
-+  });
-@@ -174 +188 @@
--    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
-+    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
---- a/source/app/list/sortComparator.test.ts
-+++ b/source/app/list/sortComparator.test.ts
-@@ -15 +15 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/list/useSidebarThreadReveal.test.tsx
-+++ b/source/app/list/useSidebarThreadReveal.test.tsx
-@@ -12 +12 @@
--} from "../model/fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/model/machine-thread-groups.test.ts
-+++ b/source/app/model/machine-thread-groups.test.ts
-@@ -2 +2 @@
--import { makeSidebarThread, type SidebarThreadOverrides } from "./fixtures.js";
-+import { makeSidebarThread, type SidebarThreadOverrides } from "../testing/fixtures.js";
---- a/source/app/model/pinned-sidebar-threads.test.ts
-+++ b/source/app/model/pinned-sidebar-threads.test.ts
-@@ -6 +6 @@
--} from "./fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/model/project-thread-groups.test.ts
-+++ b/source/app/model/project-thread-groups.test.ts
-@@ -17 +17 @@
--} from "./fixtures.js";
-+} from "../testing/fixtures.js";
---- a/source/app/model/thread-activity.test.ts
-+++ b/source/app/model/thread-activity.test.ts
-@@ -10 +10 @@
--import { makeSidebarThread, type SidebarThreadOverrides } from "./fixtures.js";
-+import { makeSidebarThread, type SidebarThreadOverrides } from "../testing/fixtures.js";
---- a/source/app/model/use-sidebar-data.test.ts
-+++ b/source/app/model/use-sidebar-data.test.ts
-@@ -2 +2 @@
--import { makeSidebarThread } from "./fixtures.js";
-+import { makeSidebarThread } from "../testing/fixtures.js";
---- a/source/app/rows/ThreadRow.test.tsx
-+++ b/source/app/rows/ThreadRow.test.tsx
-@@ -21 +21 @@
--import { makeSidebarThread } from "../model/fixtures.js";
-+import { makeSidebarThread } from "../testing/fixtures.js";
-@@ -301 +301 @@
--      expect(slot.inspection.sdkCalls).toEqual([
-+      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
-@@ -501 +501 @@
--      expect(slot.inspection.sdkCalls).toEqual([
-+      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
-@@ -543 +543 @@
--      expect(slot.inspection.sdkCalls).toEqual([
-+      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
-@@ -571 +571 @@
--      expect(slot.inspection.sdkCalls).toEqual([
-+      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+diff --git a/source/app.test.tsx b/source/app.test.tsx
+index 4d15df5..572dbf5 100644
 --- a/source/app.test.tsx
 +++ b/source/app.test.tsx
-@@ -4,0 +5 @@
+@@ -4,0 +5 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 +import { registerSection, setSectionHidden } from "../../bb-studio-kit/src/app/sidebar-registry.js";
-@@ -11 +12 @@
+@@ -11 +12 @@ import {
 -import { makePluginProject, makeSidebarThread } from "./app/model/fixtures.js";
-+import { makePluginProject, makeSidebarThread } from "./app/testing/fixtures.js";
-@@ -150,0 +152,16 @@
++import { makePluginProject, makeSidebarThread, sdkResult } from "./app/testing/fixtures.js";
+@@ -125,0 +127 @@ function renderList(
++    sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots" ? [] : { automations: [] })() } },
+@@ -150,0 +153,72 @@ describe("thread-list plugin", () => {
++  it.each(["project", "chronological", "machine"] as const)("collapses bot and automation threads in %s mode", async (organizationMode) => {
++    renderList({ organizationMode }, {
++      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads: [
++        ...THREADS,
++        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams" }),
++        makeSidebarThread({ id: "thr_run", projectId: "proj_web", title: "Daily digest", originPluginId: "automations" }),
++      ] },
++    });
++    await screen.findByRole("button", { name: "Expand Background section" });
++    expect(threadIds()).not.toContain("thr_bot");
++    expect(threadIds()).not.toContain("thr_run");
++    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
++    await screen.findByText("Atlas scheduled work");
++    expect(threadIds().filter((id) => id === "thr_bot")).toHaveLength(1);
++    expect(threadIds().filter((id) => id === "thr_run")).toHaveLength(1);
++    expect(threadIds()).toContain("thr_pinned");
++  });
++
++  it("identifies existing bot and automation targets through their public RPCs", async () => {
++    renderList({ organizationMode: "project" }, {
++      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
++        ? [{ threadId: "thr_parent" }]
++        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
++    });
++    await screen.findByRole("button", { name: "Expand Background section" });
++    expect(threadIds()).not.toContain("thr_parent");
++    expect(threadIds()).not.toContain("thr_child");
++    expect(threadIds()).not.toContain("thr_later");
++    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
++    await screen.findByText("Parent thread");
++    expect(threadIds()).toContain("thr_child");
++    expect(threadIds()).toContain("thr_later");
++  });
++
++  it.each(["updates", "hidden", "all"] as const)("applies background visibility: %s", async (backgroundThreads) => {
++    renderList({ organizationMode: "project", backgroundThreads, backgroundCollapsed: false }, {
++      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
++        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false }),
++        makeSidebarThread({ id: "thr_unread", projectId: "proj_app", title: "New digest", originPluginId: "automations" }),
++        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
++      ] },
++    });
++    await screen.findByText("My work");
++    if (backgroundThreads === "hidden") {
++      expect(threadIds()).toEqual(["thr_normal"]);
++      expect(sectionHeaders()).not.toContain("Background");
++    } else if (backgroundThreads === "updates") {
++      await screen.findByText("New digest");
++      expect(threadIds()).not.toContain("thr_read");
++      expect(sectionHeaders()).toContain("Background");
++    } else {
++      await screen.findByText("Read digest");
++      expect(threadIds()).toContain("thr_unread");
++      expect(sectionHeaders()).not.toContain("Background");
++    }
++  });
 +  it("places Studio sections above threads and hides them when requested", async () => {
 +    const unregister = registerSection({ pluginId: "pages", id: "tabs", title: "Studio", order: 0 });
 +    try {
@@ -136,7 +82,7 @@
 +      unregister();
 +    }
 +  });
-@@ -303,0 +321,15 @@
+@@ -303,0 +378,15 @@ describe("thread-list plugin", () => {
 +  it("opens the New project dialog from Threads", async () => {
 +    setPreferencesMirrorStorageForTest(null);
 +    renderList({ organizationMode: "project" }, {
@@ -152,12 +98,192 @@
 +    expect(screen.getByRole("textbox", { name: "Folder path" })).not.toBeNull();
 +  });
 +
+diff --git a/source/app/dnd/sidebarNestPreviewPlacement.test.ts b/source/app/dnd/sidebarNestPreviewPlacement.test.ts
+index 4c66844..d768d3a 100644
+--- a/source/app/dnd/sidebarNestPreviewPlacement.test.ts
++++ b/source/app/dnd/sidebarNestPreviewPlacement.test.ts
+@@ -7 +7 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/dnd/useSectionThreadDnd.projection.test.tsx b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
+index cfeb6de..073f1d4 100644
+--- a/source/app/dnd/useSectionThreadDnd.projection.test.tsx
++++ b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
+@@ -15 +15 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/dnd/useSectionThreadDnd.test.ts b/source/app/dnd/useSectionThreadDnd.test.ts
+index a697435..80efb32 100644
+--- a/source/app/dnd/useSectionThreadDnd.test.ts
++++ b/source/app/dnd/useSectionThreadDnd.test.ts
+@@ -5 +5 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/list/ProjectList.modes.test.tsx b/source/app/list/ProjectList.modes.test.tsx
+index edd8510..31b8562 100644
+--- a/source/app/list/ProjectList.modes.test.tsx
++++ b/source/app/list/ProjectList.modes.test.tsx
+@@ -46 +46 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/list/ProjectList.sectionCreate.test.tsx b/source/app/list/ProjectList.sectionCreate.test.tsx
+index 0c6322a..a795e7c 100644
+--- a/source/app/list/ProjectList.sectionCreate.test.tsx
++++ b/source/app/list/ProjectList.sectionCreate.test.tsx
+@@ -16 +16 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/list/ProjectListSectionHeader.test.tsx b/source/app/list/ProjectListSectionHeader.test.tsx
+index ba682fd..f95e297 100644
+--- a/source/app/list/ProjectListSectionHeader.test.tsx
++++ b/source/app/list/ProjectListSectionHeader.test.tsx
+@@ -17 +17 @@ import type { SectionThreadDndState } from "../dnd/useSectionThreadDnd.js";
+-import { makeSidebarThread } from "../model/fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+diff --git a/source/app/list/ProjectRow.interactions.test.tsx b/source/app/list/ProjectRow.interactions.test.tsx
+index a3817b9..87a501c 100644
+--- a/source/app/list/ProjectRow.interactions.test.tsx
++++ b/source/app/list/ProjectRow.interactions.test.tsx
+@@ -31 +31 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/list/ProjectThreadTree.disclosure.test.tsx b/source/app/list/ProjectThreadTree.disclosure.test.tsx
+index dce3458..3f198ab 100644
+--- a/source/app/list/ProjectThreadTree.disclosure.test.tsx
++++ b/source/app/list/ProjectThreadTree.disclosure.test.tsx
+@@ -12 +12 @@ import {
+-import { makeSidebarThread } from "../model/fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+diff --git a/source/app/list/SidebarHeaderControls.test.tsx b/source/app/list/SidebarHeaderControls.test.tsx
+index 738d0ad..41c800e 100644
+--- a/source/app/list/SidebarHeaderControls.test.tsx
++++ b/source/app/list/SidebarHeaderControls.test.tsx
+@@ -23,0 +24,3 @@ import {
++  sidebarHideEmptyProjectsAtom,
++  sidebarBackgroundThreadsAtom,
++  sidebarBackgroundCollapsedAtom,
+@@ -50,0 +54 @@ function setup(
++  store.set(sidebarHideEmptyProjectsAtom, false);
+@@ -92,0 +97,27 @@ describe("sidebar header controls", () => {
++  it("changes background visibility in Filter and expands updates", async () => {
++    const { store } = setup();
++    store.set(sidebarBackgroundThreadsAtom, "grouped");
++    store.set(sidebarBackgroundCollapsedAtom, true);
++    await openMenu();
++    await openSubmenu("Filter");
++    const updates = await screen.findByRole("menuitemradio", { name: "Only show updates" });
++    fireEvent.click(updates);
++    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("updates");
++    expect(store.get(sidebarBackgroundCollapsedAtom)).toBe(false);
++    fireEvent.click(screen.getByRole("menuitemradio", { name: "Hide background threads" }));
++    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("hidden");
++    fireEvent.click(screen.getByRole("menuitemradio", { name: "Show with other threads" }));
++    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("all");
++  });
++  it("toggles Hide empty projects in Filter", async () => {
++    const { store } = setup();
++    await openMenu();
++    await openSubmenu("Filter");
++    const toggle = await screen.findByRole("menuitemcheckbox", {
++      name: "Hide empty projects",
++    });
++    expect(toggle.getAttribute("aria-checked")).toBe("false");
++    fireEvent.click(toggle);
++    expect(store.get(sidebarHideEmptyProjectsAtom)).toBe(true);
++    expect(toggle.getAttribute("aria-checked")).toBe("true");
++  });
+@@ -174 +205 @@ describe("sidebar header controls", () => {
+-    ).toEqual(["New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
++    ).toEqual(["New project", "New section", "Organize", "Sort by", "Filter", "Rename", "Remove"]);
+diff --git a/source/app/list/sortComparator.test.ts b/source/app/list/sortComparator.test.ts
+index 411fa38..312b1cc 100644
+--- a/source/app/list/sortComparator.test.ts
++++ b/source/app/list/sortComparator.test.ts
+@@ -15 +15 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/list/useSidebarThreadReveal.test.tsx b/source/app/list/useSidebarThreadReveal.test.tsx
+index 23ad9d0..14f467e 100644
+--- a/source/app/list/useSidebarThreadReveal.test.tsx
++++ b/source/app/list/useSidebarThreadReveal.test.tsx
+@@ -12 +12 @@ import {
+-} from "../model/fixtures.js";
++} from "../testing/fixtures.js";
+@@ -14,0 +15 @@ import {
++  collapsedProjectIdsAtom,
+@@ -81,0 +83,10 @@ describe("useSidebarThreadReveal", () => {
++  it("does not expand a background thread's former project on an update", () => {
++    const rows = [thread("first"), thread("background", { projectId: "proj_app", originPluginId: "automations" })];
++    const { store, update } = setup(rows, { selectedThreadId: undefined, backgroundThreadIds: new Set(["background"]) });
++    store.set(sidebarOrganizationModeAtom, "project");
++    store.set(collapsedProjectIdsAtom, ["proj_app"]);
++    update({ threads: rows.map((row) => row.id === "background" ? { ...row, isUnread: true } : row) });
++    expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
++    update({ selectedThreadId: "background" });
++    expect(store.get(collapsedProjectIdsAtom)).toEqual(["proj_app"]);
++  });
+diff --git a/source/app/model/machine-thread-groups.test.ts b/source/app/model/machine-thread-groups.test.ts
+index d1bb637..873c8bf 100644
+--- a/source/app/model/machine-thread-groups.test.ts
++++ b/source/app/model/machine-thread-groups.test.ts
+@@ -2 +2 @@ import { describe, expect, it } from "vitest";
+-import { makeSidebarThread, type SidebarThreadOverrides } from "./fixtures.js";
++import { makeSidebarThread, type SidebarThreadOverrides } from "../testing/fixtures.js";
+diff --git a/source/app/model/pinned-sidebar-threads.test.ts b/source/app/model/pinned-sidebar-threads.test.ts
+index e8dc93e..7845799 100644
+--- a/source/app/model/pinned-sidebar-threads.test.ts
++++ b/source/app/model/pinned-sidebar-threads.test.ts
+@@ -6 +6 @@ import {
+-} from "./fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/model/project-thread-groups.test.ts b/source/app/model/project-thread-groups.test.ts
+index 1f87f70..205c552 100644
+--- a/source/app/model/project-thread-groups.test.ts
++++ b/source/app/model/project-thread-groups.test.ts
+@@ -17 +17 @@ import {
+-} from "./fixtures.js";
++} from "../testing/fixtures.js";
+diff --git a/source/app/model/thread-activity.test.ts b/source/app/model/thread-activity.test.ts
+index d1817b2..5c35247 100644
+--- a/source/app/model/thread-activity.test.ts
++++ b/source/app/model/thread-activity.test.ts
+@@ -10 +10 @@ import {
+-import { makeSidebarThread, type SidebarThreadOverrides } from "./fixtures.js";
++import { makeSidebarThread, type SidebarThreadOverrides } from "../testing/fixtures.js";
+diff --git a/source/app/model/use-sidebar-data.test.ts b/source/app/model/use-sidebar-data.test.ts
+index d144f54..af836cb 100644
+--- a/source/app/model/use-sidebar-data.test.ts
++++ b/source/app/model/use-sidebar-data.test.ts
+@@ -2 +2 @@ import { describe, expect, it } from "vitest";
+-import { makeSidebarThread } from "./fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+diff --git a/source/app/rows/ThreadRow.test.tsx b/source/app/rows/ThreadRow.test.tsx
+index 654f0a6..5915bf1 100644
+--- a/source/app/rows/ThreadRow.test.tsx
++++ b/source/app/rows/ThreadRow.test.tsx
+@@ -21 +21 @@ import { NO_COLLAPSED_CHILD_ACTIVITY } from "../model/thread-activity.js";
+-import { makeSidebarThread } from "../model/fixtures.js";
++import { makeSidebarThread } from "../testing/fixtures.js";
+@@ -301 +301 @@ describe("ThreadRow", () => {
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+@@ -501 +501 @@ describe("ThreadRow", () => {
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+@@ -543 +543 @@ describe("ThreadRow", () => {
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+@@ -571 +571 @@ describe("ThreadRow", () => {
+-      expect(slot.inspection.sdkCalls).toEqual([
++      expect(slot.inspection.sdkCalls.filter((call) => call.method !== "plugins.list")).toEqual([
+diff --git a/source/server.test.ts b/source/server.test.ts
+index 9e138f7..77e538a 100644
 --- a/source/server.test.ts
 +++ b/source/server.test.ts
-@@ -4 +4 @@
+@@ -4 +4 @@ import plugin, { migrateFromUiPreferences } from "./server.js";
 -import { defaultPreferences } from "./shared/preferences.js";
 +import { defaultPreferences, parsePreferenceValue } from "./shared/preferences.js";
-@@ -34,0 +35,3 @@
+@@ -34,0 +35,3 @@ describe("thread-list preferences rpc", () => {
 +    expect(defaultPreferences().hideEmptyProjects).toBe(false);
 +    expect(parsePreferenceValue("hideEmptyProjects", true)).toEqual({ success: true, value: true });
 +    expect(parsePreferenceValue("hideEmptyProjects", "true").success).toBe(false);

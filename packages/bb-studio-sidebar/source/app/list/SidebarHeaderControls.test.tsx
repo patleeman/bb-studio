@@ -22,6 +22,8 @@ import {
   sidebarSortDirectionAtom,
   sidebarShowProviderIconsAtom,
   sidebarHideEmptyProjectsAtom,
+  sidebarBackgroundThreadsAtom,
+  sidebarBackgroundCollapsedAtom,
 } from "../preferences/atoms.js";
 import type { OrganizationMode } from "../../shared/preferences.js";
 
@@ -92,6 +94,21 @@ async function openSubmenu(label: string) {
 }
 
 describe("sidebar header controls", () => {
+  it("changes background visibility in Filter and expands updates", async () => {
+    const { store } = setup();
+    store.set(sidebarBackgroundThreadsAtom, "grouped");
+    store.set(sidebarBackgroundCollapsedAtom, true);
+    await openMenu();
+    await openSubmenu("Filter");
+    const updates = await screen.findByRole("menuitemradio", { name: "Only show updates" });
+    fireEvent.click(updates);
+    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("updates");
+    expect(store.get(sidebarBackgroundCollapsedAtom)).toBe(false);
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Hide background threads" }));
+    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("hidden");
+    fireEvent.click(screen.getByRole("menuitemradio", { name: "Show with other threads" }));
+    expect(store.get(sidebarBackgroundThreadsAtom)).toBe("all");
+  });
   it("toggles Hide empty projects in Filter", async () => {
     const { store } = setup();
     await openMenu();

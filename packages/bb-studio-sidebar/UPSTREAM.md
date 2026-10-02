@@ -20,12 +20,13 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 
 | File | Reason |
 | --- | --- |
-| `source/app.tsx` | Mount Studio section anchors above the thread list and name the provider Studio Sidebar. |
-| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, and filter empty project rows through Studio's visibility rule. |
+| `source/app.tsx` | Mount Studio section anchors above the thread list, name the provider Studio Sidebar, and move thread reveal into ProjectList so background updates do not expand their former groups. |
+| `source/app/list/ProjectList.tsx` | Mount the New project dialog, supply its menu action, filter empty project rows, and group bot and automation threads in Background. |
+| `source/app/list/useSidebarThreadReveal.ts` | Keep ancestor reveal while skipping the former group of background threads. |
 | `source/app/list/SidebarHeaderControls.tsx` | Add the project action to the creation context. |
-| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, and empty project filter menu items. |
-| `source/app/preferences/atoms.ts` | Expose the synced empty project preference. |
-| `source/shared/preferences.ts` | Define the synced empty project preference and default. |
+| `source/app/list/SidebarViewItems.tsx` | Insert New project, hidden Studio section, empty project, and background thread filter menu items. |
+| `source/app/preferences/atoms.ts` | Expose synced empty project and background preferences. |
+| `source/shared/preferences.ts` | Define synced empty project and background preferences and defaults. |
 | `source/app/list/SidebarHeaderControls.test.tsx` | Check the empty project menu toggle. |
 | `source/server.test.ts` | Check the new preference default and parsing. |
 | `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split. |

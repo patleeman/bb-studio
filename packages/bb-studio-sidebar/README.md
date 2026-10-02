@@ -15,6 +15,7 @@ list and its organization controls, and adds:
   accepts a folder path, creates the project through BB's Plugin SDK, and
   opens it.
 - **Hide empty projects** in **Filter → Projects** removes project groups with no visible threads. Selected, newly created, and renamed projects remain visible.
+- **Background threads** groups bot and automation threads in a section that starts collapsed. Its status indicator shows unread results, running work, and requests for input. Use **Background ⋯** or **Threads ⋯ → Filter → Background threads** to show only updates, hide them, or show them with other threads. Updates include completed unread results, requests for input, and failed queued messages. Pinned threads stay in the main list. Existing threads attached to bots or automations are detected on load, on window focus, and every 30 seconds.
 - **Float** in each thread's menu, after **Open in split**, while
   [Float](../bb-studio-float) is installed. It opens the thread in a window
   along the bottom of the screen.

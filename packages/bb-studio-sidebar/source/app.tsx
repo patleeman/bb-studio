@@ -4,14 +4,12 @@ import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compa
 import { TooltipProvider } from "@/components/ui/tooltip";
 import { PreferencesSync } from "./app/preferences/PreferencesSync.js";
 import { ProjectList } from "./app/list/ProjectList.js";
-import { useSidebarThreadReveal } from "./app/list/useSidebarThreadReveal.js";
 
 function ThreadList({
   activeThreadId,
   isCompactViewport,
   onNavigate,
 }: PluginThreadListProps) {
-  useSidebarThreadReveal();
   return (
     <CompactViewportOverrideProvider isCompactViewport={isCompactViewport}>
       <TooltipProvider>

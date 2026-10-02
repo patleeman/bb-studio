@@ -9,7 +9,7 @@ import {
   renderSlot,
   type RenderSlotOptions,
 } from "@get-bb/plugin-sdk/testing/app";
-import { makePluginProject, makeSidebarThread } from "./app/testing/fixtures.js";
+import { makePluginProject, makeSidebarThread, sdkResult } from "./app/testing/fixtures.js";
 import {
   resetPreferencesSyncForTest,
   setPreferencesMirrorStorageForTest,
@@ -124,6 +124,7 @@ function renderList(
       }),
       setPreference: (input: unknown) => input,
     },
+    sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots" ? [] : { automations: [] })() } },
     ...options,
   });
 }
@@ -149,6 +150,62 @@ afterEach(() => {
 });
 
 describe("thread-list plugin", () => {
+  it.each(["project", "chronological", "machine"] as const)("collapses bot and automation threads in %s mode", async (organizationMode) => {
+    renderList({ organizationMode }, {
+      sidebarThreads: { projects: PROJECTS, sections: SECTIONS, threads: [
+        ...THREADS,
+        makeSidebarThread({ id: "thr_bot", projectId: "proj_app", title: "Atlas scheduled work", originPluginId: "bot-teams" }),
+        makeSidebarThread({ id: "thr_run", projectId: "proj_web", title: "Daily digest", originPluginId: "automations" }),
+      ] },
+    });
+    await screen.findByRole("button", { name: "Expand Background section" });
+    expect(threadIds()).not.toContain("thr_bot");
+    expect(threadIds()).not.toContain("thr_run");
+    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
+    await screen.findByText("Atlas scheduled work");
+    expect(threadIds().filter((id) => id === "thr_bot")).toHaveLength(1);
+    expect(threadIds().filter((id) => id === "thr_run")).toHaveLength(1);
+    expect(threadIds()).toContain("thr_pinned");
+  });
+
+  it("identifies existing bot and automation targets through their public RPCs", async () => {
+    renderList({ organizationMode: "project" }, {
+      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
+        ? [{ threadId: "thr_parent" }]
+        : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
+    });
+    await screen.findByRole("button", { name: "Expand Background section" });
+    expect(threadIds()).not.toContain("thr_parent");
+    expect(threadIds()).not.toContain("thr_child");
+    expect(threadIds()).not.toContain("thr_later");
+    fireEvent.click(screen.getByRole("button", { name: "Expand Background section" }));
+    await screen.findByText("Parent thread");
+    expect(threadIds()).toContain("thr_child");
+    expect(threadIds()).toContain("thr_later");
+  });
+
+  it.each(["updates", "hidden", "all"] as const)("applies background visibility: %s", async (backgroundThreads) => {
+    renderList({ organizationMode: "project", backgroundThreads, backgroundCollapsed: false }, {
+      sidebarThreads: { projects: PROJECTS, sections: [], threads: [
+        makeSidebarThread({ id: "thr_read", projectId: "proj_app", title: "Read digest", originPluginId: "automations", isUnread: false }),
+        makeSidebarThread({ id: "thr_unread", projectId: "proj_app", title: "New digest", originPluginId: "automations" }),
+        makeSidebarThread({ id: "thr_normal", projectId: "proj_web", title: "My work", isUnread: false }),
+      ] },
+    });
+    await screen.findByText("My work");
+    if (backgroundThreads === "hidden") {
+      expect(threadIds()).toEqual(["thr_normal"]);
+      expect(sectionHeaders()).not.toContain("Background");
+    } else if (backgroundThreads === "updates") {
+      await screen.findByText("New digest");
+      expect(threadIds()).not.toContain("thr_read");
+      expect(sectionHeaders()).toContain("Background");
+    } else {
+      await screen.findByText("Read digest");
+      expect(threadIds()).toContain("thr_unread");
+      expect(sectionHeaders()).not.toContain("Background");
+    }
+  });
   it("places Studio sections above threads and hides them when requested", async () => {
     const unregister = registerSection({ pluginId: "pages", id: "tabs", title: "Studio", order: 0 });
     try {

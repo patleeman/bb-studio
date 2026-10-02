@@ -111,6 +111,7 @@ export interface SidebarThreadRevealInputs {
   threadsReady: boolean;
   preferencesReady: boolean;
   personalProjectId: string | null;
+  backgroundThreadIds?: ReadonlySet<string>;
 }
 
 export function useSidebarThreadRevealCore({
@@ -119,6 +120,7 @@ export function useSidebarThreadRevealCore({
   threadsReady,
   preferencesReady,
   personalProjectId,
+  backgroundThreadIds,
 }: SidebarThreadRevealInputs): void {
   const organizationMode = useAtomValue(sidebarOrganizationModeAtom);
   const setCollapsedThreadIdList = useSetAtom(collapsedThreadIdsAtom);
@@ -208,6 +210,9 @@ export function useSidebarThreadRevealCore({
         removeCollapsedIds(current, environmentIdsToExpand),
       );
 
+      // Background results must not expand their former project or machine.
+      // Ancestors still expand when navigating directly to a child thread.
+      if (backgroundThreadIds?.has(thread.id)) continue;
       const isPinned = effectivePinnedThreadIds.has(thread.id);
       const expansion = getThreadSidebarExpansion({
         organizationMode,
@@ -250,6 +255,7 @@ export function useSidebarThreadRevealCore({
     threads,
     threadById,
     effectivePinnedThreadIds,
+    backgroundThreadIds,
     setCollapsedThreadIdList,
     setCollapsedEnvironmentIdList,
     setCollapsedProjectIdList,

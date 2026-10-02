@@ -69,6 +69,18 @@ function definePreference<Schema extends z.ZodTypeAny>(
 }
 
 export const preferenceDefinitions = {
+  backgroundThreads: definePreference(
+    z.enum(["grouped", "updates", "hidden", "all"]),
+    "grouped",
+    "Show bot and automation threads in Background, only with updates, hide them, or show them inline.",
+    null,
+  ),
+  backgroundCollapsed: definePreference(
+    z.boolean(),
+    true,
+    "Collapse the Background section while keeping its activity indicator visible.",
+    null,
+  ),
   showProviderIcons: definePreference(
     z.boolean(),
     false,

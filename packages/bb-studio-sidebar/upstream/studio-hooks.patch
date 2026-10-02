@@ -1,31 +1,42 @@
+diff --git a/source/app.tsx b/source/app.tsx
+index bdc330d..c1bf1e7 100644
 --- a/source/app.tsx
 +++ b/source/app.tsx
-@@ -1,0 +2 @@
+@@ -1,0 +2 @@ import { definePluginApp, type PluginThreadListProps } from "@get-bb/plugin-sdk/
 +import { SidebarAnchors } from "@bb-studio/kit/app";
-@@ -17,0 +19 @@
+@@ -6 +6,0 @@ import { ProjectList } from "./app/list/ProjectList.js";
+-import { useSidebarThreadReveal } from "./app/list/useSidebarThreadReveal.js";
+@@ -13 +12,0 @@ function ThreadList({
+-  useSidebarThreadReveal();
+@@ -17,0 +17 @@ function ThreadList({
 +        <SidebarAnchors onNavigate={onNavigate} />
-@@ -30 +32 @@
+@@ -30 +30 @@ export default definePluginApp((app) => {
 -    title: "Thread list",
 +    title: "Studio Sidebar",
-@@ -32 +34 @@
+@@ -32 +32 @@ export default definePluginApp((app) => {
 -      "Pinned threads, custom sections, projects, machines, and nested threads.",
 +      "Studio apps' sections above your threads: pinned threads, custom sections, projects, machines, and nested threads.",
+diff --git a/source/app/list/ProjectList.tsx b/source/app/list/ProjectList.tsx
+index afa82d9..9cc3cc9 100644
 --- a/source/app/list/ProjectList.tsx
 +++ b/source/app/list/ProjectList.tsx
-@@ -45,0 +46,2 @@
+@@ -45,0 +46,5 @@ import { ThreadSectionCreateDialog } from "./ThreadSectionCreateDialog.js";
 +import { useProjectCreation } from "../studio/useProjectCreation.js";
 +import { visibleProjects } from "../studio/visibleProjects.js";
-@@ -99,0 +102 @@
++import { useBackgroundThreads } from "../studio/useBackgroundThreads.js";
++import { BackgroundThreadsSection } from "../studio/BackgroundThreadsSection.js";
++import { useSidebarThreadRevealCore } from "./useSidebarThreadReveal.js";
+@@ -99,0 +105 @@ import {
 +  sidebarHideEmptyProjectsAtom,
-@@ -522,0 +526 @@
+@@ -522,0 +529 @@ interface ProjectModeSectionsProps
 +  createdProjectId: string | null;
-@@ -548,0 +553 @@
+@@ -548,0 +556 @@ function ProjectModeSections({
 +  createdProjectId,
-@@ -558,0 +564,3 @@
+@@ -558,0 +567,3 @@ function ProjectModeSections({
 +  const hideEmptyProjects = useAtomValue(sidebarHideEmptyProjectsAtom);
 +  const rename = useSidebarRenameState();
 +  const [dragging, setDragging] = useState(false);
-@@ -593,2 +601,10 @@
+@@ -593,2 +604,10 @@ function ProjectModeSections({
 -      projects
 -        .filter((project) => !project.isPersonal)
 +      visibleProjects({
@@ -38,7 +49,7 @@
 +        dragging,
 +        ready: status === "ready",
 +      })
-@@ -603 +619,10 @@
+@@ -603 +622,10 @@ function ProjectModeSections({
 -    [projects, status, threadsByProject],
 +    [
 +      projects,
@@ -50,7 +61,7 @@
 +      createdProjectId,
 +      dragging,
 +    ],
-@@ -696,0 +722,30 @@
+@@ -696,0 +725,30 @@ function ProjectModeSections({
 +  const projectThreadDnd = threadDnd && {
 +    ...threadDnd,
 +    dndContextProps: {
@@ -81,73 +92,145 @@
 +      },
 +    },
 +  };
-@@ -794 +849,4 @@
+@@ -794 +852,4 @@ function ProjectModeSections({
 -      <ReorderableSidebarSectionOrderList order={order} threadDnd={threadDnd}>
 +      <ReorderableSidebarSectionOrderList
 +        order={order}
 +        threadDnd={projectThreadDnd}
 +      >
-@@ -1347,0 +1406 @@
+@@ -1347,0 +1409 @@ function ProjectListComponent({
 +  const projectCreation = useProjectCreation(onProjectSelect);
-@@ -1733,0 +1793,2 @@
+@@ -1349 +1411 @@ function ProjectListComponent({
+-  const { status, sections, projects, personalProject, archived } =
++  const { status, sections, projects: allProjects, personalProject, archived } =
+@@ -1350,0 +1413 @@ function ProjectListComponent({
++  const { projects, background } = useBackgroundThreads(allProjects);
+@@ -1359,0 +1423,10 @@ function ProjectListComponent({
++  const allThreads = useMemo(() => allProjects.flatMap((project) => project.threads), [allProjects]);
++  const backgroundIds = useMemo(() => new Set(background.map((thread) => thread.id)), [background]);
++  useSidebarThreadRevealCore({
++    selectedThreadId,
++    threads: allThreads,
++    threadsReady: status === "ready",
++    preferencesReady,
++    personalProjectId,
++    backgroundThreadIds: backgroundIds,
++  });
+@@ -1733,0 +1807,2 @@ function ProjectListComponent({
 +        onNewProject: projectCreation.openDialog,
 +        isCreatingProject: projectCreation.isCreating,
-@@ -1804,0 +1866 @@
+@@ -1804,0 +1880 @@ function ProjectListComponent({
 +              createdProjectId={projectCreation.createdProjectId}
-@@ -1860,0 +1923 @@
+@@ -1831,0 +1908,10 @@ function ProjectListComponent({
++        <BackgroundThreadsSection
++          threads={background}
++          selectedThreadId={selectedThreadId}
++          compareThreads={sidebarThreadComparator}
++          collapsedThreadIds={collapsedThreadIds}
++          collapsedEnvironmentIds={collapsedEnvironmentIds}
++          onProjectSelect={onProjectSelect}
++          onToggleThreadCollapsed={toggleThreadCollapsed}
++          onToggleEnvironmentCollapsed={toggleEnvironmentCollapsed}
++        />
+@@ -1860,0 +1947 @@ function ProjectListComponent({
 +      {projectCreation.dialog}
+diff --git a/source/app/list/SidebarHeaderControls.tsx b/source/app/list/SidebarHeaderControls.tsx
+index ec076ad..fe95274 100644
 --- a/source/app/list/SidebarHeaderControls.tsx
 +++ b/source/app/list/SidebarHeaderControls.tsx
-@@ -22,0 +23,2 @@
+@@ -22,0 +23,2 @@ export interface HeaderCreationActions {
 +  onNewProject?: () => void;
 +  isCreatingProject?: boolean;
+diff --git a/source/app/list/SidebarViewItems.tsx b/source/app/list/SidebarViewItems.tsx
+index 063bfec..53b3436 100644
 --- a/source/app/list/SidebarViewItems.tsx
 +++ b/source/app/list/SidebarViewItems.tsx
-@@ -0,0 +1,2 @@
+@@ -0,0 +1,3 @@
 +import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
 +import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
-@@ -74,0 +77 @@
++import { BackgroundThreadsMenuItems } from "../studio/BackgroundThreadsMenuItems.js";
+@@ -74,0 +78 @@ export function SidebarHeaderMenuContents({
 +      <StudioNewProjectItem onSelect={creation.onNewProject} disabled={creation.isCreatingProject} />
-@@ -81,0 +85 @@
+@@ -81,0 +86 @@ export function SidebarHeaderMenuContents({
 +      <HiddenStudioSectionItems />
-@@ -147 +151,2 @@
+@@ -147 +152,2 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 -      <DropdownMenuGroup aria-label="Filter">
 +      <>
 +        <DropdownMenuGroup aria-label="Filter">
-@@ -174 +179,3 @@
+@@ -174 +180,4 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
 -      </DropdownMenuGroup>
 +        </DropdownMenuGroup>
 +        <HideEmptyProjectsMenuItems />
++        <BackgroundThreadsMenuItems />
 +      </>
+diff --git a/source/app/list/useSidebarThreadReveal.ts b/source/app/list/useSidebarThreadReveal.ts
+index b2ccb13..589c940 100644
+--- a/source/app/list/useSidebarThreadReveal.ts
++++ b/source/app/list/useSidebarThreadReveal.ts
+@@ -113,0 +114 @@ export interface SidebarThreadRevealInputs {
++  backgroundThreadIds?: ReadonlySet<string>;
+@@ -121,0 +123 @@ export function useSidebarThreadRevealCore({
++  backgroundThreadIds,
+@@ -210,0 +213,3 @@ export function useSidebarThreadRevealCore({
++      // Background results must not expand their former project or machine.
++      // Ancestors still expand when navigating directly to a child thread.
++      if (backgroundThreadIds?.has(thread.id)) continue;
+@@ -252,0 +258 @@ export function useSidebarThreadRevealCore({
++    backgroundThreadIds,
+diff --git a/source/app/preferences/atoms.ts b/source/app/preferences/atoms.ts
+index aa949ec..ebcf484 100644
+--- a/source/app/preferences/atoms.ts
++++ b/source/app/preferences/atoms.ts
+@@ -3,0 +4,3 @@ import { createSyncedPreferenceAtom } from "./synced-preference-atom.js";
++export const sidebarBackgroundThreadsAtom = createSyncedPreferenceAtom("backgroundThreads");
++export const sidebarBackgroundCollapsedAtom = createSyncedPreferenceAtom("backgroundCollapsed");
++
+@@ -46,0 +50,2 @@ export const sidebarShowProviderIconsAtom =
++export const sidebarHideEmptyProjectsAtom =
++  createSyncedPreferenceAtom("hideEmptyProjects");
+diff --git a/source/app/rows/ThreadActionsMenu.tsx b/source/app/rows/ThreadActionsMenu.tsx
+index c9f9497..e122491 100644
 --- a/source/app/rows/ThreadActionsMenu.tsx
 +++ b/source/app/rows/ThreadActionsMenu.tsx
-@@ -51,0 +52 @@
+@@ -51,0 +52 @@ import { THREAD_ROW_ACTIONS } from "./threadRowActions.js";
 +import { FloatItem, useFloatAvailable } from "../studio/FloatItem.js";
-@@ -257,0 +259 @@
+@@ -257,0 +259 @@ function ThreadActionsMenuItems({
 +  const floatAvailable = useFloatAvailable();
-@@ -327 +329,4 @@
+@@ -327 +329,4 @@ function ThreadActionsMenuItems({
 -          {id === "split" && onOpenInSplit ? separator : null}
 +          {id === "split" && floatAvailable ? (
 +            <FloatItem threadId={thread.id} surface={surface} />
 +          ) : null}
 +          {id === "split" && (onOpenInSplit || floatAvailable) ? separator : null}
+diff --git a/source/app/rows/ThreadRow.tsx b/source/app/rows/ThreadRow.tsx
+index 13d58a8..0eaeab6 100644
 --- a/source/app/rows/ThreadRow.tsx
 +++ b/source/app/rows/ThreadRow.tsx
-@@ -97,0 +98 @@
+@@ -97,0 +98 @@ import {
 +import { StudioThreadBadge } from "../studio/StudioThreadBadge.js";
-@@ -595,0 +597 @@
+@@ -595,0 +597 @@ function ThreadRowComponent({
 +              <StudioThreadBadge threadId={thread.id} />
+diff --git a/source/shared/preferences.ts b/source/shared/preferences.ts
+index 98a5200..638a06b 100644
 --- a/source/shared/preferences.ts
 +++ b/source/shared/preferences.ts
-@@ -75,0 +76,6 @@
+@@ -71,0 +72,12 @@ export const preferenceDefinitions = {
++  backgroundThreads: definePreference(
++    z.enum(["grouped", "updates", "hidden", "all"]),
++    "grouped",
++    "Show bot and automation threads in Background, only with updates, hide them, or show them inline.",
 +    null,
 +  ),
++  backgroundCollapsed: definePreference(
++    z.boolean(),
++    true,
++    "Collapse the Background section while keeping its activity indicator visible.",
++    null,
++  ),
+@@ -77,0 +90,6 @@ export const preferenceDefinitions = {
 +  hideEmptyProjects: definePreference(
 +    z.boolean(),
 +    false,
 +    "Hide projects with no visible threads from the sidebar.",
---- a/source/app/preferences/atoms.ts
-+++ b/source/app/preferences/atoms.ts
-@@ -46,0 +47,2 @@
-+export const sidebarHideEmptyProjectsAtom =
-+  createSyncedPreferenceAtom("hideEmptyProjects");
++    null,
++  ),

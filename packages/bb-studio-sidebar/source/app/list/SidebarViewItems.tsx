@@ -1,5 +1,6 @@
 import { HiddenStudioSectionItems, StudioNewProjectItem } from "../studio/StudioHeaderMenuItems.js";
 import { HideEmptyProjectsMenuItems } from "../studio/HideEmptyProjectsMenuItems.js";
+import { BackgroundThreadsMenuItems } from "../studio/BackgroundThreadsMenuItems.js";
 import type { ReactNode } from "react";
 import { useAtom, useAtomValue, useSetAtom } from "jotai";
 import { Icon } from "@/components/ui/icon";
@@ -178,6 +179,7 @@ function SidebarViewItems({ page }: { page: SidebarViewPage }) {
         })}
         </DropdownMenuGroup>
         <HideEmptyProjectsMenuItems />
+        <BackgroundThreadsMenuItems />
       </>
     );
   }
