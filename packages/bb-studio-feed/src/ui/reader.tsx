@@ -550,7 +550,7 @@ function EarlierUpdates({ post }: { post: PostView }) {
 function RailBox({ title, tone, children }: { title: string; tone?: "danger"; children: ReactNode }) {
   return (
     <section className="rounded-lg bg-foreground/[0.04] p-4">
-      <h2 className={cn("mb-2 text-sm font-bold", tone === "danger" && "text-destructive")}>{title}</h2>
+      <h2 className={cn("mb-2 text-sm font-semibold", tone === "danger" && "text-destructive")}>{title}</h2>
       <ol className="space-y-3">{children}</ol>
     </section>
   );
