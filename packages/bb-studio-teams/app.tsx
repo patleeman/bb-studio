@@ -370,8 +370,8 @@ export default definePluginApp((app) => {
     path: "bots",
     component: BotsPage,
   });
-  app.slots.navPanel({ id: "views", title: "Views", icon: "MessagesSquare", path: "views", component: ViewsPage });
-  app.slots.navPanel({ id: "former-channels", title: "Views", icon: "MessagesSquare", path: "channels", component: FormerChannelRedirect });
+  app.slots.navPanel({ id: "views", title: "Views", icon: "MessageSquare", path: "views", component: ViewsPage });
+  app.slots.navPanel({ id: "former-channels", title: "Views", icon: "MessageSquare", path: "channels", component: FormerChannelRedirect });
   app.slots.experimental_appOverlay({ id: "sidebar-sections", component: ViewsSidebar });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });

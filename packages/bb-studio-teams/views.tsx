@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useRef, useState } from "react";
+import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemHeader, ItemTile, PageColumn, SidebarPortal, SidebarSection, useSidebarHosted, useSidebarNavigated } from "@bb-studio/kit/app";
 import { Button, Input } from "@bb-studio/kit/ui";
@@ -24,7 +24,7 @@ export function ViewsSidebar() {
   const { views } = useViews();
   if (!hosted) return null;
   return <SidebarPortal id="thread-views" title="Views"><SidebarSection title="Views" trailing={<button type="button" aria-label="New view" onClick={() => { navigate.toPluginPanel("views", { subPath: "new" }); navigated(); }}><Icon name="Plus" className="size-3.5" /></button>}>
-    {views.filter(v => !v.archived).map(v => <button type="button" key={v.id} className="flex min-h-7 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-state-hover" onClick={() => { navigate.toPluginPanel("views", { subPath: v.id }); navigated(); }}><Icon name="MessagesSquare" className="size-3.5 shrink-0" /><span className="truncate">{v.name}</span></button>)}
+    {views.filter(v => !v.archived).map(v => <button type="button" key={v.id} className="flex min-h-7 w-full items-center gap-2 rounded px-2 text-left text-sm hover:bg-state-hover" onClick={() => { navigate.toPluginPanel("views", { subPath: v.id }); navigated(); }}><Icon name="MessageSquare" className="size-3.5 shrink-0" /><span className="truncate">{v.name}</span></button>)}
   </SidebarSection></SidebarPortal>;
 }
 function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView; open: boolean; onClose(): void; onSaved(view: ThreadView): void }) {
@@ -65,6 +65,10 @@ function ViewDetail({ id }: { id: string }) {
   const [pending, setPending] = useState(false), [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const generation = useRef(0), retry = useRef<{ requestId: string; signature: string } | null>(null);
+  const timeline = useRef<HTMLDivElement>(null), followLatest = useRef(true);
+  useLayoutEffect(() => {
+    if (followLatest.current && timeline.current) timeline.current.scrollTop = timeline.current.scrollHeight;
+  }, [page?.entries.at(-1)?.id]);
   const load = useCallback(() => {
     const seq = ++generation.current;
     void rpc.call("view", { id }).then(next => {
@@ -96,7 +100,7 @@ function ViewDetail({ id }: { id: string }) {
   const renderEntry = (entry: ViewEntry) => {
     const bot = botFor(entry.threadId), thread = page.threads.find(t => t.id === entry.threadId);
     return <li key={entry.id} className="py-4" data-view-entry={entry.role}>
-      <div className="mb-1 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={entry.role === "user" ? null : bot?.avatar || null} kindIcon={entry.role === "user" ? "User" : "Bot"} size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => navigate.toThread(entry.threadId)}>{entry.role === "user" ? "You" : bot?.name || thread?.title || "Thread"}</button><time className="ml-auto shrink-0 text-xs text-muted-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(entry.createdAt)}</time><button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => { setReply(entry.threadId); setTargets([]); }}>Reply</button></div>
+      <div className="mb-1 flex min-w-0 items-center gap-2 text-sm"><ItemTile icon={entry.role === "user" ? null : bot?.avatar || null} kindIcon={entry.role === "user" ? "UserRound" : "Bot"} size="sm" /><button type="button" className="min-w-0 truncate font-medium hover:underline" onClick={() => navigate.toThread(entry.threadId)}>{entry.role === "user" ? "You" : bot?.name || thread?.title || "Thread"}</button><time className="ml-auto shrink-0 text-xs text-muted-foreground" dateTime={new Date(entry.createdAt).toISOString()}>{new Intl.DateTimeFormat(undefined, { dateStyle: "short", timeStyle: "short" }).format(entry.createdAt)}</time><button type="button" className="text-xs text-muted-foreground hover:underline" onClick={() => { setReply(entry.threadId); setTargets([]); }}>Reply</button></div>
       <div className="min-w-0 break-words pl-8"><Markdown content={entry.text} /></div>
     </li>;
   };
@@ -104,9 +108,9 @@ function ViewDetail({ id }: { id: string }) {
   const rootEntries = page.entries.filter(e => roots.has(e.threadId));
   const lastEntry = new Map(rootEntries.map(e=>[e.threadId,e.id]));
   const archive = async () => { try { await rpc.call("viewUpdate", { ...page.view, archived: !page.view.archived, expectedUpdatedAt: page.view.updatedAt }); load(); } catch(e) { setError(message(e)); } };
-  return <div className="flex h-full min-h-0 flex-col" data-thread-view>
+  return <div className="relative flex h-full min-h-0 flex-col" data-thread-view>
     <ItemHeader backLabel="Views" onBack={() => navigate.toPluginPanel("views")} trailing={<><Button variant="ghost" size="sm" onClick={() => setEditing(true)}>Edit view</Button><Button variant="ghost" size="sm" onClick={() => void archive()}>{page.view.archived ? "Restore" : "Archive"}</Button></>} />
-    <div className="min-h-0 flex-1 overflow-auto"><PageColumn><h1 className="mb-4 text-2xl font-semibold">{page.view.name}</h1>
+    <div ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><PageColumn><h1 className="mb-4 text-2xl font-semibold">{page.view.name}</h1>
       <div className="flex flex-wrap gap-x-4 gap-y-1 text-sm">{page.threads.filter(t => !t.parentThreadId).map(t => <button type="button" key={t.id} onClick={() => navigate.toThread(t.id)} className="max-w-64 truncate text-muted-foreground hover:underline">{botFor(t.id)?.name || t.title}{["starting", "active"].includes(t.status) ? " · Working…" : ""}{t.error ? " · Unavailable" : ""}</button>)}</div>
       {page.hasOlder && <Button variant="ghost" size="sm" onClick={() => void rpc.call("view", { id, before: page.entries[0]?.createdAt, beforeId: page.entries[0]?.id }).then(older => setPage(current => current ? { ...current, entries: [...older.entries, ...current.entries], hasOlder: older.hasOlder } : older), e => setError(message(e)))}>Earlier replies</Button>}
       {!page.entries.length && <p className="py-12 text-center text-sm text-muted-foreground">Send a message to start work in this view.</p>}
@@ -127,7 +131,7 @@ export function ViewsPage({ subPath }: PluginNavPanelProps) {
   if (id && id !== "new") return <ViewDetail key={id} id={id} />;
   return <PageColumn><div className="mb-6 flex items-center justify-between"><h1 className="text-2xl font-semibold">Views</h1><Button onClick={() => navigate.toPluginPanel("views", { subPath: "new" })}>New view</Button></div><ErrorMessage error={error} />
     {!views.length && <p className="py-8 text-sm text-muted-foreground">Group bots and threads in one timeline.</p>}
-    <ol>{views.map(v => <li key={v.id}><button type="button" className="flex w-full items-center gap-2 border-b border-border py-3 text-left text-sm hover:bg-state-hover" onClick={() => navigate.toPluginPanel("views", { subPath: v.id })}><Icon name="MessagesSquare" className="size-4" /><span className="min-w-0 flex-1 truncate">{v.name}</span>{v.archived && <span className="text-muted-foreground">Archived</span>}</button></li>)}</ol>
+    <ol>{views.map(v => <li key={v.id}><button type="button" className="flex w-full items-center gap-2 border-b border-border py-3 text-left text-sm hover:bg-state-hover" onClick={() => navigate.toPluginPanel("views", { subPath: v.id })}><Icon name="MessageSquare" className="size-4" /><span className="min-w-0 flex-1 truncate">{v.name}</span>{v.archived && <span className="text-muted-foreground">Archived</span>}</button></li>)}</ol>
     <ViewEditor open={id === "new"} onClose={() => navigate.toPluginPanel("views")} onSaved={v => navigate.toPluginPanel("views", { subPath: v.id })} />
   </PageColumn>;
 }
