@@ -69,6 +69,15 @@ export const MIGRATIONS = [
       UPDATE conversations SET key='thread:'||thread_id,
         json=json_remove(json_set(json,'$.key','thread:'||thread_id),'$.archivedAt','$.originalKey')
         WHERE json_extract(json,'$.kind')='admin';`,
+  // Saved views reference normal threads. Old channel transcripts remain stored,
+  // but are never replayed into the new conversations.
+  `CREATE TABLE IF NOT EXISTS thread_views (id TEXT PRIMARY KEY, json TEXT NOT NULL);
+   CREATE TABLE IF NOT EXISTS view_threads (view_id TEXT NOT NULL, thread_id TEXT NOT NULL, bot_id TEXT, PRIMARY KEY(view_id,thread_id));
+   CREATE INDEX IF NOT EXISTS views_by_thread ON view_threads(thread_id);
+   CREATE TABLE IF NOT EXISTS view_entries (id TEXT PRIMARY KEY, thread_id TEXT NOT NULL, created_at INTEGER NOT NULL, json TEXT NOT NULL);
+   CREATE INDEX IF NOT EXISTS view_entries_by_thread ON view_entries(thread_id,created_at);
+   CREATE TABLE IF NOT EXISTS view_sends (id TEXT PRIMARY KEY, view_id TEXT NOT NULL, json TEXT NOT NULL);
+   CREATE TABLE IF NOT EXISTS view_migrations (room_id TEXT PRIMARY KEY, completed_at INTEGER NOT NULL);`,
 ];
 
 /** Used by isolated store tests; production uses bb.storage.migrate. */

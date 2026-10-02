@@ -19,14 +19,16 @@ test("migrates a database created before migration tracking without losing data"
 test("former direct messages become threads with a profile, listed to be shown once", async () => {
   const host = createFakePluginHost({ pluginId: "bot-teams" });
   const db = host.bb.storage.database();
-  for (const statement of MIGRATIONS.slice(0, -1)) db.exec(statement);
+  const profileMigration = MIGRATIONS.findIndex(sql => sql.includes("CREATE TABLE IF NOT EXISTS profile_threads_to_show"));
+  expect(profileMigration).toBeGreaterThan(0);
+  for (const statement of MIGRATIONS.slice(0, profileMigration)) db.exec(statement);
   const insert = db.prepare("INSERT INTO conversations VALUES (?,?,?,?,?)");
   const conversation = (id: string, key: string, kind: string, extra = {}) =>
     insert.run(id, "bot_0123456789abcdef", key, `thr_${id}`, JSON.stringify({ id, botId: "bot_0123456789abcdef", key, threadId: `thr_${id}`, title: "Chat", kind, createdAt: 1, ...extra }));
   conversation("current", "admin", "admin");
   conversation("earlier", "history:1", "admin", { archivedAt: 2, originalKey: "admin" });
   conversation("work", "group:room", "group");
-  db.exec(MIGRATIONS.at(-1)!);
+  db.exec(MIGRATIONS[profileMigration]!);
   const store = new Store(db);
   expect(store.conversations("bot_0123456789abcdef").map((c) => [c.key, c.archivedAt, c.originalKey])).toEqual([
     ["group:room", undefined, undefined],
