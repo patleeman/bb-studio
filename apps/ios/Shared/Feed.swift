@@ -25,6 +25,10 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
     public var projectId: String?
     public var channelId: String?
     public var channelName: String?
+    /// What its thread is called: "#channel", or the thread's title.
+    public var threadTitle: String?
+    /// Read with the rest of its story. Servers from before per-post read state leave it out.
+    @ReadByDefault public var read: Bool
     public var createdAt: Double
     public var updatedAt: Double
     public var editedBy: String?
@@ -38,6 +42,12 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
 
     public var created: Date { Date(timeIntervalSince1970: createdAt / 1000) }
 
+    /// Discuss's item for the thread it came from: "Open #ops", or the thread's title.
+    public var openThreadLabel: String {
+        if let threadTitle, !threadTitle.isEmpty { return "Open \(threadTitle)" }
+        return channelName.map { "Open #\($0)" } ?? "Open thread"
+    }
+
     /// App path that opens it in BB web, and that notifications carry.
     public var href: String { "/plugins/feed/feed/\(id)" }
 
@@ -47,11 +57,23 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
     }
 }
 
+/// A flag that decodes as true when it's missing.
+@propertyWrapper
+public struct ReadByDefault: Decodable, Hashable, Sendable {
+    public var wrappedValue: Bool
+    public init(wrappedValue: Bool) { self.wrappedValue = wrappedValue }
+    public init(from decoder: Decoder) throws { wrappedValue = try decoder.singleValueContainer().decode(Bool.self) }
+}
+
+extension KeyedDecodingContainer {
+    func decode(_ type: ReadByDefault.Type, forKey key: Key) throws -> ReadByDefault {
+        try decodeIfPresent(type, forKey: key) ?? ReadByDefault(wrappedValue: true)
+    }
+}
+
 public struct FeedPage: Decodable, Sendable {
     public var posts: [FeedPost]
     public var nextCursor: String?
-    /// When you last read the feed; posts after it are new.
-    public var lastSeenAt: Double
 }
 
 extension BBClient {
@@ -103,12 +125,20 @@ extension BBClient {
         let _: JSONValue = try await rpc("feed", "remove", ["postId": .string(id)])
     }
 
-    /// Everything up to now is read.
+    /// Marks a post read or unread, with the rest of its story.
+    @discardableResult
+    public func markFeedPost(_ id: String, read: Bool) async throws -> FeedPost? {
+        struct Result: Decodable { var post: FeedPost? }
+        let result: Result = try await rpc("feed", "read", ["postId": .string(id), "read": .bool(read)])
+        return result.post
+    }
+
+    /// Marks everything up to now read, on every device.
     public func markFeedSeen() async throws {
         let _: JSONValue = try await rpc("feed", "seen", .object([:]))
     }
 
-    /// Stories with a post since you last read the feed.
+    /// Stories with an unread post.
     public func feedUnread() async throws -> Int {
         struct Result: Decodable { var count: Int }
         let result: Result = try await rpc("feed", "unread", .object([:]))

@@ -8,8 +8,6 @@ struct FeedView: View {
     @State private var topic: String?
     @State private var query = ""
     @State private var nextCursor: String?
-    /// Posts after this were new when the feed opened.
-    @State private var lastSeenAt: Double?
     @State private var loaded = false
     @State private var loadingMore = false
     @State private var error: String?
@@ -22,18 +20,7 @@ struct FeedView: View {
             if topics.count > 1 {
                 Section { topicBar }.listRowInsets(EdgeInsets()).listRowBackground(Color.clear)
             }
-            let fresh = posts.filter { isNew($0) }
-            let earlier = posts.filter { !isNew($0) }
-            if !fresh.isEmpty {
-                Section("New") { ForEach(fresh) { row($0) } }
-            }
-            if !earlier.isEmpty {
-                Section {
-                    ForEach(earlier) { row($0) }
-                } header: {
-                    if !fresh.isEmpty { Text("Earlier") }
-                }
-            }
+            ForEach(posts) { row($0) }
             if nextCursor != nil {
                 Button { Task { await loadMore() } } label: {
                     if loadingMore { ProgressView() } else { Text("More") }
@@ -56,6 +43,12 @@ struct FeedView: View {
             }
         }
         .navigationTitle(topic ?? "Feed")
+        .toolbar {
+            if posts.contains(where: { !$0.read }) {
+                Button("Mark all read") { Task { await markAllRead() } }
+                .accessibilityIdentifier("feedMarkAllRead")
+            }
+        }
         .searchable(text: $query, prompt: "Search the feed")
         .refreshable { await load() }
         .task(id: "\(topic ?? "")|\(query)") {
@@ -66,9 +59,11 @@ struct FeedView: View {
         .task {
             listener = app.realtime.listen { event in
                 guard case .pluginSignal(let pluginId, _, _) = event, pluginId == "feed" else { return }
-                Task { await load(markSeen: false) }
+                Task { await load() }
             }
         }
+        // Back from a post, which marked its story read.
+        .onAppear { if loaded { Task { await load() } } }
         .onDisappear { if let listener { app.realtime.removeListener(listener) } }
         .confirmationDialog(
             "Remove \u{201C}\(removing?.title ?? "")\u{201D}?",
@@ -109,9 +104,13 @@ struct FeedView: View {
 
     private func row(_ post: FeedPost) -> some View {
         NavigationLink(value: Route.feedPost(id: post.id)) {
-            FeedRow(post: post, new: isNew(post))
+            FeedRow(post: post)
         }
         .swipeActions(edge: .leading) {
+            Button { Task { await markRead(post, !post.read) } } label: {
+                Label(post.read ? "Unread" : "Read", systemImage: post.read ? "circle.fill" : "circle")
+            }
+            .tint(.accentColor)
             Button { Task { await resolve(post) } } label: {
                 Label(post.isResolved ? "Reopen" : "Resolve", systemImage: post.isResolved ? "arrow.uturn.backward" : "checkmark")
             }
@@ -123,7 +122,7 @@ struct FeedView: View {
         .contextMenu {
             if let threadId = post.threadId {
                 Button { app.push(.thread(id: threadId)) } label: {
-                    Label(post.channelName.map { "Open #\($0)" } ?? "Open thread", systemImage: "bubble.left")
+                    Label(post.openThreadLabel, systemImage: "bubble.left")
                 }
             }
             Button { app.newThread(text: post.discussPrompt) } label: {
@@ -132,23 +131,16 @@ struct FeedView: View {
         }
     }
 
-    private func isNew(_ post: FeedPost) -> Bool {
-        guard let lastSeenAt, lastSeenAt > 0 else { return false }
-        return post.createdAt > lastSeenAt
-    }
-
-    /// The first load marks the feed read; what was new stays marked until you leave.
-    private func load(markSeen: Bool = true) async {
+    /// Loading leaves read state alone; opening a post or Mark all read changes it.
+    private func load() async {
         do {
             async let names = try? app.client.feedTopics()
             let page = try await app.client.feed(topic: topic, query: query)
-            if lastSeenAt == nil { lastSeenAt = page.lastSeenAt }
             posts = page.posts
             nextCursor = page.nextCursor
             topics = await names ?? topics
             error = nil
             loaded = true
-            if markSeen { try? await app.client.markFeedSeen() }
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
             loaded = true
@@ -163,6 +155,27 @@ struct FeedView: View {
         let ids = Set(posts.map(\.id))
         posts += page.posts.filter { !ids.contains($0.id) }
         nextCursor = page.nextCursor
+    }
+
+    /// The whole story, as the server marks it.
+    private func markRead(_ post: FeedPost, _ read: Bool) async {
+        do {
+            try await app.client.markFeedPost(post.id, read: read)
+            for index in posts.indices where posts[index].id == post.id || (post.story != nil && posts[index].story == post.story) {
+                posts[index].read = read
+            }
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+    }
+
+    private func markAllRead() async {
+        do {
+            try await app.client.markFeedSeen()
+            for index in posts.indices { posts[index].read = true }
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
     }
 
     private func resolve(_ post: FeedPost) async {
@@ -187,17 +200,17 @@ struct FeedView: View {
     }
 }
 
-/// A feed row: title, who and where, topic, age, earlier updates and linked sites.
+/// A feed row: title, who and where, topic, age, earlier updates and linked sites. Unread rows are bold with a dot.
 struct FeedRow: View {
     let post: FeedPost
-    var new = false
 
     var body: some View {
         HStack(alignment: .firstTextBaseline, spacing: 8) {
-            Circle().fill(new ? Color.accentColor : .clear).frame(width: 7, height: 7)
+            Circle().fill(post.read ? .clear : Color.accentColor).frame(width: 7, height: 7)
             VStack(alignment: .leading, spacing: 4) {
                 Text(post.title)
-                    .font(.body.weight(.semibold))
+                    .font(.body.weight(post.read ? .regular : .semibold))
+                    .foregroundStyle(post.read ? .secondary : .primary)
                     .lineLimit(3)
                 if !post.preview.isEmpty {
                     Text(post.preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
@@ -263,6 +276,8 @@ struct FeedPostView: View {
     @State private var error: String?
     @State private var confirmingRemove = false
     @State private var listener: UUID?
+    /// Opening it marks its story read, once, so Mark Unread sticks.
+    @State private var markedRead = false
 
     var body: some View {
         Group {
@@ -310,6 +325,9 @@ struct FeedPostView: View {
                     ShareLink(item: URL(string: post.href, relativeTo: app.serverURL)!.absoluteURL) {
                         Label("Share link", systemImage: "square.and.arrow.up")
                     }
+                    Button { Task { await markRead(post, !post.read) } } label: {
+                        Label(post.read ? "Mark unread" : "Mark read", systemImage: post.read ? "circle.fill" : "circle")
+                    }
                     Button(role: .destructive) { confirmingRemove = true } label: { Label("Remove", systemImage: "trash") }
                 } label: {
                     Label("More", systemImage: "ellipsis")
@@ -341,7 +359,7 @@ struct FeedPostView: View {
             Menu {
                 if let threadId = post.threadId {
                     Button { app.push(.thread(id: threadId)) } label: {
-                        Label(post.channelName.map { "Open #\($0)" } ?? "Open thread", systemImage: "bubble.left")
+                        Label(post.openThreadLabel, systemImage: "bubble.left")
                     }
                 }
                 Button { app.newThread(text: post.discussPrompt) } label: {
@@ -369,12 +387,25 @@ struct FeedPostView: View {
                 return
             }
             self.post = post
+            if !post.read, !markedRead {
+                markedRead = true
+                if let updated = try? await app.client.markFeedPost(id, read: true) { self.post = updated }
+            }
             if let key = post.story, post.storyPosts > 1 {
                 story = (try? await app.client.feedStory(key)) ?? []
             } else {
                 story = []
             }
             error = nil
+        } catch {
+            self.error = BBClient.describe(error, server: app.client.baseURL)
+        }
+    }
+
+    private func markRead(_ post: FeedPost, _ read: Bool) async {
+        markedRead = true
+        do {
+            if let updated = try await app.client.markFeedPost(post.id, read: read) { self.post = updated }
         } catch {
             self.error = BBClient.describe(error, server: app.client.baseURL)
         }
