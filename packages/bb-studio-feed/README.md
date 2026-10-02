@@ -42,10 +42,13 @@ When the thread goes idle, the reply is published. The body is everything
 before the line. The reply stays where it was written, in the thread or the
 channel, and a card shows the post it made.
 
-Agents post only when their task, their automation's prompt, or you ask them
-to. An automation that should report somewhere ends its prompt with something
-like "post the result to the feed". An automation with nothing to say leaves
-the line out, and nothing is posted.
+Agents post when their task, their automation's prompt, or you ask them to.
+They also post the result of a scheduled or automated run on their own when
+it's worth reading later: a digest, report, alert or finding. A run with
+nothing to say, or one that ends in `[PASS]`, leaves the line out, and nothing
+is posted. To steer an automation's posts, end its prompt with the title,
+topic and story to use. Agents are told to lead with a picture when they have
+one and to link the source first, which the feed shows as a card.
 
 - **`title`** is required. **`topic`** is a short section name.
 - **`story`** groups follow-ups. Posts with the same key are one story. The
