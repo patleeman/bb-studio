@@ -365,7 +365,7 @@ function RecordingDetail({ id }: { id: string }) {
             <button type="button" aria-label="Copy transcript" title="Copy transcript" className={ICON_BUTTON} disabled={transcript === ""} onClick={copy}>
               <Icon name="Copy" className="size-4" />
             </button>
-            <ItemMenu onDelete={() => setConfirmDelete(true)} deleteDisabled={activeHere || recording.status === "recording"}>
+            <ItemMenu reference={{ title: recording.title, href: recordingHref(recording.id) }} onDelete={() => setConfirmDelete(true)} deleteDisabled={activeHere || recording.status === "recording"}>
 
                 <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}>
                   <Icon name="MessageSquarePlus" className="size-4" /> New thread

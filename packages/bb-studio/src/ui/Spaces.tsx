@@ -2,6 +2,7 @@
 // channels and projects, and the dialogs that make a space and fill it. Spaces are
 // protected tags (src/spaces.ts); only the user makes one here.
 import {
+  CopyReferenceMenuItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -10,6 +11,8 @@ import {
   DropdownMenuTrigger,
   GHOST_BUTTON,
   Icon,
+  ItemLinkText,
+  ItemLinkTextarea,
   ItemTile,
   OUTLINE_BUTTON,
   PageColumn,
@@ -20,9 +23,10 @@ import {
   type CollectionItem,
   type CollectionKind,
   type Project,
+  type StudioItemLink,
 } from "@bb-studio/kit/app";
 import { errorMessage, plural, relativeTime, untitled } from "@bb-studio/kit/format";
-import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input, Textarea } from "@bb-studio/kit/ui";
+import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@bb-studio/kit/ui";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -335,10 +339,10 @@ export function SpaceHome({
           {space.icon ? `${space.icon} ` : ""}
           {space.name}
         </h1>
-        <SpaceMenu onEdit={onEdit} onDelete={onDelete} />
+        <SpaceMenu reference={{ href: spaceHref(space.id), title: space.name, ...(space.icon ? { icon: space.icon } : {}) }} onEdit={onEdit} onDelete={onDelete} />
       </div>
       {space.description ? (
-        <p className="mt-2 text-muted-foreground">{space.description}</p>
+        <p className="mt-2 whitespace-pre-wrap text-muted-foreground"><ItemLinkText text={space.description} /></p>
       ) : (
         <button type="button" className={`${GHOST_BUTTON} mt-1 -ml-2.5 text-muted-foreground`} onClick={onEdit}>
           Say what this space is for
@@ -405,7 +409,7 @@ export function SpaceHome({
 }
 
 /** The space's options menu, beside its title. */
-export function SpaceMenu({ onEdit, onDelete }: { onEdit(): void; onDelete(): void }) {
+export function SpaceMenu({ reference, onEdit, onDelete }: { reference: StudioItemLink; onEdit(): void; onDelete(): void }) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -418,6 +422,7 @@ export function SpaceMenu({ onEdit, onDelete }: { onEdit(): void; onDelete(): vo
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-48">
+        <CopyReferenceMenuItem item={reference} />
         <DropdownMenuItem onSelect={onEdit}>
           <Icon name="Pencil" className="size-4" /> Edit space
         </DropdownMenuItem>
@@ -512,7 +517,14 @@ export function SpaceDialog({
           </div>
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">What it's for</span>
-            <Textarea rows={2} value={description} maxLength={500} onChange={(event) => setDescription(event.target.value)} />
+            <ItemLinkTextarea
+              rows={2}
+              value={description}
+              maxLength={500}
+              placeholder="Type @ to link a page, board or other item"
+              onValueChange={setDescription}
+              className="w-full rounded-md border border-input bg-transparent px-3 py-2 text-sm placeholder:text-muted-foreground focus-visible:ring-1 focus-visible:ring-ring focus-visible:outline-none"
+            />
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-xs font-medium text-muted-foreground">Default project</span>

@@ -1,5 +1,6 @@
 // Moving Studio items and threads in one gesture, anywhere on screen:
-// - right-click one for Open, Float, Open in split, Copy link, New thread;
+// - right-click one for Open, Float, Open in split, Copy link, Copy reference
+//   (which pastes into a page as a pill), New thread;
 // - Mod-click to open it in a split, Shift-click to float it;
 // - drag it onto the floating panel (or the corner, with no panel) to float it.
 // Items are marked with the kit's studioItemProps or studioThreadProps, and
@@ -7,6 +8,7 @@
 // Shift+right-click, keep their usual behavior.
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import {
+  CopyReferenceMenuItem,
   cn,
   dropTarget,
   DropdownMenu,

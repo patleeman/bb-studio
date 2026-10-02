@@ -187,7 +187,7 @@ export function ArtifactViewer({
       <a aria-label="Download" title="Download" className={ICON_BUTTON} href={contentUrl(artifactId, version.id, { download: true })} download={version.name}>
         <Icon name="Download" className="size-4" />
       </a>
-      <ItemMenu projects={projects} projectId={artifact.projectId} onMove={(id) => void move(id)} onDelete={() => setConfirmDelete(true)} busy={busy}>
+      <ItemMenu reference={thread} projects={projects} projectId={artifact.projectId} onMove={(id) => void move(id)} onDelete={() => setConfirmDelete(true)} busy={busy}>
 
           <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread

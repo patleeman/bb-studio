@@ -430,7 +430,7 @@ export function DrawingEditor({
       <button type="button" aria-label="Copy image" title="Copy image" className={ICON_BUTTON} onClick={() => void copyImage()}>
         <Icon name="Copy" className="size-4" />
       </button>
-      <ItemMenu onDelete={() => setConfirmDelete(true)} className="w-52">
+      <ItemMenu reference={thread} onDelete={() => setConfirmDelete(true)} className="w-52">
 
           {threadId ? null : (
             <DropdownMenuItem className="md:hidden" onSelect={() => openNewItemThread(navigate, thread)}>

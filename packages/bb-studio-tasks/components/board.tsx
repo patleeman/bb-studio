@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type DragEvent, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
+  CopyReferenceMenuItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -18,7 +19,7 @@ import {
   type Project,
 } from "@bb-studio/kit/app";
 import { errorMessage, plural, untitled } from "@bb-studio/kit/format";
-import { type TaskStatus } from "../src/shared";
+import { taskHref, type TaskStatus } from "../src/shared";
 import { BoardHeader, BoardMissing } from "./boards";
 import { AddColumn, ColumnMenu, ColumnTitle, MAX_COLUMNS, columnId, withColumn, type BoardColumn } from "./columns";
 import { AssigneeChip, DueChip, HandoffBadge, STATUS_ICONS } from "./pieces";
@@ -488,6 +489,7 @@ function TaskCard({
               </DropdownMenuItem>
             ))}
             <DropdownMenuSeparator />
+            <CopyReferenceMenuItem item={{ href: taskHref(task.id), title: untitled(task.title) }} />
             <DropdownMenuItem onSelect={() => onArchive(task)}>
               <Icon name="Archive" className="size-4" /> Archive
             </DropdownMenuItem>

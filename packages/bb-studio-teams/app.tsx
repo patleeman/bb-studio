@@ -17,7 +17,7 @@ import type {
   Room,
   rpcContract,
 } from "./contract";
-import { AddOnCollection, ComposerMore, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, ComposerMore, CopyReferenceMenuItem, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
 import {
@@ -42,7 +42,7 @@ import { ThreadBadges } from "./thread-badges";
 import { ProfileThreads } from "./profile-threads";
 import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
-import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID } from "./studio-provider";
+import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID, botHref } from "./studio-provider";
 import {
   Badge,
   DropdownMenu,
@@ -180,6 +180,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
                 </button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-52">
+                <CopyReferenceMenuItem item={{ href: botHref(id), title: bot.name }} />
                 <DropdownMenuItem
                   disabled={pending || !!bot.retired}
                   onSelect={() => void action(() => rpc.call("wake", { id }))}

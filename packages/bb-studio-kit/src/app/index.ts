@@ -19,7 +19,9 @@ export { EditableTitle, ItemHeader, openNewItemThread, useNewItemThread, type It
 export { RelatedPanel, type RelatedRef } from "./related-panel";
 export { SpaceMark, SpaceMenuItems, SpacePicker, type MenuSpace } from "./space-picker";
 export { spaceMembership, type SpaceHolder, type SpaceMembership } from "./space-state";
-export { ItemDeleteConfirm, ItemMenu } from "./item-menu";
+export { CopyReferenceMenuItem, copyReferenceWithToast, ItemDeleteConfirm, ItemMenu } from "./item-menu";
+export { ITEM_LINK_PILLS, ITEM_PILL, ItemLinkText, ItemLinkTextarea, ItemPill, mentionQuery, splitItemLinks } from "./item-links";
+export { copyItemReference, ITEM_REFERENCE_TYPE, itemReferenceFrom, itemReferenceText, parseItemReference } from "./item-reference";
 export { ItemDirectiveCard } from "./directive-card";
 export { openAppPath, studioPath } from "./nav";
 export {

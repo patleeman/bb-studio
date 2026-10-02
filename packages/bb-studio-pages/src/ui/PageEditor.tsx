@@ -12,6 +12,7 @@ import {
 } from "@blocknote/react";
 import { BlockNoteView } from "@blocknote/shadcn";
 import "@blocknote/shadcn/style.css";
+import { itemReferenceFrom } from "@bb-studio/kit/app";
 import { useRpc, useSdk } from "@get-bb/plugin-sdk/app";
 import { toast } from "sonner";
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
@@ -19,7 +20,7 @@ import { Icon } from "@bb-studio/kit/ui";
 import { HUMAN_USER_ID, MAX_UPLOAD_BYTES, PLUGIN_ID, UPLOAD_PATH } from "../constants";
 import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, SPACE_SECTIONS, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
-import { linkEmbed } from "./links";
+import { linkEmbed, referenceMention } from "./links";
 import { PageSideMenu, placeEmbed } from "./block-menu";
 import { focusNewTask } from "./live-embeds";
 import { pageSpaceId, SPACE_SECTION_LABELS } from "./space-embeds";
@@ -137,6 +138,8 @@ export function PageEditor({
   const rpc = useRpc<typeof rpcContract>();
   const ui = usePagesUi();
   const dark = useDarkMode();
+  const uiRef = useRef(ui);
+  uiRef.current = ui;
   const botsRef = useRef(bots);
   botsRef.current = bots;
   const pagesRef = useRef(pages);
@@ -189,6 +192,19 @@ export function PageEditor({
       // BlockNote eases nesting changes over 0.3s, which makes Tab feel slow.
       animations: false,
       pasteHandler: ({ event, editor, defaultPasteHandler }) => {
+        // A copied item reference becomes a mention pill, or a link when it isn't a Studio item Pages knows.
+        const reference = itemReferenceFrom(event.clipboardData);
+        if (reference) {
+          const label = untitled(reference.title ?? "");
+          void uiRef.current.studioItems().catch(() => []).then((items) => {
+            const mention = referenceMention(reference.href, items);
+            editor.insertInlineContent([
+              mention ? ({ type: "mention", props: { ...mention, label } } as never) : { type: "link", href: reference.href, content: label },
+              " ",
+            ]);
+          });
+          return true;
+        }
         const embed = linkEmbed(event.clipboardData?.getData("text/plain") ?? "", window.location.origin);
         const block = editor.getTextCursorPosition().block;
         if (!embed || block.type !== "paragraph" || !Array.isArray(block.content) || block.content.length > 0) return defaultPasteHandler();

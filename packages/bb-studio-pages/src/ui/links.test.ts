@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { linkEmbed } from "./links";
+import { linkEmbed, referenceMention } from "./links";
 
 const ORIGIN = "http://127.0.0.1:38886";
 
@@ -36,4 +36,11 @@ describe("linkEmbed", () => {
     expect(linkEmbed("mailto:me@example.com", ORIGIN)).toBeNull();
     expect(linkEmbed("example.com", ORIGIN)).toBeNull();
   });
+});
+
+it("turns a pasted reference into a page or item mention", () => {
+  const items = [{ pluginId: "studio-tables", id: "tbl_1", href: "/plugins/studio-tables/tables/tbl_1" }];
+  expect(referenceMention("/plugins/pages/pages/pg_0123456789ab", items)).toEqual({ kind: "page", target: "pg_0123456789ab" });
+  expect(referenceMention("/plugins/studio-tables/tables/tbl_1/view/v_1", items)).toEqual({ kind: "item", target: "studio-tables:tbl_1" });
+  expect(referenceMention("/plugins/feed/feed/p_1", items)).toBeNull();
 });

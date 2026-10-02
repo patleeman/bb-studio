@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
 import { Icon } from "../ui/icon";
+import { ItemLinkText, ItemLinkTextarea } from "./item-links";
 import { useStudioPresent } from "./presence";
 import { studioItemProps } from "./studio-item";
 
@@ -83,14 +84,14 @@ export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
       {threads.length ? threads.map((thread) => <a key={thread.threadId} href={`/threads/${thread.threadId}`} className="block rounded px-2 py-1.5 text-sm hover:bg-state-hover">{thread.role}<span className="block text-xs text-muted-foreground">{thread.state}</span></a>) : <p className="px-2 text-sm text-muted-foreground">No threads yet.</p>}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Comments</div>
       {rootComments.length ? rootComments.map((comment) => <div key={comment.id} className="border-b border-border/70 px-2 py-2 last:border-b-0">
-        <p className="whitespace-pre-wrap break-words text-sm">{comment.body}</p>
-        {comments.filter((reply) => reply.parentId === comment.id).map((reply) => <p key={reply.id} className="mt-2 border-l border-border pl-2 text-sm whitespace-pre-wrap break-words">{reply.body}</p>)}
+        <p className="whitespace-pre-wrap break-words text-sm"><ItemLinkText text={comment.body} /></p>
+        {comments.filter((reply) => reply.parentId === comment.id).map((reply) => <p key={reply.id} className="mt-2 border-l border-border pl-2 text-sm whitespace-pre-wrap break-words"><ItemLinkText text={reply.body} /></p>)}
         <div className="mt-2 flex items-center gap-3 text-xs">
           {comment.resolvedAt ? <span className="text-muted-foreground">Resolved</span> : <button type="button" disabled={busy} onClick={() => setReplyTo(replyTo === comment.id ? null : comment.id)} className="text-foreground underline-offset-2 hover:underline focus-visible:underline">Reply</button>}
           <button type="button" disabled={busy} onClick={() => resolveComment(comment.id, !comment.resolvedAt)} className="text-foreground underline-offset-2 hover:underline focus-visible:underline">{comment.resolvedAt ? "Reopen" : "Resolve"}</button>
         </div>
         {replyTo === comment.id && !comment.resolvedAt ? <form className="mt-2 flex flex-col gap-1" onSubmit={(event) => { event.preventDefault(); const body = replyText.trim(); if (body) createComment(body, comment.id); }}>
-          <textarea aria-label="Reply to comment" rows={2} value={replyText} onChange={(event) => setReplyText(event.target.value)} className="w-full resize-y rounded border border-border bg-background px-2 py-1 text-sm" />
+          <ItemLinkTextarea aria-label="Reply to comment" placeholder="Reply… @ links an item" rows={2} value={replyText} onValueChange={setReplyText} className="w-full resize-y rounded border border-border bg-background px-2 py-1 text-sm" />
           <button type="submit" disabled={busy || !replyText.trim()} className="self-end rounded border border-border px-2 text-sm disabled:opacity-50">Post reply</button>
         </form> : null}
       </div>) : <p className="px-2 text-sm text-muted-foreground">No comments yet.</p>}
@@ -99,7 +100,7 @@ export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
         const body = commentText.trim();
         if (!body) return;
         createComment(body, null);
-      }}><input aria-label="New comment" value={commentText} onChange={(event) => setCommentText(event.target.value)} className="min-w-0 flex-1 rounded border border-border bg-background px-2 text-sm" /><button type="submit" disabled={busy || !commentText.trim()} className="rounded border border-border px-2 text-sm disabled:opacity-50">Post</button></form> : null}
+      }}><ItemLinkTextarea aria-label="New comment" placeholder="Comment… @ links an item" rows={1} value={commentText} onValueChange={setCommentText} wrapperClassName="min-w-0 flex-1" onKeyDown={(event) => { if (event.key === "Enter" && !event.shiftKey) { event.preventDefault(); event.currentTarget.form?.requestSubmit(); } }} className="block w-full resize-none rounded border border-border bg-background px-2 py-1 text-sm" /><button type="submit" disabled={busy || !commentText.trim()} className="rounded border border-border px-2 text-sm disabled:opacity-50">Post</button></form> : null}
       {error ? <p role="alert" className="px-2 text-xs text-destructive">{error}</p> : null}
       <div className="mt-3 mb-2 text-xs font-semibold text-muted-foreground">Versions</div>
       {versions.length ? versions.map((version) => <p key={version.id} className="rounded px-2 py-1 text-sm">{version.label}<span className="block text-xs text-muted-foreground">{new Date(version.createdAt).toLocaleString()}</span></p>) : <p className="px-2 text-sm text-muted-foreground">No saved versions.</p>}

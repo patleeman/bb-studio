@@ -15,6 +15,8 @@ import {
   Icon,
   ItemHeader,
   ItemDeleteConfirm,
+  ITEM_LINK_PILLS,
+  ItemLinkTextarea,
   ItemMenu,
   openNewItemThread,
   OUTLINE_BUTTON,
@@ -181,7 +183,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
       <button type="button" className={FLOATING_BUTTON} onClick={() => void move(done ? (columns.find((column) => column.id !== "done")?.id ?? "todo") : "done")}>
         <Icon name={done ? "RotateCcw" : "CircleCheck"} /> {done ? "Reopen" : "Mark done"}
       </button>
-      <ItemMenu projects={projects} projectId={task.projectId} onMove={(id) => void update({ projectId: id })} onDelete={() => setConfirmDelete(true)} className="w-60">
+      <ItemMenu reference={thread} projects={projects} projectId={task.projectId} onMove={(id) => void update({ projectId: id })} onDelete={() => setConfirmDelete(true)} className="w-60">
 
           {!done && openThreads ? (
             <DropdownMenuItem onSelect={() => void move("done", true)}>
@@ -342,7 +344,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
         </Section>
 
         <Section title="Description">
-          <Description text={task.description} onSave={(description) => update({ description })} />
+          <Description text={task.description} selfHref={taskHref(taskId)} onSave={(description) => update({ description })} />
         </Section>
 
         <Section title="Links">
@@ -472,21 +474,23 @@ function LatestHandoff({ handoff, task, onSendBack }: { handoff: Handoff; task: 
   );
 }
 
-function Description({ text, onSave }: { text: string; onSave(text: string): Promise<unknown> }) {
+function Description({ text, selfHref, onSave }: { text: string; selfHref: string; onSave(text: string): Promise<unknown> }) {
   const [editing, setEditing] = useState(false);
   const [draft, setDraft] = useState(text);
 
   if (editing) {
     return (
       <div className="flex flex-col gap-2">
-        <textarea
+        <ItemLinkTextarea
           autoFocus
           aria-label="Description"
+          placeholder="Markdown. Type @ to link a Studio item."
+          selfHref={selfHref}
           value={draft}
           rows={Math.min(20, Math.max(5, draft.split("\n").length + 1))}
           maxLength={20_000}
           className="w-full resize-y rounded-md border border-border bg-background px-3 py-2 font-mono text-sm outline-none focus:ring-1 focus:ring-ring"
-          onChange={(event) => setDraft(event.currentTarget.value)}
+          onValueChange={setDraft}
           onKeyDown={(event) => {
             if (event.key === "Escape") setEditing(false);
             if (event.key === "Enter" && (event.metaKey || event.ctrlKey)) {
@@ -529,7 +533,7 @@ function Description({ text, onSave }: { text: string; onSave(text: string): Pro
   }
   return (
     <div className="group relative rounded-md">
-      <Markdown content={text} className="text-sm" />
+      <Markdown content={text} className={cn("text-sm", ITEM_LINK_PILLS)} />
       <button
         type="button"
         aria-label="Edit description"

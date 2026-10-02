@@ -54,6 +54,7 @@ import {
 } from "./selection";
 import { TagChips, TagDot, TagMenuItems, TagNameInput, type CollectionTag } from "./tags";
 import { openFloat, useFloatAvailable } from "./float";
+import { CopyReferenceMenuItem } from "./item-menu";
 import { floatPanelFor } from "./float-registry";
 import { useOpenTarget } from "./move";
 import { STUDIO_ITEM_CLICKS_OFF, studioItemProps } from "./studio-item";
@@ -481,6 +482,7 @@ export function CollectionPage({
           <DropdownMenuItem onSelect={() => handlers.onNewThread([item])}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread with this
           </DropdownMenuItem>
+          {item.href ? <CopyReferenceMenuItem item={{ href: item.href, title: untitled(item.title), ...(item.icon ? { icon: item.icon } : {}) }} /> : null}
           {handlers.onDuplicate && kind?.capabilities?.duplicate ? <DropdownMenuItem onSelect={() => void handlers.onDuplicate!(item)}><Icon name="Copy" className="size-4" /> Duplicate</DropdownMenuItem> : null}
           {handlers.onSetTemplate && kind?.capabilities?.templates ? <DropdownMenuItem onSelect={() => void handlers.onSetTemplate!(item, !item.template)}><Icon name="Star" className="size-4" /> {item.template ? "Remove template" : "Save as template"}</DropdownMenuItem> : null}
           {handlers.onExport && kind?.capabilities?.export ? <DropdownMenuSub><DropdownMenuSubTrigger><Icon name="Download" className="size-4" /> Export</DropdownMenuSubTrigger><DropdownMenuSubContent>

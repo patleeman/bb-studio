@@ -1,6 +1,7 @@
 // Pasting a lone link on an empty line turns it into an embed: a page,
 // thread, drawing, artifact, recording, task, board or live table for a BB
 // link, a bookmark for anything else on the web.
+import { itemAtPath } from "@bb-studio/kit/contract";
 import { parseTableSubPath, tableSubPath } from "@bb-studio/kit/tables";
 import { STUDIO_EMBEDS, boardTarget, isEmbedKindItem, type EmbedKind, type StudioEmbedKind } from "../schema-config";
 
@@ -48,4 +49,15 @@ export function linkEmbed(text: string, origin: string): { kind: EmbedKind; targ
     if (item) return item;
   }
   return { kind: "bookmark", target: url.toString() };
+}
+
+/** The mention a pasted item reference makes: a page, or an item the Studio index lists. */
+export function referenceMention(
+  href: string,
+  items: readonly { pluginId: string; id: string; href: string }[],
+): { kind: "page" | "item"; target: string } | null {
+  const page = PAGE_PATH.exec(href.split(/[?#]/)[0]!);
+  if (page) return { kind: "page", target: page[1]! };
+  const item = itemAtPath(items, href);
+  return item ? { kind: "item", target: `${item.pluginId}:${item.id}` } : null;
 }

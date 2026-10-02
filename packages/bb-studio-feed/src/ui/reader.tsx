@@ -5,13 +5,13 @@
 // or starts a new thread. A rail lists what needs you and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, OUTLINE_BUTTON, PageColumn, cn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
+import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, cn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import type { rpcContract } from "../contract";
-import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL } from "../shared";
+import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
 import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
 
 const PAGE = 40;
@@ -368,6 +368,7 @@ function PostMenu({ post, onRemoved }: { post: PostView; onRemoved?(): void }) {
         <DropdownMenuItem onSelect={() => discuss.openPost(post)}>
           <Icon name="Maximize2" className="size-4" /> Open as a page
         </DropdownMenuItem>
+        <CopyReferenceMenuItem item={{ href: postHref(post.id), title: post.title, icon: FEED_ICON }} />
         <DropdownMenuSeparator />
         <DropdownMenuItem
           onSelect={() => {
@@ -441,7 +442,7 @@ function PostContent({ post }: { post: PostView }) {
   return (
     <>
       <Picture src={linkedPicture} className="mb-4 max-h-80 w-full rounded-lg" />
-      {post.body ? <Markdown content={post.body} className="text-sm leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-sm [&_li:has(input[type=checkbox])]:list-none [&_p]:text-sm" /> : null}
+      {post.body ? <Markdown content={post.body} className={cn(ITEM_LINK_PILLS, "text-sm leading-relaxed [&_img]:max-h-96 [&_img]:rounded-lg [&_li]:text-sm [&_li:has(input[type=checkbox])]:list-none [&_p]:text-sm")} /> : null}
       {post.embeds.map((embed) => (
         <ItemPreview key={`${embed.pluginId}:${embed.id}`} embed={embed} />
       ))}
@@ -476,7 +477,7 @@ function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
       {content?.type === "markdown" && content.text ? (
         <div className="relative">
           <div className={cn("px-4 py-3", !more && "max-h-72 overflow-hidden")}>
-            <Markdown content={content.text} className="text-sm leading-relaxed [&_img]:max-h-64 [&_img]:rounded-md [&_li]:text-sm [&_li:has(input[type=checkbox])]:list-none [&_p]:text-sm" />
+            <Markdown content={content.text} className={cn(ITEM_LINK_PILLS, "text-sm leading-relaxed [&_img]:max-h-64 [&_img]:rounded-md [&_li]:text-sm [&_li:has(input[type=checkbox])]:list-none [&_p]:text-sm")} />
           </div>
           {more ? null : (
             <div className="absolute inset-x-0 bottom-0 flex h-20 items-end justify-center bg-gradient-to-t from-background to-transparent pb-2">

@@ -13,12 +13,12 @@ import {
 } from "@bb-studio/kit/ui";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
-import type { BotView, PageMetaView, rpcContract } from "../contract";
+import { PLUGIN_ID, type BotView, type PageMetaView, type rpcContract } from "../contract";
 
 export type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 export { useProjects } from "@bb-studio/kit/app";
 export type { Project } from "@bb-studio/kit/app";
-import type { Project } from "@bb-studio/kit/app";
+import { CopyReferenceMenuItem, type Project } from "@bb-studio/kit/app";
 import { spaceDialog } from "./space-embeds";
 export type BotsState = { available: boolean; reason: string | null; bots: BotView[] };
 
@@ -89,6 +89,7 @@ export function PageMenu({
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-56" onClick={(event) => event.stopPropagation()}>
         {leading}
+        <CopyReferenceMenuItem item={{ href: `/plugins/${PLUGIN_ID}/pages/${page.id}`, title: untitled(page.title), ...(page.icon ? { icon: page.icon } : {}) }} />
         {space ? (
           <>
             <DropdownMenuItem onSelect={() => spaceDialog(space.id, "edit")}>

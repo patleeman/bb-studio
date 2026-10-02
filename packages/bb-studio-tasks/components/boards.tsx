@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import {
+  CopyReferenceMenuItem,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -19,7 +20,7 @@ import {
 } from "@bb-studio/kit/app";
 import { errorMessage, plural, relativeTime, untitled } from "@bb-studio/kit/format";
 import { useBbContext } from "@get-bb/plugin-sdk/app";
-import { BOARD_ICON } from "../src/shared";
+import { BOARD_ICON, boardHref } from "../src/shared";
 import { SPIN, useTasksRpc, type Board } from "./types";
 
 export function BoardsIndex({ refreshKey, onOpen }: { refreshKey: unknown; onOpen(id: string): void }) {
@@ -136,6 +137,7 @@ export function BoardsIndex({ refreshKey, onOpen }: { refreshKey: unknown; onOpe
                   </button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-44">
+                  <CopyReferenceMenuItem item={{ href: boardHref(board.id), title: untitled(board.title), icon: BOARD_ICON }} />
                   <DropdownMenuItem onSelect={() => archive(board)}>
                     <Icon name="Archive" className="size-4" /> Archive
                   </DropdownMenuItem>
@@ -221,6 +223,7 @@ export function BoardHeader({
             </button>
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" className="w-44">
+            <CopyReferenceMenuItem item={{ href: boardHref(board.id), title: untitled(board.title), icon: BOARD_ICON }} />
             <DropdownMenuItem
               onSelect={() =>
                 void rpc.call("boardArchive", { id: board.id, archived: !board.archived }).then(
