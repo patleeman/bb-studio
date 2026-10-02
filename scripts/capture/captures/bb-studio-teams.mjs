@@ -1,6 +1,10 @@
 import { launchRoomReplies } from "../bb.mjs";
+import teamsCompanions from "./teams-companions.mjs";
 
-export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
+export default context => {
+ const {pluginRpc, launchRoomThread, getLaunchRoomId} = context;
+ return [
+ ...(process.env.BB_CAPTURE_TEAMS_COMPANIONS === "1" ? [teamsCompanions(context)] : []),
  {
   id:"bots",packageDir:"bb-studio-teams",fileName:"staged-preview.png",
   setup:async client=>{
@@ -73,4 +77,5 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
    return ()=>client.command("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
   }
  }
-];
+ ];
+};

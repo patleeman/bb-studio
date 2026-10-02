@@ -31,3 +31,7 @@ The public RPC contract is [client-contract.ts](client-contract.ts); saved view 
 Captured from an isolated stable BB installed from the pushed Git revision. The Launch work view shows deterministic ORBIT-42 replies from Atlas and Scribe, laid out like a regular BB thread: your messages on the right, each bot's reply under its name (which links to its ordinary thread), and BB's prompt box with recipient and approval menus beneath it.
 
 The [compact preview](assets/staged-preview-mobile.png) shows the same live view at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) and [sidebar](assets/studio-sidebar.png) show profile settings and a saved view open under Studio.
+
+![A saved view, bot profile, and conversation in shared companion tabs](assets/companion-preview.png)
+
+Captured on stable BB 0.45.0 with the full suite installed from pushed commit adc6638. The live check retains the saved view’s exact composer DOM, an unsent draft, and `release-review.txt` through switching and folding. Atlas’s Chat action reuses its existing direct conversation, and the saved view keeps its own title and member controls without an extra Studio Chat action.

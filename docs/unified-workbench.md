@@ -144,6 +144,25 @@ The phone page header is still crowded; the remaining compact-layout audit
 must cover item-header navigation and overflow menus across the suite, beyond
 the verified conversation drawer.
 
+Teams now registers companion renderers for bot profiles, saved views, and
+legacy channel routes. Bot Chat resumes its direct conversation; New
+conversation is separate. Saved-view and profile thread entry points use
+the shared companion policy. Kinds with `hasOwnChat: true` opt out of
+automatic Studio Chat discovery while keeping explicit mention context.
+Headers can supply their own `chatAction`. Companion navigation now has an
+explicit context for asynchronous saves and legacy redirects, so it does
+not depend on a transient click event.
+
+The full suite check passes after pushed commit adc6638: typechecks, all
+plugin tests, stable BB 0.45.0 compatibility, contracts, marketplace,
+screenshots, and the shared kit archive. Teams has 92 tests, the kit 73,
+and Studio Chat 23. Its repeatable `bots-companions` capture on stable BB
+0.45.0 verifies the saved view's exact composer DOM, draft, and file
+attachment through tab switching and folding, conversation reuse without
+duplication, and retained title/member controls. The screenshot is visually
+checked. This extends stable Float coverage; native host release is still
+required.
+
 Remaining delivery includes native host live verification and release,
 the SDK/CLI placement controller, embedded composer
 targeting, all suite entry points, compact behavior,
