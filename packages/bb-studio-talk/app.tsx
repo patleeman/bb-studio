@@ -15,8 +15,13 @@ import { TOGGLE_EVENT, clearStatus, fieldAt, publishStatus } from "./src/client/
 import { watchHoldToTalk } from "./src/client/hold-to-talk";
 import { TalkOverlay } from "./src/client/overlay";
 import { RecordingsPanel } from "./src/client/recordings-panel";
+import { ComposerBridge } from "./src/client/ComposerBridge";
 
 export default definePluginApp((app) => {
+  app.composer.customize({
+    id: "recording-references",
+    banners: [{ id: "bridge", chrome: "bare", component: ComposerBridge }],
+  });
   app.slots.navPanel({
     id: "recordings",
     title: "Recordings",

@@ -17,6 +17,19 @@ describe("pending inserts", () => {
     expect(parsePending("[1]")).toEqual({});
     expect(parsePending(JSON.stringify({ thr_a: "text", thr_b: 3, thr_c: " " }))).toEqual({ thr_a: "text" });
   });
+
+  it("keeps each recording reference when dictations wait for the same thread", () => {
+    const first = { id: "rec_aaaaaaaa", title: "First thought", kind: "dictation" as const };
+    const second = { id: "rec_bbbbbbbb", title: "Second thought", kind: "recording" as const };
+    const one = addPending({}, "thr_a", "First thought.", [first]);
+    const two = addPending(one, "thr_a", "Second thought.", [second, first]);
+    expect(parsePending(JSON.stringify(two))).toEqual({ thr_a: { text: "First thought. Second thought.", recordings: [first, second] } });
+    expect(withoutPending(two, "thr_a")).toEqual({});
+  });
+
+  it("preserves text when saved source metadata is invalid", () => {
+    expect(parsePending(JSON.stringify({ thr_a: { text: "Still here.", recordings: [{ id: "../escape", title: "x", kind: "dictation" }] } }))).toEqual({ thr_a: "Still here." });
+  });
 });
 
 describe("waiting field dictations", () => {

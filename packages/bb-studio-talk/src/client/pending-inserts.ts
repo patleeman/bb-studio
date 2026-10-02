@@ -4,14 +4,22 @@
 // Talk holds the text here and types it into the thread's composer the next
 // time that composer is on screen.
 
+import { parseRecordingReference, type RecordingReference } from "./recording-reference";
 export const PENDING_STORAGE_KEY = "bb-plugin-talk:pending-inserts";
 
-export type PendingInserts = Record<string, string>;
+export type PendingInsert = string | { text: string; recordings: RecordingReference[] };
+export type PendingInserts = Record<string, PendingInsert>;
+
+export const pendingText = (value: PendingInsert): string => typeof value === "string" ? value : value.text;
+export const pendingRecordings = (value: PendingInsert): RecordingReference[] => typeof value === "string" ? [] : value.recordings;
 
 /** Adds `text` for a thread, after anything already waiting there. */
-export function addPending(pending: PendingInserts, threadId: string, text: string): PendingInserts {
-  const before = pending[threadId]?.trim();
-  return { ...pending, [threadId]: before ? `${before} ${text.trim()}` : text.trim() };
+export function addPending(pending: PendingInserts, threadId: string, text: string, recordings: readonly RecordingReference[] = []): PendingInserts {
+  const previous = pending[threadId];
+  const before = previous ? pendingText(previous).trim() : "";
+  const combined = before ? `${before} ${text.trim()}` : text.trim();
+  const sources = [...new Map([...(previous ? pendingRecordings(previous) : []), ...recordings].map((recording) => [recording.id, recording])).values()];
+  return { ...pending, [threadId]: sources.length ? { text: combined, recordings: sources } : combined };
 }
 
 export function withoutPending(pending: PendingInserts, threadId: string): PendingInserts {
@@ -23,11 +31,15 @@ export function parsePending(raw: string | null): PendingInserts {
   try {
     const value: unknown = raw ? JSON.parse(raw) : null;
     if (!value || typeof value !== "object" || Array.isArray(value)) return {};
-    return Object.fromEntries(
-      Object.entries(value).filter(
-        (entry): entry is [string, string] => typeof entry[1] === "string" && entry[1].trim() !== "",
-      ),
-    );
+    const result: PendingInserts = {};
+    for (const [key, entry] of Object.entries(value)) {
+      if (typeof entry === "string" && entry.trim()) result[key] = entry;
+      else if (entry && typeof entry === "object" && typeof entry.text === "string" && entry.text.trim()) {
+        const recordings = Array.isArray(entry.recordings) ? (entry.recordings as unknown[]).map(parseRecordingReference).filter((recording): recording is RecordingReference => recording !== null) : [];
+        result[key] = recordings.length ? { text: entry.text, recordings } : entry.text;
+      }
+    }
+    return result;
   } catch {
     return {};
   }

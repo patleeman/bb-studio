@@ -23,7 +23,8 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contract";
 import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, isLongDictation, joinTranscript, transcriptionError } from "../shared/format";
-import { findComposer, insertIntoComposer, type MicState } from "./composer-dom";
+import { findComposer, insertDictationIntoComposer, type MicState } from "./composer-dom";
+import { textWithRecordings, type RecordingReference } from "./recording-reference";
 import {
   Outbox,
   audioFileName,
@@ -48,6 +49,8 @@ import {
   PENDING_STORAGE_KEY,
   addPending,
   readPending,
+  pendingText,
+  pendingRecordings,
   readTimes,
   staleFields,
   withoutPending,
@@ -965,6 +968,7 @@ export class TalkController {
       if (cleaned) text = cleaned;
     }
     const { threadId, field, recording } = this.state;
+    const references: RecordingReference[] = recording ? [{ id: recording.id, title: recording.title, kind: recording.kind }] : [];
     if (text === "") {
       this.announceEmpty(this.state.kind);
     } else if (field) {
@@ -975,16 +979,16 @@ export class TalkController {
         });
         this.onPendingChanged();
       }
-    } else if (insertIntoComposer(this.sourceComposer(), text)) {
+    } else if (await insertDictationIntoComposer(this.sourceComposer(), text, references)) {
       // Typed where it started.
     } else if (threadId !== null) {
-      writePending(addPending(readPending(), threadId, text));
+      writePending(addPending(readPending(), threadId, text, references));
       toast.success("Dictation ready. It goes into the thread's composer when you go back.", {
         action: this.navigate ? { label: "Go back", onClick: () => this.navigate?.toThread(threadId) } : undefined,
       });
       this.onPendingChanged();
     } else {
-      void navigator.clipboard?.writeText(text).then(
+      void navigator.clipboard?.writeText(textWithRecordings(text, references)).then(
         () => toast.success("Dictation copied. Paste it into the composer."),
         () => toast.info("Dictation saved in Talk recordings."),
       );
@@ -1021,8 +1025,9 @@ export class TalkController {
   private openField(field: FieldRef): void {
     if (requestOpenField(field.key)) return;
     const pendingKey = `${FIELD_PENDING_PREFIX}${field.key}`;
-    const text = readPending()[pendingKey];
-    if (!text) return;
+    const pending = readPending()[pendingKey];
+    if (!pending) return;
+    const text = pendingText(pending);
     writePending(withoutPending(readPending(), pendingKey));
     this.onPendingChanged();
     void navigator.clipboard?.writeText(text).then(
@@ -1070,7 +1075,7 @@ export class TalkController {
    * must be on screen for a full poll first, so BB has restored the thread's
    * own unsent text before Talk adds to it.
    */
-  private flushPending(): void {
+  private async flushPending(): Promise<void> {
     this.flushPendingFields();
     const threadId = this.context.threadId;
     const composer = threadId && document.visibilityState === "visible" ? findComposer() : null;
@@ -1078,14 +1083,16 @@ export class TalkController {
     this.pendingComposer = composer;
     if (!threadId || !settled) return;
     const pending = readPending();
-    const text = pending[threadId];
-    if (!text) return;
+    const insertion = pending[threadId];
+    if (!insertion) return;
+    const text = pendingText(insertion);
+    const references = pendingRecordings(insertion);
     // Claim it before typing, so a second window on this thread skips it.
     writePending(withoutPending(pending, threadId));
-    if (insertIntoComposer(composer, text)) {
+    if (await insertDictationIntoComposer(composer, text, references)) {
       toast.success("Added your dictation to the composer.");
     } else {
-      writePending(addPending(readPending(), threadId, text));
+      writePending(addPending(readPending(), threadId, text, references));
     }
     this.onPendingChanged();
   }
@@ -1098,9 +1105,10 @@ export class TalkController {
     this.expirePendingFields();
     const visible = document.visibilityState === "visible";
     const seen = new Set<string>();
-    for (const [pendingKey, text] of Object.entries(readPending())) {
+    for (const [pendingKey, insertion] of Object.entries(readPending())) {
       if (!pendingKey.startsWith(FIELD_PENDING_PREFIX)) continue;
       const key = pendingKey.slice(FIELD_PENDING_PREFIX.length);
+      const text = pendingText(insertion);
       if (!visible || !findField(key)) continue;
       seen.add(key);
       if (!this.fieldsOnScreen.has(key)) continue;

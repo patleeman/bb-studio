@@ -10,6 +10,9 @@
 // These selectors track BB's PromptBox markup. If BB changes it, the mic
 // falls back to built-in dictation and Talk stays reachable from its
 // commands and the recordings page.
+import { recordingLink, type RecordingReference } from "./recording-reference";
+
+export const COMPOSER_REFERENCE_EVENT = "bb-talk:composer-reference";
 
 export const BUILT_IN_MIC_SELECTOR = '[data-promptbox] button[aria-label="Start voice input"]';
 const EDITOR_SELECTOR = '[contenteditable="true"]';
@@ -50,6 +53,8 @@ export function interceptBuiltInMic(options: MicInterceptOptions, signal: AbortS
   // Mark the buttons Talk owns, and show the dictating state on them.
   const style = document.createElement("style");
   style.textContent = `
+    /* An invisible SDK bridge must not leave an empty banner row. */
+    [data-promptbox-shell] > div:has(> [data-bb-plugin="talk"] > [data-talk-composer-bridge]):not(:has(> :not([data-bb-plugin="talk"]))):not(:has(> [data-bb-plugin="talk"] > :not([data-talk-composer-bridge]))) { display: none; }
     button[${CLAIMED_ATTR}][${ACTIVE_ATTR}] { color: var(--destructive, #e5484d) !important; }
     button[${CLAIMED_ATTR}][${ACTIVE_ATTR}] svg { animation: bb-talk-pulse 1.4s ease-in-out infinite; }
     button[${CLAIMED_ATTR}][${BUSY_ATTR}] { opacity: .4; }
@@ -122,6 +127,24 @@ export function insertIntoComposer(promptbox: HTMLElement | null, text: string):
   // editor's own input handling, so undo and mentions keep working.
   const ok = document.execCommand("insertText", false, spaced);
   return ok && (editor.textContent?.length ?? 0) > beforeLength;
+}
+
+/** Keep the saved source beside the transcript, using native mention context. */
+export async function insertDictationIntoComposer(promptbox: HTMLElement | null, text: string, recordings: readonly RecordingReference[] = []): Promise<boolean> {
+  if (!insertIntoComposer(promptbox, text)) return false;
+  for (const recording of recordings) {
+    // Let TipTap commit the typed transcript before the SDK reads its draft.
+    await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+    const event = new CustomEvent(COMPOSER_REFERENCE_EVENT, { bubbles: true, cancelable: true, detail: { recording } });
+    promptbox?.dispatchEvent(event);
+    if (event.defaultPrevented) {
+      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
+      insertIntoComposer(promptbox, `\n\n${recordingLink(recording, recording.kind === "dictation" ? "Open dictation" : "Open recording")}`);
+    } else {
+      insertIntoComposer(promptbox, `\n\n${recordingLink(recording)}`);
+    }
+  }
+  return true;
 }
 
 function textBeforeCaret(editor: HTMLElement): string {
