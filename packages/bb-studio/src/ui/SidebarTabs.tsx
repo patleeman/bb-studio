@@ -1,7 +1,8 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
 // and closing the one on screen opens the next. Right-click a tab to float it
-// or open it in a split.
+// or open it in a split. Above the tabs, the spaces expand to what they hold
+// (SidebarSpaces).
 import {
   DropdownMenuItem,
   Icon,
@@ -31,6 +32,9 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import type { rpcContract, TabView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
+import { SidebarSpaces, useSpaceTree } from "./SidebarSpaces";
+
+const SHOW_SPACES_KEY = "studio:sidebar-show-spaces";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const APP_NAMES: Record<string, string> = {
@@ -81,6 +85,21 @@ export function SidebarTabs() {
     { organization: "none", sort: "opened", direction: "ascending" },
     { organization: ["none", "app"], sort: ["opened", "alpha"] },
   );
+  const [showSpaces, setShowSpaces] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_SPACES_KEY) !== "false";
+    } catch {
+      return true;
+    }
+  });
+  const spaces = useSpaceTree(hosted && showSpaces);
+  const spacesShown = showSpaces && !!spaces?.length;
+  const toggleSpaces = () => {
+    setShowSpaces(!showSpaces);
+    try {
+      localStorage.setItem(SHOW_SPACES_KEY, String(!showSpaces));
+    } catch {}
+  };
 
   // Visiting an item's view opens its tab.
   const visited = useRef<string | null>(null);
@@ -124,7 +143,7 @@ export function SidebarTabs() {
   const groups =
     display.organization === "app"
       ? [...new Set(sorted.map((tab) => tab.pluginId))].map((pluginId) => ({ label: APP_NAMES[pluginId] ?? pluginId, tabs: sorted.filter((tab) => tab.pluginId === pluginId) }))
-      : [{ label: null, tabs: sorted }];
+      : [{ label: spacesShown ? "Open" : null, tabs: sorted }];
 
   return (
     <SidebarPortal id="tabs" title="Studio" order={0}>
@@ -146,6 +165,18 @@ export function SidebarTabs() {
                 ["alpha", "Alphabetical", "ascending"],
               ]}
             />
+            <DropdownMenuItem
+              role="menuitemcheckbox"
+              aria-checked={showSpaces}
+              onSelect={(event) => {
+                event.preventDefault();
+                toggleSpaces();
+              }}
+            >
+              <Icon name="Layers" />
+              Show spaces
+              {showSpaces ? <Icon name="Check" className="ml-auto" /> : null}
+            </DropdownMenuItem>
             {active && tabs && tabs.length > 1 ? (
               <DropdownMenuItem onSelect={() => close(tabs.filter((tab) => tab !== active))}>
                 <Icon name="X" />
@@ -161,6 +192,7 @@ export function SidebarTabs() {
           </>
         }
       >
+        {spacesShown ? <SidebarSpaces spaces={spaces!} path={path} onNavigate={navigated} /> : null}
         {error && !tabs ? <SidebarNote tone="danger">{error}</SidebarNote> : null}
         {tabs && !tabs.length ? <SidebarNote icon="GridView">No open items</SidebarNote> : null}
         {groups.map((group) => (

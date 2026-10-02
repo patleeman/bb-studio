@@ -7,6 +7,7 @@ import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
 import { FLOATING, FLOATING_BUTTON } from "./pieces";
 import { RelatedPanel, type RelatedRef } from "./related-panel";
+import { SpacePicker } from "./space-picker";
 
 export type ItemThread = { title: string; href: string; ref?: RelatedRef };
 
@@ -66,6 +67,7 @@ export function ItemHeader({
         {leading}
       </div>
       {trailing || thread ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+        {relatedRef ? <SpacePicker item={relatedRef} /> : null}
         {relatedRef ? <RelatedPanel ref={relatedRef} /> : null}
         {thread ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
           <Icon name="MessageSquarePlus" /> New thread

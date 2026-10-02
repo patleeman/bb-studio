@@ -49,7 +49,8 @@ const opSchema = z.discriminatedUnion("op", [
   z.object({ op: z.literal("replace_all"), markdown: z.string() }),
 ]);
 
-export function registerTools(bb: BbPluginApi, service: PagesService): void {
+/** `created` tells Studio an agent made a page, so it joins the thread's spaces. */
+export function registerTools(bb: BbPluginApi, service: PagesService, created: (pageId: string, threadId: string) => void = () => {}): void {
   const { store } = service;
 
   const pageLine = (page: PageMeta, depth = 0) =>
@@ -128,6 +129,7 @@ export function registerTools(bb: BbPluginApi, service: PagesService): void {
         markdown: params.markdown,
         actor: actor.key,
       });
+      created(page.id, ctx.threadId);
       return `Created page "${page.title}" (id ${page.id}). The user can open it at ${pageUrl(page.id)}.`;
     },
   });

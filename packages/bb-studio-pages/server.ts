@@ -428,7 +428,8 @@ export default async function plugin(bb: BbPluginApi) {
 
   // Agents --------------------------------------------------------------------
 
-  registerTools(bb, service);
+  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
+  registerTools(bb, service, created);
   bb.agents.configure(() => agentConfiguration());
 
   bb.ui.registerMentionProvider(defineItemMention({
@@ -498,6 +499,7 @@ export default async function plugin(bb: BbPluginApi) {
               markdown,
               actor: ctx.threadId ? `agent:${ctx.threadId}` : HUMAN_USER_ID,
             });
+            if (ctx.threadId) created(page.id, ctx.threadId);
             return { exitCode: 0, stdout: `${page.id}\n` };
           }
           case "append": {

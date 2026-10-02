@@ -67,6 +67,10 @@ the matching text with the match in bold.
   be tagged "Launch". Tag from an item's ⋯ menu or the selection bar, filter
   by tag (or Untagged) from the tag menu, and click a chip to filter by it.
   The tag menu also renames and deletes the active tag.
+- **Spaces fill themselves.** What a thread in a space makes joins the space:
+  its agent's pages, drawings, boards, tasks, tables and new artifacts, and
+  items made from a thread's side panel. A sub-page made under a space's page,
+  or under an item in a space, joins it too, once; taking it out sticks.
 - **Shared actions**: select items (shift-click for a range) to start a
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's

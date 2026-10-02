@@ -32,6 +32,7 @@ public enum Studio {
     public static let spaceMembers = "spaceMembers"
     public static let spaceThreads = "spaceThreads"
     public static let spacesForThread = "spacesForThread"
+    public static let pendingThreadSpaces = "pendingThreadSpaces"
     public static let spacePage = "spacePage"
     public static let spaceWidget = "spaceWidget"
     public static let restoreSpaceWidgets = "restoreSpaceWidgets"
@@ -41,6 +42,7 @@ public enum Studio {
     public static let deleteView = "deleteView"
     public static let studio_changed = "studio_changed"
     public static let sidebar = "sidebar"
+    public static let spaceTree = "spaceTree"
     public static let tabs = "tabs"
     public static let visitTab = "visitTab"
     public static let closeTabs = "closeTabs"
@@ -128,6 +130,8 @@ public enum Studio {
 
   public typealias SpacesForThread = SpacesForThreadOutput
 
+  public typealias PendingThreadSpaces = PendingThreadSpacesOutput
+
   public typealias SpacePage = SpacePageOutput
 
   public typealias SpaceWidget = SpaceWidgetOutput
@@ -149,6 +153,10 @@ public enum Studio {
   public typealias SidebarInput = StudioJSONValue
 
   public typealias Sidebar = SidebarOutput
+
+  public typealias SpaceTreeInput = StudioJSONValue
+
+  public typealias SpaceTree = SpaceTreeOutput
 
   public typealias TabsInput = StudioJSONValue
 
@@ -2522,6 +2530,24 @@ public enum Studio {
     }
   }
 
+  public struct PendingThreadSpacesInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var ids: [String]?
+
+    public init(projectId: String? = nil, ids: [String]? = nil) {
+      self.projectId = projectId
+      self.ids = ids
+    }
+  }
+
+  public struct PendingThreadSpacesOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
   public struct SpacePageInput: Sendable, Hashable, Codable {
     public var id: String?
 
@@ -2861,6 +2887,103 @@ public enum Studio {
 
     public init(panels: [SidebarOutputPanelsItem]? = nil) {
       self.panels = panels
+    }
+  }
+
+  public struct SpaceTreeOutputSpacesItemItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var title: String?
+    public var icon: String?
+    public var kindIcon: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var parentId: String?
+    public var depth: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, updatedAt: Double? = nil, parentId: String? = nil, depth: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.title = title
+      self.icon = icon
+      self.kindIcon = kindIcon
+      self.href = href
+      self.updatedAt = updatedAt
+      self.parentId = parentId
+      self.depth = depth
+    }
+  }
+
+  public enum SpaceTreeOutputSpacesItemThreadsItemKind: Sendable, Hashable, Codable {
+    case thread
+    case channel
+    case dm
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "channel": self = .channel
+      case "dm": self = .dm
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .channel: try container.encode("channel")
+      case .dm: try container.encode("dm")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceTreeOutputSpacesItemThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var kind: SpaceTreeOutputSpacesItemThreadsItemKind?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, kind: SpaceTreeOutputSpacesItemThreadsItemKind? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.kind = kind
+    }
+  }
+
+  public struct SpaceTreeOutputSpacesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var color: String?
+    public var href: String?
+    public var items: [SpaceTreeOutputSpacesItemItemsItem]?
+    public var itemCount: Double?
+    public var threads: [SpaceTreeOutputSpacesItemThreadsItem]?
+    public var threadCount: Double?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, href: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil, threads: [SpaceTreeOutputSpacesItemThreadsItem]? = nil, threadCount: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.color = color
+      self.href = href
+      self.items = items
+      self.itemCount = itemCount
+      self.threads = threads
+      self.threadCount = threadCount
+    }
+  }
+
+  public struct SpaceTreeOutput: Sendable, Hashable, Codable {
+    public var spaces: [SpaceTreeOutputSpacesItem]?
+
+    public init(spaces: [SpaceTreeOutputSpacesItem]? = nil) {
+      self.spaces = spaces
     }
   }
 

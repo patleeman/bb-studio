@@ -121,6 +121,8 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const store = new DrawingStore(db);
   const services = studioServices(bb.sdk);
+  /** Tells Studio an agent made a drawing, so it joins the thread's spaces. */
+  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* Studio is optional. */ });
 
   const studio = studioSchemas(z);
   // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
@@ -353,8 +355,9 @@ export default async function plugin(bb: BbPluginApi) {
     description:
       "Create a new empty Excalidraw drawing and return its id, name, and link. The user can open it from Drawings, or from Studio when it's installed.",
     parameters: z.object({ name: z.string().min(1).max(200) }),
-    execute({ name }) {
+    execute({ name }, ctx) {
       const row = create(name, "agent");
+      created(row.id, ctx.threadId);
       return `Created Excalidraw drawing "${name}" (id ${row.id}). Link: [${name.replace(/[[\]]/g, "")}](${drawingHref(row.id)})`;
     },
   });
@@ -502,6 +505,7 @@ export default async function plugin(bb: BbPluginApi) {
             };
           }
           const row = create(name, "cli");
+          if (ctx.threadId) created(row.id, ctx.threadId);
           return { exitCode: 0, stdout: `${row.id}\t${name}\n` };
         }
         case "show": {

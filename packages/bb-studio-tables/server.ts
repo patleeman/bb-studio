@@ -1,6 +1,6 @@
 import { studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
-import { createChangeBus, createStoreProvider, defineItemMention, studioIndex } from "@bb-studio/kit/server";
+import { createChangeBus, createStoreProvider, defineItemMention, studioIndex, studioServices } from "@bb-studio/kit/server";
 import {
   columnSchema,
   csv,
@@ -85,6 +85,9 @@ export default function plugin(bb: BbPluginApi) {
     event: (tableId) => ({ tableId }),
   });
   const changed = (tableId: string) => changes.changed(tableId);
+  const services = studioServices(bb.sdk);
+  /** Tells Studio an agent made a table, so it joins the thread's spaces. */
+  const created = (tableId: string, threadId: string) => void services.created({ pluginId: TABLES_PLUGIN_ID, id: tableId }, threadId).catch(() => { /* Studio is optional. */ });
   const index = studioIndex(bb.sdk, studio);
   const query = (table: Table, viewId?: string, filters?: Filter[], sorts?: Sort[]) => {
     const view: View | undefined = viewId ? table.views.find((item) => item.id === viewId) : undefined;
@@ -291,6 +294,7 @@ export default function plugin(bb: BbPluginApi) {
     execute: ({ title, columns, rows }, ctx) => {
       const table = store.create(title, ctx.projectId ?? null, columns, rows);
       changed(table.id);
+      created(table.id, ctx.threadId);
       return JSON.stringify({ id: table.id, href: tableHref({ tableId: table.id }), rows: table.rows.length });
     },
   });
@@ -385,6 +389,7 @@ export default function plugin(bb: BbPluginApi) {
               ctx.projectId ?? null,
             );
             changed(table.id);
+            if (ctx.threadId) created(table.id, ctx.threadId);
             output = `${table.id}\t${table.title}`;
             break;
           }

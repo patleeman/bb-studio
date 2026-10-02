@@ -3792,6 +3792,45 @@
         "additionalProperties": false
       }
     },
+    "pendingThreadSpaces": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "ids": {
+            "maxItems": 50,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 100
+            }
+          }
+        },
+        "required": [
+          "projectId",
+          "ids"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "spacePage": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4363,6 +4402,151 @@
         },
         "required": [
           "panels"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "spaceTree": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaces": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "name": {
+                  "type": "string"
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "color": {
+                  "type": "string"
+                },
+                "href": {
+                  "type": "string"
+                },
+                "items": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "pluginId": {
+                        "type": "string"
+                      },
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "kindIcon": {
+                        "type": "string"
+                      },
+                      "href": {
+                        "type": "string"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      },
+                      "parentId": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "depth": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "pluginId",
+                      "id",
+                      "title",
+                      "icon",
+                      "kindIcon",
+                      "href",
+                      "updatedAt",
+                      "parentId",
+                      "depth"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "itemCount": {
+                  "type": "number"
+                },
+                "threads": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "title": {
+                        "type": "string"
+                      },
+                      "status": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "thread",
+                          "channel",
+                          "dm"
+                        ]
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "title",
+                      "status",
+                      "kind"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "threadCount": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "icon",
+                "color",
+                "href",
+                "items",
+                "itemCount",
+                "threads",
+                "threadCount"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "spaces"
         ],
         "additionalProperties": false
       }

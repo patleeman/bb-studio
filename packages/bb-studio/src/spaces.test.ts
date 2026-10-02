@@ -1,7 +1,7 @@
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { inSpace, linkedSpaceIds, PROJECT_REF, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace } from "./spaces";
+import { inSpace, linkedSpaceIds, parentSpaceIds, PROJECT_REF, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace } from "./spaces";
 import { pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince } from "./space-page";
 import { TagStore } from "./tags";
 import { firstThreadSpaceIds } from "./thread-item-refs";
@@ -117,5 +117,22 @@ describe("spaces", () => {
     expect(linkedSpaceIds(`Work on ${link} and ${link}`)).toEqual(["spc_0123456789abcdef"]);
     expect(firstThreadSpaceIds([{ type: "client/thread/start", data: { input: [{ type: "text", text: `In ${link}` }] } }])).toEqual(["spc_0123456789abcdef"]);
     expect(firstThreadSpaceIds([])).toBeNull();
+  });
+
+  it("take in sub-items made under their items or their page", () => {
+    const { spaces } = stores();
+    const launch = spaces.create({ name: "Launch" });
+    spaces.setPage(launch.id, "pg_home");
+    spaces.add(launch.id, [{ pluginId: "pages", id: "pg_1" }]);
+    const app = spaces.create({ name: "App" });
+    spaces.add(app.id, [{ pluginId: PROJECT_REF, id: "proj_app" }, { pluginId: "pages", id: "pg_1" }]);
+    const all = spaces.list();
+    const child = (parentId: string | null, projectId: string | null = null) => ({ pluginId: "pages", id: "pg_2", parentId, projectId });
+    expect(parentSpaceIds(all, child("pg_1"), "pages")).toEqual([app.id, launch.id]);
+    // Already in App through its project.
+    expect(parentSpaceIds(all, child("pg_1", "proj_app"), "pages")).toEqual([launch.id]);
+    expect(parentSpaceIds(all, child("pg_home"), "pages")).toEqual([launch.id]);
+    expect(parentSpaceIds(all, { ...child("pg_home"), pluginId: "excalidraw" }, "pages")).toEqual([]);
+    expect(parentSpaceIds(all, child(null), "pages")).toEqual([]);
   });
 });

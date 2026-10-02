@@ -285,6 +285,8 @@ export default async function plugin(bb: BbPluginApi) {
 
   const studio = studioSchemas(z);
   const services = studioServices(bb.sdk);
+  /** Tells Studio an agent made a board or task, so it joins the thread's spaces. */
+  const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* The hub is optional. */ });
   const syncLinks = (id: string) => services.replaceLinks({ pluginId: PLUGIN_ID, id }, PLUGIN_ID,
     store.links(id).filter((link) => link.target === "item" && link.plugin_id).map((link) => ({
       from: { pluginId: PLUGIN_ID, id }, to: { pluginId: link.plugin_id!, id: link.item_id }, kind: "task-link" as const, source: PLUGIN_ID,
@@ -875,6 +877,7 @@ export default async function plugin(bb: BbPluginApi) {
       }
       const board = store.createBoard({ title, projectId: global ? null : (context.projectId ?? null), columns: statuses, by: "agent" });
       changed(board.id);
+      created(board.id, context.threadId);
       return `Made ${boardLine(board)}\n\nTo show it in a page, embed it with kind "board" and target "${board.id}".`;
     },
   });
@@ -933,6 +936,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (status && (status === "done" || !hasColumn(board.id, status))) return { content: [{ type: "text", text: `Use one of the board's columns other than Done: ${store.statuses(board.id).filter((column) => column.id !== "done").map((column) => column.id).join(", ")}.` }], isError: true };
       const task = store.create({ title, description, status, boardId: board.id, due: due ?? null, assignee: assignee ?? null, priority, labels, parentId, recurrence, reminderAt, ...(boardId ? {} : { projectId: context.projectId ?? null }), by: "agent" });
       changed(task.id);
+      created(task.id, context.threadId);
       return `Added ${taskLine(task)}\n\nTo show it in your reply, put this on its own line:\n${directive(task.id)}`;
     },
   });

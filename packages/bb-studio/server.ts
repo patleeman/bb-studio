@@ -24,8 +24,9 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
-import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
+import { inSpace, parentSpaceIds, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
+import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
 import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
@@ -178,6 +179,7 @@ export default async function plugin(bb: BbPluginApi) {
       closed = tabs.prune(provider.pluginId, live) || closed;
     }
     if (closed) tabsChanged();
+    inheritParentSpaces(result.items);
     const assigned = tags.assignments();
     const allSpaces = spaces.list();
     const inSpaces = spaceAssignments(allSpaces, result.items);
@@ -220,11 +222,12 @@ export default async function plugin(bb: BbPluginApi) {
     return found;
   };
   /** A space's threads: the ones added to it and its projects' open ones, newest first. */
-  const spaceThreads = async (space: Space): Promise<ThreadView[]> => {
+  const spaceThreads = async (space: Space, conversationsOnce?: Promise<Map<string, Conversation>>): Promise<ThreadView[]> => {
     const [byProject, added, known] = await Promise.all([
       Promise.all(space.projectIds.map((projectId) => bb.sdk.threads.list({ projectId, archived: false, limit: 50 }).catch(() => []))),
       Promise.all(space.threadIds.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null))),
-      conversations(),
+      // The tree asks Studio Teams once for every space.
+      conversationsOnce ?? conversations(),
     ]);
     const found = new Map<string, ThreadView>();
     for (const thread of byProject.flat()) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
@@ -246,6 +249,40 @@ export default async function plugin(bb: BbPluginApi) {
   const tagsChanged = () => {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+  };
+  /**
+   * What a thread makes joins the spaces the thread is in, so work done in a
+   * space stays there without the user filing it.
+   */
+  const joinThreadSpaces = async (threadId: string, ref: ItemRef) => {
+    const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
+    const holding = threadSpaces(threadId, thread?.projectId ?? null);
+    if (!holding.length) return;
+    const item = (await hub.get(ref.pluginId, [ref.id]).catch(() => []))[0];
+    const joining = holding.filter((space) => !item || !inSpace(space, item));
+    for (const space of joining) spaces.add(space.id, [ref]);
+    if (joining.length) tagsChanged();
+  };
+  // A sub-item joins its parent's spaces once, when it's new; taking it out
+  // later sticks. Add-ons say an item is new only by its createdAt.
+  const NEW_ITEM_MS = 2 * 60_000;
+  const inherited = new Set<string>();
+  const inheritParentSpaces = (items: readonly HubItem[]) => {
+    const now = Date.now();
+    let all: Space[] | null = null;
+    let joined = false;
+    for (const item of items) {
+      const key = `${item.pluginId}:${item.id}`;
+      if (!item.parentId || item.archived || now - item.createdAt > NEW_ITEM_MS || inherited.has(key)) continue;
+      inherited.add(key);
+      all ??= spaces.list();
+      for (const id of parentSpaceIds(all, item, PAGES_PLUGIN_ID)) {
+        spaces.add(id, [{ pluginId: item.pluginId, id: item.id }]);
+        joined = true;
+      }
+    }
+    if (joined) tagsChanged();
+    return joined;
   };
 
   const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean(), title: z.string().optional(), icon: z.string().optional() }).nullable() });
@@ -539,6 +576,31 @@ export default async function plugin(bb: BbPluginApi) {
         itemsHref: `${spacePath(space.id)}/items`,
       };
     },
+    spaceTree: async () => {
+      const all = spaces.list();
+      if (!all.length) return { spaces: [] };
+      const known = conversations();
+      const [{ items, providers }, threads] = await Promise.all([hub.overview(), Promise.all(all.map((space) => spaceThreads(space, known).catch(() => [])))]);
+      const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
+      const options = { background: backgroundKinds(providers), pagesPluginId: PAGES_PLUGIN_ID, kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
+      return {
+        spaces: all.map((space, index) => {
+          const tree = spaceTreeItems(space, items, options);
+          const held = threads[index]!;
+          return {
+            id: space.id,
+            name: space.name,
+            icon: space.icon,
+            color: space.color,
+            href: space.pageId ? pageHref(space.pageId) : spacePath(space.id),
+            items: tree.items,
+            itemCount: tree.count,
+            threads: held.slice(0, TREE_THREADS).map(({ id, title, status, kind }) => ({ id, title, status, kind })),
+            threadCount: held.length,
+          };
+        }),
+      };
+    },
     createInSpace: async ({ id, pluginId, kind }) => {
       const space = spaces.get(id);
       if (!space) throw new Error("That space no longer exists.");
@@ -594,6 +656,7 @@ export default async function plugin(bb: BbPluginApi) {
           fresh = await hub.get(pluginId, ids);
         } catch { fresh = null; changes.append(null); }
       }
+      if (fresh?.length) inheritParentSpaces(fresh);
       const byId = new Map(fresh?.map((item) => [item.id, item]));
       for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
       for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
@@ -658,7 +721,11 @@ export default async function plugin(bb: BbPluginApi) {
     links: ({ ref }) => services.links(ref),
     replaceLinks: ({ ref, source, links }) => { services.replaceLinks(ref, source, links); return { ok: true }; },
     itemThreads: ({ ref }) => ({ threads: services.threads(ref) }),
-    linkItemThread: ({ thread }) => { services.linkThread(thread); return { ok: true }; },
+    linkItemThread: async ({ thread }) => {
+      services.linkThread(thread);
+      if (thread.role === "created") await joinThreadSpaces(thread.threadId, thread.ref).catch(() => {});
+      return { ok: true };
+    },
     threadItems: ({ threadId }) => ({ threads: services.threadsForThread(threadId) }),
     spawnForItem: async ({ ref, prompt, role, metadata, projectId, visibility }) => {
       const item = (await hub.get(ref.pluginId, [ref.id]))[0];
@@ -877,7 +944,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_space_items",
     description:
-      "Add Studio items, or this thread, to one of the user's spaces, or take them out. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file something in a space.",
+      "Add Studio items, or this thread, to one of the user's spaces, or take them out. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file something in a space. What this thread makes in Studio joins its spaces by itself.",
     parameters: z.object({
       space: z.string().min(1).max(100).describe("The space's name or id"),
       add: z.array(z.string().max(500)).max(100).optional().describe("Item links, e.g. /plugins/pages/pages/pg_x"),

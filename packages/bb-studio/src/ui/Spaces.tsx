@@ -65,7 +65,7 @@ export function spacePrompt(space: SpaceView, rest = ""): string {
   return `${rest}${rest ? "\n\n" : ""}Space: ${space.name} (${spaceHref(space.id)})\n\n`;
 }
 
-export function SpaceGlyph({ space, className }: { space: SpaceView; className?: string }) {
+export function SpaceGlyph({ space, className }: { space: Pick<SpaceView, "icon" | "color">; className?: string }) {
   return space.icon ? (
     <span className={className}>{space.icon}</span>
   ) : (

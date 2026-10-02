@@ -12,7 +12,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 // Studio's collection (src/server/studio.ts).
 import { basename } from "node:path";
 import { studioSchemas } from "@bb-studio/kit/contract";
-import { createChangeBus } from "@bb-studio/kit/server";
+import { createChangeBus, studioServices } from "@bb-studio/kit/server";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { mentionContext } from "./lib/mention";
@@ -197,6 +197,12 @@ export default async function plugin(bb: BbPluginApi) {
   const studio = studioSchemas(z);
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id) => ({ type: ARTIFACT_UPDATE_TYPE, artifactId: id }) });
 
+  const services = studioServices(bb.sdk);
+  /** A new artifact saved from a thread joins the thread's spaces. */
+  function created(result: SaveResult, threadId: string | null) {
+    if (result.outcome === "created" && threadId) void services.created({ pluginId: PLUGIN_ID, id: result.artifact.id }, threadId).catch(() => { /* Studio is optional. */ });
+  }
+
   /** Tells open viewers, collections and Studio that an artifact changed. */
   function changed(id: string) {
     changeBus.changed(id);
@@ -271,6 +277,7 @@ export default async function plugin(bb: BbPluginApi) {
       by: input.by,
     });
     if (result.outcome !== "unchanged" || result.restored || input.title || input.description) changed(result.artifact.id);
+    created(result, input.threadId);
     return { ...result, display: displayPath(source) };
   }
 
@@ -297,6 +304,7 @@ export default async function plugin(bb: BbPluginApi) {
       by: input.by,
     });
     changed(result.artifact.id);
+    created(result, input.threadId);
     return result;
   }
 

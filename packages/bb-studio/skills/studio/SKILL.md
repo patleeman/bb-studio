@@ -68,6 +68,9 @@ and later. A thread is in a space when it was added to it or its project is.
   asks to.
 - A new thread whose first message links a space
   (`/plugins/studio/studio/space/<id>`) joins it.
+- What a thread in a space makes joins that space by itself: pages, drawings,
+  boards, tasks, tables and new artifacts. So does a sub-page made under the
+  space's page or under an item in the space. Don't file those again.
 
 ## In the app
 

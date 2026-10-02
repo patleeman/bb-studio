@@ -54,6 +54,8 @@ import {
 } from "./selection";
 import { TagChips, TagDot, TagMenuItems, TagNameInput, type CollectionTag } from "./tags";
 import { studioItemProps } from "./studio-item";
+import { SpaceMenuItems } from "./space-picker";
+import { spaceMembership } from "./space-state";
 
 export type { CollectionTag } from "./tags";
 export { groupItems, itemKey, sortItems, toggleSelection, type ActionResults, type CollectionItem, type CollectionKind, type GroupBy, type Sort } from "./selection";
@@ -74,6 +76,8 @@ export interface CollectionHandlers {
   onCreateTag?(name: string): Promise<CollectionTag>;
   onRenameTag?(tag: CollectionTag, name: string): Promise<void>;
   onDeleteTag?(tag: CollectionTag): Promise<void>;
+  /** Adds items to a space or takes them out, when the collection has `spaces`. */
+  onSpace?(items: CollectionItem[], spaceId: string, add: boolean): Promise<void>;
   onDuplicate?(item: CollectionItem): Promise<void>;
   onSetTemplate?(item: CollectionItem, template: boolean): Promise<void>;
   exportFormats?(item: CollectionItem): readonly { format: string; label: string }[];
@@ -106,6 +110,8 @@ export interface CollectionSpace {
   id: string;
   name: string;
   glyph?: ReactNode;
+  /** Projects whose items are all in the space, so they can't leave it one by one. */
+  projectIds?: readonly string[];
 }
 
 const GROUP_LABELS: Record<GroupBy, string> = { none: "None", kind: "Kind", project: "Project", space: "Space", tag: "Tag" };
@@ -388,6 +394,17 @@ export function CollectionPage({
       onCreate={(name) => createTag(targets, name)}
     />
   );
+  const spacing = !!spaces && handlers.onSpace !== undefined;
+  const spaceMenu = (targets: CollectionItem[]) => (
+    <SpaceMenuItems
+      spaces={spaces ?? []}
+      projects={projects}
+      state={(candidate) => spaceMembership(candidate, targets)}
+      onToggle={(candidate, add) => run(async () => {
+        await handlers.onSpace?.(targets, candidate.id, add);
+      })}
+    />
+  );
   const pickTag = useCallback((candidate: CollectionTag) => setTagFilter(candidate.id), [setTagFilter]);
 
   // New items land in the filtered project, else the one BB has open.
@@ -479,6 +496,15 @@ export function CollectionPage({
                 <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
               </DropdownMenuSubTrigger>
               <DropdownMenuSubContent className="max-h-80 w-56 overflow-auto">{tagMenu([item])}</DropdownMenuSubContent>
+            </DropdownMenuSub>
+          ) : null}
+          {spacing ? (
+            <DropdownMenuSub>
+              <DropdownMenuSubTrigger>
+                <Icon name="Layers" className="size-4" /> Spaces
+                <Icon name="ChevronRight" className="ml-auto size-3.5 text-muted-foreground" />
+              </DropdownMenuSubTrigger>
+              <DropdownMenuSubContent className="max-h-80 w-56 overflow-auto">{spaceMenu([item])}</DropdownMenuSubContent>
             </DropdownMenuSub>
           ) : null}
           {(kind?.capabilities?.archive ?? kind?.canArchive) ? (
@@ -798,6 +824,19 @@ export function CollectionPage({
                     <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
                       <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Tag {plural(chosen.length, "item")}</DropdownMenuLabel>
                       {tagMenu(chosen)}
+                    </DropdownMenuContent>
+                  </DropdownMenu>
+                ) : null}
+                {spacing ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <button type="button" className={OUTLINE_BUTTON} disabled={working}>
+                        <Icon name="Layers" className="size-4" /> Space <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+                      </button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent align="start" className="max-h-80 w-56 overflow-auto">
+                      <DropdownMenuLabel className="text-xs font-normal text-muted-foreground">Add {plural(chosen.length, "item")} to</DropdownMenuLabel>
+                      {spaceMenu(chosen)}
                     </DropdownMenuContent>
                   </DropdownMenu>
                 ) : null}

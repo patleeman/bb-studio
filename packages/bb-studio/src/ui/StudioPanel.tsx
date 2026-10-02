@@ -375,6 +375,30 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           refetch();
         }
       },
+      onSpace: async (items, spaceId, add) => {
+        // Show the change now; the refetch confirms it. Items in the space
+        // through their project stay in it.
+        const keys = new Set(items.map((item) => `${item.pluginId}:${item.id}`));
+        setData((previous) => {
+          if (!previous) return previous;
+          const through = previous.spaces.find((each) => each.id === spaceId)?.projectIds ?? [];
+          return {
+            ...previous,
+            items: previous.items.map((item) =>
+              !keys.has(`${item.pluginId}:${item.id}`) ? item
+                : add ? { ...item, spaces: [...new Set([...(item.spaces ?? []), spaceId])] }
+                  : item.projectId && through.includes(item.projectId) ? item
+                    : { ...item, spaces: (item.spaces ?? []).filter((id) => id !== spaceId) },
+            ),
+          };
+        });
+        const members = items.map((item) => ({ pluginId: item.pluginId, id: item.id }));
+        try {
+          await rpc.call("spaceMembers", { id: spaceId, add: add ? members : [], remove: add ? [] : members });
+        } finally {
+          refetch();
+        }
+      },
       onCreateTag: async (name): Promise<CollectionTag> => {
         const { tag } = await rpc.call("createTag", { name });
         setData((previous) => previous && { ...previous, tags: previous.tags.some((each) => each.id === tag.id) ? previous.tags : [...previous.tags, tag] });
@@ -414,7 +438,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     </button>
   ));
   const collectionSpaces = useMemo(
-    () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
+    () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, projectIds: each.projectIds, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
     [data?.spaces],
   );
   const notice = (

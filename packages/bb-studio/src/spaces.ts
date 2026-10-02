@@ -212,6 +212,19 @@ export function threadInSpace(space: Space, thread: { id: string; projectId: str
   return space.threadIds.includes(thread.id) || (thread.projectId !== null && space.projectIds.includes(thread.projectId));
 }
 
+/**
+ * The spaces a new sub-item joins: the ones its parent was added to, and the
+ * one whose page it was made under. `pagesPluginId` names the add-on that
+ * keeps space pages.
+ */
+export function parentSpaceIds(spaces: readonly Space[], item: { pluginId: string; id: string; parentId: string | null; projectId: string | null }, pagesPluginId: string): string[] {
+  if (!item.parentId) return [];
+  const parent = `${item.pluginId}:${item.parentId}`;
+  return spaces
+    .filter((space) => (space.itemKeys.includes(parent) || (item.pluginId === pagesPluginId && space.pageId === item.parentId)) && !inSpace(space, item))
+    .map((space) => space.id);
+}
+
 /** Space ids per `<plugin>:<id>`, for every item given. */
 export function spaceAssignments(spaces: readonly Space[], items: readonly { pluginId: string; id: string; projectId: string | null }[]): Map<string, string[]> {
   const map = new Map<string, string[]>();

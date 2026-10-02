@@ -24,6 +24,11 @@ export function studioServices(sdk: Sdk) {
     replaceLinks: (item: StudioRef, source: string, links: StudioLink[]) => call("replaceLinks", { ref: item, source, links }, z.object({ ok: z.boolean() })),
     threads: (item: StudioRef) => call("itemThreads", { ref: item }, z.object({ threads: z.array(thread) })),
     linkThread: (entry: z.infer<typeof thread>) => call("linkItemThread", { thread: entry }, z.object({ ok: z.boolean() })),
+    /** Links an item an agent made to its thread; Studio files it in the thread's spaces. */
+    created: (item: StudioRef, threadId: string) => {
+      const at = Date.now();
+      return call("linkItemThread", { thread: { threadId, ref: item, role: "created", state: "working", createdAt: at, updatedAt: at, metadata: {} } }, z.object({ ok: z.boolean() }));
+    },
     spawnForItem: (input: { ref: StudioRef; prompt: string; role: string; projectId?: string | null; metadata?: Record<string, string>; visibility?: "user" | "agent-only" }) =>
       call("spawnForItem", input, z.object({ threadId: z.string() })),
     activity: (input: { ref?: StudioRef; since?: number; limit?: number } = {}) => call("activity", input, z.object({ events: z.array(activity) })),

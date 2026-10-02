@@ -113,6 +113,21 @@ const tab = z.object({
 });
 export type TabView = z.infer<typeof tab>;
 
+/** A space in the sidebar's tree, with its newest items, sub-items under their parents. */
+const treeSpace = z.object({
+  id: z.string(),
+  name: z.string(),
+  icon: z.string().nullable(),
+  color: z.string(),
+  href: z.string(),
+  items: z.array(tab.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
+  /** Every item it holds; `items` stops at a cap. */
+  itemCount: z.number(),
+  threads: z.array(spaceThread.pick({ id: true, title: true, status: true, kind: true })),
+  threadCount: z.number(),
+});
+export type SpaceTreeView = z.infer<typeof treeSpace>;
+
 export const rpcContract = defineRpcContract({
   home: {
     input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
@@ -212,6 +227,8 @@ export const rpcContract = defineRpcContract({
   /** Add-ons call this when their items change. */
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
+  /** Every space with what it holds, for the sidebar's tree. */
+  spaceTree: { input: z.null(), output: z.object({ spaces: z.array(treeSpace) }) },
   /** Open tabs, in order; tabs of deleted items are closed. */
   tabs: { input: z.null(), output: z.object({ tabs: z.array(tab) }) },
   /** Opens a tab for the item whose view is at `path`, if any. */
