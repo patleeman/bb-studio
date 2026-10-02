@@ -13,6 +13,7 @@ import {
   openTab,
   replaceTab,
   panelSize,
+  pinTab,
   parseState,
   placeAt,
   resizeRect,
@@ -21,6 +22,7 @@ import {
   stripLayout,
   toggleCollapsed,
   toggleHidden,
+  tabKey,
   type FloatState,
 } from "./stack";
 
@@ -148,7 +150,7 @@ it("parses saved state, dropping bad entries and duplicates", () => {
     ],
   });
   expect(state).toEqual({
-    tabs: [{ key: "thread:a", target: thread("a"), tag: "item" }],
+    tabs: [{ key: "thread:a", target: thread("a"), pinned: false, opened: true, tag: "item" }],
     active: "thread:a",
     collapsed: false,
     hidden: true,
@@ -235,6 +237,85 @@ describe("links inside a tab", () => {
 
   it("swaps a tab's content for the main view's", () => {
     const state = openTab(EMPTY, path("/plugins/pages/pages/a"));
-    expect(replaceTab(state, "path:/plugins/pages/pages/a", path("/plugins/pages/pages/m")).tabs).toEqual([{ key: "path:/plugins/pages/pages/m", target: path("/plugins/pages/pages/m") }]);
+    expect(replaceTab(state, "path:/plugins/pages/pages/a", path("/plugins/pages/pages/m")).tabs).toEqual([{ key: "path:/plugins/pages/pages/m", target: path("/plugins/pages/pages/m"), pinned: false, opened: true }]);
   });
+});
+
+describe("pinned companions", () => {
+  it("keeps a pinned item's conversation when background context follows another item", () => {
+    const automatic = { minimized: true, tag: "studio-chat:item" };
+    let state = openTab(EMPTY, thread("notes"), automatic);
+    state = pinTab(state, "thread:notes", true);
+    state = openTab(state, thread("next"), automatic);
+    expect(keys(state)).toEqual(["thread:notes", "thread:next"]);
+    expect(state.tabs[0]).toMatchObject({ pinned: true, target: thread("notes") });
+    expect(state.tabs[0]!.tag).toBeUndefined();
+    state = openTab(state, thread("third"), automatic);
+    expect(keys(state)).toEqual(["thread:notes", "thread:third"]);
+  });
+
+  it("opens links beside a pinned reference and focuses a destination already open", () => {
+    const source = { kind: "path" as const, path: "/plugins/pages/pages/spec" };
+    const state = pinTab(openTab(EMPTY, source), tabKey(source), true);
+    const moved = navigateTab(state, tabKey(source), thread("review"));
+    expect(keys(moved)).toEqual([tabKey(source), "thread:review"]);
+    expect(moved.tabs[0]).toEqual(state.tabs[0]);
+    const refocused = navigateTab(selectTab(moved, tabKey(source)), tabKey(source), thread("review"));
+    expect(keys(refocused)).toEqual(keys(moved));
+    expect(refocused.active).toBe("thread:review");
+  });
+
+  it("preserves pins and the active conversation through the tab limit and reload", () => {
+    let state = pinTab(openTab(EMPTY, thread("reference")), "thread:reference", true);
+    for (let index = 0; index < MAX_TABS + 3; index++) state = openTab(state, thread(String(index)));
+    expect(keys(state)).toContain("thread:reference");
+    expect(state.tabs).toHaveLength(MAX_TABS + 4);
+    const restored = parseState(JSON.parse(JSON.stringify(state)));
+    expect(restored).toEqual(state);
+  });
+
+  it("treats the limit as soft when every existing companion is pinned", () => {
+    let state = EMPTY;
+    for (let index = 0; index < MAX_TABS; index++) {
+      state = pinTab(openTab(state, thread(String(index))), `thread:${index}`, true);
+    }
+    state = openTab(state, thread("new"));
+    expect(state.tabs).toHaveLength(MAX_TABS + 1);
+    expect(parseState(JSON.parse(JSON.stringify(state))).tabs).toEqual(state.tabs);
+    state = pinTab(state, "thread:0", false);
+    expect(keys(openTab(state, thread("newer")))).toContain("thread:0");
+  });
+
+  it("still allows explicitly closing a pinned tab", () => {
+    const state = pinTab(openTab(EMPTY, thread("a")), "thread:a", true);
+    expect(closeTab(state, "thread:a")).toMatchObject({ tabs: [], dismissed: true });
+  });
+});
+
+it("restores validated navigation history so Back works after reload", () => {
+  const source = { kind: "path" as const, path: "/plugins/pages/pages/spec" };
+  let state = navigateTab(openTab(EMPTY, source), tabKey(source), thread("review"));
+  state = pinTab(state, "thread:review", true);
+  const restored = parseState(JSON.parse(JSON.stringify(state)));
+  expect(goBack(restored, "thread:review").tabs[0]).toMatchObject({ target: source, pinned: true });
+  expect(parseState({ tabs: [{ target: thread("a"), back: [null, source, { kind: "thread" }] }] }).tabs[0]!.back).toEqual([source]);
+});
+
+it("keeps a conversation that may contain a draft after it stops being the active tab", () => {
+  const automatic = { minimized: true, tag: "studio-chat:item" };
+  let state = selectTab(openTab(EMPTY, thread("draft"), automatic), "thread:draft");
+  state = openTab(state, thread("other"));
+  state = openTab(state, thread("next-item"), automatic);
+  expect(keys(state)).toEqual(["thread:draft", "thread:other", "thread:next-item"]);
+  expect(state.tabs[0]!.opened).toBe(true);
+  expect(state.tabs[0]!.tag).toBeUndefined();
+});
+
+it("never evicts user work when automatic background tabs reach the soft limit", () => {
+  let state = EMPTY;
+  for (let index = 0; index < MAX_TABS + 2; index++) state = openTab(state, thread(String(index)));
+  const existingKeys = keys(state);
+  state = openTab(state, thread("background"), { minimized: true });
+  expect(keys(state)).toEqual(existingKeys);
+  expect(keys(parseState(JSON.parse(JSON.stringify(state))))).toEqual(existingKeys);
 });

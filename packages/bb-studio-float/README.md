@@ -60,6 +60,11 @@ picked, so Pages renders the page inside it.
   header.
 - **Move a tab.** The ⋯ menu has **Move to main view**, **Move to split**,
   and **Swap with main view**, which trades the tab and the main view.
+- **Pin a companion.** **Pin tab** in ⋯ keeps its conversation or reference
+  while you open other items. Links from a pinned tab open another tab.
+  Pinned tabs stay through reloads and do not close at the tab limit.
+- **Keep work in progress.** Switching tabs, folding the panel, and hiding it
+  retain each opened view, including its editor state and unsent chat draft.
 - **Links stay in the tab.** A link or item opened from inside a tab opens
   in that tab, as in a browser; ← goes back.
 - **Mod+Shift+J** hides the panel and shows it again. You can rebind it in
@@ -87,7 +92,8 @@ More in [docs/float.md](../../docs/float.md).
 
 - Some buttons inside a floated view still open the main view, where the
   view navigates with BB's own router instead of a link.
-- Switching tabs reloads the tab you switch to; only the one showing runs.
+- Opened tabs stay mounted until closed. Background tabs can keep audio,
+  subscriptions, and editors running; tabs you have never shown stay unloaded.
 - A view that can't show in the panel says so, with a button to open it.
 - An item open both in the panel and in the main view runs two editors, each
   saving on its own.

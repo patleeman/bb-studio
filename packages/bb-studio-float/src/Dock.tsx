@@ -48,7 +48,7 @@ export function Dock() {
         style={{ right: `var(${FLOAT_RIGHT_VAR}, 1.5rem)` }}
       />
       <ItemGestures />
-      {state.hidden ? null : <Stack state={state} dockOffset={cornerWidth ? cornerWidth + 8 : 0} />}
+      <Stack state={state} dockOffset={cornerWidth ? cornerWidth + 8 : 0} />
     </>
   );
 }

@@ -7,9 +7,12 @@ import type { FloatOpenOptions, FloatTarget } from "@bb-studio/kit/app";
 export interface FloatTab {
   key: string;
   target: FloatTarget;
+  pinned: boolean;
+  /** Once shown, a tab can hold a draft or an editor and must stay until closed. */
+  opened: boolean;
   /** The caller's tag from `openFloat`, if any. */
   tag?: string;
-  /** What the tab showed before following links inside it, newest last. Not kept across a reload. */
+  /** What the tab showed before following links inside it, newest last. */
   back?: FloatTarget[];
 }
 
@@ -39,7 +42,7 @@ const DOCK: FloatPlace = { kind: "dock" };
 
 export const EMPTY: FloatState = { tabs: [], active: null, collapsed: false, hidden: false, dismissed: false, place: DOCK, size: null };
 
-/** More than this and the oldest closes; the tab menu can't usefully list more. */
+/** A soft limit for unopened background tabs; user work is never evicted. */
 export const MAX_TABS = 12;
 
 export const tabKey = (target: FloatTarget): string =>
@@ -81,9 +84,16 @@ export function parseState(raw: unknown): FloatState {
     if (seen.has(key)) continue;
     seen.add(key);
     const tag = (entry as { tag?: unknown }).tag;
-    tabs.push({ key, target, ...(typeof tag === "string" ? { tag } : {}) });
+    const pinned = (entry as { pinned?: unknown }).pinned === true;
+    const opened = (entry as { opened?: unknown }).opened !== false;
+    const back = (entry as { back?: unknown }).back;
+    tabs.push({
+      key, target, pinned, opened,
+      ...(typeof tag === "string" ? { tag } : {}),
+      ...(Array.isArray(back) ? { back: back.filter(isTarget).slice(-MAX_BACK) } : {}),
+    });
   }
-  const kept = tabs.slice(-MAX_TABS);
+  const kept = trim(tabs, typeof saved.active === "string" ? saved.active : null);
   const active = kept.find((tab) => tab.key === saved.active)?.key ?? kept.at(-1)?.key ?? null;
   return {
     tabs: kept,
@@ -101,11 +111,11 @@ function withoutTag(tab: FloatTab): FloatTab {
   return rest;
 }
 
-/** Past the limit, the oldest tabs close, never the one showing. */
+/** Past the soft limit, discard only unopened background tabs. */
 function trim(tabs: FloatTab[], active: string | null): FloatTab[] {
   const extra = tabs.length - MAX_TABS;
   if (extra <= 0) return tabs;
-  const dropped = new Set(tabs.filter((tab) => tab.key !== active).slice(0, extra).map((tab) => tab.key));
+  const dropped = new Set(tabs.filter((tab) => !tab.pinned && !tab.opened && tab.key !== active).slice(0, extra).map((tab) => tab.key));
   return tabs.filter((tab) => !dropped.has(tab.key));
 }
 
@@ -113,8 +123,7 @@ function trim(tabs: FloatTab[], active: string | null): FloatTab[] {
  * Opens `target` as a tab and shows it. A tab already showing it is reused
  * where it is; anything else joins at the end. With `minimized`, the tab
  * opens behind the one showing (or, in an empty stack, folded). With a tag,
- * a tab opened under that tag gives its place to the new one, unless you're
- * looking at it.
+ * an unopened, unpinned tab under that tag gives its place to the new one.
  */
 export function openTab(state: FloatState, target: FloatTarget, options: FloatOpenOptions = {}): FloatState {
   const key = tabKey(target);
@@ -128,12 +137,12 @@ export function openTab(state: FloatState, target: FloatTarget, options: FloatOp
   if (state.tabs.some((tab) => tab.key === key)) {
     tabs = state.tabs.map((tab) =>
       // A tag follows the tab it was last given to.
-      tab.key === key ? { ...tab, target: { ...tab.target, ...target }, ...(tag ? { tag } : {}) } : untag(tab),
+      tab.key === key ? { ...tab, opened: tab.opened || !background, target: { ...tab.target, ...target }, ...(tag ? { tag } : {}) } : untag(tab),
     );
   } else {
-    const next: FloatTab = { key, target, ...(tag ? { tag } : {}) };
+    const next: FloatTab = { key, target, pinned: false, opened: !background, ...(tag ? { tag } : {}) };
     const replaced = tag ? state.tabs.find((tab) => tab.tag === tag) : undefined;
-    if (replaced && !viewing(replaced.key)) {
+    if (replaced && !replaced.pinned && !replaced.opened && !viewing(replaced.key)) {
       tabs = state.tabs.map((tab) => (tab === replaced ? next : tab));
       if (active === replaced.key) active = key;
     } else {
@@ -164,6 +173,12 @@ export const closeAll = (state: FloatState): FloatState => ({ ...EMPTY, dismisse
 /** Past this, a tab forgets the oldest place it can go back to. */
 export const MAX_BACK = 20;
 
+/** A pinned companion keeps its target when other items or links open. */
+export function pinTab(state: FloatState, key: string, pinned: boolean): FloatState {
+  if (!state.tabs.some((tab) => tab.key === key && tab.pinned !== pinned)) return state;
+  return { ...state, tabs: state.tabs.map((tab) => tab.key === key ? { ...tab, pinned } : tab) };
+}
+
 /**
  * Follows a link inside a tab: the tab shows `target`, and can go back to
  * what it showed. If another tab already shows `target`, that tab shows and
@@ -174,12 +189,13 @@ export function navigateTab(state: FloatState, key: string, target: FloatTarget)
   if (!tab) return state;
   const nextKey = tabKey(target);
   if (nextKey === key) return state;
+  if (tab.pinned) return openTab(state, target);
   if (state.tabs.some((candidate) => candidate.key === nextKey)) {
     const tabs = state.tabs.filter((candidate) => candidate.key !== key);
     return { ...state, tabs, active: nextKey, collapsed: false, hidden: false };
   }
   const back = [...(tab.back ?? []), tab.target].slice(-MAX_BACK);
-  const next: FloatTab = { key: nextKey, target, back };
+  const next: FloatTab = { key: nextKey, target, pinned: false, opened: true, back };
   return {
     ...state,
     tabs: state.tabs.map((candidate) => (candidate.key === key ? next : candidate)),
@@ -194,7 +210,7 @@ export function goBack(state: FloatState, key: string): FloatState {
   if (!tab || !previous) return state;
   const previousKey = tabKey(previous);
   if (state.tabs.some((candidate) => candidate.key === previousKey)) return selectTab(closeTab(state, key), previousKey);
-  const next: FloatTab = { key: previousKey, target: previous, back: tab.back!.slice(0, -1) };
+  const next: FloatTab = { key: previousKey, target: previous, pinned: tab.pinned, opened: true, back: tab.back!.slice(0, -1) };
   return {
     ...state,
     tabs: state.tabs.map((candidate) => (candidate.key === key ? next : candidate)),
@@ -206,14 +222,14 @@ export function goBack(state: FloatState, key: string): FloatState {
 export function replaceTab(state: FloatState, key: string, target: FloatTarget): FloatState {
   const nextKey = tabKey(target);
   if (nextKey === key || state.tabs.some((candidate) => candidate.key === nextKey)) return state;
-  const tabs = state.tabs.map((candidate) => (candidate.key === key ? { key: nextKey, target } : candidate));
+  const tabs = state.tabs.map((candidate) => (candidate.key === key ? { key: nextKey, target, pinned: candidate.pinned, opened: true } : candidate));
   return { ...state, tabs, active: state.active === key ? nextKey : state.active };
 }
 
 /** Shows a tab, opening the panel if it's folded or hidden. */
 export function selectTab(state: FloatState, key: string): FloatState {
   if (!state.tabs.some((tab) => tab.key === key)) return state;
-  return { ...state, active: key, collapsed: false, hidden: false };
+  return { ...state, tabs: state.tabs.map((tab) => tab.key === key ? { ...tab, opened: true } : tab), active: key, collapsed: false, hidden: false };
 }
 
 /** Moves a tab to `index` in the strip. */

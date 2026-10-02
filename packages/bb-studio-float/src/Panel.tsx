@@ -23,6 +23,7 @@ import {
 } from "@bb-studio/kit/app";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { update } from "./store";
+import { RetainedView } from "./RetainedView";
 import {
   clampFree,
   closeAll,
@@ -37,6 +38,7 @@ import {
   ICON_TAB_WIDTH,
   moveTab,
   panelSize,
+  pinTab,
   placeAt,
   replaceTab,
   resizeRect,
@@ -255,6 +257,7 @@ function TabStrip({ state }: { state: FloatState }) {
             }}
           >
             <Icon name={tabIcon(tab.target)} className="size-4 shrink-0" />
+            {tab.pinned && labeled ? <Icon name="Pin" className="size-3 shrink-0" aria-hidden /> : null}
             {labeled ? (
               <>
                 <span className="float-tab-title min-w-0 flex-1 truncate">
@@ -315,6 +318,10 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
+          <DropdownMenuItem onSelect={() => update((next) => pinTab(next, active.key, !active.pinned))}>
+            <Icon name={active.pinned ? "PinOff" : "Pin"} className="size-4" />
+            {active.pinned ? "Unpin tab" : "Pin tab"}
+          </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => move("main")}>
             <Icon name="Maximize2" className="size-4" /> Move to main view
           </DropdownMenuItem>
@@ -338,6 +345,7 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
               <span className={cn("min-w-0 flex-1 truncate", tab.key === active.key && "font-medium")}>
                 <TabLabel target={tab.target} />
               </span>
+              {tab.pinned ? <Icon name="Pin" className="size-3 shrink-0" aria-hidden /> : null}
               {tab.key === active.key ? <Icon name="Check" className="size-4" /> : null}
             </DropdownMenuItem>
           ))}
@@ -515,6 +523,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
       ) : null}
       <section
         ref={panel}
+        hidden={state.hidden}
         aria-label="Floating tabs"
         data-float-place={dragAt ? "dragging" : resizing ? "resizing" : state.place.kind}
         className={cn(
@@ -526,7 +535,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           dragAt && "shadow-2xl",
           resizing && "select-none",
         )}
-        style={{ ...position, width, height }}
+        style={{ ...position, width, height, ...(state.hidden ? { display: "none" } : {}) }}
       >
         {state.collapsed || dragAt ? null : (
           <ResizeHandles docked={state.place.kind === "dock"} panel={panel} screen={screen} onResize={setResizing} />
@@ -562,9 +571,11 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           </button>
           <TabMenu state={state} active={active} />
         </header>
-        {state.collapsed ? null : (
-          <TabWindow key={active.key} tab={active} />
-        )}
+        {state.tabs.map((tab) => (
+          <RetainedView key={tab.key} visible={tab.key === active.key && !state.collapsed && !state.hidden}>
+            <TabWindow tab={tab} />
+          </RetainedView>
+        ))}
       </section>
     </>
   );

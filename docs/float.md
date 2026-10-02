@@ -47,9 +47,11 @@ chat from inside the panel.
 - `FloatThreadLeading` renders above a thread tab's messages; Studio Chat's
   "Viewing" chip uses it.
 - `openFloat(target, { minimized, tag })`: `minimized` opens the tab behind
-  the one showing (folded, in an empty panel). A tag swaps the tab opened
-  under the same tag unless you're looking at it, so Studio Chat bringing
+  the one showing (folded, in an empty panel). A tag swaps an unopened tab
+  under the same tag, so Studio Chat bringing
   back each item's chat doesn't add a tab per item.
+  Pinned and previously opened tabs keep their target when that tag follows
+  another item, preserving any draft or editor they may hold.
   After the last tab or all tabs close, minimized opens are ignored until
   an explicit Float action opens the panel again.
 - `--studio-float-right` on the root element moves the corner and a docked
@@ -81,19 +83,24 @@ Studio's sidebar tabs.
 fallbacks. The collection's row menu, the item header's ⧉ menu, Quick Open
 and Float's tab menu all use it.
 
-Inside a tab, links follow in the tab. Float catches plain link clicks in the
+Inside an unpinned tab, links follow in the tab. Float catches plain link clicks in the
 tab body, and the kit's `openAppPath` checks whether the click came from
 inside a tab (`navigateFromFloat`) and sends the tab there. Each tab keeps a
-back stack for its ← button; the stack isn't kept across a reload.
+back stack for its ← button; validated history survives a reload. A pinned
+tab keeps its target and opens links in another tab, focusing an existing
+destination when one is already open.
 
 ## Layout
 
-- **Tabs.** New tabs join at the end and show. One tab shows at a time, and
-  only it is mounted, so switching reloads the tab. Tabs reorder by dragging
+- **Tabs.** New tabs join at the end and show. A tab mounts when first shown
+  and stays mounted until closed. Switching tabs, folding, and hiding the
+  panel preserve local editor and composer state. Tabs reorder by dragging
   (pointer events, committed on drop). While every tab fits at 96px, all
   are labeled; past that, the tab showing keeps its label and the others
   are 32px icons, as many as fit around it. The ⋯ menu lists every tab. At
-  most 12; past that the oldest closes, never the one showing.
+  the soft limit of 12, only unopened background tabs can be discarded.
+  Opened and pinned companions stay until explicitly closed, even when
+  that exceeds the limit.
 - **Place.** Docked, the panel is 400px wide at the bottom right, left of
   the corner content. Dragging the header (anywhere that isn't a tab or a
   button) pulls it free. A free panel is stored by its left edge and its gap
@@ -103,7 +110,7 @@ back stack for its ← button; the stack isn't kept across a reload.
 - **Size.** 400 by 560 until resized. Drag an edge or corner: docked, the top
   and left edges, since the bottom and right stay put; free, any edge. At
   least 300 by 200, and kept on screen. Double-click an edge for the default.
-- **State.** Per browser window in session storage: the tabs and their tags,
+- **State.** Per browser window in session storage: the tabs, pins, history, and tags,
   the tab showing, folded, hidden (Mod+Shift+J), dismissed, the place and the size.
 
 ## Limits
