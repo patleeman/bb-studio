@@ -78,12 +78,16 @@ export const jobPrompt = (job: Job) => {
   const forkNote = isForkConversation(job.conversationKey)
     ? "This is a separate fork. Handle only the new request; do not resume inherited work. The primary session owns shared MEMORY.md; do not edit it from this fork. Include useful durable findings in your channel answer."
     : "";
+  const retryNote = job.stallRetriedAt
+    ? "Retry: the previous attempt at this request made no progress (the provider kept failing or the host disconnected) and was stopped. Start the request now."
+    : "";
   const wrapUpNote = job.wrapUpRequestedAt
     ? `Time check: stop new implementation work now. Save the current state in the existing worktree without reverting or committing. In ${job.roomId ? "this channel" : "this conversation"}, report what is done, what changed, what remains, checks/screenshots completed, and any blockers. Then finish your response.`
     : "";
   return [
     ...(job.roomId ? [] : ["Read MISSION.md and MEMORY.md before acting."]),
     forkNote,
+    retryNote,
     wrapUpNote,
     job.text,
     `Request: ${job.id}`,
@@ -164,6 +168,8 @@ export class Runtime {
     requiredBotIds?: string[],
   ) => Promise<RoutingSelection>;
   readonly busy = new Map<string, { threadId: string; at: number }>();
+  /** Whether each running job's turn has made progress, and when that was read (see runtime-stall.ts). */
+  readonly progressChecks = new Map<string, { at: number; progress: boolean }>();
   readonly abort = new AbortController();
   readonly data: ChannelData;
   constructor(

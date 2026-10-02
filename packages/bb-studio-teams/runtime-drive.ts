@@ -42,6 +42,7 @@ import {
 } from "./send-mode";
 import type { Runtime } from "./runtime";
 import { advanceTurnClock } from "./turn-clock";
+import { jobHasProgress, retryStalled, stalledAfterRetry } from "./runtime-stall";
 import { errorText, jobPrompt, jobInput, missingThread, primaryLane } from "./runtime";
 export async function driveRoom(this: Runtime, room: Room) {
     if (room.archived) return;
@@ -234,13 +235,20 @@ export async function driveJob(this: Runtime, bot: Bot, job: Job, forkJob: boole
         turnMs >= limitMs * 0.75 &&
         turnMs < limitMs
       ) {
-        current.pendingSteer = { priorPrompt: jobPrompt(current) };
-        current.wrapUpRequestedAt = Date.now();
-        current.requiresPromptMatch = true;
-        this.store.putJob(current);
-        this.changed();
-        await this.startSteer({ jobId: current.id });
-        return;
+        if (await jobHasProgress(this, current)) {
+          current.pendingSteer = { priorPrompt: jobPrompt(current) };
+          current.wrapUpRequestedAt = Date.now();
+          current.requiresPromptMatch = true;
+          this.store.putJob(current);
+          this.changed();
+          await this.startSteer({ jobId: current.id });
+          return;
+        }
+        // Nothing to wrap up: send it again once, else let it reach the limit.
+        if (!current.stallRetriedAt) {
+          await retryStalled(this, current);
+          return;
+        }
       }
       if (thread.status === "error") {
         const matches = await this.latestPromptMatches(
@@ -341,7 +349,9 @@ export async function driveJob(this: Runtime, bot: Bot, job: Job, forkJob: boole
       )
         await this.cancel(
           latest,
-          `Turn timed out after ${(bot.limits ?? defaultLimits).minutesPerTurn} minutes. Inspect the conversation before retrying.`,
+          stalledAfterRetry(this, latest)
+            ? `The bot made no progress in ${(bot.limits ?? defaultLimits).minutesPerTurn} minutes, even after a retry. Its provider may be failing or its computer offline; open the work thread to check.`
+            : `Turn timed out after ${(bot.limits ?? defaultLimits).minutesPerTurn} minutes. Inspect the conversation before retrying.`,
           false,
           true,
         );

@@ -1925,6 +1925,7 @@ public enum BotTeams {
     public var wrapUpRequestedAt: Double?
     public var turnMs: Double?
     public var clockAt: Double?
+    public var stallRetriedAt: Double?
     public var automationId: String?
     public var id: String?
     public var botId: String?
@@ -1948,7 +1949,7 @@ public enum BotTeams {
     public var attachments: [ChannelSurfaceOutputJobsItemAttachmentsItem]?
     public var outputAttachments: [ChannelSurfaceOutputJobsItemOutputAttachmentsItem]?
 
-    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: ChannelSurfaceOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: ChannelSurfaceOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: ChannelSurfaceOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [ChannelSurfaceOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [ChannelSurfaceOutputJobsItemOutputAttachmentsItem]? = nil) {
+    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: ChannelSurfaceOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: ChannelSurfaceOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: ChannelSurfaceOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [ChannelSurfaceOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [ChannelSurfaceOutputJobsItemOutputAttachmentsItem]? = nil) {
       self.contextMessageId = contextMessageId
       self.rosterVersion = rosterVersion
       self.delegationId = delegationId
@@ -1970,6 +1971,7 @@ public enum BotTeams {
       self.wrapUpRequestedAt = wrapUpRequestedAt
       self.turnMs = turnMs
       self.clockAt = clockAt
+      self.stallRetriedAt = stallRetriedAt
       self.automationId = automationId
       self.id = id
       self.botId = botId
@@ -5098,6 +5100,7 @@ public enum BotTeams {
     public var wrapUpRequestedAt: Double?
     public var turnMs: Double?
     public var clockAt: Double?
+    public var stallRetriedAt: Double?
     public var automationId: String?
     public var id: String?
     public var botId: String?
@@ -5121,7 +5124,7 @@ public enum BotTeams {
     public var attachments: [RetryJobOutputAttachmentsItem]?
     public var outputAttachments: [RetryJobOutputOutputAttachmentsItem]?
 
-    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: RetryJobOutputDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: RetryJobOutputPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: RetryJobOutputStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [RetryJobOutputAttachmentsItem]? = nil, outputAttachments: [RetryJobOutputOutputAttachmentsItem]? = nil) {
+    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: RetryJobOutputDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: RetryJobOutputPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: RetryJobOutputStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [RetryJobOutputAttachmentsItem]? = nil, outputAttachments: [RetryJobOutputOutputAttachmentsItem]? = nil) {
       self.contextMessageId = contextMessageId
       self.rosterVersion = rosterVersion
       self.delegationId = delegationId
@@ -5143,6 +5146,7 @@ public enum BotTeams {
       self.wrapUpRequestedAt = wrapUpRequestedAt
       self.turnMs = turnMs
       self.clockAt = clockAt
+      self.stallRetriedAt = stallRetriedAt
       self.automationId = automationId
       self.id = id
       self.botId = botId
@@ -6321,6 +6325,7 @@ public enum BotTeams {
     public var wrapUpRequestedAt: Double?
     public var turnMs: Double?
     public var clockAt: Double?
+    public var stallRetriedAt: Double?
     public var automationId: String?
     public var id: String?
     public var botId: String?
@@ -6344,7 +6349,7 @@ public enum BotTeams {
     public var attachments: [GetOutputJobsItemAttachmentsItem]?
     public var outputAttachments: [GetOutputJobsItemOutputAttachmentsItem]?
 
-    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: GetOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: GetOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: GetOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [GetOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [GetOutputJobsItemOutputAttachmentsItem]? = nil) {
+    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: GetOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: GetOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: GetOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [GetOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [GetOutputJobsItemOutputAttachmentsItem]? = nil) {
       self.contextMessageId = contextMessageId
       self.rosterVersion = rosterVersion
       self.delegationId = delegationId
@@ -6366,6 +6371,7 @@ public enum BotTeams {
       self.wrapUpRequestedAt = wrapUpRequestedAt
       self.turnMs = turnMs
       self.clockAt = clockAt
+      self.stallRetriedAt = stallRetriedAt
       self.automationId = automationId
       self.id = id
       self.botId = botId
@@ -8387,6 +8393,7 @@ public enum BotTeams {
     public var wrapUpRequestedAt: Double?
     public var turnMs: Double?
     public var clockAt: Double?
+    public var stallRetriedAt: Double?
     public var automationId: String?
     public var id: String?
     public var botId: String?
@@ -8410,7 +8417,7 @@ public enum BotTeams {
     public var attachments: [RoomOutputJobsItemAttachmentsItem]?
     public var outputAttachments: [RoomOutputJobsItemOutputAttachmentsItem]?
 
-    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: RoomOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: RoomOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: RoomOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [RoomOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [RoomOutputJobsItemOutputAttachmentsItem]? = nil) {
+    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: RoomOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: RoomOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: RoomOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [RoomOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [RoomOutputJobsItemOutputAttachmentsItem]? = nil) {
       self.contextMessageId = contextMessageId
       self.rosterVersion = rosterVersion
       self.delegationId = delegationId
@@ -8432,6 +8439,7 @@ public enum BotTeams {
       self.wrapUpRequestedAt = wrapUpRequestedAt
       self.turnMs = turnMs
       self.clockAt = clockAt
+      self.stallRetriedAt = stallRetriedAt
       self.automationId = automationId
       self.id = id
       self.botId = botId

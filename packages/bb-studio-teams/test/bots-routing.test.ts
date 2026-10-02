@@ -549,7 +549,6 @@ test("queue age is excluded from the execution timeout", async () => {
     assert.equal(x.store.job("old")!.status, "running");
     assert.ok(x.store.job("old")!.dispatchStartedAt! > Date.now() - 5000);
     // The computer slept for half an hour: the gap doesn't count against the turn.
-
     x.store.setTurnClock("old", { turnMs: 60000, clockAt: Date.now() - 30 * 60000 });
     await x.runtime.drive(x.a);
     assert.equal(x.store.job("old")!.status, "running");
@@ -559,6 +558,65 @@ test("queue age is excluded from the execution timeout", async () => {
     x.store.setTurnClock("old", { turnMs: 21 * 60000, clockAt: Date.now() });
     await x.runtime.drive(x.a);
     assert.equal(x.store.job("old")!.status, "cancelled");
+  } finally {
+    await x.close();
+  }
+});
+
+/** A running mission job whose thread shows `rows` since it started. */
+async function runningJob(x: ReturnType<typeof setup>, rows: unknown[]) {
+  x.runtime.enqueue(x.a, { id: "slow", text: "work", conversationKey: "mission" });
+  await x.runtime.drive(x.a);
+  x.harness.inspection.sdk.stub("threads.queuedMessages.list", async () => [
+    { id: "queued", content: [{ type: "text", text: jobPrompt(x.store.job("slow")!) }] },
+  ]);
+  // Each row happened just now, during the turn.
+  x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: rows.map((row) => ({ ...(row as object), createdAt: Date.now() })) }));
+  await x.runtime.drive(x.a);
+  assert.equal(x.store.job("slow")!.status, "running");
+}
+
+test("a turn that made no progress is sent again once, not told to wrap up", async () => {
+  const x = setup();
+  try {
+    await runningJob(x, [{ id: "retry", kind: "system", systemKind: "operation", title: "API retry 2/10" }]);
+    x.store.setTurnClock("slow", { turnMs: 16 * 60000, clockAt: Date.now() });
+    await x.runtime.drive(x.a);
+    const retried = x.store.job("slow")!;
+    assert.equal(retried.status, "queued");
+    assert.equal(retried.wrapUpRequestedAt, undefined);
+    assert.ok(retried.stallRetriedAt);
+    assert.equal(retried.turnMs, undefined);
+    assert.equal(x.harness.inspection.sdk.callsTo("threads.stop").length, 1);
+    assert.match(jobPrompt(retried), /^Retry: the previous attempt/m);
+    // It goes out again; stalling again, it isn't retried twice or told to wrap up.
+    x.harness.inspection.sdk.stub("threads.queuedMessages.list", async () => [
+      { id: "queued", content: [{ type: "text", text: jobPrompt(x.store.job("slow")!) }] },
+    ]);
+    await x.runtime.drive(x.a);
+    await x.runtime.drive(x.a);
+    assert.equal(x.store.job("slow")!.status, "running");
+    x.store.setTurnClock("slow", { turnMs: 16 * 60000, clockAt: Date.now() });
+    await x.runtime.drive(x.a);
+    assert.equal(x.store.job("slow")!.status, "running");
+    assert.equal(x.store.job("slow")!.wrapUpRequestedAt, undefined);
+    x.store.setTurnClock("slow", { turnMs: 21 * 60000, clockAt: Date.now() });
+    await x.runtime.drive(x.a);
+    assert.equal(x.store.job("slow")!.status, "cancelled");
+    assert.match(x.store.job("slow")!.error!, /no progress .* even after a retry/);
+  } finally {
+    await x.close();
+  }
+});
+
+test("a turn that is working gets the wrap-up request", async () => {
+  const x = setup();
+  try {
+    await runningJob(x, [{ id: "cmd", kind: "work", workKind: "command", command: "ls" }]);
+    x.store.setTurnClock("slow", { turnMs: 16 * 60000, clockAt: Date.now() });
+    await x.runtime.drive(x.a);
+    assert.ok(x.store.job("slow")!.wrapUpRequestedAt);
+    assert.equal(x.store.job("slow")!.stallRetriedAt, undefined);
   } finally {
     await x.close();
   }

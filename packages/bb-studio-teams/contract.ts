@@ -216,6 +216,8 @@ export const jobSchema = z.object({
   turnMs: z.number().optional(),
   /** When the runtime last moved `turnMs`. */
   clockAt: z.number().optional(),
+  /** When a turn that made no progress was stopped and sent again (once per job). */
+  stallRetriedAt: z.number().optional(),
   automationId: z.string().optional(),
   id: z.string(),
   botId: idSchema,

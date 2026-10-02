@@ -204,3 +204,20 @@ export function activitySnippetFromTimeline(
       .at(-1) ?? null
   );
 }
+
+/**
+ * Whether the bot did anything in the turn that started at `since`: wrote a
+ * reply or started any work (a command, a tool, a search, an approval). System
+ * rows don't count, so a turn stuck retrying its provider, or whose host went
+ * away, has made no progress. A row without a time counts, to be safe.
+ */
+export function turnHasProgress(timeline: unknown, since: number): boolean {
+  const value = asRecord(timeline);
+  const rows: RecordValue[] = [];
+  collectRows(Array.isArray(value?.rows) ? value.rows : [], rows, new Set());
+  return rows.some(
+    (row) =>
+      (typeof row.createdAt !== "number" || row.createdAt >= since) &&
+      ((row.kind === "conversation" && row.role === "assistant" && asText(row.text) !== null) || row.kind === "work"),
+  );
+}

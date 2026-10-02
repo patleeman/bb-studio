@@ -177,3 +177,15 @@ test("activity snippets skip rows from earlier turns in a reused thread", () => 
     "Reading MEMORY.md",
   );
 });
+
+test("a turn has made progress once the bot writes or works, not on system rows", async () => {
+  const { turnHasProgress } = await import("../activity");
+  const since = 1_000;
+  const system = { id: "s", kind: "system", systemKind: "operation", title: "API retry 2/10", createdAt: 2_000 };
+  assert.equal(turnHasProgress({ rows: [system] }, since), false);
+  assert.equal(turnHasProgress({ rows: [{ id: "old", kind: "work", workKind: "command", createdAt: 500 }] }, since), false);
+  assert.equal(turnHasProgress({ rows: [{ id: "you", kind: "conversation", role: "user", text: "work", createdAt: 2_000 }] }, since), false);
+  assert.equal(turnHasProgress({ rows: [system, { id: "w", kind: "work", workKind: "tool", createdAt: 3_000 }] }, since), true);
+  assert.equal(turnHasProgress({ rows: [{ id: "a", kind: "conversation", role: "assistant", text: "On it", createdAt: 3_000 }] }, since), true);
+  assert.equal(turnHasProgress({}, since), false);
+});

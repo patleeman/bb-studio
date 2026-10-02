@@ -1446,6 +1446,9 @@
                     "clockAt": {
                       "type": "number"
                     },
+                    "stallRetriedAt": {
+                      "type": "number"
+                    },
                     "automationId": {
                       "type": "string"
                     },
@@ -5218,6 +5221,9 @@
           "clockAt": {
             "type": "number"
           },
+          "stallRetriedAt": {
+            "type": "number"
+          },
           "automationId": {
             "type": "string"
           },
@@ -6373,6 +6379,9 @@
                   "type": "number"
                 },
                 "clockAt": {
+                  "type": "number"
+                },
+                "stallRetriedAt": {
                   "type": "number"
                 },
                 "automationId": {
@@ -8556,6 +8565,9 @@
                   "type": "number"
                 },
                 "clockAt": {
+                  "type": "number"
+                },
+                "stallRetriedAt": {
                   "type": "number"
                 },
                 "automationId": {

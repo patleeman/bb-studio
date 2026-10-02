@@ -452,6 +452,7 @@ export async function roomJobsWithActivity(this: Runtime, roomId: string): Promi
         queuePosition: pending.findIndex((j) => j.id === job.id) + 1,
         queueReason:
           this.store.get(job.botId).error ??
+          (job.stallRetriedAt ? "Retrying: the last attempt made no progress" : undefined) ??
           (isForkConversation(job.conversationKey)
             ? "Waiting for a fork slot"
             : "Waiting for this bot's earlier work"),
