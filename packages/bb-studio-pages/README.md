@@ -8,6 +8,10 @@ comments, charts, and embeds. It also connects to
 [Studio Teams](../bb-studio-teams): @mention a bot in a page to hand it
 work, or give a page an owner bot that keeps it up to date on a schedule.
 
+With Studio Talk installed, the microphone in a comment box lets you dictate
+new comments, replies, and edits. Stop dictation to insert the transcript at
+the cursor, then review it and post when ready. The page body stays separate.
+
 ## Staged preview
 
 ![A Pages document with stats, a chart, and a checklist](assets/staged-preview.png)

@@ -29,6 +29,7 @@ import { createHighlighter } from "./code";
 import type { PageConnection } from "./connection";
 import { authorInfo, usePagesUi } from "./context";
 import { useDarkMode } from "./shared";
+import { CommentDictation } from "./CommentDictation";
 import {
   dictationParagraphs,
   pageFieldKey,
@@ -490,6 +491,7 @@ export function PageEditor({
       renderEditor={false}
       className="pages-editor flex min-h-0 min-w-0 flex-1"
     >
+      <CommentDictation page={page}>
       <div
         ref={fieldRef}
         className="pages-main min-w-0 flex-1"
@@ -529,6 +531,7 @@ export function PageEditor({
       <PageSideMenu pageId={page.id} pageTitle={page.title} />
       <SuggestionMenuController triggerCharacter="/" getItems={slashMenuItems} />
       <SuggestionMenuController triggerCharacter="@" getItems={mentionItems} />
+      </CommentDictation>
     </BlockNoteView>
   );
 }

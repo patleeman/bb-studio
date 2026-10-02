@@ -124,6 +124,11 @@
 .pages-main > .bn-editor:focus {
   outline: none;
 }
+/* Leave room for the comment microphone without covering the draft text. */
+.pages-comment-dictation .bn-comment-editor .bn-editor {
+  padding-right: 44px;
+  min-height: 40px;
+}
 /* Slash and @ menus: single-line rows sized like BB's own menus. */
 .pages-editor .bn-suggestion-menu {
   width: 260px;
