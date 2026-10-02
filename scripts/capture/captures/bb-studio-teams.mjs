@@ -32,5 +32,23 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
    await launchRoomThread();await client.navigate(`/plugins/bot-teams/views/${getLaunchRoomId()}`);
    await client.waitForSelector('section[aria-label="Views"]');await client.waitForText("Design review");
   }
+ },
+ {
+  id:"bots-mobile",packageDir:"bb-studio-teams",fileName:"staged-preview-mobile.png",privateSidebar:false,
+  setup:async client=>{
+   await client.command("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
+   await launchRoomThread();await client.navigate(`/plugins/bot-teams/views/${getLaunchRoomId()}`);
+   await client.waitForSelector('[data-thread-view]');
+   await client.waitForText("Logged: release check passed.");
+   await client.evaluate(`(()=>{
+    if(document.documentElement.scrollWidth>innerWidth)throw new Error("Saved view overflows the compact screen");
+    const composer=document.querySelector('[data-thread-view] form');
+    if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error("Compact composer is offscreen");
+    const reply=[...document.querySelectorAll('[data-view-entry="assistant"]')].at(-1);
+    const timeline=reply?.closest('[data-thread-view]')?.querySelector('[data-view-timeline]');
+    if(!reply||!timeline||reply.getBoundingClientRect().bottom>timeline.getBoundingClientRect().bottom+1)throw new Error("Latest reply is hidden beneath the composer");
+   })()`);
+   return ()=>client.command("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
+  }
  }
 ];
