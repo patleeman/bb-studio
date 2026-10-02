@@ -21,7 +21,7 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
    })()`);
    await client.command("Input.dispatchKeyEvent",{type:"keyDown",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
    await client.command("Input.dispatchKeyEvent",{type:"keyUp",key:"Escape",code:"Escape",windowsVirtualKeyCode:27});
-   await client.evaluate(`new Promise((resolve,reject)=>setTimeout(()=>document.querySelector('[role="group"][aria-label="Recipients"]')?reject(new Error("Recipient menu stayed open")):resolve(),400))`,true);
+   await client.evaluate(`new Promise((resolve,reject)=>setTimeout(()=>document.querySelector('[role="group"][aria-label="Recipients"]')?reject(new Error("Recipient menu stayed open")):resolve(document.activeElement?.blur()),400))`,true);
   }
  },
  {
