@@ -101,7 +101,12 @@ function useItemSearch(query: string | null, exclude?: string) {
     const timer = setTimeout(() => {
       sdk.plugins
         .callRpc({ pluginId: STUDIO_PLUGIN_ID, method: "searchAll", input: { query, limit: 8 } as never, outputSchema: resultSchema })
-        .then((found) => live && setResults(found.filter((result) => result.href.startsWith("/plugins/") && result.href !== exclude)))
+        .then((found) => {
+          if (!live) return;
+          // A search can find one item twice, as indexed and as a fallback match.
+          const seen = new Set<string>(exclude ? [exclude] : []);
+          setResults(found.filter((result) => result.href.startsWith("/plugins/") && !seen.has(result.href) && seen.add(result.href)));
+        })
         .catch(() => live && setResults([]));
     }, 120);
     return () => {
