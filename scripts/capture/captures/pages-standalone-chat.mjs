@@ -44,6 +44,18 @@ export default ({ projectId, seedPages, pluginRpc, bbCli, sleep, mobile = false 
         if (sidebarToggle) await client.clickAriaButtonWithPointer(sidebarToggle);
       }
       await client.waitForSelector('[data-studio-item-header] button[title="Continue this page\'s conversation"]');
+      if (mobile) {
+        await client.clickAriaButtonWithPointer("Item actions");
+        await client.clickAriaButtonWithPointer("Page actions");
+        await client.waitForText("Version history…");
+        await client.command("Input.dispatchKeyEvent", { type: "keyDown", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        await client.command("Input.dispatchKeyEvent", { type: "keyUp", key: "Escape", code: "Escape", windowsVirtualKeyCode: 27 });
+        if (await client.evaluate(`document.querySelector('button[aria-label="Item actions"]').getAttribute('aria-expanded') === 'true'`)) await client.clickAriaButtonWithPointer("Item actions");
+        const fits = await client.evaluate(`(() => [...document.querySelectorAll('[data-studio-item-header] button')].filter(button => button.checkVisibility()).every(button => {
+          const r = button.getBoundingClientRect(); return r.left >= 0 && r.right <= innerWidth && r.top >= 0 && r.bottom <= innerHeight;
+        }))()`);
+        if (!fits) throw new Error("Standalone Pages clips its compact header controls");
+      }
       await client.clickElementWithTextAndPointer('[data-studio-item-header] button', "Chat");
       await client.waitForSelector(`[data-float-window="thread:${threadId}"] [data-promptbox]`);
       const chats = await pluginRpc("pages", "chats", { pageId: page.id });

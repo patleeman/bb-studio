@@ -23,6 +23,7 @@ import bb_studio_decisions from "./capture/captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./capture/captures/bb-studio-mobile.mjs";
 import bb_studio_tables from "./capture/captures/bb-studio-tables.mjs";
 import bb_studio_navigation from "./capture/captures/bb-studio-navigation.mjs";
+import compactHeaders from "./capture/captures/compact-headers.mjs";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginFlag = process.argv.indexOf("--plugin");
 if (pluginFlag >= 0 && !process.argv[pluginFlag + 1]) throw new Error("Usage: --plugin <plugin-id>");
@@ -37,6 +38,7 @@ const captureOnly = process.env.BB_CAPTURE_ONLY
 if (!projectId || !threadId) throw new Error("Set BB_CAPTURE_PROJECT_ID and BB_CAPTURE_THREAD_ID to a seeded BB thread before capturing.");
 const context = { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
 const captures = [
+  ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
   ...bb_studio_sidebar(context),
   ...bb_studio_teams(context),
   ...bb_studio_draw(context),
