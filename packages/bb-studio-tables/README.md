@@ -12,6 +12,15 @@ In a thread's side panel, the **Tables** tab lists the tables made in that threa
 
 ## Staged preview
 
+![The compact Tables header](assets/compact-header.png)
+
+The live 390-pixel Release inventory table contains a seeded Review notes row.
+**Chat** stays visible, and **Item actions** keeps Export and More clickable
+above the sticky table header.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
+
 ![A seeded inventory table in the live BB Studio Tables panel](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): a seeded "QA Inventory" table open in the Tables panel.

@@ -10,6 +10,15 @@ can link to and @-mention.
 
 ## Staged preview
 
+![The compact Talk header](assets/compact-header.png)
+
+The live 390-pixel recording page shows the paused, synthetic Weekly product
+sync recording with four transcript sections. **Chat** stays visible and
+**Item actions** exposes the recording's secondary controls.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
+
 ![Dictation controls inline at the active input](assets/inline-dictation.png)
 
 The real staged composer shows the timer, level meter, cleanup toggle, pause,

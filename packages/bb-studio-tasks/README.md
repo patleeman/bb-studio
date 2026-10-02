@@ -11,6 +11,15 @@ next, such as "Needs your input" or "Ready for review". You mark it done. Boards
 
 ## Staged preview
 
+![The compact Tasks board header](assets/compact-header.png)
+
+The live 390-pixel Release checklist board contains Review the launch notes.
+**Chat** stays visible and **Item actions** exposes the board's secondary
+controls while its Board, List, and Calendar navigation remains available.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
+
 ![Live BB screenshot of a Studio Tasks board](assets/staged-preview.png)
 
 A board opened from the Boards index in an isolated staged BB application:

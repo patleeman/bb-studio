@@ -43,6 +43,7 @@ export default context => {
       };
       try {
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+        if (await client.evaluate(`location.origin === 'null'`)) await client.navigate('/plugins/studio/studio');
         await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
         await client.navigate(path);
         await client.waitForSelector(ready);

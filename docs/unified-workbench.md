@@ -140,9 +140,8 @@ page chat continues without duplication, a draft survives closing and
 reopening, and the phone drawer keeps all composer buttons in the viewport.
 The scheduled fixture never runs an agent. Studio Chat is restored and the
 fixture thread/pages are deleted after capture.
-The phone page header is still crowded; the remaining compact-layout audit
-must cover item-header navigation and overflow menus across the suite, beyond
-the verified conversation drawer.
+The updated stable BB 0.45.0 standalone captures also verify the compact
+primary Chat action and access to Version history through Page actions.
 
 Teams now registers companion renderers for bot profiles, saved views, and
 legacy channel routes. Bot Chat resumes its direct conversation; New
@@ -163,9 +162,35 @@ duplication, and retained title/member controls. The screenshot is visually
 checked. This extends stable Float coverage; native host release is still
 required.
 
-Remaining delivery includes native host live verification and release,
-the SDK/CLI placement controller, embedded composer
-targeting, all suite entry points, compact behavior,
-staged live captures, documentation and marketplace checks, and the
-requirement-by-requirement completion audit. This goal stays active
-until those workflows are implemented and verified.
+The shared header now keeps Chat visible at narrow widths and groups secondary
+controls under Item actions. Its controls stay mounted through closing,
+resizing, and placement changes. Task boards use the same header, with a
+canonical board identity for Chat and the current Board/List/Calendar route
+for placement. Related uses a viewport-bounded popover and binds navigation
+to the companion that opened it, including portal-rendered links.
+
+The compact-layout implementation and capture definitions are pushed in
+715a380, 7cd7050, and 786fd2f. The full suite check passes; the kit has 76 tests.
+Live captures on stable BB 0.45.0, with all 17 plugins installed from 786fd2f,
+pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
+[Draw](../packages/bb-studio-draw/assets/compact-header.png),
+[Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
+[Talk](../packages/bb-studio-talk/assets/compact-header.png),
+[Tables](../packages/bb-studio-tables/assets/compact-header.png),
+[Tasks](../packages/bb-studio-tasks/assets/compact-header.png), and
+[Teams](../packages/bb-studio-teams/assets/compact-header.png).
+Each checks the primary Chat action, every visible header button's bounds
+and hit target, page overflow, and the Related popover at 390 by 844 pixels.
+Visual review caught Tables' sticky grid header covering Export and More;
+the corrected layering passes both the hit checks and final screenshot review.
+All seven captures are visually checked, with seeded fixtures removed.
+
+Remaining delivery includes publishing the native host changes, the SDK/CLI
+placement controller, embedded composer targeting, and the remaining suite
+entry points: Explore, Feed discussions and links, task handoffs, Talk return
+navigation, and split/swap actions. Initial main-view-to-companion transfer
+must also prove retention of an already-open editor's unsaved state; the
+existing native capture verifies transfers after the companion is realized.
+The requirement-by-requirement completion audit and final release checks
+remain required. This goal stays active until those workflows are implemented
+and verified.

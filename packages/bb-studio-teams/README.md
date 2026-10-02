@@ -6,7 +6,7 @@ Studio Teams adds persistent bot profiles and saved views to BB Studio. Bots kee
 
 Create a bot from **Teams → New bot**. Describe its purpose in the prefilled conversation; the agent chooses sensible profile settings and creates it. The bot's page lets you edit its profile, mission and memory, and open every thread working as it. **Work as bot** beside a thread's composer attaches a profile to an idle thread. The thread keeps its own project and model selection. The profile’s **Chat** action resumes its direct conversation; **Chat → New conversation** starts another. Conversations open in the shared companion tabs, preferring the right workbench when supported and Float otherwise. Without Float, they open in the main view.
 
-Open **Studio → New → View** and select bots or existing threads. Views are Studio items: find them in the collection, add tags or spaces, and open them as tabs under **Studio** in the sidebar. A view combines owner input and final replies from its members, including replies sent directly in a member thread. It hides tools, inter-agent input, unfinished output and `[PASS]`. Spawned child threads are folded beneath their parents. A thread can belong to several views; deleting a view leaves its threads intact. Bot profiles and saved views also open as companion tabs. A saved view keeps its own composer and title controls, and opening a member thread leaves the view’s draft in place.
+Open **Studio → New → View** and select bots or existing threads. Views are Studio items: find them in the collection, add tags or spaces, and open them as tabs under **Studio** in the sidebar. A view combines owner input and final replies from its members, including replies sent directly in a member thread. It hides tools, inter-agent input, unfinished output and empty replies. Spawned child threads are folded beneath their parents. A thread can belong to several views; deleting a view leaves its threads intact. Bot profiles and saved views also open as companion tabs. A saved view keeps its own composer and title controls, and opening a member thread leaves the view’s draft in place.
 
 The composer is BB's own prompt box, so it has the same editor, file attachments, voice dictation, and saved drafts as a thread. @-mention the bots or threads that should get a message, or choose **Reply** on a message. Attachments go to every recipient. The approval menu under the box sets the approval mode for everyone or per member; **Each bot's own** leaves every thread's mode as it is. A bot continues its latest thread in this view. Add `+new` after its mention (`@atlas +new`) to start a fresh one. All recipients receive the same addressed thread roster and recent context, with real thread IDs allocated before delivery. A message with no mention goes to the view's only member, or asks Studio Decisions to choose recipients; if it is uncertain, the draft stays in the composer for you to address. Retry preserves successful deliveries when another recipient failed.
 
@@ -25,6 +25,15 @@ Use BB Automations to schedule work in a normal thread. Scheduled findings go to
 The public RPC contract is [client-contract.ts](client-contract.ts); saved view schemas are [view-contract.ts](view-contract.ts). Bot and historical storage schemas remain in [contract.ts](contract.ts). The channel provider, channel orchestration, chat modes and channel tools have been removed.
 
 ## Staged preview
+
+![The compact Teams profile header](assets/compact-header.png)
+
+The live 390-pixel Atlas profile keeps its own **Chat** action visible.
+**Item actions** exposes space, related items, and placement controls alongside
+the bot's profile sections.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
 
 ![A saved view over Atlas and Scribe's ordinary threads](assets/staged-preview.png)
 

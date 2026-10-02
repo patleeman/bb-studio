@@ -12,6 +12,15 @@ agent to save it.
 
 ## Staged preview
 
+![The compact Artifacts header](assets/compact-header.png)
+
+The live 390-pixel viewer shows the seeded Q3 HTML report. **Chat** stays
+visible while **Item actions** exposes related items, placement, and the
+artifact controls.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
+
 ![Live BB screenshot of the Studio Artifacts viewer](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`). It shows an

@@ -14,6 +14,15 @@ the cursor, then review it and post when ready. The page body stays separate.
 
 ## Staged preview
 
+![The compact Pages header](assets/compact-header.png)
+
+The live 390-pixel page keeps **Chat** visible while **Item actions** opens the
+space, related items, placement, and page controls. The standalone phone capture
+also checks that Version history remains reachable through Page actions.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
+
 ![A Pages document with stats, a chart, and a checklist](assets/staged-preview.png)
 
 This is the real BB **Pages** panel in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. The capture

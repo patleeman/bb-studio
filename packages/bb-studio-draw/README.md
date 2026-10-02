@@ -8,6 +8,15 @@ plugin id stays `excalidraw`, so existing installs and drawings carry over.
 
 ## Staged preview
 
+![The compact Draw header](assets/compact-header.png)
+
+The live 390-pixel editor shows the seeded Checkout flow, zoomed to fit Cart,
+Payment, and Confirmation. **Chat** stays visible and **Item actions** exposes
+the drawing's secondary controls.
+These compact captures run on stable BB 0.45.0 with the full suite installed
+from pushed commit 786fd2f. They check viewport bounds, button hit targets,
+and the Related popover before capture.
+
 ![Live BB screenshot of the Studio Draw editor](assets/staged-preview.png)
 
 Captured from a staged BB (`node scripts/staged-bb.mjs start`): the seeded "Checkout flow" drawing open in the Draw
