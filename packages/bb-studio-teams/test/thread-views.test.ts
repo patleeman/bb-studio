@@ -110,6 +110,21 @@ test("history follows BB cursors past tool-only pages and keeps equal timestamps
   } finally { await x.close(); }
 });
 
+test("text-only replies use BB completion events when no turn wrapper exists", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Text replies", [{ kind: "thread", id: "thr_text" }]);
+    x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [
+      { id: "done", kind: "conversation", role: "assistant", threadId: "thr_text", text: "Done", turnId: "turn_done", sourceSeqStart: 2, sourceSeqEnd: 3, createdAt: 100 },
+      { id: "partial", kind: "conversation", role: "assistant", threadId: "thr_text", text: "Working", turnId: "turn_active", sourceSeqStart: 5, sourceSeqEnd: 6, createdAt: 200 },
+    ], timelinePage: { olderCursor: null, hasOlderRows: false } }) as never);
+    x.harness.inspection.sdk.stub("threads.events.list", async () => [
+      { type: "turn/completed", seq: 4, scope: { kind: "turn", turnId: "turn_done" }, data: { status: "completed" } },
+    ] as never);
+    expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual(["Done"]);
+  } finally { await x.close(); }
+});
+
 test("reply, explicit steer, and @bot+new select real threads", async () => {
   const x = fixture();
   try {

@@ -11,9 +11,9 @@ type Row = Timeline["rows"][number];
 const envelope = /^\[Studio view message ([a-f0-9-]+)\]\n([\s\S]*?)\n\[End owner message\]/;
 
 /** Only owner input and the last completed assistant message in each turn. */
-export function finalEntries(rows: Row[]): ViewEntry[] {
+export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set()): ViewEntry[] {
   const entries: ViewEntry[] = [], replies = new Map<string, Row & { kind: "conversation"; role: "assistant" }>();
-  const completedTurns = new Set<string>(), automationTurns = new Set<string>();
+  const completedTurns = new Set(completed), automationTurns = new Set<string>();
   const collect = (items: Row[]) => { for (const row of items) {
     if (row.kind === "turn") { if (row.status === "completed") completedTurns.add(row.turnId ?? row.id); collect(row.children ?? []); }
     else if (row.kind === "conversation" && row.role === "user" && row.turnId && /^\[bb automation due:[^\]]+\]\n/.test(row.text)) automationTurns.add(row.turnId);
@@ -139,7 +139,26 @@ export class ThreadViews {
     const cursors = new Set<string>();
     do {
       const page = await this.bb.sdk.threads.timeline({ threadId, segmentLimit: "60", includeNestedRows: "true", ...(cursor ? { beforeAnchorId: cursor.anchorId, beforeAnchorSeq: String(cursor.anchorSeq) } : {}) });
-      entries.push(...finalEntries(page.rows));
+      // Text-only turns have no summary wrapper. Read their completion events
+      // rather than treating an idle thread or a flat message as proof of finality.
+      const flatTurns = new Set(page.rows.filter(row => row.kind === "conversation" && row.role === "assistant" && row.turnId).map(row => row.turnId!));
+      for (const row of page.rows) if (row.kind === "turn") flatTurns.delete(row.turnId ?? row.id);
+      const completed = new Set<string>();
+      if (flatTurns.size) {
+        let afterSeq = Math.max(0, Math.min(...page.rows.map(row => row.sourceSeqStart)) - 1);
+        for (;;) {
+          const events = await this.bb.sdk.threads.events.list({ threadId, types: ["turn/completed"], afterSeq: String(afterSeq), order: "asc", limit: "100" });
+          for (const event of events) if (event.type === "turn/completed" && event.scope.kind === "turn" && event.data.status === "completed") {
+            completed.add(event.scope.turnId);
+            flatTurns.delete(event.scope.turnId);
+          }
+          if (events.length < 100 || !flatTurns.size) break;
+          const next = events.at(-1)!.seq;
+          if (next <= afterSeq) throw new Error("BB returned a repeated completion cursor.");
+          afterSeq = next;
+        }
+      }
+      entries.push(...finalEntries(page.rows, completed));
       cursor = page.timelinePage.olderCursor;
       const key = JSON.stringify(cursor);
       if (cursors.has(key)) throw new Error("BB returned a repeated history cursor.");
