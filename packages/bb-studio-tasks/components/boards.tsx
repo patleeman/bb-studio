@@ -12,6 +12,7 @@ import {
   EmptyState,
   Icon,
   ItemTile,
+  ItemHeader,
   OUTLINE_BUTTON,
   PRIMARY_BUTTON,
   cn,
@@ -20,7 +21,7 @@ import {
 } from "@bb-studio/kit/app";
 import { errorMessage, plural, relativeTime, untitled } from "@bb-studio/kit/format";
 import { useBbContext } from "@get-bb/plugin-sdk/app";
-import { BOARD_ICON, boardHref } from "../src/shared";
+import { BOARD_ICON, boardHref, type BoardView } from "../src/shared";
 import { SPIN, useTasksRpc, type Board } from "./types";
 
 export function BoardsIndex({ refreshKey, onOpen }: { refreshKey: unknown; onOpen(id: string): void }) {
@@ -159,11 +160,13 @@ export function BoardsIndex({ refreshKey, onOpen }: { refreshKey: unknown; onOpe
 /** A board's title, project and menu, above any of its views. */
 export function BoardHeader({
   board,
+  view = "board",
   onBack,
   onChanged,
   children,
 }: {
   board: Board;
+  view?: BoardView;
   onBack(replace?: boolean): void;
   onChanged(): void;
   children?: React.ReactNode;
@@ -175,9 +178,62 @@ export function BoardHeader({
 
   return (
     <div className="flex shrink-0 flex-col gap-2 px-6 pt-6 pb-4 max-md:px-3 max-md:pt-4">
-      <button type="button" className="flex w-fit items-center gap-1 text-xs text-muted-foreground hover:text-foreground" onClick={() => onBack()}>
-        <Icon name="ChevronLeft" className="size-3.5" /> Boards
-      </button>
+      <ItemHeader
+        className="relative items-center p-0 max-md:p-0"
+        backLabel="Boards"
+        onBack={() => onBack()}
+        thread={{ href: boardHref(board.id), title: untitled(board.title) }}
+        item={{ href: boardHref(board.id, view), title: untitled(board.title) }}
+        trailing={<>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" className={OUTLINE_BUTTON}>
+                <Icon name={board.projectId ? "Folder" : "Globe"} /> <span className="max-w-40 truncate">{projectName(projects, board.projectId)}</span>
+                <Icon name="ChevronDown" className="text-muted-foreground" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
+              {[{ id: null as string | null, name: "Global" }, ...projects].map((project) => (
+                <DropdownMenuItem key={project.id ?? "global"} onSelect={() => project.id !== board.projectId && save({ projectId: project.id })}>
+                  <Icon name={project.id ? "Folder" : "Globe"} className="size-4" /> <span className="truncate">{project.name}</span>
+                  {project.id === board.projectId ? <Icon name="Check" className="ml-auto size-4" /> : null}
+                </DropdownMenuItem>
+              ))}
+            </DropdownMenuContent>
+          </DropdownMenu>
+          <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+              <button type="button" aria-label="Board actions" className={cn(OUTLINE_BUTTON, "px-2")}>
+                <Icon name="MoreHorizontal" />
+              </button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-44">
+              <CopyReferenceMenuItem item={{ href: boardHref(board.id), title: untitled(board.title), icon: BOARD_ICON }} />
+              <DropdownMenuItem
+                onSelect={() =>
+                  void rpc.call("boardArchive", { id: board.id, archived: !board.archived }).then(
+                    () => (board.archived ? onChanged() : onBack(true)),
+                    (failure) => toast.error(errorMessage(failure)),
+                  )
+                }
+              >
+                <Icon name="Archive" className="size-4" /> {board.archived ? "Unarchive" : "Archive"}
+              </DropdownMenuItem>
+              <DropdownMenuSeparator />
+              <DropdownMenuItem
+                variant="destructive"
+                onSelect={() => {
+                  const count = board.open + board.done;
+                  if (!window.confirm(`Delete "${untitled(board.title)}"${count ? ` and its ${plural(count, "task")}` : ""}? This can't be undone.`)) return;
+                  void rpc.call("boardDelete", { id: board.id }).then(() => onBack(true), (failure) => toast.error(errorMessage(failure)));
+                }}
+              >
+                <Icon name="Trash2" className="size-4" /> Delete…
+              </DropdownMenuItem>
+            </DropdownMenuContent>
+          </DropdownMenu>
+        </>}
+      />
       <div className="flex flex-wrap items-center gap-2">
         <input
           aria-label="Board title"
@@ -200,53 +256,6 @@ export function BoardHeader({
           }}
         />
         {children}
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" className={OUTLINE_BUTTON}>
-              <Icon name={board.projectId ? "Folder" : "Globe"} /> <span className="max-w-40 truncate">{projectName(projects, board.projectId)}</span>
-              <Icon name="ChevronDown" className="text-muted-foreground" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="max-h-80 w-56 overflow-y-auto">
-            {[{ id: null as string | null, name: "Global" }, ...projects].map((project) => (
-              <DropdownMenuItem key={project.id ?? "global"} onSelect={() => project.id !== board.projectId && save({ projectId: project.id })}>
-                <Icon name={project.id ? "Folder" : "Globe"} className="size-4" /> <span className="truncate">{project.name}</span>
-                {project.id === board.projectId ? <Icon name="Check" className="ml-auto size-4" /> : null}
-              </DropdownMenuItem>
-            ))}
-          </DropdownMenuContent>
-        </DropdownMenu>
-        <DropdownMenu>
-          <DropdownMenuTrigger asChild>
-            <button type="button" aria-label="Board actions" className={cn(OUTLINE_BUTTON, "px-2")}>
-              <Icon name="MoreHorizontal" />
-            </button>
-          </DropdownMenuTrigger>
-          <DropdownMenuContent align="end" className="w-44">
-            <CopyReferenceMenuItem item={{ href: boardHref(board.id), title: untitled(board.title), icon: BOARD_ICON }} />
-            <DropdownMenuItem
-              onSelect={() =>
-                void rpc.call("boardArchive", { id: board.id, archived: !board.archived }).then(
-                  () => (board.archived ? onChanged() : onBack(true)),
-                  (failure) => toast.error(errorMessage(failure)),
-                )
-              }
-            >
-              <Icon name="Archive" className="size-4" /> {board.archived ? "Unarchive" : "Archive"}
-            </DropdownMenuItem>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem
-              variant="destructive"
-              onSelect={() => {
-                const count = board.open + board.done;
-                if (!window.confirm(`Delete "${untitled(board.title)}"${count ? ` and its ${plural(count, "task")}` : ""}? This can't be undone.`)) return;
-                void rpc.call("boardDelete", { id: board.id }).then(() => onBack(true), (failure) => toast.error(errorMessage(failure)));
-              }}
-            >
-              <Icon name="Trash2" className="size-4" /> Delete…
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
       </div>
     </div>
   );

@@ -8,6 +8,8 @@ A provider registers `studio_*` RPCs with `registerStudioProvider`. Studio accep
 
 A kind can set `hasOwnChat: true` when it owns its conversation UI. Studio Chat then skips automatic chat discovery for that kind, while explicit item mentions remain available. Its header can pass `chatAction` to `ItemHeader` to supply its primary Chat button, or `null` to omit one. Register its routes with `FloatPanels` so the same view can open as a companion. `useCompanionNavigate()` routes asynchronous actions inside that companion; it returns false outside a companion so the caller can use normal navigation.
 
+The shared item header keeps Chat visible in compact panes and gathers secondary controls under **Item actions**. It measures its own pane, so phone screens and narrow companions behave the same way. Closing the disclosure or widening the pane keeps its controls mounted and preserves their state. Related items use a popover that stays within the viewport, with links bound to their originating companion.
+
 | Method | Input | Output |
 |---|---|---|
 | `studio_describe` | `null` | Plugin id, contract version, panel, kinds and their capabilities |

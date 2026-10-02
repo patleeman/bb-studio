@@ -503,11 +503,11 @@ export function PageView({
         onBack={onBack}
         item={{ title: title || "Untitled", href: `/plugins/pages/pages/${page.id}` }}
         leading={inFloat ? undefined : <Breadcrumbs page={shown} pages={pages} />}
+        chatAction={studioChat === false ? <PageChat page={page} rpc={rpc} threadId={chatThread ?? chats[0]?.threadId ?? null}
+          onStarted={(threadId) => { setChatThread(threadId); loadChats(); }} /> : undefined}
         trailing={
           <>
           <ConnectionBadge status={status} />
-          {studioChat === false ? <PageChat page={page} rpc={rpc} threadId={chatThread ?? chats[0]?.threadId ?? null}
-            onStarted={(threadId) => { setChatThread(threadId); loadChats(); }} /> : null}
           <ActivityPill
             page={page}
             refreshBot={refreshBot}

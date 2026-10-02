@@ -7,7 +7,7 @@ Studio item like a page: it has its own columns, shows as a board, list or
 calendar, and embeds in a page. A handed-off task
 follows its thread: it moves to In progress while the agent works and to
 Review when the agent replies or says it's ready. Its card says who acts
-next, such as "Needs your input" or "Ready for review". You mark it done.
+next, such as "Needs your input" or "Ready for review". You mark it done. Boards and tasks use the shared **Chat** action. In narrow panes, **Item actions** holds the secondary header controls while Chat stays visible.
 
 ## Staged preview
 

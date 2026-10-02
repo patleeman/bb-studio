@@ -35,7 +35,7 @@ export function TaskViews({ boardId, mode, refreshKey, onOpen, onBack, viewToggl
   function shift(offset: number) { const date = new Date(`${month}-01T12:00:00Z`); date.setUTCMonth(date.getUTCMonth() + offset); setMonth(date.toISOString().slice(0, 7)); }
   if (!board) return <BoardMissing error={error} onBack={() => onBack(true)} />;
   return <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-    <BoardHeader board={board} onBack={onBack} onChanged={refetch}>{viewToggle}</BoardHeader>
+    <BoardHeader board={board} view={mode} onBack={onBack} onChanged={refetch}>{viewToggle}</BoardHeader>
     {error ? <p role="alert" className="px-6 text-sm text-destructive">{error}</p> : null}
     {mode === "list" ? <div className="min-h-0 overflow-auto px-6 pb-6 max-md:px-3">
       <div className="mb-4 flex gap-3 text-sm">

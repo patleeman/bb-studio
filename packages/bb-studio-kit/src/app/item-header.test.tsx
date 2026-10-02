@@ -14,7 +14,7 @@ vi.mock("./item-chat", () => ({
     choose: () => state.launch?.("choose"),
   }),
 }));
-vi.mock("./presence", () => ({ useStudioChatPresent: () => true }));
+vi.mock("./presence", () => ({ useStudioChatPresent: () => true, useStudioPresent: () => true }));
 vi.mock("./float", () => ({ useInFloat: () => true, useCanFloat: () => true }));
 vi.mock("./move", () => ({ useOpenTarget: () => ({ open: () => {}, anchor: null }) }));
 vi.mock("./related-panel", () => ({ RelatedPanel: () => null }));
@@ -56,6 +56,31 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); state.launch = null; });
 
 describe("Chat menu focus", () => {
+  it("keeps Chat visible and accessory state mounted while a narrow header opens, closes, and widens", async () => {
+    const width = window.innerWidth;
+    const resize = (value: number) => { Object.defineProperty(window, "innerWidth", { configurable: true, value }); window.dispatchEvent(new Event("resize")); };
+    try {
+      await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={{ title: "Launch", href: "/plugins/pages/pages/launch" }} trailing={<input aria-label="Accessory draft" defaultValue="Keep me" />} />));
+      const input = container.querySelector("input")!;
+      input.value = "Edited accessory draft";
+      await act(async () => resize(390));
+      const actions = container.querySelector<HTMLElement>('[data-studio-item-actions]')!;
+      expect(actions.style.display).toBe("none");
+      expect(container.querySelector('[data-studio-chat-item]')?.closest('[data-studio-item-actions]')).toBeNull();
+      const trigger = container.querySelector<HTMLButtonElement>('[aria-label="Item actions"]')!;
+      await act(async () => trigger.click());
+      expect(actions.style.display).toBe("");
+      expect(trigger.getAttribute("aria-expanded")).toBe("true");
+      await act(async () => document.dispatchEvent(new KeyboardEvent("keydown", { key: "Escape", bubbles: true })));
+      expect(actions.style.display).toBe("none");
+      expect(document.activeElement).toBe(trigger);
+      await act(async () => resize(900));
+      expect(container.querySelector("input")).toBe(input);
+      expect(input.value).toBe("Edited accessory draft");
+      expect(actions.style.display).toBe("");
+      expect(container.querySelector('button[aria-label="Item actions"]')).toBeNull();
+    } finally { await act(async () => resize(width)); }
+  });
   it("lets a conversation-owning view supply one Chat action or opt out", async () => {
     const item = { title: "Atlas", href: "/plugins/bot-teams/bots/atlas" };
     await act(async () => root.render(<ItemHeader backLabel="Studio" onBack={() => {}} item={item} chatAction={<button>Chat with Atlas</button>} />));
