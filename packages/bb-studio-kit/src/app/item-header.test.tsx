@@ -56,6 +56,10 @@ beforeEach(async () => {
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); state.launch = null; });
 
 describe("Chat menu focus", () => {
+  it("uses the companion's navigation chrome inside Float", () => {
+    expect([...container.querySelectorAll("button")].some((button) => button.textContent?.trim() === "Studio")).toBe(false);
+    expect(container.querySelector('[data-studio-chat-item="pages:launch"] > button')?.textContent?.trim()).toBe("Chat");
+  });
   it.each([["New conversation", "compose"], ["Choose conversation…", "choose"]])("keeps %s focused after the menu closes", async (label, mode) => {
     await menu();
     const entry = [...document.querySelectorAll('[role="menuitem"]')].find((element) => element.textContent?.trim() === label) as HTMLElement;

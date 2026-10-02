@@ -506,7 +506,7 @@ export function PageView({
         backLabel={backLabel}
         onBack={onBack}
         item={{ title: title || "Untitled", href: `/plugins/pages/pages/${page.id}` }}
-        leading={<Breadcrumbs page={shown} pages={pages} />}
+        leading={inFloat ? undefined : <Breadcrumbs page={shown} pages={pages} />}
         trailing={
           <>
           <ConnectionBadge status={status} />

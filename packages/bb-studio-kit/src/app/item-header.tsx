@@ -89,6 +89,7 @@ export function ItemHeader({
   className?: string;
 }) {
   const newThread = useNewItemThread(thread);
+  const inFloat = useInFloat();
   const moved = item ?? thread;
   // Studio Chat owns item links and conversation creation across item views.
   const studioChat = useStudioChatPresent();
@@ -99,13 +100,14 @@ export function ItemHeader({
     : null);
   return (
     <div
+      data-studio-item-header=""
       className={cn(
         "pointer-events-none absolute inset-x-0 top-0 z-20 flex items-start justify-between gap-2 p-3 max-md:p-2",
         className,
       )}
     >
       <div className="pointer-events-auto flex min-w-0 items-center gap-1.5">
-        <button
+        {!inFloat ? <button
           type="button"
           className={cn(
             FLOATING,
@@ -114,12 +116,12 @@ export function ItemHeader({
           onClick={onBack}
         >
           <Icon name="ChevronLeft" className="size-4" /> {backLabel}
-        </button>
+        </button> : null}
         {leading}
       </div>
       {trailing || thread || moved ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
         {relatedRef ? <SpacePicker item={relatedRef} /> : null}
-        {relatedRef ? <RelatedPanel ref={relatedRef} /> : null}
+        {relatedRef ? <RelatedPanel ref={relatedRef} compact={inFloat} /> : null}
         {thread && studioChat === false ? <button type="button" className={cn(FLOATING_BUTTON, "max-md:hidden")} onClick={newThread}>
           <Icon name="MessageSquare" /> Chat
         </button> : null}

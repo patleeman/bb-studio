@@ -83,7 +83,24 @@ items, overlapping requests and submissions, failed drafts, and fallback
 thread navigation. Teams saved views remain free of item-chat overlays and
 automatic background chat discovery. The old corner bar is removed.
 Targeted staging installs the full suite while seeding only the selected
-capture's required fixtures; its live Chat verification is pending.
+capture's required fixtures. Stable BB 0.44.0 captures pass with the full suite
+installed from pushed commit 5b1d128: Chat opens an unlinked composer, chooses
+and focuses a linked thread without duplication, starts another composer
+without changing the link, and targets a floated page while the main pane
+navigates between a drawing and another page. Float's retention and pin
+assertions also pass. Screenshot review identified crowded narrow headers;
+the shared header now delegates Back to the companion chrome, uses a compact
+Related action, and removes Pages' duplicate floated breadcrumb. Its live
+bounds assertion remains to be verified at the next pushed commit.
+
+BB core commit f865c4e38 locally scopes embedded chat leading content to its
+own bottom composer and composer view. Its 18 embedded-chat tests and app
+typecheck pass, including a regression that writes to the child draft while
+leaving an outer parent draft untouched. Publishing that core commit awaits
+resolution of an older uncommitted channel-workbench change in the shared
+BB checkout; its owner's thread is archived. Stable plugin floors stay
+unchanged, and stable BB still uses the guarded Viewing chip until that host
+fix ships.
 
 Remaining delivery includes the common opening and placement controller,
 native workbench integration, Pages standalone migration, embedded composer

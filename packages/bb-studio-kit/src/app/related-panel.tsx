@@ -16,7 +16,7 @@ const commentsSchema = z.object({ comments: z.array(z.object({ id: z.string(), p
 const versionsSchema = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), createdAt: z.number() }).passthrough()) });
 
 /** Related items and threads from Studio. Hidden when the hub is absent. */
-export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
+export function RelatedPanel({ ref: item, compact = false }: { ref: RelatedRef; compact?: boolean }) {
   const sdk = useSdk();
   const studio = useStudioPresent();
   const [open, setOpen] = useState(false);
@@ -74,8 +74,8 @@ export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
   }, [open, item.pluginId, item.id, sdk]);
   if (!studio) return null;
   return <div className="relative">
-    <button type="button" aria-expanded={open} onClick={() => setOpen(!open)} className="flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-sm shadow-sm hover:bg-state-hover">
-      <Icon name="Layers" className="size-4" /> Related
+    <button type="button" aria-label="Related" title={compact ? "Related items" : undefined} aria-expanded={open} onClick={() => setOpen(!open)} className="flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-sm shadow-sm hover:bg-state-hover">
+      <Icon name="Layers" className="size-4" /> {compact ? null : "Related"}
     </button>
     {open ? <div className="absolute top-10 right-0 z-30 max-h-[70vh] w-72 overflow-y-auto rounded-lg border border-border bg-background p-3 shadow-xl">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">Related items</div>

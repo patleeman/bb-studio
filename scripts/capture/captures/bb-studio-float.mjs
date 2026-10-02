@@ -74,6 +74,17 @@ export default ({ threadId, seedPages, seedDrawing, sleep }) => [
         await client.waitForSelector(`[data-float-window="${pageKey}"] .float-body .pages-doc`);
         const pageText = await client.evaluate(`document.querySelector('[data-float-window="${pageKey}"]').innerText`);
         if (!pageText.includes("Launch checklist")) throw new Error("The floated page doesn't show its content");
+        await client.waitForSelector(`[data-float-window="${pageKey}"] [data-studio-item-header]`);
+        const clippedControls = await client.evaluate(`(() => {
+          const body = document.querySelector('[data-float-window="${pageKey}"] .float-body');
+          const bounds = body.getBoundingClientRect();
+          return [...body.querySelectorAll('[data-studio-item-header] button')].filter(button => {
+            if (!button.checkVisibility()) return false;
+            const rect = button.getBoundingClientRect();
+            return rect.left < bounds.left || rect.right > bounds.right;
+          }).map(button => button.getAttribute('aria-label') ?? button.textContent);
+        })()`);
+        if (clippedControls.length) throw new Error(`The floated page clips header controls: ${JSON.stringify(clippedControls)}`);
         await expectPlace("free");
 
         // Exercise the real SDK composer and Pages editor, including hidden views.
