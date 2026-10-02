@@ -1,14 +1,15 @@
 import React, { useCallback, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { experimental_NewThreadComposer as NewThreadComposer, Markdown, useBbNavigate, useRealtime, useRpc, useSdk, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { Icon, ItemHeader, ItemTile, PageColumn, AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
-import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
+import { Icon, ItemTile, PageColumn, AddOnCollection, type ProviderCall } from "@bb-studio/kit/app";
+import { toast } from "sonner";
+import { Button, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuSub, DropdownMenuSubContent, DropdownMenuSubTrigger, DropdownMenuTrigger, Input } from "@bb-studio/kit/ui";
 import { Modal } from "./channel-controls";
 import { ErrorMessage, message } from "./bot-ui";
 import { PLUGIN_ID, VIEW_KIND } from "./studio-provider";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
-import type { ThreadView, ViewAttachment, ViewEntry, ViewMember, ViewThread } from "./view-contract";
+import type { ThreadView, ViewAttachment, ViewEntry, ViewMember, ViewPermissionMode, ViewThread } from "./view-contract";
 import type { NewThreadRequest } from "@get-bb/plugin-sdk/app";
 
 type Contract = typeof rpcContract;
@@ -45,11 +46,62 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
     </form>
   </Modal>;
 }
+const ROW_BUTTON = "flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active";
+const ROW_ICON_BUTTON = "inline-flex h-6 shrink-0 items-center justify-center rounded-md px-1 text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground";
+const EDIT_VIEW_EVENT = "bot-teams:edit-view";
+/** BB's own approval-mode names, plus leaving each thread as it is. */
+const MODE_CHOICES: { id: ViewPermissionMode | undefined; label: string; detail: string }[] = [
+  { id: undefined, label: "Each bot's own", detail: "Every thread keeps the approval mode it already has." },
+  { id: "accept-edits", label: "Accept Edits", detail: "Applies edits inside the workspace automatically. Anything beyond it asks you first." },
+  { id: "auto", label: "Approve for me", detail: "Same workspace sandbox, with requests reviewed automatically." },
+  { id: "full", label: "Full Access", detail: "No sandbox and no approvals. The agent can run anything on your machine." },
+];
+const modeLabel = (mode: ViewPermissionMode) => MODE_CHOICES.find(c => c.id === mode)!.label;
+type Permissions = { all?: ViewPermissionMode; members: Record<string, ViewPermissionMode> };
+/** Approval choices are a per-view preference on this device, like a thread's composer picks. */
+function useStoredPermissions(id: string) {
+  const key = `bot-teams:view-permissions:${id}`;
+  const [value, setValue] = useState<Permissions>(() => { try { return { members: {}, ...JSON.parse(localStorage.getItem(key) ?? "{}") }; } catch { return { members: {} }; } });
+  useEffect(() => { localStorage.setItem(key, JSON.stringify(value)); }, [key, value]);
+  return [value, setValue] as const;
+}
+/** The view's title bar: its name and menu where a thread's title sits, members on the right. */
+export function ViewHeader({ subPath }: PluginNavPanelProps) {
+  const rpc = useRpc<Contract>();
+  const id = subPath.split("/")[0];
+  const [views, setViews] = useState<ThreadView[]>([]), [bots, setBots] = useState<Bot[]>([]);
+  const load = useCallback(() => { void rpc.call("views", {}).then(setViews, () => undefined); void rpc.call("profiles", {}).then(setBots, () => undefined); }, [rpc]);
+  useEffect(load, [load]);
+  useRealtime("views-changed", load);
+  const view = views.find(v => v.id === id);
+  if (!view) return null;
+  const edit = () => window.dispatchEvent(new CustomEvent(EDIT_VIEW_EVENT, { detail: { id } }));
+  const archive = () => void rpc.call("viewUpdate", { ...view, archived: !view.archived, expectedUpdatedAt: view.updatedAt }).then(load, e => toast.error(message(e)));
+  return <div data-view-header className="flex min-w-0 flex-1 items-center gap-2">
+    <p className="min-w-0 truncate text-sm font-semibold">{view.name}</p>
+    {view.archived && <span className="shrink-0 rounded bg-foreground/[0.08] px-1.5 text-[11px] text-muted-foreground">Archived</span>}
+    <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="View options" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger>
+      <DropdownMenuContent align="start" className="w-44">
+        <DropdownMenuItem onSelect={edit}><Icon name="Edit" />Edit view</DropdownMenuItem>
+        <DropdownMenuItem onSelect={archive}><Icon name="Archive" />{view.archived ? "Restore" : "Archive"}</DropdownMenuItem>
+      </DropdownMenuContent></DropdownMenu>
+    <button type="button" aria-label="Edit view" title="Members" onClick={edit} className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground">
+      <span className="flex -space-x-1.5">{view.members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>
+      <span className="max-sm:sr-only">{view.members.length || "Add"} {view.members.length === 1 ? "member" : "members"}</span>
+    </button>
+  </div>;
+}
 function ViewDetail({ id }: { id: string }) {
-  const rpc = useRpc<Contract>(), navigate = useBbNavigate(), studio = useStudioPresent();
+  const rpc = useRpc<Contract>(), navigate = useBbNavigate();
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
   const [targets, setTargets] = useState<ViewMember[]>([]), [reply, setReply] = useState<string | null>(null);
   const [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false), [focus, setFocus] = useState(0);
+  const [permissions, setPermissions] = useStoredPermissions(id);
+  useEffect(() => {
+    const edit = (event: Event) => { if ((event as CustomEvent<{ id?: string }>).detail?.id === id) setEditing(true); };
+    window.addEventListener(EDIT_VIEW_EVENT, edit);
+    return () => window.removeEventListener(EDIT_VIEW_EVENT, edit);
+  }, [id]);
   const [expanded, setExpanded] = useState<Set<string>>(new Set());
   const generation = useRef(0), retry = useRef<{ requestId: string; signature: string } | null>(null);
   const initialized = useRef(false);
@@ -91,7 +143,7 @@ function ViewDetail({ id }: { id: string }) {
     }).join("\n").trim();
     const command = /^\/(steer|followup|fork)\s+/.exec(text);
     const recipients = [...new Map([...targets, ...mentioned].map(m => [memberKey(m), m])).values()];
-    const input = { id, text: command ? text.slice(command[0].length) : text, attachments, targets: recipients, replyThreadId: reply, fresh, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork" };
+    const input = { id, text: command ? text.slice(command[0].length) : text, attachments, targets: recipients, replyThreadId: reply, fresh, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permissions.all ?? null, memberPermissionModes: page.view.members.flatMap(member => permissions.members[memberKey(member)] ? [{ member, mode: permissions.members[memberKey(member)]! }] : []) };
     const signature = JSON.stringify(input);
     if (retry.current?.signature !== signature) retry.current = { signature, requestId: crypto.randomUUID() };
     let failure: string | null = null;
@@ -124,16 +176,17 @@ function ViewDetail({ id }: { id: string }) {
   const children = (parentId: string): React.ReactNode => page.threads.filter(t => t.parentThreadId === parentId).map(t => <li key={t.id} className="px-2"><details open={expanded.has(t.id)} onToggle={event => { const open = event.currentTarget.open; setExpanded(current => { const next = new Set(current); if(open) next.add(t.id); else next.delete(t.id); return next; }); }} className="ml-8 border-l border-border pl-4"><summary className="cursor-pointer text-xs text-subtle-foreground hover:text-foreground">{t.title}{["active", "starting"].includes(t.status) ? " · Working…" : ""}</summary><ol className="mt-3 space-y-5">{page.entries.filter(e => e.threadId === t.id).map((e, i, all) => renderEntry(e, all[i - 1]))}{children(t.id)}</ol></details></li>);
   const rootEntries = page.entries.filter(e => roots.has(e.threadId));
   const lastEntry = new Map(rootEntries.map(e=>[e.threadId,e.id]));
-  const archive = async () => { try { await rpc.call("viewUpdate", { ...page.view, archived: !page.view.archived, expectedUpdatedAt: page.view.updatedAt }); load(); } catch(e) { setError(message(e)); } };
   const isTarget = (m: ViewMember) => targets.some(t => memberKey(t) === memberKey(m));
   const memberLabel = (m: ViewMember) => (m.kind === "bot" ? bots.find(b => b.id === m.id)?.name : page.threads.find(t => t.id === m.id)?.title) || "Member";
   const memberAvatar = (m: ViewMember) => m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null;
   const toggleTarget = (m: ViewMember) => setTargets(current => isTarget(m) ? current.filter(t => memberKey(t) !== memberKey(m)) : [...current, m]);
   const chosen = page.view.members.filter(isTarget);
   const working = page.threads.filter(t => !t.parentThreadId && ["starting", "active"].includes(t.status)).map(t => botFor(t.id)?.name || t.title);
+  const overrides = page.view.members.filter(m => permissions.members[memberKey(m)]);
+  const approvals = { label: `${permissions.all ? modeLabel(permissions.all) : "Each bot's own"}${overrides.length ? ` · ${overrides.length} custom` : ""}`, anyFull: permissions.all === "full" || overrides.some(m => permissions.members[memberKey(m)] === "full") };
+  const approvalTitle = `Approval mode: ${permissions.all ? modeLabel(permissions.all) : "each thread keeps its own"}${overrides.map(m => `\n${memberLabel(m)}: ${modeLabel(permissions.members[memberKey(m)]!)}`).join("")}`;
   const avatars = (members: ViewMember[]) => <span className="flex -space-x-1.5">{members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>;
   return <div className="relative flex h-full min-h-0 flex-col" data-thread-view>
-    <ItemHeader className="relative shrink-0 bg-background view-controls" backLabel={studio ? "Studio" : "Views"} onBack={() => studio ? openAppPath(studioPath(VIEW_KIND.id)) : navigate.toPluginPanel("views")} leading={<span className="min-w-0 truncate text-sm font-medium">{page.view.name}</span>} trailing={<><button type="button" aria-label="Edit view" title="Edit view" onClick={() => setEditing(true)} className="flex h-8 items-center gap-1.5 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground">{page.view.members.length ? avatars(page.view.members) : <Icon name="Plus" className="size-4" />}<span className="max-sm:sr-only">{page.view.members.length || "Add"} {page.view.members.length === 1 ? "member" : "members"}</span></button><Button variant="ghost" size="sm" onClick={() => void archive()}>{page.view.archived ? "Restore" : "Archive"}</Button></>} />
     <div data-view-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
       {page.hasOlder && <Button className="mb-4 self-center" variant="ghost" size="sm" onClick={() => void rpc.call("view", { id, before: page.entries[0]?.createdAt, beforeId: page.entries[0]?.id }).then(older => setPage(current => current ? { ...current, entries: [...older.entries, ...current.entries], hasOlder: older.hasOlder } : older), e => setError(message(e)))}>Earlier replies</Button>}
       {!page.entries.length && <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
@@ -145,18 +198,30 @@ function ViewDetail({ id }: { id: string }) {
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
     </div></div>
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
-    <div className="flex min-w-0 items-center gap-1 pb-1.5">
-      <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Choose recipients" className="flex h-7 min-w-0 items-center gap-1.5 rounded-md px-2 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><span className="text-subtle-foreground">To</span>{chosen.length ? <><span className="max-sm:hidden">{avatars(chosen)}</span><span className="min-w-0 truncate text-foreground">{chosen.map(memberLabel).join(", ")}</span></> : <span className="text-foreground">{reply ? botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title || "Reply thread" : "Auto"}</span>}{fresh && <span className="rounded bg-foreground/[0.08] px-1 text-[11px]">New threads</span>}<Icon name="ChevronDown" className="size-3.5 shrink-0" /></button></DropdownMenuTrigger>
-        <DropdownMenuContent align="start" side="top" className="w-64">
-          <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Leave empty to route by @mention</DropdownMenuLabel>
-          <div role="group" aria-label="Recipients">{page.view.members.map(m => <DropdownMenuItem key={memberKey(m)} onSelect={e => { e.preventDefault(); toggleTarget(m); }} role="menuitemcheckbox" aria-checked={isTarget(m)}><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span>{isTarget(m) && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</div>
-          <DropdownMenuSeparator />
-          <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="SquarePen" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
-        </DropdownMenuContent></DropdownMenu>
-      {reply && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><Icon name="Reply" className="size-3.5 shrink-0" /><span className="truncate">Replying</span><button type="button" aria-label="Cancel reply" className="rounded p-0.5 hover:bg-state-hover hover:text-foreground" onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></span>}
-    </div>
-    {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This view is archived. Restore it to send messages.</p>
+    {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This view is archived. Restore it from the ··· menu to send messages.</p>
       : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @ to mention members.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}
+    <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
+      <div className="flex min-w-0 flex-1 items-center gap-1">
+        <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Choose recipients" className={`${ROW_BUTTON} -ml-1.5`}><Icon name="Bot" className="size-3.5 shrink-0" />{chosen.length ? <span className="truncate text-foreground">{chosen.map(memberLabel).join(", ")}</span> : <span className="truncate">{reply ? `Reply to ${botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title || "thread"}` : "Auto recipients"}</span>}{fresh && <span className="shrink-0 text-subtle-foreground">· new threads</span>}<Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
+          <DropdownMenuContent align="start" side="top" className="w-64">
+            <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Send to. Leave empty to route by @mention.</DropdownMenuLabel>
+            <div role="group" aria-label="Recipients">{page.view.members.map(m => <DropdownMenuItem key={memberKey(m)} onSelect={e => { e.preventDefault(); toggleTarget(m); }} role="menuitemcheckbox" aria-checked={isTarget(m)}><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span>{isTarget(m) && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</div>
+            <DropdownMenuSeparator />
+            <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="SquarePen" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
+          </DropdownMenuContent></DropdownMenu>
+        {reply && <button type="button" aria-label="Cancel reply" title="Cancel reply" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}
+      </div>
+      <div className="flex shrink-0 items-center gap-2">
+        <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Approval mode" title={approvalTitle} className={`inline-flex h-6 min-w-0 items-center gap-1 rounded-md px-1 text-xs font-medium leading-tight transition-colors hover:bg-state-hover data-[state=open]:bg-state-active ${approvals.anyFull ? "text-warning-text" : "text-muted-foreground hover:text-foreground"}`}><span className="truncate">{approvals.label}</span><Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
+          <DropdownMenuContent align="end" side="top" className="w-72">
+            <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Approvals for everyone</DropdownMenuLabel>
+            {MODE_CHOICES.map(choice => <DropdownMenuItem key={choice.id ?? "own"} onSelect={() => setPermissions(current => ({ ...current, all: choice.id }))} className="items-start"><span className="min-w-0 flex-1"><span className={`block text-sm ${choice.id === "full" ? "text-warning-text" : ""}`}>{choice.label}</span><span className="block text-xs text-subtle-foreground">{choice.detail}</span></span>{permissions.all === choice.id && <Icon name="Check" className="mt-0.5 size-4" />}</DropdownMenuItem>)}
+            {page.view.members.length > 1 && <><DropdownMenuSeparator /><DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Per member</DropdownMenuLabel>
+              {page.view.members.map(m => { const own = permissions.members[memberKey(m)]; return <DropdownMenuSub key={memberKey(m)}><DropdownMenuSubTrigger><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span><span className={`shrink-0 text-xs ${own === "full" ? "text-warning-text" : "text-subtle-foreground"}`}>{own ? modeLabel(own) : "Same"}</span></DropdownMenuSubTrigger>
+                <DropdownMenuSubContent className="w-56">{[{ id: undefined, label: "Same as everyone" }, ...MODE_CHOICES.filter(c => c.id)].map(choice => <DropdownMenuItem key={choice.id ?? "same"} onSelect={() => setPermissions(current => { const members = { ...current.members }; if (choice.id) members[memberKey(m)] = choice.id; else delete members[memberKey(m)]; return { ...current, members }; })}><span className={`flex-1 text-sm ${choice.id === "full" ? "text-warning-text" : ""}`}>{choice.label}</span>{own === choice.id && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</DropdownMenuSubContent></DropdownMenuSub>; })}</>}
+          </DropdownMenuContent></DropdownMenu>
+      </div>
+    </div>
     {error && <div className="mt-2"><ErrorMessage error={error} /></div>}
     </div><ViewEditor key={page.view.updatedAt} initial={page.view} open={editing} onClose={() => setEditing(false)} onSaved={() => { setEditing(false); load(); }} />
   </div>;

@@ -24,12 +24,17 @@ export const viewAttachmentSchema = z.discriminatedUnion("type", [
   z.object({ type: z.literal("localImage"), path: z.string().min(1) }),
   z.object({ type: z.literal("localFile"), path: z.string().min(1), name: z.string().optional(), mimeType: z.string().optional(), sizeBytes: z.number().optional() }),
 ]);
+export const viewPermissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export const viewSendInput = z.object({
   id: z.string().uuid(), requestId: z.string().uuid(), text: z.string().trim().max(16000).default(""),
   attachments: z.array(viewAttachmentSchema).max(20).default([]),
   targets: z.array(viewMemberSchema).max(32).default([]),
   replyThreadId: z.string().nullable().default(null), fresh: z.boolean().default(false),
   mode: z.enum(["auto", "steer", "followup", "fork"]).default("auto"),
+  /** Approval mode for every recipient's turn; null keeps each thread's own. */
+  permissionMode: viewPermissionModeSchema.nullable().default(null),
+  /** Per-member approval modes, ahead of `permissionMode`. */
+  memberPermissionModes: z.array(z.object({ member: viewMemberSchema, mode: viewPermissionModeSchema })).max(32).default([]),
 }).refine(input => input.text || input.attachments.length, { message: "Write a message or attach a file.", path: ["text"] });
 export const viewDeliverySchema = z.object({
   threadId: z.string(), status: z.enum(["sent", "queued", "error"]), error: z.string().nullable(),
@@ -56,5 +61,6 @@ export type ViewMember = z.infer<typeof viewMemberSchema>;
 export type ViewThread = z.infer<typeof viewThreadSchema>;
 export type ViewEntry = z.infer<typeof viewEntrySchema>;
 export type ViewSend = z.infer<typeof viewSendInput>;
+export type ViewPermissionMode = z.infer<typeof viewPermissionModeSchema>;
 export type ViewAttachment = z.infer<typeof viewAttachmentSchema>;
 export type ViewDelivery = z.infer<typeof viewDeliverySchema>;

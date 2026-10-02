@@ -357,6 +357,70 @@ public enum BotTeams {
     }
   }
 
+  public enum ViewSendInputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ViewSendInputMemberPermissionModesItemMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ViewSendInputMemberPermissionModesItem: Sendable, Hashable, Codable {
+    public var member: StudioJSONValue?
+    public var mode: ViewSendInputMemberPermissionModesItemMode?
+
+    public init(member: StudioJSONValue? = nil, mode: ViewSendInputMemberPermissionModesItemMode? = nil) {
+      self.member = member
+      self.mode = mode
+    }
+  }
+
   public struct ViewSendInput: Sendable, Hashable, Codable {
     public var id: String?
     public var requestId: String?
@@ -366,8 +430,10 @@ public enum BotTeams {
     public var replyThreadId: String?
     public var fresh: Bool?
     public var mode: ViewSendInputMode?
+    public var permissionMode: ViewSendInputPermissionMode?
+    public var memberPermissionModes: [ViewSendInputMemberPermissionModesItem]?
 
-    public init(id: String? = nil, requestId: String? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, targets: [StudioJSONValue]? = nil, replyThreadId: String? = nil, fresh: Bool? = nil, mode: ViewSendInputMode? = nil) {
+    public init(id: String? = nil, requestId: String? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, targets: [StudioJSONValue]? = nil, replyThreadId: String? = nil, fresh: Bool? = nil, mode: ViewSendInputMode? = nil, permissionMode: ViewSendInputPermissionMode? = nil, memberPermissionModes: [ViewSendInputMemberPermissionModesItem]? = nil) {
       self.id = id
       self.requestId = requestId
       self.text = text
@@ -376,6 +442,8 @@ public enum BotTeams {
       self.replyThreadId = replyThreadId
       self.fresh = fresh
       self.mode = mode
+      self.permissionMode = permissionMode
+      self.memberPermissionModes = memberPermissionModes
     }
   }
 

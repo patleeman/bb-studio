@@ -781,6 +781,82 @@
               "followup",
               "fork"
             ]
+          },
+          "permissionMode": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "enum": [
+                  "accept-edits",
+                  "auto",
+                  "full"
+                ]
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "memberPermissionModes": {
+            "default": [],
+            "maxItems": 32,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "member": {
+                  "oneOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "bot"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id"
+                      ]
+                    },
+                    {
+                      "type": "object",
+                      "properties": {
+                        "kind": {
+                          "type": "string",
+                          "const": "thread"
+                        },
+                        "id": {
+                          "type": "string",
+                          "minLength": 1
+                        }
+                      },
+                      "required": [
+                        "kind",
+                        "id"
+                      ]
+                    }
+                  ]
+                },
+                "mode": {
+                  "type": "string",
+                  "enum": [
+                    "accept-edits",
+                    "auto",
+                    "full"
+                  ]
+                }
+              },
+              "required": [
+                "member",
+                "mode"
+              ]
+            }
           }
         },
         "required": [

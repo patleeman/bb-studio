@@ -1,7 +1,7 @@
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { decisionsClient, type Question } from "@bb-studio/kit/decisions";
-import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery } from "./view-contract";
+import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type ViewMember, type ViewThread, type ViewEntry, type ViewSend, type ViewDelivery, type ViewPermissionMode } from "./view-contract";
 import type { Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
@@ -59,7 +59,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
   return entries;
 }
 
-type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveries: ViewDelivery[] };
+type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveries: ViewDelivery[]; modes?: Record<string, ViewPermissionMode> };
 export class ThreadViews {
   private readonly locks = new Map<string, Promise<unknown>>();
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
@@ -257,8 +257,9 @@ export class ThreadViews {
         if (JSON.stringify(record.input) !== JSON.stringify(input)) throw new Error("This request ID was already used for another message.");
       } else {
         const { targets, threads } = await this.recipients(view, input);
-        const resolved: string[] = [];
+        const resolved: string[] = [], modes: Record<string, ViewPermissionMode> = {};
         for (const target of targets) {
+          const mode = input.memberPermissionModes.find(m => m.member.kind === target.kind && m.member.id === target.id)?.mode ?? input.permissionMode;
           let id = target.id;
           if (target.kind === "bot") {
             const bot = this.store.get(target.id);
@@ -276,11 +277,12 @@ export class ThreadViews {
             this.addThread(view.id, id, botId);
           }
           resolved.push(id);
+          if (mode) modes[id] = mode;
         }
         const ids = [...new Set(resolved)];
         const roster = ids.map(threadId => ({ threadId, bot: this.store.byThread(threadId)?.botId ? this.store.get(this.store.byThread(threadId)!.botId).name : null }));
         const recent = (await this.page(view.id)).entries.slice(-8).map(e => ({ threadId: e.threadId, role: e.role, text: e.text.slice(0, 1500) }));
-        record = { input, targets: ids, deliveries: [], prompt: [
+        record = { input, targets: ids, deliveries: [], modes, prompt: [
           `[Studio view message ${input.requestId}]`, input.text, "[End owner message]",
           `View: /plugins/bot-teams/views/${view.id}`,
           `Recipients: ${JSON.stringify(roster)}`,
@@ -293,7 +295,7 @@ export class ThreadViews {
         if (record.deliveries.some(d => d.threadId === threadId && d.status !== "error")) continue;
         let delivery: ViewDelivery;
         try {
-          const sent = await this.bb.sdk.threads.send({ threadId, input: [{ type: "text", text: record.prompt, mentions: [] }, ...(record.input.attachments ?? [])], mode: input.mode === "followup" ? "queue-if-active" : input.mode === "steer" ? "steer-if-active" : "auto" });
+          const sent = await this.bb.sdk.threads.send({ threadId, input: [{ type: "text", text: record.prompt, mentions: [] }, ...(record.input.attachments ?? [])], mode: input.mode === "followup" ? "queue-if-active" : input.mode === "steer" ? "steer-if-active" : "auto", ...(record.modes?.[threadId] ? { permissionMode: record.modes[threadId], executionInputSources: { permissionMode: "explicit" as const } } : {}) });
           delivery = { threadId, status: sent.delivery, error: null };
           this.saveEntry({ id: `view:${input.requestId}:${threadId}`, threadId, role: "user", text: withAttachmentNames(input), groupId: input.requestId, createdAt: Date.now() });
         } catch (cause) { delivery = { threadId, status: "error", error: String(cause) }; }

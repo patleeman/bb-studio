@@ -1,4 +1,4 @@
-import { ViewsPage, FormerChannelRedirect } from "./views";
+import { ViewHeader, ViewsPage, FormerChannelRedirect } from "./views";
 import { affects } from "./realtime";
 import { UsagePanel } from "./channel-workbench";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -370,7 +370,7 @@ export default definePluginApp((app) => {
     path: "bots",
     component: BotsPage,
   });
-  app.slots.navPanel({ id: "views", title: "Views", icon: "MessageSquare", path: "views", component: ViewsPage });
+  app.slots.navPanel({ id: "views", title: "Views", icon: "MessageSquare", path: "views", component: ViewsPage, headerContent: ViewHeader });
   app.slots.navPanel({ id: "former-channels", title: "Views", icon: "MessageSquare", path: "channels", component: FormerChannelRedirect });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });

@@ -1213,3 +1213,11 @@
 [data-view-composer] [aria-label^="Provider, model and reasoning"],
 [data-view-composer] [aria-label="Send options"],
 [data-view-composer] [data-promptbox-shell] > form ~ div { display: none; }
+
+/* An open view's name and menu take the title bar's left side, where a
+   thread's title sits, in place of the panel's fixed "Views" label. If BB's
+   header changes shape, the header content still shows on the right. */
+[data-testid="app-page-header-content-row"]:has([data-view-header]) > div:first-child { display: none; }
+[data-testid="app-page-header-content-row"]:has([data-view-header]) > div:last-child,
+[data-testid="app-page-header-content-row"]:has([data-view-header]) > div:last-child > div:first-child,
+[data-bb-plugin-root]:has(> [data-view-header]) { flex: 1 1 auto; min-width: 0; }
