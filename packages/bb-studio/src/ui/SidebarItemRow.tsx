@@ -1,6 +1,7 @@
 // A Studio item's row in the sidebar, drawn as BB draws a thread's: the whole
 // row highlights on hover, and its buttons show at the right end, × to close
-// (open tabs only) and ⋯ for the same menu right-click opens.
+// (open tabs only) and ⋯ for the same menu right-click opens. A row that
+// expands, like a space's tab, shows a chevron over its icon on hover.
 import { Icon, SIDEBAR_ROW, cn, openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "@bb-studio/kit/ui";
 import { useId, useRef, useState, type CSSProperties, type MouseEvent } from "react";
@@ -23,6 +24,8 @@ export function SidebarItemRow({
   style,
   onOpen,
   onClose,
+  expanded = false,
+  onToggle,
   rowProps,
 }: {
   href: string;
@@ -35,6 +38,9 @@ export function SidebarItemRow({
   onOpen(): void;
   /** Shows × and Close tab. */
   onClose?(): void;
+  /** Whether the row's children show; with `onToggle`, the icon expands it. */
+  expanded?: boolean;
+  onToggle?(): void;
   rowProps?: Record<`data-${string}`, string>;
 }) {
   const target = { kind: "path" as const, path: href, title, icon: kindIcon };
@@ -82,11 +88,28 @@ export function SidebarItemRow({
               onClose();
             }}
           >
-            <span className="flex size-4 shrink-0 items-center justify-center text-subtle-foreground">
+            <span
+              className={cn(
+                "flex size-4 shrink-0 items-center justify-center text-subtle-foreground",
+                onToggle && "group-hover/item:opacity-0 group-focus-within/item:opacity-0 pointer-coarse:opacity-0",
+              )}
+            >
               {glyph ? <span className="text-sm leading-none">{glyph}</span> : <Icon name={kindIcon} className="size-4" />}
             </span>
             <span className="min-w-0 flex-1 truncate">{title}</span>
           </a>
+          {onToggle ? (
+            // Over the icon, outside the link: a button can't sit inside an <a>.
+            <button
+              type="button"
+              aria-expanded={expanded}
+              aria-label={`${expanded ? "Collapse" : "Expand"} ${title}`}
+              className="absolute top-1/2 left-1 inline-flex size-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle-foreground opacity-0 outline-none hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-sidebar-ring group-hover/item:opacity-100 group-focus-within/item:opacity-100 pointer-coarse:opacity-100"
+              onClick={onToggle}
+            >
+              <Icon name="ChevronRight" aria-hidden className={cn("size-3.5 transition-transform duration-150", expanded && "rotate-90")} />
+            </button>
+          ) : null}
           <span className="pointer-events-none absolute inset-y-0 right-1 flex items-center gap-0.5 opacity-0 group-hover/item:pointer-events-auto group-hover/item:opacity-100 group-focus-within/item:pointer-events-auto group-focus-within/item:opacity-100 group-data-[state=open]/item:pointer-events-auto group-data-[state=open]/item:opacity-100 pointer-coarse:pointer-events-auto pointer-coarse:opacity-100">
             {onClose ? (
               <button type="button" aria-label={`Close ${title}`} title="Close tab" className={ACTION} onClick={onClose}>

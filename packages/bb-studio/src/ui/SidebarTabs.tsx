@@ -1,8 +1,8 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
 // and closing the one on screen opens the next. A tab's ⋯ or right-click
-// floats it or opens it in a split. Above the tabs, the spaces expand to what they hold
-// (SidebarSpaces).
+// floats it or opens it in a split. A space's tab expands to what the space
+// holds (SidebarSpaces).
 import {
   DropdownMenuItem,
   Icon,
@@ -18,7 +18,7 @@ import {
   useSidebarNavigated,
   usePathname,
 } from "@bb-studio/kit/app";
-import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -26,9 +26,7 @@ import type { rpcContract, TabView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
 import { SidebarItemRow } from "./SidebarItemRow";
-import { SidebarSpaces, useSpaceTree } from "./SidebarSpaces";
-
-const SHOW_SPACES_KEY = "studio:sidebar-show-spaces";
+import { SpaceMembers, useSpaceTree, type SpaceTree } from "./SidebarSpaces";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const APP_NAMES: Record<string, string> = {
@@ -79,21 +77,8 @@ export function SidebarTabs() {
     { organization: "none", sort: "opened", direction: "ascending" },
     { organization: ["none", "app"], sort: ["opened", "alpha"] },
   );
-  const [showSpaces, setShowSpaces] = useState(() => {
-    try {
-      return localStorage.getItem(SHOW_SPACES_KEY) !== "false";
-    } catch {
-      return true;
-    }
-  });
-  const spaceTree = useSpaceTree(hosted && showSpaces);
-  const spacesShown = showSpaces && (!!spaceTree.spaces?.length || spaceTree.failed);
-  const toggleSpaces = () => {
-    setShowSpaces(!showSpaces);
-    try {
-      localStorage.setItem(SHOW_SPACES_KEY, String(!showSpaces));
-    } catch {}
-  };
+  // Spaces open as Studio's own items.
+  const spaceTree = useSpaceTree(hosted ? (tabs ?? []).filter((tab) => tab.pluginId === STUDIO_PLUGIN_ID).map((tab) => tab.id) : []);
 
   // Visiting an item's view opens its tab.
   const visited = useRef<string | null>(null);
@@ -137,7 +122,7 @@ export function SidebarTabs() {
   const groups =
     display.organization === "app"
       ? [...new Set(sorted.map((tab) => tab.pluginId))].map((pluginId) => ({ label: APP_NAMES[pluginId] ?? pluginId, tabs: sorted.filter((tab) => tab.pluginId === pluginId) }))
-      : [{ label: spacesShown ? "Open" : null, tabs: sorted }];
+      : [{ label: null, tabs: sorted }];
 
   return (
     <SidebarPortal id="tabs" title="Studio" order={0}>
@@ -159,18 +144,6 @@ export function SidebarTabs() {
                 ["alpha", "Alphabetical", "ascending"],
               ]}
             />
-            <DropdownMenuItem
-              role="menuitemcheckbox"
-              aria-checked={showSpaces}
-              onSelect={(event) => {
-                event.preventDefault();
-                toggleSpaces();
-              }}
-            >
-              <Icon name="Layers" />
-              Show spaces
-              {showSpaces ? <Icon name="Check" className="ml-auto" /> : null}
-            </DropdownMenuItem>
             {active && tabs && tabs.length > 1 ? (
               <DropdownMenuItem onSelect={() => close(tabs.filter((tab) => tab !== active))}>
                 <Icon name="X" />
@@ -186,16 +159,22 @@ export function SidebarTabs() {
           </>
         }
       >
-        {spacesShown ? <SidebarSpaces tree={spaceTree} path={path} onNavigate={navigated} /> : null}
-        {/* With no tabs, the heading still separates the note from the spaces above. */}
-        {spacesShown && !tabs?.length ? <SidebarGroupHeading>Open</SidebarGroupHeading> : null}
         {error && !tabs ? <SidebarNote tone="danger">{error}</SidebarNote> : null}
         {tabs && !tabs.length ? <SidebarNote icon="GridView">No open items</SidebarNote> : null}
         {groups.filter((group) => group.tabs.length).map((group) => (
           <div key={group.label ?? "all"} className="flex flex-col gap-px">
             {group.label ? <SidebarGroupHeading>{group.label}</SidebarGroupHeading> : null}
             {group.tabs.map((tab) => (
-              <TabRow key={`${tab.pluginId}:${tab.id}`} tab={tab} selected={tab === active} onOpen={() => open(tab)} onClose={() => close([tab])} />
+              <TabRow
+                key={`${tab.pluginId}:${tab.id}`}
+                tab={tab}
+                selected={tab === active}
+                spaces={tab.pluginId === STUDIO_PLUGIN_ID ? spaceTree : null}
+                path={path}
+                onNavigate={navigated}
+                onOpen={() => open(tab)}
+                onClose={() => close([tab])}
+              />
             ))}
           </div>
         ))}
@@ -204,17 +183,32 @@ export function SidebarTabs() {
   );
 }
 
-function TabRow({ tab, selected, onOpen, onClose }: { tab: TabView; selected: boolean; onOpen(): void; onClose(): void }) {
+function TabRow({ tab, selected, spaces, path, onNavigate, onOpen, onClose }: {
+  tab: TabView;
+  selected: boolean;
+  /** For a space's tab, what it holds. */
+  spaces: SpaceTree | null;
+  path: string;
+  onNavigate(): void;
+  onOpen(): void;
+  onClose(): void;
+}) {
+  const expanded = spaces?.expanded(tab.id) ?? false;
   return (
-    <SidebarItemRow
-      href={tab.href}
-      title={tab.title}
-      kindIcon={tab.kindIcon}
-      glyph={tab.icon}
-      selected={selected}
-      onOpen={onOpen}
-      onClose={onClose}
-      rowProps={{ "data-studio-tab": `${tab.pluginId}:${tab.id}` }}
-    />
+    <>
+      <SidebarItemRow
+        href={tab.href}
+        title={tab.title}
+        kindIcon={tab.kindIcon}
+        glyph={tab.icon}
+        selected={selected}
+        onOpen={onOpen}
+        onClose={onClose}
+        expanded={expanded}
+        onToggle={spaces ? () => spaces.toggle(tab.id) : undefined}
+        rowProps={{ "data-studio-tab": `${tab.pluginId}:${tab.id}` }}
+      />
+      {spaces && expanded ? <SpaceMembers tree={spaces} spaceId={tab.id} path={path} onNavigate={onNavigate} /> : null}
+    </>
   );
 }

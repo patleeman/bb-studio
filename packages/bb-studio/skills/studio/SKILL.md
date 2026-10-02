@@ -84,7 +84,7 @@ and later. A thread is in a space when it was added to it or its project is.
 
 Spaces are Studio items of kind Space: they list in the collection, are
 made from **New ▾ → Space**, and an open space shows as a tab in the
-sidebar's Studio section. A space opens its page in Pages, made from a
+sidebar's Studio section, with its items nested under it. A space opens its page in Pages, made from a
 template when the space is: an editable page with live widgets for making a
 thread or any add-on's item in it, its recent items, threads, channels and
 direct messages, and projects. The user writes around the widgets, moves or

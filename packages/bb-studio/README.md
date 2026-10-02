@@ -80,7 +80,9 @@ the matching text with the match in bold.
   above your threads. × or middle-click closes a tab; closing the one on
   screen opens the next. The section's ⋯ menu groups tabs by app, sorts them,
   and closes other or all tabs. Studio keeps the tabs, so every window shows
-  the same ones, and closes tabs of deleted items.
+  the same ones, and closes tabs of deleted items. A space's tab lists what
+  the space holds under it, sub-pages under their pages, then its threads;
+  its icon turns into a chevron on hover to fold it.
 - **New ▾** creates any kind an installed add-on offers, in the current
   project.
 - **Takes over from the add-ons.** With Studio installed, each add-on's own
