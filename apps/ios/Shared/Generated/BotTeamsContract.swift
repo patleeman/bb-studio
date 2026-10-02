@@ -361,15 +361,17 @@ public enum BotTeams {
     public var id: String?
     public var requestId: String?
     public var text: String?
+    public var attachments: [StudioJSONValue]?
     public var targets: [StudioJSONValue]?
     public var replyThreadId: String?
     public var fresh: Bool?
     public var mode: ViewSendInputMode?
 
-    public init(id: String? = nil, requestId: String? = nil, text: String? = nil, targets: [StudioJSONValue]? = nil, replyThreadId: String? = nil, fresh: Bool? = nil, mode: ViewSendInputMode? = nil) {
+    public init(id: String? = nil, requestId: String? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, targets: [StudioJSONValue]? = nil, replyThreadId: String? = nil, fresh: Bool? = nil, mode: ViewSendInputMode? = nil) {
       self.id = id
       self.requestId = requestId
       self.text = text
+      self.attachments = attachments
       self.targets = targets
       self.replyThreadId = replyThreadId
       self.fresh = fresh
