@@ -64,7 +64,6 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
     </form>
   </Modal>;
 }
-const ROW_BUTTON = "flex min-w-0 items-center gap-1 rounded-md px-1.5 py-0.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active";
 const ROW_ICON_BUTTON = "inline-flex h-6 shrink-0 items-center justify-center rounded-md px-1 text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground";
 const EDIT_VIEW_EVENT = "bot-teams:edit-view";
 /** A thread's per-message hover actions. */
@@ -115,8 +114,8 @@ function ViewDetail({ id }: { id: string }) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
   const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
-  const [targets, setTargets] = useState<ViewMember[]>([]), [reply, setReply] = useState<string | null>(null);
-  const [editing, setEditing] = useState(false), [fresh, setFresh] = useState(false), [focus, setFocus] = useState(0);
+  const [reply, setReply] = useState<string | null>(null);
+  const [editing, setEditing] = useState(false), [focus, setFocus] = useState(0);
   const [permissions, setPermissions] = useStoredPermissions(id);
   useEffect(() => {
     const edit = (event: Event) => { if ((event as CustomEvent<{ id?: string }>).detail?.id === id) setEditing(true); };
@@ -158,13 +157,15 @@ function ViewDetail({ id }: { id: string }) {
         const bot = r.kind === "plugin" && r.pluginId === PLUGIN_ID ? bots.find(b => b.id === r.itemId.replace(/^bots:/, "")) : undefined;
         if (bot && page.view.members.some(v => v.kind === "bot" && v.id === bot.id)) mentioned.push({ kind: "bot", id: bot.id });
         if (r.kind === "thread" && page.threads.some(t => t.id === r.threadId)) mentioned.push({ kind: "thread", id: r.threadId });
-        out = out.slice(0, m.start) + (bot ? `@${bot.handle}` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label) + out.slice(m.end);
+        // BB puts a space after a mention pill; "@Atlas +new" still asks for a fresh thread.
+        const rest = out.slice(m.end), fresh = bot ? /^\s?\+new\b/.exec(rest) : null;
+        out = out.slice(0, m.start) + (bot ? `@${bot.handle}${fresh ? "+new" : ""}` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label) + (fresh ? rest.slice(fresh[0].length) : rest);
       }
       return [out];
     }).join("\n").trim();
     const command = /^\/(steer|followup|fork)\s+/.exec(text);
-    const recipients = [...new Map([...targets, ...mentioned].map(m => [memberKey(m), m])).values()];
-    const input = { id, text: command ? text.slice(command[0].length) : text, attachments, targets: recipients, replyThreadId: reply, fresh, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permissions.all ?? null, memberPermissionModes: page.view.members.flatMap(member => permissions.members[memberKey(member)] ? [{ member, mode: permissions.members[memberKey(member)]! }] : []) };
+    const recipients = [...new Map(mentioned.map(m => [memberKey(m), m])).values()];
+    const input = { id, text: command ? text.slice(command[0].length) : text, attachments, targets: recipients, replyThreadId: reply, fresh: false, mode: (command?.[1] ?? "auto") as "auto" | "steer" | "followup" | "fork", permissionMode: permissions.all ?? null, memberPermissionModes: page.view.members.flatMap(member => permissions.members[memberKey(member)] ? [{ member, mode: permissions.members[memberKey(member)]! }] : []) };
     const signature = JSON.stringify(input);
     if (retry.current?.signature !== signature) retry.current = { signature, requestId: crypto.randomUUID() };
     let failure: string | null = null;
@@ -172,7 +173,7 @@ function ViewDetail({ id }: { id: string }) {
       const result = await rpc.call("viewSend", { ...input, requestId: retry.current!.requestId });
       const failures = result.deliveries.filter(d => d.status === "error");
       if (failures.length) failure = failures.map(d => d.error).join("\n");
-      else { setReply(null); retry.current = null; setTargets([]); followLatest.current = true; }
+      else { setReply(null); retry.current = null; followLatest.current = true; }
       load();
     } catch (e) { failure = message(e); }
     if (failure) { setError(failure); throw new Error(failure); }
@@ -187,7 +188,7 @@ function ViewDetail({ id }: { id: string }) {
     const action = (label: string, icon: string, run: () => void) => <button type="button" aria-label={label} title={label} onClick={run} className={MESSAGE_ACTION}><Icon name={icon} className="size-3.5" /></button>;
     const actions = <div className={`flex h-5 items-center gap-2 ${entry.role === "user" ? "justify-end pr-[13px]" : ""}`}>
       {action("Copy message", "Copy", () => void navigator.clipboard.writeText(entry.text).then(() => toast.success("Copied"), e => toast.error(message(e))))}
-      {action(`Reply to ${entry.role === "user" ? thread?.title || "thread" : bot?.name || thread?.title || "thread"}`, "ArrowTurnBackward", () => { setReply(entry.threadId); setTargets([]); setFocus(value => value + 1); })}
+      {action(`Reply to ${entry.role === "user" ? thread?.title || "thread" : bot?.name || thread?.title || "thread"}`, "ArrowTurnBackward", () => { setReply(entry.threadId); setFocus(value => value + 1); })}
       {entry.role === "assistant" && action("Open thread", "ArrowUpRight", () => openThread(entry.threadId))}
     </div>;
     if (entry.role === "user") return <li key={entry.id} data-view-entry="user" className="group/message ml-auto flex w-fit max-w-[70%] flex-col items-end gap-1">
@@ -205,11 +206,8 @@ function ViewDetail({ id }: { id: string }) {
   const children = (parentId: string): React.ReactNode => page.threads.filter(t => t.parentThreadId === parentId).map(t => <li key={t.id} className="px-2"><details open={expanded.has(t.id)} onToggle={event => { const open = event.currentTarget.open; setExpanded(current => { const next = new Set(current); if(open) next.add(t.id); else next.delete(t.id); return next; }); }} className="ml-8 border-l border-border pl-4"><summary className="cursor-pointer text-xs text-subtle-foreground hover:text-foreground">{t.title}{["active", "starting"].includes(t.status) ? " · Working…" : ""}</summary><ol className="mt-3 space-y-5">{page.entries.filter(e => e.threadId === t.id).map((e, i, all) => renderEntry(e, all[i - 1]))}{children(t.id)}</ol></details></li>);
   const rootEntries = page.entries.filter(e => roots.has(e.threadId));
   const lastEntry = new Map(rootEntries.map(e=>[e.threadId,e.id]));
-  const isTarget = (m: ViewMember) => targets.some(t => memberKey(t) === memberKey(m));
   const memberLabel = (m: ViewMember) => (m.kind === "bot" ? bots.find(b => b.id === m.id)?.name : page.threads.find(t => t.id === m.id)?.title) || "Member";
   const memberAvatar = (m: ViewMember) => m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null;
-  const toggleTarget = (m: ViewMember) => setTargets(current => isTarget(m) ? current.filter(t => memberKey(t) !== memberKey(m)) : [...current, m]);
-  const chosen = page.view.members.filter(isTarget);
   const working = page.threads.filter(t => !t.parentThreadId && ["starting", "active"].includes(t.status)).map(t => botFor(t.id)?.name || t.title);
   const overrides = page.view.members.filter(m => permissions.members[memberKey(m)]);
   const approvals = { label: `${permissions.all ? modeLabel(permissions.all) : "Each bot's own"}${overrides.length ? ` · ${overrides.length} custom` : ""}`, anyFull: permissions.all === "full" || overrides.some(m => permissions.members[memberKey(m)] === "full") };
@@ -231,14 +229,7 @@ function ViewDetail({ id }: { id: string }) {
       : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @ to mention members.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}
     <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
       <div className="flex min-w-0 flex-1 items-center gap-1">
-        <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Choose recipients" className={`${ROW_BUTTON} -ml-1.5`}><Icon name="Bot" className="size-3.5 shrink-0" />{chosen.length ? <span className="truncate text-foreground">{chosen.map(memberLabel).join(", ")}</span> : <span className="truncate">{reply ? `Reply to ${botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title || "thread"}` : "Auto recipients"}</span>}{fresh && <span className="shrink-0 text-subtle-foreground">· new threads</span>}<Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
-          <DropdownMenuContent align="start" side="top" className="w-64">
-            <DropdownMenuLabel className="text-xs font-normal text-subtle-foreground">Send to. Leave empty to route by @mention.</DropdownMenuLabel>
-            <div role="group" aria-label="Recipients">{page.view.members.map(m => <DropdownMenuItem key={memberKey(m)} onSelect={e => { e.preventDefault(); toggleTarget(m); }} role="menuitemcheckbox" aria-checked={isTarget(m)}><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{memberLabel(m)}</span>{isTarget(m) && <Icon name="Check" className="size-4" />}</DropdownMenuItem>)}</div>
-            <DropdownMenuSeparator />
-            <DropdownMenuItem onSelect={e => { e.preventDefault(); setFresh(value => !value); }} role="menuitemcheckbox" aria-checked={fresh}><Icon name="MessageSquarePlus" className="size-4" /><span className="flex-1 text-sm">New bot threads</span>{fresh && <Icon name="Check" className="size-4" />}</DropdownMenuItem>
-          </DropdownMenuContent></DropdownMenu>
-        {reply && <button type="button" aria-label="Cancel reply" title="Cancel reply" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button>}
+        {reply && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">Replying to <span className="text-foreground">{botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title || "thread"}</span></span><button type="button" aria-label="Cancel reply" title="Cancel reply" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></span>}
       </div>
       <div className="flex shrink-0 items-center gap-2">
         <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Approval mode" title={approvalTitle} className={`inline-flex h-6 min-w-0 items-center gap-1 rounded-md px-1 text-xs font-medium leading-tight transition-colors hover:bg-state-hover data-[state=open]:bg-state-active ${approvals.anyFull ? "text-warning-text" : "text-muted-foreground hover:text-foreground"}`}><span className="truncate">{approvals.label}</span><Icon name="ChevronDown" className="size-3 shrink-0" /></button></DropdownMenuTrigger>
