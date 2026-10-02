@@ -483,12 +483,12 @@ function RecordingDetail({ id }: { id: string }) {
 
         {segments.length > 0 && !recording.audioRemoved ? (
           <section aria-label="Audio playback" className="sticky top-0 z-10 mt-6 border-y border-border bg-background py-3">
-            <div className="flex items-center gap-2">
+            <div className="flex flex-wrap items-center gap-2">
               <button type="button" className={OUTLINE_BUTTON} aria-label={player.playing ? "Pause playback" : "Play recording"} onClick={player.toggle}>
                 <Icon name={player.playing ? "Pause" : "Play"} /> {player.playing ? "Pause" : "Play"}
               </button>
-              <button type="button" className={ICON_BUTTON} aria-label="Back 10 seconds" title="Back 10 seconds" onClick={() => player.seek(player.positionMs - 10_000)}><Icon name="RotateCcw" /></button>
-              <button type="button" className={ICON_BUTTON} aria-label="Forward 10 seconds" title="Forward 10 seconds" onClick={() => player.seek(player.positionMs + 10_000)}><Icon name="RotateCw" /></button>
+              <button type="button" className={OUTLINE_BUTTON} aria-label="Back 10 seconds" title="Back 10 seconds" onClick={() => player.seek(player.positionMs - 10_000)}>−10s</button>
+              <button type="button" className={OUTLINE_BUTTON} aria-label="Forward 10 seconds" title="Forward 10 seconds" onClick={() => player.seek(player.positionMs + 10_000)}>+10s</button>
               <span className="ml-auto text-sm tabular-nums">{formatClock(player.positionMs)} / {formatClock(player.durationMs)}</span>
               <select aria-label="Playback speed" className="rounded border border-border bg-background px-1 py-1 text-sm" value={player.rate} onChange={(event) => player.setRate(Number(event.target.value))}>
                 {[0.75, 1, 1.25, 1.5, 2].map((rate) => <option key={rate} value={rate}>{rate}×</option>)}
@@ -505,7 +505,7 @@ function RecordingDetail({ id }: { id: string }) {
         <div className="mt-8 flex flex-wrap items-center gap-2">
           <h2 className="mr-auto font-semibold">Transcript</h2>
           <button type="button" className={OUTLINE_BUTTON} disabled={cleaning !== null || recording.status !== "done" || recording.pendingCount > 0 || recording.failedCount > 0 || !recording.wordCount || hasCleaned} onClick={() => void cleanUp()}>
-            <Icon name={cleaning !== null ? "Loading" : "Sparkles"} className={cleaning !== null ? "animate-spin motion-reduce:animate-none" : undefined} /> {cleaning !== null ? "Cleaning…" : hasCleaned ? "Cleanup saved" : "Clean up transcript"}
+            {cleaning !== null ? <Icon name="Loading" className="animate-spin motion-reduce:animate-none" /> : null} {cleaning !== null ? "Cleaning…" : hasCleaned ? "Cleanup saved" : "Clean up transcript"}
           </button>
           <button type="button" className={OUTLINE_BUTTON} disabled={!transcript} onClick={() => openNewItemThread(navigate, { title: recording.title, href: recordingHref(recording.id) })}><Icon name="MessageSquarePlus" /> Send to agent</button>
         </div>
@@ -529,7 +529,7 @@ function RecordingDetail({ id }: { id: string }) {
                   <button type="button" onClick={() => player.seek(segment.offsetMs, true)} className="mt-0.5 h-6 shrink-0 rounded px-1 font-mono text-xs tabular-nums text-muted-foreground hover:bg-state-hover hover:text-foreground focus-visible:outline focus-visible:outline-2" aria-label={`Play from ${formatClock(segment.offsetMs)}`} title="Play from here">{formatClock(segment.offsetMs)}</button>
                 )}
                 <p className="min-w-0 flex-1 whitespace-pre-wrap break-words text-[15px] leading-relaxed">
-                  <SegmentText segment={segment} playing={player.segmentId === segment.id} onPlay={recording.audioRemoved ? undefined : () => player.seek(segment.offsetMs, true)} />
+                  <SegmentText segment={segment} onPlay={recording.audioRemoved ? undefined : () => player.seek(segment.offsetMs, true)} />
                 </p>
               </section>
             ))}
@@ -541,7 +541,7 @@ function RecordingDetail({ id }: { id: string }) {
 }
 
 /** Without `onPlay` (the audio is gone) the text is plain. */
-function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: boolean; onPlay?: () => void }) {
+function SegmentText({ segment, onPlay }: { segment: Segment; onPlay?: () => void }) {
   const at = formatClock(segment.offsetMs);
   if (segment.status === "empty") return <span className="text-sm text-muted-foreground">No speech detected</span>;
   if (segment.status === "pending") {
@@ -570,10 +570,7 @@ function SegmentText({ segment, playing, onPlay }: { segment: Segment; playing: 
       type="button"
       onClick={onPlay}
       title={`${at} — play`}
-      className={cn(
-        "cursor-pointer rounded-sm text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2",
-        playing && "bg-primary/15 hover:bg-primary/20",
-      )}
+      className="cursor-pointer rounded-sm text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2"
     >
       {segment.text}{" "}
     </button>

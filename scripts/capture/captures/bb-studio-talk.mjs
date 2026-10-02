@@ -33,10 +33,13 @@ export default ({ projectId, seedTalkRecording, talkRpc, sleep }) => [
         await client.clickButtonText("Cleaned");
         // Observe real audio objects while driving the live controls.
         await client.evaluate(`window.Audio = class extends window.Audio { constructor(...args) { super(...args); window.__talkCaptureAudio = this; } }`);
-        await client.clickFirstButtonWithAria("Play recording");
+        await client.clickAriaButtonWithPointer("Play recording");
         await sleep(1500);
         const started = await client.evaluate(`window.__talkCaptureAudio?.currentTime > 0 && !window.__talkCaptureAudio.paused`);
-        if (!started) throw new Error("The seeded recording did not play.");
+        if (!started) {
+          const detail = await client.evaluate(`({ audio: window.__talkCaptureAudio ? { src: window.__talkCaptureAudio.src, time: window.__talkCaptureAudio.currentTime, paused: window.__talkCaptureAudio.paused, ready: window.__talkCaptureAudio.readyState, error: window.__talkCaptureAudio.error?.message } : null, notices: [...document.querySelectorAll('[data-sonner-toast]')].map(item => item.textContent) })`);
+          throw new Error(`The seeded recording did not play: ${JSON.stringify(detail)}`);
+        }
         const second = cleaned.segments[1];
         await client.evaluate(`(() => {
           const input = document.querySelector('input[aria-label="Recording position"]');
