@@ -1,7 +1,8 @@
 // Studio Feed's reader, seeded with posts through `bb feed post`: a commute
 // story with two earlier updates, an urgent alert, and posts with and
-// without pictures. Two are marked read, the commute story is opened in place
-// and closed, and the morning briefing is left open.
+// without pictures, and a launch post that links a checklist page. Two are
+// marked read, the commute story is opened in place and closed, and the
+// launch post is left open with a preview of its page.
 const picture = (path) => `![](https://upload.wikimedia.org/wikipedia/commons/thumb/${path}/960px-${path.split("/").pop()})`;
 const POSTS = [
   ["--title", "Metro-North running about 10 minutes late on the Harlem Line", "--topic", "Commute", "--story", "harlem-line", "--author", "Commute Bot",
@@ -24,7 +25,20 @@ const POSTS = [
     "--body", `${picture("2/2c/Metro-North_M7A_4060_leaves_White_Plains_on_Train_465.jpg")}\\n\\nService is back to normal as of 9:55. The signal at Fordham was repaired.\\n\\n- Inbound trains are on time\\n- The 10:12 from Scarsdale runs as scheduled`],
 ];
 
-export default ({ bbCli, sleep }) => [
+const CHECKLIST = [
+  "## Before Friday",
+  "",
+  "- [x] Release notes drafted",
+  "- [x] Rollback plan reviewed by Ops",
+  "- [ ] Owner sign-off from Priya",
+  "- [ ] Status page message scheduled",
+  "",
+  "## Window",
+  "",
+  "Friday 2:00 to 3:30 PM. Scribe watches error rates for an hour after.",
+].join("\n");
+
+export default ({ bbCli, sleep, pluginRpc, projectId }) => [
   {
     id: "feed",
     packageDir: "bb-studio-feed",
@@ -33,9 +47,18 @@ export default ({ bbCli, sleep }) => [
       const ids = [];
       const cleanup = async () => {
         for (const id of ids) await bbCli(["feed", "remove", id]).catch(() => undefined);
+        if (pageId) await pluginRpc("pages", "remove", { id: pageId }).catch(() => undefined);
       };
+      let pageId = null;
       try {
-        for (const args of POSTS) {
+        // A page the launch post links: the reader previews it in the post.
+        ({ page: { id: pageId } } = await pluginRpc("pages", "create", { projectId, parentId: null, title: "ORBIT-42 launch checklist", icon: "✅", markdown: CHECKLIST }));
+        const posts = POSTS.map((args) =>
+          args[1] === "ORBIT-42 release window confirmed for Friday 2pm"
+            ? args.map((arg, index) => (args[index - 1] === "--body" ? `${arg}\\n\\nChecklist: [ORBIT-42 launch checklist](/plugins/pages/pages/${pageId})` : arg))
+            : args,
+        );
+        for (const args of posts) {
           ids.push((await bbCli(["feed", "post", ...args])).split("\t")[0].trim());
           await sleep(50);
         }
@@ -66,10 +89,17 @@ export default ({ bbCli, sleep }) => [
         await client.waitForText("New thread");
         await client.waitForText("Mark unread");
         await client.waitForText("4 unread");
-        // Close it, and leave the short briefing open so the stream shows.
+        // Close it, and leave the launch post open with its checklist page previewed.
         await client.evaluate(`(${row("Harlem Line delays cleared")}).querySelector("button[aria-expanded]").click()`);
-        await client.evaluate(`(${row("Your Thursday")}).querySelector("button[aria-expanded]").click()`);
-        await client.waitForText("Rain after 4, so take the umbrella.");
+        await client.evaluate(`(${row("ORBIT-42 release window")}).querySelector("button[aria-expanded]").click()`);
+        await client.waitForText("Owner sign-off from Priya");
+        await client.waitForText("Scribe watches error rates for an hour after.");
+        await client.evaluate(`(() => {
+          const preview = document.querySelector('main section[aria-label$="ORBIT-42 launch checklist"]');
+          if (!preview) throw new Error("The launch post doesn't preview its checklist page");
+          if (![...preview.querySelectorAll("button")].some((button) => button.innerText.includes("Open"))) throw new Error("The page preview has no Open button");
+          return true;
+        })()`);
         await client.waitForText("3 unread");
         await client.evaluate(`document.querySelector("main").scrollIntoView()`);
         for (let tries = 0; ; tries += 1) {

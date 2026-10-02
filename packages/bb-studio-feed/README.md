@@ -10,7 +10,7 @@ channel or automation. You read it as one list on desktop and phone.
 
 ## Staged preview
 
-![The Feed reader with unread and read rows, the morning briefing open in place, and a Needs you rail](assets/staged-preview.png)
+![The Feed reader with the launch post open in place, previewing its linked checklist page, and a Needs you rail](assets/staged-preview.png)
 
 This is the **Feed** page in a staged BB (`node scripts/staged-bb.mjs start`).
 The capture seeds nine posts with `bb feed post` from seven authors:
@@ -18,15 +18,16 @@ The capture seeds nine posts with `bb feed post` from seven authors:
 - an urgent Ops alert
 - a briefing, a research digest, a launch note, a local tip and a cost report
 
-Four of them have a picture in their body. The posts are listed under
-**Today** in the margin. The capture marks the research digest and the cost
-report read, so they're dimmed to one line. It opens the commute story in
-place and checks its picture, **Earlier updates**, and the **New thread** and
-**Mark unread** buttons. Then it closes it and leaves the morning briefing
-open. The header counts **3 unread**. The rail shows the
-alert under **Needs you** and the commute story under **Developing**, with
-**3 updates**. Every post was made seconds before the capture, so each shows
-"just now".
+Four posts have a picture in their body. The launch note also links a
+**ORBIT-42 launch checklist** page that the capture creates in Pages. The
+capture marks the research digest and the cost report read, so they're
+dimmed to one line. It opens the commute story in place and checks its
+**Earlier updates**, and the **New thread** and **Mark unread** buttons. Then
+it closes it and opens the launch note. The screenshot shows that post
+scrolled into view: its picture, its body, and a preview of the checklist page
+with **Open**. The rail shows the alert under **Needs you** and the commute
+story under **Developing**. Every post was made seconds before the capture, so
+each shows "just now".
 
 ## How agents post
 
