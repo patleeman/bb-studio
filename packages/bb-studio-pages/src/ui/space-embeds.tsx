@@ -4,7 +4,7 @@
 // makes a space's page with all of them, and the user writes around them,
 // moves them or removes them. Pages asks Studio for the data; Studio's own
 // overlay shows the dialogs that change the space.
-import { projectName, studioItemProps, useProjects } from "@bb-studio/kit/app";
+import { projectName, studioItemProps, studioThreadProps, useProjects } from "@bb-studio/kit/app";
 import { plural, relativeTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
@@ -94,7 +94,7 @@ function Empty({ children }: { children: ReactNode }) {
   return <div className="px-4 py-3 text-xs text-muted-foreground/70">{children}</div>;
 }
 
-function Row({ icon, glyph, title, sub, aside, href, onOpen }: {
+function Row({ icon, glyph, title, sub, aside, href, threadId, onOpen }: {
   icon: string;
   glyph?: string | null;
   title: string;
@@ -102,6 +102,8 @@ function Row({ icon, glyph, title, sub, aside, href, onOpen }: {
   aside?: string;
   /** An item's, for the right-click menu. */
   href?: string;
+  /** A thread's, for the right-click menu. */
+  threadId?: string;
   onOpen(): void;
 }) {
   return (
@@ -109,7 +111,7 @@ function Row({ icon, glyph, title, sub, aside, href, onOpen }: {
       type="button"
       className="flex w-full items-center gap-3 px-3 py-1.5 text-left hover:bg-state-hover"
       onClick={onOpen}
-      {...studioItemProps(href ? { href, title, icon } : null)}
+      {...(threadId ? studioThreadProps(threadId, title, { drag: false }) : studioItemProps(href ? { href, title, icon } : null, { drag: false }))}
     >
       <span className="flex size-7 shrink-0 items-center justify-center rounded-md bg-background text-muted-foreground">
         {glyph ? <span className="text-base leading-none">{glyph}</span> : <Icon name={icon} className="size-4" />}
@@ -228,7 +230,7 @@ function Threads({ view, conversations }: { view: SpaceWidgetView; conversations
     <>
       <div className="py-1">
         {shown.map((thread) => (
-          <Row key={thread.id} icon={threadIcon(thread)} title={thread.title} sub={place(thread)} aside={relativeTime(thread.updatedAt)} onOpen={() => ui.openThread(thread.id)} />
+          <Row key={thread.id} icon={threadIcon(thread)} title={thread.title} sub={place(thread)} aside={relativeTime(thread.updatedAt)} threadId={thread.id} onOpen={() => ui.openThread(thread.id)} />
         ))}
         {!threads.length ? (
           <Empty>

@@ -461,7 +461,7 @@ function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
     <section
       aria-label={`${embed.kind}: ${embed.title}`}
       className="mt-4 overflow-hidden rounded-lg border border-border/70 bg-background"
-      {...studioItemProps({ href: embed.href, title: embed.title })}
+      {...studioItemProps({ href: embed.href, title: embed.title }, { drag: false })}
     >
       <header className="flex items-center gap-2 border-b border-border/60 py-1.5 pr-1.5 pl-3">
         {embed.icon ? <span aria-hidden>{embed.icon}</span> : <Icon name={embed.pluginId === "artifacts" ? "FileCode2" : "FileText"} className="size-4 text-muted-foreground" />}

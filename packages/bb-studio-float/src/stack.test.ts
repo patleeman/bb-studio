@@ -8,7 +8,10 @@ import {
   LABELED_TAB_WIDTH,
   MAX_TABS,
   moveTab,
+  goBack,
+  navigateTab,
   openTab,
+  replaceTab,
   panelSize,
   parseState,
   placeAt,
@@ -181,5 +184,31 @@ describe("stripLayout", () => {
     expect(stripLayout(12, 6, 140 + ICON_TAB_WIDTH * 4)).toEqual({ labeled: false, start: 4, end: 9 });
     expect(stripLayout(12, 0, 140 + ICON_TAB_WIDTH * 4)).toEqual({ labeled: false, start: 0, end: 5 });
     expect(stripLayout(12, 11, 140 + ICON_TAB_WIDTH * 4)).toEqual({ labeled: false, start: 7, end: 12 });
+  });
+});
+
+describe("links inside a tab", () => {
+  const path = (p: string) => ({ kind: "path" as const, path: p });
+  it("follows a link in place and goes back", () => {
+    const state = openTab(openTab(EMPTY, path("/plugins/pages/pages/a")), thread("t"));
+    const moved = navigateTab(selectTab(state, "path:/plugins/pages/pages/a"), "path:/plugins/pages/pages/a", path("/plugins/pages/pages/b"));
+    expect(moved.tabs.map((tab) => tab.key)).toEqual(["path:/plugins/pages/pages/b", "thread:t"]);
+    expect(moved.active).toBe("path:/plugins/pages/pages/b");
+    const back = goBack(moved, "path:/plugins/pages/pages/b");
+    expect(back.tabs.map((tab) => tab.key)).toEqual(["path:/plugins/pages/pages/a", "thread:t"]);
+    expect(back.tabs[0]!.back).toEqual([]);
+    expect(goBack(back, "path:/plugins/pages/pages/a")).toBe(back);
+  });
+
+  it("shows a tab already open instead of opening it twice", () => {
+    const state = openTab(openTab(EMPTY, path("/plugins/pages/pages/a")), path("/plugins/pages/pages/b"));
+    const moved = navigateTab(state, "path:/plugins/pages/pages/b", path("/plugins/pages/pages/a"));
+    expect(moved.tabs.map((tab) => tab.key)).toEqual(["path:/plugins/pages/pages/a"]);
+    expect(moved.active).toBe("path:/plugins/pages/pages/a");
+  });
+
+  it("swaps a tab's content for the main view's", () => {
+    const state = openTab(EMPTY, path("/plugins/pages/pages/a"));
+    expect(replaceTab(state, "path:/plugins/pages/pages/a", path("/plugins/pages/pages/m")).tabs).toEqual([{ key: "path:/plugins/pages/pages/m", target: path("/plugins/pages/pages/m") }]);
   });
 });

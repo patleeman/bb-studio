@@ -113,7 +113,7 @@ export function CellValue({ column, cell, host, wrap = false }: { column: Column
           type="button"
           className="inline-flex h-5 max-w-full min-w-0 items-center gap-1 rounded bg-muted px-1.5 text-xs hover:bg-state-hover"
           title={item ? `${item.kindLabel ?? "Item"}: ${item.title}` : `${cell.pluginId}:${cell.itemId}`}
-          {...studioItemProps(item?.href ? { href: item.href, title: item.title, icon: item.kindIcon } : null)}
+          {...studioItemProps(item?.href ? { href: item.href, title: item.title, icon: item.kindIcon } : null, { drag: false })}
           onMouseDown={stop}
           onClick={(event) => {
             event.stopPropagation();

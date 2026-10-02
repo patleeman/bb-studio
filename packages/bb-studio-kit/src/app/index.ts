@@ -53,8 +53,10 @@ export {
   useInFloat,
 } from "./float";
 export {
+  FLOAT_WINDOW_ATTRIBUTE,
   floatPanelFor,
   floatWindowKey,
+  navigateFromFloat,
   publishFloatBody,
   publishFloatDock,
   publishFloatLeading,
@@ -62,7 +64,21 @@ export {
   type FloatOpenOptions,
   type FloatTarget,
 } from "./float-registry";
-export { openPathInSplit, pluginViewPath, studioItemAt, studioItemProps, type StudioItemLink } from "./studio-item";
+export {
+  dropTarget,
+  openPathInSplit,
+  pluginViewPath,
+  setDragTarget,
+  STUDIO_ITEM_CLICKS_OFF,
+  STUDIO_TARGET_TYPE,
+  studioItemProps,
+  studioTargetAt,
+  studioThreadProps,
+  targetHref,
+  threadLinkId,
+  type StudioItemLink,
+} from "./studio-item";
+export { useOpenTarget, type OpenPlace } from "./move";
 export { COMPOSER_MORE_ITEM, ComposerMore, useComposerMoreSide } from "./composer-more";
 export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";

@@ -16,6 +16,7 @@ import {
   openAppPath,
   projectName,
   studioItemProps,
+  studioThreadProps,
   type CollectionItem,
   type CollectionKind,
   type Project,
@@ -127,7 +128,12 @@ function ThreadRow({ thread, projects, onRemove }: { thread: SpaceThreadView; pr
   const navigate = useBbNavigate();
   return (
     <div className="group flex items-center gap-2 px-3 py-2 hover:bg-state-hover">
-      <button type="button" className="flex min-w-0 flex-1 items-center gap-2 text-left" onClick={() => navigate.toThread(thread.id)}>
+      <button
+        type="button"
+        className="flex min-w-0 flex-1 items-center gap-2 text-left"
+        onClick={() => navigate.toThread(thread.id)}
+        {...studioThreadProps(thread.id, thread.title)}
+      >
         <Icon name={threadIcon(thread)} className="size-4 shrink-0 text-muted-foreground" />
         <span className="min-w-0 flex-1 truncate text-sm">{thread.title}</span>
         <span className="shrink-0 text-xs text-muted-foreground">

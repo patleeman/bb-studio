@@ -54,21 +54,35 @@ chat from inside the panel.
   panel left; Pages sets it while its comments card is open.
 - The older `bb-studio:chat:float` window event still floats a thread.
 
-## The item menu
+## Moving items
 
-Right-clicking a Studio item anywhere opens **Open**, **Float** and **Open in
-split**. Float listens for `contextmenu` on the document, so a plugin only
-marks the element that opens an item:
-`<button {...studioItemProps({ href, title, icon })}>`. A link to
-`/plugins/<id>/<panel>/<more>` needs no mark. The menu stays out of the way
-when the element has its own menu (anything that cancels the event, such as
-Studio's sidebar tabs) and on Shift+right-click.
+Float listens on the document, so any marked element and any link into a
+plugin view or a thread moves in one gesture (`src/ItemMenu.tsx`):
 
-BB has no API to open a path in a split, but it opens a Mod-clicked link in
-one when the link is inside the clicking plugin's own tree.
-`openPathInSplit(anchor, path)` clicks such an anchor pointed at the path,
-and falls back to opening it in full when BB doesn't take the click (splits
-off, a small screen). Float's ⋯ menu and Studio's sidebar tabs use it too.
+- **Right-click:** Open, Float, Open in split, Copy link, New thread with this.
+- **Shift-click** floats it, and **Mod-click** opens it in a split. The
+  listener runs in the capture phase, so the element's own click handler
+  doesn't open it as well.
+- **Drag:** a drop zone covers the panel, or the corner when there's none.
+
+A plugin marks the element that opens an item with
+`<button {...studioItemProps({ href, title, icon })}>`, or a thread with
+`studioThreadProps(threadId, title)`. Marks make the element draggable;
+pass `{ drag: false }` inside an editor or a grid that drags its own
+content, or where the text should stay selectable. While Mod- and
+Shift-clicks mean something of the element's own, such as extending a
+selection, set `STUDIO_ITEM_CLICKS_OFF` on it. A menu of the element's own
+(anything that cancels `contextmenu`) wins, as on collection rows and
+Studio's sidebar tabs.
+
+`useOpenTarget()` opens a target in the main view, Float or a split, with
+fallbacks. The collection's row menu, the item header's ⧉ menu, Quick Open
+and Float's tab menu all use it.
+
+Inside a tab, links follow in the tab. Float catches plain link clicks in the
+tab body, and the kit's `openAppPath` checks whether the click came from
+inside a tab (`navigateFromFloat`) and sends the tab there. Each tab keeps a
+back stack for its ← button; the stack isn't kept across a reload.
 
 ## Layout
 
@@ -92,12 +106,17 @@ off, a small screen). Float's ⋯ menu and Studio's sidebar tabs use it too.
 
 ## Limits
 
-- **Navigation.** A floated panel's `useBbNavigate()` and links drive the main
-  route, since BB gives the portal no router of its own.
+- **Navigation.** A floated panel's `useBbNavigate()` drives the main route,
+  since BB gives the portal no router of its own. Links, and buttons that go
+  through `openAppPath`, stay in the tab.
 - **One item twice.** An item open both in the panel and in the main view runs
   two editors, each saving on its own.
 - **Float actions.** BB has no slot in its own thread menu or next to the
   sidebar toggle, so Float is offered in Studio Sidebar's, Studio Teams' and
   Studio's own row menus, the item menu, and the palette.
-- **Item menu.** Only marked elements and plugin links get it; an item a
-  plugin draws without a mark keeps the browser's menu.
+- **Item gestures.** Only marked elements and links get them; an item a
+  plugin draws without a mark keeps the browser's behavior.
+- **Splits.** BB has no API to open a path in a split, but it opens a
+  Mod-clicked link in one when the link is inside the clicking plugin's own
+  tree. `openPathInSplit(anchor, path)` clicks such an anchor and falls back
+  to the main view when BB doesn't take it (splits off, a small screen).

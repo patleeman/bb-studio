@@ -18,7 +18,7 @@ import {
   XAxis,
   YAxis,
 } from "recharts";
-import { studioItemProps } from "@bb-studio/kit/app";
+import { studioItemProps, studioThreadProps } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
@@ -501,7 +501,9 @@ function MentionChip({ kind, target, label }: { kind: keyof typeof MENTION_ICONS
         kind === "bot" ? "bg-violet-500/12 text-violet-600 dark:text-violet-300" : "bg-foreground/6 text-foreground",
       )}
       data-kind={kind}
-      {...studioItemProps(href ? { href, title: text, icon: kind === "page" ? MENTION_ICONS.page : item?.kindIcon } : null)}
+      {...(kind === "thread"
+        ? studioThreadProps(target, text, { drag: false })
+        : studioItemProps(href ? { href, title: text, icon: kind === "page" ? MENTION_ICONS.page : item?.kindIcon } : null, { drag: false }))}
       onClick={() => {
         if (kind === "page") ui.openPage(target);
         else if (kind === "thread") ui.openThread(target);

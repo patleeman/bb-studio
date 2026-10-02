@@ -160,7 +160,7 @@ function ItemEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; t
   const ui = usePagesUi();
   const { item, loading } = useStudioItem(kind, target);
   // A task is its own live row; a header would repeat it and go stale.
-  const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }) : {};
+  const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }, { drag: false }) : {};
   if (item && isEmbedKindItem("task", item.pluginId, item.id)) {
     return (
       <div className="contents" {...link}>

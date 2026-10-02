@@ -1,4 +1,4 @@
-import { Icon, ItemTile, cn, openAppPath, projectName, useProjects } from "@bb-studio/kit/app";
+import { Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type FloatTarget, type OpenPlace } from "@bb-studio/kit/app";
 import { untitled } from "@bb-studio/kit/format";
 import { mentionPrompt } from "@bb-studio/kit/contract";
 import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
@@ -86,15 +86,25 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const rows: Row[] = [...[...results].sort((a, b) => a.kind.localeCompare(b.kind) || b.score - a.score).map((hit): Row => ({ type: "result", hit })), ...visibleCommands];
   useEffect(() => setSelected(0), [query]);
   useEffect(() => { list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" }); }, [selected]);
-  const activate = (row?: Row) => {
+  const { open: openTarget, anchor } = useOpenTarget();
+  // Mod opens a result in a split and Shift floats it, as clicking an item does anywhere.
+  const placeFor = (event: { metaKey: boolean; ctrlKey: boolean; shiftKey: boolean }): OpenPlace =>
+    event.metaKey || event.ctrlKey ? "split" : event.shiftKey ? "float" : "main";
+  const activate = (row: Row | undefined, place: OpenPlace = "main") => {
     if (!row) return;
-    if (row.type === "command") row.run();
-    else { onClose(); openAppPath(row.hit.href); }
+    if (row.type === "command") return row.run();
+    onClose();
+    const threadId = threadLinkId(row.hit.href);
+    const target: FloatTarget = threadId
+      ? { kind: "thread", threadId, title: untitled(row.hit.title) }
+      : { kind: "path", path: row.hit.href, title: untitled(row.hit.title), icon: kinds.get(`${row.hit.ref.pluginId}:${row.hit.kind}`)?.icon };
+    if (place === "main" && !threadId) openAppPath(row.hit.href);
+    else openTarget(target, place);
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.nativeEvent.isComposing) return;
     if (event.key === "ArrowDown" || event.key === "ArrowUp") setSelected((at) => (at + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length);
-    else if (event.key === "Enter") activate(rows[selected]);
+    else if (event.key === "Enter") activate(rows[selected], placeFor(event));
     else if (event.key === "Escape") onClose();
     else return;
     event.preventDefault(); event.stopPropagation();
@@ -113,7 +123,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
           const info = row.type === "result" ? kinds.get(`${row.hit.ref.pluginId}:${kind}`) : null;
           return <div key={row.type === "result" ? `${row.hit.ref.pluginId}:${row.hit.ref.id}` : row.label}>
             {group ? <p className="px-2.5 pt-2 pb-1 text-xs font-medium text-muted-foreground">{!query && row.type === "result" ? "Recently changed" : kind === "command" ? "Commands" : info?.plural ?? (kind === "thread" ? "Threads" : kind === "channel" ? "Channels" : kind)}</p> : null}
-            <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={() => activate(row)}>
+            <div id={`studio-quick-open-${index}`} data-index={index} role="option" aria-selected={index === selected} className={cn("studio-quick-open-row flex cursor-pointer items-center gap-3 rounded-md px-2.5 py-2", index === selected && "bg-state-hover")} onMouseMove={() => setSelected(index)} onClick={(event) => activate(row, placeFor(event))}>
               {row.type === "result" ? <><ItemTile icon={null} kindIcon={info?.icon ?? (kind === "thread" ? "MessageSquare" : "File")} size="md" /><div className="min-w-0 flex-1"><div className="flex items-baseline gap-2"><span className="truncate text-sm font-medium">{untitled(row.hit.title)}</span><span className="shrink-0 text-xs text-muted-foreground">{info?.label ?? kind}{row.hit.projectId ? ` · ${projectName(projects, row.hit.projectId)}` : ""}</span></div>{row.hit.snippet.text ? <p className="studio-quick-open-snippet truncate text-xs text-muted-foreground"><Marked {...row.hit.snippet} /></p> : null}</div></> : <><Icon name="CornerDownRight" className="size-4 text-muted-foreground" /><span className="text-sm">{row.label}</span></>}
             </div>
           </div>;
@@ -121,7 +131,8 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
         {error ? <p className="px-3 py-4 text-sm text-destructive">{error}</p> : null}
         {!loading && !results.length && query && !error ? <p className="px-3 py-3 text-sm text-muted-foreground">No matches.</p> : null}
       </div>
-      <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>esc to close</span></div>
+      <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>⌘↵ in a split</span><span>⇧↵ to float</span><span>esc to close</span></div>
+      {anchor}
     </div>
   </div>;
 }

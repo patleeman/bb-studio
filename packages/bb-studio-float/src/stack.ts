@@ -9,6 +9,8 @@ export interface FloatTab {
   target: FloatTarget;
   /** The caller's tag from `openFloat`, if any. */
   tag?: string;
+  /** What the tab showed before following links inside it, newest last. Not kept across a reload. */
+  back?: FloatTarget[];
 }
 
 /**
@@ -154,6 +156,55 @@ export function closeTab(state: FloatState, key: string): FloatState {
 
 /** Closes every tab. The panel keeps its place and size for next time. */
 export const closeAll = (state: FloatState): FloatState => ({ ...EMPTY, place: state.place, size: state.size });
+
+/** Past this, a tab forgets the oldest place it can go back to. */
+export const MAX_BACK = 20;
+
+/**
+ * Follows a link inside a tab: the tab shows `target`, and can go back to
+ * what it showed. If another tab already shows `target`, that tab shows and
+ * this one closes, so nothing is open twice.
+ */
+export function navigateTab(state: FloatState, key: string, target: FloatTarget): FloatState {
+  const tab = state.tabs.find((candidate) => candidate.key === key);
+  if (!tab) return state;
+  const nextKey = tabKey(target);
+  if (nextKey === key) return state;
+  if (state.tabs.some((candidate) => candidate.key === nextKey)) {
+    const tabs = state.tabs.filter((candidate) => candidate.key !== key);
+    return { ...state, tabs, active: nextKey, collapsed: false, hidden: false };
+  }
+  const back = [...(tab.back ?? []), tab.target].slice(-MAX_BACK);
+  const next: FloatTab = { key: nextKey, target, back };
+  return {
+    ...state,
+    tabs: state.tabs.map((candidate) => (candidate.key === key ? next : candidate)),
+    active: state.active === key ? nextKey : state.active,
+  };
+}
+
+/** Takes a tab back to what it showed before its last link. */
+export function goBack(state: FloatState, key: string): FloatState {
+  const tab = state.tabs.find((candidate) => candidate.key === key);
+  const previous = tab?.back?.at(-1);
+  if (!tab || !previous) return state;
+  const previousKey = tabKey(previous);
+  if (state.tabs.some((candidate) => candidate.key === previousKey)) return selectTab(closeTab(state, key), previousKey);
+  const next: FloatTab = { key: previousKey, target: previous, back: tab.back!.slice(0, -1) };
+  return {
+    ...state,
+    tabs: state.tabs.map((candidate) => (candidate.key === key ? next : candidate)),
+    active: state.active === key ? previousKey : state.active,
+  };
+}
+
+/** Puts `target` in the tab instead of what it showed, for swapping with the main view. */
+export function replaceTab(state: FloatState, key: string, target: FloatTarget): FloatState {
+  const nextKey = tabKey(target);
+  if (nextKey === key || state.tabs.some((candidate) => candidate.key === nextKey)) return state;
+  const tabs = state.tabs.map((candidate) => (candidate.key === key ? { key: nextKey, target } : candidate));
+  return { ...state, tabs, active: state.active === key ? nextKey : state.active };
+}
 
 /** Shows a tab, opening the panel if it's folded or hidden. */
 export function selectTab(state: FloatState, key: string): FloatState {

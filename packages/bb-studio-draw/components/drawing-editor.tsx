@@ -448,6 +448,7 @@ export function DrawingEditor({
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
       <ItemHeader
         thread={threadId || confirmDelete ? undefined : thread}
+        item={thread}
         className="relative shrink-0 items-center border-b border-border/70"
         backLabel={backLabel}
         onBack={() => onBack()}

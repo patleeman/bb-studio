@@ -53,7 +53,10 @@ import {
   type SortKey,
 } from "./selection";
 import { TagChips, TagDot, TagMenuItems, TagNameInput, type CollectionTag } from "./tags";
-import { studioItemProps } from "./studio-item";
+import { openFloat, useFloatAvailable } from "./float";
+import { floatPanelFor } from "./float-registry";
+import { useOpenTarget } from "./move";
+import { STUDIO_ITEM_CLICKS_OFF, studioItemProps } from "./studio-item";
 import { SpaceMenuItems } from "./space-picker";
 import { spaceMembership } from "./space-state";
 
@@ -220,6 +223,10 @@ export function CollectionPage({
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [working, setWorking] = useState(false);
   const anchor = useRef<string | null>(null);
+  // A right-clicked row's menu, at the pointer.
+  const [rowContext, setRowContext] = useState<{ item: CollectionItem; x: number; y: number } | null>(null);
+  const floatAvailable = useFloatAvailable();
+  const { open: openTarget, anchor: splitAnchor } = useOpenTarget();
 
   const kindById = useMemo(() => new Map(kinds.map((kind) => [`${kind.pluginId}:${kind.id}`, kind])), [kinds]);
   const kindOf = useCallback((item: CollectionItem) => kindById.get(`${item.pluginId}:${item.kind}`), [kindById]);
@@ -453,18 +460,23 @@ export function CollectionPage({
     </>
   );
 
-  const rowMenu = (item: CollectionItem, triggerClassName: string) => {
+  const itemTarget = (item: CollectionItem) => ({ kind: "path" as const, path: item.href, title: untitled(item.title), icon: kindOf(item)?.icon });
+  const floatable = (item: CollectionItem) => floatAvailable && floatPanelFor(item.href.split(/[?#]/)[0]!) !== null;
+  // The row's whole menu, shown from its ⋯ button or a right-click.
+  const rowMenuItems = (item: CollectionItem) => {
     const kind = kindOf(item);
     return (
-      <DropdownMenu>
-        <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Actions" className={triggerClassName} onClick={(event) => event.stopPropagation()}>
-            <Icon name="MoreHorizontal" className="size-4" />
-          </button>
-        </DropdownMenuTrigger>
-        <DropdownMenuContent align="end" className="w-56" onClick={(event) => event.stopPropagation()}>
+      <>
           <DropdownMenuItem onSelect={() => handlers.onOpen(item)}>
             <Icon name="ArrowUpRight" className="size-4" /> Open
+          </DropdownMenuItem>
+          {floatable(item) ? (
+            <DropdownMenuItem onSelect={() => openFloat(itemTarget(item))}>
+              <Icon name="AppWindow" className="size-4" /> Float
+            </DropdownMenuItem>
+          ) : null}
+          <DropdownMenuItem onSelect={() => openTarget(itemTarget(item), "split")}>
+            <Icon name="Columns2" className="size-4" /> Open in split
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => handlers.onNewThread([item])}>
             <Icon name="MessageSquarePlus" className="size-4" /> New thread with this
@@ -522,10 +534,21 @@ export function CollectionPage({
           >
             <Icon name="Trash2" className="size-4" /> Delete
           </DropdownMenuItem> : null}
-        </DropdownMenuContent>
-      </DropdownMenu>
+      </>
     );
   };
+  const rowMenu = (item: CollectionItem, triggerClassName: string) => (
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <button type="button" aria-label="Actions" className={triggerClassName} onClick={(event) => event.stopPropagation()}>
+          <Icon name="MoreHorizontal" className="size-4" />
+        </button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent align="end" className="w-56" onClick={(event) => event.stopPropagation()}>
+        {rowMenuItems(item)}
+      </DropdownMenuContent>
+    </DropdownMenu>
+  );
   const revealClass =
     "rounded-md p-1 text-muted-foreground opacity-0 group-hover/row:opacity-100 [@media(hover:none)]:opacity-100 hover:bg-state-hover hover:text-foreground focus-visible:opacity-100 data-[state=open]:opacity-100";
 
@@ -671,6 +694,12 @@ export function CollectionPage({
         )}
         style={gridTemplate}
         {...studioItemProps({ href: item.href, title: untitled(item.title), icon: kind?.icon })}
+        {...(chosen.length ? { [STUDIO_ITEM_CLICKS_OFF]: "" } : {})}
+        onContextMenu={(event) => {
+          if (event.shiftKey) return;
+          event.preventDefault();
+          setRowContext({ item, x: event.clientX, y: event.clientY });
+        }}
         onClick={(event) => (chosen.length && reason === undefined ? toggle(item, event.shiftKey) : handlers.onOpen(item))}
         onKeyDown={(event) => {
           if (event.target !== event.currentTarget) return;
@@ -683,7 +712,7 @@ export function CollectionPage({
       >
         <div role="gridcell" className="flex min-w-0 items-center gap-3">
           {/* The checkbox sits on the avatar: it shows on hover, focus, or while selecting. */}
-          <span className="group/pick relative flex size-8 shrink-0 items-center justify-center">
+          <span className="group/pick relative flex size-8 shrink-0 items-center justify-center" {...{ [STUDIO_ITEM_CLICKS_OFF]: "" }}>
             <span className={cn("flex", checked || chosen.length ? "invisible" : "group-hover/row:invisible group-focus-within/pick:invisible")}>
               {item.thumbnailUrl ? (
                 <span className="flex size-8 shrink-0 items-center justify-center overflow-hidden rounded-lg border border-border bg-background">
@@ -747,6 +776,17 @@ export function CollectionPage({
   const hasRail = filter !== undefined && filter.rail !== undefined;
   return (
     <PageColumn className={cn(filter && "max-w-6xl")}>
+      {splitAnchor}
+      {rowContext ? (
+        <DropdownMenu key={`${rowContext.x},${rowContext.y}`} open modal={false} onOpenChange={(open) => !open && setRowContext(null)}>
+          <DropdownMenuTrigger asChild>
+            <span aria-hidden className="pointer-events-none fixed size-px" style={{ left: rowContext.x, top: rowContext.y }} />
+          </DropdownMenuTrigger>
+          <DropdownMenuContent align="start" sideOffset={0} className="w-56" aria-label={`${untitled(rowContext.item.title)} options`}>
+            {rowMenuItems(rowContext.item)}
+          </DropdownMenuContent>
+        </DropdownMenu>
+      ) : null}
       <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
       <div className="mt-6 flex items-center gap-2">
         {filter ? (
@@ -797,6 +837,11 @@ export function CollectionPage({
                 <button type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => handlers.onNewThread(chosen)}>
                   <Icon name="MessageSquarePlus" /> New thread
                 </button>
+                {chosen.some(floatable) ? (
+                  <button type="button" className={OUTLINE_BUTTON} onClick={() => chosen.filter(floatable).forEach((item) => openFloat(itemTarget(item)))}>
+                    <Icon name="AppWindow" /> Float {chosen.filter(floatable).length}
+                  </button>
+                ) : null}
                 {chosenKind?.actions.map((action) => (
                   <button key={action.id} type="button" className={OUTLINE_BUTTON} disabled={working} onClick={() => act(chosenKind, action, chosen)}>
                     <Icon name={action.icon} /> {action.label.replace("{count}", String(chosen.length))}

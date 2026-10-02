@@ -23,10 +23,23 @@ picked, so Pages renders the page inside it.
   [Studio Sidebar](../bb-studio-sidebar)), every channel row (with
   [Studio Teams](../bb-studio-teams)), and every Studio tab (with
   [Studio](../bb-studio)).
-- **Right-click any Studio item.** A collection row, a mention or embed on a
-  page, a table's item chip, a task's link, a Feed post's item: right-click
-  it for **Open**, **Float** and **Open in split**. Links into a plugin view
-  get the same menu. Shift+right-click keeps the browser's own menu.
+- **Move any item in one gesture.** This works on Studio items and threads
+  anywhere: a collection row, a mention or embed on a page, a table's item
+  chip, a task's link, a Space's rows, Home, a Feed post's item, and any link
+  into a plugin view or a thread.
+  - **Shift-click** floats it, and **⌘-click** (Ctrl-click) opens it in a
+    split.
+  - **Right-click** for Open, Float, Open in split, Copy link and New thread
+    with this. On a collection row, right-click opens the row's whole menu.
+  - **Drag** a collection row, Space row or link onto the panel, or onto the
+    corner when no panel is open, to float it.
+  - Shift+right-click keeps the browser's own menu.
+- **From the collection.** The ⋯ row menu has Float and Open in split, and a
+  selection has **Float N** to float every picked item.
+- **From an open item.** The ⧉ button in an item's header has **Float this**,
+  which moves the item into the panel and takes the main view back, and
+  **Open in split**.
+- **From Quick Open.** ⇧↵ floats the result and ⌘↵ opens it in a split.
 - **Float this view.** The palette's "Float: float this view" floats the
   Studio item or view on screen, or else the thread.
 - **One panel, many tabs.** Everything you float is a tab in one panel, and
@@ -40,7 +53,11 @@ picked, so Pages renders the page inside it.
 - **Resize it.** Drag an edge or corner. Docked, the top and left edges move;
   free, every edge does. Double-click an edge to go back to the default size.
 - **Fold it** to its tab strip with the − button or a double-click on the
-  header. The ⋯ menu also opens the tab full, or in a split.
+  header.
+- **Move a tab.** The ⋯ menu has **Move to main view**, **Move to split**,
+  and **Swap with main view**, which trades the tab and the main view.
+- **Links stay in the tab.** A link or item opened from inside a tab opens
+  in that tab, as in a browser; ← goes back.
 - **Mod+Shift+J** hides the panel and shows it again. You can rebind it in
   BB's keyboard settings.
 
@@ -64,7 +81,8 @@ More in [docs/float.md](../../docs/float.md).
 
 ## Limits
 
-- Links inside a floated item or view open in the main view, not the panel.
+- Some buttons inside a floated view still open the main view, where the
+  view navigates with BB's own router instead of a link.
 - Switching tabs reloads the tab you switch to; only the one showing runs.
 - A view that can't show in the panel says so, with a button to open it.
 - An item open both in the panel and in the main view runs two editors, each

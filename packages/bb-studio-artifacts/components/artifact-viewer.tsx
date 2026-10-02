@@ -230,6 +230,7 @@ export function ArtifactViewer({
         className="relative shrink-0 items-center border-b border-border/70"
         backLabel={backLabel}
         onBack={() => onBack()}
+        item={thread}
         leading={
           <>
             <input

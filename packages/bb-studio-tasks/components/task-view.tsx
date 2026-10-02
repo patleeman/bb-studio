@@ -22,6 +22,7 @@ import {
   cn,
   openAppPath,
   studioItemProps,
+  studioThreadProps,
   useProjects,
 } from "@bb-studio/kit/app";
 
@@ -209,7 +210,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
 
   return (
     <div className="relative h-full min-h-0">
-      <ItemHeader backLabel={untitled(boards.find((board) => board.id === task.boardId)?.title ?? "Board")} onBack={() => back()} thread={confirmDelete || compact ? undefined : thread} trailing={trailing} />
+      <ItemHeader backLabel={untitled(boards.find((board) => board.id === task.boardId)?.title ?? "Board")} onBack={() => back()} thread={confirmDelete || compact ? undefined : thread} item={thread} trailing={trailing} />
       <PageColumn className="max-w-3xl">
         {task.archived ? (
           <div className="mb-4 flex items-center gap-2 rounded-md bg-muted/60 px-3 py-2 text-sm text-muted-foreground">
@@ -568,7 +569,7 @@ function Links({
                 type="button"
                 className="flex min-w-0 flex-1 items-center gap-2 px-2 py-1.5 text-left text-sm"
                 onClick={() => onOpen(link)}
-                {...studioItemProps(link.target !== "thread" && link.href ? { href: link.href, title: link.label } : null)}
+                {...(link.target === "thread" ? studioThreadProps(link.itemId, link.label) : studioItemProps(link.href ? { href: link.href, title: link.label } : null))}
               >
                 <Icon name={link.target === "thread" ? "MessageSquare" : "File"} className="size-4 shrink-0 text-muted-foreground" />
                 <span className="truncate">{link.label}</span>

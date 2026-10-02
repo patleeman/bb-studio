@@ -1,7 +1,7 @@
 // The panel: a strip of tabs, and the showing tab's thread or view below.
 // Drag a tab to reorder it. Drag the header anywhere on screen; dropped near
 // the bottom, the panel docks again.
-import { experimental_useSidebarThreadActions, ThreadChat, ThreadTitle } from "@get-bb/plugin-sdk/app";
+import { ThreadChat, ThreadTitle } from "@get-bb/plugin-sdk/app";
 import {
   cn,
   DropdownMenu,
@@ -9,15 +9,19 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  floatPanelFor,
+  floatWindowKey,
   Icon,
   openAppPath,
   publishFloatBody,
   publishFloatLeading,
+  studioTargetAt,
+  threadLinkId,
   useCanFloat,
+  useOpenTarget,
   type FloatTarget,
 } from "@bb-studio/kit/app";
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
-import { useOpenInSplit } from "./ItemMenu";
 import { update } from "./store";
 import {
   clampFree,
@@ -27,11 +31,14 @@ import {
   dropPlace,
   DOCK_SNAP,
   FREE_EDGES,
+  goBack,
+  navigateTab,
   HEADER_HEIGHT,
   ICON_TAB_WIDTH,
   moveTab,
   panelSize,
   placeAt,
+  replaceTab,
   resizeRect,
   resizeTo,
   selectTab,
@@ -120,13 +127,43 @@ function PathBody({ tab }: { tab: FloatTab }) {
     return (
       <div className="flex flex-1 flex-col items-center justify-center gap-3 p-6 text-center text-sm text-muted-foreground">
         <p>This can't show in a window right now.</p>
-        <button type="button" className="rounded-md border border-border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => openAppPath(path)}>
+        <button type="button" className="rounded-md border border-border px-3 py-1.5 text-foreground hover:bg-state-hover" onClick={() => openAppPath(path, { main: true })}>
           Open it
         </button>
       </div>
     );
   }
   return <div ref={setBody} className="float-body relative min-h-0 flex-1 overflow-auto" />;
+}
+
+/**
+ * The showing tab's body. A plain click on a link inside it follows the link
+ * in the tab, as a browser tab would; the kit's openAppPath does the same for
+ * buttons that open items. Mod- and Shift-clicks still split and float.
+ */
+function TabWindow({ tab }: { tab: FloatTab }) {
+  const [body, setBody] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    if (!body) return;
+    // Capturing, ahead of BB's own link handling, which would open the main view.
+    const onClick = (event: MouseEvent) => {
+      if (event.button !== 0 || event.defaultPrevented || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const element = event.target instanceof Element ? event.target : null;
+      if (!element?.closest("a[href]")) return;
+      const target = studioTargetAt(element);
+      if (!target || (target.kind === "path" && !floatPanelFor(target.path))) return;
+      event.preventDefault();
+      event.stopPropagation();
+      update((next) => navigateTab(next, tab.key, target));
+    };
+    body.addEventListener("click", onClick, true);
+    return () => body.removeEventListener("click", onClick, true);
+  }, [body, tab.key]);
+  return (
+    <div ref={setBody} data-float-window={tab.key} className="flex min-h-0 flex-1 flex-col">
+      {tab.target.kind === "thread" ? <ThreadBody tab={tab} threadId={tab.target.threadId} /> : <PathBody tab={tab} />}
+    </div>
+  );
 }
 
 interface TabDrag {
@@ -247,19 +284,30 @@ function TabStrip({ state }: { state: FloatState }) {
   );
 }
 
+/** What the main view shows, if a tab could show it too. */
+function mainTarget(): FloatTarget | null {
+  const path = `${window.location.pathname}${window.location.search}`;
+  const threadId = threadLinkId(path);
+  if (threadId) return { kind: "thread", threadId };
+  return floatPanelFor(window.location.pathname) ? { kind: "path", path } : null;
+}
+
 function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
-  const actions = experimental_useSidebarThreadActions();
-  const splitPath = useOpenInSplit();
-  const openFull = (split: boolean) => {
+  const { open, anchor } = useOpenTarget();
+  const move = (place: "main" | "split") => {
     // BB's own view takes over; the tab would only repeat it.
     update((next) => closeTab(next, active.key));
-    if (active.target.kind === "thread") actions.open(active.target.threadId, { split });
-    else if (split) splitPath.open(active.target.path);
-    else openAppPath(active.target.path);
+    open(active.target, place);
+  };
+  const main = mainTarget();
+  const swap = () => {
+    if (!main) return;
+    update((next) => replaceTab(next, active.key, main));
+    open(active.target, "main");
   };
   return (
     <>
-      {splitPath.element}
+      {anchor}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" aria-label="Floating tab actions" className={HEADER_BUTTON}>
@@ -267,12 +315,17 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-64">
-          <DropdownMenuItem onSelect={() => openFull(false)}>
-            <Icon name="Maximize2" className="size-4" /> Open full
+          <DropdownMenuItem onSelect={() => move("main")}>
+            <Icon name="Maximize2" className="size-4" /> Move to main view
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => openFull(true)}>
-            <Icon name="Columns2" className="size-4" /> Open in split
+          <DropdownMenuItem onSelect={() => move("split")}>
+            <Icon name="Columns2" className="size-4" /> Move to split
           </DropdownMenuItem>
+          {main && floatWindowKey(main) !== active.key ? (
+            <DropdownMenuItem onSelect={swap}>
+              <Icon name="ArrowLeftRight" fallback="Repeat" className="size-4" /> Swap with main view
+            </DropdownMenuItem>
+          ) : null}
           {state.place.kind === "free" ? (
             <DropdownMenuItem onSelect={() => update((next) => placeAt(next, { kind: "dock" }))}>
               <Icon name="PanelBottom" fallback="ArrowDownToLine" className="size-4" /> Dock at the bottom
@@ -490,6 +543,11 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           }}
         >
           <Icon name="GripVertical" fallback="MoreVertical" className="size-4 shrink-0 text-muted-foreground/60" aria-hidden />
+          {active.back?.length && !state.collapsed ? (
+            <button type="button" aria-label="Back" title="Back" className={HEADER_BUTTON} onClick={() => update((next) => goBack(next, active.key))}>
+              <Icon name="ChevronLeft" className="size-4" />
+            </button>
+          ) : null}
           <TabStrip state={state} />
           <button
             type="button"
@@ -502,9 +560,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           <TabMenu state={state} active={active} />
         </header>
         {state.collapsed ? null : (
-          <div key={active.key} data-float-window={active.key} className="flex min-h-0 flex-1 flex-col">
-            {active.target.kind === "thread" ? <ThreadBody tab={active} threadId={active.target.threadId} /> : <PathBody tab={active} />}
-          </div>
+          <TabWindow key={active.key} tab={active} />
         )}
       </section>
     </>

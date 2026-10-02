@@ -1,10 +1,10 @@
 import { errorMessage } from "@bb-studio/kit/format";
-import { AddOnCollection, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, navigateFromFloat, openAppPath, studioPath, useStudioPresent, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
-import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
+import { PLUGIN_ID, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract, StudioEmbedItem } from "../contract";
 import { PagesUiContext, type PagesUi } from "./context";
 import { PageView } from "./PageView";
@@ -49,14 +49,17 @@ export function usePagesData(rpc: Rpc) {
 /** What the page's blocks and mentions need to open things, shared by every view of a page. */
 export function usePagesUiValue(rpc: Rpc, pages: PageMetaView[] | null, bots: BotsState): PagesUi {
   const navigate = useBbNavigate();
-  const openPage = useCallback((id: string) => navigate.toPluginPanel("pages", { subPath: id }), [navigate]);
+  // Through openAppPath, so a page opened from a floating tab opens in that tab.
+  const openPage = useCallback((id: string) => openAppPath(`/plugins/${PLUGIN_ID}/pages/${id}`), []);
   const studioItems = useRef<{ at: number; items: Promise<StudioEmbedItem[]> } | null>(null);
   return useMemo<PagesUi>(
     () => ({
       pages: pages ?? [],
       bots: bots.bots,
       openPage,
-      openThread: (threadId) => navigate.toThread(threadId),
+      openThread: (threadId) => {
+        if (!navigateFromFloat({ kind: "thread", threadId })) navigate.toThread(threadId);
+      },
       openProject: (projectId) => navigate.toProject(projectId),
       openUrl: (url) => {
         if (!navigate.openUrl(url)) window.open(url, "_blank", "noopener");
