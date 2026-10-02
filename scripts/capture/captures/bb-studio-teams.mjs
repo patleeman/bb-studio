@@ -46,6 +46,8 @@ export default ({pluginRpc, launchRoomThread, getLaunchRoomId}) => [
     if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error("Compact composer is offscreen");
     const reply=[...document.querySelectorAll('[data-view-entry="assistant"]')].at(-1);
     const timeline=reply?.closest('[data-thread-view]')?.querySelector('[data-view-timeline]');
+    const controls=document.querySelector(".view-controls");
+    if(!controls||!timeline||timeline.getBoundingClientRect().top<controls.getBoundingClientRect().bottom-1)throw new Error("View controls overlap the timeline");
     if(!reply||!timeline||reply.getBoundingClientRect().bottom>timeline.getBoundingClientRect().bottom+1)throw new Error("Latest reply is hidden beneath the composer");
    })()`);
    return ()=>client.command("Emulation.setDeviceMetricsOverride",{width:1440,height:1000,deviceScaleFactor:1,mobile:false});
