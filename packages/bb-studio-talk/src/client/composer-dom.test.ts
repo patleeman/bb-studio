@@ -25,7 +25,7 @@ function composer() {
 const recording = { id: "rec_aaaaaaaa", title: "Brain dump", kind: "dictation" as const };
 
 describe("dictation source delivery", () => {
-  it("targets the same composer with a native reference and an audio link", async () => {
+  it("targets the same composer with only a native reference", async () => {
     const target = composer();
     const elsewhere = document.createElement("form"); document.body.append(elsewhere);
     const wrong = vi.fn(); elsewhere.addEventListener(COMPOSER_REFERENCE_EVENT, wrong);
@@ -35,7 +35,7 @@ describe("dictation source delivery", () => {
     });
     expect(await insertDictationIntoComposer(target, "My thought.", [recording])).toBe(true);
     expect(target.textContent).toContain("Existing draft. My thought.");
-    expect(target.textContent).toContain("[Open dictation](/plugins/talk/recordings/rec_aaaaaaaa)");
+    expect(target.textContent).toBe("Existing draft. My thought.");
     expect(references).toEqual([recording]); expect(wrong).not.toHaveBeenCalled();
   });
 

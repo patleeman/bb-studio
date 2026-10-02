@@ -117,14 +117,16 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep 
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         const mentionSelector = `[data-promptbox] [data-prompt-mention-resource*="${recordingId}"]`;
         await client.waitForSelector(mentionSelector);
+        if (await client.evaluate(`document.querySelector('[data-promptbox] [contenteditable="true"]').textContent.includes('/plugins/talk/recordings/')`)) throw new Error("Dictation injected a separate recording link into the draft.");
         const source = await client.evaluate(`JSON.parse(document.querySelector(${JSON.stringify(mentionSelector)}).getAttribute('data-prompt-mention-resource'))`);
         if (source?.pluginId !== "talk" || source.itemId !== `recordings:${recordingId}`) throw new Error("Recovered dictation did not attach its native Talk mention.");
         // The delivery toast otherwise covers the submit button while hovered.
         await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 1, y: 1, buttons: 0 });
         await sleep(5000);
         await client.clickAriaButtonWithPointer("Submit (Enter)");
-        const linkSelector = `a[href="/plugins/talk/recordings/${recordingId}"]`;
+        const linkSelector = `[data-talk-recording-link="/plugins/talk/recordings/${recordingId}"]`;
         await client.waitForSelector(linkSelector);
+        if (await client.evaluate(`!!document.querySelector('a[href="/plugins/talk/recordings/${recordingId}"]')`)) throw new Error("Dictation injected a separate recording link into the message.");
         await bbCli(["thread", "wait", threadId, "--timeout", "60s", "--json"]);
         const events = JSON.parse(await bbCli(["thread", "messages", threadId, "--json"]));
         const input = events.findLast(event => event.type === "client/turn/requested")?.data.input;
@@ -132,7 +134,7 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep 
         const reply = events.findLast(event => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
         if (!/import/i.test(reply) || !/stall|stuck|struggl|drop|abandon/i.test(reply)) throw new Error(`The agent did not receive the saved onboarding transcript: ${reply}`);
         await client.waitForText(reply.trim());
-        // The link must open the saved source and remain valid after Keep.
+        // The pill must open the saved source and remain valid after Keep.
         await client.evaluate(`document.querySelector(${JSON.stringify(linkSelector)}).click()`);
         await client.waitForSelector('input[aria-label="Title"]');
         await client.waitForText("Onboarding is the next focus");
@@ -145,11 +147,10 @@ export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep 
         await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
         await sleep(350);
         const fits = await client.evaluate(`(() => {
-          const link = document.querySelector(${JSON.stringify(linkSelector)}).getBoundingClientRect();
-          const mention = [...document.querySelectorAll('[data-prompt-mention]')].find(element => element.textContent.includes('Launch brain dump')).getBoundingClientRect();
-          return [link, mention].every(rect => rect.left >= 0 && rect.right <= innerWidth);
+          const pill = document.querySelector(${JSON.stringify(linkSelector)}).getBoundingClientRect();
+          return pill.left >= 0 && pill.right <= innerWidth;
         })()`);
-        if (!fits) throw new Error("Dictation source controls overflow the mobile message.");
+        if (!fits) throw new Error("Dictation source pill overflows the mobile message.");
         await client.capture(resolve("packages/bb-studio-talk/assets/dictation-message-mobile.png"));
         await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
         await client.evaluate(`document.querySelector('button[aria-label^="Toggle sidebar"]')?.click()`);

@@ -6,7 +6,7 @@
 //   lets other plugins' fields ask for dictation (src/client/fields.ts).
 // - Another watches the hold-to-talk key (src/client/hold-to-talk.ts).
 // - The Recordings nav panel lists recordings and is each recording's page.
-import { FloatPanels } from "@bb-studio/kit/app";
+import { FloatPanels, openAppPath } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { PANEL_PATH, TALK_ICON } from "./src/shared/format";
 import { interceptBuiltInMic, findComposer } from "./src/client/composer-dom";
@@ -16,8 +16,13 @@ import { watchHoldToTalk } from "./src/client/hold-to-talk";
 import { TalkOverlay } from "./src/client/overlay";
 import { RecordingsPanel } from "./src/client/recordings-panel";
 import { ComposerBridge } from "./src/client/ComposerBridge";
+import { linkRecordingMentions } from "./src/client/recording-mentions";
 
 export default definePluginApp((app) => {
+  app.contentScripts.register({
+    id: "recording-links",
+    mount({ signal }) { linkRecordingMentions(openAppPath, signal); },
+  });
   app.composer.customize({
     id: "recording-references",
     banners: [{ id: "bridge", chrome: "bare", component: ComposerBridge }],

@@ -137,10 +137,7 @@ export async function insertDictationIntoComposer(promptbox: HTMLElement | null,
     await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
     const event = new CustomEvent(COMPOSER_REFERENCE_EVENT, { bubbles: true, cancelable: true, detail: { recording } });
     promptbox?.dispatchEvent(event);
-    if (event.defaultPrevented) {
-      await new Promise<void>((resolve) => requestAnimationFrame(() => resolve()));
-      insertIntoComposer(promptbox, `\n\n${recordingLink(recording, recording.kind === "dictation" ? "Open dictation" : "Open recording")}`);
-    } else {
+    if (!event.defaultPrevented) {
       insertIntoComposer(promptbox, `\n\n${recordingLink(recording)}`);
     }
   }

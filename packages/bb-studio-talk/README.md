@@ -45,14 +45,14 @@ playback controls fit the screen.
 
 ![Dictated message with its saved Talk source](assets/dictation-message.png)
 
-The staged chat shows a dictated message with a native **Launch brain dump**
-mention and an **Open dictation** link. The capture checks recovered delivery,
-the agent's answer using the saved transcript, and the link to the source. It
+The staged chat shows a dictated message with a clickable **Launch brain dump**
+mention. The capture checks recovered delivery, the absence of an extra link,
+the agent's answer using the saved transcript, and the pill opening the source. It
 also checks that keeping the dictation as a recording preserves the reference.
 
 ![Dictated message and saved source on mobile](assets/dictation-message-mobile.png)
 
-The same message at a 390-pixel viewport, with both source controls in view.
+The same message at a 390-pixel viewport, with the source pill in view.
 
 ## What you get
 
@@ -60,10 +60,10 @@ The same message at a 390-pixel viewport, with both source controls in view.
   dictation. Pressing it again, or ✓ in the pill, stops recording, waits for
   the transcript, and types it into that composer. ✕ stops without inserting.
 - **The source stays with the message.** Chat dictation adds a native Talk
-  mention beside the text, attaching the saved item for the agent, and an
-  **Open dictation** link to the original Studio item. Both survive finishing
-  away from the thread and returning later. **Keep as a recording** preserves
-  the same link. Dictation into document fields inserts the text as usual.
+  mention beside the text, attaching the saved item for the agent. Click the
+  pill in the sent message to open the original Studio item. The reference
+  survives finishing away from the thread and returning later. **Keep as a
+  recording** preserves it. Dictation into document fields inserts the text as usual.
 - **One dictation, one thread.** While Talk is dictating, the mics in other
   threads are dimmed. Pressing one says where the dictation is, with a **Go
   back** button. The thread being dictated into shows a mic in the sidebar.
