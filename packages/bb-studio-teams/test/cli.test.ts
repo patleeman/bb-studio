@@ -122,6 +122,11 @@ test("CLI creates and patches profiles, preserves fields, and exposes its skill"
     const b = await x.create();
     assert.equal(b.intervalMinutes, 0);
     assert.match((await x.run(["mission", "@atlas"])).stdout, /Verify facts/);
+    await x.ok(["memory", "@atlas", "--text", "Remember the release window."]);
+    assert.equal((await x.run(["memory", "@atlas"])).stdout, "Remember the release window.");
+    const stale = await x.run(["memory", "@atlas", "--text", "Changed", "--version", "stale"]);
+    assert.equal(stale.exitCode, 1);
+    assert.match(stale.stderr ?? "", /changed/);
     const updated = botSchema.parse(
       await x.ok([
         "update",

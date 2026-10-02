@@ -69,7 +69,13 @@ export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: Plugin
           case "retire": case "restore": method = "retire"; input = { id: botId(), retired: command === "retire" }; break;
           case "wake": method = "wake"; input = { id: botId() }; break;
           case "message": method = "conversation"; input = { id: botId() }; break;
-          case "mission": case "memory": method = text === undefined ? "document" : "saveDocument"; input = { id: botId(), file: command === "mission" ? "MISSION.md" : "MEMORY.md", ...(text === undefined ? {} : { text, version: v.version }) }; break;
+          case "mission": case "memory": {
+            const documentInput = { id: botId(), file: command === "mission" ? "MISSION.md" as const : "MEMORY.md" as const };
+            method = text === undefined ? "document" : "saveDocument";
+            const version = text === undefined ? undefined : v.version ?? (await handlers.document(documentInput)).version;
+            input = { ...documentInput, ...(text === undefined ? {} : { text, version }) };
+            break;
+          }
           case "view-read": method = "view"; input = { id, ...parsed }; break;
           case "view-create": method = "viewCreate"; input = { ...parsed, name: v.name ?? parsed.name, members: v.members ? JSON.parse(v.members) : parsed.members ?? [], requestId: v["request-id"] ?? randomUUID() }; break;
           case "view-send": method = "viewSend"; input = { ...parsed, id, text: text ?? parsed.text, targets: v.targets ? JSON.parse(v.targets) : parsed.targets ?? [], requestId: v["request-id"] ?? randomUUID() }; if (context.threadId) throw new Error("Coordinate using bb thread tell with the owner's roster. View sends are owner addressing actions."); break;
