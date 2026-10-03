@@ -7,8 +7,9 @@ import { nativeRpcInventory } from "./native-rpc-inventory.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const check = process.argv.includes("--check");
-if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check")) {
-  throw new Error("Usage: pnpm gen:contracts [--check]");
+const schemasOnly = process.argv.includes("--schemas-only");
+if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check" && arg !== "--schemas-only")) {
+  throw new Error("Usage: pnpm gen:contracts [--check] [--schemas-only]");
 }
 
 const plugins = [
@@ -150,7 +151,7 @@ for (const [pluginId, namespace, path, exportName] of plugins) {
   const document = { pluginId, methods, ...(pluginId === "studio" ? { StudioItem: item } : {}) };
   documents.set(pluginId, { namespace, ...document });
   await output(`contracts/${pluginId}.schema.json`, `${JSON.stringify(document, null, 2)}\n`);
-  await output(`apps/ios/Shared/Generated/${namespace}Contract.swift`, swiftSource(namespace, document.methods, document.StudioItem));
+  if (!schemasOnly) await output(`apps/ios/Shared/Generated/${namespace}Contract.swift`, swiftSource(namespace, document.methods, document.StudioItem));
   console.log(`${check ? "Checked" : "Generated"} ${pluginId}: ${Object.keys(document.methods).length} methods`);
 }
 const native = await nativeRpcInventory(root, documents);
