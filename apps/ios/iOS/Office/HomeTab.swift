@@ -1,24 +1,20 @@
 import SwiftUI
 
-/// Home of the current Space: start work or hand it off, then what needs you,
-/// what the team is doing, and what came back.
-struct HomeTab: View {
-    @EnvironmentObject private var app: AppModel
+/// Home of the current Space, opened from Tabs: start work or hand it off,
+/// then what needs you, what the team is doing, and what came back.
+struct OfficeHomeScreen: View {
     @Environment(OfficeContext.self) private var office
 
     var body: some View {
-        NavigationStack(path: $app.homePath) {
-            Group {
-                if let home = office.home {
-                    HomeList(store: home)
-                } else {
-                    ProgressView()
-                }
+        Group {
+            if let home = office.home {
+                HomeList(store: home)
+            } else {
+                ProgressView()
             }
-            .toolbar { ToolbarItem(placement: .principal) { SpaceSwitcher() } }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
         }
+        .navigationTitle("Home")
+        .navigationBarTitleDisplayMode(.inline)
     }
 }
 

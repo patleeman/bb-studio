@@ -135,21 +135,36 @@ extension Face {
     }
 }
 
-/// The Space's mark: its emoji, or its initial on a rounded tile.
+/// The Space's mark, like an Arc Space's: its emoji on a soft circle of its
+/// color, or a dot of that color when it has no emoji.
 struct SpaceMark: View {
     var space: OfficeSpace
     var size: CGFloat = 22
 
     var body: some View {
-        RoundedRectangle(cornerRadius: size * 0.25)
-            .fill(Color(.tertiarySystemFill))
-            .frame(width: size, height: size)
-            .overlay {
-                Text(space.icon?.isEmpty == false ? space.icon! : String(space.name.prefix(1)).uppercased())
-                    .font(.system(size: size * 0.6, weight: .semibold))
-                    .foregroundStyle(.primary)
+        let color = space.tint
+        Group {
+            if let icon = space.icon, !icon.isEmpty {
+                Circle()
+                    .fill(color.opacity(0.3))
+                    .overlay { Text(icon).font(.system(size: size * 0.6)) }
+            } else {
+                Circle()
+                    .fill(color.opacity(0.3))
+                    .overlay { Circle().fill(color).padding(size * 0.3) }
             }
-            .accessibilityHidden(true)
+        }
+        .frame(width: size, height: size)
+        .accessibilityHidden(true)
+    }
+}
+
+extension OfficeSpace {
+    /// The Space's color, from its "#rrggbb"; the stock blue for older servers.
+    var tint: Color {
+        let hex = (color ?? "#3b82f6").dropFirst()
+        guard hex.count == 6, let value = UInt32(hex, radix: 16) else { return .blue }
+        return Color(red: Double((value >> 16) & 0xff) / 255, green: Double((value >> 8) & 0xff) / 255, blue: Double(value & 0xff) / 255)
     }
 }
 

@@ -27,6 +27,10 @@ enum Route: Hashable {
     case studioCollection
     /// A bot's desk in the office: its DM, tasks and profile.
     case botDesk(id: String)
+    /// The Space's Home: what needs you, what the team is doing, what came back.
+    case officeHome
+    /// The Space's bots and conversations.
+    case officeTeam
 }
 
 extension Route {
@@ -85,8 +89,10 @@ enum Sheet: Identifiable, Hashable {
 
 /// The office: Inbox (every Space), then the current Space's Home, Work and
 /// Team. See docs/office-model.md.
+/// Inbox (every Space), the current Space's tabs, and Settings. Home, Work
+/// and Team folded into Tabs: bots and Home open from there or from search.
 enum Tab: Hashable {
-    case inbox, home, work, team, settings
+    case inbox, tabs, settings
 }
 
 @MainActor
@@ -95,12 +101,10 @@ final class AppModel: ObservableObject {
 
     @Published private(set) var client: BBClient
     @Published private(set) var realtime: BBRealtime
-    @Published var tab: Tab = .home
-    /// Work's stack: threads and items open here unless another tab is showing.
+    @Published var tab: Tab = .tabs
+    /// The Tabs stack: threads and items open here unless another tab is showing.
     @Published var path: [Route] = []
     @Published var inboxPath: [Route] = []
-    @Published var homePath: [Route] = []
-    @Published var teamPath: [Route] = []
     /// Studio used to be its own tab; its routes now open in Work.
     var studioPath: [Route] {
         get { path }
@@ -135,8 +139,7 @@ final class AppModel: ObservableObject {
         // `simctl launch <device> nyc.plee.bbgo -officeTab work` opens a tab, for screenshots.
         switch UserDefaults.standard.string(forKey: "officeTab") {
         case "inbox": tab = .inbox
-        case "work": tab = .work
-        case "team": tab = .team
+        case "tabs", "work", "team", "home": tab = .tabs
         case "settings": tab = .settings
         default: break
         }
@@ -170,8 +173,6 @@ final class AppModel: ObservableObject {
         flushOutboxOnConnect()
         path = []
         inboxPath = []
-        homePath = []
-        teamPath = []
         lastThreadId = ""
         newThreadDraft = nil
         replyThreadId = nil
@@ -235,32 +236,31 @@ final class AppModel: ObservableObject {
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "inbox": tab = .inbox
-        case "work": tab = .work
-        case "team": tab = .team
+        case "tabs", "work", "team", "home": tab = .tabs
         case "web", "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.
-        default: tab = .home
+        default: tab = .tabs
         }
     }
 
     func newThread(text: String = "") {
-        if tab == .inbox || tab == .settings { tab = .work }
+        if tab == .inbox || tab == .settings { tab = .tabs }
         newThreadDraft = text
     }
 
     func openThread(_ id: String) {
-        tab = .work
+        tab = .tabs
         path = [.thread(id: id)]
     }
 
     func open(_ route: Route) {
-        tab = .work
+        tab = .tabs
         path = [route]
     }
 
     /// Over the feed, so Back reads the rest of it.
     func openFeedPost(_ id: String) {
-        tab = .work
+        tab = .tabs
         path = [.feed, .feedPost(id: id)]
     }
 
@@ -268,11 +268,9 @@ final class AppModel: ObservableObject {
     func push(_ route: Route) {
         switch tab {
         case .inbox: inboxPath.append(route)
-        case .home: homePath.append(route)
-        case .team: teamPath.append(route)
-        case .work: path.append(route)
+        case .tabs: path.append(route)
         case .settings:
-            tab = .work
+            tab = .tabs
             path.append(route)
         }
     }
@@ -292,7 +290,7 @@ final class AppModel: ObservableObject {
     }
 
     func openStudio(kind: String?, _ route: Route? = nil) {
-        tab = .work
+        tab = .tabs
         if let kind { studioKind = kind }
         path = [route ?? .studioCollection]
     }
@@ -310,7 +308,7 @@ final class AppModel: ObservableObject {
 
     func startVoiceChat(threadId: String? = nil) {
         guard let id = threadId ?? (lastThreadId.isEmpty ? nil : lastThreadId) else {
-            tab = .work
+            tab = .tabs
             return
         }
         sheet = .voiceChat(threadId: id)

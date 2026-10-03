@@ -1,33 +1,30 @@
 import SwiftUI
 
-/// Who you work with in this Space: bots as faces, then the conversations you
-/// have with them. A face opens the bot's desk; a channel opens the channel.
-struct TeamTab: View {
-    @EnvironmentObject private var app: AppModel
+/// Who you work with in this Space, opened from Tabs: bots as faces, then the
+/// conversations you have with them. A face opens the bot's desk; a channel
+/// opens the channel.
+struct OfficeTeamScreen: View {
     @Environment(OfficeContext.self) private var office
     @State private var adding = false
 
     var body: some View {
-        NavigationStack(path: $app.teamPath) {
-            Group {
-                if let team = office.team {
-                    TeamList(store: team)
-                } else {
-                    ProgressView()
-                }
+        Group {
+            if let team = office.team {
+                TeamList(store: team)
+            } else {
+                ProgressView()
             }
-            .toolbar {
-                ToolbarItem(placement: .principal) { SpaceSwitcher() }
-                ToolbarItem(placement: .topBarTrailing) {
-                    Button { adding = true } label: { Label("Add a Bot", systemImage: "person.badge.plus") }
-                        .disabled(office.currentSpace == nil)
-                }
+        }
+        .navigationTitle("Team")
+        .navigationBarTitleDisplayMode(.inline)
+        .toolbar {
+            ToolbarItem(placement: .topBarTrailing) {
+                Button { adding = true } label: { Label("Add a Bot", systemImage: "person.badge.plus") }
+                    .disabled(office.currentSpace == nil)
             }
-            .navigationBarTitleDisplayMode(.inline)
-            .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-            .sheet(isPresented: $adding) {
-                if let space = office.currentSpace { AddBotSheet(space: space) }
-            }
+        }
+        .sheet(isPresented: $adding) {
+            if let space = office.currentSpace { AddBotSheet(space: space) }
         }
     }
 }
@@ -133,7 +130,7 @@ private struct TeamList: View {
                             // Several links in one List row would all fire on a tap, so each
                             // face is its own borderless button that pushes its desk.
                             Button {
-                                app.teamPath.append(.botDesk(id: bot.id))
+                                app.push(.botDesk(id: bot.id))
                             } label: {
                                 VStack(spacing: 6) {
                                     Face(bot, size: 52)
