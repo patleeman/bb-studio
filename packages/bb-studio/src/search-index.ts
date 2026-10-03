@@ -46,8 +46,11 @@ type Row = { plugin_id: string; item_id: string; kind: string; project_id: strin
 
 export class SearchIndex {
   private ready = false;
+  private started = false;
   private initializing: Promise<void> | null = null;
   private syncing: Promise<void> = Promise.resolve();
+  /** Providers whose last snapshot or content read was incomplete. */
+  private readonly pending = new Set<string>();
 
   constructor(private readonly db: Database.Database, private readonly hub: StudioHub) {}
 
@@ -57,31 +60,71 @@ export class SearchIndex {
       .run(item.pluginId, item.id, item.kind, item.projectId, item.href, item.updatedAt, item.title, body);
   }
 
-  private async content(item: HubItem, v2: boolean): Promise<string> {
-    if (!v2) return "";
-    return (await this.hub.call(item.pluginId, "studio_read", { id: item.id, format: "text" }).catch(() => ({ content: null }))).content ?? "";
+  private async content(item: HubItem, v2: boolean): Promise<string | null> {
+    if (!v2 || item.archived) return "";
+    try {
+      return (await this.hub.call(item.pluginId, "studio_read", { id: item.id, format: "text" })).content ?? "";
+    } catch {
+      this.pending.add(item.pluginId);
+      return null;
+    }
   }
 
   private async add(items: HubItem[], versions: Map<string, boolean>): Promise<void> {
     for (let at = 0; at < items.length; at += 8) {
       const batch = items.slice(at, at + 8);
       const bodies = await Promise.all(batch.map((item) => this.content(item, versions.get(item.pluginId) ?? false)));
-      this.db.transaction(() => batch.forEach((item, i) => this.put(item, bodies[i]!)))();
+      this.db.transaction(() => batch.forEach((item, i) => {
+        // Keep the last searchable body through a temporary read failure.
+        const previous = bodies[i] === null
+          ? this.db.prepare("SELECT body FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").get(item.pluginId, item.id) as { body: string } | undefined
+          : undefined;
+        this.put(item, bodies[i] ?? previous?.body ?? "");
+      }))();
     }
   }
 
   async rebuild(): Promise<number> {
+    this.started = true;
+    let count = 0;
+    await this.queue(async () => { count = await this.reconcile(); });
+    return count;
+  }
+
+  private async reconcile(only?: ReadonlySet<string>): Promise<number> {
     const result = await this.hub.overview();
     const versions = new Map(result.providers.map((provider) => [provider.pluginId, this.hub.version(provider.pluginId) === 2]));
-    this.db.exec("DELETE FROM studio_search_fts");
-    await this.add(result.items, versions);
+    const installed = new Set(result.providers.map((provider) => provider.pluginId));
+    const stored = this.db.prepare("SELECT DISTINCT plugin_id FROM studio_search_fts").all() as { plugin_id: string }[];
+    for (const { plugin_id: pluginId } of stored) {
+      if ((!only || only.has(pluginId)) && !installed.has(pluginId)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ?").run(pluginId);
+    }
+    for (const pluginId of this.pending) if (!installed.has(pluginId)) this.pending.delete(pluginId);
+    for (const provider of result.providers) {
+      const pluginId = provider.pluginId;
+      if (only && !only.has(pluginId)) continue;
+      if (provider.state !== "ready") { this.pending.add(pluginId); continue; }
+      this.pending.delete(pluginId);
+      const items = result.items.filter((item) => item.pluginId === pluginId);
+      if (result.truncated.has(pluginId)) this.pending.add(pluginId);
+      else {
+        const live = new Set(items.map((item) => item.id));
+        const rows = this.db.prepare("SELECT item_id FROM studio_search_fts WHERE plugin_id = ?").all(pluginId) as { item_id: string }[];
+        const remove = this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?");
+        this.db.transaction(() => { for (const row of rows) if (!live.has(row.item_id)) remove.run(pluginId, row.item_id); })();
+      }
+      await this.add(items, versions);
+    }
     this.ready = true;
     return result.items.length;
   }
 
   async ensure(): Promise<void> {
-    if (!this.ready) await (this.initializing ??= this.queue(() => this.rebuild().then(() => {})).finally(() => { this.initializing = null; }));
-    else await this.syncing;
+    if (!this.ready) await (this.initializing ??= this.rebuild().then(() => {}).finally(() => { this.initializing = null; }));
+    else if (this.pending.size) await this.queue(() => this.reconcile(new Set(this.pending)).then(() => {}));
+    // Events received while initialization read provider content follow that
+    // snapshot in the same queue. The first search must wait for their replay.
+    await this.syncing;
   }
 
   private queue(work: () => Promise<void>): Promise<void> {
@@ -90,15 +133,26 @@ export class SearchIndex {
   }
 
   changed(pluginId: string, ids?: string[], removed?: string[]): Promise<void> {
-    if (!this.ready) return Promise.resolve();
+    if (!this.started) return Promise.resolve();
     return this.queue(async () => {
-      if (!ids && !removed) { await this.rebuild(); return; }
+      if (!ids && !removed) { await this.reconcile(); return; }
       for (const id of removed ?? []) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
       if (ids?.length) {
-        const found = await this.hub.get(pluginId, ids);
-        const live = new Set(found.map((item) => item.id));
-        for (const id of ids) if (!live.has(id)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
-        await this.add(found, new Map([[pluginId, this.hub.version(pluginId) === 2]]));
+        // get() deliberately returns [] for offline providers; that must not
+        // be mistaken for confirmation that the items were deleted.
+        try {
+          const provider = (await this.hub.providers()).find((entry) => entry.pluginId === pluginId);
+          if (provider?.state !== "ready") { this.pending.add(pluginId); return; }
+          const v2 = this.hub.version(pluginId) === 2;
+          const result = v2 ? await this.hub.call(pluginId, "studio_get", { ids }) : await this.hub.call(pluginId, "studio_list", null);
+          const found = result.items.filter((item) => ids.includes(item.id)).map((item) => ({ ...item, pluginId }));
+          const live = new Set(found.map((item) => item.id));
+          if ("truncated" in result && result.truncated) this.pending.add(pluginId);
+          else for (const id of ids) if (!live.has(id)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
+          await this.add(found, new Map([[pluginId, v2]]));
+        } catch {
+          this.pending.add(pluginId);
+        }
       }
     });
   }
