@@ -3,17 +3,15 @@ import UIKit
 
 /// Opt-in native previews against the isolated staged BB; never launch on a default origin.
 final class ArtifactRuntimeUITests: XCTestCase {
-    private var origin: String {
-        ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES"
-            ? "http://127.0.0.1:49626" : "http://127.0.0.1:49486"
-    }
+    private var origin: String { ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_SERVER_URL"] ?? "http://127.0.0.1:1" }
     private var fixtures: [String: [String: Any]] = [:]
     private var baseline: Bool { ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_BASELINE"] == "YES" }
 
     override func setUpWithError() throws {
         continueAfterFailure = false
         let env = ProcessInfo.processInfo.environment
-        guard env["BB_ARTIFACT_QA_SERVER_URL"] == origin, env["BB_ARTIFACT_QA_PRIVATE_SIM"] == "YES",
+        guard StagedFixture.isIsolated, env["BB_ARTIFACT_QA_EDGE"] == "YES",
+              let url = URL(string: origin), url.host == "127.0.0.1", url.port != nil, url.port != 1, url.port != 38886,
               let json = env["BB_ARTIFACT_QA_FIXTURES"] else {
             throw XCTSkip("Requires exact staged origin, private simulator, and owned artifact fixtures before launch.")
         }
@@ -99,7 +97,10 @@ final class ArtifactRuntimeUITests: XCTestCase {
         capture(app, "missing-text-error")
         try restore("missingText")
         app.buttons["Retry"].tap()
-        XCTAssertTrue(app.staticTexts["Artifact Runtime recovered text 20261003"].waitForExistence(timeout: 15))
+        let payload = try XCTUnwrap(fixtures["missingText"]?["payload"] as? [String: Any])
+        let bytes = try XCTUnwrap(payload["bytes"] as? String)
+        let recovered = try XCTUnwrap(Data(base64Encoded: bytes).flatMap { String(data: $0, encoding: .utf8) })
+        XCTAssertTrue(app.staticTexts[recovered].waitForExistence(timeout: 15))
         capture(app, "recovered-text")
     }
 
@@ -146,7 +147,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testCorruptHeaderPDFShowsRecoveryAction() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        XCTAssertEqual(ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"], "YES", "Runner-owned fixture proxy")
         let app = try launch()
         defer { app.terminate() }
         try open("headerPDF", in: app)
@@ -164,7 +165,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testInitialLookupCanRetry() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        XCTAssertEqual(ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"], "YES", "Runner-owned fixture proxy")
         let app = try launch()
         defer { app.terminate() }
         try control("arm-lookup")
@@ -181,7 +182,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testDelayedVersionCannotReplaceSelection() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        XCTAssertEqual(ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"], "YES", "Runner-owned fixture proxy")
         let app = try launch()
         defer { app.terminate() }
         try control("arm-delay")
@@ -211,7 +212,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
     }
 
     func testLockedPDFOffersShare() throws {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        XCTAssertEqual(ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"], "YES", "Runner-owned fixture proxy")
         let app = try launch()
         defer { app.terminate() }
         try open("lockedPDF", in: app)
@@ -235,7 +236,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
 
     @discardableResult
     private func control(_ action: String) throws -> [String: Bool] {
-        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        XCTAssertEqual(ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"], "YES", "Runner-owned fixture proxy")
         let done = expectation(description: "Controlled edge response")
         var result: [String: Bool] = [:]
         URLSession.shared.dataTask(with: URL(string: origin + "/__edge/" + action)!) { data, response, error in

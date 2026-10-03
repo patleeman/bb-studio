@@ -252,5 +252,7 @@ is parsed through the server API before the tests start. The seed is reused
 on later runs against that staged project. The runner also builds the real Share host and enables all five system
 share-sheet tests, including an upload/send to the verified staged project.
 The Send test checks the server message and file, then deletes its new thread.
-Accessibility tests still require their own fixtures; a skip is not a pass for
+Artifact runtime tests also run automatically: the runner creates native-preview
+fixtures and an owned loopback proxy for lookup failure, delayed versions and
+recovery. The proxy stops when the runner exits. Accessibility tests still require their own fixtures; a skip is not a pass for
 those workflows.

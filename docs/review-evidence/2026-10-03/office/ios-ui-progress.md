@@ -326,3 +326,29 @@ the longer destination list. The final five-test run includes the scrolling and
 server assertions. Build, shell syntax, diff checks, and all seven stable plugin
 compatibility checks passed. Review and Artifact harness skips and the final
 fresh full-suite run remain.
+
+## Twelve Artifact runtime skips resolved
+
+The isolated runner now seeds the native artifact suite against the consolidated
+Studio API and staged artifacts database. A loopback proxy on an available port
+controls one failed lookup and an old-version response released after switching
+versions. Missing-content blobs are unique to this fixture run; only their
+known payloads may be restored through the proxy. Deletion through the proxy is
+limited to artifacts it created for restoration. The runner stops its proxy on
+exit. No production origin, historical project ID, or fixed review port is used.
+
+`/tmp/office-artifact-fixtures/results.xcresult`: all 12 tests ran, 11 passed and
+one failed because the recovered-text assertion still expected the old fixed
+text without the fixture's unique suffix. The assertion now compares against
+the exact seeded payload. `/tmp/office-artifact-recovery/results.xcresult` reran
+all three unavailable HTML/image/text recovery tests: 3 passed, 0 failures,
+0 skips. Every one of the 12 tests therefore has passing focused evidence.
+The final combined full-suite run is still required.
+
+The first run's proxy events prove old-response completion after version switch,
+newest-version clipboard bytes, newest-version shared bytes, and lookup failure
+then recovery. Exported image and PDF screenshots were visually inspected:
+the distinctive blue rectangle and PDF page text render. Additional proxy
+checks rejected unowned import/delete payloads with 403. Native builds, Python
+and shell syntax, diff checks, and all seven stable compatibility checks passed.
+Only the Review harness skip group remains before the final fresh full run.

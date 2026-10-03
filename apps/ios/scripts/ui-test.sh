@@ -17,13 +17,32 @@ assert any(p['id']==os.environ['BB_QA_PROJECT_ID'] for p in projects), 'Staged p
 PY
 run_dir="${BB_UI_TEST_RUN_DIR:-/tmp/bb-studio-ui-tests-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$run_dir"
-trap 'printf "UI test evidence: %s\n" "$run_dir"' EXIT
+artifact_proxy_pid=""
+cleanup() {
+  if [ -n "$artifact_proxy_pid" ]; then kill "$artifact_proxy_pid" 2>/dev/null || true; fi
+  printf 'UI test evidence: %s\n' "$run_dir"
+}
+trap cleanup EXIT
 if [ -n "${BB_QA_DATA_DIR:-}" ]; then
   node scripts/seed-ui-fixtures.mjs "$run_dir/fixture-inputs.json"
   BB_DATA_DIR="$BB_QA_DATA_DIR" BB_SERVER_URL="$BB_QA_SERVER_URL" \
     BB_CAPTURE_PROJECT_ID="$BB_QA_PROJECT_ID" BB_CAPTURE_THREAD_ID="$BBGO_QA_THREAD" \
     node --input-type=module -e 'const { seedOffice } = await import("../../scripts/capture/seed-office.mjs"); await seedOffice();'
   export BB_OFFICE_CAPTURE_DIR="$run_dir/office-captures"
+  export BB_ARTIFACT_QA_RUN_DIR="$run_dir/artifact-fixtures"
+  export BB_ARTIFACT_QA_DEVICE="$BB_TEST_SIMULATOR_ID"
+  mkdir -p "$BB_ARTIFACT_QA_RUN_DIR"
+  python3 scripts/seed-artifact-fixtures.py > "$run_dir/artifact-seed.log"
+  python3 scripts/artifact-fixture-proxy.py > "$run_dir/artifact-proxy.log" 2>&1 &
+  artifact_proxy_pid=$!
+  for attempt in {1..100}; do
+    [ -f "$BB_ARTIFACT_QA_RUN_DIR/proxy-origin" ] && break
+    kill -0 "$artifact_proxy_pid" || exit 1
+    sleep 0.1
+  done
+  export BB_ARTIFACT_QA_SERVER_URL=$(cat "$BB_ARTIFACT_QA_RUN_DIR/proxy-origin")
+  export BB_ARTIFACT_QA_EDGE=YES
+  export BB_ARTIFACT_QA_FIXTURES=$(cat "$BB_ARTIFACT_QA_RUN_DIR/fixtures.json")
 fi
 xcodegen generate -q
 for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
@@ -50,7 +69,7 @@ data=anchor(data)
 targets=[data['BBStudioUITests']] if 'BBStudioUITests' in data else [t for c in data['TestConfigurations'] for t in c['TestTargets'] if t['BlueprintName']=='BBStudioUITests']
 for target in targets:
  env=target.setdefault('EnvironmentVariables',{})
- env.update({k:v for k,v in os.environ.items() if k.startswith(('BB_QA_', 'BBGO_QA_', 'BB_OFFICE_CAPTURE_'))})
+ env.update({k:v for k,v in os.environ.items() if k.startswith(('BB_QA_', 'BBGO_QA_', 'BB_OFFICE_CAPTURE_', 'BB_ARTIFACT_QA_'))})
  fixture_inputs=sys.argv[1]+'/fixture-inputs.json'
  if os.path.exists(fixture_inputs):
   with open(fixture_inputs) as f: env.update(json.load(f))
