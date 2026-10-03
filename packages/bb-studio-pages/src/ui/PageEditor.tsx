@@ -170,6 +170,7 @@ export function PageEditor({
   const editor = useCreateBlockNote(
     withCollaboration({
       schema: pageSchema,
+      domAttributes: { editor: { "aria-label": "Page content" } },
       collaboration: {
         fragment: connection.doc.getXmlFragment(DOCUMENT_FRAGMENT),
         user: { name: "You", color: HUMAN_COLOR },
