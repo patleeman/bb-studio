@@ -68,10 +68,12 @@ Captured on stable BB 0.45.0 with the full suite installed from pushed commit ad
 The [Focus view](assets/channel-focus.png) keeps one transcript large and the other
 members in a rail. The [Active view](assets/channel-active.png) promotes a running
 thread, while the [phone grid](assets/channel-grid-mobile.png) stacks the transcripts
-above the shared composer.
+above the shared composer. [Phone Focus](assets/channel-focus-mobile.png) keeps
+the selected transcript below a compact member rail.
 
 These captures run in the full stable BB 0.45.0 application with Studio Teams
-installed from pushed commit 7edce33. Live assertions check native reaction rendering and reply routing,
+installed from pushed commit c93bd18. Live assertions check concise owner input
+without transport envelopes in Grid and phone Focus, native reaction rendering and reply routing,
 retention of the exact composer and its draft across all four views, and promotion
 and removal of a running thread in Active.
 

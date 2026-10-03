@@ -1,16 +1,25 @@
 // Exercise native transcripts through the full staged stable BB application.
 export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId, sleep }) => {
  let fixture;
+ const settleBots = async page => {
+  // Their fixed launch replies are already present. Freeze any remaining
+  // demo coordination so the Active check can start one known worker.
+  await Promise.all(page.threads.filter(thread => thread.botId).map(thread => bbCli(["thread", "stop", thread.id])));
+ };
  const seed = async () => {
   if (fixture) return fixture;
   const existing = (await pluginRpc("bot-teams", "views", {})).find(view => view.name === "Channel layouts" && !view.archived);
   if (existing) {
    const page = await pluginRpc("bot-teams", "view", { id: existing.id });
+   await settleBots(page);
    fixture = { id: existing.id, threadId: page.view.members.at(-1).id };
    return fixture;
   }
   await launchRoomThread();
   const launch = await pluginRpc("bot-teams", "view", { id: getLaunchRoomId() });
+  const brief = launch.entries.filter(entry => entry.role === "user" && entry.text.includes("Here's the ORBIT-42 launch brief."));
+  if (brief.length !== 1 || !brief[0].groupId) throw new Error("Hidden channel context lost merged receipt grouping");
+  await settleBots(launch);
   const thread = JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", "Release checklist", "--prompt", 'This is a deterministic UI fixture. Do not use tools or change files. Reply exactly with these two lines:\nThe launch checklist is ready.\n::reactions{items="✅ Approve|🔍 Review"}', "--json"]));
   await bbCli(["thread", "wait", thread.id, "--timeout", "1m"]);
   const members = [...launch.threads.filter(thread => !thread.parentThreadId).map(thread => ({ kind: "thread", id: thread.id })), { kind: "thread", id: thread.id }];
@@ -43,12 +52,19 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
   for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 4 });
   for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "Backspace", code: "Backspace", windowsVirtualKeyCode: 8 });
  };
+ const concise = client => client.evaluate(`(()=>{
+  const text=Array.from(document.querySelectorAll('[data-channel-thread]')).map(pane=>pane.innerText).join('\\n');
+  for(const marker of ['[Studio view message','[End owner message]','Channel: /plugins/bot-teams/','Recipients:','Recent channel replies (context'])if(text.includes(marker))throw new Error('Native transcript exposed transport context: '+marker);
+  if(!text.includes("Here's the ORBIT-42 launch brief."))throw new Error('Native transcript lost the owner request');
+ })()`);
  return [
   { id: "bots-grid", packageDir: "bb-studio-teams", fileName: "channel-grid.png", setup: guard(async client => {
    const data = await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
    await client.waitForText("The launch checklist is ready.");
    await client.waitForSelector(`[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"]`);
+   await client.waitForText("Ready. I checked the brief:");
+   await concise(client);
    await clearDraft(client);
    await client.command("Input.insertText", { text: "Keep this channel draft." });
    await client.evaluate("(()=>{window.channelCaptureComposer=document.querySelector('[data-view-composer] .ProseMirror');return true;})()");
@@ -94,7 +110,18 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
    await client.waitForText("Ready. I checked the brief:");
+   await concise(client);
    await client.evaluate("(()=>{if(document.documentElement.scrollWidth>innerWidth)throw new Error('Grid overflows the phone');const composer=document.querySelector('[data-view-composer]');if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error('Grid composer is offscreen');})()");
+   return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  }) },
+  { id: "bots-focus-mobile", packageDir: "bb-studio-teams", fileName: "channel-focus-mobile.png", privateSidebar: false, setup: guard(async client => {
+   await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+   await open(client, "grid");
+   await client.clickAriaButtonWithPointer("Focus Atlas");
+   await client.waitForSelector('[data-channel-layout="focus"]');
+   await client.waitForText("Ready. I checked the brief:");
+   await concise(client);
+   await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('[aria-label=\"Channel threads\"] button').length!==3)throw new Error('Phone focus lost its selected thread or member rail');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-view-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone focus exceeds the viewport');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
   { id: "bots-thread-drop", packageDir: "bb-studio-teams", fileName: "channel-thread-drop.png", showSidebar: true, setup: guard(async client => {
