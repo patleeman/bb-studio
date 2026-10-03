@@ -82,6 +82,20 @@ final class ReviewQualityUITests: XCTestCase {
         XCTAssertTrue(auditFindings.isEmpty, auditFindings.joined(separator: "\n"))
     }
 
+    /// The Library search placeholder must remain readable at both text sizes.
+    func testStudioSearchClippingAtBothTextSizes() throws {
+        for large in [false, true] {
+            let app = try diagnosticApplication(largeText: large)
+            defer { app.terminate() }
+            app.open(URL(string: "bbstudio://studio")!)
+            XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+            let search = app.descendants(matching: .any)["studioSearch"]
+            if !search.waitForExistence(timeout: 3) { app.swipeDown() }
+            XCTAssertTrue(search.waitForExistence(timeout: 10))
+            try captureNativeDiagnostic(app, "studio-search-" + (large ? "accessibility-xxxl" : "default"), audit: [.textClipped])
+        }
+    }
+
     func testStudioRowsAtAccessibilityText() throws {
         try verifyFixedControlViewers()
         let app = application(largeText: true)

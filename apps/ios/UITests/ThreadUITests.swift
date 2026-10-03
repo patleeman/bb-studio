@@ -305,7 +305,7 @@ final class ThreadUITests: XCTestCase {
             XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 5), "back from \(name)")
             app.buttons[chip].firstMatch.tap()
         }
-        let search = app.searchFields.firstMatch
+        let search = app.descendants(matching: .any)["studioSearch"]
         if !search.waitForExistence(timeout: 2) {
             app.collectionViews.firstMatch.swipeDown()
         }
@@ -1272,7 +1272,7 @@ final class ThreadUITests: XCTestCase {
         _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
         openStudioCollection()
-        let search = app.searchFields.firstMatch
+        let search = app.descendants(matching: .any)["studioSearch"]
         if !search.waitForExistence(timeout: 5) { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 10), "search field")
         search.tap()

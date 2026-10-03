@@ -385,6 +385,23 @@ struct StudioView: View {
 
     var body: some View {
         List(selection: $selection) {
+            HStack(alignment: .firstTextBaseline, spacing: 8) {
+                Image(systemName: "magnifyingglass").accessibilityHidden(true)
+                TextField("Search Studio", text: $query, axis: .vertical)
+                    .textInputAutocapitalization(.never)
+                    .autocorrectionDisabled()
+                    .accessibilityIdentifier("studioSearch")
+                    .fixedSize(horizontal: false, vertical: true)
+                if !query.isEmpty {
+                    Button { query = "" } label: {
+                        Image(systemName: "xmark.circle.fill")
+                            .frame(minWidth: 44, minHeight: 44)
+                    }
+                    .buttonStyle(.borderless)
+                    .accessibilityLabel("Clear search")
+                }
+            }
+            .foregroundStyle(.primary)
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(client) } }
             }
@@ -462,9 +479,6 @@ struct StudioView: View {
         .environment(\.editMode, $editMode)
         .navigationTitle(selecting ? (selection.isEmpty ? "Select Items" : "\(selection.count) Selected") : showArchived ? "Archived" : "Studio")
         .navigationBarTitleDisplayMode(selecting ? .inline : .automatic)
-        .searchable(text: $query, prompt: "Search Studio")
-        // Keep Select reachable, so search results can be acted on together.
-        .searchPresentationToolbarBehavior(.avoidHidingContent)
         .toolbar {
             if selecting {
                 ToolbarItem(placement: .topBarLeading) {
@@ -1257,7 +1271,7 @@ struct StudioRow: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(Color.primary.opacity(0.75))
+                .foregroundStyle(.primary)
             }
         }
         .padding(.vertical, 2)

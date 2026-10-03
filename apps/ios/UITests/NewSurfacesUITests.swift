@@ -33,9 +33,9 @@ final class NewSurfacesUITests: XCTestCase {
         shot(app, "search")
     }
 
-    /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
+    /// Search is the collection's first row and grows with Dynamic Type.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
-        let search = app.searchFields["Search"]
+        let search = app.descendants(matching: .any)["studioSearch"]
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         if !search.waitForExistence(timeout: 3) {
             let window = app.windows.firstMatch
@@ -90,7 +90,7 @@ final class NewSurfacesUITests: XCTestCase {
         addTeardownBlock { _ = self.rpc("studio", "tables_remove", ["id": id]) }
         let app = launch()
         openCollection(app)
-        let search = app.searchFields.firstMatch
+        let search = app.descendants(matching: .any)["studioSearch"]
         if !search.waitForExistence(timeout: 3) { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap(); search.typeText(title)
