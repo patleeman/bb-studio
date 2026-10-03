@@ -1,5 +1,9 @@
 # BB Studio codebase and product review — 2 October 2026
 
+This report records the first review pass. The repair goal remains active;
+see the [issue and evidence ledger](review-issues.md) for subsequent fixes and
+open verification. The priorities below describe findings at that checkpoint.
+
 BB Studio has a sound foundation for an agent workspace: plugins own durable
 items, ordinary BB threads perform the work, Studio connects and searches the
 items, and Feed reports outcomes. The shared kit, typed provider contracts,

@@ -135,6 +135,8 @@ See [`AGENTS.md`](AGENTS.md) for the SDK pinning, marketplace and screenshot
 rules, and [`docs/`](docs/) for the design notes.
 The [October 2026 codebase and product review](docs/codebase-review-2026-10-02.md)
 records verified fixes, plugin and mobile coverage, and remaining priorities.
+The active [issue and evidence ledger](docs/review-issues.md) tracks their fixes
+and the verification still required.
 
 ## License
 
