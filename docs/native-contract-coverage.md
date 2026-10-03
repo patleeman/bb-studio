@@ -22,6 +22,28 @@ The first inventory found a real drift: native Studio Chat called the removed
 `lastThread` method. It now calls `home` and reads `thread.threadId`, with a
 transport regression for linked and unlinked items.
 
+`pnpm check:native-payloads` validates 11 representative request/response
+fixtures against the generated plugin schemas. Six
+[`NativePayloadContractTests`](../apps/ios/Tests/NativePayloadContractTests.swift)
+then call the real Swift wrappers, decode their serialized transport requests,
+compare them with those same fixtures, and check response decoding:
+
+- Talk recording creation, audio segment upload and transcript reads.
+- Tasks creation, nullable handoff fields and integer reminder timestamps.
+- Bots document revision tokens and channel delivery failures.
+- Tables text, number, boolean, list, relation and null cell values.
+- Feed read state, priority and pagination; Studio Chat's start envelope.
+
+The reminder case reproduced a rejected native request: fractional epoch
+milliseconds violated Tasks' integer schema. The wrapper now rounds to the
+nearest millisecond before serialization. Existing Feed and Studio Chat tests
+also cover older responses and linked/unlinked items.
+
+These are transport fixtures, not live server integration or exhaustive method
+coverage. Both sides of each fixture are schema checked, but unrepresented
+optional fields, error responses and other methods still need coverage. Chat's
+host project-defaults lookup is stubbed separately from its plugin RPC.
+
 Remaining boundaries: host-bundled plugins such as Automations, push
 notifications, concurrency controls and the native thread list are maintained
 outside this repository. Their runtime compatibility still needs integration

@@ -14,10 +14,11 @@
     "test": "pnpm -r --if-present test",
     "check:docs": "node scripts/check-docs.mjs",
     "check:marketplace": "node scripts/check-marketplace.mjs",
-    "check": "pnpm typecheck && pnpm test && pnpm check:compat && pnpm check:docs && pnpm check:marketplace && pnpm check:contracts && pnpm check:kit",
+    "check": "pnpm typecheck && pnpm test && pnpm check:compat && pnpm check:docs && pnpm check:marketplace && pnpm check:contracts && pnpm check:native-payloads && pnpm check:kit",
     "gen:contracts": "tsx scripts/gen-contracts.mjs",
     "check:contracts": "tsx scripts/gen-contracts.mjs --check",
-    "check:kit": "sh scripts/pack-kit.sh --check"
+    "check:kit": "sh scripts/pack-kit.sh --check",
+    "check:native-payloads": "node scripts/check-native-payload-fixtures.mjs"
   },
   "devDependencies": {
     "ajv": "8.17.1",

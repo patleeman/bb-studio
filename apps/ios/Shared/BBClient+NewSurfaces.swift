@@ -42,7 +42,7 @@ extension BBClient {
             "id": .string(id), "priority": .string(priority),
             "labels": .array(labels.map(JSONValue.string)),
             "recurrence": recurrence.map(JSONValue.string) ?? .null,
-            "reminderAt": reminderAt.map { .number($0.timeIntervalSince1970 * 1000) } ?? .null,
+            "reminderAt": reminderAt.map { .number(($0.timeIntervalSince1970 * 1000).rounded()) } ?? .null,
         ])
     }
 
