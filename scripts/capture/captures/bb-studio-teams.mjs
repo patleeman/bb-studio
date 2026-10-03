@@ -15,10 +15,10 @@ export default context => {
   id:"bots-broadcasts",packageDir:"bb-studio-teams",fileName:"channel-broadcasts.png",
   setup:async client=>{
    await launchRoomThread();
-   const launch=await pluginRpc("bot-teams","view",{id:getLaunchRoomId()});
-   const view=await pluginRpc("bot-teams","viewCreate",{name:"Release review",members:launch.view.members,requestId:crypto.randomUUID()});
+   const launch=await pluginRpc("studio", "teams_view",{id:getLaunchRoomId()});
+   const view=await pluginRpc("studio", "teams_viewCreate",{name:"Release review",members:launch.view.members,requestId:crypto.randomUUID()});
    const id=view.id;
-   await client.navigate(`/plugins/bot-teams/channels/${id}`);
+   await client.navigate(`/plugins/studio/channels/${id}`);
    await client.waitForSelector('[data-view-composer] .ProseMirror');
    const key=async(k,code,vk)=>{for(const type of ["keyDown","keyUp"])await client.command("Input.dispatchKeyEvent",{type,key:k,code,windowsVirtualKeyCode:vk});};
    for(const handle of ["all","channel"]){
@@ -32,7 +32,7 @@ export default context => {
     await key("Enter","Enter",13);
     // The owner receipt appears only after the send succeeds. It must keep @.
     await client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+20000;const tick=()=>[...document.querySelectorAll('[data-view-entry="user"]')].some(e=>e.textContent.includes(${JSON.stringify(text)}))?resolve():Date.now()>end?reject(new Error("Broadcast send did not produce an owner receipt")):setTimeout(tick,200);tick();})`,true);
-    const page=await pluginRpc("bot-teams","view",{id});
+    const page=await pluginRpc("studio", "teams_view",{id});
     if(!page.entries.some(e=>e.role==="user"&&e.text.includes(`@${handle}`)&&e.text.includes(text)))throw new Error("Broadcast lost its @ on submit");
     for(const thread of page.threads.filter(t=>!t.parentThreadId)){
      await context.bbCli(["thread","wait",thread.id,"--timeout","1m"]);
@@ -52,8 +52,8 @@ export default context => {
   setup:async client=>{
    await launchRoomThread(); const id=getLaunchRoomId();
    // Channels used to live at /views/<id>; old links must land on the channel.
-   await client.navigate(`/plugins/bot-teams/views/${id}`);
-   await client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+15000;const tick=()=>location.pathname==="/plugins/bot-teams/channels/${id}"?resolve():Date.now()>end?reject(new Error("Old view link stayed at "+location.pathname)):setTimeout(tick,200);tick();})`,true);
+   await client.navigate(`/plugins/studio/views/${id}`);
+   await client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+15000;const tick=()=>location.pathname==="/plugins/studio/channels/${id}"?resolve():Date.now()>end?reject(new Error("Old view link stayed at "+location.pathname)):setTimeout(tick,200);tick();})`,true);
    await client.waitForSelector('[data-thread-view]');
    for(const text of launchRoomReplies)await client.waitForText(text);
    await client.evaluate(`(()=>{
@@ -84,9 +84,9 @@ export default context => {
  {
   id:"bots-profile",packageDir:"bb-studio-teams",fileName:"bot-profile.png",
   setup:async client=>{
-   const {bots}=await pluginRpc("bot-teams","list",null);const atlas=bots.find(b=>b.handle==="atlas");
+   const {bots}=await pluginRpc("studio", "teams_list",null);const atlas=bots.find(b=>b.handle==="atlas");
    if(!atlas)throw new Error("Missing staged Atlas");
-   await client.navigate(`/plugins/bot-teams/bots/${atlas.id}/profile`);
+   await client.navigate(`/plugins/studio/bots/${atlas.id}/profile`);
    await client.waitForText("Research and verify the facts");
   }
  },
@@ -95,11 +95,11 @@ export default context => {
   setup:async client=>{
    await launchRoomThread();
    await client.navigate("/plugins/studio/studio/view");
-   await client.waitForSelector(`[data-studio-item="/plugins/bot-teams/channels/${getLaunchRoomId()}"]`);
-   await client.evaluate(`document.querySelector('[data-studio-item="/plugins/bot-teams/channels/${getLaunchRoomId()}"]').click()`);
+   await client.waitForSelector(`[data-studio-item="/plugins/studio/channels/${getLaunchRoomId()}"]`);
+   await client.evaluate(`document.querySelector('[data-studio-item="/plugins/studio/channels/${getLaunchRoomId()}"]').click()`);
    await client.waitForSelector('[data-thread-view]');
    await client.waitForSelector('section[aria-label="Studio"]');
-   await client.waitForSelector(`section[aria-label="Studio"] a[href="/plugins/bot-teams/channels/${getLaunchRoomId()}"]`);
+   await client.waitForSelector(`section[aria-label="Studio"] a[href="/plugins/studio/channels/${getLaunchRoomId()}"]`);
    await client.evaluate(`(()=>{if(document.querySelector('section[aria-label="Views"]'))throw new Error("Saved views still have a separate sidebar section");})()`);
   }
  },
@@ -107,7 +107,7 @@ export default context => {
   id:"bots-mobile",packageDir:"bb-studio-teams",fileName:"staged-preview-mobile.png",privateSidebar:false,
   setup:async client=>{
    await client.command("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
-   await launchRoomThread();await client.navigate(`/plugins/bot-teams/channels/${getLaunchRoomId()}`);
+   await launchRoomThread();await client.navigate(`/plugins/studio/channels/${getLaunchRoomId()}`);
    await client.waitForSelector('[data-thread-view]');
    await client.waitForText("Logged: release check passed.");
    await client.evaluate(`(()=>{

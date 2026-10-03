@@ -5,7 +5,7 @@ import { z } from "zod";
 // Reads bots from the Studio Teams plugin over its published RPC. Pages works
 // without Studio Teams; bot features then report that it isn't installed.
 
-export const BOT_TEAMS_ID = "bot-teams";
+export const BOT_TEAMS_ID = "studio";
 const CACHE_MS = 15_000;
 
 const botListSchema = z.object({
@@ -112,7 +112,7 @@ export class BotDirectory {
   async conversationThread(botId: string): Promise<string> {
     const conversation = await this.bb.sdk.plugins.callRpc({
       pluginId: BOT_TEAMS_ID,
-      method: "conversation",
+      method: "teams_conversation",
       input: { id: botId },
       outputSchema: conversationSchema,
     });
@@ -133,7 +133,7 @@ export class BotDirectory {
     try {
       const result = await this.bb.sdk.plugins.callRpc({
         pluginId: BOT_TEAMS_ID,
-        method: "list",
+        method: "teams_list",
         input: null,
         outputSchema: botListSchema,
       });

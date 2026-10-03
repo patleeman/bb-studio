@@ -1,9 +1,9 @@
 /** Add an id only when its implementation moves into Studio. */
-export const absorbedPluginIds = ["studio-tables", "studio-chat", "feed", "studio-tasks"] as const;
+export const absorbedPluginIds = ["studio-tables", "studio-chat", "feed", "studio-tasks", "bot-teams"] as const;
 
 export function rewriteLegacyText(text: string, ids: readonly string[] = absorbedPluginIds): string {
   for (const id of ids) {
-    text = text.replaceAll(`/plugins/${id}/`, "/plugins/studio/");
+    text = text.replace(new RegExp(`(^|https?://[^/\\s]+|[\\s(\"'=<>])((?:/api(?:/v1)?)?/plugins/)${id}/`, "g"), "$1$2studio/");
     text = text.replace(new RegExp(`(^|[^a-zA-Z0-9_-])${id}:`, "g"), "$1studio:");
   }
   return text;

@@ -2,7 +2,7 @@
 // and in a thread working as a bot, in the ⋯ menu under it in a thread without one.
 export default ({ pluginRpc, projectId, threadId }) => {
  const atlas = async () => {
-  const bot = (await pluginRpc("bot-teams", "profiles", {})).find(b => b.handle === "atlas");
+  const bot = (await pluginRpc("studio", "teams_profiles", {})).find(b => b.handle === "atlas");
   if (!bot) throw new Error("Missing staged Atlas");
   return bot;
  };
@@ -18,20 +18,20 @@ export default ({ pluginRpc, projectId, threadId }) => {
  };
  return [
   {
-   id: "bots-composer-thread", packageDir: "bb-studio-teams", fileName: "composer-thread-bot.png", clip,
+   id: "bots-composer-thread", packageDir: "bb-studio/src/modules/teams", fileName: "composer-thread-bot.png", clip,
    setup: async client => {
     const bot = await atlas();
-    await pluginRpc("bot-teams", "setThreadProfile", { threadId, botId: null });
+    await pluginRpc("studio", "teams_setThreadProfile", { threadId, botId: null });
     await openThread(client);
     await wait(client, inMenu("Work as a bot"), "A thread without a bot doesn't keep Work as bot in the ⋯ menu");
-    await pluginRpc("bot-teams", "setThreadProfile", { threadId, botId: bot.id });
+    await pluginRpc("studio", "teams_setThreadProfile", { threadId, botId: bot.id });
     await openThread(client);
     await wait(client, inline(`Working as ${bot.name}`), "A thread working as a bot doesn't show it after the model picker");
-    return () => pluginRpc("bot-teams", "setThreadProfile", { threadId, botId: null });
+    return () => pluginRpc("studio", "teams_setThreadProfile", { threadId, botId: null });
    },
   },
   {
-   id: "bots-composer-new", packageDir: "bb-studio-teams", fileName: "composer-new-thread-bot.png", clip,
+   id: "bots-composer-new", packageDir: "bb-studio/src/modules/teams", fileName: "composer-new-thread-bot.png", clip,
    setup: async client => {
     const bot = await atlas();
     await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(`bb:bots:new-thread-profile:${projectId}`)})`).catch(() => {});
@@ -44,7 +44,7 @@ export default ({ pluginRpc, projectId, threadId }) => {
     await wait(client, inline(`Working as ${bot.name}`), "Picking a bot in a new thread didn't keep it after the model picker");
     await client.evaluate("document.activeElement?.blur()");
     return async () => {
-     await pluginRpc("bot-teams", "pendingThreadProfile", { projectId, botId: null });
+     await pluginRpc("studio", "teams_pendingThreadProfile", { projectId, botId: null });
      await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(`bb:bots:new-thread-profile:${projectId}`)})`);
     };
    },

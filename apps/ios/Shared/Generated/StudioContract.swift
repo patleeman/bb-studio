@@ -159,6 +159,39 @@ public enum Studio {
     public static let tasks_sendBack = "tasks_sendBack"
     public static let tasks_archiveThreads = "tasks_archiveThreads"
     public static let tasks_settings = "tasks_settings"
+    public static let teams_viewThreads = "teams_viewThreads"
+    public static let teams_views = "teams_views"
+    public static let teams_viewCreate = "teams_viewCreate"
+    public static let teams_viewUpdate = "teams_viewUpdate"
+    public static let teams_viewDelete = "teams_viewDelete"
+    public static let teams_view = "teams_view"
+    public static let teams_viewSend = "teams_viewSend"
+    public static let teams_list = "teams_list"
+    public static let teams_spaceConversations = "teams_spaceConversations"
+    public static let teams_createBotSetupThread = "teams_createBotSetupThread"
+    public static let teams_create = "teams_create"
+    public static let teams_resolveBotCreateRequest = "teams_resolveBotCreateRequest"
+    public static let teams_update = "teams_update"
+    public static let teams_swapModel = "teams_swapModel"
+    public static let teams_retire = "teams_retire"
+    public static let teams_retryJob = "teams_retryJob"
+    public static let teams_cancelJob = "teams_cancelJob"
+    public static let teams_profiles = "teams_profiles"
+    public static let teams_threadProfile = "teams_threadProfile"
+    public static let teams_threadBots = "teams_threadBots"
+    public static let teams_setThreadProfile = "teams_setThreadProfile"
+    public static let teams_pendingThreadProfile = "teams_pendingThreadProfile"
+    public static let teams_profileThreads = "teams_profileThreads"
+    public static let teams_documentHistory = "teams_documentHistory"
+    public static let teams_get = "teams_get"
+    public static let teams_document = "teams_document"
+    public static let teams_saveDocument = "teams_saveDocument"
+    public static let teams_wake = "teams_wake"
+    public static let teams_conversation = "teams_conversation"
+    public static let teams_newConversation = "teams_newConversation"
+    public static let teams_handoffSource = "teams_handoffSource"
+    public static let teams_usage = "teams_usage"
+    public static let teams_saveLimits = "teams_saveLimits"
   }
 
   public typealias Home = HomeOutput
@@ -506,6 +539,88 @@ public enum Studio {
   public typealias TasksSettingsInput = StudioJSONValue
 
   public typealias TasksSettings = TasksSettingsOutput
+
+  public typealias TeamsViewThreadsOutput = [TeamsViewThreadsOutputItem]
+
+  public typealias TeamsViewThreads = TeamsViewThreadsOutput
+
+  public typealias TeamsViewsOutput = [TeamsViewsOutputItem]
+
+  public typealias TeamsViews = TeamsViewsOutput
+
+  public typealias TeamsViewCreate = TeamsViewCreateOutput
+
+  public typealias TeamsViewUpdate = TeamsViewUpdateOutput
+
+  public typealias TeamsViewDelete = TeamsViewDeleteOutput
+
+  public typealias TeamsView = TeamsViewOutput
+
+  public typealias TeamsViewSend = TeamsViewSendOutput
+
+  public typealias TeamsListInput = StudioJSONValue
+
+  public typealias TeamsList = TeamsListOutput
+
+  public typealias TeamsSpaceConversationsInput = StudioJSONValue
+
+  public typealias TeamsSpaceConversations = TeamsSpaceConversationsOutput
+
+  public typealias TeamsCreateBotSetupThread = TeamsCreateBotSetupThreadOutput
+
+  public typealias TeamsCreate = TeamsCreateOutput
+
+  public typealias TeamsResolveBotCreateRequest = TeamsResolveBotCreateRequestOutput
+
+  public typealias TeamsUpdate = TeamsUpdateOutput
+
+  public typealias TeamsSwapModel = TeamsSwapModelOutput
+
+  public typealias TeamsRetire = TeamsRetireOutput
+
+  public typealias TeamsRetryJob = TeamsRetryJobOutput
+
+  public typealias TeamsCancelJob = TeamsCancelJobOutput
+
+  public typealias TeamsProfilesOutput = [TeamsProfilesOutputItem]
+
+  public typealias TeamsProfiles = TeamsProfilesOutput
+
+  public typealias TeamsThreadProfile = TeamsThreadProfileOutput
+
+  public typealias TeamsThreadBotsOutput = [TeamsThreadBotsOutputItem]
+
+  public typealias TeamsThreadBots = TeamsThreadBotsOutput
+
+  public typealias TeamsSetThreadProfile = TeamsSetThreadProfileOutput
+
+  public typealias TeamsPendingThreadProfile = TeamsPendingThreadProfileOutput
+
+  public typealias TeamsProfileThreadsOutput = [TeamsProfileThreadsOutputItem]
+
+  public typealias TeamsProfileThreads = TeamsProfileThreadsOutput
+
+  public typealias TeamsDocumentHistoryOutput = [TeamsDocumentHistoryOutputItem]
+
+  public typealias TeamsDocumentHistory = TeamsDocumentHistoryOutput
+
+  public typealias TeamsGet = TeamsGetOutput
+
+  public typealias TeamsDocument = TeamsDocumentOutput
+
+  public typealias TeamsSaveDocument = TeamsSaveDocumentOutput
+
+  public typealias TeamsWake = TeamsWakeOutput
+
+  public typealias TeamsConversation = TeamsConversationOutput
+
+  public typealias TeamsNewConversation = TeamsNewConversationOutput
+
+  public typealias TeamsHandoffSource = TeamsHandoffSourceOutput
+
+  public typealias TeamsUsage = TeamsUsageOutput
+
+  public typealias TeamsSaveLimits = TeamsSaveLimitsOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -13274,6 +13389,3673 @@ public enum Studio {
 
     public init(archiveThreadsOnDone: Bool? = nil) {
       self.archiveThreadsOnDone = archiveThreadsOnDone
+    }
+  }
+
+  public struct TeamsViewThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TeamsViewThreadsOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var botId: String?
+    public var parentThreadId: String?
+    public var status: String?
+    public var updatedAt: Double?
+    public var error: String?
+    public var hasPendingInteraction: Bool?
+
+    public init(id: String? = nil, title: String? = nil, botId: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.botId = botId
+      self.parentThreadId = parentThreadId
+      self.status = status
+      self.updatedAt = updatedAt
+      self.error = error
+      self.hasPendingInteraction = hasPendingInteraction
+    }
+  }
+
+  public struct TeamsViewsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct TeamsViewsOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.members = members
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TeamsViewCreateInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var requestId: String?
+
+    public init(name: String? = nil, members: [StudioJSONValue]? = nil, requestId: String? = nil) {
+      self.name = name
+      self.members = members
+      self.requestId = requestId
+    }
+  }
+
+  public struct TeamsViewCreateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.members = members
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TeamsViewUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var archived: Bool?
+    public var expectedUpdatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, expectedUpdatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.members = members
+      self.archived = archived
+      self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public struct TeamsViewUpdateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.members = members
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TeamsViewDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TeamsViewDeleteOutput: Sendable, Hashable, Codable {
+    public var deleted: Bool?
+
+    public init(deleted: Bool? = nil) {
+      self.deleted = deleted
+    }
+  }
+
+  public struct TeamsViewInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var before: Double?
+    public var beforeId: String?
+    public var limit: Int?
+
+    public init(id: String? = nil, before: Double? = nil, beforeId: String? = nil, limit: Int? = nil) {
+      self.id = id
+      self.before = before
+      self.beforeId = beforeId
+      self.limit = limit
+    }
+  }
+
+  public struct TeamsViewOutputView: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.members = members
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TeamsViewOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var botId: String?
+    public var parentThreadId: String?
+    public var status: String?
+    public var updatedAt: Double?
+    public var error: String?
+    public var hasPendingInteraction: Bool?
+
+    public init(id: String? = nil, title: String? = nil, botId: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.botId = botId
+      self.parentThreadId = parentThreadId
+      self.status = status
+      self.updatedAt = updatedAt
+      self.error = error
+      self.hasPendingInteraction = hasPendingInteraction
+    }
+  }
+
+  public enum TeamsViewOutputEntriesItemRole: Sendable, Hashable, Codable {
+    case user
+    case assistant
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "assistant": self = .assistant
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .assistant: try container.encode("assistant")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsViewOutputEntriesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var threadId: String?
+    public var role: TeamsViewOutputEntriesItemRole?
+    public var text: String?
+    public var createdAt: Double?
+    public var groupId: String?
+
+    public init(id: String? = nil, threadId: String? = nil, role: TeamsViewOutputEntriesItemRole? = nil, text: String? = nil, createdAt: Double? = nil, groupId: String? = nil) {
+      self.id = id
+      self.threadId = threadId
+      self.role = role
+      self.text = text
+      self.createdAt = createdAt
+      self.groupId = groupId
+    }
+  }
+
+  public struct TeamsViewOutput: Sendable, Hashable, Codable {
+    public var view: TeamsViewOutputView?
+    public var threads: [TeamsViewOutputThreadsItem]?
+    public var entries: [TeamsViewOutputEntriesItem]?
+    public var hasOlder: Bool?
+
+    public init(view: TeamsViewOutputView? = nil, threads: [TeamsViewOutputThreadsItem]? = nil, entries: [TeamsViewOutputEntriesItem]? = nil, hasOlder: Bool? = nil) {
+      self.view = view
+      self.threads = threads
+      self.entries = entries
+      self.hasOlder = hasOlder
+    }
+  }
+
+  public enum TeamsViewSendInputMode: Sendable, Hashable, Codable {
+    case auto
+    case steer
+    case followup
+    case fork
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "auto": self = .auto
+      case "steer": self = .steer
+      case "followup": self = .followup
+      case "fork": self = .fork
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .auto: try container.encode("auto")
+      case .steer: try container.encode("steer")
+      case .followup: try container.encode("followup")
+      case .fork: try container.encode("fork")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsViewSendInputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsViewSendInputMemberPermissionModesItemMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsViewSendInputMemberPermissionModesItem: Sendable, Hashable, Codable {
+    public var member: StudioJSONValue?
+    public var mode: TeamsViewSendInputMemberPermissionModesItemMode?
+
+    public init(member: StudioJSONValue? = nil, mode: TeamsViewSendInputMemberPermissionModesItemMode? = nil) {
+      self.member = member
+      self.mode = mode
+    }
+  }
+
+  public struct TeamsViewSendInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var requestId: String?
+    public var text: String?
+    public var attachments: [StudioJSONValue]?
+    public var targets: [StudioJSONValue]?
+    public var replyThreadId: String?
+    public var fresh: Bool?
+    public var mode: TeamsViewSendInputMode?
+    public var permissionMode: TeamsViewSendInputPermissionMode?
+    public var memberPermissionModes: [TeamsViewSendInputMemberPermissionModesItem]?
+
+    public init(id: String? = nil, requestId: String? = nil, text: String? = nil, attachments: [StudioJSONValue]? = nil, targets: [StudioJSONValue]? = nil, replyThreadId: String? = nil, fresh: Bool? = nil, mode: TeamsViewSendInputMode? = nil, permissionMode: TeamsViewSendInputPermissionMode? = nil, memberPermissionModes: [TeamsViewSendInputMemberPermissionModesItem]? = nil) {
+      self.id = id
+      self.requestId = requestId
+      self.text = text
+      self.attachments = attachments
+      self.targets = targets
+      self.replyThreadId = replyThreadId
+      self.fresh = fresh
+      self.mode = mode
+      self.permissionMode = permissionMode
+      self.memberPermissionModes = memberPermissionModes
+    }
+  }
+
+  public enum TeamsViewSendOutputDeliveriesItemStatus: Sendable, Hashable, Codable {
+    case sent
+    case queued
+    case error
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "sent": self = .sent
+      case "queued": self = .queued
+      case "error": self = .error
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .sent: try container.encode("sent")
+      case .queued: try container.encode("queued")
+      case .error: try container.encode("error")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsViewSendOutputDeliveriesItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var status: TeamsViewSendOutputDeliveriesItemStatus?
+    public var error: String?
+
+    public init(threadId: String? = nil, status: TeamsViewSendOutputDeliveriesItemStatus? = nil, error: String? = nil) {
+      self.threadId = threadId
+      self.status = status
+      self.error = error
+    }
+  }
+
+  public struct TeamsViewSendOutput: Sendable, Hashable, Codable {
+    public var requestId: String?
+    public var deliveries: [TeamsViewSendOutputDeliveriesItem]?
+
+    public init(requestId: String? = nil, deliveries: [TeamsViewSendOutputDeliveriesItem]? = nil) {
+      self.requestId = requestId
+      self.deliveries = deliveries
+    }
+  }
+
+  public struct TeamsListOutputBotsItemLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsListOutputBotsItemFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsListOutputBotsItemReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsListOutputBotsItemPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsListOutputBotsItem: Sendable, Hashable, Codable {
+    public var limits: TeamsListOutputBotsItemLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsListOutputBotsItemFallbackReasoningLevel?
+    public var reasoningLevel: TeamsListOutputBotsItemReasoningLevel?
+    public var permissionMode: TeamsListOutputBotsItemPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+    public var working: Bool?
+    public var lastActivityAt: Double?
+
+    public init(limits: TeamsListOutputBotsItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsListOutputBotsItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsListOutputBotsItemReasoningLevel? = nil, permissionMode: TeamsListOutputBotsItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil, working: Bool? = nil, lastActivityAt: Double? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+      self.working = working
+      self.lastActivityAt = lastActivityAt
+    }
+  }
+
+  public enum TeamsListOutputDirectThreadsValueIndicator: Sendable, Hashable, Codable {
+    case background_agent
+    case background_command
+    case draft
+    case goal
+    case none
+    case plan_mode
+    case queued_failed
+    case queued_waiting
+    case runtime
+    case unread_error
+    case unread_success
+    case waiting_for_input
+    case workflow
+    case working_draft
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "background-agent": self = .background_agent
+      case "background-command": self = .background_command
+      case "draft": self = .draft
+      case "goal": self = .goal
+      case "none": self = .none
+      case "plan-mode": self = .plan_mode
+      case "queued-failed": self = .queued_failed
+      case "queued-waiting": self = .queued_waiting
+      case "runtime": self = .runtime
+      case "unread-error": self = .unread_error
+      case "unread-success": self = .unread_success
+      case "waiting-for-input": self = .waiting_for_input
+      case "workflow": self = .workflow
+      case "working-draft": self = .working_draft
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .background_agent: try container.encode("background-agent")
+      case .background_command: try container.encode("background-command")
+      case .draft: try container.encode("draft")
+      case .goal: try container.encode("goal")
+      case .none: try container.encode("none")
+      case .plan_mode: try container.encode("plan-mode")
+      case .queued_failed: try container.encode("queued-failed")
+      case .queued_waiting: try container.encode("queued-waiting")
+      case .runtime: try container.encode("runtime")
+      case .unread_error: try container.encode("unread-error")
+      case .unread_success: try container.encode("unread-success")
+      case .waiting_for_input: try container.encode("waiting-for-input")
+      case .workflow: try container.encode("workflow")
+      case .working_draft: try container.encode("working-draft")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsListOutputDirectThreadsValueStatus: Sendable, Hashable, Codable {
+    case pending
+    case starting
+    case active
+    case stopping
+    case idle
+    case error
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "starting": self = .starting
+      case "active": self = .active
+      case "stopping": self = .stopping
+      case "idle": self = .idle
+      case "error": self = .error
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .starting: try container.encode("starting")
+      case .active: try container.encode("active")
+      case .stopping: try container.encode("stopping")
+      case .idle: try container.encode("idle")
+      case .error: try container.encode("error")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsListOutputDirectThreadsValue: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var indicator: TeamsListOutputDirectThreadsValueIndicator?
+    public var status: TeamsListOutputDirectThreadsValueStatus?
+
+    public init(threadId: String? = nil, indicator: TeamsListOutputDirectThreadsValueIndicator? = nil, status: TeamsListOutputDirectThreadsValueStatus? = nil) {
+      self.threadId = threadId
+      self.indicator = indicator
+      self.status = status
+    }
+  }
+
+  public enum TeamsListOutputDirectConversationsValueItemKind: Sendable, Hashable, Codable {
+    case admin
+    case group
+    case mission
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "admin": self = .admin
+      case "group": self = .group
+      case "mission": self = .mission
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .admin: try container.encode("admin")
+      case .group: try container.encode("group")
+      case .mission: try container.encode("mission")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsListOutputDirectConversationsValueItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var key: String?
+    public var threadId: String?
+    public var title: String?
+    public var kind: TeamsListOutputDirectConversationsValueItemKind?
+    public var createdAt: Double?
+    public var archivedAt: Double?
+    public var originalKey: String?
+    public var providerId: String?
+    public var model: String?
+
+    public init(id: String? = nil, botId: String? = nil, key: String? = nil, threadId: String? = nil, title: String? = nil, kind: TeamsListOutputDirectConversationsValueItemKind? = nil, createdAt: Double? = nil, archivedAt: Double? = nil, originalKey: String? = nil, providerId: String? = nil, model: String? = nil) {
+      self.id = id
+      self.botId = botId
+      self.key = key
+      self.threadId = threadId
+      self.title = title
+      self.kind = kind
+      self.createdAt = createdAt
+      self.archivedAt = archivedAt
+      self.originalKey = originalKey
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public struct TeamsListOutputDirectThreadInfoValue: Sendable, Hashable, Codable {
+    public var title: String?
+    public var projectId: String?
+    public var archivedAt: Double?
+    public var pinned: Bool?
+    public var unread: Bool?
+    public var sectionId: String?
+    public var updatedAt: Double?
+
+    public init(title: String? = nil, projectId: String? = nil, archivedAt: Double? = nil, pinned: Bool? = nil, unread: Bool? = nil, sectionId: String? = nil, updatedAt: Double? = nil) {
+      self.title = title
+      self.projectId = projectId
+      self.archivedAt = archivedAt
+      self.pinned = pinned
+      self.unread = unread
+      self.sectionId = sectionId
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TeamsListOutputBotCreateRequestsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var requesterBotId: String?
+    public var requesterName: String?
+    public var channelName: String?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: String?
+    public var permissionMode: String?
+    public var intervalMinutes: Double?
+    public var mission: String?
+    public var missionTruncated: Bool?
+    public var createdAt: Double?
+    public var expiresAt: Double?
+
+    public init(id: String? = nil, requesterBotId: String? = nil, requesterName: String? = nil, channelName: String? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: String? = nil, permissionMode: String? = nil, intervalMinutes: Double? = nil, mission: String? = nil, missionTruncated: Bool? = nil, createdAt: Double? = nil, expiresAt: Double? = nil) {
+      self.id = id
+      self.requesterBotId = requesterBotId
+      self.requesterName = requesterName
+      self.channelName = channelName
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.mission = mission
+      self.missionTruncated = missionTruncated
+      self.createdAt = createdAt
+      self.expiresAt = expiresAt
+    }
+  }
+
+  public struct TeamsListOutputViewsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var members: [StudioJSONValue]?
+    public var archived: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.members = members
+      self.archived = archived
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TeamsListOutput: Sendable, Hashable, Codable {
+    public var bots: [TeamsListOutputBotsItem]?
+    public var directThreads: [String: TeamsListOutputDirectThreadsValue]?
+    public var directConversations: [String: [TeamsListOutputDirectConversationsValueItem]]?
+    public var directThreadInfo: [String: TeamsListOutputDirectThreadInfoValue]?
+    public var botCreateRequests: [TeamsListOutputBotCreateRequestsItem]?
+    public var views: [TeamsListOutputViewsItem]?
+
+    public init(bots: [TeamsListOutputBotsItem]? = nil, directThreads: [String: TeamsListOutputDirectThreadsValue]? = nil, directConversations: [String: [TeamsListOutputDirectConversationsValueItem]]? = nil, directThreadInfo: [String: TeamsListOutputDirectThreadInfoValue]? = nil, botCreateRequests: [TeamsListOutputBotCreateRequestsItem]? = nil, views: [TeamsListOutputViewsItem]? = nil) {
+      self.bots = bots
+      self.directThreads = directThreads
+      self.directConversations = directConversations
+      self.directThreadInfo = directThreadInfo
+      self.botCreateRequests = botCreateRequests
+      self.views = views
+    }
+  }
+
+  public struct TeamsSpaceConversationsOutputDirectItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botName: String?
+
+    public init(threadId: String? = nil, botName: String? = nil) {
+      self.threadId = threadId
+      self.botName = botName
+    }
+  }
+
+  public struct TeamsSpaceConversationsOutput: Sendable, Hashable, Codable {
+    public var direct: [TeamsSpaceConversationsOutputDirectItem]?
+
+    public init(direct: [TeamsSpaceConversationsOutputDirectItem]? = nil) {
+      self.direct = direct
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateBotSetupThreadInputExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsCreateBotSetupThreadInputExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: TeamsCreateBotSetupThreadInputExecutionInputSourcesModel?
+    public var permissionMode: TeamsCreateBotSetupThreadInputExecutionInputSourcesPermissionMode?
+    public var providerId: TeamsCreateBotSetupThreadInputExecutionInputSourcesProviderId?
+    public var reasoningLevel: TeamsCreateBotSetupThreadInputExecutionInputSourcesReasoningLevel?
+    public var serviceTier: TeamsCreateBotSetupThreadInputExecutionInputSourcesServiceTier?
+
+    public init(model: TeamsCreateBotSetupThreadInputExecutionInputSourcesModel? = nil, permissionMode: TeamsCreateBotSetupThreadInputExecutionInputSourcesPermissionMode? = nil, providerId: TeamsCreateBotSetupThreadInputExecutionInputSourcesProviderId? = nil, reasoningLevel: TeamsCreateBotSetupThreadInputExecutionInputSourcesReasoningLevel? = nil, serviceTier: TeamsCreateBotSetupThreadInputExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct TeamsCreateBotSetupThreadInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TeamsCreateBotSetupThreadInputReasoningLevel?
+    public var permissionMode: TeamsCreateBotSetupThreadInputPermissionMode?
+    public var serviceTier: TeamsCreateBotSetupThreadInputServiceTier?
+    public var executionInputSources: TeamsCreateBotSetupThreadInputExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: TeamsCreateBotSetupThreadInputReasoningLevel? = nil, permissionMode: TeamsCreateBotSetupThreadInputPermissionMode? = nil, serviceTier: TeamsCreateBotSetupThreadInputServiceTier? = nil, executionInputSources: TeamsCreateBotSetupThreadInputExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct TeamsCreateBotSetupThreadOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct TeamsCreateInputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsCreateInputFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateInputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateInputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsCreateInput: Sendable, Hashable, Codable {
+    public var limits: TeamsCreateInputLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsCreateInputFallbackReasoningLevel?
+    public var reasoningLevel: TeamsCreateInputReasoningLevel?
+    public var permissionMode: TeamsCreateInputPermissionMode?
+    public var intervalMinutes: Int?
+    public var mission: String?
+
+    public init(limits: TeamsCreateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateInputReasoningLevel? = nil, permissionMode: TeamsCreateInputPermissionMode? = nil, intervalMinutes: Int? = nil, mission: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.mission = mission
+    }
+  }
+
+  public struct TeamsCreateOutputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsCreateOutputFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsCreateOutputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsCreateOutput: Sendable, Hashable, Codable {
+    public var limits: TeamsCreateOutputLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsCreateOutputFallbackReasoningLevel?
+    public var reasoningLevel: TeamsCreateOutputReasoningLevel?
+    public var permissionMode: TeamsCreateOutputPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: TeamsCreateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateOutputReasoningLevel? = nil, permissionMode: TeamsCreateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public struct TeamsResolveBotCreateRequestInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var approved: Bool?
+
+    public init(id: String? = nil, approved: Bool? = nil) {
+      self.id = id
+      self.approved = approved
+    }
+  }
+
+  public struct TeamsResolveBotCreateRequestOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TeamsUpdateInputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsUpdateInputFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsUpdateInputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsUpdateInputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsUpdateInput: Sendable, Hashable, Codable {
+    public var limits: TeamsUpdateInputLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsUpdateInputFallbackReasoningLevel?
+    public var reasoningLevel: TeamsUpdateInputReasoningLevel?
+    public var permissionMode: TeamsUpdateInputPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var expectedUpdatedAt: Double?
+
+    public init(limits: TeamsUpdateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateInputReasoningLevel? = nil, permissionMode: TeamsUpdateInputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, expectedUpdatedAt: Double? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public struct TeamsUpdateOutputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsUpdateOutputFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsUpdateOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsUpdateOutputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsUpdateOutput: Sendable, Hashable, Codable {
+    public var limits: TeamsUpdateOutputLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsUpdateOutputFallbackReasoningLevel?
+    public var reasoningLevel: TeamsUpdateOutputReasoningLevel?
+    public var permissionMode: TeamsUpdateOutputPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: TeamsUpdateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateOutputReasoningLevel? = nil, permissionMode: TeamsUpdateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public struct TeamsSwapModelInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var expectedUpdatedAt: Double?
+
+    public init(id: String? = nil, expectedUpdatedAt: Double? = nil) {
+      self.id = id
+      self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public struct TeamsSwapModelOutputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsSwapModelOutputFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsSwapModelOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsSwapModelOutputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsSwapModelOutput: Sendable, Hashable, Codable {
+    public var limits: TeamsSwapModelOutputLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsSwapModelOutputFallbackReasoningLevel?
+    public var reasoningLevel: TeamsSwapModelOutputReasoningLevel?
+    public var permissionMode: TeamsSwapModelOutputPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: TeamsSwapModelOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsSwapModelOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsSwapModelOutputReasoningLevel? = nil, permissionMode: TeamsSwapModelOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public struct TeamsRetireInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var retired: Bool?
+
+    public init(id: String? = nil, retired: Bool? = nil) {
+      self.id = id
+      self.retired = retired
+    }
+  }
+
+  public struct TeamsRetireOutputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsRetireOutputFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsRetireOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsRetireOutputPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsRetireOutput: Sendable, Hashable, Codable {
+    public var limits: TeamsRetireOutputLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsRetireOutputFallbackReasoningLevel?
+    public var reasoningLevel: TeamsRetireOutputReasoningLevel?
+    public var permissionMode: TeamsRetireOutputPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: TeamsRetireOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsRetireOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsRetireOutputReasoningLevel? = nil, permissionMode: TeamsRetireOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public struct TeamsRetryJobInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TeamsRetryJobOutputDispatchAction: Sendable, Hashable, Codable {
+    case steer
+    case followup
+    case fork
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "steer": self = .steer
+      case "followup": self = .followup
+      case "fork": self = .fork
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .steer: try container.encode("steer")
+      case .followup: try container.encode("followup")
+      case .fork: try container.encode("fork")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsRetryJobOutputPendingSteer: Sendable, Hashable, Codable {
+    public var priorPrompt: String?
+    public var attemptedAt: Double?
+
+    public init(priorPrompt: String? = nil, attemptedAt: Double? = nil) {
+      self.priorPrompt = priorPrompt
+      self.attemptedAt = attemptedAt
+    }
+  }
+
+  public enum TeamsRetryJobOutputStatus: Sendable, Hashable, Codable {
+    case queued
+    case dispatching
+    case running
+    case done
+    case error
+    case cancelled
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "dispatching": self = .dispatching
+      case "running": self = .running
+      case "done": self = .done
+      case "error": self = .error
+      case "cancelled": self = .cancelled
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .dispatching: try container.encode("dispatching")
+      case .running: try container.encode("running")
+      case .done: try container.encode("done")
+      case .error: try container.encode("error")
+      case .cancelled: try container.encode("cancelled")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsRetryJobOutputAttachmentsItemType: Sendable, Hashable, Codable {
+    case localFile
+    case localImage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "localFile": self = .localFile
+      case "localImage": self = .localImage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .localFile: try container.encode("localFile")
+      case .localImage: try container.encode("localImage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsRetryJobOutputAttachmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var roomId: String?
+    public var projectId: String?
+    public var name: String?
+    public var path: String?
+    public var mimeType: String?
+    public var type: TeamsRetryJobOutputAttachmentsItemType?
+    public var sizeBytes: Double?
+    public var alt: String?
+
+    public init(id: String? = nil, roomId: String? = nil, projectId: String? = nil, name: String? = nil, path: String? = nil, mimeType: String? = nil, type: TeamsRetryJobOutputAttachmentsItemType? = nil, sizeBytes: Double? = nil, alt: String? = nil) {
+      self.id = id
+      self.roomId = roomId
+      self.projectId = projectId
+      self.name = name
+      self.path = path
+      self.mimeType = mimeType
+      self.type = type
+      self.sizeBytes = sizeBytes
+      self.alt = alt
+    }
+  }
+
+  public enum TeamsRetryJobOutputOutputAttachmentsItemType: Sendable, Hashable, Codable {
+    case localFile
+    case localImage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "localFile": self = .localFile
+      case "localImage": self = .localImage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .localFile: try container.encode("localFile")
+      case .localImage: try container.encode("localImage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsRetryJobOutputOutputAttachmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var roomId: String?
+    public var projectId: String?
+    public var name: String?
+    public var path: String?
+    public var mimeType: String?
+    public var type: TeamsRetryJobOutputOutputAttachmentsItemType?
+    public var sizeBytes: Double?
+    public var alt: String?
+
+    public init(id: String? = nil, roomId: String? = nil, projectId: String? = nil, name: String? = nil, path: String? = nil, mimeType: String? = nil, type: TeamsRetryJobOutputOutputAttachmentsItemType? = nil, sizeBytes: Double? = nil, alt: String? = nil) {
+      self.id = id
+      self.roomId = roomId
+      self.projectId = projectId
+      self.name = name
+      self.path = path
+      self.mimeType = mimeType
+      self.type = type
+      self.sizeBytes = sizeBytes
+      self.alt = alt
+    }
+  }
+
+  public struct TeamsRetryJobOutput: Sendable, Hashable, Codable {
+    public var contextMessageId: String?
+    public var rosterVersion: String?
+    public var delegationId: String?
+    public var rootTaskId: String?
+    public var parentTaskId: String?
+    public var coordinatorId: String?
+    public var returnOf: String?
+    public var timedOut: Bool?
+    public var timeoutNoticePending: Bool?
+    public var taskTitle: String?
+    public var queueReason: String?
+    public var queuePosition: Double?
+    public var dispatchAction: TeamsRetryJobOutputDispatchAction?
+    public var forkSourceThreadId: String?
+    public var requiresPromptMatch: Bool?
+    public var fallbackAttempted: Bool?
+    public var directMessageRequestIds: [String]?
+    public var pendingSteer: TeamsRetryJobOutputPendingSteer?
+    public var wrapUpRequestedAt: Double?
+    public var turnMs: Double?
+    public var clockAt: Double?
+    public var stallRetriedAt: Double?
+    public var automationId: String?
+    public var id: String?
+    public var botId: String?
+    public var conversationKey: String?
+    public var threadId: String?
+    public var text: String?
+    public var status: TeamsRetryJobOutputStatus?
+    public var cancellationPending: Bool?
+    public var activitySnippet: String?
+    public var retryOf: String?
+    public var reply: String?
+    public var error: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var startedAt: Double?
+    public var dispatchStartedAt: Double?
+    public var roomId: String?
+    public var runId: String?
+    public var triggerMessageId: String?
+    public var depth: Int?
+    public var attachments: [TeamsRetryJobOutputAttachmentsItem]?
+    public var outputAttachments: [TeamsRetryJobOutputOutputAttachmentsItem]?
+
+    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: TeamsRetryJobOutputDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: TeamsRetryJobOutputPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: TeamsRetryJobOutputStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [TeamsRetryJobOutputAttachmentsItem]? = nil, outputAttachments: [TeamsRetryJobOutputOutputAttachmentsItem]? = nil) {
+      self.contextMessageId = contextMessageId
+      self.rosterVersion = rosterVersion
+      self.delegationId = delegationId
+      self.rootTaskId = rootTaskId
+      self.parentTaskId = parentTaskId
+      self.coordinatorId = coordinatorId
+      self.returnOf = returnOf
+      self.timedOut = timedOut
+      self.timeoutNoticePending = timeoutNoticePending
+      self.taskTitle = taskTitle
+      self.queueReason = queueReason
+      self.queuePosition = queuePosition
+      self.dispatchAction = dispatchAction
+      self.forkSourceThreadId = forkSourceThreadId
+      self.requiresPromptMatch = requiresPromptMatch
+      self.fallbackAttempted = fallbackAttempted
+      self.directMessageRequestIds = directMessageRequestIds
+      self.pendingSteer = pendingSteer
+      self.wrapUpRequestedAt = wrapUpRequestedAt
+      self.turnMs = turnMs
+      self.clockAt = clockAt
+      self.stallRetriedAt = stallRetriedAt
+      self.automationId = automationId
+      self.id = id
+      self.botId = botId
+      self.conversationKey = conversationKey
+      self.threadId = threadId
+      self.text = text
+      self.status = status
+      self.cancellationPending = cancellationPending
+      self.activitySnippet = activitySnippet
+      self.retryOf = retryOf
+      self.reply = reply
+      self.error = error
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.startedAt = startedAt
+      self.dispatchStartedAt = dispatchStartedAt
+      self.roomId = roomId
+      self.runId = runId
+      self.triggerMessageId = triggerMessageId
+      self.depth = depth
+      self.attachments = attachments
+      self.outputAttachments = outputAttachments
+    }
+  }
+
+  public struct TeamsCancelJobInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TeamsCancelJobOutput: Sendable, Hashable, Codable {
+    public var cancelled: Bool?
+
+    public init(cancelled: Bool? = nil) {
+      self.cancelled = cancelled
+    }
+  }
+
+  public struct TeamsProfilesInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct TeamsProfilesOutputItemLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsProfilesOutputItemFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsProfilesOutputItemReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsProfilesOutputItemPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsProfilesOutputItem: Sendable, Hashable, Codable {
+    public var limits: TeamsProfilesOutputItemLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsProfilesOutputItemFallbackReasoningLevel?
+    public var reasoningLevel: TeamsProfilesOutputItemReasoningLevel?
+    public var permissionMode: TeamsProfilesOutputItemPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: TeamsProfilesOutputItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsProfilesOutputItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsProfilesOutputItemReasoningLevel? = nil, permissionMode: TeamsProfilesOutputItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public struct TeamsThreadProfileInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct TeamsThreadProfileOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsThreadBotsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct TeamsThreadBotsOutputItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsSetThreadProfileInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsSetThreadProfileOutput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsPendingThreadProfileInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var botId: String?
+
+    public init(projectId: String? = nil, botId: String? = nil) {
+      self.projectId = projectId
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsPendingThreadProfileOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TeamsProfileThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TeamsProfileThreadsOutputItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var archived: Bool?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, title: String? = nil, archived: Bool? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.archived = archived
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public enum TeamsDocumentHistoryInputFile: Sendable, Hashable, Codable {
+    case MISSION_md
+    case MEMORY_md
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "MISSION.md": self = .MISSION_md
+      case "MEMORY.md": self = .MEMORY_md
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .MISSION_md: try container.encode("MISSION.md")
+      case .MEMORY_md: try container.encode("MEMORY.md")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsDocumentHistoryInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var file: TeamsDocumentHistoryInputFile?
+    public var before: Double?
+
+    public init(id: String? = nil, file: TeamsDocumentHistoryInputFile? = nil, before: Double? = nil) {
+      self.id = id
+      self.file = file
+      self.before = before
+    }
+  }
+
+  public struct TeamsDocumentHistoryOutputItem: Sendable, Hashable, Codable {
+    public var id: Double?
+    public var text: String?
+    public var createdAt: Double?
+    public var `actor`: String?
+
+    public init(id: Double? = nil, text: String? = nil, createdAt: Double? = nil, `actor`: String? = nil) {
+      self.id = id
+      self.text = text
+      self.createdAt = createdAt
+      self.`actor` = `actor`
+    }
+  }
+
+  public struct TeamsGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TeamsGetOutputBotLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public enum TeamsGetOutputBotFallbackReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsGetOutputBotReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsGetOutputBotPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsGetOutputBot: Sendable, Hashable, Codable {
+    public var limits: TeamsGetOutputBotLimits?
+    public var name: String?
+    public var description: String?
+    public var avatar: String?
+    public var providerId: String?
+    public var model: String?
+    public var fallbackProviderId: String?
+    public var fallbackModel: String?
+    public var fallbackReasoningLevel: TeamsGetOutputBotFallbackReasoningLevel?
+    public var reasoningLevel: TeamsGetOutputBotReasoningLevel?
+    public var permissionMode: TeamsGetOutputBotPermissionMode?
+    public var intervalMinutes: Int?
+    public var id: String?
+    public var handle: String?
+    public var home: String?
+    public var projectId: String?
+    public var hostId: String?
+    public var retired: Bool?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var lastWakeAt: Double?
+    public var error: String?
+
+    public init(limits: TeamsGetOutputBotLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsGetOutputBotFallbackReasoningLevel? = nil, reasoningLevel: TeamsGetOutputBotReasoningLevel? = nil, permissionMode: TeamsGetOutputBotPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.limits = limits
+      self.name = name
+      self.description = description
+      self.avatar = avatar
+      self.providerId = providerId
+      self.model = model
+      self.fallbackProviderId = fallbackProviderId
+      self.fallbackModel = fallbackModel
+      self.fallbackReasoningLevel = fallbackReasoningLevel
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.intervalMinutes = intervalMinutes
+      self.id = id
+      self.handle = handle
+      self.home = home
+      self.projectId = projectId
+      self.hostId = hostId
+      self.retired = retired
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.lastWakeAt = lastWakeAt
+      self.error = error
+    }
+  }
+
+  public enum TeamsGetOutputConversationsItemKind: Sendable, Hashable, Codable {
+    case admin
+    case group
+    case mission
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "admin": self = .admin
+      case "group": self = .group
+      case "mission": self = .mission
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .admin: try container.encode("admin")
+      case .group: try container.encode("group")
+      case .mission: try container.encode("mission")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsGetOutputConversationsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var key: String?
+    public var threadId: String?
+    public var title: String?
+    public var kind: TeamsGetOutputConversationsItemKind?
+    public var createdAt: Double?
+    public var archivedAt: Double?
+    public var originalKey: String?
+    public var providerId: String?
+    public var model: String?
+
+    public init(id: String? = nil, botId: String? = nil, key: String? = nil, threadId: String? = nil, title: String? = nil, kind: TeamsGetOutputConversationsItemKind? = nil, createdAt: Double? = nil, archivedAt: Double? = nil, originalKey: String? = nil, providerId: String? = nil, model: String? = nil) {
+      self.id = id
+      self.botId = botId
+      self.key = key
+      self.threadId = threadId
+      self.title = title
+      self.kind = kind
+      self.createdAt = createdAt
+      self.archivedAt = archivedAt
+      self.originalKey = originalKey
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public enum TeamsGetOutputJobsItemDispatchAction: Sendable, Hashable, Codable {
+    case steer
+    case followup
+    case fork
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "steer": self = .steer
+      case "followup": self = .followup
+      case "fork": self = .fork
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .steer: try container.encode("steer")
+      case .followup: try container.encode("followup")
+      case .fork: try container.encode("fork")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsGetOutputJobsItemPendingSteer: Sendable, Hashable, Codable {
+    public var priorPrompt: String?
+    public var attemptedAt: Double?
+
+    public init(priorPrompt: String? = nil, attemptedAt: Double? = nil) {
+      self.priorPrompt = priorPrompt
+      self.attemptedAt = attemptedAt
+    }
+  }
+
+  public enum TeamsGetOutputJobsItemStatus: Sendable, Hashable, Codable {
+    case queued
+    case dispatching
+    case running
+    case done
+    case error
+    case cancelled
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "queued": self = .queued
+      case "dispatching": self = .dispatching
+      case "running": self = .running
+      case "done": self = .done
+      case "error": self = .error
+      case "cancelled": self = .cancelled
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .queued: try container.encode("queued")
+      case .dispatching: try container.encode("dispatching")
+      case .running: try container.encode("running")
+      case .done: try container.encode("done")
+      case .error: try container.encode("error")
+      case .cancelled: try container.encode("cancelled")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamsGetOutputJobsItemAttachmentsItemType: Sendable, Hashable, Codable {
+    case localFile
+    case localImage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "localFile": self = .localFile
+      case "localImage": self = .localImage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .localFile: try container.encode("localFile")
+      case .localImage: try container.encode("localImage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsGetOutputJobsItemAttachmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var roomId: String?
+    public var projectId: String?
+    public var name: String?
+    public var path: String?
+    public var mimeType: String?
+    public var type: TeamsGetOutputJobsItemAttachmentsItemType?
+    public var sizeBytes: Double?
+    public var alt: String?
+
+    public init(id: String? = nil, roomId: String? = nil, projectId: String? = nil, name: String? = nil, path: String? = nil, mimeType: String? = nil, type: TeamsGetOutputJobsItemAttachmentsItemType? = nil, sizeBytes: Double? = nil, alt: String? = nil) {
+      self.id = id
+      self.roomId = roomId
+      self.projectId = projectId
+      self.name = name
+      self.path = path
+      self.mimeType = mimeType
+      self.type = type
+      self.sizeBytes = sizeBytes
+      self.alt = alt
+    }
+  }
+
+  public enum TeamsGetOutputJobsItemOutputAttachmentsItemType: Sendable, Hashable, Codable {
+    case localFile
+    case localImage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "localFile": self = .localFile
+      case "localImage": self = .localImage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .localFile: try container.encode("localFile")
+      case .localImage: try container.encode("localImage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsGetOutputJobsItemOutputAttachmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var roomId: String?
+    public var projectId: String?
+    public var name: String?
+    public var path: String?
+    public var mimeType: String?
+    public var type: TeamsGetOutputJobsItemOutputAttachmentsItemType?
+    public var sizeBytes: Double?
+    public var alt: String?
+
+    public init(id: String? = nil, roomId: String? = nil, projectId: String? = nil, name: String? = nil, path: String? = nil, mimeType: String? = nil, type: TeamsGetOutputJobsItemOutputAttachmentsItemType? = nil, sizeBytes: Double? = nil, alt: String? = nil) {
+      self.id = id
+      self.roomId = roomId
+      self.projectId = projectId
+      self.name = name
+      self.path = path
+      self.mimeType = mimeType
+      self.type = type
+      self.sizeBytes = sizeBytes
+      self.alt = alt
+    }
+  }
+
+  public struct TeamsGetOutputJobsItem: Sendable, Hashable, Codable {
+    public var contextMessageId: String?
+    public var rosterVersion: String?
+    public var delegationId: String?
+    public var rootTaskId: String?
+    public var parentTaskId: String?
+    public var coordinatorId: String?
+    public var returnOf: String?
+    public var timedOut: Bool?
+    public var timeoutNoticePending: Bool?
+    public var taskTitle: String?
+    public var queueReason: String?
+    public var queuePosition: Double?
+    public var dispatchAction: TeamsGetOutputJobsItemDispatchAction?
+    public var forkSourceThreadId: String?
+    public var requiresPromptMatch: Bool?
+    public var fallbackAttempted: Bool?
+    public var directMessageRequestIds: [String]?
+    public var pendingSteer: TeamsGetOutputJobsItemPendingSteer?
+    public var wrapUpRequestedAt: Double?
+    public var turnMs: Double?
+    public var clockAt: Double?
+    public var stallRetriedAt: Double?
+    public var automationId: String?
+    public var id: String?
+    public var botId: String?
+    public var conversationKey: String?
+    public var threadId: String?
+    public var text: String?
+    public var status: TeamsGetOutputJobsItemStatus?
+    public var cancellationPending: Bool?
+    public var activitySnippet: String?
+    public var retryOf: String?
+    public var reply: String?
+    public var error: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var startedAt: Double?
+    public var dispatchStartedAt: Double?
+    public var roomId: String?
+    public var runId: String?
+    public var triggerMessageId: String?
+    public var depth: Int?
+    public var attachments: [TeamsGetOutputJobsItemAttachmentsItem]?
+    public var outputAttachments: [TeamsGetOutputJobsItemOutputAttachmentsItem]?
+
+    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: TeamsGetOutputJobsItemDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: TeamsGetOutputJobsItemPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: TeamsGetOutputJobsItemStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [TeamsGetOutputJobsItemAttachmentsItem]? = nil, outputAttachments: [TeamsGetOutputJobsItemOutputAttachmentsItem]? = nil) {
+      self.contextMessageId = contextMessageId
+      self.rosterVersion = rosterVersion
+      self.delegationId = delegationId
+      self.rootTaskId = rootTaskId
+      self.parentTaskId = parentTaskId
+      self.coordinatorId = coordinatorId
+      self.returnOf = returnOf
+      self.timedOut = timedOut
+      self.timeoutNoticePending = timeoutNoticePending
+      self.taskTitle = taskTitle
+      self.queueReason = queueReason
+      self.queuePosition = queuePosition
+      self.dispatchAction = dispatchAction
+      self.forkSourceThreadId = forkSourceThreadId
+      self.requiresPromptMatch = requiresPromptMatch
+      self.fallbackAttempted = fallbackAttempted
+      self.directMessageRequestIds = directMessageRequestIds
+      self.pendingSteer = pendingSteer
+      self.wrapUpRequestedAt = wrapUpRequestedAt
+      self.turnMs = turnMs
+      self.clockAt = clockAt
+      self.stallRetriedAt = stallRetriedAt
+      self.automationId = automationId
+      self.id = id
+      self.botId = botId
+      self.conversationKey = conversationKey
+      self.threadId = threadId
+      self.text = text
+      self.status = status
+      self.cancellationPending = cancellationPending
+      self.activitySnippet = activitySnippet
+      self.retryOf = retryOf
+      self.reply = reply
+      self.error = error
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.startedAt = startedAt
+      self.dispatchStartedAt = dispatchStartedAt
+      self.roomId = roomId
+      self.runId = runId
+      self.triggerMessageId = triggerMessageId
+      self.depth = depth
+      self.attachments = attachments
+      self.outputAttachments = outputAttachments
+    }
+  }
+
+  public struct TeamsGetOutput: Sendable, Hashable, Codable {
+    public var bot: TeamsGetOutputBot?
+    public var conversations: [TeamsGetOutputConversationsItem]?
+    public var jobs: [TeamsGetOutputJobsItem]?
+
+    public init(bot: TeamsGetOutputBot? = nil, conversations: [TeamsGetOutputConversationsItem]? = nil, jobs: [TeamsGetOutputJobsItem]? = nil) {
+      self.bot = bot
+      self.conversations = conversations
+      self.jobs = jobs
+    }
+  }
+
+  public enum TeamsDocumentInputFile: Sendable, Hashable, Codable {
+    case MISSION_md
+    case MEMORY_md
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "MISSION.md": self = .MISSION_md
+      case "MEMORY.md": self = .MEMORY_md
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .MISSION_md: try container.encode("MISSION.md")
+      case .MEMORY_md: try container.encode("MEMORY.md")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsDocumentInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var file: TeamsDocumentInputFile?
+
+    public init(id: String? = nil, file: TeamsDocumentInputFile? = nil) {
+      self.id = id
+      self.file = file
+    }
+  }
+
+  public struct TeamsDocumentOutput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var version: String?
+
+    public init(text: String? = nil, version: String? = nil) {
+      self.text = text
+      self.version = version
+    }
+  }
+
+  public enum TeamsSaveDocumentInputFile: Sendable, Hashable, Codable {
+    case MISSION_md
+    case MEMORY_md
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "MISSION.md": self = .MISSION_md
+      case "MEMORY.md": self = .MEMORY_md
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .MISSION_md: try container.encode("MISSION.md")
+      case .MEMORY_md: try container.encode("MEMORY.md")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsSaveDocumentInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var file: TeamsSaveDocumentInputFile?
+    public var text: String?
+    public var version: String?
+
+    public init(id: String? = nil, file: TeamsSaveDocumentInputFile? = nil, text: String? = nil, version: String? = nil) {
+      self.id = id
+      self.file = file
+      self.text = text
+      self.version = version
+    }
+  }
+
+  public struct TeamsSaveDocumentOutput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var version: String?
+
+    public init(text: String? = nil, version: String? = nil) {
+      self.text = text
+      self.version = version
+    }
+  }
+
+  public struct TeamsWakeInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TeamsWakeOutput: Sendable, Hashable, Codable {
+    public var queued: Bool?
+
+    public init(queued: Bool? = nil) {
+      self.queued = queued
+    }
+  }
+
+  public struct TeamsConversationInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TeamsConversationOutputKind: Sendable, Hashable, Codable {
+    case admin
+    case group
+    case mission
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "admin": self = .admin
+      case "group": self = .group
+      case "mission": self = .mission
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .admin: try container.encode("admin")
+      case .group: try container.encode("group")
+      case .mission: try container.encode("mission")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsConversationOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var key: String?
+    public var threadId: String?
+    public var title: String?
+    public var kind: TeamsConversationOutputKind?
+    public var createdAt: Double?
+    public var archivedAt: Double?
+    public var originalKey: String?
+    public var providerId: String?
+    public var model: String?
+
+    public init(id: String? = nil, botId: String? = nil, key: String? = nil, threadId: String? = nil, title: String? = nil, kind: TeamsConversationOutputKind? = nil, createdAt: Double? = nil, archivedAt: Double? = nil, originalKey: String? = nil, providerId: String? = nil, model: String? = nil) {
+      self.id = id
+      self.botId = botId
+      self.key = key
+      self.threadId = threadId
+      self.title = title
+      self.kind = kind
+      self.createdAt = createdAt
+      self.archivedAt = archivedAt
+      self.originalKey = originalKey
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public struct TeamsNewConversationInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TeamsNewConversationOutputKind: Sendable, Hashable, Codable {
+    case admin
+    case group
+    case mission
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "admin": self = .admin
+      case "group": self = .group
+      case "mission": self = .mission
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .admin: try container.encode("admin")
+      case .group: try container.encode("group")
+      case .mission: try container.encode("mission")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamsNewConversationOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var key: String?
+    public var threadId: String?
+    public var title: String?
+    public var kind: TeamsNewConversationOutputKind?
+    public var createdAt: Double?
+    public var archivedAt: Double?
+    public var originalKey: String?
+    public var providerId: String?
+    public var model: String?
+
+    public init(id: String? = nil, botId: String? = nil, key: String? = nil, threadId: String? = nil, title: String? = nil, kind: TeamsNewConversationOutputKind? = nil, createdAt: Double? = nil, archivedAt: Double? = nil, originalKey: String? = nil, providerId: String? = nil, model: String? = nil) {
+      self.id = id
+      self.botId = botId
+      self.key = key
+      self.threadId = threadId
+      self.title = title
+      self.kind = kind
+      self.createdAt = createdAt
+      self.archivedAt = archivedAt
+      self.originalKey = originalKey
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public struct TeamsHandoffSourceInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct TeamsHandoffSourceOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var projectId: String?
+    public var title: String?
+
+    public init(threadId: String? = nil, projectId: String? = nil, title: String? = nil) {
+      self.threadId = threadId
+      self.projectId = projectId
+      self.title = title
+    }
+  }
+
+  public struct TeamsUsageInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+
+    public init(id: String? = nil, kind: String? = nil) {
+      self.id = id
+      self.kind = kind
+    }
+  }
+
+  public struct TeamsUsageOutputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public struct TeamsUsageOutput: Sendable, Hashable, Codable {
+    public var turns: Double?
+    public var forks: Double?
+    public var active: Double?
+    public var errors: Double?
+    public var routingCalls: Double?
+    public var routingMilliseconds: Double?
+    public var since: Double?
+    public var limits: TeamsUsageOutputLimits?
+
+    public init(turns: Double? = nil, forks: Double? = nil, active: Double? = nil, errors: Double? = nil, routingCalls: Double? = nil, routingMilliseconds: Double? = nil, since: Double? = nil, limits: TeamsUsageOutputLimits? = nil) {
+      self.turns = turns
+      self.forks = forks
+      self.active = active
+      self.errors = errors
+      self.routingCalls = routingCalls
+      self.routingMilliseconds = routingMilliseconds
+      self.since = since
+      self.limits = limits
+    }
+  }
+
+  public struct TeamsSaveLimitsInputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public struct TeamsSaveLimitsInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var kind: String?
+    public var limits: TeamsSaveLimitsInputLimits?
+
+    public init(id: String? = nil, kind: String? = nil, limits: TeamsSaveLimitsInputLimits? = nil) {
+      self.id = id
+      self.kind = kind
+      self.limits = limits
+    }
+  }
+
+  public struct TeamsSaveLimitsOutputLimits: Sendable, Hashable, Codable {
+    public var turnsPerHour: Int?
+    public var turnsPerDay: Int?
+    public var minutesPerTurn: Int?
+    public var concurrentForks: Int?
+
+    public init(turnsPerHour: Int? = nil, turnsPerDay: Int? = nil, minutesPerTurn: Int? = nil, concurrentForks: Int? = nil) {
+      self.turnsPerHour = turnsPerHour
+      self.turnsPerDay = turnsPerDay
+      self.minutesPerTurn = minutesPerTurn
+      self.concurrentForks = concurrentForks
+    }
+  }
+
+  public struct TeamsSaveLimitsOutput: Sendable, Hashable, Codable {
+    public var turns: Double?
+    public var forks: Double?
+    public var active: Double?
+    public var errors: Double?
+    public var routingCalls: Double?
+    public var routingMilliseconds: Double?
+    public var since: Double?
+    public var limits: TeamsSaveLimitsOutputLimits?
+
+    public init(turns: Double? = nil, forks: Double? = nil, active: Double? = nil, errors: Double? = nil, routingCalls: Double? = nil, routingMilliseconds: Double? = nil, since: Double? = nil, limits: TeamsSaveLimitsOutputLimits? = nil) {
+      self.turns = turns
+      self.forks = forks
+      self.active = active
+      self.errors = errors
+      self.routingCalls = routingCalls
+      self.routingMilliseconds = routingMilliseconds
+      self.since = since
+      self.limits = limits
     }
   }
 

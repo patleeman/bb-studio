@@ -173,8 +173,8 @@
   },
   {
     "id": "bot-document",
-    "plugin": "bot-teams",
-    "method": "saveDocument",
+    "plugin": "studio",
+    "method": "teams_saveDocument",
     "input": {
       "id": "bot_aaaaaaaaaaaaaaaa",
       "file": "MEMORY.md",
@@ -188,8 +188,8 @@
   },
   {
     "id": "bot-send",
-    "plugin": "bot-teams",
-    "method": "viewSend",
+    "plugin": "studio",
+    "method": "teams_viewSend",
     "input": {
       "id": "11111111-1111-4111-8111-111111111111",
       "text": "Review this",

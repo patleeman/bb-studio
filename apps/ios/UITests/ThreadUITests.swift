@@ -698,10 +698,10 @@ final class ThreadUITests: XCTestCase {
     /// A bot's Mission and Memory open from the bot. Read-only on a real bot: edit is
     /// started and cancelled, and the file's version is checked to be unchanged.
     func testBotDocuments() throws {
-        let bots = (rpc("bot-teams", "list", NSNull())?["bots"] as? [[String: Any]]) ?? []
+        let bots = (rpc("studio", "teams_list", NSNull())?["bots"] as? [[String: Any]]) ?? []
         let bot = try XCTUnwrap(bots.first { $0["retired"] as? Bool != true })
         let id = try XCTUnwrap(bot["id"] as? String)
-        let before = try XCTUnwrap(rpc("bot-teams", "document", ["id": id, "file": "MISSION.md"])?["version"] as? String)
+        let before = try XCTUnwrap(rpc("studio", "teams_document", ["id": id, "file": "MISSION.md"])?["version"] as? String)
         app.open(URL(string: "bbstudio://bot/\(id)")!)
         let mission = app.buttons["Mission"]
         XCTAssertTrue(mission.waitForExistence(timeout: 10), "bot files")
@@ -719,7 +719,7 @@ final class ThreadUITests: XCTestCase {
         shot("bot-mission-edit")
         app.navigationBars["Mission"].buttons["Cancel"].tap()
         XCTAssertTrue(app.navigationBars["Mission"].buttons["Edit"].waitForExistence(timeout: 5), "back to reading")
-        let after = rpc("bot-teams", "document", ["id": id, "file": "MISSION.md"])?["version"] as? String
+        let after = rpc("studio", "teams_document", ["id": id, "file": "MISSION.md"])?["version"] as? String
         XCTAssertEqual(before, after, "mission untouched")
         app.navigationBars["Mission"].buttons.element(boundBy: 0).tap()
         app.buttons["Memory"].tap()
@@ -733,12 +733,12 @@ final class ThreadUITests: XCTestCase {
     func testChannelManagement() throws {
         let name = "QA channel \(Int(Date().timeIntervalSince1970))"
         func channel() -> [String: Any]? {
-            (rpc("bot-teams", "list", NSNull())?["rooms"] as? [[String: Any]])?.first { $0["name"] as? String == name }
+            (rpc("studio", "teams_list", NSNull())?["rooms"] as? [[String: Any]])?.first { $0["name"] as? String == name }
         }
         addTeardownBlock {
-            if let id = channel()?["id"] as? String { _ = self.rpc("bot-teams", "deleteRoom", ["id": id]) }
+            if let id = channel()?["id"] as? String { _ = self.rpc("studio", "teams_deleteRoom", ["id": id]) }
         }
-        let bots = (rpc("bot-teams", "list", NSNull())?["bots"] as? [[String: Any]]) ?? []
+        let bots = (rpc("studio", "teams_list", NSNull())?["bots"] as? [[String: Any]]) ?? []
         let bot = try XCTUnwrap(bots.first { $0["retired"] as? Bool != true }?["name"] as? String)
         app.buttons["New Channel"].firstMatch.tap()
         let field = app.textFields["channelNameField"]
@@ -1170,10 +1170,10 @@ final class ThreadUITests: XCTestCase {
         let name = "QA automation \(Int(Date().timeIntervalSince1970))"
         var createdId: String?
         addTeardownBlock {
-            let list = self.rpc("bot-teams", "automationList", ["channelId": channel, "limit": 50])
+            let list = self.rpc("studio", "teams_automationList", ["channelId": channel, "limit": 50])
             for case let automation as [String: Any] in list?["automations"] as? [Any] ?? []
             where (automation["name"] as? String)?.hasPrefix("QA automation") == true {
-                _ = self.rpc("bot-teams", "automationAction", [
+                _ = self.rpc("studio", "teams_automationAction", [
                     "channelId": channel, "automationId": automation["id"] as! String, "action": "delete"])
             }
         }
@@ -1196,14 +1196,14 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Save"].tap()
         let created = app.staticTexts[name].firstMatch
         XCTAssertTrue(created.waitForExistence(timeout: 10), "created and listed")
-        let list = rpc("bot-teams", "automationList", ["channelId": channel, "limit": 50])
+        let list = rpc("studio", "teams_automationList", ["channelId": channel, "limit": 50])
         let automation = (list?["automations"] as? [[String: Any]])?.first { $0["name"] as? String == name }
         createdId = automation?["id"] as? String
         XCTAssertEqual(automation?["enabled"] as? Bool, false, "saved disabled")
         XCTAssertEqual((automation?["trigger"] as? [String: Any])?["triggerType"] as? String, "once")
         // Push it far out so nothing can fire even if a later step enables it.
         if let id = createdId {
-            _ = rpc("bot-teams", "automationUpdate", [
+            _ = rpc("studio", "teams_automationUpdate", [
                 "channelId": channel, "automationId": id,
                 "trigger": ["triggerType": "once", "runAt": (Date().timeIntervalSince1970 + 300 * 86400) * 1000]])
         }

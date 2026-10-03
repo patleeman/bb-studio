@@ -15,10 +15,10 @@ export default context => {
       await pluginRpc("studio", "tasks_create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
       return { path: `/plugins/studio/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio", "tasks_boardDelete", { id: board.id }) };
     } },
-    { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
-      const { bots } = await pluginRpc("bot-teams", "list", null);
+    { id: "teams", packageDir: "bb-studio/src/modules/teams", seed: async () => {
+      const { bots } = await pluginRpc("studio", "teams_list", null);
       const bot = bots.find(b => b.handle === "atlas"); if (!bot) throw new Error("Missing staged Atlas profile");
-      return { path: `/plugins/bot-teams/bots/${bot.id}/profile`, ready: '[aria-label="Bot sections"]', cleanup: async () => {} };
+      return { path: `/plugins/studio/bots/${bot.id}/profile`, ready: '[aria-label="Bot sections"]', cleanup: async () => {} };
     } },
   ];
   return fixtures.map(fixture => ({

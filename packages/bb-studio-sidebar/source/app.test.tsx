@@ -124,7 +124,7 @@ function renderList(
       }),
       setPreference: (input: unknown) => input,
     },
-    sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots" ? [] : { automations: [] })() } },
+    sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "teams_threadBots" ? [] : { automations: [] })() } },
     ...options,
   });
 }
@@ -170,7 +170,7 @@ describe("thread-list plugin", () => {
 
   it("identifies existing bot and automation targets through their public RPCs", async () => {
     renderList({ organizationMode: "project" }, {
-      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "threadBots"
+      sdk: { plugins: { callRpc: ({ method }: { method: string }) => sdkResult(method === "teams_threadBots"
         ? [{ threadId: "thr_parent" }]
         : { automations: [{ automation: { execution: { targetThreadId: "thr_later" } } }] })() } },
     });

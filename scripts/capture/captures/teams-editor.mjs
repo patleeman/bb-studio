@@ -3,18 +3,18 @@ export default ({ pluginRpc, bbCli, projectId, sleep }) => {
   let fixture;
   const seed = async () => {
     if (fixture) return fixture;
-    let bots = await pluginRpc("bot-teams", "profiles", {});
+    let bots = await pluginRpc("studio", "teams_profiles", {});
     for (let i = 1; i <= 16; i++) {
       const name = `Release reviewer ${String(i).padStart(2, "0")}`;
       if (!bots.some(bot => bot.name === name)) {
-        await pluginRpc("bot-teams", "create", { name, mission: "Deterministic member picker fixture. No scheduled work.", intervalMinutes: 0 });
+        await pluginRpc("studio", "teams_create", { name, mission: "Deterministic member picker fixture. No scheduled work.", intervalMinutes: 0 });
       }
     }
-    bots = await pluginRpc("bot-teams", "profiles", {});
+    bots = await pluginRpc("studio", "teams_profiles", {});
     const threads = JSON.parse(await bbCli(["thread", "list", "--project", projectId, "--json"]));
     const members = [...bots.slice(0, 4).map(bot => ({ kind: "bot", id: bot.id })), ...threads.slice(0, 3).map(thread => ({ kind: "thread", id: thread.id }))];
-    const existing = (await pluginRpc("bot-teams", "views", {})).find(view => view.name === "Release planning" && !view.archived);
-    const view = existing ?? await pluginRpc("bot-teams", "viewCreate", { name: "Release planning", members, requestId: crypto.randomUUID() });
+    const existing = (await pluginRpc("studio", "teams_views", {})).find(view => view.name === "Release planning" && !view.archived);
+    const view = existing ?? await pluginRpc("studio", "teams_viewCreate", { name: "Release planning", members, requestId: crypto.randomUUID() });
     fixture = { id: view.id, extra: bots.find(bot => bot.name === "Release reviewer 16").id };
     return fixture;
   };
@@ -44,7 +44,7 @@ export default ({ pluginRpc, bbCli, projectId, sleep }) => {
   const setup = (width, height, mobile) => async client => {
     const data = await seed();
     await client.command("Emulation.setDeviceMetricsOverride", { width, height, deviceScaleFactor: 1, mobile });
-    await client.navigate(`/plugins/bot-teams/channels/${data.id}`);
+    await client.navigate(`/plugins/studio/channels/${data.id}`);
     await client.waitForSelector('[data-view-composer]');
     await client.evaluate(`(() => {
       const picker = document.querySelector('[aria-label="Channel view"]');
@@ -83,14 +83,14 @@ export default ({ pluginRpc, bbCli, projectId, sleep }) => {
     return async () => {
       await client.clickElementWithTextAndPointer('[role="dialog"]:has([aria-label="Channel name"]) button', "Save channel");
       await client.evaluate("new Promise((resolve,reject) => { const end = Date.now() + 10000; const tick = () => !document.querySelector('[aria-label=\"Channel name\"]') ? resolve() : Date.now() > end ? reject(new Error('Channel save did not close the editor')) : setTimeout(tick, 100); tick(); })", true);
-      const page = await pluginRpc("bot-teams", "view", { id: data.id });
+      const page = await pluginRpc("studio", "teams_view", { id: data.id });
       if (!page.view.members.some(member => member.kind === "bot" && member.id === data.extra)) throw new Error("Channel save lost the scrolled member selection");
-      await pluginRpc("bot-teams", "viewUpdate", { ...page.view, members: page.view.members.filter(member => member.id !== data.extra), expectedUpdatedAt: page.view.updatedAt });
+      await pluginRpc("studio", "teams_viewUpdate", { ...page.view, members: page.view.members.filter(member => member.id !== data.extra), expectedUpdatedAt: page.view.updatedAt });
       await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
     };
   };
   return [
-    { id: "bots-channel-editor", packageDir: "bb-studio-teams", fileName: "channel-editor.png", setup: setup(1440, 1000, false) },
-    { id: "bots-channel-editor-mobile", packageDir: "bb-studio-teams", fileName: "channel-editor-mobile.png", privateSidebar: false, setup: setup(390, 844, true) },
+    { id: "bots-channel-editor", packageDir: "bb-studio/src/modules/teams", fileName: "channel-editor.png", setup: setup(1440, 1000, false) },
+    { id: "bots-channel-editor-mobile", packageDir: "bb-studio/src/modules/teams", fileName: "channel-editor-mobile.png", privateSidebar: false, setup: setup(390, 844, true) },
   ];
 };

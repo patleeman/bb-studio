@@ -194,7 +194,7 @@ struct ThreadView: View {
             if runningPlugins.split(separator: ",").contains("studio") {
                 Task { await spaces.load(model.threadId, client: client) }
             }
-            if runningPlugins.split(separator: ",").contains("bot-teams") {
+            if runningPlugins.split(separator: ",").contains("studio") {
                 Task {
                     profile = try? await client.threadProfile(model.threadId)
                     await loadProfileBot()

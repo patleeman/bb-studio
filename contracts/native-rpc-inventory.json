@@ -231,62 +231,62 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "list",
+      "plugin": "studio",
+      "method": "teams_list",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "document",
+      "plugin": "studio",
+      "method": "teams_document",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "saveDocument",
+      "plugin": "studio",
+      "method": "teams_saveDocument",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "profiles",
+      "plugin": "studio",
+      "method": "teams_profiles",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "threadProfile",
+      "plugin": "studio",
+      "method": "teams_threadProfile",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "setThreadProfile",
+      "plugin": "studio",
+      "method": "teams_setThreadProfile",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "pendingThreadProfile",
+      "plugin": "studio",
+      "method": "teams_pendingThreadProfile",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "threadBots",
+      "plugin": "studio",
+      "method": "teams_threadBots",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "profileThreads",
+      "plugin": "studio",
+      "method": "teams_profileThreads",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "bot-teams",
-      "method": "newConversation",
+      "plugin": "studio",
+      "method": "teams_newConversation",
       "coverage": "literal method checked against contract"
     },
     {
@@ -651,32 +651,32 @@
     },
     {
       "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "view",
+      "plugin": "studio",
+      "method": "teams_view",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewCreate",
+      "plugin": "studio",
+      "method": "teams_viewCreate",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewUpdate",
+      "plugin": "studio",
+      "method": "teams_viewUpdate",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewDelete",
+      "plugin": "studio",
+      "method": "teams_viewDelete",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
-      "method": "viewSend",
+      "plugin": "studio",
+      "method": "teams_viewSend",
       "coverage": "literal method checked against contract"
     },
     {

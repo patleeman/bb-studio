@@ -25,7 +25,7 @@ export function useThreadChannelDrop() {
     const seq = ++generation.current;
     requestId.current = crypto.randomUUID();
     setDrop({ threads, nest }); setName(threads.map(thread => thread.title || thread.titleFallback || "Thread").join(" + ").slice(0, 80)); setError(null); setAvailable(null);
-    void Promise.resolve().then(() => sdk.plugins.callRpc({ pluginId: "bot-teams", method: "views", input: {}, outputSchema: z.array(z.object({ id: z.string() })) })).then(() => { if (seq === generation.current) setAvailable(true); }, () => { if (seq === generation.current) setAvailable(false); });
+    void Promise.resolve().then(() => sdk.plugins.callRpc({ pluginId: "studio", method: "teams_views", input: {}, outputSchema: z.array(z.object({ id: z.string() })) })).then(() => { if (seq === generation.current) setAvailable(true); }, () => { if (seq === generation.current) setAvailable(false); });
   }, [sdk]);
   const act = async (create: boolean) => {
     if (!drop || busy.current) return;
@@ -33,8 +33,8 @@ export function useThreadChannelDrop() {
     const seq = generation.current;
     try {
       if (create) {
-        const channel = await sdk.plugins.callRpc({ pluginId: "bot-teams", method: "viewCreate", input: { name: name.trim(), members: drop.threads.map(thread => ({ kind: "thread", id: thread.id })), requestId: requestId.current }, outputSchema: z.object({ id: z.string() }) });
-        if (seq === generation.current) { setDrop(null); openAppPath(`/plugins/bot-teams/channels/${channel.id}`); }
+        const channel = await sdk.plugins.callRpc({ pluginId: "studio", method: "teams_viewCreate", input: { name: name.trim(), members: drop.threads.map(thread => ({ kind: "thread", id: thread.id })), requestId: requestId.current }, outputSchema: z.object({ id: z.string() }) });
+        if (seq === generation.current) { setDrop(null); openAppPath(`/plugins/studio/channels/${channel.id}`); }
       } else { await drop.nest?.(); setDrop(null); }
     } catch (cause) { setError(getMutationErrorMessage({ error: cause, fallbackMessage: "Could not combine these threads." })); }
     finally { busy.current = false; setPending(false); }

@@ -1,3 +1,4 @@
+import { registerServer as registerTeams } from "./src/modules/teams/server";
 import { registerServer as registerTasks } from "./src/modules/tasks/server";
 import { registerServer as registerFeed } from "./src/modules/feed/server";
 import type { ModuleServices } from "./src/modules/services";
@@ -65,6 +66,7 @@ export default async function plugin(host: BbPluginApi) {
   const runtime = new ModuleRuntime(host);
   await registerCore(runtime.coreApi(), runtime.provider, runtime.services);
   await runtime.register([
+    { name: "teams", legacyPluginId: "bot-teams", skills: ["bots"], registerServer: registerTeams },
     { name: "tasks", legacyPluginId: "studio-tasks", registerServer: registerTasks },
     { name: "feed", legacyPluginId: "feed", registerServer: registerFeed },
     { name: "tables", legacyPluginId: "studio-tables", skills: ["studio-tables"], registerServer: registerTables },

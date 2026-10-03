@@ -9,11 +9,11 @@ import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/
 import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
 import { registerStudio as registerArtifacts } from "../../bb-studio-artifacts/src/server/studio";
 import { memoryStore as artifactStore, bytes } from "../../bb-studio-artifacts/src/test/db";
-import { registerStudio as registerBots } from "../../bb-studio-teams/studio-provider";
-import { createTestStore } from "../../bb-studio-teams/test/test-store";
-import { botSchema } from "../../bb-studio-teams/contract";
-import { Runtime } from "../../bb-studio-teams/mission-runtime";
-import { ThreadViews } from "../../bb-studio-teams/thread-views";
+import { registerStudio as registerBots } from "./modules/teams/studio-provider";
+import { createTestStore } from "./modules/teams/test/test-store";
+import { botSchema } from "./modules/teams/contract";
+import { Runtime } from "./modules/teams/mission-runtime";
+import { ThreadViews } from "./modules/teams/thread-views";
 import tablesPlugin from "./modules/tables/server";
 import { schemas } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
@@ -104,7 +104,7 @@ function botsFixture(kind: "bot" | "view"): ProviderHarness {
     retire: (id, retired) => runtime.retire(id, retired),
   });
   return {
-    pluginId: "bot-teams", kind, handlers, expectedContent: kind === "bot" ? "Conformance bot content" : "Conformance channel", projectId: null, canDelete: kind !== "bot",
+    pluginId: "studio", kind, handlers, expectedContent: kind === "bot" ? "Conformance bot content" : "Conformance channel", projectId: null, canDelete: kind !== "bot",
     ...(kind === "bot" ? { seed: () => {
       const id = `bot_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
       store.put(botSchema.parse({ id, name: "Conformance bot", description: "Conformance bot content", handle: id, home: "/unused/conformance", projectId: "proj_private", hostId: "local", createdAt: 1, updatedAt: 1, lastWakeAt: 0, error: null }));

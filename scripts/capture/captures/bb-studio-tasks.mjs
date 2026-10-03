@@ -28,7 +28,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           const { task: created } = await pluginRpc("studio", "tasks_create", { ...task, projectId, boardId });
           ids.push(created.id);
         }
-        const { task: subtask } = await pluginRpc("studio", "tasks_create", { title: "Review the launch draft", projectId, parentId: ids[0], priority: "medium" });
+        const { task: subtask } = await pluginRpc("studio", "tasks_create", { title: "Review the launch draft", projectId, boardId, parentId: ids[0], priority: "medium" });
         ids.push(subtask.id);
         // The boards index lists the seeded board, then it opens on its own page.
         await client.navigate("/plugins/studio/tasks");

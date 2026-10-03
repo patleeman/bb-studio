@@ -1,6 +1,6 @@
 # Studio Feed
 
-> **Studio Feed** is part of **[BB Studio](../../../../../README.md)**. It is built into Studio. With [Studio Teams](../../../../bb-studio-teams) it knows which bot and channel
+> **Studio Feed** is part of **[BB Studio](../../../../../README.md)**. It is built into Studio. With [Studio Teams](../../../../bb-studio/src/modules/teams) it knows which bot and channel
 > posted. With [Studio Mobile](../../../../bb-studio-mobile) it notifies your phone.
 
 One feed of what your agents report: morning briefings, alerts, research

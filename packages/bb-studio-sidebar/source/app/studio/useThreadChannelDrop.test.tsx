@@ -21,14 +21,14 @@ describe("drag threads together", () => {
   });
   it("creates a channel of references without moving either thread", async () => {
     const nest = vi.fn();
-    state.sdk.plugins.callRpc.mockImplementation(async ({ method }) => method === "views" ? [] : { id: "new-channel" });
+    state.sdk.plugins.callRpc.mockImplementation(async ({ method }) => method === "teams_views" ? [] : { id: "new-channel" });
     render(<Fixture nest={nest} />);
     fireEvent.click(screen.getByText("Drop threads"));
     await waitFor(() => expect(screen.getByRole("button", { name: "Create channel" }).hasAttribute("disabled")).toBe(false));
     fireEvent.change(screen.getByLabelText("Channel name"), { target: { value: "Release review" } });
     fireEvent.click(screen.getByRole("button", { name: "Create channel" }));
-    await waitFor(() => expect(state.open).toHaveBeenCalledWith("/plugins/bot-teams/channels/new-channel"));
-    expect(state.sdk.plugins.callRpc.mock.calls[1]![0]).toMatchObject({ method: "viewCreate", input: { name: "Release review", members: [{ kind: "thread", id: "a" }, { kind: "thread", id: "b" }] } });
+    await waitFor(() => expect(state.open).toHaveBeenCalledWith("/plugins/studio/channels/new-channel"));
+    expect(state.sdk.plugins.callRpc.mock.calls[1]![0]).toMatchObject({ method: "teams_viewCreate", input: { name: "Release review", members: [{ kind: "thread", id: "a" }, { kind: "thread", id: "b" }] } });
     expect(nest).not.toHaveBeenCalled();
   });
   it("keeps nesting available and allows cancel without any mutation", async () => {
@@ -41,10 +41,10 @@ describe("drag threads together", () => {
     fireEvent.click(screen.getByText("Drop threads"));
     await act(async () => fireEvent.click(screen.getByText("Nest threads")));
     expect(nest).toHaveBeenCalledOnce();
-    expect(state.sdk.plugins.callRpc.mock.calls.every(([args]) => args.method === "views")).toBe(true);
+    expect(state.sdk.plugins.callRpc.mock.calls.every(([args]) => args.method === "teams_views")).toBe(true);
   });
   it("keeps the dialog and request ID for retry after a failed channel creation", async () => {
-    state.sdk.plugins.callRpc.mockImplementation(async ({ method }) => { if (method === "views") return []; throw new Error("Disconnected"); });
+    state.sdk.plugins.callRpc.mockImplementation(async ({ method }) => { if (method === "teams_views") return []; throw new Error("Disconnected"); });
     render(<Fixture />);
     fireEvent.click(screen.getByText("Drop threads"));
     await waitFor(() => expect(screen.getByRole("button", { name: "Create channel" }).hasAttribute("disabled")).toBe(false));

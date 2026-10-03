@@ -133,7 +133,7 @@ BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \
 
 - **Float from the sidebar.** **Float** is in the menu of every thread row (with
   [Studio Sidebar](../bb-studio-sidebar)), every channel row (with
-  [Studio Teams](../bb-studio-teams)), and every Studio tab (with
+  [Studio Teams](../bb-studio/src/modules/teams)), and every Studio tab (with
   [Studio](../bb-studio)).
 - **Move any item in one gesture.** This works on Studio items and threads
   anywhere: a collection row, a mention or embed on a page, a table's item

@@ -14,6 +14,6 @@ export function moduleApp(host: import("@get-bb/plugin-sdk/app").PluginAppBuilde
   return { ...host, slots: new Proxy(host.slots, { get(target, property) {
     const register = Reflect.get(target, property);
     if (typeof register !== "function") return register;
-    return (registration: { component?: import("react").ComponentType<object> }) => register.call(target, registration.component ? { ...registration, component: moduleComponent(name, registration.component) } : registration);
+    return (registration: { component?: import("react").ComponentType<object>; headerContent?: import("react").ComponentType<object> }) => register.call(target, { ...registration, ...(registration.component ? { component: moduleComponent(name, registration.component) } : {}), ...(registration.headerContent ? { headerContent: moduleComponent(name, registration.headerContent) } : {}) });
   } }) };
 }

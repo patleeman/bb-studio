@@ -181,31 +181,6 @@
       }
     },
     {
-      "id": "bot-teams",
-      "displayName": "Studio Teams",
-      "description": "Part of BB Studio. Persistent bot profiles and channels of ordinary threads, with shared memory and missions.",
-      "icon": "Bot",
-      "tags": [
-        "agents",
-        "collaboration",
-        "channels",
-        "automation",
-        "notifications",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-teams",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "thread-list-plus",
       "displayName": "Studio Sidebar",
       "description": "BB's thread list with a section for each Studio app above your threads, and New project in its menu.",

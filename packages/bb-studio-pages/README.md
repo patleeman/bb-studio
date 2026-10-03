@@ -1,11 +1,11 @@
 # Studio Pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio/src/modules/tasks), [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio-teams).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio/src/modules/tasks), [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio/src/modules/teams).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
 comments, charts, and embeds. It also connects to
-[Studio Teams](../bb-studio-teams): @mention a bot in a page to hand it
+[Studio Teams](../bb-studio/src/modules/teams): @mention a bot in a page to hand it
 work, or give a page an owner bot that keeps it up to date on a schedule.
 
 With Studio Talk installed, the microphone in a comment box lets you dictate

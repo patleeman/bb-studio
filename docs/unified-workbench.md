@@ -187,7 +187,7 @@ pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Talk](../packages/bb-studio-talk/assets/compact-header.png),
 [Tables](../packages/bb-studio/src/modules/tables/assets/compact-header.png),
 [Tasks](../packages/bb-studio/src/modules/tasks/assets/compact-header.png), and
-[Teams](../packages/bb-studio-teams/assets/compact-header.png).
+[Teams](../packages/bb-studio/src/modules/teams/assets/compact-header.png).
 Each checks the primary Chat action, every visible header button's bounds
 and hit target, page overflow, and the Related popover at 390 by 844 pixels.
 Visual review caught Tables' sticky grid header covering Export and More;

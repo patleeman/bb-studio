@@ -25,7 +25,7 @@ export function useBackgroundThreads(projects: SidebarProject[]) {
       if (refreshing) return;
       refreshing = true;
       await Promise.allSettled([
-        Promise.resolve().then(() => sdk.plugins.callRpc({ pluginId: "bot-teams", method: "threadBots", input: {}, outputSchema: botThreadsSchema, signal: AbortSignal.timeout(10_000) }))
+        Promise.resolve().then(() => sdk.plugins.callRpc({ pluginId: "studio", method: "teams_threadBots", input: {}, outputSchema: botThreadsSchema, signal: AbortSignal.timeout(10_000) }))
           .then((rows) => { if (active) setBotIds(new Set(rows.map((row) => row.threadId))); }),
         Promise.resolve().then(() => sdk.plugins.callRpc({ pluginId: "automations", method: "automations_overview", input: null, outputSchema: overviewSchema, signal: AbortSignal.timeout(10_000) }))
           .then((result) => { if (active) setAutomationIds(new Set(result.automations.flatMap(({ automation }) => automation.execution?.targetThreadId ? [automation.execution.targetThreadId] : []))); }),

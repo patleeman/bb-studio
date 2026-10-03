@@ -1,6 +1,6 @@
 # Studio Tasks
 
-> **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio-talk), [Studio Draw](../../../../bb-studio-draw), [Studio Artifacts](../../../../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../../../../bb-studio-teams).
+> **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio-talk), [Studio Draw](../../../../bb-studio-draw), [Studio Artifacts](../../../../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../../../../bb-studio/src/modules/teams).
 
 Boards of tasks you can do yourself or hand to an agent. Each board is a
 Studio item like a page: it has its own columns, shows as a board, list or

@@ -42,7 +42,7 @@ function useViewing(rpc: Rpc, path: string): Viewed | null {
     if (!path.startsWith("/plugins/")) return setViewed({ path, item: null });
     let live = true;
     rpc.call("viewing", { path }).then(
-      ({ item }) => live && setViewed({ path, item: item?.pluginId === "bot-teams" && item.kind === "view" ? null : item }),
+      ({ item }) => live && setViewed({ path, item: item?.kind === "view" ? null : item }),
       () => live && setViewed({ path, item: null }),
     );
     return () => {

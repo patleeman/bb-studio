@@ -29,7 +29,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
       for (const threadId of threads) await bbCli(["thread", "delete", threadId, "--yes", "--json"]);
       if (boardId) await pluginRpc("studio", "tasks_boardDelete", { id: boardId });
       if (bot) {
-        await pluginRpc("bot-teams", "retire", { id: bot.id, retired: true });
+        await pluginRpc("studio", "teams_retire", { id: bot.id, retired: true });
       }
       await rm(directory, { recursive: true, force: true });
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbDispatchDraft").catch(() => {});
@@ -97,7 +97,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
       await client.clickElementWithTextAndPointer("button", "Open thread");
       await client.waitForSelector(selected(agentThread)); await retained(agentTask, agentThread);
 
-      bot = await pluginRpc("bot-teams", "create", { name: "Companion dispatch verifier", description: "A temporary staged handoff fixture.", mission: description,
+      bot = await pluginRpc("studio", "teams_create", { name: "Companion dispatch verifier", description: "A temporary staged handoff fixture.", mission: description,
         intervalMinutes: 0, limits: { turnsPerHour: 3, turnsPerDay: 3, minutesPerTurn: 1, concurrentForks: 1 } });
       ({ task: botTask } = await pluginRpc("studio", "tasks_create", { title: "Verify a bot handoff", projectId, boardId, description, assignee: `bot:${bot.id}` }));
       await client.clickAriaButtonWithPointer("Fold floating tabs");
@@ -106,7 +106,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
       await client.clickElementWithTextAndPointer("button", "Send to bot");
       const sent = await handoff(botTask), botThread = sent.handoffs[0].threadId;
       await client.waitForSelector(selected(botThread));
-      const profile = await pluginRpc("bot-teams", "threadProfile", { threadId: botThread });
+      const profile = await pluginRpc("studio", "teams_threadProfile", { threadId: botThread });
       if (profile?.botId !== bot.id || !sent.links.some(link => link.target === "thread" && link.itemId === botThread && link.label.startsWith("Bot work:"))) throw new Error("Bot handoff targeted a different profile or conversation");
       await draft(botThread);
       const botText = await client.evaluate(`document.querySelector(${JSON.stringify(root(botThread))}).textContent`);

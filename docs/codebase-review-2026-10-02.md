@@ -71,7 +71,7 @@ retained Pages conversation composers, Talk model selection, Explore scheduling
 controls, and Pages version retention. Those features were already in progress;
 they are included in the integration assessment rather than attributed solely
 to this review. See the [settings audit](settings-audit.md),
-[Teams documentation](../packages/bb-studio-teams/README.md), and
+[Teams documentation](../packages/bb-studio/src/modules/teams/README.md), and
 [Pages documentation](../packages/bb-studio-pages/README.md).
 
 New channel messages now keep routing metadata in agent-only context. The

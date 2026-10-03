@@ -22,11 +22,11 @@ export default context => {
       await pluginRpc("studio", "tasks_create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
       return { path: `/plugins/studio/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio", "tasks_boardDelete", { id: board.id }) };
     } },
-    { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
-      const { bots } = await pluginRpc("bot-teams", "list", null);
+    { id: "teams", packageDir: "bb-studio/src/modules/teams", seed: async () => {
+      const { bots } = await pluginRpc("studio", "teams_list", null);
       const existing = bots.find(b => b.handle === "atlas");
-      const bot = existing ?? await pluginRpc("bot-teams", "create", { name: "Companion profile check", mission: "Wait for explicit owner input. No scheduled work.", intervalMinutes: 0 });
-      return { path: `/plugins/bot-teams/bots/${bot.id}/profile`, ready: '[aria-label="Bot profile"] input[id$="-name"]', cleanup: async () => { if (!existing) await pluginRpc("bot-teams", "retire", { id: bot.id, retired: true }); } };
+      const bot = existing ?? await pluginRpc("studio", "teams_create", { name: "Companion profile check", mission: "Wait for explicit owner input. No scheduled work.", intervalMinutes: 0 });
+      return { path: `/plugins/studio/bots/${bot.id}/profile`, ready: '[aria-label="Bot profile"] input[id$="-name"]', cleanup: async () => { if (!existing) await pluginRpc("studio", "teams_retire", { id: bot.id, retired: true }); } };
     } },
     ...entrypoints(context),
   ];
