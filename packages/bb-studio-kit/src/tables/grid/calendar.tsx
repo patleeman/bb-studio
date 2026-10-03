@@ -7,6 +7,7 @@ import { rowTitle, type Row, type Table, type Values, type View } from "../model
 import { newRowId, type Change } from "./state";
 
 const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const PAGE_SIZE = 10;
 const MONTH = new Intl.DateTimeFormat(undefined, { month: "long", year: "numeric", timeZone: "UTC" });
 
 function today(): string {
@@ -32,6 +33,7 @@ export function Calendar({
   const dateBy = view.dateBy;
   const [month, setMonth] = useState(() => today().slice(0, 7));
   const [over, setOver] = useState<string | null>(null);
+  const [pages, setPages] = useState<Record<string, number>>({});
   if (!dateBy) return <p className="p-6 text-sm text-muted-foreground">Choose a date column for this calendar.</p>;
   const [year, monthNumber] = month.split("-").map(Number) as [number, number];
   const first = new Date(Date.UTC(year, monthNumber - 1, 1));
@@ -41,7 +43,11 @@ export function Calendar({
   const byDay = new Map<string, Row[]>();
   for (const row of rows) {
     const day = row.values[dateBy];
-    if (typeof day === "string") byDay.set(day, [...(byDay.get(day) ?? []), row]);
+    if (typeof day === "string") {
+      const entries = byDay.get(day);
+      if (entries) entries.push(row);
+      else byDay.set(day, [row]);
+    }
   }
   const undated = rows.length - [...byDay.values()].reduce((sum, each) => sum + each.length, 0);
   const now = today();
@@ -75,6 +81,12 @@ export function Calendar({
         {Array.from({ length: Math.ceil((offset + days) / 7) * 7 }, (_, index) => {
           const date = index - offset + 1;
           const day = date > 0 && date <= days ? `${month}-${String(date).padStart(2, "0")}` : null;
+          const entries = day ? (byDay.get(day) ?? []) : [];
+          const pageKey = `${view.id}:${day}`;
+          const lastPage = Math.max(0, Math.ceil(entries.length / PAGE_SIZE) - 1);
+          const page = Math.min(pages[pageKey] ?? 0, lastPage);
+          const start = page * PAGE_SIZE;
+          const setPage = (next: number) => setPages((current) => ({ ...current, [pageKey]: next }));
           return (
             <div
               key={index}
@@ -105,7 +117,7 @@ export function Calendar({
                       <Icon name="Plus" className="size-3.5" />
                     </button>
                   </div>
-                  {(byDay.get(day) ?? []).map((row) => (
+                  {entries.slice(start, start + PAGE_SIZE).map((row) => (
                     <button
                       key={row.id}
                       type="button"
@@ -120,6 +132,22 @@ export function Calendar({
                       {rowTitle(table, row)}
                     </button>
                   ))}
+                  {entries.length > PAGE_SIZE ? (
+                    <nav aria-label={`Rows on ${day}`} className="mt-1 grid grid-cols-2 gap-0.5 text-[10px] text-muted-foreground">
+                      <span className="col-span-2 tabular-nums">{start + 1}–{Math.min(start + PAGE_SIZE, entries.length)} of {entries.length}</span>
+                      {([
+                        ["First", 0, page === 0, "ChevronLeft"],
+                        ["Previous", page - 1, page === 0, "ChevronLeft"],
+                        ["Next", page + 1, page === lastPage, "ChevronRight"],
+                        ["Last", lastPage, page === lastPage, "ChevronRight"],
+                      ] as const).map(([name, next, disabled, icon]) => (
+                        <button key={name} type="button" aria-label={`${name} rows on ${day}`} disabled={disabled} className="flex justify-center rounded p-1.5 hover:bg-state-hover disabled:opacity-30" onClick={() => setPage(next)}>
+                          <Icon name={icon} className="size-4" />
+                          {name === "First" || name === "Last" ? <Icon name={icon} className="-ml-2 size-4" /> : null}
+                        </button>
+                      ))}
+                    </nav>
+                  ) : null}
                 </>
               ) : null}
             </div>

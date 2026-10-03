@@ -9,6 +9,7 @@ import type { TableHost } from "./host";
 import { newRowId, type Change } from "./state";
 
 const NONE = "";
+const PAGE_SIZE = 50;
 
 export function Board({
   table,
@@ -28,6 +29,7 @@ export function Board({
   newRowValues(): Values;
 }) {
   const [over, setOver] = useState<string | null>(null);
+  const [pages, setPages] = useState<Record<string, number>>({});
   const group = table.columns.find((column) => column.id === view.groupBy);
   if (!group) return <p className="p-6 text-sm text-muted-foreground">Group this board by a select column.</p>;
   const title = titleColumn(table);
@@ -48,6 +50,12 @@ export function Board({
       {lanes.map((lane) => {
         const cards = rows.filter((row) => laneOf(row) === lane);
         if (lane === NONE && !cards.length) return null;
+        const pageKey = `${view.id}:${lane}`;
+        const lastPage = Math.max(0, Math.ceil(cards.length / PAGE_SIZE) - 1);
+        const page = Math.min(pages[pageKey] ?? 0, lastPage);
+        const setPage = (next: number) => setPages((current) => ({ ...current, [pageKey]: next }));
+        const start = page * PAGE_SIZE;
+        const label = lane || `No ${group.name}`;
         return (
           <section
             key={lane || "none"}
@@ -71,8 +79,26 @@ export function Board({
               {lane ? <OptionChip column={group} option={lane} /> : <span className="text-xs text-muted-foreground">No {group.name}</span>}
               <span className="text-xs text-muted-foreground tabular-nums">{cards.length}</span>
             </header>
+            {cards.length > PAGE_SIZE ? (
+              <nav aria-label={`${label} cards`} className="mb-2 flex items-center justify-between gap-1 text-xs text-muted-foreground">
+                <span className="tabular-nums">{start + 1}–{Math.min(start + PAGE_SIZE, cards.length)} of {cards.length}</span>
+                <div className="flex gap-0.5">
+                  {([
+                    ["First", 0, page === 0, "ChevronLeft"],
+                    ["Previous", page - 1, page === 0, "ChevronLeft"],
+                    ["Next", page + 1, page === lastPage, "ChevronRight"],
+                    ["Last", lastPage, page === lastPage, "ChevronRight"],
+                  ] as const).map(([name, next, disabled, icon]) => (
+                    <button key={name} type="button" aria-label={`${name} ${label} cards`} disabled={disabled} className="flex rounded p-1.5 hover:bg-state-hover disabled:opacity-30" onClick={() => setPage(next)}>
+                      <Icon name={icon} className="size-4" />
+                      {name === "First" || name === "Last" ? <Icon name={icon} className="-ml-2 size-4" /> : null}
+                    </button>
+                  ))}
+                </div>
+              </nav>
+            ) : null}
             <div className="flex min-h-0 flex-col gap-1.5 overflow-y-auto">
-              {cards.map((row) => (
+              {cards.slice(start, start + PAGE_SIZE).map((row) => (
                 <button
                   key={row.id}
                   type="button"

@@ -9,8 +9,9 @@ In a thread's side panel, the **Tables** tab lists the tables made in that threa
 The grid renders a window of visible rows for large tables, including embedded
 Pages tables. Keyboard navigation and clipboard ranges still span every row;
 an open cell editor stays mounted when scrolled out of view. The full table
-is still loaded for local sorting/filtering; board and calendar views are
-separate from this grid optimization.
+is still loaded for local sorting/filtering. Dense boards show 50 cards per
+lane and calendars show 10 entries per day. Each has totals and page controls,
+including direct access to the first and last page; every row remains editable.
 
 ## Commands
 
