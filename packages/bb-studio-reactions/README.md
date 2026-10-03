@@ -17,7 +17,9 @@ one drafts a reply:
 ```
 
 and focuses the composer. Each reaction is a user-configurable emoji + label
-pair, editable in the **Reactions** section of the plugin's settings page.
+pair, editable in BB's settings form for the plugin. The **Saved reactions**
+section previews the stored choices and reports whether this window needs to
+reload before message menus use them.
 The reaction buttons show the emoji only (the host renders plugin actions
 with the plugin's compact icon — identical for every reaction — so a content
 script swaps that icon for the emoji glyph in the per-message action bar and
@@ -78,7 +80,7 @@ composer. The staged BB passes the thread's ID as
 
 ## Settings
 
-- **Reactions** (`emojiItems`) — comma-separated `emoji label` items.
+- **Reactions** (`emojiItems`) — up to eight `emoji label` items, separated by lines or commas.
   Each item appears as one button in the selection menu and is used verbatim
   as the drafted reply text. Empty removes all reaction buttons.
   Default: `👍 Agree, 👎 Disagree, ✅ Do it, ❓ Clarify`
@@ -102,12 +104,10 @@ composer. The staged BB passes the thread's ID as
   [Smart reactions](#smart-reactions).
 
 Disable any surface you don’t want — at least one must stay enabled for
-reactions to be visible. The editor has a **Where reactions appear** group
-with those three toggles, so you can keep only the selection menu, only the
+reactions to be visible. The three location toggles let you keep only the selection menu, only the
 bottom bars, or a mix.
 
-Edit them in the plugin's settings page (the **Reactions** editor, or the raw
-fields below it) or via the CLI:
+Edit them in the plugin's single host settings form, or via the CLI:
 
 ```sh
 bb plugin config emoji-react set emojiItems "👍 Agree, 👎 Disagree, ✅ Do it"
@@ -120,11 +120,12 @@ bb plugin config emoji-react set smartReactions true
 bb plugin reload emoji-react
 ```
 
-The settings editor's **Save & apply** updates the selection menu immediately
-(the host only re-interprets a plugin frontend when its bundle changes, so the
-editor briefly disables and re-enables the plugin to refresh the menu).
-Changes made via the CLI apply on the next app reload or frontend
-re-interpretation.
+After saving, **Saved reactions** shows the stored reaction list and whether
+message menus in this window still use the earlier settings. **Reload window
+to apply** refreshes those menus. Applying never disables or re-enables the
+plugin, and a failed settings save stays in BB's normal settings form.
+Other open windows use the new menu settings after their next reload.
+Smart-reaction instructions use saved settings when a thread starts or resumes.
 
 ## How it works
 
@@ -138,26 +139,21 @@ re-interpretation.
 - A zero-visibility composer banner captures the bound `useComposer()` API
   into a module ref — `messageAction` runs are plain host-chrome callbacks
   with no hook access, and banners mount in every composer layout.
-- The settings section on the plugin detail page is a live editor (rows of
-  emoji + label inputs) persisting through the standard plugin settings
-  endpoint. It now includes a **Where reactions appear** toggle group for the
-  three surfaces; the host-rendered raw settings form below the editor also
-  exposes the same three booleans.
+- BB's host settings form is the only editor. The plugin's settings section
+  previews saved choices and compares them with this window's setup snapshot.
+  The default reaction list is retained if reading that snapshot fails.
 - Smart reactions: `server.ts` keeps the settings in memory and, when
   `smartReactions` is on, returns instructions from `bb.agents.configure`.
   `app.tsx` registers a `reactions` message directive that renders the
   suggested items as buttons. `src/smart-reactions.ts` parses the untrusted
   directive attribute and builds the instructions.
-- A content script replaces the plugin's compact icon with the reaction
-  glyph: the per-message action bar renders plugin actions as icon-only
-  buttons (the title lives in `aria-label`), so the script swaps the icon
-  span for the emoji text; the floating selection-menu buttons already carry
-  the emoji as their label, so there the icon span is simply stripped. It
-  relies on the icon span's `data-plugin-icon-asset` URL, so if a future bb
-  changes those internals the script degrades to leaving the icon in place.
-  When a location is disabled the script hides those buttons instead of
-  swapping — selection-menu buttons are detected by text content, action-bar
-  buttons by role heuristics (assistant vs user via ancestor attributes).
+- The small `src/action-decoration.ts` host adapter identifies actions only by
+  this plugin's icon plus a configured reaction title. It swaps the icon for
+  an emoji in message bars and removes the redundant icon in selection menus.
+  Role-specific visibility uses explicit role attributes; unknown roles stay
+  visible unless both message-bar locations are off. It restores every owned
+  icon and visibility change when the plugin generation ends, and never targets
+  unrelated buttons just because they share an emoji label.
 
 ## Develop
 

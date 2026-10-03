@@ -1,4 +1,3 @@
-import { errorMessage } from "@bb-studio/kit/format";
 // @bb-studio/emoji-react — frontend.
 //
 // Port of NeonPilot's system-reply-actions extension for bb:
@@ -14,18 +13,10 @@ import { errorMessage } from "@bb-studio/kit/format";
 //    an answer with `::reactions{items="…"}`; a messageDirective renders it as
 //    reaction buttons under that message. Clicking one drafts the reaction.
 //
-// 3. Settings — a settingsSection editor with emoji + label rows (like
-//    NeonPilot's `emoji-label-list` control). Saving persists via the
-//    standard plugin settings endpoint and re-applies the menu immediately
-//    through a disable/enable cycle, because the host only re-interprets a
-//    plugin frontend when its bundle hash changes or the plugin re-appears.
-//
-// The emoji list must exist at frontend-interpretation time (slot
-// registrations are static), so setup reads the plugin settings
-// synchronously with a same-origin XHR. Failures fall back to the defaults;
-// the menu then refreshes on the next interpretation (app reload, `bb
-// plugin dev` rebuild, or the editor's save & apply).
-import { useEffect, useState } from "react";
+// 3. Settings — BB owns the single settings form. A read-only preview shows
+//    whether saved menu settings need a window reload. Applying never disables
+//    the plugin. Static action registrations read one snapshot at setup.
+import { useEffect } from "react";
 import { toast } from "sonner";
 import {
   definePluginApp,
@@ -36,18 +27,12 @@ import {
   type PluginMessageDirectiveProps,
 } from "@get-bb/plugin-sdk/app";
 import { Button } from "@bb-studio/kit/ui";
-import { Icon } from "@bb-studio/kit/ui/huge-icon";
-import { Input } from "@bb-studio/kit/ui";
-import {
-  MAX_EMOJI_ITEMS,
-  parseEmojiItems,
-  serializeEmojiItems,
-  type EmojiItem,
-} from "./src/emoji-items";
+import { parseEmojiItems } from "./src/emoji-items";
+import { menuSettings, needsMenuReload, type MenuSettings } from "./src/settings";
+import { mountActionDecoration } from "./src/action-decoration";
 import { pickComposer } from "./src/composer-target";
 import {
   composeReactionDraft,
-  parseQuotePosition,
   type QuotePosition,
 } from "./src/draft";
 import {
@@ -62,54 +47,16 @@ const PLUGIN_ID = "emoji-react";
 // static per frontend interpretation, and `useSettings` is hook-only).
 // ---------------------------------------------------------------------------
 
-interface SettingsSnapshot {
-  emojiItems: string | undefined;
-  quoteSelection: boolean;
-  quotePosition: QuotePosition;
-  showInSelectionMenu: boolean;
-  showInAssistantBar: boolean;
-  showInUserBar: boolean;
-}
-
-function readSettingsSnapshot(): SettingsSnapshot {
+function readSettingsSnapshot(): MenuSettings {
   try {
     const xhr = new XMLHttpRequest();
     xhr.open("GET", `/api/v1/plugins/${PLUGIN_ID}/settings`, false);
     xhr.send();
-    if (xhr.status !== 200) {
-      return {
-        emojiItems: undefined,
-        quoteSelection: true,
-        quotePosition: "before",
-        showInSelectionMenu: true,
-        showInAssistantBar: true,
-        showInUserBar: true,
-      };
-    }
-    const body = JSON.parse(xhr.responseText) as {
-      values?: Record<string, unknown>;
-    };
-    const values = body.values ?? {};
-    return {
-      emojiItems:
-        typeof values.emojiItems === "string" ? values.emojiItems : undefined,
-      quoteSelection: values.quoteSelection !== false,
-      quotePosition: parseQuotePosition(values.quotePosition),
-      showInSelectionMenu: values.showInSelectionMenu !== false,
-      showInAssistantBar: values.showInAssistantBar !== false,
-      showInUserBar: values.showInUserBar !== false,
-    };
+    if (xhr.status !== 200) return menuSettings();
+    const body = JSON.parse(xhr.responseText) as { values?: Record<string, unknown> };
+    return menuSettings(body.values);
   } catch {
-    // Server unreachable / malformed response: fall back to defaults rather
-    // than failing the whole frontend registration.
-    return {
-      emojiItems: undefined,
-      quoteSelection: true,
-      quotePosition: "before",
-      showInSelectionMenu: true,
-      showInAssistantBar: true,
-      showInUserBar: true,
-    };
+    return menuSettings();
   }
 }
 
@@ -202,296 +149,27 @@ function SmartReactions({ attributes, message }: PluginMessageDirectiveProps) {
 }
 
 // ---------------------------------------------------------------------------
-// Settings editor (settingsSection on the plugin detail page)
+// The host owns editing and persistence. This section only previews saved
+// settings and makes static menu registration state explicit.
 // ---------------------------------------------------------------------------
 
-function EmojiReactionsSettings() {
+function ReactionsPreview({ applied }: { applied: MenuSettings }) {
   const { values, isLoading } = useSettings();
-  const [items, setItems] = useState<EmojiItem[]>(() =>
-    parseEmojiItems(
-      typeof values?.emojiItems === "string" ? values.emojiItems : undefined,
-    ),
-  );
-  const [quoteSelection, setQuoteSelection] = useState(
-    values?.quoteSelection !== false,
-  );
-  const [quotePosition, setQuotePosition] = useState<QuotePosition>(
-    parseQuotePosition(values?.quotePosition),
-  );
-  const [showInSelectionMenu, setShowInSelectionMenu] = useState(
-    values?.showInSelectionMenu !== false,
-  );
-  const [showInAssistantBar, setShowInAssistantBar] = useState(
-    values?.showInAssistantBar !== false,
-  );
-  const [showInUserBar, setShowInUserBar] = useState(
-    values?.showInUserBar !== false,
-  );
-  const [smartReactions, setSmartReactions] = useState(
-    values?.smartReactions === true,
-  );
-  const [saving, setSaving] = useState(false);
-
-  // Keep local state in sync when settings change elsewhere (CLI, the
-  // host-rendered settings form, or this editor's own save cycle).
-  useEffect(() => {
-    setItems(
-      parseEmojiItems(
-        typeof values?.emojiItems === "string" ? values.emojiItems : undefined,
-      ),
-    );
-    setQuoteSelection(values?.quoteSelection !== false);
-    setQuotePosition(parseQuotePosition(values?.quotePosition));
-    setShowInSelectionMenu(values?.showInSelectionMenu !== false);
-    setShowInAssistantBar(values?.showInAssistantBar !== false);
-    setShowInUserBar(values?.showInUserBar !== false);
-    setSmartReactions(values?.smartReactions === true);
-  }, [
-    values?.emojiItems,
-    values?.quoteSelection,
-    values?.quotePosition,
-    values?.showInSelectionMenu,
-    values?.showInAssistantBar,
-    values?.showInUserBar,
-    values?.smartReactions,
-  ]);
-
-  const updateItem = (index: number, patch: Partial<EmojiItem>) => {
-    setItems((current) =>
-      current.map((item, i) => {
-        if (i !== index) return item;
-        const emoji = patch.emoji ?? item.emoji;
-        const label = patch.label ?? item.label;
-        return { emoji, label, text: `${emoji} ${label}`.trim() };
-      }),
-    );
-  };
-
-  const addItem = () => {
-    setItems((current) =>
-      current.length >= MAX_EMOJI_ITEMS
-        ? current
-        : [...current, { emoji: "", label: "", text: "" }],
-    );
-  };
-
-  const removeItem = (index: number) => {
-    setItems((current) =>
-      current.length <= 1
-        ? current
-        : current.filter((_, i) => i !== index),
-    );
-  };
-
-  const save = async () => {
-    setSaving(true);
-    try {
-      const cleaned = items.filter(
-        (item) => item.emoji.trim().length > 0 || item.label.trim().length > 0,
-      );
-      const response = await fetch(`/api/v1/plugins/${PLUGIN_ID}/settings`, {
-        method: "PUT",
-        headers: { "content-type": "application/json" },
-        body: JSON.stringify({
-          values: {
-            emojiItems: serializeEmojiItems(cleaned),
-            quoteSelection,
-            quotePosition,
-            showInSelectionMenu,
-            showInAssistantBar,
-            showInUserBar,
-            smartReactions,
-          },
-        }),
-      });
-      const body = (await response.json().catch(() => null)) as {
-        ok?: boolean;
-        error?: string;
-      } | null;
-      if (!response.ok || body?.ok !== true) {
-        throw new Error(body?.error ?? `HTTP ${response.status}`);
-      }
-      toast.success("Reactions saved");
-      // Apply immediately: the host only re-interprets a frontend when its
-      // bundle hash changes or the plugin re-appears, so a disable/enable
-      // cycle re-runs setup, which re-reads the fresh settings.
-      const disable = await fetch(`/api/v1/plugins/${PLUGIN_ID}/disable`, {
-        method: "POST",
-      });
-      const enable = await fetch(`/api/v1/plugins/${PLUGIN_ID}/enable`, {
-        method: "POST",
-      });
-      if (!disable.ok || !enable.ok) {
-        toast.error(
-          "Saved, but the menu didn't refresh. Reload the window to see the new reactions.",
-        );
-      }
-    } catch (error) {
-      toast.error(
-        `Couldn't save reactions: ${
-          errorMessage(error)
-        }`,
-      );
-    } finally {
-      setSaving(false);
-    }
-  };
-
-  return (
-    <div className="space-y-3">
-      <p className="text-sm text-muted-foreground">
-        Each reaction shows as its emoji in the text selection menu and the
-        bar under messages. Clicking one drafts a reply with the reaction and,
-        if you choose, the text you selected. Save &amp; apply updates the
-        menus right away.
-      </p>
-      <div className="space-y-2">
-        {items.map((item, index) => (
-          <div key={index} className="flex items-center gap-2">
-            <Input
-              value={item.emoji}
-              onChange={(event) =>
-                updateItem(index, { emoji: event.target.value })
-              }
-              className="w-14 shrink-0 text-center"
-              aria-label={`Reaction ${index + 1} emoji`}
-              placeholder="👍"
-            />
-            <Input
-              value={item.label}
-              onChange={(event) =>
-                updateItem(index, { label: event.target.value })
-              }
-              className="flex-1"
-              aria-label={`Reaction ${index + 1} label`}
-              placeholder="Agree"
-            />
-            <Button
-              type="button"
-              variant="ghost"
-              size="icon"
-              aria-label={`Remove reaction ${index + 1}`}
-              onClick={() => removeItem(index)}
-              disabled={items.length <= 1}
-            >
-              <Icon name="Trash2" className="size-4" />
-            </Button>
-          </div>
-        ))}
-        {items.length === 0 ? (
-          <p className="text-sm text-muted-foreground">
-            No reactions yet. Add one, or leave the list empty to hide the
-            reaction buttons.
-          </p>
-        ) : null}
-      </div>
-      <div className="flex flex-wrap items-center gap-3">
-        <Button
-          type="button"
-          variant="outline"
-          size="sm"
-          onClick={addItem}
-          disabled={items.length >= MAX_EMOJI_ITEMS}
-        >
-          <Icon name="Plus" className="mr-1 size-4" />
-          Add reaction
-        </Button>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={quoteSelection}
-            onChange={(event) => setQuoteSelection(event.target.checked)}
-            className="size-4 accent-foreground"
-          />
-          Quote the highlighted text
-        </label>
-        <select
-          value={quotePosition}
-          onChange={(event) =>
-            setQuotePosition(
-              event.target.value === "after" ? "after" : "before",
-            )
-          }
-          disabled={!quoteSelection}
-          aria-label="Quote position"
-          className="h-8 rounded-md border border-border bg-background px-2 text-sm text-foreground disabled:opacity-50"
-        >
-          <option value="before">Quote first</option>
-          <option value="after">Reaction first</option>
-        </select>
-      </div>
-
-      {/* Location toggles */}
-      <div className="rounded-md border border-border p-3 space-y-2">
-        <p className="text-sm font-medium">Where reactions appear</p>
-        <p className="text-xs text-muted-foreground">
-          Choose where reactions show. With all three off, they're hidden
-          everywhere.
-        </p>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={showInSelectionMenu}
-            onChange={(event) => setShowInSelectionMenu(event.target.checked)}
-            className="size-4 accent-foreground"
-          />
-          In the text selection menu and right-click menu
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={showInAssistantBar}
-            onChange={(event) => setShowInAssistantBar(event.target.checked)}
-            className="size-4 accent-foreground"
-          />
-          Under assistant messages
-        </label>
-        <label className="flex cursor-pointer items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            checked={showInUserBar}
-            onChange={(event) => setShowInUserBar(event.target.checked)}
-            className="size-4 accent-foreground"
-          />
-          Under your messages
-        </label>
-        {!showInSelectionMenu && !showInAssistantBar && !showInUserBar ? (
-          <p className="text-xs text-amber-600 dark:text-amber-400">
-            All three are off, so reactions are hidden everywhere.
-          </p>
-        ) : null}
-      </div>
-
-      <div className="rounded-md border border-border p-3 space-y-2">
-        <label className="flex cursor-pointer items-center gap-2 text-sm font-medium">
-          <input
-            type="checkbox"
-            checked={smartReactions}
-            onChange={(event) => setSmartReactions(event.target.checked)}
-            className="size-4 accent-foreground"
-          />
-          Smart reactions
-        </label>
-        <p className="text-xs text-muted-foreground">
-          When a reply asks you something, the assistant adds buttons with
-          reactions that fit it. It uses yours when they fit and writes its
-          own for distinct options. Applies to threads that start or resume
-          after you save.
-        </p>
-      </div>
-
-      <div className="flex justify-end">
-        <Button
-          type="button"
-          size="sm"
-          onClick={() => void save()}
-          disabled={saving || isLoading}
-        >
-          {saving ? "Saving…" : "Save & apply"}
-        </Button>
-      </div>
+  const saved = menuSettings(values ?? {});
+  const items = parseEmojiItems(saved.emojiItems);
+  const pending = needsMenuReload(applied, saved);
+  return <div className="space-y-3">
+    <p className="text-sm text-muted-foreground">Edit and save your reactions in the settings above. Each button drafts its reaction into the conversation.</p>
+    <div className="flex flex-wrap gap-2" aria-label="Saved reaction preview">
+      {items.map((item, index) => <span key={index} className="rounded-md border border-border px-2 py-1 text-sm">{item.text}</span>)}
+      {!items.length && <span className="text-sm text-muted-foreground">No reaction buttons configured.</span>}
     </div>
-  );
+    <p role="status" className="text-sm text-muted-foreground">{isLoading ? "Loading saved settings…" : !values ? "Saved settings are unavailable. Reopen settings when connected." : pending
+      ? "Your changes are saved. Reload this window to apply them to message menus."
+      : "Saved menu settings are applied in this window."}</p>
+    {pending && !isLoading && values && <Button type="button" size="sm" onClick={() => window.location.reload()}>Reload window to apply</Button>}
+    <p className="text-xs text-muted-foreground">Smart reactions use saved settings when a thread starts or resumes.</p>
+  </div>;
 }
 
 // ---------------------------------------------------------------------------
@@ -559,238 +237,12 @@ export default definePluginApp((app) => {
 
   app.slots.settingsSection({
     id: "emoji-reactions-editor",
-    title: "Reactions",
-    description:
-      "Reactions in the text selection menu and the bar under messages, and smart reactions.",
-    component: EmojiReactionsSettings,
+    title: "Saved reactions",
+    component: () => <ReactionsPreview applied={snapshot} />,
   });
 
-  // Emoji-only surfaces need the plugin's compact icon replaced by the
-  // reaction glyph itself, because the host renders plugin messageActions
-  // with PluginIcon (no icon-less path) and plugin stylesheets are
-  // @scope-confined to plugin roots. Two surfaces, two treatments:
-  //
-  // - Selection menu (portaled overlay): the action title is rendered as
-  //   button text next to the icon, so the icon is redundant — strip it.
-  // - Per-message action bar: plugin actions render as icon-only buttons
-  //   (the title lives in `aria-label`), so every reaction would show the
-  //   same plugin icon. Swap the icon span for the reaction glyph.
-  // The icon stays everywhere else (plugin list, hover action bar button,
-  // …) — only surfaces where the emoji already says everything lose it.
-  //
-  // Location toggles (showInSelectionMenu / showInAssistantBar / showInUserBar)
-  // are enforced here: the single `messageAction` slot drives both surfaces,
-  // so we hide the DOM for disabled locations. Selection menu buttons carry
-  // text, action-bar buttons are icon-only; for the action bar we attempt to
-  // detect user vs assistant via ancestor attributes/classes and only hide
-  // when we can confidently tell the role.
   app.contentScripts.register({
     id: "emoji-glyph-actions",
-    mount({ signal }) {
-      // The icon span is `<span data-plugin-icon-asset="/api/v1/plugins/
-      // emoji-react/assets/icon?h=…">` — unique to this plugin, so other
-      // plugins' actions in the same menu are never touched.
-      const ICON_SELECTOR =
-        'span[data-plugin-icon-asset*="plugins/emoji-react/assets/icon"]';
-      const GLYPH_MARKER = "data-emoji-react-glyph";
-      const SURFACE_ATTR = "data-emoji-react-surface";
-
-      // Keep a set of our reaction titles to spot already-processed glyph buttons
-      const reactionTitles = new Set(
-        items.map((i) => (i.emoji || i.label || i.text).trim()).filter(Boolean),
-      );
-
-      const isReactionButton = (button: HTMLButtonElement): boolean =>
-        reactionTitles.has((button.getAttribute("aria-label") ?? "").trim()) ||
-        reactionTitles.has((button.textContent ?? "").trim());
-
-      const isSelectionMenuButton = (button: HTMLButtonElement): boolean =>
-        (button.textContent ?? "").trim().length > 0;
-
-      const getMessageRole = (
-        button: HTMLButtonElement,
-      ): "user" | "assistant" | null => {
-        let el: Element | null = button;
-        for (let i = 0; i < 10 && el; i++) {
-          const dataRole =
-            el.getAttribute("data-role") ??
-            el.getAttribute("data-message-role") ??
-            el.getAttribute("data-conversation-role") ??
-            el.getAttribute("data-testid") ??
-            "";
-          const lower = dataRole.toLowerCase();
-          if (lower.includes("assistant")) return "assistant";
-          if (lower === "user" || lower.includes("user-message") || lower.includes("user_message")) return "user";
-          // Class-based heuristics
-          const cls = (el.getAttribute("class") ?? "").toLowerCase();
-          if (cls.includes("assistant")) return "assistant";
-          if (cls.includes("user-message") || cls.includes("role-user")) return "user";
-          // Some builds put role on a nearby test id like "message-assistant"
-          if (lower.includes("assistant-message") || lower.includes("assistant_message")) return "assistant";
-          el = el.parentElement;
-        }
-        // Fallback: search ancestors for any element whose aria-label or title hints at role
-        let scan: Element | null = button.parentElement;
-        for (let i = 0; i < 6 && scan; i++) {
-          const label = (scan.getAttribute("aria-label") ?? "").toLowerCase();
-          if (label.includes("assistant")) return "assistant";
-          if (label.includes("user")) return "user";
-          scan = scan.parentElement;
-        }
-        return null;
-      };
-
-      const shouldHideForSurface = (
-        surface: string | null,
-        role: "user" | "assistant" | null,
-        isSelection: boolean,
-      ): boolean => {
-        if (isSelection) return !showInSelectionMenu;
-        // action-bar path
-        if (role === "assistant") return !showInAssistantBar;
-        if (role === "user") return !showInUserBar;
-        // surface hint fallback
-        if (surface === "assistant-bar") return !showInAssistantBar;
-        if (surface === "user-bar") return !showInUserBar;
-        // Unknown role: only hide if both bars are disabled (global action-bar off)
-        if (!showInAssistantBar && !showInUserBar) return true;
-        return false;
-      };
-
-      const shouldHide = (button: HTMLButtonElement): boolean => {
-        if (isSelectionMenuButton(button)) {
-          return !showInSelectionMenu;
-        }
-        // Per-message action bar (icon-only before swap, glyph after)
-        const role = getMessageRole(button);
-        if (role === "assistant") return !showInAssistantBar;
-        if (role === "user") return !showInUserBar;
-        // Unknown role: only hide if both bars are disabled (global action-bar off)
-        if (!showInAssistantBar && !showInUserBar) return true;
-        return false;
-      };
-
-      const sweep = () => {
-        // 1) Fresh buttons that still carry the plugin icon
-        for (const icon of Array.from(document.querySelectorAll(ICON_SELECTOR))) {
-          // Only reaction buttons: the same icon also marks this plugin in
-          // the settings nav, the plugin page header, and the plugin list.
-          const button = icon.closest("button") as HTMLButtonElement | null;
-          if (button === null || !isReactionButton(button)) continue;
-
-          const isSelection = isSelectionMenuButton(button);
-          const role = isSelection ? null : getMessageRole(button);
-          const surface = isSelection ? "selection-menu" : role ? (role + "-bar") : "action-bar";
-
-          if (shouldHide(button)) {
-            button.style.display = "none";
-            button.setAttribute("hidden", "");
-            button.setAttribute(SURFACE_ATTR, surface);
-            continue;
-          } else {
-            // Ensure button is visible if previously hidden (settings just changed via reload on same DOM)
-            if (button.hasAttribute("hidden") || button.style.display === "none") {
-              button.style.display = "";
-              button.removeAttribute("hidden");
-            }
-            button.setAttribute(SURFACE_ATTR, surface);
-          }
-
-          // Selection menu: the button already carries the emoji as text
-          // next to the icon — drop the redundant icon.
-          if (isSelection) {
-            icon.remove();
-            continue;
-          }
-          // Per-message action bar: the button is icon-only; its accessible
-          // name (the emoji) becomes the visible glyph.
-          const label = button.getAttribute("aria-label");
-          if (label === null || label.trim().length === 0) {
-            icon.remove();
-            continue;
-          }
-          // Avoid double-replacing if we already swapped
-          if (button.querySelector(`span[${GLYPH_MARKER}]`) !== null) continue;
-          const glyph = document.createElement("span");
-          glyph.setAttribute("aria-hidden", "true");
-          glyph.setAttribute(GLYPH_MARKER, "true");
-          glyph.textContent = label.trim();
-          icon.replaceWith(glyph);
-        }
-
-        // 2) Already-processed buttons: icon is gone, glyph or plain text remains.
-        // Find our reaction buttons via the surface marker or via aria-label matching.
-        const candidates = new Set<HTMLButtonElement>();
-        for (const el of Array.from(document.querySelectorAll(`button[${SURFACE_ATTR}]`))) {
-          const b = el as HTMLButtonElement;
-          candidates.add(b);
-        }
-        for (const el of Array.from(document.querySelectorAll(`span[${GLYPH_MARKER}]`))) {
-          const btn = (el as Element).closest("button") as HTMLButtonElement | null;
-          if (btn) candidates.add(btn);
-        }
-        // Fallback: buttons whose aria-label matches a known reaction title (covers pre-marker DOM from previous generation)
-        for (const btn of Array.from(document.querySelectorAll('button[aria-label]')) as HTMLButtonElement[]) {
-          const aria = (btn.getAttribute("aria-label") ?? "").trim();
-          if (reactionTitles.has(aria) && !candidates.has(btn)) {
-            // Heuristic: only treat as ours if it looks like an action-bar or selection-menu reaction
-            // (selection menu buttons after icon removal still have aria-label? Usually they do, but we can include)
-            candidates.add(btn);
-          }
-        }
-
-        for (const button of candidates) {
-          // Skip buttons still handled by the icon loop (they have icon and were already processed)
-          if (button.querySelector(ICON_SELECTOR) !== null) continue;
-
-          const surface = button.getAttribute(SURFACE_ATTR);
-          const hasGlyph = button.querySelector(`span[${GLYPH_MARKER}]`) !== null;
-          // Re-derive surface/role if marker missing
-          const isSelection = !hasGlyph && (button.textContent ?? "").trim().length > 0 && surface === "selection-menu";
-          // For glyph buttons, they are always action-bar
-          const role = hasGlyph ? getMessageRole(button) : null;
-          const isSelectionCandidate = hasGlyph ? false : (surface === "selection-menu" || (!hasGlyph && (button.textContent ?? "").trim().length > 0 && reactionTitles.has((button.textContent ?? "").trim())));
-
-          let hide = false;
-          if (hasGlyph) {
-            hide = shouldHideForSurface(surface, role, false);
-          } else if (surface === "selection-menu" || isSelectionCandidate) {
-            hide = !showInSelectionMenu;
-          } else {
-            // Unknown pre-marker button that matched aria-label: treat as action-bar
-            hide = shouldHideForSurface(surface, role, false);
-          }
-
-          if (hide) {
-            button.style.display = "none";
-            button.setAttribute("hidden", "");
-          } else {
-            if (button.style.display === "none") button.style.display = "";
-            button.removeAttribute("hidden");
-          }
-        }
-      };
-
-      // The menu mounts fresh per selection; watch for it and clean up as
-      // soon as it appears. rAF-debounced so streaming text mutations do
-      // not trigger a sweep every token.
-      let frame: number | undefined;
-      const schedule = () => {
-        if (frame !== undefined) return;
-        frame = requestAnimationFrame(() => {
-          frame = undefined;
-          sweep();
-        });
-      };
-      const observer = new MutationObserver(schedule);
-      observer.observe(document.body, { childList: true, subtree: true });
-      sweep(); // the menu may already be open when the script mounts
-
-      signal.addEventListener("abort", () => {
-        observer.disconnect();
-        if (frame !== undefined) cancelAnimationFrame(frame);
-      });
-    },
+    mount: ({ signal }) => mountActionDecoration(snapshot, signal),
   });
 });
-

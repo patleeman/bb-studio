@@ -11,8 +11,8 @@
 //
 // Everything else lives in the frontend (app.tsx): the selection menu reads the
 // settings synchronously at frontend-interpretation time, so a settings
-// change takes effect after the plugin's frontend is re-interpreted (the
-// settings editor performs a disable/enable cycle to apply immediately).
+// change takes effect after the plugin's frontend is re-interpreted. The
+// settings preview offers a window reload without disabling the plugin.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { DEFAULT_EMOJI_ITEMS, parseEmojiItems } from "./src/emoji-items";
 import { smartReactionInstructions } from "./src/smart-reactions";
@@ -22,9 +22,10 @@ export default async function plugin(bb: BbPluginApi) {
     emojiItems: {
       type: "string",
       label: "Reactions",
+      experimental_multiline: true,
       default: DEFAULT_EMOJI_ITEMS,
       description:
-        "Comma-separated emoji and label pairs, such as \"👍 Agree\". Each shows as its emoji and is drafted as your reply. Leave empty to hide the buttons.",
+        "Up to eight emoji and label pairs, such as \"👍 Agree\", separated by lines or commas. Each shows as its emoji and is drafted as your reply. Leave empty to hide the buttons.",
     },
     quoteSelection: {
       type: "boolean",
