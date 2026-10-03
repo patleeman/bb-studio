@@ -22,16 +22,16 @@ struct SavedViewEditor: View {
     var body: some View {
         NavigationStack {
             Form {
-                TextField("View name", text: $name)
+                TextField("Channel name", text: $name)
                 if let error { Text(error).foregroundStyle(.red) }
                 Section("Bots") { ForEach(bots) { bot in memberRow(SavedViewMember(kind: "bot", id: bot.id), label: bot.name) } }
                 Section("Threads") { ForEach(threads) { thread in memberRow(SavedViewMember(kind: "thread", id: thread.id), label: thread.displayTitle) } }
                 if let initial {
-                    Section { Button(initial.archived ? "Restore view" : "Archive view") { Task { await archive(initial) } } }
+                    Section { Button(initial.archived ? "Restore channel" : "Archive channel") { Task { await archive(initial) } } }
                 }
             }
             .disabled(saving)
-            .navigationTitle(initial == nil ? "New View" : "Edit View")
+            .navigationTitle(initial == nil ? "New Channel" : "Edit Channel")
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || members.count > 32) }

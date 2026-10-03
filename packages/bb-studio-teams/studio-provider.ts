@@ -27,13 +27,13 @@ export const BOT_KIND: StudioKind = {
 };
 
 export const VIEW_KIND: StudioKind = {
-  id: "view", label: "View", plural: "Views", icon: "MessageSquare",
+  id: "view", label: "Channel", plural: "Channels", icon: "MessageSquare",
   columns: [], actions: [], create: { mode: "rpc" }, canArchive: true,
   capabilities: { create: true, move: false, archive: true, delete: true, rename: false, duplicate: false, export: false, comments: false, versions: false, links: false },
   mentionProviderId: "views",
   hasOwnChat: true,
-  blurb: "Bots and ordinary threads gathered in one timeline.",
-  agentHint: "Read this saved thread view with `bb bots view-read <id>`. Work and approvals belong to its ordinary threads.",
+  blurb: "Message several bots and threads together.",
+  agentHint: "Read this channel with `bb bots channel-read <id>`. Work and approvals belong to its ordinary threads.",
 };
 export const viewHref = (id: string) => `/plugins/${PLUGIN_ID}/views/${id}`;
 export function viewStudioItem(view: ThreadView): StudioItem {
@@ -118,7 +118,7 @@ export function registerStudio(
       if (kind === VIEW_KIND.id) return { item: viewStudioItem(await deps.createView()) };
       throw new Error("Bots are created in a setup chat.");
     },
-    studio_move: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: deps.views().some(view => view.id === id) ? "A view spans projects. Add it to a Studio space instead." : "A bot keeps its own project." })) }),
+    studio_move: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: deps.views().some(view => view.id === id) ? "A channel spans projects. Add it to a Studio space instead." : "A bot keeps its own project." })) }),
     studio_archive: ({ ids, archived }) => eachId(ids, (id) => deps.views().some(view => view.id === id) ? deps.archiveView(id, archived) : deps.retire(id, archived)),
     studio_delete: ({ ids }) => eachId(ids, (id) => {
       if (deps.views().some(view => view.id === id)) return deps.deleteView(id);

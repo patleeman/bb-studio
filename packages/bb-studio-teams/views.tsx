@@ -45,13 +45,13 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
     try { onSaved(initial ? await rpc.call("viewUpdate", { ...initial, name, members, expectedUpdatedAt: initial.updatedAt }) : await rpc.call("viewCreate", { name, members, requestId: requestId.current })); }
     catch (e) { setError(message(e)); } finally { setPending(false); }
   };
-  return <Modal title={initial ? "Edit view" : "New view"} open={open} onOpenChange={value => { if (!value) onClose(); }}>
+  return <Modal title={initial ? "Edit channel" : "New channel"} open={open} onOpenChange={value => { if (!value) onClose(); }}>
     <form onSubmit={event => { event.preventDefault(); void save(); }} className="flex flex-col gap-4">
-      <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">Name</span><Input aria-label="View name" value={name} maxLength={80} onChange={e => setName(e.target.value)} placeholder="Command Center" autoFocus /></label>
+      <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">Name</span><Input aria-label="Channel name" value={name} maxLength={80} onChange={e => setName(e.target.value)} placeholder="Command Center" autoFocus /></label>
       <div className="flex flex-col gap-1.5">
         <div className="flex items-baseline justify-between"><span className="text-xs font-medium text-muted-foreground">Members</span><span className={`text-xs ${members.length > 32 ? "text-destructive" : "text-subtle-foreground"}`}>{members.length > 32 ? `${members.length} of 32 allowed` : `${members.length} selected`}</span></div>
         <div className="relative"><Icon name="Search" className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle-foreground" /><Input aria-label="Find bots and threads" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find bots and threads" className="pl-8" /></div>
-        <div className="-mx-1 max-h-72 overflow-auto px-1" role="group" aria-label="View members">
+        <div className="-mx-1 max-h-72 overflow-auto px-1" role="group" aria-label="Channel members">
           {sections.map(section => <section key={section.label} aria-label={section.label} className="pt-2 first:pt-1">
             <h3 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-subtle-foreground uppercase">{section.label}</h3>
             {section.rows.map(c => <label key={memberKey(c.member)} className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-state-hover"><Checkbox checked={isMember(c.member)} onCheckedChange={() => toggle(c.member)} aria-label={c.label} /><ItemTile icon={c.icon} kindIcon={c.kindIcon} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>{c.detail && <span className="max-w-40 shrink-0 truncate text-xs text-subtle-foreground">{c.detail}</span>}</label>)}
@@ -60,7 +60,7 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
         </div>
       </div>
       <ErrorMessage error={error} />
-      <div className="flex justify-end gap-2 border-t border-border pt-3"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={pending || !name.trim() || members.length > 32}>{pending ? "Saving…" : initial ? "Save view" : "Create view"}</Button></div>
+      <div className="flex justify-end gap-2 border-t border-border pt-3"><Button type="button" variant="ghost" onClick={onClose}>Cancel</Button><Button type="submit" disabled={pending || !name.trim() || members.length > 32}>{pending ? "Saving…" : initial ? "Save channel" : "Create channel"}</Button></div>
     </form>
   </Modal>;
 }
@@ -99,12 +99,12 @@ export function ViewHeader({ subPath }: PluginNavPanelProps) {
   return <div data-view-header className="flex min-w-0 flex-1 items-center gap-2">
     <p className="min-w-0 truncate text-sm font-semibold">{view.name}</p>
     {view.archived && <span className="shrink-0 rounded bg-foreground/[0.08] px-1.5 text-[11px] text-muted-foreground">Archived</span>}
-    <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="View options" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger>
+    <DropdownMenu><DropdownMenuTrigger asChild><button type="button" aria-label="Channel options" className="inline-flex size-6 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"><Icon name="MoreHorizontal" className="size-4" /></button></DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-44">
-        <DropdownMenuItem onSelect={edit}><Icon name="Edit" />Edit view</DropdownMenuItem>
+        <DropdownMenuItem onSelect={edit}><Icon name="Edit" />Edit channel</DropdownMenuItem>
         <DropdownMenuItem onSelect={archive}><Icon name="Archive" />{view.archived ? "Restore" : "Archive"}</DropdownMenuItem>
       </DropdownMenuContent></DropdownMenu>
-    <button type="button" aria-label="Edit view" title="Members" onClick={edit} className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground">
+    <button type="button" aria-label="Edit channel" title="Members" onClick={edit} className="ml-auto flex h-7 shrink-0 items-center gap-1.5 rounded-md px-1.5 text-xs text-muted-foreground transition-colors hover:bg-state-hover hover:text-foreground">
       <span className="flex -space-x-1.5">{view.members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>
       <span className="max-sm:sr-only">{view.members.length || "Add"} {view.members.length === 1 ? "member" : "members"}</span>
     </button>
@@ -128,7 +128,7 @@ function ViewDetail({ id }: { id: string }) {
   useEffect(() => {
     if (!page || initialized.current) return;
     initialized.current = true;
-    if (page.view.name === "New view" && !page.view.members.length) setEditing(true);
+    if (["New view", "New channel"].includes(page.view.name) && !page.view.members.length) setEditing(true);
   }, [page]);
   const timeline = useRef<HTMLDivElement>(null), followLatest = useRef(true);
   useLayoutEffect(() => {
@@ -178,7 +178,7 @@ function ViewDetail({ id }: { id: string }) {
     } catch (e) { failure = message(e); }
     if (failure) { setError(failure); throw new Error(failure); }
   };
-  if (!page) return <PageColumn><ErrorMessage error={error} /><p role="status">Loading view…</p></PageColumn>;
+  if (!page) return <PageColumn><ErrorMessage error={error} /><p role="status">Loading channel…</p></PageColumn>;
   const botFor = (threadId: string) => bots.find(b => b.id === page.threads.find(t => t.id === threadId)?.botId);
   const roots = new Set(page.threads.filter(t => !t.parentThreadId).map(t => t.id));
   const time = (at: number) => new Intl.DateTimeFormat(undefined, { timeStyle: "short" }).format(at);
@@ -225,7 +225,7 @@ function ViewDetail({ id }: { id: string }) {
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
     </div></div>
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
-    {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This view is archived. Restore it from the ··· menu to send messages.</p>
+    {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This channel is archived. Restore it from the ··· menu to send messages.</p>
       : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @ to mention members.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}
     <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
       <div className="flex min-w-0 flex-1 items-center gap-1">
@@ -259,7 +259,7 @@ function ViewCollection() {
   const call = useCallback<ProviderCall>((method, input) => rpc.call(method, input as never) as never, [rpc]);
   const [version, setVersion] = useState(0);
   useRealtime("views-changed", () => setVersion(value => value + 1));
-  return <AddOnCollection pluginId={PLUGIN_ID} title="Views" kind={VIEW_KIND.id} call={call} refreshKey={version} />;
+  return <AddOnCollection pluginId={PLUGIN_ID} title="Channels" kind={VIEW_KIND.id} call={call} refreshKey={version} />;
 }
 export function FormerChannelRedirect({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<Contract>(), navigate = useBbNavigate();
@@ -278,5 +278,5 @@ export function FormerChannelRedirect({ subPath }: PluginNavPanelProps) {
     }, e => { if (active) setError(message(e)); });
     return () => { active = false; };
   }, [subPath, rpc, navigate]);
-  return <PageColumn><ErrorMessage error={error} /><p role="status">Opening view…</p></PageColumn>;
+  return <PageColumn><ErrorMessage error={error} /><p role="status">Opening channel…</p></PageColumn>;
 }

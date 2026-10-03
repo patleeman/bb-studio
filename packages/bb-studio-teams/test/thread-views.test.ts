@@ -86,7 +86,7 @@ test("uncertain addressing and out-of-view targets don't dispatch anything", asy
     const view = await x.views.create("Work", [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }]);
     const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: "Help" });
     await expect(x.views.send(input)).rejects.toThrow("Choose recipients");
-    await expect(x.views.send({ ...input, targets: [{ kind: "thread", id: "thr_other" }] })).rejects.toThrow("belong to this view");
+    await expect(x.views.send({ ...input, targets: [{ kind: "thread", id: "thr_other" }] })).rejects.toThrow("belong to this channel");
     expect(x.harness.inspection.sdk.callsTo("threads.send")).toHaveLength(0);
   } finally { await x.close(); }
 });

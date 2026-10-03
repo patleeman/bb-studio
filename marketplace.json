@@ -257,12 +257,12 @@
     {
       "id": "bot-teams",
       "displayName": "Studio Teams",
-      "description": "Part of BB Studio. Persistent bot profiles and saved views of ordinary threads, with shared memory and missions.",
+      "description": "Part of BB Studio. Persistent bot profiles and channels of ordinary threads, with shared memory and missions.",
       "icon": "Bot",
       "tags": [
         "agents",
         "collaboration",
-        "views",
+        "channels",
         "automation",
         "notifications",
         "bb-studio"

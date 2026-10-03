@@ -39,9 +39,9 @@ struct ThreadProfileSheet: View {
                                     .foregroundStyle(.primary)
                             }
                         } header: {
-                            Text("Create a shared view")
+                            Text("Create a channel")
                         } footer: {
-                            Text("Keep this thread and another bot together in a saved view.")
+                            Text("Keep this thread and another bot together in a channel.")
                         }
                     }
                 } else if bots.isEmpty {

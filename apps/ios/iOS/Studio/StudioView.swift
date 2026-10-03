@@ -335,7 +335,7 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
         StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
-        StudioKind(id: "view", label: "View", plural: "Views", symbol: "bubble.left.and.bubble.right", tint: .indigo),
+        StudioKind(id: "view", label: "Channel", plural: "Channels", symbol: "bubble.left.and.bubble.right", tint: .indigo),
         StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
         StudioKind(id: "board", label: "Board", plural: "Boards", symbol: "rectangle.split.3x1", tint: .green),
         StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),

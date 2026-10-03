@@ -29,7 +29,7 @@ struct SavedViewScreen: View {
                     if page.hasOlder {
                         Button("Earlier replies") { Task { await loadOlder() } }
                     }
-                    if page.entries.isEmpty { Text("Send a message to start work in this view.").foregroundStyle(.secondary).padding(.vertical, 40) }
+                    if page.entries.isEmpty { Text("Send a message to start work in this channel.").foregroundStyle(.secondary).padding(.vertical, 40) }
                     ForEach(page.entries.filter { entry in page.threads.contains { $0.id == entry.threadId && $0.parentThreadId == nil } }) { entry in
                         entryRow(entry)
                         if page.entries.last(where: { $0.threadId == entry.threadId })?.id == entry.id {
@@ -49,9 +49,9 @@ struct SavedViewScreen: View {
         .defaultScrollAnchor(.bottom)
         .scrollDismissesKeyboard(.interactively)
         .safeAreaInset(edge: .bottom) { composer }
-        .navigationTitle(page?.view.name ?? "View")
+        .navigationTitle(page?.view.name ?? "Channel")
         .navigationBarTitleDisplayMode(.inline)
-        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Edit view") { editing = true }.disabled(page == nil) } }
+        .toolbar { ToolbarItem(placement: .topBarTrailing) { Button("Edit channel") { editing = true }.disabled(page == nil) } }
         .sheet(isPresented: $editing) { if let view = page?.view { SavedViewEditor(initial: view) { _ in Task { await load() } } } }
         .task {
             listener = app.realtime.listen { event in
@@ -123,7 +123,7 @@ struct SavedViewScreen: View {
                 updated.entries = old + next.entries
                 if !old.isEmpty { updated.hasOlder = previous.hasOlder }
             }
-            if page == nil, next.view.name == "New view", next.view.members.isEmpty { editing = true }
+            if page == nil, ["New view", "New channel"].contains(next.view.name), next.view.members.isEmpty { editing = true }
             page = updated
         } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
     }

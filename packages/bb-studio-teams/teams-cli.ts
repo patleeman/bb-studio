@@ -11,9 +11,9 @@ import type { Store } from "./store";
 export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: PluginRpcHandlers<typeof rpcContract>, approveCreate: (input: z.infer<typeof rpcContract.create.input>, threadId: string, signal?: AbortSignal) => Promise<{ approved: boolean; bot: Bot | null }>) {
   const tools: string[] = [];
   for (const [name, method, description] of [
-    ["bots_views", "views", "List saved views of bots and ordinary BB threads."],
-    ["bots_view_read", "view", "Read a saved view's final replies and member thread IDs. Coordinate using BB's thread primitives."],
-    ["bots_view_create", "viewCreate", "Create a saved view referencing bots and threads. No group provider or orchestration is involved."],
+    ["bots_views", "views", "List channels: saved groups of bots and ordinary BB threads."],
+    ["bots_view_read", "view", "Read a channel's final replies and member thread IDs. Coordinate using BB's thread primitives."],
+    ["bots_view_create", "viewCreate", "Create a channel referencing bots and threads. No group provider or orchestration is involved."],
   ] as const) {
     tools.push(name);
     bb.agents.registerTool({ name, description, parameters: rpcContract[method].input, execute: async (input) => JSON.stringify(await (handlers[method] as (input: never) => Promise<unknown>)(input as never)) });
@@ -25,11 +25,11 @@ export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: Plugin
     return JSON.stringify(result.bot ?? await handlers.create(input));
   } });
   bb.cli.register({
-    name: "bots", summary: "Manage persistent bot profiles and saved thread views",
+    name: "bots", summary: "Manage persistent bot profiles and channels",
     commands: [
-      { name: "list", summary: "List bots and views", usage: "[options]" }, { name: "show", summary: "Read a bot profile", usage: "<id>" },
-      { name: "create", summary: "Create a bot", usage: "[options]" }, { name: "view-read", summary: "Read a saved thread view", usage: "<id>" },
-      { name: "view-create", summary: "Create a saved thread view", usage: "[options]" }, { name: "view-send", summary: "Address threads in a view", usage: "[options]" },
+      { name: "list", summary: "List bots and channels", usage: "[options]" }, { name: "show", summary: "Read a bot profile", usage: "<id>" },
+      { name: "create", summary: "Create a bot", usage: "[options]" }, { name: "channel-read", summary: "Read a channel (alias: view-read)", usage: "<id>" },
+      { name: "channel-create", summary: "Create a channel (alias: view-create)", usage: "[options]" }, { name: "channel-send", summary: "Message threads in a channel (alias: view-send)", usage: "[options]" },
       { name: "mission", summary: "Read or save the bot's mission", usage: "[options]" }, { name: "memory", summary: "Read or save durable bot memory", usage: "[options]" },
       { name: "wake", summary: "Run the bot's mission now", usage: "[options]" }, { name: "message", summary: "Open the bot's normal thread", usage: "[options]" },
       { name: "update", summary: "Update a bot's profile", usage: "[options]" },
@@ -38,8 +38,10 @@ export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: Plugin
       const options = { json: { type: "boolean" }, input: { type: "string" }, "input-file": { type: "string" }, name: { type: "string" }, description: { type: "string" }, avatar: { type: "string" }, provider: { type: "string" }, model: { type: "string" }, reasoning: { type: "string" }, permissions: { type: "string" }, interval: { type: "string" }, mission: { type: "string" }, "mission-file": { type: "string" }, "fallback-provider": { type: "string" }, "fallback-model": { type: "string" }, "fallback-reasoning": { type: "string" }, machine: { type: "string" }, file: { type: "string" }, text: { type: "string" }, "text-file": { type: "string" }, "request-id": { type: "string" }, members: { type: "string" }, targets: { type: "string" }, version: { type: "string" }, help: { type: "boolean" } } as const;
       try {
         const { values: v, positionals: args } = parseArgs({ args: argv, options, allowPositionals: true });
-        if (!args.length || v.help) return { exitCode: 0, stdout: "bb bots list | show <bot> | create --name NAME --mission TEXT | update <bot> --input JSON | mission|memory <bot> [--text TEXT --version HASH] | wake <bot> | message <bot> | view-read <view> | view-create --name NAME --members JSON | view-send <view> --text TEXT [--targets JSON]\nBot profiles run in ordinary BB threads. Use bb automation for schedules and bb feed for reports." };
-        const [command, id] = args;
+        if (!args.length || v.help) return { exitCode: 0, stdout: "bb bots list | show <bot> | create --name NAME --mission TEXT | update <bot> --input JSON | mission|memory <bot> [--text TEXT --version HASH] | wake <bot> | message <bot> | channel-read <channel> | channel-create --name NAME --members JSON | channel-send <channel> --text TEXT [--targets JSON]\nThe view-read, view-create and view-send names still work.\nBot profiles run in ordinary BB threads. Use bb automation for schedules and bb feed for reports." };
+        const [given, id] = args;
+        // Channels were called views; the old command names stay as aliases.
+        const command = given?.replace(/^channel-/, "view-");
         const parsed = v["input-file"] ? JSON.parse(await readFile(v["input-file"], "utf8")) : v.input ? JSON.parse(v.input) : {};
         let method: keyof typeof rpcContract, input: unknown;
         const botId = () => { const matches = store.all().filter(b => b.id === id || (id?.startsWith("@") ? b.handle === id.slice(1) : b.name.toLowerCase() === id?.toLowerCase())); if (matches.length > 1) throw new Error("Bot name is ambiguous. Use a handle or ID."); const bot = matches[0]; if (!bot) throw new Error("Bot not found."); const author = context.threadId ? store.byThread(context.threadId) : null; if (author && author.botId !== bot.id) throw new Error("Use your own bot profile for private state."); return bot.id; };
@@ -78,8 +80,8 @@ export function registerTeamsCli(bb: BbPluginApi, store: Store, handlers: Plugin
           }
           case "view-read": method = "view"; input = { id, ...parsed }; break;
           case "view-create": method = "viewCreate"; input = { ...parsed, name: v.name ?? parsed.name, members: v.members ? JSON.parse(v.members) : parsed.members ?? [], requestId: v["request-id"] ?? randomUUID() }; break;
-          case "view-send": method = "viewSend"; input = { ...parsed, id, text: text ?? parsed.text, targets: v.targets ? JSON.parse(v.targets) : parsed.targets ?? [], requestId: v["request-id"] ?? randomUUID() }; if (context.threadId) throw new Error("Coordinate using bb thread tell with the owner's roster. View sends are owner addressing actions."); break;
-          default: throw new Error(`Unknown bots command: ${command}`);
+          case "view-send": method = "viewSend"; input = { ...parsed, id, text: text ?? parsed.text, targets: v.targets ? JSON.parse(v.targets) : parsed.targets ?? [], requestId: v["request-id"] ?? randomUUID() }; if (context.threadId) throw new Error("Coordinate using bb thread tell with the owner's roster. Channel sends are owner addressing actions."); break;
+          default: throw new Error(`Unknown bots command: ${given}`);
         }
         let data = await (handlers[method] as (input: never) => Promise<unknown>)(rpcContract[method].input.parse(input) as never);
         if (command === "show") data = (data as {bot:Bot}).bot;

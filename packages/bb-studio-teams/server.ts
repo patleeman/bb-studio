@@ -365,7 +365,7 @@ export default async function plugin(bb: BbPluginApi) {
     bots: () => store.all(),
     activity: () => store.botActivitySummary(),
     views: () => views.all(),
-    createView: () => views.create("New view", []),
+    createView: () => views.create("New channel", []),
     archiveView: async (id, archived) => {
       const view = views.get(id);
       return views.handlers().viewUpdate({ ...view, archived, expectedUpdatedAt: view.updatedAt });

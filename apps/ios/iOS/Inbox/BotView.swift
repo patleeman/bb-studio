@@ -62,7 +62,7 @@ struct BotView: View {
                 }
                 let rooms = teams?.views.filter { !$0.archived && $0.members.contains { $0.kind == "bot" && $0.id == id } } ?? []
                 if !rooms.isEmpty {
-                    Section("Views") {
+                    Section("Channels") {
                         ForEach(rooms) { room in
                             NavigationLink(value: Route.savedView(id: room.id)) { Label(room.name, systemImage: "rectangle.stack") }
                         }

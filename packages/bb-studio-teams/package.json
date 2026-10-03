@@ -9,7 +9,7 @@
   },
   "bb": {
     "name": "Studio Teams",
-    "description": "Part of BB Studio. Persistent bot profiles and saved views of ordinary threads, with shared memory and missions.",
+    "description": "Part of BB Studio. Persistent bot profiles and channels of ordinary threads, with shared memory and missions.",
     "branding": {
       "icon": "Bot"
     },
