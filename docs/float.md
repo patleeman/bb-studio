@@ -12,7 +12,7 @@ float, several things at once.
 |---|---|
 | The panel, its tabs and thread tabs | `packages/bb-studio-float` (`experimental_appOverlay` "dock"); state in `src/stack.ts`, UI in `src/Panel.tsx` |
 | The registry between Float and other plugins | `packages/bb-studio-kit/src/app/float-registry.ts`, on `window.__bbStudioFloat_v1` |
-| `openFloat`, `useFloatAvailable`, `useCanFloat`, `FloatPanels`, `FloatThreadLeading`, `FloatDockPortal`, `useInFloat` | `packages/bb-studio-kit/src/app/float.tsx` |
+| `openFloat`, `useFloatAvailable`, `useCanFloat`, `FloatPanels`, `retainPanel`, `FloatThreadLeading`, `FloatDockPortal`, `useInFloat` | `packages/bb-studio-kit/src/app/float.tsx` |
 | The right-click menu on Studio items | `packages/bb-studio-float/src/ItemMenu.tsx`; items are marked with `studioItemProps` from `packages/bb-studio-kit/src/app/studio-item.ts` |
 
 A tab's target is a thread (`{ kind: "thread", threadId }`) or an in-app
@@ -28,9 +28,13 @@ versioned key, and:
 1. Each plugin that can show paths renders
    `<FloatPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} />`
    from an app overlay. This registers `/plugins/<plugin id>/<path>`.
-2. Float publishes an empty element for the path tab showing. The kit calls
+2. Its nav registration uses `retainPanel("pages", PagesPanel)`. The overlay
+   owns the initial main editor in a stable container, before Float opens.
+   A pending transfer keeps it alive if the header leaves the main route
+   before the companion body mounts.
+3. Float publishes an empty element for the path tab showing. The kit calls
    a tab a "window" (`windowKey`, `floatBodies`), from before tabs.
-3. The plugin whose registered path is the longest prefix of the tab's
+4. The plugin whose registered path is the longest prefix of the tab's
    path portals its panel into that element, with the rest of the path as
    `subPath`, just as BB passes it to a nav panel. The portal carries
    `data-bb-plugin-root` and `data-bb-plugin` so the plugin's CSS applies.
@@ -118,8 +122,10 @@ destination when one is already open.
 - **Navigation.** A floated panel's `useBbNavigate()` drives the main route,
   since BB gives the portal no router of its own. Links, and buttons that go
   through `openAppPath`, stay in the tab.
-- **One item twice.** An item open both in the panel and in the main view runs
-  two editors, each saving on its own.
+- **Main panes.** Separate main panes keep independent editors. The most
+  recently focused pane supplies an item's first companion move. Its original
+  route offers Show companion, and closing the companion returns the same
+  editor to an available main pane.
 - **Float actions.** BB has no slot in its own thread menu or next to the
   sidebar toggle, so Float is offered in Studio Sidebar's, Studio Teams' and
   Studio's own row menus, the item menu, and the palette.

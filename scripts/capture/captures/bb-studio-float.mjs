@@ -1,9 +1,11 @@
 import companionHost from "./companion-host.mjs";
 import dragCleanup from "./float-drag-cleanup.mjs";
+import mainMobile from "./float-main-mobile.mjs";
 
 const STATE_KEY = "bb-studio-float:windows";
 
 export default ({ threadId, seedPages, seedDrawing, sleep, bbCli }) => [
+  ...(process.env.BB_CAPTURE_MAIN_RETENTION === "1" ? [mainMobile({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_FLOAT_DRAG === "1" ? [dragCleanup({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_NATIVE_COMPANION === "1" ? [companionHost({ threadId, seedPages, sleep, bbCli })] : []),
   {
@@ -16,6 +18,7 @@ export default ({ threadId, seedPages, seedDrawing, sleep, bbCli }) => [
       const forget = async () => {
         await client.evaluate(`sessionStorage.removeItem(${JSON.stringify(STATE_KEY)})`).catch(() => {});
         await client.evaluate(`delete window.bbFloatCaptureRetained`).catch(() => {});
+        await client.evaluate(`delete window.bbFloatMainEditor; delete window.bbFloatMainCanvas`).catch(() => {});
         await cleanup();
         await cleanupDrawing();
       };
@@ -38,16 +41,25 @@ export default ({ threadId, seedPages, seedDrawing, sleep, bbCli }) => [
         // Visiting the page opens its Studio tab, whose menu floats it.
         await client.navigate(`/plugins/pages/pages/${page.id}`);
         await client.waitForText("Offline mode launch");
+        await client.waitForSelector(".ProseMirror[contenteditable=true]");
+        await client.evaluate(`(() => { window.bbFloatMainEditor = document.querySelector('.ProseMirror[contenteditable=true]'); return true; })()`);
         await client.waitForSelector(`[data-studio-tab="pages:${page.id}"]`);
         await float(`[data-studio-tab="pages:${page.id}"] a`);
+        await client.waitForSelector(`[data-float-window="path:/plugins/pages/pages/${page.id}"] .ProseMirror[contenteditable=true]`);
+        const sameInitialPage = await client.evaluate(`document.querySelector('[data-float-window="path:/plugins/pages/pages/${page.id}"] .ProseMirror[contenteditable=true]') === window.bbFloatMainEditor`);
+        if (!sameInitialPage) throw new Error("The first Float move replaced the main Pages editor");
         // A thread and a drawing opened through their real sidebar menus.
         await client.openThreadContextMenu();
         await client.waitForSelector('[role="menuitem"]');
         await client.clickElementWithTextAndPointer('[role="menuitem"]', "Float");
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.waitForSelector("canvas.excalidraw__canvas");
+        await client.evaluate(`(() => { window.bbFloatMainCanvas = document.querySelector('canvas.excalidraw__canvas'); return true; })()`);
         await client.waitForSelector(`[data-studio-tab="excalidraw:${drawing.id}"]`);
         await float(`[data-studio-tab="excalidraw:${drawing.id}"] a`);
+        await client.waitForSelector(`[data-float-window="path:/plugins/excalidraw/drawings/${drawing.id}"] canvas.excalidraw__canvas`);
+        const sameInitialCanvas = await client.evaluate(`document.querySelector('[data-float-window="path:/plugins/excalidraw/drawings/${drawing.id}"] canvas.excalidraw__canvas') === window.bbFloatMainCanvas`);
+        if (!sameInitialCanvas) throw new Error("The first Float move replaced the main drawing canvas");
         // The tabs stay while the main view moves on, the newest showing.
         await client.navigate("/plugins/studio/studio");
         const pageKey = `path:/plugins/pages/pages/${page.id}`;

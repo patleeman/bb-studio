@@ -338,9 +338,24 @@ provides a Show companion action. Closing its companion returns the same
 view to an available main pane; ordinary navigation without a companion
 disposes the view. If no renderer is registered, the panel renders inline.
 
-Six regression checks cover original editor/file-input identity, local state,
+Seven regression checks cover original editor/file-input identity, local state,
 focus, selection, scroll, main-route changes, two panes of the same document,
-asynchronous navigation context, and fallback/disposal. All 1,545 suite
-checks, typechecks, builds, stable compatibility, contracts, marketplace,
-documentation, and the refreshed Kit pack pass. Live first-move proof is next;
-native main-thread composer adoption and split/swap still require verification.
+asynchronous navigation context, and fallback/disposal. The header regression leaves the main route before
+the companion body registers; a bounded pending transfer retains its owner
+through that interval. Kit has 92 passing tests. Full suite checks, builds,
+stable compatibility, contracts, marketplace, documentation, and the
+refreshed Kit pack pass. Native main-thread composer adoption and split/swap
+still require verification.
+
+
+Live first-move evidence now passes. Both isolated BB stages install all 17
+plugins from pushed `b241546`, with Pages and Float updated to `75ad5f5`.
+The stable desktop capture records the Pages editor and drawing canvas in
+the main view before their first Float move and verifies the exact original
+nodes. The [390px header capture](../packages/bb-studio-float/assets/first-main-transfer-mobile.png)
+uses the real Move → Float this action, leaves the main route, and verifies
+one original editor with its inserted text in a companion that fits the
+viewport. The current native BB capture records and edits the main editor
+before Float, then checks the same node through UI and CLI placement changes,
+including pin-protected close and returning to a main companion. All three
+screenshots are visually checked. No agent runs for these fixtures.

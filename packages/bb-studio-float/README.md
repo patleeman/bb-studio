@@ -17,6 +17,19 @@ as three tabs in one panel. The drawing's tab was dragged to the front,
 then the pinned page was selected over the Studio list. The capture also
 checks the real Pages editor and an unsent thread draft through tab switches,
 folding, hiding, and moving Float, and verifies the pin in saved state.
+Before their first Float moves, it records the main Pages editor and drawing
+canvas and verifies that both original nodes move into their companions.
+
+![The original main Pages editor after a mobile header move](assets/first-main-transfer-mobile.png)
+
+At 390 by 844 pixels, the live header's Move → Float this action leaves the
+main route and carries its existing editor and inserted text into Float.
+The capture checks the exact original node, one companion, and panel bounds.
+
+```sh
+BB_CAPTURE_MAIN_RETENTION=1 BB_CAPTURE_ONLY=float-main-mobile \
+  node scripts/capture-plugin-screenshots.mjs --plugin float
+```
 
 ![A page opened in Float by a real browser drag](assets/drag-preview.png)
 
@@ -35,8 +48,9 @@ BB_CAPTURE_FLOAT_DRAG=1 BB_CAPTURE_ONLY=float-drag-cleanup \
 
 The native-host integration capture runs an optimized local BB build based
 on current core `32efd2e3f`, in its own data directory with all 17 suite
-plugins installed from GitHub `ba0ae10` and Float updated to `f962c2c`. It moves the
-real Pages editor and SDK composer through Float, workbench, and main while
+plugins installed from GitHub `b241546`, with Pages and Float updated to
+`75ad5f5`. It records and edits the real main Pages editor before Float opens,
+then moves that original editor and SDK composer through Float, workbench, and main while
 asserting DOM identity, the unsent draft, its file attachment, and the shared
 pin. Its optional CLI check also verifies saved placement, pin-protected
 close, and returning to an existing main companion after another main view
@@ -128,7 +142,10 @@ compatible with stable; the suite detects native hosting when it is present.
 Float draws the panel, and a thread tab is BB's `ThreadChat`. Any other
 tab shows another plugin's nav panel. BB has no way to put one plugin's
 view inside another's, so the plugin that owns the path renders its panel
-into the panel through a portal. The shared kit's `FloatPanels` does this
+into the panel through a portal. Main routes use Kit's `retainPanel` wrapper;
+the app overlay owns the view before its first companion move. The same
+editor or player moves into Float, leaving a Show companion action in the
+main route. The shared kit's `FloatPanels` does this
 (`packages/bb-studio-kit/src/app/float.tsx`). Pages, Draw, Tables, Tasks,
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
@@ -146,8 +163,8 @@ More in [docs/float.md](../../docs/float.md).
 - Opened tabs stay mounted until closed. Background tabs can keep audio,
   subscriptions, and editors running; tabs you have never shown stay unloaded.
 - A view that can't show in the panel says so, with a button to open it.
-- An item open both in the panel and in the main view runs two editors, each
-  saving on its own.
+- Separate main panes of the same item keep independent editors. Moving one
+  into a companion carries the most recently focused pane's editor.
 
 ## Develop
 
