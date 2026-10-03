@@ -6,6 +6,7 @@ import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/serv
 import type { Recording } from "../shared/contract";
 import { NEW_RECORDING_EVENT, TALK_ICON, formatLength, recordingBadge, recordingHref } from "../shared/format";
 import type { TalkStore } from "./store";
+import { extensionFor } from "./audio-files";
 
 const COLUMNS = [
   { id: "length", label: "Length" },
@@ -114,7 +115,7 @@ export function registerStudio(
         for (const [index, segment] of store.segments(id).entries()) {
           const entry = store.segmentFile(id, segment.id);
           if (!entry) continue;
-          const extension = entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : "webm";
+          const extension = extensionFor(entry.mimeType);
           output.push({ name: `${String(index + 1).padStart(4, "0")}.${extension}`, mime: entry.mimeType, data: (await deps.readAudio(entry.file)).toString("base64") });
         }
       }

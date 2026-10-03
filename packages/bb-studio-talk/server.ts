@@ -16,7 +16,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { rpcContract } from "./src/shared/contract";
 import { RECORDING_CHANGED, formatLength } from "./src/shared/format";
-import { AudioFiles, pluginDataDirectory } from "./src/server/audio-files";
+import { AudioFiles, extensionFor, pluginDataDirectory } from "./src/server/audio-files";
 import { audioResponse } from "./src/server/audio-response";
 import { audioArchive } from "./src/server/audio-archive";
 import { MENTION_TRANSCRIPT_CHARS, mentionContext, mentionSubtitle } from "./src/server/mentions";
@@ -379,7 +379,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (!entry) return context.text("Not found", 404);
     const bytes = await files.read(entry.file);
     const downloadName = context.req.query("download") === "1"
-      ? `${segmentId.replace(/[^a-zA-Z0-9_-]/g, "")}.${entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : "webm"}`
+      ? `${segmentId.replace(/[^a-zA-Z0-9_-]/g, "")}.${extensionFor(entry.mimeType)}`
       : undefined;
     return audioResponse(new Uint8Array(bytes), entry.mimeType, context.req.header("range"), downloadName);
   });
@@ -402,12 +402,14 @@ export default async function plugin(bb: BbPluginApi) {
   bb.http.route("GET", "/audio-export", async (context) => {
     const id = context.req.query("recording") ?? "";
     const recording = store.recording(id);
-    if (!recording || recording.status !== "done") return context.text("Not found", 404);
+    // Recovery can download the durable prefix before a recording finishes.
+    // Taking a segment snapshot excludes any segment still being uploaded.
+    if (!recording) return context.text("Not found", 404);
     if (recording.audioRemoved) return context.text("This dictation's audio was deleted", 404);
     const segments = store.segments(id);
     const filesToArchive = await Promise.all(segments.map(async (segment, index) => {
       const entry = store.segmentFile(id, segment.id)!;
-      const extension = entry.mimeType.includes("mp4") ? "m4a" : entry.mimeType.includes("ogg") ? "ogg" : entry.mimeType.includes("webm") ? "webm" : "audio";
+      const extension = extensionFor(entry.mimeType);
       return { name: `${String(index + 1).padStart(4, "0")}.${extension}`, bytes: await files.read(entry.file) };
     }));
     return serveBytes(new Uint8Array(audioArchive(filesToArchive)), {
