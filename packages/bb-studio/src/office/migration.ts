@@ -1,5 +1,5 @@
 import type Database from "better-sqlite3";
-import { SPACE_COLORS } from "./contract";
+import { SPACE_COLORS } from "./space-colors";
 
 export const PERSONAL_PROJECT_ID = "proj_personal";
 export interface LegacyMember { pluginId: string; id: string }

@@ -9,7 +9,8 @@ import { OfficeHome } from "./OfficeHome";
 import { openOffice, parseOfficeRoute } from "./routes";
 import { SpaceMark } from "./SpaceSwitcher";
 import { cn } from "./styles";
-import { SPACE_COLORS, type OfficeOutput } from "../../office/contract";
+import type { OfficeOutput } from "../../office/contract";
+import { SPACE_COLORS } from "../../office/space-colors";
 import { EXTERNAL_PROVIDERS, useExternalHealth } from "./external";
 
 export function OfficePanel({ subPath }: { subPath: string }) {
