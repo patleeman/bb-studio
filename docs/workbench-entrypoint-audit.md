@@ -56,7 +56,57 @@ distinct visible BB panes.
 Kit has 97 passing tests, Float 53, and the full JavaScript suite has 1,585.
 All 18 packages typecheck and pass stable compatibility; the packed Kit and
 all 16 consumer locks match. The [saved host patch](host-support/native-companions/README.md)
-contains eight verified core commits and exact-tree application evidence.
+contains nine verified core commits and exact-tree application evidence.
+
+## Cross-plugin transfer matrix
+
+The seven view types below pass on isolated stable BB 0.45.0 and the optimized
+current-core host with plugins installed from pushed `a36295c`. Stable moves
+the original main view through Float → main → Float → main. The native host
+moves it through Float → workbench → main → Float → workbench. Each move
+checks exact original control identity, connectedness, visible viewport,
+requested placement and one saved tab for its target.
+
+| View | Original controls checked | Stable capture | Native capture |
+| --- | --- | --- | --- |
+| Pages | ProseMirror editor; backward text anchor/focus through first adoption | [Main](../packages/bb-studio-pages/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-pages/assets/companion-transfers-native.png) |
+| Draw | Both original Excalidraw canvas layers | [Main](../packages/bb-studio-draw/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-draw/assets/companion-transfers-native.png) |
+| Artifacts | HTML iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-artifacts/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-artifacts/assets/companion-transfers-native.png) |
+| Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio-talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-talk/assets/companion-transfers-native.png) |
+| Tables | Title input and seeded table row | [Main](../packages/bb-studio-tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tables/assets/companion-transfers-native.png) |
+| Tasks | Board title input and seeded task | [Main](../packages/bb-studio-tasks/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tasks/assets/companion-transfers-native.png) |
+| Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](../packages/bb-studio-teams/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-teams/assets/companion-transfers-native.png) |
+
+These checks exposed three defects: Teams reset resolved model defaults and
+accepted picker-only updates, profile moves used a different route from the
+view on screen, and DOM reparenting preserved an iframe element while reloading
+its embedded document. Teams now settles defaults and carries the actual
+route. Kit keeps pending transfers connected in a parking container, preserves
+selection direction and uses state-preserving DOM moves when available.
+Float's stable wrapper and the ninth core patch use the same move behavior.
+Browsers without that DOM API use the compatible append fallback; embedded
+document state continuity is established only for the tested browser hosts.
+
+After sourcing the appropriate isolated `capture.env`, select `native` or
+`stable` and the corresponding capture IDs:
+
+```sh
+BB_CAPTURE_PLUGIN= BB_CAPTURE_SUITE_TRANSFERS=1 \
+BB_CAPTURE_TRANSFER_SELECTION=1 BB_CAPTURE_TRANSFER_FRAME=1 \
+BB_CAPTURE_SUITE_HOST=native \
+BB_CAPTURE_ONLY=suite-native-pages,suite-native-draw,suite-native-artifacts,suite-native-talk,suite-native-tables,suite-native-tasks,suite-native-teams \
+node scripts/capture-plugin-screenshots.mjs
+```
+
+The Pages direction check invokes the production Float host for its first
+move so pointer focus cannot replace the selection before transfer. Other
+initial moves and all later placement changes use the real UI controls.
+Cleanup unloads each synthetic view before deleting its fixture, preventing
+deletion navigation from becoming the next capture's companion.
+
+The integrated checkpoint passes 1,599 JavaScript tests across all 18 packages,
+including 99 Kit and 121 Teams tests, plus all type, stable compatibility,
+documentation, marketplace, contract, native-payload and packed-Kit gates.
 
 ## Remaining release and QA boundaries
 

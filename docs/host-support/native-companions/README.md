@@ -1,6 +1,6 @@
 # Native companion host support
 
-[native-companions.patch](native-companions.patch) contains eight verified
+[native-companions.patch](native-companions.patch) contains nine verified
 BB core commits based on `get-bb/bb` commit `32efd2e3f`:
 
 - `bda6f61ef`: persistent plugin portals, dynamic native workbench tabs, and
@@ -21,6 +21,9 @@ BB core commits based on `get-bb/bb` commit `32efd2e3f`:
   focus and undo survive transfers and return after close.
 - `c3191cf76`: native panel navigation and empty persisted tab state do not
   dismiss a visible companion. Explicit Hide/Show retain their behavior.
+- `318990df9`: connected companion transfers preserve embedded browsing
+  contexts where the browser supports state-preserving DOM moves. Updating
+  floating-tab metadata no longer reparents the same element into its parent.
 
 The isolated checkout is `/tmp/bb-companion-current`; no unrelated edits from
 the shared BB checkout are included. The patch is an ordinary `git am` series.
@@ -45,7 +48,9 @@ All checks use Turbo against that current BB base:
 | Main composer adoption, keystrokes and native panel regressions | 107 passed |
 | Updated Plugin SDK and BB guide checks | 369 passed |
 | Optimized BB runtime build | 50 tasks passed |
-| Applying all eight commits to the stated base | Exact verified source tree |
+| Embedded document metadata and companion tests | 12 passed |
+| Updated app typecheck and optimized build | Passed |
+| Applying all nine commits to the stated base | Exact tree `2be46bcaa73ac9cdba13643d277b821723aa4c31` |
 
 The [live capture](../../../packages/bb-studio-float/assets/native-workbench-preview.png)
 runs the normal optimized BB application in its own data directory, with all

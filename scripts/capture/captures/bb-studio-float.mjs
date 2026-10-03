@@ -1,3 +1,4 @@
+import suiteTransfers from "./companion-suite-transfers.mjs";
 import companionHost from "./companion-host.mjs";
 import legacyCompanionTransfer from "./legacy-companion-transfer.mjs";
 import companionSplit from "./companion-split.mjs";
@@ -7,7 +8,10 @@ import mainMobile from "./float-main-mobile.mjs";
 
 const STATE_KEY = "bb-studio-float:windows";
 
-export default ({ projectId, threadId, seedPages, seedDrawing, sleep, bbCli }) => [
+export default context => {
+  const { projectId, threadId, seedPages, seedDrawing, sleep, bbCli } = context;
+  return [
+  ...(process.env.BB_CAPTURE_SUITE_TRANSFERS === "1" ? suiteTransfers(context) : []),
   ...(process.env.BB_CAPTURE_MAIN_THREAD === "1" ? [companionMainThread({ projectId, threadId, seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_COMPANION_SPLIT === "1" ? [companionSplit({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_LEGACY_TRANSFER === "1" ? [legacyCompanionTransfer({ seedPages, sleep })] : []),
@@ -172,3 +176,5 @@ export default ({ projectId, threadId, seedPages, seedDrawing, sleep, bbCli }) =
     },
   },
 ];
+
+};
