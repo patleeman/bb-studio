@@ -94,8 +94,19 @@ longer publishes anything; cards in older replies still find their posts.
   **Reopen** restores it. **Older alerts** loads further outstanding posts.
   The rail lists stories with updates under **Developing**.
 - **Unread** posts are bold with a dot, and the count next to **Feed** in the
-  sidebar counts them. **Read** posts dim to one line. **Mark all read** reads
+  sidebar counts them. **Read** posts dim to one line. **Mark entire feed read** reads
   everything; each row has its own read and unread button.
+- **Filters** search titles, report text, and authors. Combine search with a
+  topic, **Unread only**, and **From / Through** dates, then choose **Apply
+  filters**. Dates include the full local calendar day. **Clear filters**
+  returns to the full feed. **Needs you** always shows outstanding alerts,
+  regardless of these filters. Opening an unread result keeps it visible while
+  you read; reloading the filtered results excludes posts now marked read.
+- **Return to your place.** Filters, the open post, and reading position survive
+  a discussion and reload in the same browser tab. This state is separate for
+  each server origin and tab; it stores no report bodies. The reader restores
+  up to 2,000 previously loaded posts and anchors the first visible post. If
+  that post was removed or no longer matches, it uses the saved scroll position.
 - **Click a post** to open it in place, which marks it read. You see its
   picture, the whole post, a card for the page it links to, and the story's
   earlier updates. Press <kbd>j</kbd> and <kbd>k</kbd> to move between posts,

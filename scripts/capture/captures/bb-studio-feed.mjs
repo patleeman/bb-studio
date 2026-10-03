@@ -72,7 +72,7 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
         if (fixtures.length !== 7 || fixtures.some((post) => post.read)) throw new Error("Expected seven unread fixture stories");
         const unread = listed.posts.filter((post) => !post.read).length;
         await client.navigate("/plugins/feed/feed");
-        await client.waitForText("Mark all read");
+        await client.waitForText("Mark entire feed read");
         await client.waitForText("Today");
         await client.waitForText("Payments API error rate above 2% for 15 minutes");
         await client.waitForText("Needs you");

@@ -9,12 +9,14 @@ import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, Dropdo
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useRef, useState, useLayoutEffect, useMemo, type ReactNode } from "react";
 import type { rpcContract } from "../contract";
 import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
 import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
 import { PostDiscussion } from "./discussion";
 import { loadFeedWindow } from "../window";
+import { emptyFilters, filterError, filterInput, readReaderState, writeReaderState, type ReaderFilters } from "../reader-state";
+import { readPosition, readerScroller, restorePosition } from "./reader-position";
 
 const PAGE = 40;
 
@@ -60,6 +62,14 @@ function useReadState(setPosts: (update: (posts: PostView[] | null) => PostView[
 function FeedReader() {
   const rpc = useRpc<typeof rpcContract>();
   const discuss = useDiscuss();
+  const [saved] = useState(readReaderState);
+  const [filters, setFilters] = useState(saved.filters);
+  const [draft, setDraft] = useState(saved.filters);
+  const [filtersError, setFiltersError] = useState<string | null>(null);
+  const queryInput = useMemo(() => filterInput(filters), [filters]);
+  const readerRoot = useRef<HTMLDivElement>(null);
+  const pendingPosition = useRef(saved.position);
+  const capturePosition = useRef(() => {});
   const [attention, setAttention] = useState<PostView[]>([]);
   const [attentionCount, setAttentionCount] = useState(PAGE);
   const [attentionCursor, setAttentionCursor] = useState<string | null>(null);
@@ -87,17 +97,17 @@ function FeedReader() {
   const [posts, setPosts] = useState<PostView[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
   const [topics, setTopics] = useState<{ topic: string; posts: number }[]>([]);
-  const [topic, setTopic] = useState<string | null>(null);
-  const [open, setOpen] = useState<string | null>(null);
+  const topic = filters.topic;
+  const [open, setOpen] = useState<string | null>(saved.open);
   const [error, setError] = useState<string | null>(null);
-  const loaded = useRef(PAGE);
+  const loaded = useRef(saved.count);
   const loadingMore = useRef(false);
   const loadVersion = useRef(0);
   const end = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
     const version = ++loadVersion.current;
-    loadFeedWindow((input) => rpc.call("list", { ...input, topic }), loaded.current).then(
+    loadFeedWindow((input) => rpc.call("list", { ...input, ...queryInput }), loaded.current).then(
       (result) => {
         if (version !== loadVersion.current) return;
         setPosts(result.posts);
@@ -107,11 +117,75 @@ function FeedReader() {
       (cause: unknown) => { if (version === loadVersion.current) setError(errorMessage(cause)); },
     );
     rpc.call("topics", {}).then((result) => setTopics(result.topics), () => undefined);
-  }, [rpc, topic]);
+  }, [rpc, queryInput]);
   useEffect(() => {
     load();
     return () => { loadVersion.current++; };
   }, [load]);
+  const applyFilters = (next: ReaderFilters) => {
+    const invalid = filterError(next);
+    setFiltersError(invalid);
+    if (invalid) return;
+    const normalized = { ...next, query: next.query.trim() };
+    setDraft(normalized);
+    if (JSON.stringify(normalized) === JSON.stringify(filters)) { load(); return; }
+    loadVersion.current++;
+    pendingPosition.current = null;
+    loaded.current = PAGE;
+    setNextCursor(null);
+    setPosts(null);
+    setOpen(null);
+    setFilters(normalized);
+    if (readerRoot.current) readerScroller(readerRoot.current).scrollTop = 0;
+    writeReaderState({ filters: normalized, open: null, count: PAGE, position: null });
+  };
+
+  // Restore after rows mount; late pictures/embeds can change their height.
+  useLayoutEffect(() => {
+    const root = readerRoot.current;
+    const position = pendingPosition.current;
+    if (!root || posts === null || !position) return;
+    pendingPosition.current = null;
+    restorePosition(root, position);
+    const resize = new ResizeObserver(() => restorePosition(root, position));
+    resize.observe(root);
+    const stop = () => resize.disconnect();
+    const timer = window.setTimeout(stop, 2_000);
+    root.addEventListener("pointerdown", stop, { once: true });
+    root.addEventListener("wheel", stop, { once: true, passive: true });
+    window.addEventListener("keydown", stop, { once: true });
+    return () => {
+      stop(); window.clearTimeout(timer);
+      root.removeEventListener("pointerdown", stop);
+      root.removeEventListener("wheel", stop);
+      window.removeEventListener("keydown", stop);
+    };
+  }, [posts]);
+
+  // sessionStorage isolates server origins and tabs; it survives this tab's reload.
+  useEffect(() => {
+    const root = readerRoot.current;
+    if (!root) return;
+    const capture = () => {
+      if (posts === null || !root.getClientRects().length) return;
+      writeReaderState({ filters, open, count: loaded.current, position: readPosition(root) });
+    };
+    capturePosition.current = capture;
+    const scroller = readerScroller(root);
+    let timer = 0;
+    const onScroll = () => {
+      if (!timer) timer = window.setTimeout(() => { timer = 0; capture(); }, 100);
+    };
+    scroller.addEventListener("scroll", onScroll, { passive: true });
+    window.addEventListener("pagehide", capture);
+    capture();
+    return () => {
+      window.clearTimeout(timer);
+      scroller.removeEventListener("scroll", onScroll);
+      window.removeEventListener("pagehide", capture);
+    };
+  }, [filters, open, posts]);
+
   // New posts and edits reload; reading ("seen") is already in the list.
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = feedEvent(payload);
@@ -124,7 +198,7 @@ function FeedReader() {
     loadingMore.current = true;
     const version = loadVersion.current;
     rpc
-      .call("list", { topic, cursor: nextCursor, limit: PAGE })
+      .call("list", { ...queryInput, cursor: nextCursor, limit: PAGE })
       .then(
         (result) => {
           if (version !== loadVersion.current) return;
@@ -135,7 +209,7 @@ function FeedReader() {
         (cause: unknown) => { if (version === loadVersion.current) setError(errorMessage(cause)); },
       )
       .finally(() => (loadingMore.current = false));
-  }, [rpc, topic, nextCursor]);
+  }, [rpc, queryInput, nextCursor]);
   // Older posts load as you reach the end.
   useEffect(() => {
     const target = end.current;
@@ -193,19 +267,38 @@ function FeedReader() {
 
   return (
     <PageColumn className="max-w-6xl">
+    <div ref={readerRoot} onClickCapture={() => capturePosition.current()} className="min-w-0">
       <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">Feed</h1>
-        {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread</span> : null}
-        <button type="button" className={OUTLINE_BUTTON} disabled={!unread} onClick={markAllRead}>
-          <Icon name="feed/mark-read" /> Mark all read
+        {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
+        <button type="button" className={OUTLINE_BUTTON} disabled={posts === null} onClick={markAllRead}>
+          <Icon name="feed/mark-read" /> Mark entire feed read
         </button>
       </header>
+      <form role="search" aria-label="Filter feed" className="mb-4 flex flex-wrap items-end gap-3" noValidate onSubmit={(event) => { event.preventDefault(); applyFilters(draft); }}>
+        <label className="min-w-40 flex-1 text-xs text-muted-foreground">Search feed
+          <input type="search" maxLength={200} value={draft.query} onChange={(event) => setDraft({ ...draft, query: event.target.value })}
+            placeholder="Title, report, or author" className="mt-1 block h-9 w-full rounded-md border border-border bg-background px-3 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
+        </label>
+        <label className="text-xs text-muted-foreground">From
+          <input type="date" value={draft.from} onChange={(event) => setDraft({ ...draft, from: event.target.value })}
+            className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
+        </label>
+        <label className="text-xs text-muted-foreground">Through
+          <input type="date" value={draft.through} onChange={(event) => setDraft({ ...draft, through: event.target.value })}
+            className="mt-1 block h-9 rounded-md border border-border bg-background px-2 text-sm text-foreground focus-visible:outline focus-visible:outline-2" />
+        </label>
+        <label className="flex h-9 items-center gap-2 text-sm"><input type="checkbox" checked={draft.unread} onChange={(event) => setDraft({ ...draft, unread: event.target.checked })} /> Unread only</label>
+        <button type="submit" className={OUTLINE_BUTTON}>Apply filters</button>
+        {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? <button type="button" className={GHOST_BUTTON} onClick={() => applyFilters(emptyFilters())}>Clear filters</button> : null}
+        {filtersError ? <p role="alert" className="w-full text-sm text-destructive">{filtersError}</p> : null}
+      </form>
       <nav className="mb-2 flex gap-5 overflow-x-auto border-b border-border/70 [scrollbar-width:none]" aria-label="Topics">
-        <TopicTab active={topic === null} onClick={() => setTopic(null)}>
+        <TopicTab active={topic === null} onClick={() => applyFilters({ ...filters, topic: null })}>
           All topics
         </TopicTab>
         {topics.map((each) => (
-          <TopicTab key={each.topic} active={topic?.toLowerCase() === each.topic.toLowerCase()} onClick={() => setTopic(each.topic)}>
+          <TopicTab key={each.topic} active={topic?.toLowerCase() === each.topic.toLowerCase()} onClick={() => applyFilters({ ...filters, topic: each.topic })}>
             {each.topic}
           </TopicTab>
         ))}
@@ -220,8 +313,8 @@ function FeedReader() {
       ) : (
         <div className={cn("grid items-start gap-x-10 gap-y-6", rail && "@5xl/page:grid-cols-[minmax(0,1fr)_17rem]")}>
           <main className="min-w-0">
-            {posts.length === 0 ? <EmptyState icon={FEED_ICON} title={topic ? `Nothing in ${topic}` : "Nothing posted yet"}>
-              {topic ? null : "Ask an agent to post a report to the feed."}
+            {posts.length === 0 ? <EmptyState icon={FEED_ICON} title={JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "No posts match these filters" : "Nothing posted yet"}>
+              {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "Change or clear the filters to see more posts. Needs you still shows outstanding alerts." : "Ask an agent to post a report to the feed."}
             </EmptyState> : null}
             {days.map((group) => {
               const marker = dayMarker(group.at);
@@ -280,6 +373,7 @@ function FeedReader() {
           <kbd className="font-sans">j</kbd> / <kbd className="font-sans">k</kbd> next and previous · <kbd className="font-sans">m</kbd> mark read or unread
         </p>
       ) : null}
+    </div>
     </PageColumn>
   );
 }
@@ -336,7 +430,7 @@ function StoryRow({ post, open, showTopic, onToggle, onRead }: { post: PostView;
   // Read rows step back: one line, a small picture, faded until hovered.
   const dim = post.read && !open;
   return (
-    <article id={`post-${post.id}`} className={cn("scroll-mt-4 border-b border-border/60", open && "bg-foreground/[0.025]")}>
+    <article data-feed-post={post.id} id={`post-${post.id}`} className={cn("scroll-mt-4 border-b border-border/60", open && "bg-foreground/[0.025]")}>
       <div className={cn("group flex items-start gap-2 pr-1", dim ? "py-2" : "py-3")}>
         <button type="button" aria-expanded={open} className={cn("flex min-w-0 flex-1 items-start gap-3 text-left", dim && "opacity-60 group-hover:opacity-100")} onClick={onToggle}>
           <span className={cn("mt-2.5 size-1.5 shrink-0 rounded-full", post.read ? "bg-transparent" : "bg-blue-500")} aria-label={post.read ? undefined : "Unread"} />

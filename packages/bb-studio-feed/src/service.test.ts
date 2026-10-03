@@ -4,6 +4,7 @@ import { FeedService, type Notification, type NotifyMode, type Origin } from "./
 import type { Priority, RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS } from "./store";
 import { loadFeedWindow } from "./window";
+import { emptyFilters, filterInput } from "./reader-state";
 
 const ORIGINS: Record<string, Origin> = {
   bot: { author: "Commute Bot", botId: "bot_1", threadId: "thr_bot", projectId: "proj_1", channelId: "room_1", channelName: "command-center" },
@@ -177,5 +178,26 @@ describe("FeedService", () => {
       { topic: "Commute", posts: 1 },
       { topic: "Weather", posts: 1 },
     ]);
+  });
+
+  it("combines search, topic, unread and inclusive local date filters", async () => {
+    const { store, service, advance, post } = setup();
+    const start = new Date(2026, 9, 1).getTime();
+    const next = new Date(2026, 9, 2).getTime();
+    advance(start - 1_000_000 - 1);
+    await post("Orbit before", { topic: "Launch" });
+    advance(1);
+    const first = await post("Orbit midnight", { topic: "Launch" });
+    advance(1);
+    const read = await post("Orbit read", { topic: "Launch" });
+    service.markRead(read.id, true);
+    await post("Unrelated", { topic: "Launch" });
+    await post("Orbit other topic", { topic: "Ops" });
+    advance(next - start - 2);
+    const last = await post("Orbit last millisecond", { topic: "Launch" });
+    advance(1);
+    await post("Orbit tomorrow", { topic: "Launch" });
+    const input = filterInput({ ...emptyFilters(), query: "Orbit", topic: "launch", unread: true, from: "2026-10-01", through: "2026-10-01" });
+    expect(store.list(input).rows.map(row => row.id)).toEqual([last.id, first.id]);
   });
 });
