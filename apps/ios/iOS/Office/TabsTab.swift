@@ -1,6 +1,5 @@
 import SwiftUI
 import UIKit
-import UniformTypeIdentifiers
 
 /// The office as tabs, like the web sidebar (docs/office-tabs.md): Essentials
 /// as big tiles, then Pinned (with folders) and Today. Search finds anything
@@ -54,7 +53,7 @@ struct TabsTab: View {
                     let name = folderName.trimmingCharacters(in: .whitespaces)
                     if !name.isEmpty { Task { await office.tabs?.createFolder(name: name) } }
                 }
-            } message: { Text("A folder in Pinned. Drag tabs onto it.") }
+            } message: { Text("A folder in Pinned. Move tabs into it from their menu.") }
             .sheet(isPresented: $addingBot) {
                 if let space = office.currentSpace { AddBotSheet(space: space) }
             }
@@ -88,36 +87,31 @@ private struct TabsList: View {
                             .listRowBackground(Color.clear)
                     }
                 }
-                // Press and hold a tab, then drag it onto a tab, a section's
-                // title or a folder: the same moves as the web sidebar.
+                // Drag to reorder within a section. Swipe or use the menu
+                // to move tabs between sections and folders.
                 let loose = store.pinned.filter { $0.folderId == nil }
                 Section {
                     ForEach(loose) { tab in TabRow(store: store, tab: tab) }
                         .onMove { from, to in Task { await store.reorder(loose, from: from, to: to, zone: .pinned) } }
-                        .onInsert(of: [.plainText]) { index, providers in store.insert(providers, at: index, zone: .pinned) }
                     ForEach(store.folders.sorted { $0.position < $1.position }) { folder in
                         FolderRows(store: store, folder: folder)
                     }
                 } header: {
                     Text("Pinned").foregroundStyle(Color(.label))
                         .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                        .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .pinned) }
                 }
                 Section {
                     ForEach(store.today) { tab in TabRow(store: store, tab: tab) }
                         .onMove { from, to in Task { await store.reorder(store.today, from: from, to: to, zone: .today) } }
-                        .onInsert(of: [.plainText]) { index, providers in store.insert(providers, at: index, zone: .today) }
                     if store.today.isEmpty, !store.isLoading {
                         Text("What you open shows up here, and is archived after a few days.")
                             .font(.subheadline)
                             .foregroundStyle(Color(.label))
-                            .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .today) }
                     }
                 } header: {
                     HStack(alignment: .firstTextBaseline) {
                         Text("Today").foregroundStyle(Color(.label))
                             .frame(maxWidth: .infinity, alignment: .leading)
-                            .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .today) }
                         Spacer()
                         if !store.today.isEmpty {
                             Button { Task { await store.clearToday() } } label: {
@@ -148,12 +142,6 @@ private struct TabsList: View {
         .task(id: store.spaceId) { await store.refresh() }
     }
 
-    private func drop(_ refs: [String], zone: OfficeTabZone) -> Bool {
-        guard let ref = refs.first else { return false }
-        Task { await store.drop(ref, zone: zone) }
-        return true
-    }
-
     private func endSearch() {
         query = ""
         searchFocused = false
@@ -181,36 +169,12 @@ extension TabsStore {
         await move(list[at].ref, to: zone, folderId: folderId, index: to > at ? to - 1 : to)
     }
 
-    /// A tab dropped into a section from another one.
-    func insert(_ providers: [NSItemProvider], at index: Int, zone: OfficeTabZone, folderId: String? = nil) {
-        guard let provider = providers.first else { return }
-        _ = provider.loadObject(ofClass: NSString.self) { object, _ in
-            guard let ref = object as? String else { return }
-            Task { @MainActor in await self.move(ref, to: zone, folderId: folderId, index: index) }
-        }
-    }
-
     /// Makes a Pinned folder and files a tab in it, like "New Folder…" on the web.
     func createFolder(name: String, filing ref: String) async {
         await createFolder(name: name)
         if let folder = folders.filter({ $0.name == name }).max(by: { $0.position < $1.position }) {
             await move(ref, to: .pinned, folderId: folder.id)
         }
-    }
-
-    /// Drops a dragged tab just before `target`, or first in its list (last
-    /// for Essentials and folders, which grow at the end).
-    func drop(_ ref: String, zone: OfficeTabZone, folderId: String? = nil, before target: String? = nil) async {
-        let list: [OfficeTab] = switch zone {
-        case .essential: essentials
-        case .pinned: pinned.filter { $0.folderId == folderId }
-        case .today: today
-        case .archived: []
-        }
-        let others = list.map(\.ref).filter { $0 != ref }
-        let atEnd = zone == .essential || folderId != nil
-        let index = target.flatMap { others.firstIndex(of: $0) } ?? (atEnd ? others.count : 0)
-        await move(ref, to: zone, folderId: folderId, index: index)
     }
 }
 
@@ -240,20 +204,6 @@ private struct SplitHalves: View {
 }
 
 /// What a dragged tab looks like under your finger.
-private struct TabDragPreview: View {
-    let tab: OfficeTab
-    let title: String
-
-    var body: some View {
-        HStack(spacing: 10) {
-            TabGlyph(tab: tab, title: title)
-            Text(title).lineLimit(1)
-        }
-        .padding(.horizontal, 12)
-        .padding(.vertical, 8)
-        .background(RoundedRectangle(cornerRadius: 12, style: .continuous).fill(Color(.secondarySystemGroupedBackground)))
-    }
-}
 
 // MARK: - Opening
 
@@ -290,18 +240,9 @@ private struct EssentialsGrid: View {
                     Button { Task { await store.move(tab.ref, to: .pinned) } } label: { Label("Remove from Essentials", systemImage: "star.slash") }
                     CopyLinkButton(tab: tab, title: title)
                 }
-                .draggable(tab.ref) { TabDragPreview(tab: tab, title: title) }
-                .dropDestination(for: String.self) { refs, _ in drop(refs, before: tab.ref) }
                 .accessibilityIdentifier("officeEssential")
             }
         }
-        .dropDestination(for: String.self) { refs, _ in drop(refs, before: nil) }
-    }
-
-    private func drop(_ refs: [String], before target: String?) -> Bool {
-        guard let ref = refs.first, ref != target else { return false }
-        Task { await store.drop(ref, zone: .essential, before: target) }
-        return true
     }
 }
 
@@ -410,9 +351,6 @@ private struct TabRow: View {
             .contentShape(Rectangle())
         }
         .accessibilityIdentifier("officeTab")
-        // List rows reorder through the List itself (onMove/onInsert on each
-        // section); SwiftUI's generic drop targets on rows never fired here.
-        .onDrag { NSItemProvider(object: tab.ref as NSString) } preview: { TabDragPreview(tab: tab, title: title) }
         .swipeActions(edge: .trailing) {
             Button { Task { await store.archive(tab.ref) } } label: { Label("Close", systemImage: "xmark") }
                 .tint(.gray)
@@ -486,16 +424,11 @@ private struct FolderRows: View {
             let inside = store.pinned.filter { $0.folderId == folder.id }
             ForEach(inside) { tab in TabRow(store: store, tab: tab) }
                 .onMove { from, to in Task { await store.reorder(inside, from: from, to: to, zone: .pinned, folderId: folder.id) } }
-                .onInsert(of: [.plainText]) { index, providers in store.insert(providers, at: index, zone: .pinned, folderId: folder.id) }
         } label: {
             Label(folder.name, systemImage: "folder").fontWeight(.medium)
                 .frame(maxWidth: .infinity, alignment: .leading)
                 .contentShape(Rectangle())
-                .dropDestination(for: String.self) { refs, _ in
-                    guard let ref = refs.first else { return false }
-                    Task { await store.drop(ref, zone: .pinned, folderId: folder.id) }
-                    return true
-                }
+
                 .contextMenu {
                     Button { name = folder.name; renaming = true } label: { Label("Rename", systemImage: "pencil") }
                     Button { Task { await store.deleteFolder(folder.id) } } label: { Label("Remove Folder", systemImage: "folder.badge.minus") }
