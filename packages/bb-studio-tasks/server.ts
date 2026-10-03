@@ -489,6 +489,28 @@ export default async function plugin(bb: BbPluginApi) {
     return model ? `${name} · ${model}` : name;
   }
 
+  function recordHandoff(taskId: string, threadId: string, agent: string | null): HandoffRow {
+    const existing = store.handoff(threadId);
+    if (existing && existing.task_id !== taskId) throw new Error("This thread is already working on another task.");
+    const handoff = existing ?? store.addHandoff(taskId, threadId, agent);
+    void services.linkThread({ threadId, ref: { pluginId: PLUGIN_ID, id: taskId }, role: "handoff", state: handoff.state,
+      createdAt: handoff.created_at, updatedAt: handoff.updated_at, metadata: {} }).catch(() => { /* The hub is optional. */ });
+    return handoff;
+  }
+
+  async function taskInput(task: TaskRow, note: string | null) {
+    const linked = store.links(task.id);
+    const mentionProviders = new Map<string, string>();
+    await Promise.all([...new Set(linked.map((link) => link.plugin_id).filter((id): id is string => !!id))].map(async (pluginId) => {
+      try {
+        const info = await bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null as never, outputSchema: studio.info });
+        const kind = info.kinds[0];
+        if (kind?.mentionProviderId) mentionProviders.set(pluginId, kind.mentionProviderId);
+      } catch { /* A link still works without a mention provider. */ }
+    }));
+    return handoffInput(task, linked, note, new Date(), mentionProviders);
+  }
+
   async function handOff(input: {
     id: string;
     projectId: string | null;
@@ -503,18 +525,9 @@ export default async function plugin(bb: BbPluginApi) {
     const projectId = input.projectId ?? task.project_id;
     if (!projectId) throw new Error("Pick a project for the agent to work in.");
     if (task.project_id !== projectId) task = store.update(task.id, { projectId }, input.by);
-    const linked = store.links(task.id);
-    const mentionProviders = new Map<string, string>();
-    await Promise.all([...new Set(linked.map((link) => link.plugin_id).filter((id): id is string => !!id))].map(async (pluginId) => {
-      try {
-        const info = await bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null as never, outputSchema: studio.info });
-        const kind = info.kinds[0];
-        if (kind?.mentionProviderId) mentionProviders.set(pluginId, kind.mentionProviderId);
-      } catch { /* A link still works without a mention provider. */ }
-    }));
     const thread = await bb.sdk.threads.spawn({
       projectId,
-      input: [handoffInput(task, linked, input.note ?? null, new Date(), mentionProviders)],
+      input: [await taskInput(task, input.note ?? null)],
       ...(input.providerId ? { providerId: input.providerId } : {}),
       ...(input.model ? { model: input.model } : {}),
       ...(input.reasoningLevel ? { reasoningLevel: input.reasoningLevel as never } : {}),
@@ -525,9 +538,7 @@ export default async function plugin(bb: BbPluginApi) {
       },
       pluginMetadata: { taskId: task.id },
     });
-    store.addHandoff(task.id, thread.id, await agentLabel(thread.providerId, input.model ?? null));
-    const at = Date.now();
-    void services.linkThread({ threadId: thread.id, ref: { pluginId: PLUGIN_ID, id: task.id }, role: "handoff", state: "working", createdAt: at, updatedAt: at, metadata: {} }).catch(() => { /* The hub is optional. */ });
+    recordHandoff(task.id, thread.id, await agentLabel(thread.providerId, input.model ?? null));
     // The thread may have started, or failed, before the handoff was recorded.
     const recorded = store.handoff(thread.id);
     if (recorded) void catchUp(recorded, true);
@@ -790,14 +801,23 @@ export default async function plugin(bb: BbPluginApi) {
       const task = mustGet(id);
       const botId = task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null;
       if (!botId) throw new Error("Assign a Studio Teams bot first.");
-      const existing = store.links(id).find((link) => link.target === "thread" && link.label.startsWith("Bot work:"));
+      const latest = store.latestHandoff(id);
+      const existing = store.links(id).find((link) => {
+        if (link.target !== "thread" || !link.label.startsWith("Bot work:")) return false;
+        const handoff = store.handoff(link.item_id);
+        // A thread can identify one task, and only its newest handoff moves it.
+        return !handoff || (handoff.task_id === id && latest?.thread_id === link.item_id);
+      });
       let threadId = existing?.item_id;
       if (threadId) {
         const profile = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "threadProfile", input: { threadId } as never,
           outputSchema: z.object({ botId: z.string().nullable() }).nullable() });
         if (profile?.botId !== botId) threadId = undefined;
         else {
-          try { await bb.sdk.threads.get({ threadId }); } catch { threadId = undefined; }
+          try {
+            const thread = await bb.sdk.threads.get({ threadId });
+            if (thread.deletedAt !== null || thread.archivedAt !== null) threadId = undefined;
+          } catch { threadId = undefined; }
         }
       }
       if (!threadId) {
@@ -805,11 +825,20 @@ export default async function plugin(bb: BbPluginApi) {
           outputSchema: z.object({ threadId: z.string() }) });
         threadId = thread.threadId;
       }
-      const text = [`Work on this Studio task: ${task.title || "Untitled"}`, task.description, `Task: ${taskHref(id)}`, note].filter(Boolean).join("\n\n");
-      await bb.sdk.threads.send({ threadId, input: [{ type: "text", text, mentions: [] }], mode: "auto" });
+      const input = await taskInput(task, note ?? null);
+      recordHandoff(id, threadId, `Bot ${botId}`);
+      store.setHandoff(threadId, "starting", null);
       store.link(id, { target: "thread", plugin_id: null, item_id: threadId, label: `Bot work: ${task.title || "Task"}`, href: `/threads/${threadId}` });
       if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);
+      try {
+        await bb.sdk.threads.send({ threadId, input: [input], mode: "auto" });
+      } catch (error) {
+        apply(threadId, { type: "failed", error: errorMessage(error) });
+        throw error;
+      }
+      const recorded = store.handoff(threadId);
+      if (recorded) await catchUp(recorded, true);
       return { threadId };
     },
     async syncCheckbox({ id, checked }) {
