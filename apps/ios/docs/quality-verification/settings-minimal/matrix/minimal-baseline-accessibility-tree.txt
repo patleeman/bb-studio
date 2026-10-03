@@ -1,0 +1,135 @@
+Attributes: Application, 0x109c71b80, pid: 85640, label: 'MinimalSettings'
+Element subtree:
+ →Application, 0x109c71b80, pid: 85640, label: 'MinimalSettings'
+    Window (Main), 0x109c70dc0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x109c71180, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x109c712c0, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x109c70f00, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x109c71040, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x109c71400, {{0.0, 0.0}, {402.0, 874.0}}
+                NavigationBar, 0x109c71540, {{0.0, 62.0}, {402.0, 106.0}}, identifier: 'Settings'
+                  StaticText, 0x109c71a40, {{16.0, 119.7}, {133.0, 40.7}}, label: 'Settings'
+                Other, 0x109c71e00, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x109c71f40, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x109c71cc0, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x109c72080, {{0.0, 0.0}, {402.0, 874.0}}
+                        CollectionView, 0x109c72440, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'minimal-baseline'
+                          Other, 0x109c72580, {{-16.0, -1580.0}, {434.0, 1938.0}}
+                          Other, 0x109c721c0, {{0.0, 0.0}, {402.0, 874.0}}
+                            Other, 0x109c726c0, {{0.0, 0.0}, {402.0, 102.0}}
+                          Other, 0x109c72940, {{0.0, 0.0}, {402.0, 874.0}}
+                          Cell, 0x109c72a80, {{16.0, 168.0}, {370.0, 40.3}}
+                            Other, 0x109c72300, {{16.0, 168.0}, {370.0, 40.3}}
+                            Other, 0x109c72bc0, {{16.0, 168.0}, {370.0, 40.3}}
+                              Other, 0x109c72e40, {{16.0, 168.0}, {370.0, 40.3}}
+                                Other, 0x109c72f80, {{16.0, 168.0}, {370.0, 40.3}}
+                                  StaticText, 0x109c72d00, {{16.0, 168.0}, {370.0, 40.3}}, label: 'BB server'
+                          Cell, 0x109c730c0, {{16.0, 208.3}, {370.0, 52.0}}
+                            Other, 0x109c73340, {{16.0, 208.3}, {370.0, 52.0}}
+                              Other, 0x109c73480, {{16.0, 208.3}, {370.0, 52.0}}
+                            Other, 0x109c73200, {{16.0, 208.3}, {370.0, 52.0}}
+                              Other, 0x109c735c0, {{16.0, 208.3}, {370.0, 52.0}}
+                                Other, 0x109c73840, {{16.0, 208.3}, {370.0, 52.0}}
+                                  TextField, 0x109c73980, {{32.0, 223.3}, {338.0, 22.0}}, label: 'BB server URL', value: http://127.0.0.1:4...
+                                    Other, 0x109c73700, {{32.0, 231.3}, {338.0, 11.0}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                      Other, 0x109c73ac0, {{35.0, 239.3}, {332.0, 3.0}}
+                          Cell, 0x109c73c00, {{16.0, 260.3}, {370.0, 52.0}}
+                            Other, 0x109c73e80, {{16.0, 260.3}, {370.0, 52.0}}
+                              Other, 0x109c73d40, {{16.0, 260.3}, {370.0, 52.0}}
+                            Other, 0x109c70500, {{16.0, 260.3}, {370.0, 52.0}}
+                              Other, 0x109c70a00, {{16.0, 260.3}, {370.0, 52.0}}
+                                Other, 0x106e8f980, {{16.0, 260.3}, {370.0, 52.0}}
+                                  Button, 0x106e8fc00, {{16.0, 260.3}, {370.0, 52.0}}, label: 'Save and test'
+                          Other, 0x106e8fd40, {{32.0, 259.3}, {338.0, 1.0}}
+                          Cell, 0x106e8fac0, {{16.0, 312.3}, {370.0, 45.7}}
+                            Other, 0x106e8d400, {{16.0, 312.3}, {370.0, 45.7}}
+                            Other, 0x106e8d540, {{16.0, 312.3}, {370.0, 45.7}}
+                              Other, 0x10ae8c000, {{16.0, 312.3}, {370.0, 45.7}}
+                                Other, 0x10ae8c140, {{16.0, 312.3}, {370.0, 45.7}}
+                                  StaticText, 0x10ae8c280, {{16.0, 312.3}, {370.0, 45.7}}, label: 'Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.'
+                          Other, 0x10ae8c3c0, {{-16.0, 358.0}, {434.0, 258.0}}
+                          Cell, 0x10ae8c500, {{16.0, 358.0}, {370.0, 40.3}}
+                            Other, 0x10ae8c640, {{16.0, 358.0}, {370.0, 40.3}}
+                            Other, 0x10ae8c780, {{16.0, 358.0}, {370.0, 40.3}}
+                              Other, 0x10ae8c8c0, {{16.0, 358.0}, {370.0, 40.3}}
+                                Other, 0x10ae8ca00, {{16.0, 358.0}, {370.0, 40.3}}
+                                  StaticText, 0x10ae8cb40, {{16.0, 358.0}, {370.0, 40.3}}, label: 'Hosts'
+                          Cell, 0x10ae8cc80, {{16.0, 398.3}, {370.0, 52.0}}
+                            Other, 0x10ae8cdc0, {{16.0, 398.3}, {370.0, 52.0}}
+                              Other, 0x10ae8cf00, {{16.0, 398.3}, {370.0, 52.0}}
+                            Other, 0x10ae8d040, {{16.0, 398.3}, {370.0, 52.0}}
+                              Other, 0x10ae8d180, {{16.0, 398.3}, {370.0, 52.0}}
+                                Other, 0x10ae8d2c0, {{16.0, 398.3}, {370.0, 52.0}}
+                                  Switch, 0x10ae8d400, {{16.0, 398.3}, {370.0, 52.0}}, label: 'Keep Mac awake', value: 0
+                                    StaticText, 0x10ae8d540, {{32.0, 414.2}, {127.7, 20.3}}, label: 'Keep Mac awake'
+                                    Switch, 0x10ae8d680, {{309.0, 410.3}, {63.0, 28.0}}, value: 0
+                          Cell, 0x10ae8d7c0, {{16.0, 450.3}, {370.0, 52.0}}
+                            Other, 0x10ae8d900, {{16.0, 450.3}, {370.0, 52.0}}
+                              Other, 0x10ae8da40, {{16.0, 450.3}, {370.0, 52.0}}
+                            Other, 0x10ae8db80, {{16.0, 450.3}, {370.0, 52.0}}
+                              Other, 0x10ae8dcc0, {{16.0, 450.3}, {370.0, 52.0}}
+                                Other, 0x10ae8de00, {{16.0, 450.3}, {370.0, 52.0}}
+                                  Stepper, 0x10ae8df40, {{32.0, 460.3}, {338.0, 32.0}}, label: 'Threads at once, Automatic', value: 0
+                                    Button, 0x10ae8e080, {{276.0, 460.3}, {47.0, 32.0}}, identifier: 'Decrement', label: 'Threads at once, Automatic, Decrement', value: 0, Disabled
+                                    Button, 0x10ae8e1c0, {{323.0, 460.3}, {47.0, 32.0}}, identifier: 'Increment', label: 'Threads at once, Automatic, Increment', value: 0
+                                  StaticText, 0x10ae8e300, {{32.0, 466.2}, {236.0, 20.3}}, label: 'Threads at once, Automatic'
+                                  StaticText, 0x10ae8e440, {{32.0, 466.2}, {123.3, 20.3}}, label: 'Threads at once'
+                          Other, 0x10ae8e580, {{32.0, 449.3}, {338.0, 1.0}}
+                          Cell, 0x10ae8e6c0, {{16.0, 502.3}, {370.0, 52.0}}
+                            Other, 0x10ae8e800, {{16.0, 502.3}, {370.0, 52.0}}
+                              Other, 0x10ae8e940, {{16.0, 502.3}, {370.0, 52.0}}
+                            Other, 0x10ae8ea80, {{16.0, 502.3}, {370.0, 52.0}}
+                              Other, 0x10ae8ebc0, {{16.0, 502.3}, {370.0, 52.0}}
+                                Other, 0x10ae8ed00, {{16.0, 502.3}, {370.0, 52.0}}
+                                  StaticText, 0x10ae8ee40, {{16.0, 502.3}, {370.0, 52.0}}, label: 'Patrick's MegaMac, 18 at once'
+                                  StaticText, 0x10ae8ef80, {{32.0, 520.5}, {115.3, 15.7}}, label: 'Patrick's MegaMac'
+                          Other, 0x10ae8f0c0, {{32.0, 501.3}, {338.0, 1.0}}
+                          Cell, 0x10ae8f200, {{16.0, 554.3}, {370.0, 61.7}}
+                            Other, 0x10ae8f340, {{16.0, 554.3}, {370.0, 61.7}}
+                            Other, 0x10ae8f480, {{16.0, 554.3}, {370.0, 61.7}}
+                              Other, 0x10ae8f5c0, {{16.0, 554.3}, {370.0, 61.7}}
+                                Other, 0x10ae8f700, {{16.0, 554.3}, {370.0, 61.7}}
+                                  StaticText, 0x10ae8f840, {{16.0, 554.3}, {370.0, 61.7}}, label: 'Keep awake stops the machines idle-sleeping while BB works. Threads at once caps how many run in parallel; Automatic uses each host's core count.'
+                          Other, 0x10ae8f980, {{-16.0, 616.0}, {434.0, 110.0}}
+                          Cell, 0x10ae8fac0, {{16.0, 616.0}, {370.0, 40.3}}
+                            Other, 0x10ae8fc00, {{16.0, 616.0}, {370.0, 40.3}}
+                            Other, 0x10ae8fd40, {{16.0, 616.0}, {370.0, 40.3}}
+                              Other, 0x10ae8fe80, {{16.0, 616.0}, {370.0, 40.3}}
+                                Other, 0x10ae94000, {{16.0, 616.0}, {370.0, 40.3}}
+                                  StaticText, 0x10ae94140, {{16.0, 616.0}, {370.0, 40.3}}, label: 'Server'
+                          Cell, 0x10ae94280, {{16.0, 656.3}, {370.0, 52.0}}
+                            Other, 0x10ae943c0, {{16.0, 656.3}, {370.0, 52.0}}
+                              Other, 0x10ae94500, {{16.0, 656.3}, {370.0, 52.0}}
+                            Other, 0x10ae94640, {{16.0, 656.3}, {370.0, 52.0}}
+                              Other, 0x10ae94780, {{16.0, 656.3}, {370.0, 52.0}}
+                                Other, 0x10ae948c0, {{16.0, 656.3}, {370.0, 52.0}}
+                                  StaticText, 0x10ae94a00, {{16.0, 656.3}, {370.0, 52.0}}, label: 'Plugins'
+                                  Image, 0x10ae94b40, {{31.3, 672.0}, {26.3, 20.7}}, identifier: 'puzzlepiece.extension', label: 'Puzzle Piece Extension'
+                          Other, 0x10ae94c80, {{-16.0, 726.0}, {434.0, 1860.3}}
+                          Cell, 0x10ae94dc0, {{16.0, 726.0}, {370.0, 40.3}}
+                            Other, 0x10ae94f00, {{16.0, 726.0}, {370.0, 40.3}}
+                            Other, 0x10ae95040, {{16.0, 726.0}, {370.0, 40.3}}
+                              Other, 0x10ae95180, {{16.0, 726.0}, {370.0, 40.3}}
+                                Other, 0x10ae952c0, {{16.0, 726.0}, {370.0, 40.3}}
+                                  StaticText, 0x10ae95400, {{16.0, 726.0}, {370.0, 40.3}}, label: 'Threads'
+                          Cell, 0x10ae95540, {{16.0, 766.3}, {370.0, 52.0}}
+                            Other, 0x10ae95680, {{16.0, 766.3}, {370.0, 52.0}}
+                              Other, 0x10ae957c0, {{16.0, 766.3}, {370.0, 52.0}}
+                            Other, 0x10ae95900, {{16.0, 766.3}, {370.0, 52.0}}
+                              Other, 0x10ae95a40, {{16.0, 766.3}, {370.0, 52.0}}
+                                Other, 0x10ae95b80, {{16.0, 766.3}, {370.0, 52.0}}
+                                  StaticText, 0x10ae95cc0, {{16.0, 766.3}, {370.0, 52.0}}, label: 'Archived threads'
+                                  Image, 0x10ae95e00, {{33.3, 782.7}, {21.3, 19.7}}, identifier: 'archivebox', label: 'Archive'
+                          Other, 0x10ae95f40, {{369.0, 116.0}, {30.0, 696.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                            Other, 0x10ae96080, {{396.0, 802.0}, {3.0, 7.0}}
+                          Other, 0x10ae961c0, {{369.0, 116.0}, {30.0, 696.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                            Other, 0x10ae96300, {{396.0, 802.0}, {3.0, 7.0}}
+                Toolbar, 0x10ae96440, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                  Other, 0x10ae96580, {{0.0, 0.0}, {402.0, 874.0}}
+Path to element:
+ →Application, 0x109c71b80, pid: 85640, label: 'MinimalSettings'
+Query chain:
+ →Find: Target Application 'local.bbsettingsreview.minimal'
+  Output: {
+    Application, 0x10ae966c0, pid: 85640, label: 'MinimalSettings'
+  }

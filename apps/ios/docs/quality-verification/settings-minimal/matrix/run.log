@@ -1,0 +1,120 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-settings-minimal-DD/Build/Products/MinimalControls.xctestrun -destination id=EA7BA54A-8782-423B-A698-5E552E2EED33 -parallel-testing-enabled NO "-only-testing:MinimalSettingsUITests" -resultBundlePath /tmp/bb-settings-minimal-matrix.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-settings-minimal-matrix.xcresult
+
+2026-10-03 01:46:20.603498-0400 MinimalSettingsUITests-Runner[85584:89064292] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 01:46:24.369.
+Test Suite 'MinimalSettingsUITests.xctest' started at 2026-10-03 01:46:24.369.
+Test Suite 'MinimalSettingsUITests' started at 2026-10-03 01:46:24.369.
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testBaselineDetection]' started.
+    t =     0.02s Start Test at 2026-10-03 01:46:24.390
+    t =     0.16s Set Up
+    t =     0.16s Open local.bbsettingsreview.minimal
+    t =     0.16s     Launch local.bbsettingsreview.minimal
+2026-10-03 01:46:24.584 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:46:24.584 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: no debugger version
+objc[85584]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x1062d4398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x109ae8310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     0.83s         Setting up automation session
+    t =     3.76s         Wait for local.bbsettingsreview.minimal to idle
+    t =     5.31s Waiting 10.0s for "minimal-baseline" Any to exist
+    t =     6.37s     Checking `Expect predicate `existsNoRetry == 1` for object "minimal-baseline" Any`
+    t =     6.37s         Checking existence of `"minimal-baseline" Any`
+    t =     6.48s Find the Target Application 'local.bbsettingsreview.minimal'
+    t =     6.60s Added attachment named 'minimal-baseline'
+    t =     6.60s Requesting snapshot of accessibility hierarchy for app with pid 85640
+    t =     6.84s Requesting snapshot of accessibility hierarchy for app with pid 85640
+    t =     6.89s Added attachment named 'minimal-baseline-accessibility-tree'
+/tmp/bb-settings-minimal-harness/UITests/MinimalSettingsUITests.swift:27: error: -[MinimalSettingsUITests.MinimalSettingsUITests testBaselineDetection] : Potentially inaccessible text
+    t =     8.16s Tear Down
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testBaselineDetection]' failed (8.358 seconds).
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testBothPlainDetection]' started.
+    t =     0.00s Start Test at 2026-10-03 01:46:32.748
+    t =     0.02s Set Up
+    t =     0.02s Open local.bbsettingsreview.minimal
+    t =     0.02s     Launch local.bbsettingsreview.minimal
+    t =     0.02s         Terminate local.bbsettingsreview.minimal:85640
+2026-10-03 01:46:33.790 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:46:33.790 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     1.27s         Setting up automation session
+    t =     4.45s         Wait for local.bbsettingsreview.minimal to idle
+    t =     6.15s Waiting 10.0s for "minimal-both" Any to exist
+    t =     7.22s     Checking `Expect predicate `existsNoRetry == 1` for object "minimal-both" Any`
+    t =     7.22s         Checking existence of `"minimal-both" Any`
+    t =     7.37s Find the Target Application 'local.bbsettingsreview.minimal'
+    t =     7.49s Added attachment named 'minimal-both'
+    t =     7.49s Requesting snapshot of accessibility hierarchy for app with pid 86019
+    t =     7.79s Requesting snapshot of accessibility hierarchy for app with pid 86019
+    t =     7.84s Added attachment named 'minimal-both-accessibility-tree'
+/tmp/bb-settings-minimal-harness/UITests/MinimalSettingsUITests.swift:27: error: -[MinimalSettingsUITests.MinimalSettingsUITests testBothPlainDetection] : Potentially inaccessible text
+    t =     8.61s Tear Down
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testBothPlainDetection]' failed (17.938 seconds).
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testPlainHostDetection]' started.
+    t =     0.00s Start Test at 2026-10-03 01:46:50.687
+    t =     0.02s Set Up
+    t =     0.02s Open local.bbsettingsreview.minimal
+    t =     0.02s     Launch local.bbsettingsreview.minimal
+    t =     0.02s         Terminate local.bbsettingsreview.minimal:86019
+2026-10-03 01:46:51.773 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:46:51.773 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     1.30s         Setting up automation session
+    t =     5.30s         Wait for local.bbsettingsreview.minimal to idle
+    t =     7.10s Waiting 10.0s for "minimal-host" Any to exist
+    t =     8.17s     Checking `Expect predicate `existsNoRetry == 1` for object "minimal-host" Any`
+    t =     8.17s         Checking existence of `"minimal-host" Any`
+    t =     8.29s Find the Target Application 'local.bbsettingsreview.minimal'
+    t =     8.41s Added attachment named 'minimal-host'
+    t =     8.41s Requesting snapshot of accessibility hierarchy for app with pid 87525
+    t =     8.68s Requesting snapshot of accessibility hierarchy for app with pid 87525
+    t =     8.73s Added attachment named 'minimal-host-accessibility-tree'
+/tmp/bb-settings-minimal-harness/UITests/MinimalSettingsUITests.swift:27: error: -[MinimalSettingsUITests.MinimalSettingsUITests testPlainHostDetection] : Potentially inaccessible text
+    t =     9.52s Tear Down
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testPlainHostDetection]' failed (9.752 seconds).
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testPlainStepperDetection]' started.
+    t =     0.00s Start Test at 2026-10-03 01:47:00.440
+    t =     0.02s Set Up
+    t =     0.02s Open local.bbsettingsreview.minimal
+    t =     0.02s     Launch local.bbsettingsreview.minimal
+    t =     0.02s         Terminate local.bbsettingsreview.minimal:87525
+2026-10-03 01:47:01.511 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:47:01.511 xcodebuild[85043:89063201] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     1.29s         Setting up automation session
+    t =     5.29s         Wait for local.bbsettingsreview.minimal to idle
+    t =     7.12s Waiting 10.0s for "minimal-stepper" Any to exist
+    t =     8.19s     Checking `Expect predicate `existsNoRetry == 1` for object "minimal-stepper" Any`
+    t =     8.19s         Checking existence of `"minimal-stepper" Any`
+    t =     8.31s Find the Target Application 'local.bbsettingsreview.minimal'
+    t =     8.43s Added attachment named 'minimal-stepper'
+    t =     8.43s Requesting snapshot of accessibility hierarchy for app with pid 87714
+    t =     8.72s Requesting snapshot of accessibility hierarchy for app with pid 87714
+    t =     8.77s Added attachment named 'minimal-stepper-accessibility-tree'
+/tmp/bb-settings-minimal-harness/UITests/MinimalSettingsUITests.swift:27: error: -[MinimalSettingsUITests.MinimalSettingsUITests testPlainStepperDetection] : Potentially inaccessible text
+    t =     9.60s Tear Down
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testPlainStepperDetection]' failed (9.835 seconds).
+Test Suite 'MinimalSettingsUITests' failed at 2026-10-03 01:47:10.276.
+	 Executed 4 tests, with 4 failures (0 unexpected) in 45.884 (45.906) seconds
+Test Suite 'MinimalSettingsUITests.xctest' failed at 2026-10-03 01:47:10.276.
+	 Executed 4 tests, with 4 failures (0 unexpected) in 45.884 (45.907) seconds
+Test Suite 'Selected tests' failed at 2026-10-03 01:47:10.276.
+	 Executed 4 tests, with 4 failures (0 unexpected) in 45.884 (45.907) seconds
+2026-10-03 01:47:10.620 xcodebuild[85043:89063260]  IDETestOperationsObserverDebug: Failure collecting diagnostics from simulator: Process exited with error 72:
+ xcrun: error: unable to find utility "simctl", not a developer tool or in PATH
+
+2026-10-03 01:47:10.630 xcodebuild[85043:89063201] [MT] IDETestOperationsObserverDebug: 54.221 elapsed -- Testing started completed.
+2026-10-03 01:47:10.630 xcodebuild[85043:89063201] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 01:47:10.630 xcodebuild[85043:89063201] [MT] IDETestOperationsObserverDebug: 54.221 sec, +54.221 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-settings-minimal-matrix.xcresult
+
+Failing tests:
+	MinimalSettingsUITests.testBaselineDetection()
+	MinimalSettingsUITests.testBothPlainDetection()
+	MinimalSettingsUITests.testPlainHostDetection()
+	MinimalSettingsUITests.testPlainStepperDetection()
+
+** TEST EXECUTE FAILED **
+
+Testing started

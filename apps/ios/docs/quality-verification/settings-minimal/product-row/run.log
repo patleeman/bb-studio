@@ -1,0 +1,97 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-share-derived/Build/Products/SettingsProduct.xctestrun -destination id=DEC62F68-5602-4191-BE4E-638447B485F4 -parallel-testing-enabled NO "-only-testing:BBStudioUITests/ReviewQualityUITests/testSettingsElementDetectionAtAccessibilityText" -resultBundlePath /tmp/bb-settings-minimal-product-row.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-settings-minimal-product-row.xcresult
+
+2026-10-03 01:59:09.447235-0400 BBStudioUITests-Runner[32316:89216640] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 01:59:11.572.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 01:59:11.572.
+Test Suite 'ReviewQualityUITests' started at 2026-10-03 01:59:11.572.
+Test Case '-[BBStudioUITests.ReviewQualityUITests testSettingsElementDetectionAtAccessibilityText]' started.
+    t =     0.00s Start Test at 2026-10-03 01:59:11.574
+    t =     0.02s Set Up
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 01:59:11.633 xcodebuild[32313:89216304] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:59:11.633 xcodebuild[32313:89216304] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.47s         Setting up automation session
+objc[32316]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x106474398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x1066a0310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     2.83s         Wait for nyc.plee.bbgo to idle
+    t =     4.65s Waiting 20.0s for "Settings" Button to exist
+    t =     5.72s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.72s         Checking existence of `"Settings" Button`
+    t =     5.83s Tap "Settings" Button
+    t =     5.83s     Wait for nyc.plee.bbgo to idle
+    t =     5.83s     Find the "Settings" Button
+    t =     5.86s     Check for interrupting elements affecting "Settings" Button
+    t =     5.88s     Synthesize event
+    t =     6.17s     Wait for nyc.plee.bbgo to idle
+    t =     7.96s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.04s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.04s         Checking existence of `"settingsServerURL" Any`
+    t =     9.10s Find the "settingsServerURL" Any
+    t =     9.12s Checking existence of `"Configured limit" StaticText`
+    t =     9.16s Swipe up Target Application 'nyc.plee.bbgo'
+    t =     9.16s     Wait for nyc.plee.bbgo to idle
+    t =     9.16s     Find the Target Application 'nyc.plee.bbgo'
+    t =     9.17s     Check for interrupting elements affecting "BB Studio" Application
+    t =     9.19s     Synthesize event
+    t =     9.61s     Wait for nyc.plee.bbgo to idle
+    t =    11.74s Checking existence of `"Configured limit" StaticText`
+    t =    11.81s Find the "Configured limit" StaticText
+    t =    11.86s Swipe up Target Application 'nyc.plee.bbgo'
+    t =    11.86s     Wait for nyc.plee.bbgo to idle
+    t =    11.86s     Find the Target Application 'nyc.plee.bbgo'
+    t =    11.87s     Check for interrupting elements affecting "BB Studio" Application
+    t =    11.89s     Synthesize event
+    t =    12.30s     Wait for nyc.plee.bbgo to idle
+    t =    14.42s Checking existence of `"Configured limit" StaticText`
+    t =    14.46s Find the "Configured limit" StaticText
+    t =    14.50s Swipe up Target Application 'nyc.plee.bbgo'
+    t =    14.50s     Wait for nyc.plee.bbgo to idle
+    t =    14.51s     Find the Target Application 'nyc.plee.bbgo'
+    t =    14.52s     Check for interrupting elements affecting "BB Studio" Application
+    t =    14.53s     Synthesize event
+    t =    14.96s     Wait for nyc.plee.bbgo to idle
+    t =    17.05s Checking existence of `"Configured limit" StaticText`
+    t =    17.12s Swipe up Target Application 'nyc.plee.bbgo'
+    t =    17.12s     Wait for nyc.plee.bbgo to idle
+    t =    17.12s     Find the Target Application 'nyc.plee.bbgo'
+    t =    17.13s     Check for interrupting elements affecting "BB Studio" Application
+    t =    17.15s     Synthesize event
+    t =    17.58s     Wait for nyc.plee.bbgo to idle
+    t =    19.69s Checking existence of `"Configured limit" StaticText`
+    t =    19.74s Swipe up Target Application 'nyc.plee.bbgo'
+    t =    19.74s     Wait for nyc.plee.bbgo to idle
+    t =    19.74s     Find the Target Application 'nyc.plee.bbgo'
+    t =    19.76s     Check for interrupting elements affecting "BB Studio" Application
+    t =    19.77s     Synthesize event
+    t =    20.20s     Wait for nyc.plee.bbgo to idle
+    t =    22.29s Checking existence of `"Configured limit" StaticText`
+/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-share-review-vhuq54aq/ios/UITests/ReviewQualityUITests.swift:56: error: -[BBStudioUITests.ReviewQualityUITests testSettingsElementDetectionAtAccessibilityText] : XCTAssertTrue failed
+    t =    22.50s Tear Down
+Test Case '-[BBStudioUITests.ReviewQualityUITests testSettingsElementDetectionAtAccessibilityText]' failed (22.797 seconds).
+Test Suite 'ReviewQualityUITests' failed at 2026-10-03 01:59:34.371.
+	 Executed 1 test, with 1 failure (0 unexpected) in 22.797 (22.799) seconds
+Test Suite 'BBStudioUITests.xctest' failed at 2026-10-03 01:59:34.371.
+	 Executed 1 test, with 1 failure (0 unexpected) in 22.797 (22.799) seconds
+Test Suite 'Selected tests' failed at 2026-10-03 01:59:34.371.
+	 Executed 1 test, with 1 failure (0 unexpected) in 22.797 (22.799) seconds
+2026-10-03 01:59:34.668 xcodebuild[32313:89216382]  IDETestOperationsObserverDebug: Failure collecting diagnostics from simulator: Process exited with error 72:
+ xcrun: error: unable to find utility "simctl", not a developer tool or in PATH
+
+2026-10-03 01:59:34.673 xcodebuild[32313:89216304] [MT] IDETestOperationsObserverDebug: 26.439 elapsed -- Testing started completed.
+2026-10-03 01:59:34.673 xcodebuild[32313:89216304] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 01:59:34.673 xcodebuild[32313:89216304] [MT] IDETestOperationsObserverDebug: 26.439 sec, +26.439 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-settings-minimal-product-row.xcresult
+
+Failing tests:
+	ReviewQualityUITests.testSettingsElementDetectionAtAccessibilityText()
+
+** TEST EXECUTE FAILED **
+
+Testing started

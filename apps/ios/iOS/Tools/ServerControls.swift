@@ -20,16 +20,15 @@ struct ServerControls: View {
                     }))
                 }
                 if let concurrency {
-                    Stepper(value: Binding(get: { concurrency.globalLimit ?? 0 }, set: { limit in
+                    let configuredLimit = concurrency.globalLimit.map(String.init) ?? "Automatic"
+                    Stepper("Threads at once", value: Binding(get: { concurrency.globalLimit ?? 0 }, set: { limit in
                         Task {
                             await save { self.concurrency = try await app.client.setConcurrency(globalLimit: limit > 0 ? limit : nil, keeping: concurrency) }
                         }
-                    }), in: 0...32) {
-                        LabeledContent("Threads at once") {
-                            Text(concurrency.globalLimit.map(String.init) ?? "Automatic")
-                                .foregroundStyle(Color.primary.opacity(0.75))
-                        }
-                    }
+                    }), in: 0...32)
+                    .accessibilityValue(configuredLimit)
+                    LabeledContent("Configured limit", value: configuredLimit)
+                        .foregroundStyle(.primary)
                     ForEach(concurrency.hosts) { host in
                         LabeledContent(host.name, value: host.effectiveLimit.map { "\($0) at once" } ?? "—")
                             .font(.footnote)

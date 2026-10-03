@@ -1,0 +1,68 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-settings-minimal-DD/Build/Products/MinimalControls.xctestrun -destination id=EA7BA54A-8782-423B-A698-5E552E2EED33 -parallel-testing-enabled NO "-only-testing:MinimalSettingsUITests/MinimalSettingsUITests/testStandardStepperDetection" "-only-testing:MinimalSettingsUITests/MinimalSettingsUITests/testSeparateStepperValueDetection" -resultBundlePath /tmp/bb-settings-minimal-standard.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-settings-minimal-standard.xcresult
+
+2026-10-03 01:52:44.075739-0400 MinimalSettingsUITests-Runner[10147:89135667] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 01:52:46.083.
+Test Suite 'MinimalSettingsUITests.xctest' started at 2026-10-03 01:52:46.084.
+Test Suite 'MinimalSettingsUITests' started at 2026-10-03 01:52:46.084.
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testSeparateStepperValueDetection]' started.
+    t =     0.00s Start Test at 2026-10-03 01:52:46.085
+    t =     0.02s Set Up
+    t =     0.03s Open local.bbsettingsreview.minimal
+    t =     0.03s     Launch local.bbsettingsreview.minimal
+2026-10-03 01:52:46.149 xcodebuild[10009:89135258] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:52:46.149 xcodebuild[10009:89135258] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.27s         Setting up automation session
+objc[10147]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x10602c398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x10627c310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     2.44s         Wait for local.bbsettingsreview.minimal to idle
+    t =     3.91s Waiting 10.0s for "minimal-separate-stepper-only" Any to exist
+    t =     4.98s     Checking `Expect predicate `existsNoRetry == 1` for object "minimal-separate-stepper-only" Any`
+    t =     4.99s         Checking existence of `"minimal-separate-stepper-only" Any`
+    t =     5.07s Find the Target Application 'local.bbsettingsreview.minimal'
+    t =     5.14s Added attachment named 'minimal-separate-stepper-only'
+    t =     5.14s Requesting snapshot of accessibility hierarchy for app with pid 10160
+    t =     5.25s Requesting snapshot of accessibility hierarchy for app with pid 10160
+    t =     5.28s Added attachment named 'minimal-separate-stepper-only-accessibility-tree'
+    t =     5.70s Terminate local.bbsettingsreview.minimal:10160
+    t =     6.80s Tear Down
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testSeparateStepperValueDetection]' passed (6.825 seconds).
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testStandardStepperDetection]' started.
+    t =     0.00s Start Test at 2026-10-03 01:52:52.910
+    t =     0.02s Set Up
+    t =     0.02s Open local.bbsettingsreview.minimal
+    t =     0.02s     Launch local.bbsettingsreview.minimal
+2026-10-03 01:52:52.931 xcodebuild[10009:89135258] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 01:52:52.931 xcodebuild[10009:89135258] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.23s         Setting up automation session
+    t =     2.25s         Wait for local.bbsettingsreview.minimal to idle
+    t =     3.71s Waiting 10.0s for "minimal-standard-stepper-only" Any to exist
+    t =     4.78s     Checking `Expect predicate `existsNoRetry == 1` for object "minimal-standard-stepper-only" Any`
+    t =     4.78s         Checking existence of `"minimal-standard-stepper-only" Any`
+    t =     4.85s Find the Target Application 'local.bbsettingsreview.minimal'
+    t =     4.91s Added attachment named 'minimal-standard-stepper-only'
+    t =     4.91s Requesting snapshot of accessibility hierarchy for app with pid 10206
+    t =     5.02s Requesting snapshot of accessibility hierarchy for app with pid 10206
+    t =     5.04s Added attachment named 'minimal-standard-stepper-only-accessibility-tree'
+    t =     5.42s Terminate local.bbsettingsreview.minimal:10206
+    t =     6.51s Tear Down
+Test Case '-[MinimalSettingsUITests.MinimalSettingsUITests testStandardStepperDetection]' passed (6.523 seconds).
+Test Suite 'MinimalSettingsUITests' passed at 2026-10-03 01:52:59.433.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 13.348 (13.350) seconds
+Test Suite 'MinimalSettingsUITests.xctest' passed at 2026-10-03 01:52:59.433.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 13.348 (13.350) seconds
+Test Suite 'Selected tests' passed at 2026-10-03 01:52:59.434.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 13.348 (13.350) seconds
+2026-10-03 01:52:59.720 xcodebuild[10009:89135258] [MT] IDETestOperationsObserverDebug: 16.880 elapsed -- Testing started completed.
+2026-10-03 01:52:59.720 xcodebuild[10009:89135258] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 01:52:59.720 xcodebuild[10009:89135258] [MT] IDETestOperationsObserverDebug: 16.880 sec, +16.880 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-settings-minimal-standard.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

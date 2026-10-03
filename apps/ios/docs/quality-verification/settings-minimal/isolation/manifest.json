@@ -1,0 +1,124 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "CC8B4EB0-1BBF-47E4-8BE5-5F5B9ACEB997.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-empty-accessibility-tree_0_C98F9303-3401-4410-A36A-8B6E58F74C08.txt",
+        "timestamp" : 1791006539.767
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "1FC40984-A6CD-46B2-B355-014EAA9BFE3B.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-empty_0_BC642634-1386-4A46-A0F6-C2DAE503E5F5.png",
+        "timestamp" : 1791006539.457
+      }
+    ],
+    "testIdentifier" : "MinimalSettingsUITests/testEmptyControlsDetection()",
+    "testIdentifierURL" : "test://com.apple.xcode/MinimalSettings/MinimalSettingsUITests/MinimalSettingsUITests/testEmptyControlsDetection"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "96C06BD5-C3F2-41E4-B9ED-A72A9134B2BE.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-host-only-accessibility-tree_0_E0D2DCBA-58F0-418D-8CA0-C0877F0E28C9.txt",
+        "timestamp" : 1791006548.699
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "690E8FB7-DE7C-4FE3-BBC6-6F4E7E269A90.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-host-only_0_86E8E872-B91B-4411-A202-4A610A087E8C.png",
+        "timestamp" : 1791006548.407
+      }
+    ],
+    "testIdentifier" : "MinimalSettingsUITests/testHostOnlyDetection()",
+    "testIdentifierURL" : "test://com.apple.xcode/MinimalSettings/MinimalSettingsUITests/MinimalSettingsUITests/testHostOnlyDetection"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "6647E1B5-4DF7-4E8C-A1C5-C11E75C338B2.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-stepper-only-accessibility-tree_0_C4F588EF-9C71-4182-BB48-23DE2641857B.txt",
+        "timestamp" : 1791006556.647
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "4CA73F80-8F12-40AD-B6D2-EA39E8EB1670.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-stepper-only_0_3B889D9A-887D-40C8-A15B-2C24EE619A2A.png",
+        "timestamp" : 1791006556.505
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "973644AE-3542-4289-9B59-2D596BA1CB3C.mp4",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Screen Recording 2026-10-03 at 01.49.10 AM.mp4",
+        "timestamp" : 1791006550.503
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "85151E4F-5B23-4268-8C90-0655C22AC15B.txt",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Complete Issue Description.txt"
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "6B0B9D4A-C657-4428-82BC-B343E6F849D0.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "App Screenshot_0_9A8A091A-A7CC-4F5D-ADC6-9C48C76DDBEA.png",
+        "timestamp" : 1791006557.093
+      }
+    ],
+    "testIdentifier" : "MinimalSettingsUITests/testStepperOnlyDetection()",
+    "testIdentifierURL" : "test://com.apple.xcode/MinimalSettings/MinimalSettingsUITests/MinimalSettingsUITests/testStepperOnlyDetection"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "3B4828AE-0E0A-4E92-B79F-A63C49BDAF00.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-toggle-only-accessibility-tree_0_B8732DAD-1F09-4B4A-B509-FE44650EBDF5.txt",
+        "timestamp" : 1791006564.625
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "EA7BA54A-8782-423B-A698-5E552E2EED33",
+        "deviceName" : "BB empty minimal Settings review",
+        "exportedFileName" : "90F6B3FE-B75B-48A7-8E41-F0105E7D1360.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "minimal-toggle-only_0_92A6049A-03DF-499F-B159-10ED302210A8.png",
+        "timestamp" : 1791006564.255
+      }
+    ],
+    "testIdentifier" : "MinimalSettingsUITests/testToggleOnlyDetection()",
+    "testIdentifierURL" : "test://com.apple.xcode/MinimalSettings/MinimalSettingsUITests/MinimalSettingsUITests/testToggleOnlyDetection"
+  }
+]
