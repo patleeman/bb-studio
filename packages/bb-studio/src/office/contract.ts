@@ -39,6 +39,8 @@ export const workingTaskSchema = z.object({
 export const teamBotSchema = z.object({
   id, name: z.string(), avatar: z.string().nullable(), role: z.string().nullable(),
   spaceId: id, model: z.string().nullable(), trust: trustSchema,
+  /** The provider the bot runs on: codex, claude-code, or an external agent such as hermes or openclaw. */
+  providerId: z.string().default("codex"),
   state: z.enum(["idle", "working", "needs_you"]), activeTaskCount: z.number().int().nonnegative(),
 });
 export const talkConversationSchema = z.object({

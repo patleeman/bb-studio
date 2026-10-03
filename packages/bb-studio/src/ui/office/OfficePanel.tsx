@@ -9,6 +9,7 @@ import { OfficeHome } from "./OfficeHome";
 import { openOffice, parseOfficeRoute } from "./routes";
 import { SpaceMark } from "./SpaceSwitcher";
 import type { OfficeOutput } from "../../office/contract";
+import { EXTERNAL_PROVIDERS, useExternalHealth } from "./external";
 
 export function OfficePanel({ subPath }: { subPath: string }) {
   const { current, spaces, loading, error } = useSpaces();
@@ -217,8 +218,12 @@ function NewBotPage({ space }: { space: Space }) {
   const [role, setRole] = useState("");
   const [mission, setMission] = useState("");
   const [trust, setTrust] = useState<"ask" | "act">("ask");
+  const [runtime, setRuntime] = useState<string>("");
   const [error, setError] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
+  // Outside agents (Hermes, OpenClaw) appear once their provider is enabled.
+  const health = useExternalHealth(Object.keys(EXTERNAL_PROVIDERS));
+  const agents = Object.entries(EXTERNAL_PROVIDERS).filter(([id]) => health[id] && health[id]!.status !== "disabled" && health[id]!.status !== "unavailable");
   const submit = async (event: FormEvent) => {
     event.preventDefault();
     if (!name.trim() || !mission.trim()) return;
@@ -229,6 +234,7 @@ function NewBotPage({ space }: { space: Space }) {
         mission: mission.trim(),
         description: role.trim(),
         trust,
+        ...(runtime ? { providerId: runtime } : {}),
         ...(avatar.trim() ? { avatar: avatar.trim() } : {}),
         ...(space.defaultProjectId ? { projectId: space.defaultProjectId } : {}),
       }) as { id?: string; bot?: { id: string } };
@@ -270,7 +276,22 @@ function NewBotPage({ space }: { space: Space }) {
             </label>
           ))}
         </fieldset>
-        <p className="text-xs text-muted-foreground">It uses {space.name}'s default model. You can change that on its profile.</p>
+        {agents.length
+          ? <fieldset>
+              <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Runs on</legend>
+              <label className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-state-hover">
+                <input type="radio" name="bot-runtime" checked={runtime === ""} onChange={() => setRuntime("")} />
+                <span className="text-sm">BB, with {space.name}'s default model</span>
+              </label>
+              {agents.map(([id, label]) => (
+                <label key={id} className="flex cursor-pointer items-center gap-3 rounded-md px-2 py-1.5 hover:bg-state-hover">
+                  <input type="radio" name="bot-runtime" checked={runtime === id} onChange={() => setRuntime(id)} />
+                  <span className="text-sm">{label}, an outside agent{health[id]?.online ? "" : " (offline now)"}</span>
+                </label>
+              ))}
+            </fieldset>
+          : null}
+        <p className="text-xs text-muted-foreground">{runtime ? `${EXTERNAL_PROVIDERS[runtime]} keeps its own memory and tools. Trust covers what it does through Studio.` : `It uses ${space.name}'s default model. You can change that on its profile.`}</p>
         {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
         <div className="flex gap-2">
           <button type="submit" disabled={busy || !name.trim() || !mission.trim()} className={PRIMARY_BUTTON}>Add bot</button>

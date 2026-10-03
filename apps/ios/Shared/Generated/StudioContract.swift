@@ -5452,10 +5452,11 @@ public enum Studio {
     public var spaceId: String?
     public var model: String?
     public var trust: TeamListOutputBotsItemTrust?
+    public var providerId: String?
     public var state: TeamListOutputBotsItemState?
     public var activeTaskCount: Int?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, role: String? = nil, spaceId: String? = nil, model: String? = nil, trust: TeamListOutputBotsItemTrust? = nil, state: TeamListOutputBotsItemState? = nil, activeTaskCount: Int? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, role: String? = nil, spaceId: String? = nil, model: String? = nil, trust: TeamListOutputBotsItemTrust? = nil, providerId: String? = nil, state: TeamListOutputBotsItemState? = nil, activeTaskCount: Int? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -5463,6 +5464,7 @@ public enum Studio {
       self.spaceId = spaceId
       self.model = model
       self.trust = trust
+      self.providerId = providerId
       self.state = state
       self.activeTaskCount = activeTaskCount
     }
@@ -5543,10 +5545,11 @@ public enum Studio {
     public var spaceId: String?
     public var model: String?
     public var trust: BotDeskOutputBotTrust?
+    public var providerId: String?
     public var state: BotDeskOutputBotState?
     public var activeTaskCount: Int?
 
-    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, role: String? = nil, spaceId: String? = nil, model: String? = nil, trust: BotDeskOutputBotTrust? = nil, state: BotDeskOutputBotState? = nil, activeTaskCount: Int? = nil) {
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, role: String? = nil, spaceId: String? = nil, model: String? = nil, trust: BotDeskOutputBotTrust? = nil, providerId: String? = nil, state: BotDeskOutputBotState? = nil, activeTaskCount: Int? = nil) {
       self.id = id
       self.name = name
       self.avatar = avatar
@@ -5554,6 +5557,7 @@ public enum Studio {
       self.spaceId = spaceId
       self.model = model
       self.trust = trust
+      self.providerId = providerId
       self.state = state
       self.activeTaskCount = activeTaskCount
     }

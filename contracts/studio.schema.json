@@ -7134,6 +7134,10 @@
                     "act"
                   ]
                 },
+                "providerId": {
+                  "default": "codex",
+                  "type": "string"
+                },
                 "state": {
                   "type": "string",
                   "enum": [
@@ -7156,6 +7160,7 @@
                 "spaceId",
                 "model",
                 "trust",
+                "providerId",
                 "state",
                 "activeTaskCount"
               ],
@@ -7229,6 +7234,10 @@
                   "act"
                 ]
               },
+              "providerId": {
+                "default": "codex",
+                "type": "string"
+              },
               "state": {
                 "type": "string",
                 "enum": [
@@ -7251,6 +7260,7 @@
               "spaceId",
               "model",
               "trust",
+              "providerId",
               "state",
               "activeTaskCount"
             ],

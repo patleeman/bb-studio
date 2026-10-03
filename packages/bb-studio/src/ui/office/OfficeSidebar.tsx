@@ -12,6 +12,7 @@ import {
 import { Icon, openAppPath } from "@bb-studio/kit/app";
 import { useMemo, useState, type ReactNode } from "react";
 import { Face, FaceStack } from "./Face";
+import { externalAgentName, useExternalHealth } from "./external";
 import { ThreadMenu } from "./ThreadMenu";
 import { usePathname } from "./location";
 import { itemRef, useLive, useSpaces, useSpaceTree, useTeam, type Conversation, type TeamBot, type TreeFolder, type TreeItem } from "./model";
@@ -122,6 +123,7 @@ export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListPr
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
 
   const bots = useMemo(() => new Map(team.bots.map((bot) => [bot.id, bot])), [team.bots]);
+  const health = useExternalHealth(team.bots.map((bot) => bot.providerId));
   const folders: TreeFolder[] = (tree.data?.folders ?? []).filter((folder) => !folder.archived);
   const folderIds = useMemo(() => new Set(folders.map((folder) => folder.id)), [folders]);
 
@@ -150,11 +152,11 @@ export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListPr
                   <button
                     key={bot.id}
                     type="button"
-                    title={`${bot.name}${bot.role ? ` · ${bot.role}` : ""}`}
+                    title={[bot.name, bot.role, externalAgentName(bot.providerId) ? `${externalAgentName(bot.providerId)} agent${health[bot.providerId!]?.online === false ? ", offline" : ""}` : null].filter(Boolean).join(" · ")}
                     onClick={() => { openOffice(`team/${encodeURIComponent(bot.id)}`); onNavigate(); }}
                     className="rounded-full focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
                   >
-                    <Face name={bot.name} avatar={bot.avatar} state={bot.state} selected={selected} />
+                    <Face name={bot.name} avatar={bot.avatar} state={bot.state} selected={selected} external={externalAgentName(bot.providerId)} offline={health[bot.providerId ?? ""]?.online === false} />
                   </button>
                 );
               })}

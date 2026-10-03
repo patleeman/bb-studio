@@ -1,5 +1,6 @@
 // A bot is a face: a round avatar, never a row. A dashed ring turns while it
 // works; a dot means it needs you. "A face is someone, a row is something."
+import { Icon } from "@bb-studio/kit/app";
 import { cn } from "./styles";
 import type { BotState } from "./model";
 
@@ -16,6 +17,10 @@ export interface FaceProps {
   state?: BotState;
   size?: keyof typeof SIZES;
   selected?: boolean;
+  /** Runs on an outside agent (Hermes, OpenClaw): a small globe at the corner. */
+  external?: string | null;
+  /** That agent can't be reached right now. */
+  offline?: boolean;
   className?: string;
 }
 
@@ -23,15 +28,17 @@ function isImage(avatar: string): boolean {
   return /^(https?:|data:image\/|\/)/.test(avatar);
 }
 
-export function Face({ name, avatar, state = "idle", size = "md", selected = false, className }: FaceProps) {
-  const showState = size === "md" || size === "lg";
-  const label = state === "needs_you" ? `${name}, needs you` : state === "working" ? `${name}, working` : name;
+export function Face({ name, avatar, state = "idle", size = "md", selected = false, external = null, offline = false, className }: FaceProps) {
+  const showState = (size === "md" || size === "lg") && !offline;
+  const label = [name, external ? `${external} agent` : null, offline ? "offline" : state === "needs_you" ? "needs you" : state === "working" ? "working" : null]
+    .filter(Boolean).join(", ");
   return (
     <span role="img" aria-label={label} className={cn("relative inline-flex shrink-0", className)}>
       <span
         className={cn(
           "inline-flex items-center justify-center overflow-hidden rounded-full bg-muted leading-none select-none",
           SIZES[size],
+          offline && "opacity-45 grayscale",
           selected && "ring-2 ring-foreground/70 ring-offset-2 ring-offset-sidebar",
         )}
       >
@@ -44,6 +51,11 @@ export function Face({ name, avatar, state = "idle", size = "md", selected = fal
         : null}
       {showState && state === "needs_you"
         ? <span aria-hidden className="absolute -top-px -right-px size-2.5 rounded-full border-2 border-sidebar bg-warning-foreground" />
+        : null}
+      {external && (size === "md" || size === "lg")
+        ? <span aria-hidden className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full border border-sidebar bg-muted text-muted-foreground">
+            <Icon name="Globe" className="size-2.5" />
+          </span>
         : null}
     </span>
   );

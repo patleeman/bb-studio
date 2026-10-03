@@ -25,6 +25,8 @@ export interface TeamBot {
   role: string | null;
   state: BotState;
   activeTaskCount: number;
+  /** codex, claude-code, or an external agent such as hermes or openclaw. */
+  providerId?: string;
 }
 
 export interface Conversation {

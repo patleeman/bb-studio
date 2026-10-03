@@ -9,6 +9,7 @@ const rosterSchema = z.object({
   bots: z.array(z.object({
     id: z.string(), name: z.string(), avatar: z.string().nullable(), description: z.string(),
     projectId: z.string().nullable(), model: z.string(), trust: z.enum(["ask", "act"]).default("ask"),
+    providerId: z.string().default("codex"),
     working: z.boolean(), retired: z.boolean().optional(),
   })),
   directConversations: z.record(z.string(), z.array(z.object({ threadId: z.string() }))).default({}),
@@ -30,7 +31,7 @@ export async function officeTeam(spaceId: string, spaces: OfficeSpaceStore, inbo
     const needsYou = events.some(event => event.type === "request" && event.doneAt === null && (event.botId === bot.id || (event.threadId !== null && threads.has(event.threadId))));
     return {
       id: bot.id, name: bot.name, avatar: bot.avatar, role: bot.description || null,
-      spaceId: spaces.forProject(bot.projectId).id, model: bot.model || null, trust: bot.trust,
+      spaceId: spaces.forProject(bot.projectId).id, model: bot.model || null, trust: bot.trust, providerId: bot.providerId,
       state: needsYou ? "needs_you" : bot.working ? "working" : "idle", activeTaskCount: tasks.length,
     };
   }) };

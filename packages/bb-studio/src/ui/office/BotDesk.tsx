@@ -5,6 +5,7 @@ import { Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, PageColumn, openAppPath } from "@
 import { useState } from "react";
 import { DelegateDialog } from "./DelegateDialog";
 import { Face } from "./Face";
+import { externalAgentName, useExternalHealth } from "./external";
 import { TaskRow } from "./OfficeHome";
 import { useCall, useLive, useTeam, type BotDesk as Desk, type Space } from "./model";
 import { openOffice } from "./routes";
@@ -26,6 +27,9 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
   const call = useCall();
   const desk = useLive<Desk>("bot_desk", { botId }, { pollMs: 30_000 });
   const { bots } = useTeam(space.id);
+  const agent = externalAgentName(desk.data?.bot.providerId);
+  const health = useExternalHealth([desk.data?.bot.providerId]);
+  const agentHealth = desk.data?.bot.providerId ? health[desk.data.bot.providerId] : undefined;
   const [delegating, setDelegating] = useState(false);
   const [starting, setStarting] = useState(false);
 
@@ -45,10 +49,16 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
     <div className="flex h-full min-h-0 flex-col bg-background">
       <div className="mx-auto w-full max-w-3xl shrink-0 px-10 pt-10 @max-3xl/page:px-4">
         <header className="flex items-center gap-4">
-          <Face name={bot.name} avatar={bot.avatar} state={bot.state} size="lg" />
+          <Face name={bot.name} avatar={bot.avatar} state={bot.state} size="lg" external={agent} offline={agentHealth?.online === false} />
           <div className="min-w-0 flex-1">
             <h1 className="truncate text-2xl font-semibold">{bot.name}</h1>
-            <p className="truncate text-sm text-muted-foreground">{bot.role ? `${bot.role} · ` : ""}<span className={state.tone}>{state.label}</span></p>
+            <p className="truncate text-sm text-muted-foreground">
+              {bot.role ? `${bot.role} · ` : ""}
+              {agent ? `${agent} agent · ` : ""}
+              {agentHealth?.online === false
+                ? <span className="text-muted-foreground" title={agentHealth.message ?? undefined}>Offline</span>
+                : <span className={state.tone}>{state.label}</span>}
+            </p>
           </div>
           <button type="button" onClick={() => setDelegating(true)} className={PRIMARY_BUTTON}><Icon name="Sent" aria-hidden />Give a task</button>
         </header>
@@ -91,7 +101,14 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
               <dl className="grid grid-cols-[8rem_1fr] gap-x-4 gap-y-3 text-sm">
                 <dt className="text-muted-foreground">Role</dt><dd>{bot.role ?? "Not set"}</dd>
                 <dt className="text-muted-foreground">Model</dt><dd>{bot.model ?? "Space default"}</dd>
-                <dt className="text-muted-foreground">Trust</dt><dd>{TRUST[bot.trust]}</dd>
+                {agent
+                  ? <><dt className="text-muted-foreground">Runs on</dt><dd>{agent}, an outside agent{agentHealth ? ` · ${agentHealth.online ? "online" : `offline${agentHealth.message ? `: ${agentHealth.message}` : ""}`}` : ""}</dd></>
+                  : null}
+                <dt className="text-muted-foreground">Trust</dt>
+                <dd>
+                  {TRUST[bot.trust]}
+                  {agent ? <span className="mt-1 block text-muted-foreground">Trust covers what it does through Studio. On its own machine, {agent} follows its own settings.</span> : null}
+                </dd>
                 <dt className="text-muted-foreground">Space</dt><dd>{space.name}</dd>
               </dl>
               {desk.data.memory
