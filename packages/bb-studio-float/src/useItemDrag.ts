@@ -30,7 +30,6 @@ export function useItemDrag(): boolean {
     window.addEventListener("pointerdown", stop, true);
     window.addEventListener("pointermove", onPointerMove, true);
     window.addEventListener("mousemove", onPointerMove, true);
-    window.addEventListener("mouseup", stop, true);
     window.addEventListener("blur", stop);
     return () => {
       document.removeEventListener("dragstart", onDragStart, true);
@@ -43,7 +42,6 @@ export function useItemDrag(): boolean {
       window.removeEventListener("pointerdown", stop, true);
       window.removeEventListener("pointermove", onPointerMove, true);
       window.removeEventListener("mousemove", onPointerMove, true);
-      window.removeEventListener("mouseup", stop, true);
       window.removeEventListener("blur", stop);
     };
   }, []);

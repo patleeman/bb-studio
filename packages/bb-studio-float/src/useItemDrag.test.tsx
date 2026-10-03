@@ -74,6 +74,8 @@ it("lets the React drop handler run before the drop zone disappears", async () =
   await act(() => root.render(<Zone />));
   await drag("dragstart");
   const zone = container.querySelector("div")!;
+  await act(() => zone.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })));
+  expect(container.querySelector("div")).toBe(zone);
   await drag("drop", zone);
   expect(accept).toHaveBeenCalledOnce();
   expect(container.querySelector("div")).toBeNull();
