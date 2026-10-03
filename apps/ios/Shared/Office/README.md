@@ -29,3 +29,17 @@ wire id remains available as `itemId`.
 The stores accept fetch closures for isolated tests and preview fixtures. Native
 payload fixtures validate both request and response schemas; `OfficeStoreTests`
 asserts actual client transport bytes, decoding, and store state transitions.
+
+`InboxStore(client:)` loads all spaces. `events` includes per-event `isPending`;
+`counts` contains per-space request/unread-report counts. `act(key:actionId:text:)`,
+`done(keys:)`, and `read(keys:)` return whether the action succeeded. They apply
+optimistic overlays, reject duplicate pending actions, and roll back failures.
+`loadMore()` follows `nextCursor` (the wire field is `cursor`).
+
+Call `startObserving(_:)` with the app's existing `BBRealtime` when binding the
+store and `stopObserving()` on teardown. It listens for reconnects, thread changes,
+Studio source signals, and validated pushes. It does not own the shared socket.
+`OfficePush.receive` validates server identity before announcing a refresh.
+Notifications with `inboxKey` route approve/deny/text-answer through `inbox_act`;
+unsupported forms open the app. The coordinator owns their Inbox navigation.
+Legacy notifications without an Inbox key retain their existing action path.

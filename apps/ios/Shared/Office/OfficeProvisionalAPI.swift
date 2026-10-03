@@ -4,7 +4,7 @@ import Foundation
 // These calls intentionally stay visible as dynamic dispatch in the native
 // inventory until the office contract lands. Replace with Studio.Method then.
 extension BBClient {
-    private func pendingOfficeRPC<T: Decodable>(_ method: String, _ input: JSONValue) async throws -> T {
+    func pendingOfficeRPC<T: Decodable>(_ method: String, _ input: JSONValue) async throws -> T {
         try await rpc("studio", method, input)
     }
     public func officeHome(_ spaceId: String) async throws -> OfficeHome {
