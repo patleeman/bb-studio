@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { activeThreads, arrangeGrid, byAttention, followedThread, movePane, channelLayout, focusedThread, threadActivity } from "../channel-layout";
+import { activeThreads, arrangeGrid, byAttention, followedThreads, movePane, channelLayout, focusedThread, threadActivity } from "../channel-layout";
 import type { ViewThread } from "../view-contract";
 const thread = (id: string, status: string, extra: Partial<ViewThread> = {}): ViewThread => ({ id, title: id, status, botId: null, parentThreadId: null, updatedAt: 1, error: null, ...extra });
 test("unknown preferences preserve the existing merged view", () => {
@@ -31,11 +31,14 @@ test("arranged grid panes keep their places while new ones follow in attention o
   const same = ["a", "b"];
   expect(movePane(same, "a", "a", "after")).toBe(same);
 });
-test("active follows a pick, then work, then what it showed last, then the latest reply", () => {
-  const rows = [thread("old", "idle", { updatedAt: 1 }), thread("new", "idle", { updatedAt: 5 }), thread("run", "active")];
-  expect(followedThread(rows, "old", null)?.id).toBe("old");
-  expect(followedThread(rows, null, "old")?.id).toBe("run");
-  const idle = rows.map(row => ({ ...row, status: "idle" }));
-  expect(followedThread(idle, null, "old")?.id).toBe("old");
-  expect(followedThread(idle, "deleted", null)?.id).toBe("new");
+test("active shows every working thread with a pick first, then keeps the last set, then the latest", () => {
+  const rows = [thread("old", "idle", { updatedAt: 1 }), thread("new", "idle", { updatedAt: 5 }), thread("run", "active"), thread("ask", "idle", { hasPendingInteraction: true })];
+  const ids = (list: ViewThread[]) => list.map(row => row.id);
+  expect(ids(followedThreads(rows, null, []))).toEqual(["ask", "run"]);
+  expect(ids(followedThreads(rows, "old", []))).toEqual(["old", "ask", "run"]);
+  expect(ids(followedThreads(rows, "run", []))).toEqual(["run", "ask"]);
+  const idle = rows.map(row => ({ ...row, status: "idle", hasPendingInteraction: false }));
+  expect(ids(followedThreads(idle, null, ["run", "ask", "gone"]))).toEqual(["run", "ask"]);
+  expect(ids(followedThreads(idle, "old", ["run", "ask"]))).toEqual(["old", "run", "ask"]);
+  expect(ids(followedThreads(idle, "deleted", []))).toEqual(["new"]);
 });

@@ -13,21 +13,24 @@ const view: ThreadView = { id: "channel", name: "Review", members: [{ kind: "thr
 const render = (layout: "active" | "grid" | "focus", threads = [row("idle", "idle"), row("active", "active")], selected: string | null = null) => act(() => root.render(React.createElement(ChannelThreads, { view, initialThreads: threads, bots: [], layout, selected, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
 beforeEach(() => { vi.clearAllMocks(); state.rpc.call.mockImplementation(() => new Promise(() => {})); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-test("active follows the working thread, keeps it after it stops, and honors a pick until new work starts", async () => {
-  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active")]);
-  render("active");
+test("active shows every working thread side by side, keeps them after they stop, and adds a pick", async () => {
+  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active"), row("busy", "starting")]);
+  render("active", [row("idle", "idle"), row("active", "active"), row("busy", "starting")]);
   await act(async () => {});
-  const shown = () => [...container.querySelectorAll("[data-native-thread]")].map(node => node.getAttribute("data-native-thread"));
-  expect(shown()).toEqual(["active"]);
-  expect(container.querySelector('[aria-label="Channel threads"] [aria-current]')?.textContent).toContain("active");
-  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "idle")]);
+  const shown = () => [...container.querySelectorAll("[data-native-thread]")].map(node => node.getAttribute("data-native-thread")).sort();
+  expect(shown()).toEqual(["active", "busy"]);
+  expect([...container.querySelectorAll(".channel-switcher-row[data-current]")].map(row => row.textContent)).toHaveLength(2);
+  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "idle"), row("busy", "idle")]);
   await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
-  expect(shown()).toEqual(["active"]);
+  expect(shown()).toEqual(["active", "busy"]);
   const idle = [...container.querySelectorAll('[aria-label="Channel threads"] button')].find(button => button.textContent?.includes("idle"))!;
   act(() => (idle as HTMLButtonElement).click());
   expect(state.select).not.toHaveBeenCalled();
-  expect(shown()).toEqual(["idle"]);
-  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active")]);
+  expect(shown()).toEqual(["active", "busy", "idle"]);
+  expect(container.querySelector("[data-channel-thread]")?.getAttribute("data-channel-thread")).toBe("idle");
+  act(() => (container.querySelector('[aria-label="Stop showing idle"]') as HTMLButtonElement).click());
+  expect(shown()).toEqual(["active", "busy"]);
+  state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active"), row("busy", "idle")]);
   await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
   expect(shown()).toEqual(["active"]);
 });

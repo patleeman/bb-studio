@@ -41,11 +41,15 @@ export function movePane(ids: string[], id: string, target: string, place: "befo
   return [...rest.slice(0, at), id, ...rest.slice(at)];
 }
 /**
- * Active follows the work: a thread the owner picked, else the thread that most
- * needs attention while working, else the one it showed last, else the latest.
+ * Active follows the work: every working thread in attention order, or what
+ * it showed last when nothing works, with a thread the owner picked first.
+ * With nothing to keep it shows the latest thread.
  */
-export function followedThread(threads: ViewThread[], pinned: string | null, previous: string | null) {
+export function followedThreads(threads: ViewThread[], pinned: string | null, previous: string[]) {
   const find = (id: string | null) => id ? threads.find(thread => thread.id === id) : undefined;
-  return find(pinned) ?? byAttention(activeThreads(threads))[0] ?? find(previous)
-    ?? [...threads].filter(thread => !thread.parentThreadId && !thread.error).sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? threads[0];
+  const pick = find(pinned), working = byAttention(activeThreads(threads));
+  const rest = (working.length ? working : previous.flatMap(id => find(id) ?? [])).filter(thread => thread !== pick);
+  if (pick || rest.length) return [...(pick ? [pick] : []), ...rest];
+  const latest = [...threads].filter(thread => !thread.parentThreadId && !thread.error).sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? threads[0];
+  return latest ? [latest] : [];
 }

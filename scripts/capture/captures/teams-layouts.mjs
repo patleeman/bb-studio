@@ -22,7 +22,10 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
   await settleBots(launch);
   const thread = JSON.parse(await bbCli(["thread", "spawn", "--project", projectId, "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low", "--title", "Release checklist", "--prompt", 'This is a deterministic UI fixture. Do not use tools or change files. Reply exactly with these two lines:\nThe launch checklist is ready.\n::reactions{items="✅ Approve|🔍 Review"}', "--json"]));
   await bbCli(["thread", "wait", thread.id, "--timeout", "1m"]);
-  const members = [...launch.threads.filter(thread => !thread.parentThreadId).map(thread => ({ kind: "thread", id: thread.id })), { kind: "thread", id: thread.id }];
+  // Quinn joins without a thread here, so every layout shows a member that hasn't started.
+  const quinn = (await pluginRpc("bot-teams", "profiles", {})).find(bot => bot.handle === "quinn");
+  if (!quinn) throw new Error("Missing the seeded Quinn bot");
+  const members = [...launch.threads.filter(thread => !thread.parentThreadId).map(thread => ({ kind: "thread", id: thread.id })), { kind: "thread", id: thread.id }, { kind: "bot", id: quinn.id }];
   const view = await pluginRpc("bot-teams", "viewCreate", { name: "Channel layouts", members, requestId: crypto.randomUUID() });
   fixture = { id: view.id, threadId: thread.id };
   return fixture;
@@ -50,6 +53,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
  };
  const margin = client => client.evaluate("(()=>{const box=document.querySelector('.channel-switcher');const scroller=document.querySelector('.channel-single .channel-pane-body > div > [class~=\\'overflow-y-auto\\']');if(!box||!scroller)throw new Error('Missing member box or thread transcript');const content=scroller.getBoundingClientRect().left+parseFloat(getComputedStyle(scroller).paddingLeft);if(box.getBoundingClientRect().right>content)throw new Error('Member box overlaps the transcript');if(scroller.getBoundingClientRect().width<innerWidth*0.6)throw new Error('Transcript does not scroll edge to edge');})()");
  const rows = "document.querySelectorAll('.channel-switcher-row > button').length";
+ const unstarted = scope => client => client.evaluate(`(()=>{const quinn=Array.from(document.querySelectorAll('[data-channel-layout="${scope}"] .channel-member-unstarted')).find(node=>node.textContent.includes('Quinn'));if(!quinn)throw new Error('${scope} lost the unstarted member');if(getComputedStyle(quinn).borderTopStyle!=='dashed')throw new Error('${scope} unstarted member lacks the dashed outline');})()`);
  const clearDraft = async client => {
   await client.evaluate("document.querySelector('[data-view-composer] .ProseMirror').focus()");
   for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 4 });
@@ -68,6 +72,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.waitForSelector(`[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"]`);
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
+   await unstarted("grid")(client);
    await clearDraft(client);
    await client.command("Input.insertText", { text: "Keep this channel draft." });
    await client.evaluate("(()=>{window.channelCaptureComposer=document.querySelector('[data-view-composer] .ProseMirror');return true;})()");
@@ -115,6 +120,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.waitForSelector(`[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"]`);
    await wait(client, `${rows}===3&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Release checklist')`);
    await margin(client);
+   await unstarted("focus")(client);
   }) },
   { id: "bots-focus-compact", packageDir: "bb-studio-teams", fileName: "channel-focus-compact.png", setup: guard(async client => {
    // A narrower window keeps the member box in the margin as avatars only.
@@ -127,19 +133,28 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
   }) },
   { id: "bots-active", packageDir: "bb-studio-teams", fileName: "channel-active.png", setup: guard(async client => {
    const data = await open(client, "active");
-   await bbCli(["thread", "tell", data.threadId, "For a staged UI activity check, use the terminal to run sleep 45, then reply only Check finished. Change no files."]);
+   const bots = await pluginRpc("bot-teams", "profiles", {});
+   const page = await pluginRpc("bot-teams", "view", { id: data.id });
+   const atlas = page.threads.find(thread => !thread.parentThreadId && thread.botId === bots.find(bot => bot.handle === "atlas")?.id);
+   if (!atlas) throw new Error("Missing Atlas's channel thread");
+   const workers = [data.threadId, atlas.id];
+   const stop = () => Promise.all(workers.map(id => bbCli(["thread", "stop", id]).catch(() => {})));
+   for (const id of workers) await bbCli(["thread", "tell", id, "For a staged UI activity check, use the terminal to run sleep 45, then reply only Check finished. Change no files."]);
+   const panes = "Array.from(document.querySelectorAll('[data-channel-layout=\"active\"] [data-channel-thread]')).map(p=>p.getAttribute('data-channel-thread'))";
    try {
-    // Active follows the thread that starts working.
-    await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&!!document.querySelector('.channel-switcher-row[data-current][data-activity="Working"]')`);
-    await wait(client, `document.querySelectorAll('[data-channel-thread]').length===1&&${rows}===3`);
-    await margin(client);
-   } catch (error) { await bbCli(["thread", "stop", data.threadId]).catch(() => {}); throw error; }
+    // Active shows every working thread side by side, beside the member box.
+    await wait(client, `${panes}.length===2&&${JSON.stringify(workers)}.every(id=>${panes}.includes(id))&&document.querySelectorAll('.channel-switcher-row[data-current][data-activity="Working"]').length===2`);
+    await client.evaluate("(()=>{const box=document.querySelector('.channel-switcher').getBoundingClientRect();const panes=Array.from(document.querySelectorAll('[data-channel-layout=\"active\"] [data-channel-thread]')).map(p=>p.getBoundingClientRect());if(panes.some(p=>p.left<box.right))throw new Error('Member box overlaps an Active pane');if(Math.abs(panes[0].top-panes[1].top)>2)throw new Error('Active panes are not side by side');})()");
+    await unstarted("active")(client);
+   } catch (error) { await stop(); throw error; }
    return async () => {
-    await bbCli(["thread", "stop", data.threadId]);
-    // It keeps the finished thread on screen, and a pick swaps threads without leaving Active.
-    await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&!document.querySelector('.channel-switcher-row[data-activity="Working"]')`);
+    await stop();
+    // Finished threads stay, and a pick joins them first without leaving Active.
+    await wait(client, `${panes}.length===2&&!document.querySelector('.channel-switcher-row[data-activity="Working"]')`);
     await client.clickAriaButtonWithPointer("Scribe, Idle");
-    await wait(client, `!!document.querySelector('[data-channel-layout="active"]')&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Scribe')`);
+    await wait(client, `!!document.querySelector('[data-channel-layout="active"]')&&${panes}.length===3&&!!document.querySelector('[aria-label="Stop showing Scribe"]')`);
+    await client.clickAriaButtonWithPointer("Stop showing Scribe");
+    await wait(client, `${panes}.length===2`);
    };
   }) },
   { id: "bots-grid-mobile", packageDir: "bb-studio-teams", fileName: "channel-grid-mobile.png", privateSidebar: false, setup: guard(async client => {

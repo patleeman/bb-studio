@@ -4,7 +4,7 @@ import { Icon, ItemTile } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import type { ThreadView, ViewThread } from "./view-contract";
-import { CHANNEL_LAYOUTS, activeThreads, arrangeGrid, byAttention, focusedThread, followedThread, movePane, threadActivity, type ChannelLayout } from "./channel-layout";
+import { CHANNEL_LAYOUTS, activeThreads, arrangeGrid, byAttention, focusedThread, followedThreads, movePane, threadActivity, type ChannelLayout } from "./channel-layout";
 
 const LAYOUT_ICONS: Record<ChannelLayout, string> = { merged: "MessageSquare", grid: "GridView", active: "Zap", focus: "Maximize2" };
 const PANE_DRAG = "application/x-bb-channel-pane";
@@ -99,16 +99,24 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
     if (workingKey.split(" ").some(id => id && !before.has(id))) setPinned(null);
     previousWorking.current = workingKey;
   }, [workingKey]);
-  const lastFollowed = useRef<string | null>(null);
-  const single = layout === "focus" ? focusedThread(threads, selected) : layout === "active" ? followedThread(threads, pinned, lastFollowed.current) : undefined;
-  useEffect(() => { if (layout === "active" && single) lastFollowed.current = single.id; }, [layout, single?.id]);
-  const visible = layout === "grid" ? gridRoots : single ? [single] : [];
+  const lastFollowed = useRef<string[]>([]), beforePin = useRef<string[]>([]);
+  const single = layout === "focus" ? focusedThread(threads, selected) : undefined;
+  const followed = layout === "active" ? followedThreads(threads, pinned, lastFollowed.current) : [];
+  const followedKey = followed.map(thread => thread.id).join(" ");
+  useEffect(() => { if (layout === "active" && followedKey) lastFollowed.current = followedKey.split(" "); }, [layout, followedKey]);
+  const visible = layout === "grid" ? gridRoots : layout === "active" ? followed : single ? [single] : [];
   const arrangeable = layout === "grid" && gridRoots.length > 1;
   // The switcher lists roots in attention order, with forks right after their parent.
   const switcherThreads = roots.flatMap(root => [root, ...byAttention(childrenOf(root.id))]);
-  const pick = (id: string) => layout === "active" ? setPinned(id) : onSelect(id);
+  const pick = (id: string) => {
+    if (layout !== "active") return onSelect(id);
+    // A thread already on screen just scrolls into view; another one joins first.
+    if (followed.some(thread => thread.id === id)) document.querySelector(`[data-channel-layout="active"] [data-channel-thread="${CSS.escape(id)}"]`)?.scrollIntoView({ block: "nearest", behavior: "smooth" });
+    else { beforePin.current = followed.map(thread => thread.id); setPinned(id); }
+  };
+  const unpin = () => { lastFollowed.current = beforePin.current; setPinned(null); };
 
-  // Grid panes; Focus and Active render one transcript like a thread page.
+  // Grid and Active panes; Focus renders one transcript like a thread page.
   const pane = (thread: ViewThread) => {
     const forks = childrenOf(thread.id);
     return <section key={thread.id} className="channel-thread-pane" data-channel-thread={thread.id} data-activity={threadActivity(thread)} aria-label={`${label(thread)} transcript`}
@@ -127,6 +135,7 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
         <span className="channel-pane-actions">
           <button type="button" aria-label={`Reply to ${label(thread)}`} title="Reply in channel" onClick={() => choose(thread.id)} className="channel-pane-action"><Icon name="ArrowTurnBackward" className="size-3.5" /></button>
           <button type="button" aria-label={`Focus ${label(thread)}`} title="Focus thread" onClick={() => onSelect(thread.id)} className="channel-pane-action"><Icon name="Maximize2" className="size-3.5" /></button>
+          {layout === "active" && pinned === thread.id && <button type="button" aria-label={`Stop showing ${label(thread)}`} title="Stop showing" onClick={unpin} className="channel-pane-action"><Icon name="X" className="size-3.5" /></button>}
         </span>
       </header>
       {thread.error ? <p className="p-4 text-sm text-destructive">{thread.error}</p> : <div className="channel-pane-body" onPointerDownCapture={() => onReply(thread.id)} onFocusCapture={() => onReply(thread.id)}><ThreadChat threadId={thread.id} variant="timeline" layout="contained" className="h-full" messageActions={[{ id: "channel-reply", title: "Reply in channel", icon: "ArrowTurnBackward", run: () => choose(thread.id) }]} /></div>}
@@ -143,14 +152,14 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
 
   const switcher = layout !== "grid" && <nav className="channel-switcher" aria-label="Channel threads">
     {switcherThreads.map(thread => {
-      const current = single?.id === thread.id;
+      const current = layout === "active" ? followed.some(shown => shown.id === thread.id) : single?.id === thread.id;
       return <div key={thread.id} className="channel-switcher-row" data-current={current || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={threadActivity(thread)}>
         <button type="button" aria-current={current || undefined} onClick={() => pick(thread.id)} aria-label={`${label(thread)}, ${threadActivity(thread)}`} title={`${label(thread)} · ${threadActivity(thread)}`}>
           {thread.parentThreadId ? <Icon name="GitBranch" className="size-3.5 shrink-0 text-subtle-foreground" aria-hidden /> : avatar(thread)}
           <span className="channel-rail-name">{label(thread)}</span>
           <span className="channel-status-dot" aria-hidden />
         </button>
-        {current && <span className="channel-switcher-actions">
+        {current && layout === "focus" && <span className="channel-switcher-actions">
           <button type="button" aria-label={`Reply to ${label(thread)}`} title="Reply in channel" onClick={() => choose(thread.id)} className="channel-pane-action"><Icon name="ArrowTurnBackward" className="size-3.5" /></button>
           <button type="button" aria-label={`Open ${label(thread)}`} title="Open thread" onClick={() => onOpen(thread.id)} className="channel-pane-action"><Icon name="ArrowUpRight" className="size-3.5" /></button>
         </span>}
@@ -166,7 +175,7 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
     {switcher}
     <div className="channel-thread-stage" data-thread-count={visible.length}>
       {!visible.length && <div className="channel-stage-empty" role="status"><p className="font-medium">No conversations yet</p><p className="text-muted-foreground">Mention a member below to start one.</p></div>}
-      {layout === "grid" ? visible.map(pane) : visible.map(transcript)}
+      {layout === "focus" ? visible.map(transcript) : visible.map(pane)}
     </div>
     {layout === "grid" && gridFooter}
     <span className="sr-only" aria-live="polite">{announcement}</span>
