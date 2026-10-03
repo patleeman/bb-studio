@@ -22,7 +22,7 @@ const base = (key: string, projectId: string | null, source: string): SourceEven
 /** Modules register later in startup; check the registry on every read. */
 export function moduleInboxSources(services: ModuleServices): InboxSource[] {
   return [{
-    id: "feed",
+    id: "feed", keyPrefix: "feed:",
     async list() {
       if (!services.has("feed")) return [];
       const events = new Map<string, SourceEvent>();
@@ -46,7 +46,7 @@ export function moduleInboxSources(services: ModuleServices): InboxSource[] {
     },
     async act() { throw new Error("Reports have no source action. Mark the report done instead."); },
   }, {
-    id: "task-review",
+    id: "task-review", keyPrefix: "task-review:",
     async list() {
       if (!services.has("studio-tasks")) return [];
       const { tasks } = taskList.parse(await services.call("studio-tasks", "board", {}));
@@ -63,7 +63,7 @@ export function moduleInboxSources(services: ModuleServices): InboxSource[] {
       await services.call("studio-tasks", "update", { id: event.key.slice("task-review:".length), status: "done" });
     },
   }, {
-    id: "bot-create",
+    id: "bot-create", keyPrefix: "bot-create:",
     async list() {
       if (!services.has("bot-teams")) return [];
       const { bots, botCreateRequests } = roster.parse(await services.call("bot-teams", "list", null));

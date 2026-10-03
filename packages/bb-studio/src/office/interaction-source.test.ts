@@ -8,7 +8,7 @@ it("lists offered decisions and rechecks live status before responding", async (
     payload: { kind: "approval", reason: "Write outside home", availableDecisions: ["deny"] } });
   const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: {
-      list: async () => [{ ...makeThreadResponse({ id: "t1", projectId: "work" }), hasPendingInteraction: true }],
+      list: async input => { expect(input?.includeHidden).toBe(true); return [{ ...makeThreadResponse({ id: "t1", projectId: "work" }), hasPendingInteraction: true }]; },
       interactions: {
         list: async () => [interaction()] as never,
         get: async () => interaction() as never,

@@ -5,6 +5,7 @@ import type { InboxEvent } from "./inbox-contract";
 export type SourceEvent = Omit<InboxEvent, "spaceId" | "readAt" | "doneAt"> & { projectId: string | null };
 export interface InboxSource {
   id: string;
+  keyPrefix?: string;
   list(): Promise<SourceEvent[]>;
   act(event: SourceEvent, actionId: string, text?: string): Promise<void>;
 }
@@ -18,8 +19,8 @@ export class Inbox {
     if (new Set(sources.map(s => s.id)).size !== sources.length) throw new Error("Duplicate Inbox source");
   }
 
-  private async records() {
-    const entries = (await Promise.all(this.sources.map(async source => (await source.list()).map(event => ({ source, event }))))).flat();
+  private async records(key?: string) {
+    const entries = (await Promise.all(this.sources.filter(s => !key || !s.keyPrefix || key.startsWith(s.keyPrefix)).map(async source => (await source.list()).map(event => ({ source, event }))))).flat();
     if (new Set(entries.map(e => e.event.key)).size !== entries.length) throw new Error("Duplicate Inbox event key");
     return entries;
   }
@@ -66,7 +67,7 @@ export class Inbox {
     if (this.acting.has(key)) throw new Error("This request is already being handled.");
     this.acting.add(key);
     try {
-      const record = (await this.records()).find(r => r.event.key === key);
+      const record = (await this.records(key)).find(r => r.event.key === key);
       if (!record) throw new Error("This Inbox request is no longer available.");
       const state = this.db.prepare("SELECT done_at FROM inbox_state WHERE key=?").get(key) as { done_at: number | null } | undefined;
       if (state?.done_at != null && state.done_at >= record.event.createdAt) throw new Error("This request is already done.");

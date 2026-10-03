@@ -6,11 +6,11 @@ type Sdk = Pick<BbPluginApi["sdk"], "threads" | "plugins">;
 /** Reads all pending interactions, including bot-owned threads hidden from Work. */
 export function interactionSource(sdk: Sdk): InboxSource {
   return {
-    id: "bb-interaction",
+    id: "bb-interaction", keyPrefix: "interaction:",
     async list() {
       const events: SourceEvent[] = [];
       for (let offset = 0; ; offset += 200) {
-        const threads = await sdk.threads.list({ archived: false, offset, limit: 200 });
+        const threads = await sdk.threads.list({ archived: false, includeHidden: true, offset, limit: 200 });
         for (const thread of threads.filter(t => t.hasPendingInteraction)) {
           const interactions = await sdk.threads.interactions.list({ threadId: thread.id });
           for (const interaction of interactions.filter(i => i.status === "pending")) {

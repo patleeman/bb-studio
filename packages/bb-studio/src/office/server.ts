@@ -11,6 +11,7 @@ import { commentSource, pageRequestSource } from "./item-sources";
 import type { ModuleServices } from "../modules/services";
 import { moduleInboxSources } from "./module-sources";
 import { officeHome } from "./home";
+import { legacyAttentionSource } from "./legacy-attention";
 import { Inbox } from "./inbox";
 import { interactionSource } from "./interaction-source";
 import { officeContract } from "./contract";
@@ -48,7 +49,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
-  const inbox = new Inbox(db, [interactionSource(bb.sdk), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
+  const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
     inbox_list: input => inbox.list(input),

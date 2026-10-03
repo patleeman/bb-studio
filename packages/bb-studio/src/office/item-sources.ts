@@ -9,7 +9,7 @@ import type { InboxSource, SourceEvent } from "./inbox";
 /** The shared comment adapter preserves Pages' Yjs ownership. */
 export function commentSource(hub: StudioHub, services: StudioServices, pages: ProviderComments): InboxSource {
   return {
-    id: "comments",
+    id: "comments", keyPrefix: "comment:",
     async list() {
       const { items } = await hub.overview();
       const events: SourceEvent[] = [];
@@ -36,7 +36,7 @@ const requestsSchema = z.object({ requests: z.array(z.object({
 
 export function pageRequestSource(sdk: BbPluginApi["sdk"], hub: StudioHub): InboxSource {
   return {
-    id: "page-requests",
+    id: "page-requests", keyPrefix: "page-request:",
     async list() {
       const { items } = await hub.overview();
       const events: SourceEvent[] = [];
