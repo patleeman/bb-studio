@@ -99,4 +99,10 @@ export const MIGRATIONS = [
   `ALTER TABLE spaces ADD COLUMN page_id TEXT`,
   // The space template version its page has caught up with (src/space-page.ts).
   `ALTER TABLE spaces ADD COLUMN page_template INTEGER`,
+  // Parent-space inheritance runs once even when Studio restarts while an
+  // item is still new. Markers expire after the inheritance window.
+  `CREATE TABLE item_space_inheritance (
+     plugin_id TEXT NOT NULL, item_id TEXT NOT NULL, created_at INTEGER NOT NULL,
+     PRIMARY KEY (plugin_id, item_id)
+   );`,
 ];

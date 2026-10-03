@@ -16,6 +16,43 @@ const page = { pluginId: "pages", id: "pg_1", projectId: null };
 const drawing = { pluginId: "excalidraw", id: "d1", projectId: "proj_app" };
 
 describe("spaces", () => {
+  it("keeps an inherited child removed after the store restarts while the child is still new", () => {
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS) db.exec(statement);
+    const spaces = new SpaceStore(db);
+    const launch = spaces.create({ name: "Launch" });
+    spaces.add(launch.id, [{ pluginId: "pages", id: "parent" }]);
+    const child = { pluginId: "pages", id: "child", parentId: "parent", projectId: null, createdAt: 1_000, archived: false };
+    expect(spaces.inheritParents([child], "pages", 2_000)).toBe(true);
+    spaces.removeMembers(launch.id, [child]);
+    const restarted = new SpaceStore(db);
+    expect(restarted.inheritParents([child], "pages", 3_000)).toBe(false);
+    expect(restarted.get(launch.id)!.itemKeys).toEqual(["pages:parent"]);
+    // Expiring the marker cannot make an old child inherit again.
+    expect(restarted.inheritParents([child], "pages", 122_000)).toBe(false);
+    expect(db.prepare("SELECT * FROM item_space_inheritance").all()).toEqual([]);
+    // Explicit filing still works after automatic inheritance was suppressed.
+    restarted.add(launch.id, [child]);
+    expect(restarted.get(launch.id)!.itemKeys).toContain("pages:child");
+    db.close();
+  });
+
+  it("commits inheritance membership and its durable marker together", () => {
+    const db = new Database(":memory:");
+    for (const statement of MIGRATIONS) db.exec(statement);
+    const spaces = new SpaceStore(db);
+    const launch = spaces.create({ name: "Launch" });
+    spaces.add(launch.id, [{ pluginId: "pages", id: "parent" }]);
+    db.exec("CREATE TRIGGER fail_inheritance BEFORE INSERT ON item_tags WHEN NEW.item_id = 'child' BEGIN SELECT RAISE(ABORT, 'simulated write failure'); END;");
+    const child = { pluginId: "pages", id: "child", parentId: "parent", projectId: null, createdAt: 1_000, archived: false };
+    expect(() => spaces.inheritParents([child], "pages", 2_000)).toThrow("simulated write failure");
+    expect(db.prepare("SELECT * FROM item_space_inheritance").all()).toEqual([]);
+    db.exec("DROP TRIGGER fail_inheritance");
+    expect(spaces.inheritParents([child], "pages", 2_000)).toBe(true);
+    expect(spaces.get(launch.id)!.itemKeys).toContain("pages:child");
+    db.close();
+  });
+
   it("keep their page, and start it with every widget", () => {
     const { spaces } = stores();
     const launch = spaces.create({ name: "Launch", description: "Q4 launch" });

@@ -14,6 +14,7 @@ import { tagName, TAG_COLORS, type ItemRef } from "./tags";
 export const PROJECT_REF = "bb-project";
 export const THREAD_REF = "bb-thread";
 export const MAX_SPACE_DESCRIPTION = 500;
+const NEW_ITEM_MS = 2 * 60_000;
 
 export interface Space {
   id: string;
@@ -194,6 +195,24 @@ export class SpaceStore {
         drop.run(member.pluginId, member.id, id);
         if (member.pluginId === PROJECT_REF) clear.run(id, member.id);
       }
+    })();
+  }
+
+  /** File new children once; removing one later survives a Studio restart. */
+  inheritParents(items: readonly (SpaceMember & { parentId: string | null; projectId: string | null; createdAt: number; archived: boolean })[], pagesPluginId: string, now = Date.now()): boolean {
+    return this.db.transaction(() => {
+      this.db.prepare("DELETE FROM item_space_inheritance WHERE created_at < ?").run(now - NEW_ITEM_MS);
+      const mark = this.db.prepare("INSERT OR IGNORE INTO item_space_inheritance (plugin_id, item_id, created_at) VALUES (?, ?, ?)");
+      let joined = false;
+      for (const item of items) {
+        if (!item.parentId || item.archived || now - item.createdAt > NEW_ITEM_MS) continue;
+        if (!mark.run(item.pluginId, item.id, item.createdAt).changes) continue;
+        for (const id of parentSpaceIds(this.list(), item, pagesPluginId)) {
+          this.add(id, [item]);
+          joined = true;
+        }
+      }
+      return joined;
     })();
   }
 

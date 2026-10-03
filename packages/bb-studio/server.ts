@@ -24,7 +24,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
-import { inSpace, parentSpaceIds, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
+import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
 import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
 import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
@@ -263,22 +263,8 @@ export default async function plugin(bb: BbPluginApi) {
   };
   // A sub-item joins its parent's spaces once, when it's new; taking it out
   // later sticks. Add-ons say an item is new only by its createdAt.
-  const NEW_ITEM_MS = 2 * 60_000;
-  const inherited = new Set<string>();
   const inheritParentSpaces = (items: readonly HubItem[]) => {
-    const now = Date.now();
-    let all: Space[] | null = null;
-    let joined = false;
-    for (const item of items) {
-      const key = `${item.pluginId}:${item.id}`;
-      if (!item.parentId || item.archived || now - item.createdAt > NEW_ITEM_MS || inherited.has(key)) continue;
-      inherited.add(key);
-      all ??= spaces.list();
-      for (const id of parentSpaceIds(all, item, PAGES_PLUGIN_ID)) {
-        spaces.add(id, [{ pluginId: item.pluginId, id: item.id }]);
-        joined = true;
-      }
-    }
+    const joined = spaces.inheritParents(items, PAGES_PLUGIN_ID);
     if (joined) tagsChanged();
     return joined;
   };
