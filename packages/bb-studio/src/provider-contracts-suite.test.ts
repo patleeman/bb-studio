@@ -5,8 +5,8 @@ import { registerStudio as registerPages } from "../../bb-studio-pages/src/studi
 import { PageStore, MIGRATIONS as PAGE_MIGRATIONS } from "../../bb-studio-pages/src/store";
 import { PagesService } from "../../bb-studio-pages/src/service";
 import { readMarkdown } from "../../bb-studio-pages/src/doc";
-import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/studio";
-import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
+import { registerStudio as registerTalk } from "../../bb-studio/src/modules/talk/src/server/studio";
+import { memoryStore as talkStore, addSegment } from "../../bb-studio/src/modules/talk/src/test/db";
 import { registerStudio as registerArtifacts } from "../../bb-studio/src/modules/artifacts/src/server/studio";
 import { memoryStore as artifactStore, bytes } from "../../bb-studio/src/modules/artifacts/src/test/db";
 import { registerStudio as registerBots } from "./modules/teams/studio-provider";
@@ -60,7 +60,7 @@ for (const kind of ["recording", "dictation"] as const) providerConformance(`Tal
     store, changed: (id) => { changed.push(id); }, removeAudio: async (id) => { removedAudio.push(id); },
   });
   return {
-    pluginId: "talk", kind, handlers, expectedContent: "Conformance transcript content",
+    pluginId: "studio", kind, handlers, expectedContent: "Conformance transcript content",
     seed: (projectId) => {
       const id = `rec_${randomUUID().replaceAll("-", "").slice(0, 16)}`;
       store.create({ id, kind, projectId, threadId: null });

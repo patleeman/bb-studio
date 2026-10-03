@@ -27,7 +27,7 @@ another desktop chat panel.
 | Studio Chat | One Chat action, linked conversation, creation/picking, item-specific quotes and retained composer routes | [Draft/file/image quote and phone recovery](../packages/bb-studio/src/modules/chat/README.md) |
 | Float | Canonical stack, pins/history, explicit Float/main/split/swap; optional native workbench | [Stable and native transfers](../packages/bb-studio-float/README.md) |
 | Pages | Shared Chat; standalone fallback and legacy chat-route migration; original editor ownership | [Standalone migration and compact controls](../packages/bb-studio-pages/README.md) |
-| Talk | Retained recording/player routes; dictation and Go back target the originating composer | [Exact draft/file return and playback continuity](../packages/bb-studio-talk/README.md) |
+| Talk | Retained recording/player routes; dictation and Go back target the originating composer | [Exact draft/file return and playback continuity](../packages/bb-studio/src/modules/talk/README.md) |
 | Draw | Retained canvas, shared item Chat and companion-aware related references | [Original first-move canvas and compact header](../packages/bb-studio-draw/README.md) |
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio/src/modules/artifacts/README.md) |
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio/src/modules/tables/README.md) |
@@ -72,7 +72,7 @@ requested placement and one saved tab for its target.
 | Pages | ProseMirror editor; backward text anchor/focus through first adoption | [Main](../packages/bb-studio-pages/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-pages/assets/companion-transfers-native.png) |
 | Draw | Both original Excalidraw canvas layers | [Main](../packages/bb-studio-draw/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-draw/assets/companion-transfers-native.png) |
 | Artifacts | HTML iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio/src/modules/artifacts/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/artifacts/assets/companion-transfers-native.png) |
-| Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio-talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-talk/assets/companion-transfers-native.png) |
+| Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio/src/modules/talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/talk/assets/companion-transfers-native.png) |
 | Tables | Title input and seeded table row | [Main](../packages/bb-studio/src/modules/tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/tables/assets/companion-transfers-native.png) |
 | Tasks | Board title input and seeded task | [Main](../packages/bb-studio/src/modules/tasks/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/tasks/assets/companion-transfers-native.png) |
 | Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](../packages/bb-studio/src/modules/teams/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/teams/assets/companion-transfers-native.png) |

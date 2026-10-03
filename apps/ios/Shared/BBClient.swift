@@ -535,7 +535,7 @@ extension BBClient {
 extension BBClient {
     public func createRecording(kind: String, threadId: String?, projectId: String?) async throws -> Recording {
         try await rpc(
-            "talk", "recording_create",
+            "studio", "talk_recording_create",
             ["kind": .string(kind), "projectId": .from(projectId), "threadId": .from(threadId)])
     }
 
@@ -544,7 +544,7 @@ extension BBClient {
         audio: Data
     ) async throws {
         let _: JSONValue = try await rpc(
-            "talk", "segment_put",
+            "studio", "talk_segment_put",
             [
                 "recordingId": .string(recordingId), "sessionId": .string(sessionId), "index": .from(index),
                 "startedAt": .from(startedAt), "durationMs": .from(durationMs), "mimeType": .string(mimeType),
@@ -554,22 +554,22 @@ extension BBClient {
 
     @discardableResult
     public func setRecordingState(_ id: String, _ status: String) async throws -> Recording {
-        try await rpc("talk", "recording_state", ["id": .string(id), "status": .string(status)])
+        try await rpc("studio", "talk_recording_state", ["id": .string(id), "status": .string(status)])
     }
 
     public func heartbeat(_ id: String) async throws {
-        let _: JSONValue = try await rpc("talk", "recording_heartbeat", ["id": .string(id)])
+        let _: JSONValue = try await rpc("studio", "talk_recording_heartbeat", ["id": .string(id)])
     }
 
     public func recording(_ id: String) async throws -> RecordingDetail {
-        try await rpc("talk", "recording_get", ["id": .string(id)])
+        try await rpc("studio", "talk_recording_get", ["id": .string(id)])
     }
 
     /// One segment's audio, as it was recorded: WebM/Opus from a browser, MP4/AAC from the phone.
     public func recordingAudio(_ id: String, segment: String) async throws -> Data {
         var query = URLComponents()
         query.queryItems = [URLQueryItem(name: "recording", value: id), URLQueryItem(name: "segment", value: segment)]
-        let path = "/api/v1/plugins/talk/http/audio?" + (query.percentEncodedQuery ?? "")
+        let path = "/api/v1/plugins/studio/http/audio?" + (query.percentEncodedQuery ?? "")
         let (status, data) = try await raw(method: "GET", path: path, body: nil)
         guard (200..<300).contains(status) else {
             throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) for the segment's audio")
@@ -579,7 +579,7 @@ extension BBClient {
 
     public func recordings(limit: Int = 50) async throws -> [Recording] {
         struct List: Decodable { var recordings: [Recording] }
-        let list: List = try await rpc("talk", "recordings_list", ["limit": .from(limit)])
+        let list: List = try await rpc("studio", "talk_recordings_list", ["limit": .from(limit)])
         return list.recordings
     }
 }

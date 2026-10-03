@@ -179,7 +179,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
           if (!text || budget <= 0) return [];
           budget -= text.length;
           const query = `recording=${encodeURIComponent(recording.id)}&segment=${encodeURIComponent(segment.id)}`;
-          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/talk/http/audio?${query}` }];
+          return [{ id: segment.id, offsetMs: segment.offsetMs, durationMs: segment.durationMs, text, url: `/api/v1/plugins/studio/http/audio?${query}` }];
         }),
       };
     },

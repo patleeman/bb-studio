@@ -1,3 +1,4 @@
+import { rpcContract as talkContract } from "../packages/bb-studio/src/modules/talk/src/shared/contract.ts";
 import { rpcContract as decisionsContract } from "../packages/bb-studio/src/modules/decisions/contract.ts";
 import { rpcContract as artifactsContract } from "../packages/bb-studio/src/modules/artifacts/server.ts";
 import { rpcContract as teamsContract } from "../packages/bb-studio/src/modules/teams/client-contract.ts";
@@ -24,7 +25,6 @@ if (process.argv.some((arg) => arg.startsWith("--") && arg !== "--check" && arg 
 
 const plugins = [
   ["studio", "Studio", "../packages/bb-studio/src/contract.ts", "rpcContract"],
-  ["talk", "Talk", "../packages/bb-studio-talk/src/shared/contract.ts", "rpcContract"],
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
@@ -146,7 +146,7 @@ const item = schemaOf(studioSchemas(z).item, "output");
 const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
-  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract), ...prefixed("feed_", feedContract), ...prefixed("tasks_", tasksContract), ...prefixed("teams_", teamsContract), ...prefixed("artifacts_", artifactsContract), ...prefixed("decisions_", decisionsContract) } : mod[exportName];
+  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract), ...prefixed("feed_", feedContract), ...prefixed("tasks_", tasksContract), ...prefixed("teams_", teamsContract), ...prefixed("artifacts_", artifactsContract), ...prefixed("decisions_", decisionsContract), ...prefixed("talk_", talkContract) } : mod[exportName];
   if (!contract) throw new Error(`Missing ${exportName} in ${path}`);
   const methods = Object.fromEntries(Object.entries(contract).map(([name, value]) => [name, {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),

@@ -49,17 +49,17 @@ extension BBClient {
         return result.threadId ?? ""
     }
 
-    public func recordingNotes(_ id: String) async throws -> Talk.RecordingGetOutputRecordingMeetingNotes? {
-        let result: Talk.RecordingGetOutput = try await rpc("talk", Talk.Method.recording_get, ["id": .string(id)])
+    public func recordingNotes(_ id: String) async throws -> Studio.TalkRecordingGetOutputRecordingMeetingNotes? {
+        let result: Studio.TalkRecordingGetOutput = try await rpc("studio", Studio.Method.talk_recording_get, ["id": .string(id)])
         return result.recording?.meetingNotes
     }
 
     public func regenerateRecordingNotes(_ id: String) async throws {
-        let _: Talk.MeetingRegenerateOutput = try await rpc("talk", Talk.Method.meeting_regenerate, ["id": .string(id)])
+        let _: Studio.TalkMeetingRegenerateOutput = try await rpc("studio", Studio.Method.talk_meeting_regenerate, ["id": .string(id)])
     }
 
     public func createTaskFromRecording(_ id: String, index: Int) async throws -> String {
-        let result: Talk.MeetingCreateTaskOutput = try await rpc("talk", Talk.Method.meeting_create_task, [
+        let result: Studio.TalkMeetingCreateTaskOutput = try await rpc("studio", Studio.Method.talk_meeting_create_task, [
             "id": .string(id), "index": .number(Double(index)),
         ])
         return result.taskId ?? ""

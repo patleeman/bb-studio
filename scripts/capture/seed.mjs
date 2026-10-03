@@ -223,7 +223,7 @@ export async function talkRpc(method, input) {
   const file = join(dir, "input.json");
   await writeFile(file, JSON.stringify(input));
   try {
-    return JSON.parse(await bbCli(["plugin", "rpc", "call", "talk", method, "--input-file", file, "--json"]));
+    return JSON.parse(await bbCli(["plugin", "rpc", "call", "studio", `talk_${method}`, "--input-file", file, "--json"]));
   } finally {
     await rm(dir, { recursive: true, force: true });
   }
@@ -287,7 +287,7 @@ export async function seedTalkRecording(projectId, { transcribe = true, kind = "
     await talkRpc("recording_state", { id: recording.id, status: "finishing" });
     const started = Date.now();
     for (;;) {
-      const current = JSON.parse(await bbCli(["talk", "show", recording.id, "--json"]));
+      const current = JSON.parse(await bbCli(["studio", "talk", "show", recording.id, "--json"]));
       if (current.status === "done" && current.pendingCount === 0) {
         if (current.failedCount > 0) throw new Error(`Talk could not transcribe ${current.failedCount} seeded pieces.`);
         break;

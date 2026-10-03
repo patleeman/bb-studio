@@ -214,6 +214,23 @@ public enum Studio {
     public static let decisions_fallback_suggest = "decisions_fallback.suggest"
     public static let decisions_jev_status = "decisions_jev.status"
     public static let decisions_jev_check = "decisions_jev.check"
+    public static let talk_models_get = "talk_models.get"
+    public static let talk_models_set = "talk_models.set"
+    public static let talk_models_suggest = "talk_models.suggest"
+    public static let talk_recordings_list = "talk_recordings_list"
+    public static let talk_recording_get = "talk_recording_get"
+    public static let talk_recording_create = "talk_recording_create"
+    public static let talk_recording_rename = "talk_recording_rename"
+    public static let talk_recording_state = "talk_recording_state"
+    public static let talk_recording_heartbeat = "talk_recording_heartbeat"
+    public static let talk_segment_put = "talk_segment_put"
+    public static let talk_recording_retry = "talk_recording_retry"
+    public static let talk_meeting_regenerate = "talk_meeting_regenerate"
+    public static let talk_meeting_create_task = "talk_meeting_create_task"
+    public static let talk_dictation_cleanup = "talk_dictation_cleanup"
+    public static let talk_recording_cleanup = "talk_recording_cleanup"
+    public static let talk_recording_keep = "talk_recording_keep"
+    public static let talk_recording_delete = "talk_recording_delete"
   }
 
   public typealias Home = HomeOutput
@@ -707,6 +724,44 @@ public enum Studio {
   public typealias DecisionsJevCheckOutput = StudioJSONValue
 
   public typealias DecisionsJevCheck = DecisionsJevCheckOutput
+
+  public typealias TalkModelsGetInput = StudioJSONValue
+
+  public typealias TalkModelsGet = TalkModelsGetOutput
+
+  public typealias TalkModelsSet = TalkModelsSetOutput
+
+  public typealias TalkModelsSuggestInput = StudioJSONValue
+
+  public typealias TalkModelsSuggest = TalkModelsSuggestOutput
+
+  public typealias TalkRecordingsList = TalkRecordingsListOutput
+
+  public typealias TalkRecordingGet = TalkRecordingGetOutput
+
+  public typealias TalkRecordingCreate = TalkRecordingCreateOutput
+
+  public typealias TalkRecordingRename = TalkRecordingRenameOutput
+
+  public typealias TalkRecordingState = TalkRecordingStateOutput
+
+  public typealias TalkRecordingHeartbeat = TalkRecordingHeartbeatOutput
+
+  public typealias TalkSegmentPut = TalkSegmentPutOutput
+
+  public typealias TalkRecordingRetry = TalkRecordingRetryOutput
+
+  public typealias TalkMeetingRegenerate = TalkMeetingRegenerateOutput
+
+  public typealias TalkMeetingCreateTask = TalkMeetingCreateTaskOutput
+
+  public typealias TalkDictationCleanup = TalkDictationCleanupOutput
+
+  public typealias TalkRecordingCleanup = TalkRecordingCleanupOutput
+
+  public typealias TalkRecordingKeep = TalkRecordingKeepOutput
+
+  public typealias TalkRecordingDelete = TalkRecordingDeleteOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -18312,6 +18367,2455 @@ public enum Studio {
       self.provider = provider
       self.routes = routes
       self.problems = problems
+    }
+  }
+
+  public enum TalkModelsGetOutputCleanupReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsGetOutputCleanupServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsGetOutputCleanup: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsGetOutputCleanupReasoningLevel?
+    public var serviceTier: TalkModelsGetOutputCleanupServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsGetOutputCleanupReasoningLevel? = nil, serviceTier: TalkModelsGetOutputCleanupServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public enum TalkModelsGetOutputTitleReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsGetOutputTitleServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsGetOutputTitle: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsGetOutputTitleReasoningLevel?
+    public var serviceTier: TalkModelsGetOutputTitleServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsGetOutputTitleReasoningLevel? = nil, serviceTier: TalkModelsGetOutputTitleServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public enum TalkModelsGetOutputSummaryReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsGetOutputSummaryServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsGetOutputSummary: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsGetOutputSummaryReasoningLevel?
+    public var serviceTier: TalkModelsGetOutputSummaryServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsGetOutputSummaryReasoningLevel? = nil, serviceTier: TalkModelsGetOutputSummaryServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct TalkModelsGetOutput: Sendable, Hashable, Codable {
+    public var cleanup: TalkModelsGetOutputCleanup?
+    public var title: TalkModelsGetOutputTitle?
+    public var summary: TalkModelsGetOutputSummary?
+
+    public init(cleanup: TalkModelsGetOutputCleanup? = nil, title: TalkModelsGetOutputTitle? = nil, summary: TalkModelsGetOutputSummary? = nil) {
+      self.cleanup = cleanup
+      self.title = title
+      self.summary = summary
+    }
+  }
+
+  public enum TalkModelsSetInputPurpose: Sendable, Hashable, Codable {
+    case cleanup
+    case title
+    case summary
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "cleanup": self = .cleanup
+      case "title": self = .title
+      case "summary": self = .summary
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .cleanup: try container.encode("cleanup")
+      case .title: try container.encode("title")
+      case .summary: try container.encode("summary")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsSetInputSelectionReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsSetInputSelectionServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsSetInputSelection: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsSetInputSelectionReasoningLevel?
+    public var serviceTier: TalkModelsSetInputSelectionServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsSetInputSelectionReasoningLevel? = nil, serviceTier: TalkModelsSetInputSelectionServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct TalkModelsSetInput: Sendable, Hashable, Codable {
+    public var purpose: TalkModelsSetInputPurpose?
+    public var selection: TalkModelsSetInputSelection?
+
+    public init(purpose: TalkModelsSetInputPurpose? = nil, selection: TalkModelsSetInputSelection? = nil) {
+      self.purpose = purpose
+      self.selection = selection
+    }
+  }
+
+  public enum TalkModelsSetOutputCleanupReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsSetOutputCleanupServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsSetOutputCleanup: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsSetOutputCleanupReasoningLevel?
+    public var serviceTier: TalkModelsSetOutputCleanupServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsSetOutputCleanupReasoningLevel? = nil, serviceTier: TalkModelsSetOutputCleanupServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public enum TalkModelsSetOutputTitleReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsSetOutputTitleServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsSetOutputTitle: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsSetOutputTitleReasoningLevel?
+    public var serviceTier: TalkModelsSetOutputTitleServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsSetOutputTitleReasoningLevel? = nil, serviceTier: TalkModelsSetOutputTitleServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public enum TalkModelsSetOutputSummaryReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsSetOutputSummaryServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsSetOutputSummary: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsSetOutputSummaryReasoningLevel?
+    public var serviceTier: TalkModelsSetOutputSummaryServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsSetOutputSummaryReasoningLevel? = nil, serviceTier: TalkModelsSetOutputSummaryServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct TalkModelsSetOutput: Sendable, Hashable, Codable {
+    public var cleanup: TalkModelsSetOutputCleanup?
+    public var title: TalkModelsSetOutputTitle?
+    public var summary: TalkModelsSetOutputSummary?
+
+    public init(cleanup: TalkModelsSetOutputCleanup? = nil, title: TalkModelsSetOutputTitle? = nil, summary: TalkModelsSetOutputSummary? = nil) {
+      self.cleanup = cleanup
+      self.title = title
+      self.summary = summary
+    }
+  }
+
+  public enum TalkModelsSuggestOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkModelsSuggestOutputServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkModelsSuggestOutput: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: TalkModelsSuggestOutputReasoningLevel?
+    public var serviceTier: TalkModelsSuggestOutputServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: TalkModelsSuggestOutputReasoningLevel? = nil, serviceTier: TalkModelsSuggestOutputServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct TalkRecordingsListInput: Sendable, Hashable, Codable {
+    public var query: String?
+    public var limit: Int?
+
+    public init(query: String? = nil, limit: Int? = nil) {
+      self.query = query
+      self.limit = limit
+    }
+  }
+
+  public enum TalkRecordingsListOutputRecordingsItemTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingsListOutputRecordingsItemKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingsListOutputRecordingsItemStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingsListOutputRecordingsItemMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingsListOutputRecordingsItemMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingsListOutputRecordingsItemMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingsListOutputRecordingsItemMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingsListOutputRecordingsItemMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingsListOutputRecordingsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingsListOutputRecordingsItemTitleSource?
+    public var kind: TalkRecordingsListOutputRecordingsItemKind?
+    public var status: TalkRecordingsListOutputRecordingsItemStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingsListOutputRecordingsItemMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingsListOutputRecordingsItemTitleSource? = nil, kind: TalkRecordingsListOutputRecordingsItemKind? = nil, status: TalkRecordingsListOutputRecordingsItemStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingsListOutputRecordingsItemMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct TalkRecordingsListOutput: Sendable, Hashable, Codable {
+    public var recordings: [TalkRecordingsListOutputRecordingsItem]?
+
+    public init(recordings: [TalkRecordingsListOutputRecordingsItem]? = nil) {
+      self.recordings = recordings
+    }
+  }
+
+  public struct TalkRecordingGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TalkRecordingGetOutputRecordingTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingGetOutputRecordingKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingGetOutputRecordingStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingGetOutputRecordingMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingGetOutputRecordingMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingGetOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingGetOutputRecordingMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingGetOutputRecordingMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingGetOutputRecording: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingGetOutputRecordingTitleSource?
+    public var kind: TalkRecordingGetOutputRecordingKind?
+    public var status: TalkRecordingGetOutputRecordingStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingGetOutputRecordingMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingGetOutputRecordingTitleSource? = nil, kind: TalkRecordingGetOutputRecordingKind? = nil, status: TalkRecordingGetOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingGetOutputRecordingMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public enum TalkRecordingGetOutputSegmentsItemStatus: Sendable, Hashable, Codable {
+    case pending
+    case done
+    case empty
+    case failed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "done": self = .done
+      case "empty": self = .empty
+      case "failed": self = .failed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .done: try container.encode("done")
+      case .empty: try container.encode("empty")
+      case .failed: try container.encode("failed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingGetOutputSegmentsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var sessionId: String?
+    public var startedAt: Double?
+    public var offsetMs: Double?
+    public var durationMs: Double?
+    public var mimeType: String?
+    public var bytes: Double?
+    public var status: TalkRecordingGetOutputSegmentsItemStatus?
+    public var text: String?
+    public var cleanedText: String?
+    public var error: String?
+    public var attempts: Double?
+
+    public init(id: String? = nil, sessionId: String? = nil, startedAt: Double? = nil, offsetMs: Double? = nil, durationMs: Double? = nil, mimeType: String? = nil, bytes: Double? = nil, status: TalkRecordingGetOutputSegmentsItemStatus? = nil, text: String? = nil, cleanedText: String? = nil, error: String? = nil, attempts: Double? = nil) {
+      self.id = id
+      self.sessionId = sessionId
+      self.startedAt = startedAt
+      self.offsetMs = offsetMs
+      self.durationMs = durationMs
+      self.mimeType = mimeType
+      self.bytes = bytes
+      self.status = status
+      self.text = text
+      self.cleanedText = cleanedText
+      self.error = error
+      self.attempts = attempts
+    }
+  }
+
+  public struct TalkRecordingGetOutput: Sendable, Hashable, Codable {
+    public var recording: TalkRecordingGetOutputRecording?
+    public var segments: [TalkRecordingGetOutputSegmentsItem]?
+
+    public init(recording: TalkRecordingGetOutputRecording? = nil, segments: [TalkRecordingGetOutputSegmentsItem]? = nil) {
+      self.recording = recording
+      self.segments = segments
+    }
+  }
+
+  public enum TalkRecordingCreateInputKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingCreateInput: Sendable, Hashable, Codable {
+    public var kind: TalkRecordingCreateInputKind?
+    public var projectId: String?
+    public var threadId: String?
+
+    public init(kind: TalkRecordingCreateInputKind? = nil, projectId: String? = nil, threadId: String? = nil) {
+      self.kind = kind
+      self.projectId = projectId
+      self.threadId = threadId
+    }
+  }
+
+  public enum TalkRecordingCreateOutputTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingCreateOutputKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingCreateOutputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingCreateOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingCreateOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingCreateOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingCreateOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingCreateOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingCreateOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingCreateOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingCreateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingCreateOutputTitleSource?
+    public var kind: TalkRecordingCreateOutputKind?
+    public var status: TalkRecordingCreateOutputStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingCreateOutputMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingCreateOutputTitleSource? = nil, kind: TalkRecordingCreateOutputKind? = nil, status: TalkRecordingCreateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingCreateOutputMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct TalkRecordingRenameInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+
+    public init(id: String? = nil, title: String? = nil) {
+      self.id = id
+      self.title = title
+    }
+  }
+
+  public enum TalkRecordingRenameOutputTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingRenameOutputKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingRenameOutputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingRenameOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingRenameOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingRenameOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingRenameOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingRenameOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingRenameOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingRenameOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingRenameOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingRenameOutputTitleSource?
+    public var kind: TalkRecordingRenameOutputKind?
+    public var status: TalkRecordingRenameOutputStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingRenameOutputMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingRenameOutputTitleSource? = nil, kind: TalkRecordingRenameOutputKind? = nil, status: TalkRecordingRenameOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingRenameOutputMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public enum TalkRecordingStateInputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case finishing
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "finishing": self = .finishing
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .finishing: try container.encode("finishing")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingStateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var status: TalkRecordingStateInputStatus?
+
+    public init(id: String? = nil, status: TalkRecordingStateInputStatus? = nil) {
+      self.id = id
+      self.status = status
+    }
+  }
+
+  public enum TalkRecordingStateOutputTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingStateOutputKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingStateOutputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingStateOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingStateOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingStateOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingStateOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingStateOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingStateOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingStateOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingStateOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingStateOutputTitleSource?
+    public var kind: TalkRecordingStateOutputKind?
+    public var status: TalkRecordingStateOutputStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingStateOutputMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingStateOutputTitleSource? = nil, kind: TalkRecordingStateOutputKind? = nil, status: TalkRecordingStateOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingStateOutputMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct TalkRecordingHeartbeatInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TalkRecordingHeartbeatOutputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingHeartbeatOutput: Sendable, Hashable, Codable {
+    public var status: TalkRecordingHeartbeatOutputStatus?
+
+    public init(status: TalkRecordingHeartbeatOutputStatus? = nil) {
+      self.status = status
+    }
+  }
+
+  public struct TalkSegmentPutInput: Sendable, Hashable, Codable {
+    public var recordingId: String?
+    public var sessionId: String?
+    public var index: Int?
+    public var startedAt: Int?
+    public var durationMs: Int?
+    public var mimeType: String?
+    public var audioBase64: String?
+
+    public init(recordingId: String? = nil, sessionId: String? = nil, index: Int? = nil, startedAt: Int? = nil, durationMs: Int? = nil, mimeType: String? = nil, audioBase64: String? = nil) {
+      self.recordingId = recordingId
+      self.sessionId = sessionId
+      self.index = index
+      self.startedAt = startedAt
+      self.durationMs = durationMs
+      self.mimeType = mimeType
+      self.audioBase64 = audioBase64
+    }
+  }
+
+  public struct TalkSegmentPutOutput: Sendable, Hashable, Codable {
+    public var stored: Bool?
+
+    public init(stored: Bool? = nil) {
+      self.stored = stored
+    }
+  }
+
+  public struct TalkRecordingRetryInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TalkRecordingRetryOutputTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingRetryOutputKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingRetryOutputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingRetryOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingRetryOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingRetryOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingRetryOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingRetryOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingRetryOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingRetryOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingRetryOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingRetryOutputTitleSource?
+    public var kind: TalkRecordingRetryOutputKind?
+    public var status: TalkRecordingRetryOutputStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingRetryOutputMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingRetryOutputTitleSource? = nil, kind: TalkRecordingRetryOutputKind? = nil, status: TalkRecordingRetryOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingRetryOutputMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct TalkMeetingRegenerateInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TalkMeetingRegenerateOutputRecordingTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkMeetingRegenerateOutputRecordingKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkMeetingRegenerateOutputRecordingStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkMeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkMeetingRegenerateOutputRecordingMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkMeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkMeetingRegenerateOutputRecordingMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkMeetingRegenerateOutputRecordingMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkMeetingRegenerateOutputRecordingMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkMeetingRegenerateOutputRecordingMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkMeetingRegenerateOutputRecording: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkMeetingRegenerateOutputRecordingTitleSource?
+    public var kind: TalkMeetingRegenerateOutputRecordingKind?
+    public var status: TalkMeetingRegenerateOutputRecordingStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkMeetingRegenerateOutputRecordingMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkMeetingRegenerateOutputRecordingTitleSource? = nil, kind: TalkMeetingRegenerateOutputRecordingKind? = nil, status: TalkMeetingRegenerateOutputRecordingStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkMeetingRegenerateOutputRecordingMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct TalkMeetingRegenerateOutput: Sendable, Hashable, Codable {
+    public var recording: TalkMeetingRegenerateOutputRecording?
+
+    public init(recording: TalkMeetingRegenerateOutputRecording? = nil) {
+      self.recording = recording
+    }
+  }
+
+  public struct TalkMeetingCreateTaskInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var index: Int?
+
+    public init(id: String? = nil, index: Int? = nil) {
+      self.id = id
+      self.index = index
+    }
+  }
+
+  public struct TalkMeetingCreateTaskOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+
+    public init(taskId: String? = nil) {
+      self.taskId = taskId
+    }
+  }
+
+  public struct TalkDictationCleanupInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TalkDictationCleanupOutput: Sendable, Hashable, Codable {
+    public var text: String?
+
+    public init(text: String? = nil) {
+      self.text = text
+    }
+  }
+
+  public struct TalkRecordingCleanupInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var segmentId: String?
+
+    public init(id: String? = nil, segmentId: String? = nil) {
+      self.id = id
+      self.segmentId = segmentId
+    }
+  }
+
+  public struct TalkRecordingCleanupOutput: Sendable, Hashable, Codable {
+    public var text: String?
+
+    public init(text: String? = nil) {
+      self.text = text
+    }
+  }
+
+  public struct TalkRecordingKeepInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TalkRecordingKeepOutputTitleSource: Sendable, Hashable, Codable {
+    case pending
+    case auto
+    case user
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pending": self = .pending
+      case "auto": self = .auto
+      case "user": self = .user
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pending: try container.encode("pending")
+      case .auto: try container.encode("auto")
+      case .user: try container.encode("user")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingKeepOutputKind: Sendable, Hashable, Codable {
+    case recording
+    case dictation
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "dictation": self = .dictation
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .dictation: try container.encode("dictation")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingKeepOutputStatus: Sendable, Hashable, Codable {
+    case recording
+    case paused
+    case interrupted
+    case finishing
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "recording": self = .recording
+      case "paused": self = .paused
+      case "interrupted": self = .interrupted
+      case "finishing": self = .finishing
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .recording: try container.encode("recording")
+      case .paused: try container.encode("paused")
+      case .interrupted: try container.encode("interrupted")
+      case .finishing: try container.encode("finishing")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TalkRecordingKeepOutputMeetingNotesActionItemsItemAssignee: Sendable, Hashable, Codable {
+    case me
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "me": self = .me
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .me: try container.encode("me")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TalkRecordingKeepOutputMeetingNotesActionItemsItem: Sendable, Hashable, Codable {
+    public var title: String?
+    public var assignee: TalkRecordingKeepOutputMeetingNotesActionItemsItemAssignee?
+
+    public init(title: String? = nil, assignee: TalkRecordingKeepOutputMeetingNotesActionItemsItemAssignee? = nil) {
+      self.title = title
+      self.assignee = assignee
+    }
+  }
+
+  public struct TalkRecordingKeepOutputMeetingNotes: Sendable, Hashable, Codable {
+    public var summary: String?
+    public var decisions: [String]?
+    public var actionItems: [TalkRecordingKeepOutputMeetingNotesActionItemsItem]?
+
+    public init(summary: String? = nil, decisions: [String]? = nil, actionItems: [TalkRecordingKeepOutputMeetingNotesActionItemsItem]? = nil) {
+      self.summary = summary
+      self.decisions = decisions
+      self.actionItems = actionItems
+    }
+  }
+
+  public struct TalkRecordingKeepOutput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var titleSource: TalkRecordingKeepOutputTitleSource?
+    public var kind: TalkRecordingKeepOutputKind?
+    public var status: TalkRecordingKeepOutputStatus?
+    public var projectId: String?
+    public var threadId: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var endedAt: Double?
+    public var durationMs: Double?
+    public var segmentCount: Double?
+    public var pendingCount: Double?
+    public var failedCount: Double?
+    public var wordCount: Double?
+    public var preview: String?
+    public var archived: Bool?
+    public var audioRemoved: Bool?
+    public var meetingNotes: TalkRecordingKeepOutputMeetingNotes?
+
+    public init(id: String? = nil, title: String? = nil, titleSource: TalkRecordingKeepOutputTitleSource? = nil, kind: TalkRecordingKeepOutputKind? = nil, status: TalkRecordingKeepOutputStatus? = nil, projectId: String? = nil, threadId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, endedAt: Double? = nil, durationMs: Double? = nil, segmentCount: Double? = nil, pendingCount: Double? = nil, failedCount: Double? = nil, wordCount: Double? = nil, preview: String? = nil, archived: Bool? = nil, audioRemoved: Bool? = nil, meetingNotes: TalkRecordingKeepOutputMeetingNotes? = nil) {
+      self.id = id
+      self.title = title
+      self.titleSource = titleSource
+      self.kind = kind
+      self.status = status
+      self.projectId = projectId
+      self.threadId = threadId
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.endedAt = endedAt
+      self.durationMs = durationMs
+      self.segmentCount = segmentCount
+      self.pendingCount = pendingCount
+      self.failedCount = failedCount
+      self.wordCount = wordCount
+      self.preview = preview
+      self.archived = archived
+      self.audioRemoved = audioRemoved
+      self.meetingNotes = meetingNotes
+    }
+  }
+
+  public struct TalkRecordingDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TalkRecordingDeleteOutput: Sendable, Hashable, Codable {
+    public var deleted: Bool?
+
+    public init(deleted: Bool? = nil) {
+      self.deleted = deleted
     }
   }
 

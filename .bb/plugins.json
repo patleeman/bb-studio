@@ -20,10 +20,6 @@
       "source": "./packages/bb-studio-explore"
     },
     {
-      "name": "talk",
-      "source": "./packages/bb-studio-talk"
-    },
-    {
       "name": "excalidraw",
       "source": "./packages/bb-studio-draw"
     },

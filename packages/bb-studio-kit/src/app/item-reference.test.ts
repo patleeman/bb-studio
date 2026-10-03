@@ -15,7 +15,7 @@ it("reads a reference back from its text", () => {
     href: "/plugins/studio/tasks/brd_1",
     title: "Board",
   });
-  expect(parseItemReference("https://bb.local/plugins/talk/recordings/r_1", "https://bb.local")).toEqual({ href: "/plugins/talk/recordings/r_1" });
+  expect(parseItemReference("https://bb.local/plugins/talk/recordings/r_1", "https://bb.local")).toEqual({ href: "/plugins/studio/recordings/r_1" });
   expect(parseItemReference("[Web](https://example.com/plugins/a/b/c)", "https://bb.local")).toBeNull();
   expect(parseItemReference("See [Plan](/plugins/pages/pages/pg_1) today", "")).toBeNull();
 });

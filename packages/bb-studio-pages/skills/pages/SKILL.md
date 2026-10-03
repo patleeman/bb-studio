@@ -144,7 +144,7 @@ cursor is in the page. Talk records and transcribes, and Pages inserts the
 text at the cursor, or at the end if the user hasn't clicked into the page.
 Text finished elsewhere is added when the user goes back to the page.
 Dictation edits the page as the user, not an agent. Recordings are in Talk's
-Recordings page (`bb talk list`).
+Recordings page (`bb studio talk list`).
 
 ## CLI
 

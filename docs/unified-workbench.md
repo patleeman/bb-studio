@@ -184,7 +184,7 @@ Live captures on stable BB 0.45.0, with all 17 plugins installed from 786fd2f,
 pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Draw](../packages/bb-studio-draw/assets/compact-header.png),
 [Artifacts](../packages/bb-studio/src/modules/artifacts/assets/compact-header.png),
-[Talk](../packages/bb-studio-talk/assets/compact-header.png),
+[Talk](../packages/bb-studio/src/modules/talk/assets/compact-header.png),
 [Tables](../packages/bb-studio/src/modules/tables/assets/compact-header.png),
 [Tasks](../packages/bb-studio/src/modules/tasks/assets/compact-header.png), and
 [Teams](../packages/bb-studio/src/modules/teams/assets/compact-header.png).
@@ -290,8 +290,8 @@ returns. Talk's 127 tests, typecheck and build pass. The stable BB 0.45.0
 capture uses source `b52d193` with the compact-controls fix `fb4ca80`. It checks
 the saved recording's thread/project, exact native draft and attachment DOM,
 one tab per destination, and an unchanged main page after both return flows.
-The [desktop](../packages/bb-studio-talk/assets/companion-dictation.png) and
-[phone](../packages/bb-studio-talk/assets/companion-dictation-mobile.png)
+The [desktop](../packages/bb-studio/src/modules/talk/assets/companion-dictation.png) and
+[phone](../packages/bb-studio/src/modules/talk/assets/companion-dictation-mobile.png)
 screenshots are visually checked. At 390 by 844 pixels, every visible Talk
 control stays inside the viewport; clipped inline controls fall back to the
 floating pill. All staged recordings, threads and pages are removed without
@@ -404,7 +404,7 @@ verified commits. Legacy-host transfers, playback continuity, native desktop
 Reactions menu QA, and the final suite audit remain open.
 
 
-Talk playback continuity now has [live proof](../packages/bb-studio-talk/assets/companion-playback.png)
+Talk playback continuity now has [live proof](../packages/bb-studio/src/modules/talk/assets/companion-playback.png)
 on the same isolated current host. Real seeded audio retains its exact audio
 object and control nodes through Float, workbench/main moves, navigation
 away, and returning after close. Position advances without restart; speed and

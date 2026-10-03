@@ -44,7 +44,7 @@ final class ComposerTests: XCTestCase {
         client.transport = { _, path, body in
             let value = try JSONDecoder().decode(JSONValue.self, from: body ?? Data())
             switch path {
-            case "/api/v1/plugins/talk/rpc/recording_rename":
+            case "/api/v1/plugins/studio/rpc/talk_recording_rename":
                 XCTAssertEqual(value["id"]?.stringValue, "rec_aaaaaaaaaaaa")
                 XCTAssertEqual(value["title"]?.stringValue, "QA recording")
             case "/api/v1/plugins/excalidraw/rpc/renameDrawing":

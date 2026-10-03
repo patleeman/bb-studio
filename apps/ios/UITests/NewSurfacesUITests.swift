@@ -94,7 +94,7 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     func testMeetingNotes() throws {
-        let recordings = rpc("talk", "recordings_list", ["limit": 200])?["recordings"] as? [[String: Any]] ?? []
+        let recordings = rpc("studio", "talk_recordings_list", ["limit": 200])?["recordings"] as? [[String: Any]] ?? []
         guard let id = recordings.first(where: { $0["meetingNotes"] is [String: Any] })?["id"] as? String else {
             throw XCTSkip("No recording with meeting notes is available for read-only QA")
         }

@@ -141,20 +141,20 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "talk",
-      "method": "recording_get",
+      "plugin": "studio",
+      "method": "talk_recording_get",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "talk",
-      "method": "meeting_regenerate",
+      "plugin": "studio",
+      "method": "talk_meeting_regenerate",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "talk",
-      "method": "meeting_create_task",
+      "plugin": "studio",
+      "method": "talk_meeting_create_task",
       "coverage": "generated method"
     },
     {
@@ -291,38 +291,38 @@
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_create",
+      "plugin": "studio",
+      "method": "talk_recording_create",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "segment_put",
+      "plugin": "studio",
+      "method": "talk_segment_put",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_state",
+      "plugin": "studio",
+      "method": "talk_recording_state",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_heartbeat",
+      "plugin": "studio",
+      "method": "talk_recording_heartbeat",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recording_get",
+      "plugin": "studio",
+      "method": "talk_recording_get",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/BBClient.swift",
-      "plugin": "talk",
-      "method": "recordings_list",
+      "plugin": "studio",
+      "method": "talk_recordings_list",
       "coverage": "literal method checked against contract"
     },
     {
@@ -849,20 +849,20 @@
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "talk",
-      "method": "recording_rename",
+      "plugin": "studio",
+      "method": "talk_recording_rename",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "talk",
-      "method": "recording_retry",
+      "plugin": "studio",
+      "method": "talk_recording_retry",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Studio.swift",
-      "plugin": "talk",
-      "method": "recording_delete",
+      "plugin": "studio",
+      "method": "talk_recording_delete",
       "coverage": "literal method checked against contract"
     },
     {

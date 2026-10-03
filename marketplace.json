@@ -108,31 +108,6 @@
       }
     },
     {
-      "id": "talk",
-      "displayName": "Studio Talk",
-      "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",
-      "icon": {
-        "url": "./packages/bb-studio-talk/icons/talk.svg"
-      },
-      "tags": [
-        "productivity",
-        "voice",
-        "dictation",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-talk",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "excalidraw",
       "displayName": "Studio Draw",
       "description": "Part of BB Studio. Sketch Excalidraw drawings with your agents, keep them in Studio's collection, and attach them to conversations.",

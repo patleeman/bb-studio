@@ -1,6 +1,6 @@
 # Studio Navigation
 
-> **Studio Navigation** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio/src/modules/artifacts), [Studio Tasks](../bb-studio/src/modules/tasks), [Studio Chat](../bb-studio/src/modules/chat), [Studio Teams](../bb-studio/src/modules/teams), and [Studio Sidebar](../bb-studio-sidebar).
+> **Studio Navigation** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio/src/modules/talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio/src/modules/artifacts), [Studio Tasks](../bb-studio/src/modules/tasks), [Studio Chat](../bb-studio/src/modules/chat), [Studio Teams](../bb-studio/src/modules/teams), and [Studio Sidebar](../bb-studio-sidebar).
 
 Studio Navigation replaces BB's sidebar navigation, the rows above the thread
 list. It draws the same rows as BB's bundled Navigation plugin, and leaves out

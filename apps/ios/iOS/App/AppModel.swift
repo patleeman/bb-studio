@@ -45,7 +45,7 @@ extension Route {
         case ("pages", "pages"): self = .page(id: id)
         case ("studio", "artifacts"), ("artifacts", "artifacts"): self = .artifact(id: id)
         case ("excalidraw", "drawings"): self = .drawing(id: id)
-        case ("talk", "recordings"): self = .recording(id: id)
+        case ("studio", "recordings"), ("talk", "recordings"): self = .recording(id: id)
         case ("studio-tasks", "tasks"), ("studio", "tasks"): self = .task(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"), ("studio", "bots"): self = .bot(id: id)

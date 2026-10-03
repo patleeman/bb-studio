@@ -1,5 +1,5 @@
 /** Add an id only when its implementation moves into Studio. */
-export const absorbedPluginIds = ["studio-tables", "studio-chat", "feed", "studio-tasks", "bot-teams", "artifacts"] as const;
+export const absorbedPluginIds = ["studio-tables", "studio-chat", "feed", "studio-tasks", "bot-teams", "artifacts", "talk"] as const;
 
 export function rewriteLegacyText(text: string, ids: readonly string[] = absorbedPluginIds): string {
   for (const id of ids) {
