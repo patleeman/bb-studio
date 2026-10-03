@@ -33,6 +33,9 @@ export default ({ seedPages }) => {
     },
     capture('office-home','staged-preview.png','/plugins/studio/office',['ORBIT-42 checks are ready','Atlas wants to edit the release checklist']),
     capture('office-inbox','office-inbox.png','/plugins/studio/office/inbox/all',['All spaces','ORBIT-42 checks are ready','Atlas wants to edit the release checklist']),
+    capture('office-space-inbox','office-space-inbox.png','/plugins/studio/office/inbox',['ORBIT-42 checks are ready','Atlas wants to edit the release checklist'],async client=>{
+      if (!await client.evaluate(`Array.from(document.querySelectorAll('h1')).some(heading => heading.checkVisibility() && heading.textContent.trim() === 'Inbox')`)) throw Error('Space Inbox heading must read Inbox');
+    }),
     capture('office-sidebar','office-sidebar.png','/plugins/studio/office',['ORBIT-42 release room','Orbit'],async client=>{
       for (const name of ['Atlas','Scribe','Quinn']) await client.waitForSelector(`[aria-label="Team"] button[title^="${name}"]`);
     }),

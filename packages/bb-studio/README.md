@@ -68,6 +68,7 @@ a review task, and a report. The same staged data is used for these views:
 | View | Live capture |
 | --- | --- |
 | Inbox, All spaces | [Inbox](assets/office-inbox.png) |
+| Space Inbox | [Inbox heading](assets/office-space-inbox.png) |
 | Team faces and folders | [Sidebar](assets/office-sidebar.png) |
 | Atlas's desk | [Chat](assets/office-bot-chat.png), [Tasks](assets/office-bot-tasks.png) |
 | Space settings | [Settings](assets/office-settings.png) |
@@ -80,7 +81,7 @@ and run:
 
 ```sh
 node scripts/capture/seed-office.mjs
-BB_CAPTURE_ONLY=office-home,office-inbox,office-sidebar,office-bot-chat,office-bot-tasks,office-settings,office-delegate,office-approval node scripts/capture-plugin-screenshots.mjs --plugin studio
+BB_CAPTURE_ONLY=office-home,office-inbox,office-space-inbox,office-sidebar,office-bot-chat,office-bot-tasks,office-settings,office-delegate,office-approval node scripts/capture-plugin-screenshots.mjs --plugin studio
 ```
 
 ## Commands and agent tools

@@ -13,10 +13,15 @@ the native screenshot fixture; `fixtures.json` preserves the first capture fixtu
 
 ## Web captures
 
-All assertions passed against the real rendered BB application.
+All assertions passed against the real rendered BB application. Home, both Inbox
+views, and the sidebar were refreshed on 52586 at `09bb66a8`, which includes
+`6089c1d` (Home/Inbox headings) and the later item-icon fix. The images were checked for the
+Home panel title and the Space Inbox heading; the latter has an explicit capture
+assertion.
 
 - [Home](../../../../packages/bb-studio/assets/staged-preview.png)
 - [Inbox, All spaces](../../../../packages/bb-studio/assets/office-inbox.png)
+- [Space Inbox](../../../../packages/bb-studio/assets/office-space-inbox.png)
 - [Team faces and folders](../../../../packages/bb-studio/assets/office-sidebar.png)
 - [Bot desk: Chat](../../../../packages/bb-studio/assets/office-bot-chat.png)
 - [Bot desk: Tasks](../../../../packages/bb-studio/assets/office-bot-tasks.png)
