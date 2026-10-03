@@ -106,7 +106,21 @@ if (!fixtures.BBGO_QA_MEETING_RECORDING) {
   fixtures.BBGO_QA_MEETING_RECORDING = recording.id;
   await writeFile(marker, JSON.stringify(fixtures,null,2)+'\n');
 }
+// Enough real page content to exercise repeated native list/page navigation.
+if (!fixtures.performancePages) {
+  fixtures.performancePages = [];
+  for (let index = 1; index <= 24; index++) {
+    const result = await api('/plugins/pages/rpc/create', {
+      projectId, parentId:null, title:'Native Performance '+String(index).padStart(2,'0'),
+      markdown:'# Navigation fixture\n\n'+Array.from({length:12},(_,i)=>'Paragraph '+(i+1)+': Review the release checklist and confirm the Friday release window.').join('\n\n'),
+    });
+    if (!result.ok || !result.result?.page?.id) throw new Error('Performance page fixture failed');
+    fixtures.performancePages.push(result.result.page.id);
+  }
+  await writeFile(marker, JSON.stringify(fixtures,null,2)+'\n');
+}
 db.close();
 const env = Object.fromEntries(Object.entries(fixtures).filter(([key])=>key.startsWith('BBGO_QA_')));
+env.BBGO_QA_PERFORMANCE_READY = fixtures.performancePages.length === 24 ? 'YES' : 'NO';
 await writeFile(process.argv[2],JSON.stringify(env,null,2)+'\n');
 console.log('Seeded assistant timeline and two 90-second segmented audio fixtures.');

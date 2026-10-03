@@ -261,3 +261,17 @@ remain unchanged; other errors still fail.
 `/tmp/office-voice-capability/results.xcresult` verifies the failed-session
 controls and records 1 explicit capability skip, 0 failures. Speech recognition
 itself still requires a speech-capable device. `git diff --check` passed.
+
+## Performance fixture skip resolved
+
+The isolated runner now marks its explicit private-simulator configuration and
+seeds 24 real `Native Performance` pages with multi-paragraph content. The
+performance suite accepts the configured isolated loopback origin rather than
+requiring a retired fixed review port. It opens Work → All items → Pages,
+preserving its scrolling, page-content, return-navigation and metric assertions.
+
+`/tmp/office-performance-2/results.xcresult`: 1 passed, 0 failures; 12 navigation
+cycles including warm-up. Five measured iterations averaged 35.420 seconds per
+two-cycle iteration; peak physical memory averaged 124,223 kB. These are observed
+measurements, not a regression-baseline claim. Node/shell syntax checks and
+`git diff --check` passed. The fixture-enabled full runner will include this test.

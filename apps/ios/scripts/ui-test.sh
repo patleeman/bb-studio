@@ -7,6 +7,7 @@ export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
 : "${BB_QA_PROJECT_ID:?Set the staged project ID}"
 : "${BBGO_QA_THREAD:?Set the staged thread ID}"
 export BB_QA_SERVER_URL BB_QA_PROJECT_ID BBGO_QA_THREAD
+export BB_QA_PRIVATE_SIM=YES
 python3 - <<'PY'
 import json, os, urllib.parse, urllib.request
 origin=os.environ['BB_QA_SERVER_URL']; u=urllib.parse.urlparse(origin)
