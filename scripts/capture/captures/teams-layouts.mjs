@@ -111,14 +111,18 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
    await open(client, "grid");
    await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
+   // Phone panes stack; scroll to the last one as a reader would, then return to the top.
+   await client.evaluate("document.querySelector('[data-channel-thread]:last-of-type').scrollIntoView({block:'start'})");
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
+   await client.evaluate("document.querySelector('.channel-thread-stage').scrollTop=0");
    await client.evaluate("(()=>{if(document.documentElement.scrollWidth>innerWidth)throw new Error('Grid overflows the phone');const composer=document.querySelector('[data-view-composer]');if(!composer||composer.getBoundingClientRect().bottom>innerHeight)throw new Error('Grid composer is offscreen');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
   { id: "bots-focus-mobile", packageDir: "bb-studio-teams", fileName: "channel-focus-mobile.png", privateSidebar: false, setup: guard(async client => {
    await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
    await open(client, "grid");
+   await client.evaluate("document.querySelector('[aria-label=\"Focus Atlas\"]').closest('[data-channel-thread]').scrollIntoView({block:'start'})");
    await client.clickAriaButtonWithPointer("Focus Atlas");
    await client.waitForSelector('[data-channel-layout="focus"]');
    await client.waitForText("Ready. I checked the brief:");
