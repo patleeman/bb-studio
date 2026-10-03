@@ -93,9 +93,23 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
     return (
       <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
         <ItemHeader className="relative shrink-0 items-center border-b border-border/70" backLabel={backLabel} onBack={() => onBack()} />
-        <p role={error ? "alert" : "status"} className={`p-6 text-sm ${error ? "text-destructive" : "text-muted-foreground"}`}>
-          {error || "Loading table…"}
-        </p>
+        <div className="space-y-3 p-6">
+          <p role={error ? "alert" : "status"} className={`text-sm ${error ? "text-destructive" : "text-muted-foreground"}`}>
+            {error || "Loading table…"}
+          </p>
+          {error && (
+            <button
+              type="button"
+              className={FLOATING_BUTTON}
+              onClick={() => {
+                setLoad({ table: null, error: "" });
+                setVersion((n) => n + 1);
+              }}
+            >
+              Retry
+            </button>
+          )}
+        </div>
       </div>
     );
   return (
