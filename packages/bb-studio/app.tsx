@@ -12,6 +12,7 @@ import { StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
 import { ComposerTrim } from "./src/ui/ComposerTrim";
 import { ActivityPanel } from "./src/ui/HomePanel";
+import { registerOfficeApp } from "./src/ui/office/register";
 
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
@@ -20,6 +21,9 @@ function StudioRoot({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp((app) => {
+  // The office (docs/office-model.md). The sidebar slots switch on once the
+  // Sidebar and Navigation modules are folded into core.
+  registerOfficeApp(app, { sidebar: false });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot) });
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
