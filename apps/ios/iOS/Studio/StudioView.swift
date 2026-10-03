@@ -7,7 +7,7 @@ import SwiftUI
 final class StudioStore: ObservableObject {
     let serverURL = ServerScope.selectedURL
     static var shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "studio", "talk_excalidraw", "artifacts", "studio-tasks", "studio-tables", "bot-teams"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks", "studio-tables", "bot-teams"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -411,7 +411,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["studio", "talk_pages", "studio-tasks"]) {
+            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["studio", "pages", "studio-tasks"]) {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -586,7 +586,7 @@ struct StudioView: View {
 
     /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
-        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("studio") ? 2 : 0) + (store.plugins.contains("studio-tasks") ? 1 : 0)
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("studio") ? 2 : 0) + (!store.plugins.isDisjoint(with: ["studio", "studio-tasks"]) ? 1 : 0)
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.plugins.contains("studio") {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
@@ -603,7 +603,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if store.plugins.contains("studio-tasks") {
+            if !store.plugins.isDisjoint(with: ["studio", "studio-tasks"]) {
                 tile("Task", "checklist", .green) { app.sheet = .newTasks } menu: {
                     Button("Open Board", systemImage: "rectangle.split.3x1") { operation.complete(on: app) { app.push(.tasks) } }
                 }
@@ -850,7 +850,7 @@ struct StudioView: View {
     private var hasArchived: Bool { showArchived || store.items.contains(where: \.archived) }
 
     private func canDelete(_ item: StudioItem) -> Bool {
-        store.viaStudio || ["pages", "studio", "talk_excalidraw"].contains(item.pluginId)
+        store.viaStudio || ["pages", "studio", "excalidraw"].contains(item.pluginId)
     }
 
     private func projectName(_ item: StudioItem) -> String? {

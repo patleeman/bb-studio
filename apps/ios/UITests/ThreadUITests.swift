@@ -1119,7 +1119,7 @@ final class ThreadUITests: XCTestCase {
         shot("studio-chat-sheet")
         app.buttons["Start"].tap()
         XCTAssertTrue(wait(20) {
-            threadId = (self.rpc("studio-chat", "lastThread", ["pluginId": "studio", "id": id])?["threadId"] as? String)
+            threadId = ((self.rpc("studio", "chat_home", ["pluginId": "studio", "id": id])?["thread"] as? [String: Any])?["threadId"] as? String)
             return threadId != nil
         }, "thread linked to the task")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'automated UI test'")).firstMatch.waitForExistence(timeout: 15), "opened the thread")

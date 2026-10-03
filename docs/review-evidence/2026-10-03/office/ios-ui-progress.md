@@ -66,3 +66,21 @@ Focused validation with `3e705659` product code:
 The earlier full run remains in progress at `/tmp/stage9-retarget-full`; it
 predates these final selector changes and the automation fix. A fresh staged
 install and final full suite run are still required.
+
+## Restored consolidated capabilities
+
+`testQuickCapture` and `testStudioChat` exposed product failures, not removed
+features. The Task tile and item-chat controls still checked the retired
+`studio-tasks` and `studio-chat` plugin IDs. They now recognize `studio` while
+retaining legacy ID compatibility. Drawing notifications/deletion also use the
+correct `excalidraw` ID instead of the accidental `talk_excalidraw` string.
+
+Item chat now reads the same per-server running-plugin preference as the thread
+screen. This fixes cold task deep links, where Office has not opened or loaded
+StudioStore yet. The chat sheet loads project choices before presenting them.
+The test verifies the linked thread through consolidated `studio.chat_home`.
+
+- `testQuickCapture` passed: `/tmp/office-capabilities/results.xcresult`.
+- `testStudioChat` passed after the cold-start fix:
+  `/tmp/office-capabilities-2/results.xcresult` (1 test, 0 failures).
+- Native build succeeded. No Office, RootView or AppModel changes were needed.
