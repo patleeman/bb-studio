@@ -36,3 +36,12 @@ it("traps forward and backward Tab, closes from the close control, and restores 
   expect(document.querySelector('[role="dialog"]')).toBeNull();
   expect(document.activeElement).toBe(origin);
 });
+
+it("retains modal focus when a host control stops bubbling focus events", async () => {
+  const input = document.querySelector<HTMLInputElement>('[role="combobox"]')!;
+  // Native editors can consume focus events before Radix's document listeners.
+  input.addEventListener("focusout", event => event.stopPropagation());
+  origin.addEventListener("focusin", event => event.stopPropagation());
+  await act(async () => { origin.focus(); await Promise.resolve(); });
+  expect(document.activeElement).toBe(input);
+});

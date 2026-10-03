@@ -51,7 +51,30 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const dialog = useRef<HTMLDivElement>(null);
   const [returnFocus] = useState(() => document.activeElement instanceof HTMLElement ? document.activeElement : null);
+
+  useEffect(() => {
+    let live = true;
+    let lastFocused: HTMLElement | null = null;
+    // Host editors can consume bubbling focus events before Radix sees them.
+    // Capture the request, then repair focus after the host finishes handling it.
+    const containFocus = (event: FocusEvent) => {
+      const panel = dialog.current;
+      if (!panel || !(event.target instanceof HTMLElement)) return;
+      if (panel.contains(event.target)) { lastFocused = event.target; return; }
+      queueMicrotask(() => {
+        if (!live || !panel.isConnected || panel.contains(document.activeElement)) return;
+        const otherDialog = document.activeElement?.closest('[role="dialog"], [role="alertdialog"]');
+        if (otherDialog && !otherDialog.contains(panel) && !otherDialog.closest('[hidden], [aria-hidden="true"], [inert]')) return;
+        const target = lastFocused?.isConnected && panel.contains(lastFocused)
+          ? lastFocused : panel.querySelector<HTMLElement>('[role="combobox"]');
+        target?.focus({ preventScroll: true });
+      });
+    };
+    document.addEventListener("focusin", containFocus, true);
+    return () => { live = false; document.removeEventListener("focusin", containFocus, true); };
+  }, []);
 
   useEffect(() => {
     rpc.call("overview", null).then(({ providers }) => setProviders(providers), () => {});
@@ -114,7 +137,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   };
   let lastKind = "";
   return <Dialog open onOpenChange={(value) => { if (!value) onClose(); }}>
-    <DialogContent hideCloseButton aria-describedby={undefined} className="studio-quick-open flex max-h-[min(38rem,78vh)] w-full max-w-xl flex-col gap-0 overflow-hidden rounded-lg border border-border bg-background p-0 shadow-2xl sm:top-[12vh] sm:translate-y-0"
+    <DialogContent ref={dialog} hideCloseButton aria-describedby={undefined} className="studio-quick-open flex max-h-[min(38rem,78vh)] w-full max-w-xl flex-col gap-0 overflow-hidden rounded-lg border border-border bg-background p-0 shadow-2xl sm:top-[12vh] sm:translate-y-0"
       onCloseAutoFocus={(event) => event.preventDefault()}
       onAfterCloseAutoFocus={() => { if (returnFocus?.isConnected) returnFocus.focus(); }}>
       <DialogTitle className="sr-only">Search Studio</DialogTitle>
