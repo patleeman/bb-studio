@@ -23,7 +23,7 @@ const FOLDER_PREVIEW = 8;
 const RUNNING = new Set(["active", "waiting-for-host", "host-reconnecting"]);
 const BACKGROUND_ORIGINS = new Set(["bot-teams", "automations", "studio"]);
 
-const KIND_ICONS: Record<string, string> = {
+export const KIND_ICONS: Record<string, string> = {
   thread: "MessageSquare",
   page: "FileText",
   board: "LayoutGrid",

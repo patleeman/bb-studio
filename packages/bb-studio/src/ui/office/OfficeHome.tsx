@@ -12,6 +12,7 @@ import { InboxRow } from "./InboxRow";
 import { useCall, useLive, useTeam, type Home, type Space, type TeamBot, type WorkingTask } from "./model";
 import { openOffice } from "./routes";
 import { SpaceMark } from "./SpaceSwitcher";
+import { KIND_ICONS } from "./OfficeSidebar";
 import { cn } from "./styles";
 
 const SHOWN_REPORTS = 5;
@@ -121,6 +122,7 @@ export function OfficeHome({ space }: { space: Space }) {
                 return (
                   <li key={`${item.pluginId}:${item.id}`}>
                     <button type="button" onClick={() => openAppPath(item.href)} className="flex w-full items-center gap-3 rounded-md px-1 py-1.5 text-left text-sm hover:bg-state-hover">
+                      <Icon name={KIND_ICONS[item.kind] ?? "File"} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate">{item.title || "Untitled"}</span>
                       {author ? <Face name={author.name} avatar={author.avatar} size="sm" /> : null}
                       <span className="shrink-0 text-xs text-muted-foreground">{new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(new Date(item.updatedAt))}</span>
