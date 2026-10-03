@@ -1,0 +1,113 @@
+{
+  "checkpoint": "30c2869",
+  "audioSource": "Chrome synthetic microphone through real MediaRecorder",
+  "recordingId": "rec_5e2d4a51b33163fa",
+  "committed": [
+    {
+      "recordingId": "rec_5e2d4a51b33163fa",
+      "sessionId": "we939xyb6kte",
+      "index": 0,
+      "parts": [
+        14467
+      ],
+      "complete": false
+    }
+  ],
+  "failureMarker": {
+    "recordingId": "rec_5e2d4a51b33163fa",
+    "kind": "dictation",
+    "phase": "paused",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": false,
+    "composePath": null,
+    "localSaveFailed": true
+  },
+  "downloads": [
+    {
+      "bytes": 31210,
+      "type": "audio/webm;codecs=opus"
+    }
+  ],
+  "retrySegments": [
+    {
+      "recordingId": "rec_5e2d4a51b33163fa",
+      "sessionId": "we939xyb6kte",
+      "index": 0,
+      "parts": [
+        14467,
+        16498,
+        245
+      ],
+      "complete": true
+    }
+  ],
+  "retryMarker": {
+    "recordingId": "rec_5e2d4a51b33163fa",
+    "kind": "dictation",
+    "phase": "paused",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": false,
+    "composePath": null,
+    "localSaveFailed": false
+  },
+  "afterCommittedReload": [
+    {
+      "recordingId": "rec_5e2d4a51b33163fa",
+      "sessionId": "we939xyb6kte",
+      "index": 0,
+      "parts": [
+        14467,
+        16498,
+        245
+      ],
+      "complete": true
+    }
+  ],
+  "lostMarker": {
+    "recordingId": "rec_5e2d4a51b33163fa",
+    "kind": "dictation",
+    "phase": "paused",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": false,
+    "composePath": null,
+    "localSaveFailed": true
+  },
+  "lostReloadText": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nDurable offline canvas\nIndependent editor drafts\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\nToggle Sidebar\n0:08\nAudio needs saving\n\nThis window closed after local audio saving failed.\n\nAudio that existed only in memory cannot be recovered. Already saved audio is kept, and queued pieces will upload when connected. Review what remains before continuing.\n\nContinue with saved audio\nDownload uploaded audio",
+  "serverBeforeAck": "paused",
+  "afterAck": {
+    "recordingId": "rec_5e2d4a51b33163fa",
+    "kind": "dictation",
+    "phase": "paused",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": false,
+    "composePath": null,
+    "localSaveFailed": false
+  },
+  "deniedMarker": {
+    "recordingId": "rec_5e2d4a51b33163fa",
+    "kind": "dictation",
+    "phase": "paused",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": false,
+    "composePath": null,
+    "localSaveFailed": false
+  },
+  "deniedReload": {
+    "warning": false,
+    "marker": {
+      "recordingId": "rec_5e2d4a51b33163fa",
+      "kind": "dictation",
+      "phase": "paused",
+      "threadId": "thr_gdjki7aua7",
+      "field": null,
+      "insert": false,
+      "composePath": null,
+      "localSaveFailed": false
+    }
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "checkpoint": "30c2869",
+  "drawings": [
+    "drw_d30bd1f9b8c0f974",
+    "drw_d8b3de6b2eec56c4",
+    "drw_169114fba840f4de",
+    "drw_a3f976291ed9bfeb",
+    "drw_bb30d7259cbeed49"
+  ],
+  "offlineDraft": {
+    "id": "16f4b353-9d65-4303-908c-9e4aa9940378",
+    "token": "cfebe7c6-0941-4892-b03f-579a493aaa92",
+    "elements": [
+      "87uaSIfvCnBMBmmWGXzvr"
+    ]
+  },
+  "offlineReopenedNewTab": true,
+  "conflictOriginal": [
+    "remote-writer-element"
+  ],
+  "copy": {
+    "id": "drw_d8b3de6b2eec56c4",
+    "count": 1,
+    "dataMatches": true
+  },
+  "multitab": {
+    "ids": [
+      "04983852-c0cb-4972-b57b-fffdcce0bf34",
+      "88e6b1ad-e3d3-4ba7-8950-f732c2eaf220"
+    ],
+    "tokens": [
+      "0c1b4104-53b9-44ed-a73f-b9d0633a0ad7",
+      "5cac5499-8d7e-49f3-b5d1-8c575ec1abfe"
+    ],
+    "elements": [
+      [
+        "Q9c5oOb84HVpn71tyD9Ae"
+      ],
+      [
+        "MuQD7q6MODZXnKmiPn4l0"
+      ]
+    ],
+    "quotaRetry": true
+  }
+}

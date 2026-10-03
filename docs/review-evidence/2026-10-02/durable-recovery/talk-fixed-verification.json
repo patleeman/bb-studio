@@ -1,0 +1,77 @@
+{
+  "checkpoint": "35bb73f",
+  "syntheticMicrophone": true,
+  "refused": {
+    "recorders": 0,
+    "marker": null,
+    "created": [
+      "rec_ac4193db451a2aad"
+    ]
+  },
+  "started": {
+    "recordingId": "rec_8adbd28f14d9bd0f",
+    "kind": "dictation",
+    "phase": "recording",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": true,
+    "composePath": null,
+    "captureInProgress": true,
+    "localSaveFailed": false
+  },
+  "recordingId": "rec_8adbd28f14d9bd0f",
+  "created": [
+    "rec_ac4193db451a2aad",
+    "rec_8adbd28f14d9bd0f"
+  ],
+  "committed": [
+    {
+      "recordingId": "rec_8adbd28f14d9bd0f",
+      "sessionId": "5yz2zvn5jdv5",
+      "index": 0,
+      "startedAt": 1790999712207,
+      "mimeType": "audio/webm;codecs=opus",
+      "parts": [
+        14467
+      ],
+      "complete": false,
+      "durationMs": null,
+      "lastPartAt": 1790999716226
+    }
+  ],
+  "failedMarker": {
+    "recordingId": "rec_8adbd28f14d9bd0f",
+    "kind": "dictation",
+    "phase": "recording",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": true,
+    "composePath": null,
+    "captureInProgress": true,
+    "localSaveFailed": false
+  },
+  "afterReload": {
+    "recordingId": "rec_8adbd28f14d9bd0f",
+    "kind": "dictation",
+    "phase": "recording",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": true,
+    "composePath": null,
+    "captureInProgress": true,
+    "localSaveFailed": false
+  },
+  "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nDraft the ORBIT-42 release notes\n\nWorking...\nQueue\n1\nDraft the ORBIT-42 release notes.\nScheduled for Nov 1 9:57 PM\n· in 29d\n\n\n\n\n6.1-Sol\nMedium\nToggle Sidebar\n0:00\nAudio needs saving\n\nCapture was interrupted. The last unsaved audio may be missing.\n\nAudio that existed only in memory cannot be recovered. Already saved audio is kept, and queued pieces will upload when connected. Review what remains before continuing.\n\nContinue with saved audio\nDownload uploaded audio",
+  "status": "paused",
+  "acknowledged": {
+    "recordingId": "rec_8adbd28f14d9bd0f",
+    "kind": "dictation",
+    "phase": "paused",
+    "threadId": "thr_gdjki7aua7",
+    "field": null,
+    "insert": false,
+    "composePath": null,
+    "captureInProgress": false,
+    "localSaveFailed": false
+  }
+}
