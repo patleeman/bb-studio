@@ -1,4 +1,7 @@
+import companions from "./tasks-companions.mjs";
+
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
+  ...(process.env.BB_CAPTURE_TASKS_COMPANIONS === "1" ? [companions({ projectId, seedPages, pluginRpc, bbCli, sleep })] : []),
   {
     id: "studio-tasks",
     packageDir: "bb-studio-tasks",

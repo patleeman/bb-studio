@@ -208,8 +208,17 @@ refreshes if it misses the completion event.
 
 Task handoff confirmations, bot handoffs, current and earlier handoffs, and
 linked threads now use the shared companion policy in pushed commit 6854481.
-Tasks' 49 tests and typecheck pass. Live handoff entry-point verification
-remains part of the suite completion audit.
+Tasks' 49 tests and typecheck pass. The stable BB 0.45.0 capture, with Tasks
+installed from `258d801`, now checks the current handoff, earlier handoff and
+linked discussion from the real task page. It verifies one companion per
+destination, the unchanged main task, and exact reply draft/attachment DOM
+retention after returning and folding. The
+[desktop](../packages/bb-studio-tasks/assets/companion-handoffs.png) and
+[phone](../packages/bb-studio-tasks/assets/companion-handoffs-mobile.png)
+screenshots are visually checked; all phone composer controls fit at 390 by
+844 pixels. Deterministic handoff rows and scheduled threads seed the workflow;
+all fixtures are deleted without running agents. Live handoff-creation
+confirmation and bot-dispatch navigation remain required.
 
 Studio Chat's new-conversation composers now have shared companion routes.
 Ordinary item drafts retain their native draft keys; independent quote drafts
@@ -272,7 +281,7 @@ live recovery-list and interrupted-recording checks remain required.
 Remaining delivery includes publishing the native host changes, the SDK/CLI
 placement controller, embedded composer targeting,
 quote-draft recovery and compact composer checks, and the remaining suite
-entry points: task handoff verification, Talk recovery navigation and playback
+entry points: task handoff creation and bot dispatch, Talk recovery navigation and playback
 continuity, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
 existing native capture verifies transfers after the companion is realized.

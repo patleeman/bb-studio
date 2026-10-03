@@ -28,6 +28,22 @@ In progress, Review and Done, including a high-priority recurring task and its
 subtask. The header has the Boards back link, the board's title and project,
 and the Board, List and Calendar views.
 
+![Task handoff conversations beside the task](assets/companion-handoffs.png)
+
+The stable BB 0.45.0 capture opens the current handoff, an earlier handoff,
+and a linked discussion from **Review the offline launch**. They use companion
+tabs while the task stays open. Reopening the current handoff retains the
+exact native reply draft and its attachment, including after folding.
+
+![A retained handoff reply on a phone](assets/companion-handoffs-mobile.png)
+
+The same draft and `handoff-review.txt` attachment remain at 390 by 844 pixels,
+with all composer controls inside the viewport. Handoff rows are deterministic
+staged fixtures; the threads have messages scheduled 30 days ahead and are
+deleted after the check, so no agent runs. This checks navigation and retention;
+handoff creation and bot dispatch have separate backend tests.
+Run with `BB_CAPTURE_TASKS_COMPANIONS=1 BB_CAPTURE_ONLY=tasks-companions node scripts/capture-plugin-screenshots.mjs --plugin studio-tasks` after sourcing staged BB's `capture.env`.
+
 ## What you get
 
 - **Boards** (`/plugins/studio-tasks/tasks`): every board, newest first, with
