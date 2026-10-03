@@ -36,6 +36,16 @@ describe("office tab storage", () => {
     expect(store.rows(spaceId)[0]!.archived_at).toBeNull();
     expect(changed).toHaveBeenCalledTimes(5);
   });
+  it("adds to the end of Essentials and Pinned, and to the top of Today", () => {
+    const { store, spaceId } = setup();
+    for (const ref of ["thread:a", "thread:b", "thread:c", "thread:d"]) store.open(spaceId, ref);
+    store.move(spaceId, "thread:a", "essential"); store.move(spaceId, "thread:b", "essential");
+    store.move(spaceId, "thread:c", "pinned"); store.move(spaceId, "thread:d", "pinned");
+    expect(refs(store, spaceId, "essential")).toEqual(["thread:a", "thread:b"]);
+    expect(refs(store, spaceId, "pinned")).toEqual(["thread:c", "thread:d"]);
+    store.open(spaceId, "thread:e"); store.move(spaceId, "thread:c", "today");
+    expect(refs(store, spaceId, "today")).toEqual(["thread:c", "thread:e"]);
+  });
   it("pins, reorders, unpins and enforces the Essentials cap atomically", () => {
     const { store, spaceId, advance } = setup();
     for (let i=0; i<9; i++) { store.open(spaceId, `thread:${i}`); if (i<8) store.move(spaceId, `thread:${i}`, "essential"); }

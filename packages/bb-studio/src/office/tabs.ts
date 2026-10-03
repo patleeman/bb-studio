@@ -57,7 +57,8 @@ export class OfficeTabs {
       if (folder && !this.folders(spaceId).some(f => f.id === folder)) throw new Error("That tab folder is not in this Space.");
       this.db.prepare("UPDATE office_tabs SET zone=?,folder_id=?,archived_at=?,opened_at=? WHERE space_id=? AND ref=?")
         .run(zone, folder, zone === "archived" ? this.now() : null, zone === "today" && old.zone !== "today" ? this.now() : old.opened_at, spaceId, ref);
-      this.place(spaceId, ref, zone, folder, index ?? 0);
+      // Today and the archive are newest first; Essentials and Pinned grow at the end, as in Arc.
+      this.place(spaceId, ref, zone, folder, index ?? (zone === "today" || zone === "archived" ? 0 : Number.MAX_SAFE_INTEGER));
     })();
     this.changed();
   }
