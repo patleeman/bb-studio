@@ -49,6 +49,11 @@ assert the real request, report, channel, Atlas desk, and assigned review task.
 Two navigation bugs found during capture were fixed by the coordinator in
 `c47f355` and `1bf08d1`. Raw result: `/tmp/stage9-ios-final/results.xcresult`.
 
+The focused `testTeamAndDesk` rerun also passes (one test, zero failures) with
+an exact `Atlas` button-label match, an `Atlas` navigation-bar assertion, and
+the seeded review task under Tasks. Build and runtime evidence:
+`/tmp/office-atlas-verified/results.xcresult` (isolated server 52586).
+
 ### Full UI test run
 
 [All failures and counts](ios-ui-results.json): **90 tests, 22 passed, 55 skipped,

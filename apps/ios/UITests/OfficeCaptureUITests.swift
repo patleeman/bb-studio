@@ -41,11 +41,12 @@ final class OfficeCaptureUITests: XCTestCase {
     func testTeamAndDesk() throws {
         let app = try launch("team")
         XCTAssertTrue(app.staticTexts["ORBIT-42 release room"].waitForExistence(timeout: 20))
-        XCTAssertTrue(app.staticTexts["Atlas"].waitForExistence(timeout: 20))
+        let atlas = app.buttons.matching(NSPredicate(format: "label == %@", "Atlas")).firstMatch
+        XCTAssertTrue(atlas.waitForExistence(timeout: 20), "Atlas team face")
         try capture(app, "office-team")
-        app.buttons["Atlas"].tap()
+        atlas.tap()
         XCTAssertTrue(app.buttons["Chat"].waitForExistence(timeout: 20))
-        XCTAssertTrue(app.staticTexts["Atlas"].exists)
+        XCTAssertTrue(app.navigationBars["Atlas"].waitForExistence(timeout: 20), "Atlas desk title")
         XCTAssertTrue(app.buttons["Tasks"].exists)
         try capture(app, "office-bot-chat")
         app.buttons["Tasks"].tap()
