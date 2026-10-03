@@ -1,8 +1,10 @@
 import companionHost from "./companion-host.mjs";
+import dragCleanup from "./float-drag-cleanup.mjs";
 
 const STATE_KEY = "bb-studio-float:windows";
 
 export default ({ threadId, seedPages, seedDrawing, sleep }) => [
+  ...(process.env.BB_CAPTURE_FLOAT_DRAG === "1" ? [dragCleanup({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_NATIVE_COMPANION === "1" ? [companionHost({ threadId, seedPages, sleep })] : []),
   {
     id: "float",
