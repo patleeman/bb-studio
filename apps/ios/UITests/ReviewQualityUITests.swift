@@ -15,6 +15,66 @@ final class ReviewQualityUITests: XCTestCase {
     func testNavigationAtDefaultText() throws { try navigation(largeText: false) }
     func testNavigationAtAccessibilityText() throws { try navigation(largeText: true) }
 
+    /// Let XCTest retain its native issue attachments for an unidentified finding.
+    func testSettingsElementDetectionAtDefaultText() throws {
+        let app = application(largeText: false)
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["Settings"].tap()
+        let server = app.descendants(matching: .any)["settingsServerURL"]
+        XCTAssertTrue(server.waitForExistence(timeout: 10))
+        XCTAssertEqual(server.value as? String, fixture)
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = "settings-detection-default"
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = "settings-detection-default-accessibility-tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+        if #available(iOS 17.0, *) {
+            // No handler: retain Apple's original failure and diagnostic attachments.
+            try app.performAccessibilityAudit(for: [.elementDetection])
+        }
+    }
+
+    /// Localize unidentified OCR findings without changing Settings or its data.
+    func testSettingsDetectionAtScrollPositions() throws {
+        let app = application(largeText: false)
+        app.launch()
+        defer { app.terminate() }
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["Settings"].tap()
+        let server = app.descendants(matching: .any)["settingsServerURL"]
+        XCTAssertTrue(server.waitForExistence(timeout: 10))
+        XCTAssertEqual(server.value as? String, fixture)
+        for position in 0..<5 {
+            let name = "settings-detection-position-\(position)"
+            let screenshot = XCTAttachment(screenshot: app.screenshot())
+            screenshot.name = name
+            screenshot.lifetime = .keepAlways
+            add(screenshot)
+            let tree = XCTAttachment(string: app.debugDescription)
+            tree.name = name + "-accessibility-tree"
+            tree.lifetime = .keepAlways
+            add(tree)
+            if #available(iOS 17.0, *) {
+                try app.performAccessibilityAudit(for: [.elementDetection]) { issue in
+                    let finding = "\(name): \(issue.auditType) \(issue.compactDescription); \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")]"
+                    self.auditFindings.append(finding)
+                    print("QUALITY: \(finding)")
+                    return true // Collect positions; the final assertion stays strict.
+                }
+            }
+            if position < 4 {
+                app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.74))
+                    .press(forDuration: 0.05, thenDragTo: app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.58)))
+            }
+        }
+        XCTAssertTrue(auditFindings.isEmpty, auditFindings.joined(separator: "\n"))
+    }
+
     func testStudioRowsAtAccessibilityText() throws {
         let app = application(largeText: true)
         app.launch()
