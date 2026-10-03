@@ -50,9 +50,9 @@ enum WatchLoadProbe {
         }
         let current = URL(string: "http://localhost:49486")!
         model.selectServer(current)
-        PhoneTransport.reconcileServer(staged, requestedFrom: staged)
+        PhoneTransport.reconcileServer(staged, requestedFrom: staged, selection: model.serverSelection)
         results["old-origin-correction-ignored"] = model.client.baseURL == current
-        PhoneTransport.reconcileServer(staged, requestedFrom: current)
+        PhoneTransport.reconcileServer(staged, requestedFrom: current, selection: model.serverSelection)
         results["current-origin-correction-applied"] = model.client.baseURL == staged
         let output = FileManager.default.urls(for: .documentDirectory, in: .userDomainMask)[0].appendingPathComponent("watch-load-probe.json")
         try? JSONEncoder().encode(results).write(to: output, options: .atomic)

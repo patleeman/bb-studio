@@ -13,6 +13,8 @@ struct BBStudioWatchApp: App {
 
 struct WatchInboxView: View {
     @ObservedObject private var model = WatchModel.shared
+    @Environment(\.scenePhase) private var scenePhase
+    private struct LoadKey: Hashable { let selection: UUID; let active: Bool }
 
     var body: some View {
         List {
@@ -48,7 +50,10 @@ struct WatchInboxView: View {
         }
         .navigationTitle("BB")
         .overlay { if model.loading && model.threads.isEmpty { ProgressView() } }
-        .task { await model.load() }
+        .task(id: LoadKey(selection: model.serverSelection, active: scenePhase == .active)) {
+            guard scenePhase == .active else { return }
+            await model.load()
+        }
         .refreshable { await model.load() }
     }
 }
@@ -89,7 +94,7 @@ struct WatchThreadView: View {
             }
             Section {
                 TextField("Reply", text: $reply)
-                    .onSubmit { send(reply) }
+                    .onSubmit { send(reply, clearsDraft: true) }
                 ForEach(Self.quickReplies, id: \.self) { text in
                     Button(text) { send(text) }
                 }
@@ -137,14 +142,16 @@ struct WatchThreadView: View {
         }
     }
 
-    private func send(_ text: String) {
+    private func send(_ text: String, clearsDraft: Bool = false) {
         let text = text.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !text.isEmpty else { return }
-        reply = ""
+        let submittedDraft = reply
+        let sendsDraft = clearsDraft && submittedDraft.trimmingCharacters(in: .whitespacesAndNewlines) == text
         status = "Sending…"
         Task {
             do {
                 try await client.send(threadId, text: text)
+                if sendsDraft && reply == submittedDraft { reply = "" }
                 status = nil
                 await load()
             } catch {
