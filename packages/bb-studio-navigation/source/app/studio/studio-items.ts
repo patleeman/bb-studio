@@ -2,7 +2,6 @@
 // when another surface on screen already reaches it; bb's own rows and every
 // other plugin's panels stay.
 import type { ExperimentalSidebarNavigationItem } from "@get-bb/plugin-sdk/app";
-import { useSidebarHosted } from "@bb-studio/kit/app";
 
 export const STUDIO_HUB = "studio/studio";
 
@@ -14,28 +13,24 @@ export const HUB_PANELS = [
   "talk/recordings",
   "studio-tasks/tasks",
   "studio-tables/tables",
-  "bot-teams/views",
+  "bot-teams/channels",
 ];
-
-/** Legacy channel links are reached through saved Studio items. */
-export const SECTION_PANELS = ["bot-teams/channels"];
 
 export function studioNavigationItems(
   items: readonly ExperimentalSidebarNavigationItem[],
-  sidebarHosted: boolean,
 ): ExperimentalSidebarNavigationItem[] {
   const hub = items.find((item) => item.id === STUDIO_HUB);
   const hubReachable = hub !== undefined && !hub.isDisabled && !hub.isLoading;
   return items.filter(
     (item) =>
-      item.id !== "bot-teams/former-channels" &&
-      !(hubReachable && HUB_PANELS.includes(item.id)) &&
-      !(sidebarHosted && SECTION_PANELS.includes(item.id)),
+      // Old /views links redirect to channels; the row would only repeat Channels.
+      item.id !== "bot-teams/former-views" &&
+      !(hubReachable && HUB_PANELS.includes(item.id)),
   );
 }
 
 export function useStudioNavigationItems(
   items: readonly ExperimentalSidebarNavigationItem[],
 ): ExperimentalSidebarNavigationItem[] {
-  return studioNavigationItems(items, useSidebarHosted());
+  return studioNavigationItems(items);
 }

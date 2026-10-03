@@ -155,19 +155,3 @@ struct SavedViewScreen: View {
         } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
     }
 }
-
-struct FormerChannelScreen: View {
-    @EnvironmentObject private var app: AppModel
-    let id: String
-    @State private var page: SavedViewPage?
-    @State private var error: String?
-    var body: some View {
-        Group {
-            if let page {
-                if page.view.members.count == 1, let thread = page.threads.first { ThreadView(threadId: thread.id) }
-                else { SavedViewScreen(id: id) }
-            } else if let error { ContentUnavailableView("View unavailable", systemImage: "exclamationmark.bubble", description: Text(error)) }
-            else { ProgressView() }
-        }.task { do { page = try await app.client.savedView(id) } catch { self.error = BBClient.describe(error, server: app.client.baseURL) } }
-    }
-}

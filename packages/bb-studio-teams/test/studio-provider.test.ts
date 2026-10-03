@@ -95,7 +95,7 @@ test("saved views are Studio items with ordinary view links and lifecycle action
   assert.equal(kind.mentionProviderId, "views");
   const { items } = await call("studio_list", null);
   assert.ok(studioSchemas(z).provider.studio_list.output.parse({ items }));
-  assert.equal(items[1].href, `/plugins/bot-teams/views/${view.id}`);
+  assert.equal(items[1].href, `/plugins/bot-teams/channels/${view.id}`);
   assert.equal(items[1].projectId, null);
   assert.deepEqual((await call("studio_get", { ids: [view.id] })).items, [items[1]]);
   // Studio indexes the title itself; the content fallback must not duplicate it.

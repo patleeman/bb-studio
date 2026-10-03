@@ -1,4 +1,4 @@
-// Bots and saved thread views as Studio items.
+// Bots and channels as Studio items.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { snippets } from "@bb-studio/kit/format";
@@ -35,7 +35,7 @@ export const VIEW_KIND: StudioKind = {
   blurb: "Message several bots and threads together.",
   agentHint: "Read this channel with `bb bots channel-read <id>`. Work and approvals belong to its ordinary threads.",
 };
-export const viewHref = (id: string) => `/plugins/${PLUGIN_ID}/views/${id}`;
+export const viewHref = (id: string) => `/plugins/${PLUGIN_ID}/channels/${id}`;
 export function viewStudioItem(view: ThreadView): StudioItem {
   return {
     id: view.id, kind: VIEW_KIND.id, title: view.name, icon: null,

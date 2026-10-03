@@ -16,7 +16,7 @@ Busy messages use your global Smart Queue settings. Prefix a message with `/stee
 
 Mission and memory editors reject stale saves. A profile can configure a fallback model for managed mission work; a provider failure retries the mission once in a fresh thread. Ordinary threads keep BB's model and retry controls. Archiving a bot stops managed work and turns off its mission interval; its ordinary threads and history remain available.
 
-Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys. Legacy channel automations retain their triggers and enabled state while moving to normal profile threads. Legacy single-bot channel links open a fresh profile thread; multi-bot links open a channel. Old channel messages remain in storage and are not replayed or displayed.
+Use BB Automations to schedule work in a normal thread. Scheduled findings go to Studio Feed with stable story keys. Legacy channel automations retain their triggers and enabled state while moving to normal profile threads. Channels live at `/plugins/bot-teams/channels/<id>`. Links from before the rename (`/views/<id>`) and links to old channels open the same channel, including single-bot ones. Old channel messages remain in storage and are not replayed or displayed.
 
 ## CLI and tools
 

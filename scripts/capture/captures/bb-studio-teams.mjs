@@ -9,7 +9,9 @@ export default context => {
   id:"bots",packageDir:"bb-studio-teams",fileName:"staged-preview.png",
   setup:async client=>{
    await launchRoomThread(); const id=getLaunchRoomId();
+   // Channels used to live at /views/<id>; old links must land on the channel.
    await client.navigate(`/plugins/bot-teams/views/${id}`);
+   await client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+15000;const tick=()=>location.pathname==="/plugins/bot-teams/channels/${id}"?resolve():Date.now()>end?reject(new Error("Old view link stayed at "+location.pathname)):setTimeout(tick,200);tick();})`,true);
    await client.waitForSelector('[data-thread-view]');
    for(const text of launchRoomReplies)await client.waitForText(text);
    await client.evaluate(`(()=>{
@@ -51,11 +53,11 @@ export default context => {
   setup:async client=>{
    await launchRoomThread();
    await client.navigate("/plugins/studio/studio/view");
-   await client.waitForSelector(`[data-studio-item="/plugins/bot-teams/views/${getLaunchRoomId()}"]`);
-   await client.evaluate(`document.querySelector('[data-studio-item="/plugins/bot-teams/views/${getLaunchRoomId()}"]').click()`);
+   await client.waitForSelector(`[data-studio-item="/plugins/bot-teams/channels/${getLaunchRoomId()}"]`);
+   await client.evaluate(`document.querySelector('[data-studio-item="/plugins/bot-teams/channels/${getLaunchRoomId()}"]').click()`);
    await client.waitForSelector('[data-thread-view]');
    await client.waitForSelector('section[aria-label="Studio"]');
-   await client.waitForSelector(`section[aria-label="Studio"] a[href="/plugins/bot-teams/views/${getLaunchRoomId()}"]`);
+   await client.waitForSelector(`section[aria-label="Studio"] a[href="/plugins/bot-teams/channels/${getLaunchRoomId()}"]`);
    await client.evaluate(`(()=>{if(document.querySelector('section[aria-label="Views"]'))throw new Error("Saved views still have a separate sidebar section");})()`);
   }
  },
@@ -63,7 +65,7 @@ export default context => {
   id:"bots-mobile",packageDir:"bb-studio-teams",fileName:"staged-preview-mobile.png",privateSidebar:false,
   setup:async client=>{
    await client.command("Emulation.setDeviceMetricsOverride",{width:390,height:844,deviceScaleFactor:1,mobile:true});
-   await launchRoomThread();await client.navigate(`/plugins/bot-teams/views/${getLaunchRoomId()}`);
+   await launchRoomThread();await client.navigate(`/plugins/bot-teams/channels/${getLaunchRoomId()}`);
    await client.waitForSelector('[data-thread-view]');
    await client.waitForText("Logged: release check passed.");
    await client.evaluate(`(()=>{

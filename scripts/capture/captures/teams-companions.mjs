@@ -14,7 +14,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
     const directory = await mkdtemp(join(tmpdir(), "bb-teams-companions-"));
     const attachment = join(directory, "release-review.txt");
     await writeFile(attachment, "Deterministic attachment retained by the saved-view composer.\n");
-    const viewKey = `path:/plugins/bot-teams/views/${id}`;
+    const viewKey = `path:/plugins/bot-teams/channels/${id}`;
     const botKey = `path:/plugins/bot-teams/bots/${bot.id}`;
     const composer = `[data-float-window="${viewKey}"] [data-view-composer] [contenteditable="true"]`;
     const forget = async () => {
@@ -33,7 +33,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
     try {
       await client.navigate(`/plugins/bot-teams/bots/${bot.id}/profile`);
       await client.waitForText("Research and verify the facts");
-      await client.navigate(`/plugins/bot-teams/views/${id}`);
+      await client.navigate(`/plugins/bot-teams/channels/${id}`);
       await client.waitForSelector('[data-thread-view]');
       await client.waitForSelector(`[data-studio-tab="bot-teams:${id}"] a`);
       await client.openContextMenu(`[data-studio-tab="bot-teams:${id}"] a`);
@@ -50,7 +50,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
       await client.command("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [attachment] });
       await client.waitForText("release-review.txt");
       await retained(true);
-      const ownChat = await pluginRpc("studio-chat", "viewing", { path: `/plugins/bot-teams/views/${id}` });
+      const ownChat = await pluginRpc("studio-chat", "viewing", { path: `/plugins/bot-teams/channels/${id}` });
       if (ownChat.item) throw new Error("Saved view still triggers automatic Studio Chat");
 
       await client.dragBy(`[data-studio-tab="bot-teams:${bot.id}"] a`, 0, 0);

@@ -7,7 +7,6 @@ import type {
   ExperimentalSidebarNavigationProps,
 } from "@get-bb/plugin-sdk/app";
 import { loadPluginApp, renderSlot } from "@get-bb/plugin-sdk/testing/app";
-import { SidebarAnchors } from "@bb-studio/kit/app";
 import { useSidebarReorderDnd } from "../ui/useSidebarReorderDnd.js";
 
 vi.mock("../ui/useSidebarReorderDnd.js", async (importOriginal) => {
@@ -56,7 +55,6 @@ const ITEMS = [
   item("pages/pages", "Pages"),
   item("bot-teams/bots", "Teams"),
   item("excalidraw/drawings", "Drawings"),
-  item("bot-teams/channels", "New channel"),
   item("weather/forecast", "Forecast"),
   item("artifacts/artifacts", "Artifacts"),
   item("talk/recordings", "Recordings"),
@@ -93,20 +91,21 @@ describe("Studio Navigation", () => {
       "__bb__/new-thread",
       "studio/studio",
       "bot-teams/bots",
-      "bot-teams/channels",
       "weather/forecast",
       "__bb__/skills",
     ]);
   });
 
-  it("reaches saved views through Studio, with a standalone fallback", () => {
-    const view = item("bot-teams/views", "Views");
-    renderNavigation([...ITEMS, view]);
-    expect(rowOrder()).not.toContain(view.id);
+  it("reaches channels through Studio, with a standalone fallback", () => {
+    const channels = item("bot-teams/channels", "Channels");
+    const formerViews = item("bot-teams/former-views", "Channels");
+    renderNavigation([...ITEMS, channels, formerViews]);
+    expect(rowOrder()).not.toContain(channels.id);
+    expect(rowOrder()).not.toContain(formerViews.id);
     cleanup();
-    render(<SidebarAnchors onNavigate={() => {}} />);
-    renderNavigation([...ITEMS.filter(entry => entry !== STUDIO), view]);
-    expect(rowOrder()).toContain(view.id);
+    renderNavigation([...ITEMS.filter(entry => entry !== STUDIO), channels, formerViews]);
+    expect(rowOrder()).toContain(channels.id);
+    expect(rowOrder()).not.toContain(formerViews.id);
   });
 
   it("keeps add-on panels while the Studio hub can't open them", () => {
@@ -120,14 +119,6 @@ describe("Studio Navigation", () => {
       ),
     );
     expect(rowOrder()).toContain("pages/pages");
-  });
-
-  it("leaves out New channel while Studio Sidebar shows the Channels section", () => {
-    render(<SidebarAnchors onNavigate={() => {}} />);
-    renderNavigation();
-
-    expect(rowOrder()).not.toContain("bot-teams/channels");
-    expect(rowOrder()).toContain("bot-teams/bots");
   });
 
   it("keeps rows it leaves out in place when reordering", () => {
@@ -152,7 +143,6 @@ describe("Studio Navigation", () => {
           "studio/studio",
           "excalidraw/drawings",
           "bot-teams/bots",
-          "bot-teams/channels",
           "artifacts/artifacts",
           "talk/recordings",
           "studio-tasks/tasks",

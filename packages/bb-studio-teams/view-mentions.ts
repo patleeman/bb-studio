@@ -19,7 +19,7 @@ export function registerViewMentions(bb: BbPluginApi, store: Store, views: Threa
     async search({ query }) { return views.all().filter(v => !v.archived && v.name.toLowerCase().includes(query.toLowerCase())).slice(0, 30).map(v => ({ id: v.id, title: v.name, icon: "MessageSquare" })); },
     async resolve(itemId) {
       const view = views.get(itemId);
-      return { label: view.name, context: `Channel ${JSON.stringify(view.name)}: /plugins/bot-teams/views/${view.id}. Read it with bb bots channel-read ${view.id}. This is a view of ordinary threads, not a shared agent session.` };
+      return { label: view.name, context: `Channel ${JSON.stringify(view.name)}: /plugins/bot-teams/channels/${view.id}. Read it with bb bots channel-read ${view.id}. This is a view of ordinary threads, not a shared agent session.` };
     },
   });
 }

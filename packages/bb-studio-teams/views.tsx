@@ -251,7 +251,7 @@ export function ViewsPage({ subPath }: PluginNavPanelProps) {
   const open = (path: string) => { if (!companionNavigate({ kind: "path", path })) openAppPath(path); };
   const id = subPath.split("/")[0];
   if (id && id !== "new") return <ViewDetail key={id} id={id} />;
-  if (id === "new") return <ViewEditor open onClose={() => open(`/plugins/${PLUGIN_ID}/views`)} onSaved={v => open(viewHref(v.id))} />;
+  if (id === "new") return <ViewEditor open onClose={() => open(`/plugins/${PLUGIN_ID}/channels`)} onSaved={v => open(viewHref(v.id))} />;
   return <ViewCollection />;
 }
 function ViewCollection() {
@@ -261,22 +261,14 @@ function ViewCollection() {
   useRealtime("views-changed", () => setVersion(value => value + 1));
   return <AddOnCollection pluginId={PLUGIN_ID} title="Channels" kind={VIEW_KIND.id} call={call} refreshKey={version} />;
 }
-export function FormerChannelRedirect({ subPath }: PluginNavPanelProps) {
-  const rpc = useRpc<Contract>(), navigate = useBbNavigate();
+/** Channels lived at /views/<id>; old links and floated tabs land on the same channel. */
+export function LegacyChannelRedirect({ subPath }: PluginNavPanelProps) {
   const companionNavigate = useCompanionNavigate();
   const currentNavigate = useRef(companionNavigate);
   currentNavigate.current = companionNavigate;
-  const [error, setError] = useState<string | null>(null);
   useEffect(() => {
-    const id = subPath.split("/")[0];
-    if (!id) { const path = `/plugins/${PLUGIN_ID}/views`; if (!currentNavigate.current({ kind: "path", path })) openAppPath(path, { replace: true }); return; }
-    let active = true;
-    void rpc.call("view", { id }).then(page => {
-      if (!active) return;
-      if (page.view.members.length === 1 && page.threads[0]) { const threadId = page.threads[0].id; if (!currentNavigate.current({ kind: "thread", threadId })) navigate.toThread(threadId); }
-      else { const path = viewHref(id); if (!currentNavigate.current({ kind: "path", path })) openAppPath(path, { replace: true }); }
-    }, e => { if (active) setError(message(e)); });
-    return () => { active = false; };
-  }, [subPath, rpc, navigate]);
-  return <PageColumn><ErrorMessage error={error} /><p role="status">Opening channel…</p></PageColumn>;
+    const path = `/plugins/${PLUGIN_ID}/channels${subPath ? `/${subPath}` : ""}`;
+    if (!currentNavigate.current({ kind: "path", path })) openAppPath(path, { replace: true });
+  }, [subPath]);
+  return <PageColumn><p role="status">Opening channel…</p></PageColumn>;
 }

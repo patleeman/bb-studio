@@ -1,4 +1,4 @@
-import { ViewHeader, ViewsPage, FormerChannelRedirect } from "./views";
+import { ViewHeader, ViewsPage, LegacyChannelRedirect } from "./views";
 import { affects } from "./realtime";
 import { UsagePanel } from "./channel-workbench";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -283,7 +283,7 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
   if (id === "new")
     return <BotCreationThread key="standalone" />;
   if (id === "new-group" || id === "group")
-    return <FormerChannelRedirect subPath={id === "group" ? section ?? "" : ""} />;
+    return <LegacyChannelRedirect subPath={id === "group" ? section ?? "" : ""} />;
   if (id)
     return (
       <BotDetail
@@ -359,13 +359,13 @@ export default definePluginApp((app) => {
     path: "bots",
     component: BotsPage,
   });
-  app.slots.navPanel({ id: "views", title: "Channels", icon: "MessageSquare", path: "views", component: ViewsPage, headerContent: ViewHeader });
-  app.slots.navPanel({ id: "former-channels", title: "Channels", icon: "MessageSquare", path: "channels", component: FormerChannelRedirect });
+  app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: ViewsPage, headerContent: ViewHeader });
+  app.slots.navPanel({ id: "former-views", title: "Channels", icon: "MessageSquare", path: "views", component: LegacyChannelRedirect });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
   app.slots.experimental_appOverlay({ id: "companions", component: () => <>
     <FloatPanels path="bots" render={subPath => <BotsPage subPath={subPath} />} />
-    <FloatPanels path="views" render={subPath => <div className="flex h-full min-h-0 flex-col"><div className="flex shrink-0 items-center px-3 py-2"><ViewHeader subPath={subPath} /></div><div className="min-h-0 flex-1"><ViewsPage subPath={subPath} /></div></div>} />
-    <FloatPanels path="channels" render={subPath => <FormerChannelRedirect subPath={subPath} />} />
+    <FloatPanels path="channels" render={subPath => <div className="flex h-full min-h-0 flex-col"><div className="flex shrink-0 items-center px-3 py-2"><ViewHeader subPath={subPath} /></div><div className="min-h-0 flex-1"><ViewsPage subPath={subPath} /></div></div>} />
+    <FloatPanels path="views" render={subPath => <LegacyChannelRedirect subPath={subPath} />} />
   </> });
 });

@@ -117,7 +117,7 @@ export function ProfilePicker() {
     try {
       const members = threadId ? [{ kind: "thread" as const, id: threadId }, { kind: "bot" as const, id: other.id }] : [...(bot ? [{ kind: "bot" as const, id: bot.id }] : []), { kind: "bot" as const, id: other.id }];
       const saved = await rpc.call("viewCreate", { name: "Shared work", members, requestId: crypto.randomUUID() });
-      navigate.toPluginPanel("views", { subPath: saved.id });
+      navigate.toPluginPanel("channels", { subPath: saved.id });
     } catch(cause) { setError(message(cause)); } finally { setPending(false); }
   };
 

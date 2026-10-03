@@ -7,7 +7,7 @@ final class SavedViewTests: XCTestCase {
         let roster = try JSONDecoder().decode(BotTeamsList.self, from: Data(json.utf8))
         XCTAssertEqual(roster.views.first?.members, [SavedViewMember(kind: "thread", id: "thr_work")])
         XCTAssertEqual(Route(href: "/plugins/bot-teams/views/view-id"), .savedView(id: "view-id"))
-        XCTAssertEqual(Route(href: "/plugins/bot-teams/channels/view-id"), .formerChannel(id: "view-id"))
+        XCTAssertEqual(Route(href: "/plugins/bot-teams/channels/view-id"), .savedView(id: "view-id"))
     }
 
     func testSendPreservesRetryIdAndExplicitThreadAddressing() async throws {
