@@ -359,3 +359,13 @@ viewport. The current native BB capture records and edits the main editor
 before Float, then checks the same node through UI and CLI placement changes,
 including pin-protected close and returning to a main companion. All three
 screenshots are visually checked. No agent runs for these fixtures.
+
+
+The native Float menu now opens Move to split through the retained Companions
+outlet instead of closing and recreating the tab. Swap resolves a main
+Companions route to its actual item and exchanges the two tabs' placements.
+Both targets keep their original pins and navigation history, and an existing
+destination is reused. Float's menu lists companions in every placement,
+while its tab strip shows floating tabs. Float's 50 tests, types, build, and
+stable compatibility pass; live split/swap proof and legacy-host transfers
+remain required.

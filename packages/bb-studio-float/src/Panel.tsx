@@ -15,11 +15,11 @@ import {
   floatPanelFor,
   floatWindowKey,
   Icon,
+  openFloat,
   openAppPath,
   publishFloatBody,
   publishFloatLeading,
   studioTargetAt,
-  threadLinkId,
   useCanFloat,
   useOpenTarget,
   type FloatTarget,
@@ -28,6 +28,7 @@ import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type 
 import { update } from "./store";
 import { RetainedView } from "./RetainedView";
 import { focusCompanion } from "./focus";
+import { mainCompanionPath, mainTarget, swapCompanions } from "./placements";
 import {
   clampFree,
   closeAll,
@@ -295,30 +296,29 @@ function TabStrip({ state }: { state: FloatState }) {
   );
 }
 
-/** What the main view shows, if a tab could show it too. */
-function mainTarget(): FloatTarget | null {
-  const path = `${window.location.pathname}${window.location.search}`;
-  const threadId = threadLinkId(path);
-  if (threadId) return { kind: "thread", threadId };
-  return floatPanelFor(window.location.pathname) ? { kind: "path", path } : null;
-}
-
 function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
   const { open, anchor } = useOpenTarget();
   const navigate = useBbNavigate();
   const move = (place: "main" | "split") => {
-    if (place === "main" && companionWorkbenchAvailable()) {
+    if (companionWorkbenchAvailable()) {
       update((next) => moveCompanion(next, active.key, "main"));
-      navigate.toPluginPanel("companions", { subPath: active.key });
+      if (place === "split") open({ kind: "path", path: mainCompanionPath(active.key) }, "split");
+      else navigate.toPluginPanel("companions", { subPath: active.key });
       return;
     }
     // BB's own view takes over; the tab would only repeat it.
     update((next) => closeTab(next, active.key));
     open(active.target, place);
   };
-  const main = mainTarget();
+  const main = mainTarget(state, `${window.location.pathname}${window.location.search}`);
   const swap = () => {
     if (!main) return;
+    if (companionWorkbenchAvailable()) {
+      openFloat(main, { placement: active.placement === "workbench" ? "workbench" : "floating" });
+      update((next) => swapCompanions(next, active.key, main));
+      navigate.toPluginPanel("companions", { subPath: active.key });
+      return;
+    }
     update((next) => replaceTab(next, active.key, main));
     open(active.target, "main");
   };
@@ -596,7 +596,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           >
             <Icon name={state.collapsed ? "ChevronUp" : "Minus"} className="size-4" />
           </button>
-          <TabMenu state={floatingState} active={active} />
+          <TabMenu state={state} active={active} />
         </header>
         {state.tabs.map((tab) => (
           <RetainedView key={tab.key} visible={(native && tab.placement !== undefined && tab.placement !== "floating") || (tab.key === floatingActive?.key && !state.collapsed && !floatHidden)}>
