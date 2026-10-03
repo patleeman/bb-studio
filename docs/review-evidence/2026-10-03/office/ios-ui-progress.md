@@ -101,3 +101,23 @@ longer skips when an unrelated shared thread has no queued message.
 Fixed validation: `/tmp/office-queue-fixed/results.xcresult`, 1 test passed,
 0 failures. The same staged server and private simulator reproduced the failure
 before the fix and passed afterward.
+
+## New-thread presentation and workspace fixture
+
+`testPluginStatusAndWorkspaceChoices` combined a product defect and a fixture
+omission. New-thread presentation was attached to InboxView rather than the tab
+root. Moving its sheet to RootView fixes Settings deep links and Home/Team
+requests without changing tab layout. The coordinator was notified.
+
+The staged Orbit project also lacked any provisioned environment: all its
+capture threads were scheduled. NewThreadView correctly offers checkout and
+worktree choices only when a ready Git project checkout exists. Staging now
+accepts `--ui-tests`, creates one minimal workspace-fixture turn, waits for it,
+asserts the ready checkout, and exports the UI-test environment variables.
+The same commands were exercised on isolated server 52586, producing environment
+`env_pwkcrfm38d` and idle fixture thread `thr_2ewcsn8jby`.
+
+`/tmp/office-new-thread-fixed/results.xcresult`: 2 tests passed, 0 failures:
+`testPluginStatusAndWorkspaceChoices` and `testNewThreadFromHomeAndTeam`.
+`node --check scripts/staged-bb.mjs` and `git diff --check` passed. The final
+fresh install will exercise the new staging option from its pushed commit.

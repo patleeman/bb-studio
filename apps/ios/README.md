@@ -222,15 +222,16 @@ notifications, including through the notification extension.
 
 ### Office UI tests against a staged server
 
-Use a private simulator and the `capture.env` from `scripts/staged-bb.mjs`.
+Use a private simulator and start staging with
+`node scripts/staged-bb.mjs start --plugin studio --ui-tests`. Source its printed
+`capture.env`. The UI option provisions a Git project checkout with a minimal
+agent reply and exports the test origin, project and thread. Scheduled capture
+threads alone have no checkout for the workspace picker.
 The runner rejects the default BB port and verifies the staged project before
 launch. It supplies the same origin to the app and test RPC helpers.
 
 ```sh
 BB_TEST_SIMULATOR_ID=<private-simulator-id> \
-BB_QA_SERVER_URL="$BB_SERVER_URL" \
-BB_QA_PROJECT_ID="$BB_CAPTURE_PROJECT_ID" \
-BBGO_QA_THREAD="$BB_CAPTURE_THREAD_ID" \
 apps/ios/scripts/ui-test.sh
 ```
 

@@ -6,7 +6,7 @@
  * ~/.bb or the BB you work in. Some fixtures are real agent replies on small
  * models, using this machine's Codex sign-in, so start takes a few minutes.
  *
- *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>]
+ *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>] [--ui-tests]
  *   . "$TMPDIR/bb-studio-staged/capture.env"
  *   node scripts/capture-plugin-screenshots.mjs --plugin studio
  *   node scripts/staged-bb.mjs stop
@@ -268,6 +268,22 @@ async function start() {
     threads.push(await bb("thread", "spawn", "--project", project.id, "--title", title, "--prompt", `${title}.`, "--send-at", "30d"));
   }
 
+  // Native workspace pickers require a provisioned project checkout. Scheduled
+  // threads alone defer provisioning and cannot supply this fixture.
+  let uiTestThread = null;
+  if (process.argv.includes("--ui-tests")) {
+    uiTestThread = await bb("thread", "spawn", "--project", project.id,
+      "--environment-provider", "project-checkout", "--machine", machine.id,
+      "--provider", "codex", "--model", "gpt-6-luna", "--reasoning-level", "low",
+      "--title", "Native UI workspace fixture",
+      "--prompt", "Reply with exactly: Native UI workspace fixture is ready. Do not call tools or change files.");
+    await bb("thread", "wait", uiTestThread.id, "--timeout", "5m");
+    const environments = await bb("environment", "list", "--project", project.id);
+    if (!environments.some(e => e.status === "ready" && e.environmentProviderId === "project-checkout" && e.isGitRepo)) {
+      throw new Error("Native UI fixture requires a ready Git project checkout");
+    }
+  }
+
   const collection = await seedStudioItems(pluginRpc, project.id);
   await writeFile(join(stagedDir, "collection-fixtures.json"), JSON.stringify(collection, null, 2) + "\n");
 
@@ -288,6 +304,11 @@ async function start() {
       `export BB_SERVER_URL=${serverUrl}`,
       `export BB_CAPTURE_PROJECT_ID=${project.id}`,
       `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
+      ...(uiTestThread ? [
+        `export BB_QA_SERVER_URL=${serverUrl}`,
+        `export BB_QA_PROJECT_ID=${project.id}`,
+        `export BBGO_QA_THREAD=${uiTestThread.id}`,
+      ] : []),
       "unset BB_CAPTURE_SMART_REACTIONS_THREAD_ID BB_CAPTURE_WORKSPACE_THREAD_ID BB_CAPTURE_EXPLORE_THREAD_ID",
       ...(smartReactionsThread ? [
         `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
@@ -314,4 +335,4 @@ async function stop() {
 const command = process.argv[2];
 if (command === "start") await start();
 else if (command === "stop") await stop();
-else throw new Error("Usage: node scripts/staged-bb.mjs start [--ref <commit>] [--plugin <id>] | stop");
+else throw new Error("Usage: node scripts/staged-bb.mjs start [--ref <commit>] [--plugin <id>] [--ui-tests] | stop");

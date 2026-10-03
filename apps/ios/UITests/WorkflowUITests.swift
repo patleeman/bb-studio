@@ -26,6 +26,22 @@ final class WorkflowUITests: XCTestCase {
         screenshot("new-thread-workspace")
     }
 
+    /// New thread is presented above the Office tabs, including a cold Home launch.
+    func testNewThreadFromHomeAndTeam() {
+        app.terminate()
+        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "home"]
+        app.launch()
+        let newThread = app.buttons["New Thread"]
+        XCTAssertTrue(newThread.waitForExistence(timeout: 10))
+        newThread.tap()
+        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
+        app.buttons["Cancel"].tap()
+        app.buttons["Team"].tap()
+        app.open(URL(string: "bbstudio://new")!)
+        XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
+        app.buttons["Cancel"].tap()
+    }
+
     func testAutomationEditor() {
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))

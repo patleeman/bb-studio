@@ -364,11 +364,6 @@ struct InboxView: View {
                 .accessibilityLabel("New Thread")
             }
         }
-        .sheet(
-            isPresented: Binding(get: { app.newThreadDraft != nil }, set: { if !$0 { app.newThreadDraft = nil } })
-        ) {
-            NewThreadView(text: app.newThreadDraft ?? "")
-        }
         .task(id: app.serverURL) {
             if let running = try? await app.client.runningPlugins() { runningPlugins = running.sorted().joined(separator: ",") }
             await MutedThreads.shared.refresh()

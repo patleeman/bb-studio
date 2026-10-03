@@ -43,6 +43,11 @@ struct RootView: View {
             await office.load()
         }
         .onDisappear { office.stopObserving() }
+        .sheet(
+            isPresented: Binding(get: { model.newThreadDraft != nil }, set: { if !$0 { model.newThreadDraft = nil } })
+        ) {
+            NewThreadView(text: model.newThreadDraft ?? "")
+        }
         .sheet(item: $model.sheet) { sheet in
             switch sheet {
             case .capture:
