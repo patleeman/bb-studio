@@ -1,6 +1,7 @@
 import { Icon, ItemTile, cn, openAppPath, projectName, threadLinkId, useOpenTarget, useProjects, type FloatTarget, type OpenPlace } from "@bb-studio/kit/app";
 import { untitled } from "@bb-studio/kit/format";
 import { mentionPrompt } from "@bb-studio/kit/contract";
+import { Dialog, DialogContent, DialogTitle } from "@bb-studio/kit/ui";
 import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { ProviderView, rpcContract } from "../contract";
@@ -50,11 +51,10 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const [error, setError] = useState<string | null>(null);
   const [selected, setSelected] = useState(0);
   const list = useRef<HTMLDivElement>(null);
+  const [returnFocus] = useState(() => document.activeElement instanceof HTMLElement ? document.activeElement : null);
 
   useEffect(() => {
-    const before = document.activeElement instanceof HTMLElement ? document.activeElement : null;
     rpc.call("overview", null).then(({ providers }) => setProviders(providers), () => {});
-    return () => before?.focus();
   }, [rpc]);
   useEffect(() => {
     let live = true;
@@ -106,18 +106,22 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   };
   const onKeyDown = (event: KeyboardEvent) => {
     if (event.nativeEvent.isComposing) return;
-    if (event.key === "ArrowDown" || event.key === "ArrowUp") setSelected((at) => (at + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length);
+    if (event.key === "ArrowDown" || event.key === "ArrowUp") setSelected((at) => rows.length ? (at + (event.key === "ArrowDown" ? 1 : -1) + rows.length) % rows.length : 0);
     else if (event.key === "Enter") activate(rows[selected], placeFor(event));
     else if (event.key === "Escape") onClose();
     else return;
     event.preventDefault(); event.stopPropagation();
   };
   let lastKind = "";
-  return <div className="studio-quick-open fixed inset-0 z-50 flex justify-center bg-black/30 px-4 pt-[12vh]" onMouseDown={onClose}>
-    <div role="dialog" aria-modal="true" aria-label="Search Studio" className="flex max-h-[min(38rem,78vh)] w-full max-w-xl flex-col overflow-hidden rounded-lg border border-border bg-background shadow-2xl" onMouseDown={(event) => event.stopPropagation()}>
+  return <Dialog open onOpenChange={(value) => { if (!value) onClose(); }}>
+    <DialogContent hideCloseButton aria-describedby={undefined} className="studio-quick-open flex max-h-[min(38rem,78vh)] w-full max-w-xl flex-col gap-0 overflow-hidden rounded-lg border border-border bg-background p-0 shadow-2xl sm:top-[12vh] sm:translate-y-0"
+      onCloseAutoFocus={(event) => event.preventDefault()}
+      onAfterCloseAutoFocus={() => { if (returnFocus?.isConnected) returnFocus.focus(); }}>
+      <DialogTitle className="sr-only">Search Studio</DialogTitle>
       <div className="flex items-center gap-2.5 border-b border-border px-4"><Icon name="Search" className="size-4 shrink-0 text-muted-foreground" />
         <input autoFocus role="combobox" aria-expanded aria-controls="studio-quick-open-list" aria-activedescendant={rows.length ? `studio-quick-open-${selected}` : undefined} aria-label="Search Studio" placeholder={threadOnly ? "Search threads…" : "Search Studio, threads and channels…"} className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} />
         {loading ? <span className="text-xs text-muted-foreground">Searching…</span> : null}
+        <button type="button" aria-label="Close search" className="flex size-8 shrink-0 items-center justify-center rounded text-muted-foreground hover:bg-state-hover focus-visible:ring-2 focus-visible:ring-ring" onClick={onClose}><Icon name="X" className="size-4" /></button>
       </div>
       <SearchFreshness {...freshness} />
       <div ref={list} id="studio-quick-open-list" role="listbox" aria-label="Search results" className="min-h-0 flex-1 overflow-y-auto p-1.5">
@@ -137,6 +141,6 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       </div>
       <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>⌘↵ in a split</span><span>⇧↵ to float</span><span>esc to close</span></div>
       {anchor}
-    </div>
-  </div>;
+    </DialogContent>
+  </Dialog>;
 }
