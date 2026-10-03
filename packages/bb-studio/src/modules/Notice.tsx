@@ -12,7 +12,7 @@ export function ModuleNotice() {
   const status = useModules();
   if (!status?.legacyInstalled.length) return null;
   return <aside role="status" className="fixed bottom-4 left-4 z-50 max-w-lg rounded-lg border border-border bg-background p-4 text-sm shadow-lg">
-    Studio now includes {status.legacyInstalled.join(", ")}. Uninstall these old plugins in Settings → Plugins, then reload Studio to import their data. The old files are kept.
+    Studio now includes {status.legacyInstalled.join(", ")}. Disable these old plugins in Settings → Plugins, then reload Studio to import their data and settings. After the import, uninstall the old plugins. Their database files are kept.
   </aside>;
 }
 export function moduleComponent<P extends object>(name: string, Component: ComponentType<P>): ComponentType<P> {

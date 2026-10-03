@@ -67,7 +67,7 @@ export class ModuleRuntime {
       }
       await this.registerModule(module);
     }
-    if (this.legacyInstalled.length) this.host.log.warn(`Studio now includes ${this.legacyInstalled.join(", ")}. Uninstall those old plugins, then reload Studio to import their data.`);
+    if (this.legacyInstalled.length) this.host.log.warn(`Studio now includes ${this.legacyInstalled.join(", ")}. Disable those old plugins, then reload Studio to import their data and settings before uninstalling them.`);
     for (const database of [this.host.storage.database(), ...this.databases]) {
       const cells = migrateModuleRefs(database, this.activeIds);
       if (cells) this.host.log.info(`Studio module references: rewrote ${cells} cells`);
