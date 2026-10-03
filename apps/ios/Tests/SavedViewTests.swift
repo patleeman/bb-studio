@@ -14,7 +14,7 @@ final class SavedViewTests: XCTestCase {
         let client = BBClient(baseURL: URL(string: "http://localhost")!)
         let requestId = "11111111-1111-4111-8111-111111111111"
         client.transport = { _, path, body in
-            XCTAssertEqual(path, "/api/v1/plugins/bot-teams/rpc/viewSend")
+            XCTAssertEqual(path, "/api/v1/plugins/studio/rpc/teams_viewSend")
             let value = try JSONDecoder().decode(JSONValue.self, from: body!)
             XCTAssertEqual(value["requestId"]?.stringValue, requestId)
             XCTAssertEqual(value["replyThreadId"]?.stringValue, "thr_work")
