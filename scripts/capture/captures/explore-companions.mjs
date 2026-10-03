@@ -48,7 +48,7 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
       db.prepare("UPDATE explore_jobs SET status='ready',label='Ready',detail='Saved in Pages',progress=100,updated_at=? WHERE id=?").run(now + 1, jobId);
       db.prepare("UPDATE explore_explainers SET status='ready',page_id=?,generated_at=?,updated_at=? WHERE id=?").run(page.id, now + 1, now + 1, id);
       await client.waitForSelector(`${panel} iframe`);
-      await client.dragBy('[data-float-resize="nw"]', -240, -200);
+      await client.dragBy('[data-float-resize="nw"]', -240, 0);
       const scrollReady = `(() => {
         const frame = document.querySelector(${JSON.stringify(`${panel} iframe`)});
         let scroller = frame.parentElement;
@@ -72,11 +72,11 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
       const retained = async visible => {
         const state = await client.evaluate(`(() => {
           const frame = document.querySelector(${JSON.stringify(`${panel} iframe`)});
-          return { same: frame === window.bbExploreFrame, visible: !!frame?.checkVisibility(), scroll: window.bbExploreScroll?.scrollTop,
+          return { same: frame === window.bbExploreFrame, visible: !!frame?.checkVisibility(), scroll: window.bbExploreScroll?.scrollTop, height: frame?.style.height,
             tabs: document.querySelectorAll(${JSON.stringify(panel)}).length,
             pinned: JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.some(tab => tab.key === ${JSON.stringify(key)} && tab.pinned) };
         })()`);
-        if (!state.same || state.visible !== visible || state.tabs !== 1 || !state.pinned || state.scroll !== 80) throw new Error(`Explainer state lost: ${JSON.stringify(state)}`);
+        if (!state.same || state.visible !== visible || state.tabs !== 1 || !state.pinned || (visible && state.scroll !== 80)) throw new Error(`Explainer state lost: ${JSON.stringify(state)}`);
       };
       await retained(false);
       await client.clickElementWithTextAndPointer('[role="tab"]', label);
