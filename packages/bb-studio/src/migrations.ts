@@ -121,4 +121,9 @@ export const MIGRATIONS = [
      CHECK((zone='archived') = (archived_at IS NOT NULL))
    );
    CREATE INDEX office_tabs_space_zone ON office_tabs(space_id,zone,position);`,
+  `CREATE TABLE office_tab_splits (
+     id TEXT PRIMARY KEY, space_id TEXT NOT NULL, refs TEXT NOT NULL,
+     created_at INTEGER NOT NULL
+   );
+   CREATE INDEX office_tab_splits_space ON office_tab_splits(space_id);`,
 ];

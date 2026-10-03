@@ -19,13 +19,24 @@ export function tabCatalog(spaceId: string, deps: {
   const space = spaces.get(spaceId);
   const belongs = (projectId: string | null) => spaces.forProject(projectId).id === spaceId;
   const once = <T>(fn: () => Promise<T>) => { let promise: Promise<T> | undefined; return () => promise ??= fn(); };
-  const bots = once(() => officeTeam(spaceId, spaces, inbox, modules).then(r => r.bots));
-  const conversations = once(async () => modules ? (await officeTalk(spaceId, modules, spaces)).conversations : []);
+  const bots = once(() => officeTeam("all", spaces, inbox, modules).then(r => r.bots));
+  const conversations = once(async () => modules ? (await officeTalk("all", modules, spaces)).conversations : []);
   const overview = once(() => hub.overview());
+  const threads = new Map<string, Promise<Awaited<ReturnType<typeof bb.sdk.threads.get>> | null>>();
+  const thread = (id: string) => {
+    if (!threads.has(id)) threads.set(id, bb.sdk.threads.get({ threadId: id }).catch(error => {
+      if (rpcErrorStatus(error) === 404) return null;
+      throw error;
+    }));
+    return threads.get(id)!;
+  };
   const itemReads = new Map<string, ReturnType<StudioHub["itemsResult"]>>();
   const resolve = async (ref: string): Promise<TabTarget | null> => {
     const base = { ref, title: null, icon: null, href: null };
-    if (ref.startsWith("thread:")) return { ...base, kind: "thread" }; // Client owns thread resolution.
+    if (ref.startsWith("thread:")) {
+      const value = await thread(ref.slice(7));
+      return value && !value.deletedAt ? { ...base, kind: "thread" } : null;
+    }
     if (ref === "office:home") return { ...base, kind: "home", title: "Home", icon: "studio/home", href: "/plugins/studio/office" };
     if (ref === "office:inbox") return { ...base, kind: "inbox", title: "Inbox", icon: "studio/inbox", href: "/plugins/studio/office-inbox", badge: (await inbox.counts([spaceId])).bySpace[spaceId]?.requests ?? 0 };
     if (ref === "library") return { ...base, kind: "library", title: "Library", icon: "studio/studio", href: "/plugins/studio/studio" };
@@ -54,19 +65,38 @@ export function tabCatalog(spaceId: string, deps: {
       if (result.status === "unavailable") throw new Error(result.error);
       const item = result.status === "ready" ? result.items.find(i => i.id === id) : undefined;
       if (!item && result.status === "ready" && !result.complete) throw new Error("Item provider returned an incomplete snapshot.");
-      return item && belongs(item.projectId) ? { ...base, kind: "item", title: item.title, icon: item.icon, href: item.href, itemKind: item.kind } : null;
+      return item ? { ...base, kind: "item", title: item.title, icon: item.icon, href: item.href, itemKind: item.kind } : null;
     }
     return null;
   };
   return {
     resolve,
-    essentials: async () => ["office:inbox", ...(await bots()).sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)).slice(0,3).map(b => `bot:${b.id}`)],
+    spaceFor: async ref => {
+      if (ref.startsWith("thread:")) {
+        const value = await thread(ref.slice(7));
+        return value ? spaces.forProject(value.projectId).id : spaceId;
+      }
+      if (ref.startsWith("item:")) {
+        await resolve(ref);
+        const result = await itemReads.get(ref.slice(5))!;
+        const item = result.status === "ready" ? result.items.find(i => i.id === ref.split(":").slice(2).join(":")) : null;
+        return item ? spaces.forProject(item.projectId).id : spaceId;
+      }
+      return spaceId;
+    },
+    essentials: async () => ["office:inbox", ...(await bots()).filter(b => b.spaceId === spaceId).sort((a,b) => a.name.localeCompare(b.name) || a.id.localeCompare(b.id)).slice(0,3).map(b => `bot:${b.id}`)],
     atPath: async href => {
       if (!href.startsWith("/") || href.startsWith("//")) return null;
       const path = href.split(/[?#]/, 1)[0]!.replace(/\/+$/, "");
       if (path === "/plugins/studio/office") return resolve("office:home");
       if (path === "/plugins/studio/office-inbox") return resolve("office:inbox");
       if (path === "/plugins/studio/studio") return resolve("library");
+      const threadPath = path.match(/^\/threads\/([^/]+)$/);
+      if (threadPath) {
+        let id: string;
+        try { id = decodeURIComponent(threadPath[1]!); } catch { return null; }
+        return resolve(`thread:${id}`);
+      }
       const library = path.match(/^\/plugins\/studio\/studio\/([^/]+)$/);
       const bot = path.match(/^\/plugins\/studio\/office-team\/([^/]+)(?:\/(?:chat|tasks|profile))?$/);
       try {
@@ -75,7 +105,7 @@ export function tabCatalog(spaceId: string, deps: {
       } catch { return null; }
       const conversation = itemAtPath(await conversations(), path);
       if (conversation) return resolve(`conversation:${conversation.id}`);
-      const item = itemAtPath((await overview()).items.filter(i => belongs(i.projectId)), path);
+      const item = itemAtPath((await overview()).items, path);
       return item ? resolve(`item:${item.pluginId}:${item.id}`) : null;
     },
     // BB's own thread search: titles and messages, active and archived, so
@@ -110,7 +140,7 @@ export function tabCatalog(spaceId: string, deps: {
         .sort((a,b) => b.score - a.score || b.updatedAt - a.updatedAt);
       const itemTargets = await Promise.all(hits.map(hit => resolve(`item:${hit.ref.pluginId}:${hit.ref.id}`)));
       const refs = ["library", "office:inbox", "office:home",
-        ...(await bots()).map(b => `bot:${b.id}`), ...(await conversations()).map(c => `conversation:${c.id}`),
+        ...(await bots()).filter(b => b.spaceId === spaceId).map(b => `bot:${b.id}`), ...(modules ? (await officeTalk(spaceId, modules, spaces)).conversations : []).map(c => `conversation:${c.id}`),
         ...new Set((await overview()).providers.flatMap(p => p.kinds).map(k => `library:${k.id}`))];
       const otherTargets = (await Promise.all(refs.map(resolve))).filter((t): t is TabTarget => !!t).filter(t => matches(t, query));
       return [...itemTargets.filter((t): t is TabTarget => !!t), ...otherTargets];

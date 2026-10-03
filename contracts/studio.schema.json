@@ -7072,6 +7072,769 @@
         "additionalProperties": false
       }
     },
+    "tabs_split_create": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "refs": {
+            "minItems": 2,
+            "maxItems": 4,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500,
+              "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+            }
+          },
+          "zone": {
+            "type": "string",
+            "enum": [
+              "essential",
+              "pinned",
+              "today",
+              "archived"
+            ]
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "spaceId",
+          "refs"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "thread",
+                  "item",
+                  "bot",
+                  "conversation",
+                  "inbox",
+                  "home",
+                  "library",
+                  "split"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "itemKind": {
+                "type": "string"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "botState": {
+                "type": "string",
+                "enum": [
+                  "idle",
+                  "working",
+                  "needs_you"
+                ]
+              },
+              "badge": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "needsYou": {
+                "type": "boolean"
+              },
+              "unread": {
+                "type": "boolean"
+              },
+              "members": {
+                "minItems": 2,
+                "maxItems": 4,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "thread",
+                        "item",
+                        "bot",
+                        "conversation",
+                        "inbox",
+                        "home",
+                        "library"
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "icon": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "href": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "itemKind": {
+                      "type": "string"
+                    },
+                    "providerId": {
+                      "type": "string"
+                    },
+                    "botState": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "working",
+                        "needs_you"
+                      ]
+                    },
+                    "badge": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "needsYou": {
+                      "type": "boolean"
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "kind",
+                    "title",
+                    "icon",
+                    "href"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "zone": {
+                "type": "string",
+                "enum": [
+                  "essential",
+                  "pinned",
+                  "today",
+                  "archived"
+                ]
+              },
+              "folderId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "openedAt": {
+                "type": "number"
+              },
+              "archivedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "ref",
+              "kind",
+              "title",
+              "icon",
+              "href",
+              "zone",
+              "folderId",
+              "openedAt",
+              "archivedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "tab"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_split_remove": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^split:[^:]+$"
+          }
+        },
+        "required": [
+          "spaceId",
+          "ref"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_move_space": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+          },
+          "toSpaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spaceId",
+          "ref",
+          "toSpaceId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tab": {
+            "type": "object",
+            "properties": {
+              "ref": {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+              },
+              "kind": {
+                "type": "string",
+                "enum": [
+                  "thread",
+                  "item",
+                  "bot",
+                  "conversation",
+                  "inbox",
+                  "home",
+                  "library",
+                  "split"
+                ]
+              },
+              "title": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "icon": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "itemKind": {
+                "type": "string"
+              },
+              "providerId": {
+                "type": "string"
+              },
+              "botState": {
+                "type": "string",
+                "enum": [
+                  "idle",
+                  "working",
+                  "needs_you"
+                ]
+              },
+              "badge": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
+              "needsYou": {
+                "type": "boolean"
+              },
+              "unread": {
+                "type": "boolean"
+              },
+              "members": {
+                "minItems": 2,
+                "maxItems": 4,
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "ref": {
+                      "type": "string",
+                      "maxLength": 500,
+                      "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                    },
+                    "kind": {
+                      "type": "string",
+                      "enum": [
+                        "thread",
+                        "item",
+                        "bot",
+                        "conversation",
+                        "inbox",
+                        "home",
+                        "library"
+                      ]
+                    },
+                    "title": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "icon": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "href": {
+                      "type": [
+                        "string",
+                        "null"
+                      ]
+                    },
+                    "itemKind": {
+                      "type": "string"
+                    },
+                    "providerId": {
+                      "type": "string"
+                    },
+                    "botState": {
+                      "type": "string",
+                      "enum": [
+                        "idle",
+                        "working",
+                        "needs_you"
+                      ]
+                    },
+                    "badge": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 9007199254740991
+                    },
+                    "needsYou": {
+                      "type": "boolean"
+                    },
+                    "unread": {
+                      "type": "boolean"
+                    }
+                  },
+                  "required": [
+                    "ref",
+                    "kind",
+                    "title",
+                    "icon",
+                    "href"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "zone": {
+                "type": "string",
+                "enum": [
+                  "essential",
+                  "pinned",
+                  "today",
+                  "archived"
+                ]
+              },
+              "folderId": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 200
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "openedAt": {
+                "type": "number"
+              },
+              "archivedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              }
+            },
+            "required": [
+              "ref",
+              "kind",
+              "title",
+              "icon",
+              "href",
+              "zone",
+              "folderId",
+              "openedAt",
+              "archivedAt"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "tab"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_reopen": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tab": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "thread",
+                      "item",
+                      "bot",
+                      "conversation",
+                      "inbox",
+                      "home",
+                      "library",
+                      "split"
+                    ]
+                  },
+                  "title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "icon": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "itemKind": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "botState": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "needs_you"
+                    ]
+                  },
+                  "badge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "needsYou": {
+                    "type": "boolean"
+                  },
+                  "unread": {
+                    "type": "boolean"
+                  },
+                  "members": {
+                    "minItems": 2,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "thread",
+                            "item",
+                            "bot",
+                            "conversation",
+                            "inbox",
+                            "home",
+                            "library"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "icon": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "href": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "itemKind": {
+                          "type": "string"
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "botState": {
+                          "type": "string",
+                          "enum": [
+                            "idle",
+                            "working",
+                            "needs_you"
+                          ]
+                        },
+                        "badge": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "needsYou": {
+                          "type": "boolean"
+                        },
+                        "unread": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "kind",
+                        "title",
+                        "icon",
+                        "href"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "zone": {
+                    "type": "string",
+                    "enum": [
+                      "essential",
+                      "pinned",
+                      "today",
+                      "archived"
+                    ]
+                  },
+                  "folderId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "openedAt": {
+                    "type": "number"
+                  },
+                  "archivedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  }
+                },
+                "required": [
+                  "ref",
+                  "kind",
+                  "title",
+                  "icon",
+                  "href",
+                  "zone",
+                  "folderId",
+                  "openedAt",
+                  "archivedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "tab"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_close_many": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "refs": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "maxLength": 500,
+              "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+            }
+          }
+        },
+        "required": [
+          "spaceId",
+          "refs"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "tabs_get": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -7102,7 +7865,7 @@
                 "ref": {
                   "type": "string",
                   "maxLength": 500,
-                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
                 },
                 "kind": {
                   "type": "string",
@@ -7113,7 +7876,8 @@
                     "conversation",
                     "inbox",
                     "home",
-                    "library"
+                    "library",
+                    "split"
                   ]
                 },
                 "title": {
@@ -7133,6 +7897,109 @@
                     "string",
                     "null"
                   ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "members": {
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "thread",
+                          "item",
+                          "bot",
+                          "conversation",
+                          "inbox",
+                          "home",
+                          "library"
+                        ]
+                      },
+                      "title": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "href": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "itemKind": {
+                        "type": "string"
+                      },
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "botState": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "working",
+                          "needs_you"
+                        ]
+                      },
+                      "badge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "needsYou": {
+                        "type": "boolean"
+                      },
+                      "unread": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "ref",
+                      "kind",
+                      "title",
+                      "icon",
+                      "href"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "zone": {
                   "type": "string",
@@ -7163,31 +8030,6 @@
                     "number",
                     "null"
                   ]
-                },
-                "itemKind": {
-                  "type": "string"
-                },
-                "providerId": {
-                  "type": "string"
-                },
-                "botState": {
-                  "type": "string",
-                  "enum": [
-                    "idle",
-                    "working",
-                    "needs_you"
-                  ]
-                },
-                "badge": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "needsYou": {
-                  "type": "boolean"
-                },
-                "unread": {
-                  "type": "boolean"
                 }
               },
               "required": [
@@ -7212,7 +8054,7 @@
                 "ref": {
                   "type": "string",
                   "maxLength": 500,
-                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
                 },
                 "kind": {
                   "type": "string",
@@ -7223,7 +8065,8 @@
                     "conversation",
                     "inbox",
                     "home",
-                    "library"
+                    "library",
+                    "split"
                   ]
                 },
                 "title": {
@@ -7243,6 +8086,109 @@
                     "string",
                     "null"
                   ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "members": {
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "thread",
+                          "item",
+                          "bot",
+                          "conversation",
+                          "inbox",
+                          "home",
+                          "library"
+                        ]
+                      },
+                      "title": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "href": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "itemKind": {
+                        "type": "string"
+                      },
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "botState": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "working",
+                          "needs_you"
+                        ]
+                      },
+                      "badge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "needsYou": {
+                        "type": "boolean"
+                      },
+                      "unread": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "ref",
+                      "kind",
+                      "title",
+                      "icon",
+                      "href"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "zone": {
                   "type": "string",
@@ -7273,31 +8219,6 @@
                     "number",
                     "null"
                   ]
-                },
-                "itemKind": {
-                  "type": "string"
-                },
-                "providerId": {
-                  "type": "string"
-                },
-                "botState": {
-                  "type": "string",
-                  "enum": [
-                    "idle",
-                    "working",
-                    "needs_you"
-                  ]
-                },
-                "badge": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "needsYou": {
-                  "type": "boolean"
-                },
-                "unread": {
-                  "type": "boolean"
                 }
               },
               "required": [
@@ -7353,7 +8274,7 @@
                 "ref": {
                   "type": "string",
                   "maxLength": 500,
-                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
                 },
                 "kind": {
                   "type": "string",
@@ -7364,7 +8285,8 @@
                     "conversation",
                     "inbox",
                     "home",
-                    "library"
+                    "library",
+                    "split"
                   ]
                 },
                 "title": {
@@ -7384,6 +8306,109 @@
                     "string",
                     "null"
                   ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "members": {
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "thread",
+                          "item",
+                          "bot",
+                          "conversation",
+                          "inbox",
+                          "home",
+                          "library"
+                        ]
+                      },
+                      "title": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "href": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "itemKind": {
+                        "type": "string"
+                      },
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "botState": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "working",
+                          "needs_you"
+                        ]
+                      },
+                      "badge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "needsYou": {
+                        "type": "boolean"
+                      },
+                      "unread": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "ref",
+                      "kind",
+                      "title",
+                      "icon",
+                      "href"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "zone": {
                   "type": "string",
@@ -7414,31 +8439,6 @@
                     "number",
                     "null"
                   ]
-                },
-                "itemKind": {
-                  "type": "string"
-                },
-                "providerId": {
-                  "type": "string"
-                },
-                "botState": {
-                  "type": "string",
-                  "enum": [
-                    "idle",
-                    "working",
-                    "needs_you"
-                  ]
-                },
-                "badge": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "needsYou": {
-                  "type": "boolean"
-                },
-                "unread": {
-                  "type": "boolean"
                 }
               },
               "required": [
@@ -7518,10 +8518,13 @@
                 "minLength": 1,
                 "maxLength": 200
               },
+              "follow": {
+                "type": "boolean"
+              },
               "ref": {
                 "type": "string",
                 "maxLength": 500,
-                "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
               },
               "href": {
                 "not": {}
@@ -7539,6 +8542,9 @@
                 "type": "string",
                 "minLength": 1,
                 "maxLength": 200
+              },
+              "follow": {
+                "type": "boolean"
               },
               "href": {
                 "type": "string",
@@ -7568,7 +8574,7 @@
                   "ref": {
                     "type": "string",
                     "maxLength": 500,
-                    "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                    "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
                   },
                   "kind": {
                     "type": "string",
@@ -7579,7 +8585,8 @@
                       "conversation",
                       "inbox",
                       "home",
-                      "library"
+                      "library",
+                      "split"
                     ]
                   },
                   "title": {
@@ -7599,6 +8606,109 @@
                       "string",
                       "null"
                     ]
+                  },
+                  "itemKind": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "botState": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "needs_you"
+                    ]
+                  },
+                  "badge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "needsYou": {
+                    "type": "boolean"
+                  },
+                  "unread": {
+                    "type": "boolean"
+                  },
+                  "members": {
+                    "minItems": 2,
+                    "maxItems": 4,
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "ref": {
+                          "type": "string",
+                          "maxLength": 500,
+                          "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "thread",
+                            "item",
+                            "bot",
+                            "conversation",
+                            "inbox",
+                            "home",
+                            "library"
+                          ]
+                        },
+                        "title": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "icon": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "href": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "itemKind": {
+                          "type": "string"
+                        },
+                        "providerId": {
+                          "type": "string"
+                        },
+                        "botState": {
+                          "type": "string",
+                          "enum": [
+                            "idle",
+                            "working",
+                            "needs_you"
+                          ]
+                        },
+                        "badge": {
+                          "type": "integer",
+                          "minimum": 0,
+                          "maximum": 9007199254740991
+                        },
+                        "needsYou": {
+                          "type": "boolean"
+                        },
+                        "unread": {
+                          "type": "boolean"
+                        }
+                      },
+                      "required": [
+                        "ref",
+                        "kind",
+                        "title",
+                        "icon",
+                        "href"
+                      ],
+                      "additionalProperties": false
+                    }
                   },
                   "zone": {
                     "type": "string",
@@ -7629,31 +8739,6 @@
                       "number",
                       "null"
                     ]
-                  },
-                  "itemKind": {
-                    "type": "string"
-                  },
-                  "providerId": {
-                    "type": "string"
-                  },
-                  "botState": {
-                    "type": "string",
-                    "enum": [
-                      "idle",
-                      "working",
-                      "needs_you"
-                    ]
-                  },
-                  "badge": {
-                    "type": "integer",
-                    "minimum": 0,
-                    "maximum": 9007199254740991
-                  },
-                  "needsYou": {
-                    "type": "boolean"
-                  },
-                  "unread": {
-                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -7673,10 +8758,16 @@
                 "type": "null"
               }
             ]
+          },
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
           }
         },
         "required": [
-          "tab"
+          "tab",
+          "spaceId"
         ],
         "additionalProperties": false
       }
@@ -7694,7 +8785,7 @@
           "ref": {
             "type": "string",
             "maxLength": 500,
-            "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+            "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
           },
           "zone": {
             "type": "string",
@@ -7780,7 +8871,7 @@
                 "ref": {
                   "type": "string",
                   "maxLength": 500,
-                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
                 },
                 "kind": {
                   "type": "string",
@@ -7791,7 +8882,8 @@
                     "conversation",
                     "inbox",
                     "home",
-                    "library"
+                    "library",
+                    "split"
                   ]
                 },
                 "title": {
@@ -7811,6 +8903,109 @@
                     "string",
                     "null"
                   ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "members": {
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "thread",
+                          "item",
+                          "bot",
+                          "conversation",
+                          "inbox",
+                          "home",
+                          "library"
+                        ]
+                      },
+                      "title": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "href": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "itemKind": {
+                        "type": "string"
+                      },
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "botState": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "working",
+                          "needs_you"
+                        ]
+                      },
+                      "badge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "needsYou": {
+                        "type": "boolean"
+                      },
+                      "unread": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "ref",
+                      "kind",
+                      "title",
+                      "icon",
+                      "href"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "zone": {
                   "type": "string",
@@ -7841,31 +9036,6 @@
                     "number",
                     "null"
                   ]
-                },
-                "itemKind": {
-                  "type": "string"
-                },
-                "providerId": {
-                  "type": "string"
-                },
-                "botState": {
-                  "type": "string",
-                  "enum": [
-                    "idle",
-                    "working",
-                    "needs_you"
-                  ]
-                },
-                "badge": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "needsYou": {
-                  "type": "boolean"
-                },
-                "unread": {
-                  "type": "boolean"
                 }
               },
               "required": [
@@ -8083,7 +9253,7 @@
                 "ref": {
                   "type": "string",
                   "maxLength": 500,
-                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
                 },
                 "kind": {
                   "type": "string",
@@ -8094,7 +9264,8 @@
                     "conversation",
                     "inbox",
                     "home",
-                    "library"
+                    "library",
+                    "split"
                   ]
                 },
                 "title": {
@@ -8114,6 +9285,109 @@
                     "string",
                     "null"
                   ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                },
+                "members": {
+                  "minItems": 2,
+                  "maxItems": 4,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "ref": {
+                        "type": "string",
+                        "maxLength": 500,
+                        "pattern": "^(split:[^:]+|thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "thread",
+                          "item",
+                          "bot",
+                          "conversation",
+                          "inbox",
+                          "home",
+                          "library"
+                        ]
+                      },
+                      "title": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "icon": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "href": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "itemKind": {
+                        "type": "string"
+                      },
+                      "providerId": {
+                        "type": "string"
+                      },
+                      "botState": {
+                        "type": "string",
+                        "enum": [
+                          "idle",
+                          "working",
+                          "needs_you"
+                        ]
+                      },
+                      "badge": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 9007199254740991
+                      },
+                      "needsYou": {
+                        "type": "boolean"
+                      },
+                      "unread": {
+                        "type": "boolean"
+                      }
+                    },
+                    "required": [
+                      "ref",
+                      "kind",
+                      "title",
+                      "icon",
+                      "href"
+                    ],
+                    "additionalProperties": false
+                  }
                 },
                 "zone": {
                   "type": "string",
@@ -8144,31 +9418,6 @@
                     "number",
                     "null"
                   ]
-                },
-                "itemKind": {
-                  "type": "string"
-                },
-                "providerId": {
-                  "type": "string"
-                },
-                "botState": {
-                  "type": "string",
-                  "enum": [
-                    "idle",
-                    "working",
-                    "needs_you"
-                  ]
-                },
-                "badge": {
-                  "type": "integer",
-                  "minimum": 0,
-                  "maximum": 9007199254740991
-                },
-                "needsYou": {
-                  "type": "boolean"
-                },
-                "unread": {
-                  "type": "boolean"
                 }
               },
               "required": [
@@ -8995,6 +10244,40 @@
         ]
       }
     },
+    "space_reorder": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceIds": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "spaceIds"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
     "spaces_list": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -9010,6 +10293,11 @@
             "items": {
               "type": "object",
               "properties": {
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
                 "id": {
                   "type": "string",
                   "minLength": 1,
@@ -9069,6 +10357,7 @@
                 }
               },
               "required": [
+                "position",
                 "id",
                 "name",
                 "icon",
@@ -9131,6 +10420,11 @@
           "space": {
             "type": "object",
             "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "id": {
                 "type": "string",
                 "minLength": 1,
@@ -9190,6 +10484,7 @@
               }
             },
             "required": [
+              "position",
               "id",
               "name",
               "icon",
@@ -9256,6 +10551,11 @@
           "space": {
             "type": "object",
             "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "id": {
                 "type": "string",
                 "minLength": 1,
@@ -9315,6 +10615,7 @@
               }
             },
             "required": [
+              "position",
               "id",
               "name",
               "icon",
@@ -9392,6 +10693,11 @@
           "space": {
             "type": "object",
             "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "id": {
                 "type": "string",
                 "minLength": 1,
@@ -9451,6 +10757,7 @@
               }
             },
             "required": [
+              "position",
               "id",
               "name",
               "icon",
@@ -9853,6 +11160,11 @@
           "space": {
             "type": "object",
             "properties": {
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              },
               "id": {
                 "type": "string",
                 "minLength": 1,
@@ -9912,6 +11224,7 @@
               }
             },
             "required": [
+              "position",
               "id",
               "name",
               "icon",

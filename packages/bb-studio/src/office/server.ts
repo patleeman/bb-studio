@@ -91,6 +91,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     inbox_read: ({ keys }) => { inbox.mark(keys, "read"); changed(); return { ok: true }; },
     inbox_done: ({ keys }) => { inbox.mark(keys, "done"); changed(); return { ok: true }; },
     inbox_act: async ({ key, actionId, text }) => { await inbox.act(key, actionId, text); changed(); return { ok: true }; },
+    space_reorder: ({ spaceIds }) => { spaces.office.reorder(spaceIds); changed(); return { ok: true as const }; },
     spaces_list: async () => { spaces.office.reconcileProjects((await bb.sdk.projects.list({ includePersonal: true })).map(p => p.id)); await ensureFolders(); return { spaces: spaces.office.list() }; },
     space_create: async input => {
       // Name uniqueness also makes a lost create response recoverable.

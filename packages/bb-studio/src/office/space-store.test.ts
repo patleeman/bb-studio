@@ -69,3 +69,25 @@ it("migrates the provisional read_only label without losing its original value",
   expect(store.setSettings(id,{defaultTrust:"act"}).defaultTrust).toBe("act");
   db.close();
 });
+
+it("migrates the old Space list order once and preserves reorders across restarts", () => {
+  const db = new Database(":memory:");
+  try {
+    MIGRATIONS.forEach(sql => db.exec(sql));
+    migrateOfficeSpaces(db, { projectIds: [], projectForMember: () => undefined, logConflict: () => {} });
+    // Emulate Spaces saved before the ordering migration existed.
+    const put = db.prepare("INSERT INTO spaces(id,name,color,created_at,updated_at) VALUES (?,?,'#ffffff',1,1)");
+    put.run("z", "Zulu"); put.run("a", "Alpha");
+    const store = new OfficeSpaceStore(db);
+    const personal = store.defaultSpace().id;
+    expect(store.list().map(s => s.id)).toEqual([personal, "a", "z"]);
+    store.reorder(["z", "bogus", "z"]);
+    expect(new OfficeSpaceStore(db).list().map(s => s.id)).toEqual(["z", personal, "a"]);
+    store.update({ spaceId: "z", name: "Last renamed" });
+    const next = store.create({ name: "Aardvark" });
+    expect(store.list().map(s => s.id)).toEqual(["z", personal, "a", next.id]);
+    expect(store.list().map(s => s.position)).toEqual([0, 1, 2, 3]);
+    store.reorder([]);
+    expect(store.list()[0]?.id).toBe("z");
+  } finally { db.close(); }
+});

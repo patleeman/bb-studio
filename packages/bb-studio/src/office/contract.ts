@@ -14,6 +14,7 @@ export const trustSchema = z.enum(["ask", "act"]);
 export const spaceColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
 export { SPACE_COLORS } from "./space-colors";
 export const officeSpaceSchema = z.object({
+  position: z.number().int().nonnegative(),
   id, name, icon: z.string().max(100).nullable(), color: spaceColorSchema, description: z.string(),
   isDefault: z.boolean(), defaultProjectId: id.nullable(),
   projectIds: z.array(id), createdAt: z.number(), updatedAt: z.number(),
@@ -88,6 +89,7 @@ export const officeContract = defineRpcContract({
     needsYou: z.array(inboxEventSchema), reports: z.array(inboxEventSchema), recent: z.array(officeItemSchema),
     working: z.array(workingTaskSchema),
   }) },
+  space_reorder: { input: z.object({ spaceIds: z.array(id).max(10000) }), output: z.object({ ok: z.literal(true) }) },
   spaces_list: { input: z.object({}), output: z.object({ spaces: z.array(officeSpaceSchema) }) },
   space_create: { input: spaceInput, output: z.object({ space: officeSpaceSchema }) },
   space_update: { input: spaceInput.partial().extend({ spaceId: id }), output: z.object({ space: officeSpaceSchema }) },
