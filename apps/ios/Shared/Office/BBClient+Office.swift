@@ -1,6 +1,11 @@
 import Foundation
 
 extension BBClient {
+    /// The backend dispatches the office Home shape when spaceId is supplied.
+    public func officeHome(_ spaceId: String) async throws -> OfficeHome {
+        try await rpc("studio", Studio.Method.home, ["spaceId": .string(spaceId)])
+    }
+
     public func officeSpaces() async throws -> [OfficeSpace] {
         struct Result: Decodable { var spaces: [OfficeSpace] }
         let result: Result = try await rpc("studio", Studio.Method.spaces_list, [:])

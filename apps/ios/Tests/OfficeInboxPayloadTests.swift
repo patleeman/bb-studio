@@ -19,9 +19,15 @@ final class OfficeInboxPayloadTests: XCTestCase {
         }
         return client
     }
+    func testHomeAllowsUnassignedWorkingTask() async throws {
+        let home = try await client("home").officeHome("sp_one")
+        XCTAssertNil(home.working.first?.botId)
+        XCTAssertEqual(home.working.first?.status, .review)
+    }
     func testInboxPageCountsAndMutationsMatchSchemaFixtures() async throws {
         let page = try await client("inbox_list").officeInbox()
         XCTAssertEqual(page.nextCursor, "next")
+        XCTAssertEqual(page.events.last?.urgent, true)
         let event = try XCTUnwrap(page.events.first)
         XCTAssertEqual(event.id, "interaction:office")
         XCTAssertFalse(event.isPending)

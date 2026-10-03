@@ -14,10 +14,11 @@ on failure and ignores superseded responses.
 - `HomeStore(spaceId:client:)`: `home`, `needsYou`, `working`, `reports`, `recent`.
 - `TeamStore(spaceId:client:)`: `bots`, `conversations`.
 
-`BBClient+Office.swift` wraps the live Space/folder contract. The generator merges
+`BBClient+Office.swift` wraps the live Space/folder and Home contracts.
+Home sends `spaceId` to `home`, which distinguishes it from legacy project Home. The generator merges
 `src/office/contract.ts` into the Studio schema and generated Swift methods.
-`OfficeProvisionalAPI.swift` currently follows the web office model for Home,
-Team, Talk, and bot desks. These methods are pending backend stages 4–6, are
+`OfficeProvisionalAPI.swift` currently follows the web office model for
+Team, Talk, bot desks, delegation, and the Home composer. These methods are pending backend stages 5–6, are
 explicitly recorded as dynamic calls in the native inventory, and must be
 reconciled with the generated contract when it lands.
 
@@ -43,3 +44,5 @@ Studio source signals, and validated pushes. It does not own the shared socket.
 Notifications with `inboxKey` route approve/deny/text-answer through `inbox_act`;
 unsupported forms open the app. The coordinator owns their Inbox navigation.
 Legacy notifications without an Inbox key retain their existing action path.
+
+Trust uses the backend’s two supported levels, `ask` and `act`.

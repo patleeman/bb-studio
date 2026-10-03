@@ -14,15 +14,16 @@ final class OfficeProvisionalAPITests: XCTestCase {
         }
         return client
     }
-    func testHomeAndTeamUseOfficeShapes() async throws {
-        let home = try await client(method: "office_home", input: ["spaceId": "sp_one"], result: #"{"needsYou":[],"working":[],"reports":[],"recent":[]}"#).officeHome("sp_one")
-        XCTAssertTrue(home.working.isEmpty)
+    func testTeamUsesOfficeShapes() async throws {
         let team = try await client(method: "team_list", input: ["spaceId": "sp_one"], result: #"{"bots":[{"id":"bot_one","name":"Writer","state":"needs_you","activeTaskCount":2}]}"#).officeTeam("sp_one")
         XCTAssertEqual(team.first?.state, .needsYou)
         XCTAssertEqual(team.first?.activeTaskCount, 2)
         let talk = try await client(method: "talk_list", input: ["spaceId": "sp_one"], result: #"{"conversations":[{"id":"dm_one","title":"Writing","memberBotIds":["bot_one"],"isDirect":true,"needsYou":false,"unread":true,"href":"/talk/dm_one"}]}"#).officeTalk("sp_one")
         XCTAssertEqual(talk.first?.memberBotIds, ["bot_one"])
         XCTAssertEqual(talk.first?.isDirect, true)
+    }
+    func testDirectMessageUsesBotIdentityAndAcceptsUnspecifiedResult() async throws {
+        try await client(method: "talk_dm", input: ["botId": "bot_one"], result: "{}").officeDirectMessage(botId: "bot_one")
     }
     func testStartAndDelegateReturnNavigationTargets() async throws {
         let start = try await client(method: "office_start", input: ["spaceId": "sp_one", "request": "Write a plan"], result: #"{"threadId":"thr_one"}"#).officeStart(spaceId: "sp_one", request: "Write a plan")

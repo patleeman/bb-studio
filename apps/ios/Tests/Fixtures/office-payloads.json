@@ -34,6 +34,24 @@
           "createdAt": 1700000000000,
           "readAt": null,
           "doneAt": null
+        },
+        {
+          "key": "feed:urgent",
+          "spaceId": "sp_office",
+          "type": "report",
+          "source": "feed",
+          "botId": null,
+          "threadId": "thr_office",
+          "item": null,
+          "title": "Urgent report",
+          "body": "May I proceed?",
+          "href": "/threads/thr_office",
+          "actions": null,
+          "answerable": false,
+          "createdAt": 1700000000000,
+          "readAt": null,
+          "doneAt": null,
+          "urgent": true
         }
       ],
       "cursor": "next"
@@ -90,6 +108,31 @@
     },
     "output": {
       "ok": true
+    }
+  },
+  {
+    "id": "office-home",
+    "plugin": "studio",
+    "method": "home",
+    "input": {
+      "spaceId": "sp_one"
+    },
+    "output": {
+      "needsYou": [],
+      "reports": [],
+      "recent": [],
+      "working": [
+        {
+          "id": "tsk_one",
+          "botId": null,
+          "title": "Review",
+          "status": "review",
+          "note": null,
+          "recurring": null,
+          "href": "/tasks/tsk_one",
+          "updatedAt": 2
+        }
+      ]
     }
   }
 ]

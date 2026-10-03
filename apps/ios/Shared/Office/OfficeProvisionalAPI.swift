@@ -7,9 +7,6 @@ extension BBClient {
     func pendingOfficeRPC<T: Decodable>(_ method: String, _ input: JSONValue) async throws -> T {
         try await rpc("studio", method, input)
     }
-    public func officeHome(_ spaceId: String) async throws -> OfficeHome {
-        try await pendingOfficeRPC("office_home", ["spaceId": .string(spaceId)])
-    }
     public func officeTeam(_ spaceId: String) async throws -> [OfficeTeamBot] {
         struct Result: Decodable { var bots: [OfficeTeamBot] }
         let result: Result = try await pendingOfficeRPC("team_list", ["spaceId": .string(spaceId)])
@@ -19,6 +16,11 @@ extension BBClient {
         struct Result: Decodable { var conversations: [OfficeConversation] }
         let result: Result = try await pendingOfficeRPC("talk_list", ["spaceId": .string(spaceId)])
         return result.conversations
+    }
+    /// Creates or reuses the bot's DM. Reload its desk for navigation IDs, as
+    /// the web UI does, until talk_dm's return contract is published.
+    public func officeDirectMessage(botId: String) async throws {
+        let _: JSONValue = try await pendingOfficeRPC("talk_dm", ["botId": .string(botId)])
     }
     public func officeStart(spaceId: String, request: String) async throws -> OfficeStartResult {
         try await pendingOfficeRPC("office_start", ["spaceId": .string(spaceId), "request": .string(request)])

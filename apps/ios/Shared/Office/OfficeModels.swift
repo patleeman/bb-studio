@@ -13,7 +13,7 @@ public struct OfficeSpace: Codable, Identifiable, Hashable, Sendable {
     public var updatedAt: Double
 }
 
-public enum OfficeTrust: String, Codable, Sendable { case readOnly = "read_only", ask, act }
+public enum OfficeTrust: String, Codable, Sendable { case ask, act }
 
 public struct OfficeSpaceSettings: Codable, Hashable, Sendable {
     public struct Model: Codable, Hashable, Sendable {
@@ -121,6 +121,7 @@ public struct OfficeInboxEvent: Codable, Identifiable, Hashable, Sendable {
     public var body: String
     public var actions: [OfficeInboxAction]?
     public var answerable: Bool?
+    public var urgent: Bool?
     public var href: String?
     public var createdAt: Double
     public var readAt: Double?
@@ -128,7 +129,7 @@ public struct OfficeInboxEvent: Codable, Identifiable, Hashable, Sendable {
     /// Local state only. Never serialize pending actions to the server.
     public var isPending = false
     enum CodingKeys: String, CodingKey {
-        case key, spaceId, type, source, botId, threadId, item, title, body, actions, answerable, href, createdAt, readAt, doneAt
+        case key, spaceId, type, source, botId, threadId, item, title, body, actions, answerable, urgent, href, createdAt, readAt, doneAt
     }
 }
 
@@ -149,7 +150,7 @@ public struct OfficeInboxCounts: Codable, Hashable, Sendable {
 public struct OfficeWorkingTask: Codable, Identifiable, Hashable, Sendable {
     public enum Status: String, Codable, Sendable { case working, waiting, review, done }
     public var id: String
-    public var botId: String
+    public var botId: String?
     public var title: String
     public var status: Status
     public var note: String?
