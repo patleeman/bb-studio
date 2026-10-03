@@ -142,6 +142,54 @@ it("reports storage failure honestly and still keeps the in-memory draft after a
   expect(safeExit.defaultPrevented).toBe(false);
 });
 
+it("removes a superseded durable title after newer quota recovery saves, without removing another view's draft", async () => {
+  const state = setup(); const controller = state.mount(); const independent = state.mount();
+  const update = vi.mocked(state.transport.update);
+  update.mockRejectedValueOnce(new Error("Offline"));
+  controller.edit("Older durable title"); await flush();
+  independent.edit("Independent title"); independent.dispose();
+  await vi.advanceTimersByTimeAsync(1);
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Quota exceeded"); });
+  update.mockRejectedValueOnce(new Error("Offline"));
+  controller.edit("Newest title"); await flush(); controller.dispose();
+  write.mockRestore();
+  const restored = state.mount();
+  expect(restored.snapshot.title).toBe("Newest title");
+  expect(restored.snapshot.alternatives.map(draft => draft.title)).toEqual(["Independent title"]);
+  restored.retry(); await tick(); restored.dispose();
+  expect(state.recovery.load().map(draft => draft.title)).toEqual(["Independent title"]);
+  expect(JSON.stringify(state.recovery.exportRecords())).not.toContain("Older durable title");
+});
+
+it("keeps one durable predecessor through many memory-only keystrokes", async () => {
+  const state = setup(); const controller = state.mount();
+  controller.edit("Durable predecessor");
+  const predecessor = state.recovery.load()[0]!;
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Quota exceeded"); });
+  for (let index = 0; index < 500; index++) controller.edit(`Newest title ${index}`);
+  expect(state.recovery.memory()).toHaveLength(1);
+  expect(state.recovery.memory()[0]).toMatchObject({ title: "Newest title 499", supersedes: predecessor.id });
+  write.mockRestore(); controller.retry(); await tick();
+  expect(state.recovery.load()).toEqual([]);
+  expect(state.recovery.exportRecords().records).toEqual({});
+});
+
+it("keeps failed cleanup reachable through a bounded record link after a new document loads", async () => {
+  const state = setup(); const controller = state.mount();
+  controller.edit("Oldest");
+  const remove = vi.spyOn(Storage.prototype, "removeItem").mockImplementation(() => { throw new Error("Cleanup blocked"); });
+  controller.edit("Middle"); controller.edit("Newest"); controller.dispose();
+  expect(Object.keys(state.recovery.exportRecords().records)).toHaveLength(3);
+  for (const draft of state.recovery.memory()) state.recovery.forgetMemory(draft);
+  const restored = state.mount();
+  expect(restored.snapshot.title).toBe("Newest");
+  expect(restored.snapshot.alternatives).toEqual([]);
+  remove.mockRestore(); restored.retry(); await tick();
+  expect(restored.snapshot.status).toBe("saved");
+  expect(state.recovery.exportRecords().records).toEqual({});
+  restored.dispose(); expect(state.mount().snapshot).toMatchObject({ title: "Newest", status: "saved" });
+});
+
 it("retries a failed recovery read without replacing a previously saved title draft", () => {
   const state = setup(); const first = state.mount(); first.edit("Persisted title"); first.dispose();
   // Simulate a new document: only the on-disk version remains.

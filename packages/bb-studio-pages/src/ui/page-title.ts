@@ -1,4 +1,4 @@
-type Draft = { id: string; title: string; base: string; at: number };
+type Draft = { id: string; title: string; base: string; at: number; supersedes?: string };
 type Page = { title: string; updatedAt: number };
 export type TitleTransport = {
   update(input: { id: string; title: string; expectedTitle: string }): Promise<{ page: Page }>;
@@ -16,6 +16,7 @@ const errorText = (error: unknown) => error instanceof Error ? error.message : S
 type TitleRecoveryMemory = {
   drafts: Map<string, Draft>;
   unpersisted: Set<string>;
+  persisted?: Set<string>;
   listening: boolean;
   warn(event: BeforeUnloadEvent): void;
 };
@@ -23,7 +24,7 @@ type TitleRecoveryMemory = {
 // the same owner until storage or the server acknowledges them.
 const memoryKey = Symbol.for("bb-studio-pages:pending-title-recovery");
 const memoryHost = globalThis as typeof globalThis & { [key: symbol]: TitleRecoveryMemory | undefined };
-const recoveryMemory = memoryHost[memoryKey] ??= {
+const recoveryMemory: TitleRecoveryMemory = memoryHost[memoryKey] ??= {
   drafts: new Map(),
   unpersisted: new Set(),
   listening: false,
@@ -31,6 +32,7 @@ const recoveryMemory = memoryHost[memoryKey] ??= {
 };
 const memoryDrafts = recoveryMemory.drafts;
 const unpersisted = recoveryMemory.unpersisted;
+const persisted = recoveryMemory.persisted ??= new Set<string>();
 function markUnpersisted(key: string, failed: boolean) {
   if (failed) unpersisted.add(key); else unpersisted.delete(key);
   if (unpersisted.size && !recoveryMemory.listening) {
@@ -49,6 +51,16 @@ export class TitleRecovery {
   constructor(readonly origin: string, pageId: string, private readonly storage: () => Storage = () => localStorage) {
     this.prefix = `bb-studio-pages:title:${JSON.stringify([origin, pageId])}:`;
   }
+  private decode(key: string, raw: string): Draft {
+    try {
+      const draft = JSON.parse(raw) as Draft | null;
+      if (draft && typeof draft.id === "string" && key === this.prefix + draft.id &&
+        typeof draft.title === "string" && draft.title.length <= 200 &&
+        typeof draft.base === "string" && draft.base.length <= 200 && Number.isFinite(draft.at) &&
+        (draft.supersedes === undefined || typeof draft.supersedes === "string")) return draft;
+    } catch { /* Keep corrupt records for export. */ }
+    throw new Error("Could not read a saved title draft. Keep this browser's recovery data and retry.");
+  }
   load(): Draft[] {
     const storage = this.storage();
     const drafts = new Map(this.memory().map(draft => [draft.id, draft]));
@@ -56,30 +68,58 @@ export class TitleRecovery {
       const key = storage.key(index);
       if (!key?.startsWith(this.prefix)) continue;
       try {
-        const draft = JSON.parse(storage.getItem(key) ?? "null") as Draft | null;
-        if (draft && typeof draft.id === "string" && key === this.prefix + draft.id &&
-          typeof draft.title === "string" && draft.title.length <= 200 &&
-          typeof draft.base === "string" && draft.base.length <= 200 && Number.isFinite(draft.at)) drafts.set(draft.id, draft);
-        else throw new Error("Unrecognized title recovery data.");
+        const draft = this.decode(key, storage.getItem(key) ?? "null");
+        drafts.set(draft.id, draft);
+        persisted.add(key);
       } catch { throw new Error("Could not read a saved title draft. Keep this browser's recovery data and retry."); }
     }
-    return [...drafts.values()].sort((a, b) => b.at - a.at);
+    const superseded = new Set([...drafts.values()].map(draft => draft.supersedes));
+    return [...drafts.values()].filter(draft => !superseded.has(draft.id)).sort((a, b) => b.at - a.at);
   }
   memory(): Draft[] {
     return [...memoryDrafts].filter(([key]) => key.startsWith(this.prefix)).map(([, draft]) => draft).sort((a, b) => b.at - a.at);
   }
   hasUnpersisted(): boolean { return [...unpersisted].some(key => key.startsWith(this.prefix)); }
+  predecessor(draft: Draft): string | undefined {
+    return persisted.has(this.prefix + draft.id) ? draft.id : draft.supersedes;
+  }
   save(draft: Draft) {
     const key = this.prefix + draft.id;
     memoryDrafts.set(key, draft);
-    try { this.storage().setItem(key, JSON.stringify(draft)); markUnpersisted(key, false); }
+    try {
+      this.storage().setItem(key, JSON.stringify(draft));
+      persisted.add(key);
+      markUnpersisted(key, false);
+    }
     catch (error) { markUnpersisted(key, true); throw error; }
+    this.removePredecessors(draft);
   }
-  remove(draft: Draft) {
-    const key = this.prefix + draft.id;
+  private removeKey(key: string) {
     this.storage().removeItem(key);
     memoryDrafts.delete(key);
+    persisted.delete(key);
     markUnpersisted(key, false);
+  }
+  private removePredecessors(draft: Draft) {
+    const keys: string[] = [];
+    const seen = new Set([draft.id]);
+    let id = draft.supersedes;
+    while (id) {
+      if (seen.has(id)) throw new Error("Could not clean up cyclic title recovery. Download the draft before closing.");
+      seen.add(id);
+      const key = this.prefix + id;
+      const raw = this.storage().getItem(key);
+      if (raw === null) break;
+      keys.push(key);
+      id = this.decode(key, raw).supersedes;
+    }
+    // Keep each link until its ancestors have gone. If removal fails, the
+    // newest durable version still names the entire chain after a reload.
+    for (const key of keys.reverse()) this.removeKey(key);
+  }
+  remove(draft: Draft) {
+    this.removePredecessors(draft);
+    this.removeKey(this.prefix + draft.id);
   }
   forgetMemory(draft: Draft) {
     const key = this.prefix + draft.id;
@@ -141,7 +181,8 @@ export class PageTitle {
   }
   private replace(title: string, base: string) {
     const previous = this.draft;
-    this.draft = { id: crypto.randomUUID(), title, base, at: Math.max(Date.now(), (previous?.at ?? 0) + 1) };
+    this.draft = { id: crypto.randomUUID(), title, base, at: Math.max(Date.now(), (previous?.at ?? 0) + 1),
+      ...(previous ? { supersedes: this.recovery.predecessor(previous) } : {}) };
     this.persist(this.draft, previous);
   }
   observe(page: Page) {
