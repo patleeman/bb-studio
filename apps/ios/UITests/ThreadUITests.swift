@@ -243,9 +243,9 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.segmentedControls.buttons["Changes"].waitForExistence(timeout: 10))
         sleep(2)
         shot("extras-changes")
-        // The diff steps need the fixture thread's checkout to have changes.
-        try XCTSkipIf(app.staticTexts["No uncommitted changes"].exists, "no uncommitted changes to open")
-        app.staticTexts.matching(NSPredicate(format: "label ENDSWITH '.md'")).firstMatch.tap()
+        let changedFile = app.staticTexts["README.md"].firstMatch
+        XCTAssertTrue(changedFile.waitForExistence(timeout: 10), "staged checkout has the deterministic README change")
+        changedFile.tap()
         sleep(2)
         shot("extras-diff")
         if app.buttons["View file"].waitForExistence(timeout: 3) {
@@ -282,26 +282,28 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: filters Studio by kind, opens one of each, and searches. Records nothing.
     func testStudio() {
+        continueAfterFailure = false
         openStudioCollection()
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         sleep(2)
         shot("studio-all")
         for (chip, name) in [("Pages", "page"), ("Recordings", "recording"), ("Dictations", "dictation"), ("Drawings", "drawing"), ("Artifacts", "artifact")] {
-            let button = app.buttons[chip].firstMatch
-            guard button.waitForExistence(timeout: 3) else { continue }
+            let chips = app.scrollViews.containing(.button, identifier: "All").firstMatch
+            let button = chips.buttons[chip].firstMatch
+            for _ in 0..<6 where !button.exists || !button.isHittable { chips.swipeLeft() }
+            XCTAssertTrue(button.waitForExistence(timeout: 5), "seeded \(name) filter")
             button.tap()
             sleep(1)
             shot("studio-\(name)s")
             // Items only: the quick-action tiles start real recordings.
             let first = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch
-            if first.waitForExistence(timeout: 3) {
-                first.tap()
-                sleep(3)
-                shot("studio-\(name)")
-                XCTAssertFalse(app.navigationBars["Recording"].exists)
-                app.navigationBars.buttons.firstMatch.tap()
-                sleep(1)
-            }
+            XCTAssertTrue(first.waitForExistence(timeout: 5), "seeded \(name) item")
+            first.tap()
+            sleep(3)
+            shot("studio-\(name)")
+            XCTAssertFalse(app.navigationBars["Recording"].exists)
+            app.navigationBars.buttons.firstMatch.tap()
+            XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 5), "back from \(name)")
             app.buttons[chip].firstMatch.tap()
         }
         let search = app.searchFields.firstMatch

@@ -283,6 +283,7 @@ async function start() {
     if (!environments.some(e => e.status === "ready" && e.environmentProviderId === "project-checkout" && e.isGitRepo)) {
       throw new Error("Native UI fixture requires a ready Git project checkout");
     }
+    await writeFile(join(orbitDir, "README.md"), "# Orbit\n\nThe ORBIT-42 release.\n\nNative UI fixture: review the Friday release window.\n");
   }
 
   const collection = await seedStudioItems(pluginRpc, project.id);

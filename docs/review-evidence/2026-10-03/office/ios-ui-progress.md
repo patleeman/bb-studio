@@ -180,3 +180,25 @@ is gone while the missing space reports an error. The focused removal, module
 runtime and provider-conformance tests pass: 17 tests, 0 failures. Studio
 typechecking and stable compatibility pass. Native bulk UI verification awaits
 a fresh staged install containing this pushed server fix.
+
+## Fresh staged collection and workspace verification
+
+A fresh install at `/tmp/bb-office-final-stage`, server 52786, installed all
+plugins from pushed commit `c9fb0408` and provisioned the native workspace.
+`/tmp/office-fresh-remaining/results.xcresult` confirms `testStudioBulk` and
+`testThreadExtras` both pass. Bulk tag rename/delete, archive and task deletion
+now complete through the live UI. The workspace has a deterministic README
+change; testThreadExtras now requires it instead of skipping the diff workflow.
+Staging `--ui-tests` writes that change only inside the temporary Orbit checkout.
+
+The same run reproduced `testStudio`'s empty-drawing failure: empty drawings
+automatically present their editor, so the generic Back action only dismissed
+that sheet. The collection seed now includes a nonempty rectangle scene and a
+dictation item. The test requires each of Pages, Recordings, Dictations, Drawings
+and Artifacts, scrolls the filter row, opens an item, and asserts return to
+Studio instead of silently skipping absent filters/items.
+
+The updated seed was exercised against the fresh install.
+`/tmp/office-studio-fixture/results.xcresult`: testStudio passed, 1 test,
+0 failures. Staging script syntax and `git diff --check` passed.
+These focused runs do not replace the required final full-suite run.

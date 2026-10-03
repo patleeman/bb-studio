@@ -11,6 +11,14 @@ export async function seedStudioItems(pluginRpc, projectId) {
     markdown: "## Release checklist\n\n- [ ] Review the release notes\n- [ ] Confirm the Friday release window",
   });
   const { drawing } = await pluginRpc("excalidraw", "createDrawing", { projectId, name: "ORBIT-42 release flow" });
+  await pluginRpc("excalidraw", "saveDrawing", { id: drawing.id, data: JSON.stringify({
+    elements: [{ id: "release-check", type: "rectangle", x: 80, y: 80, width: 260, height: 120,
+      angle: 0, strokeColor: "#1971c2", backgroundColor: "#a5d8ff", fillStyle: "solid",
+      strokeWidth: 2, strokeStyle: "solid", roughness: 0, opacity: 100, seed: 42,
+      version: 1, versionNonce: 42, isDeleted: false, groupIds: [], frameId: null,
+      boundElements: null, link: null, locked: false, roundness: { type: 3 } }],
+    appState: { viewBackgroundColor: "#ffffff" }, files: {},
+  }) });
   const { table } = await call("tables", "studio-tables", "create", {
     projectId, title: "ORBIT-42 release inventory",
     columns: [{ id: "name", name: "Item", type: "text" }], rows: [{ name: "Release notes" }],
@@ -35,7 +43,10 @@ export async function seedStudioItems(pluginRpc, projectId) {
     durationMs: 1000, mimeType: "audio/wav", audioBase64: wav.toString("base64"),
   });
   await call("talk", "talk", "recording_state", { id: recording.id, status: "paused" });
-  const expected = { page: page.id, drawing: drawing.id, table: table.id, task: task.id, artifact: artifact.id, recording: recording.id };
+  const dictation = await call("talk", "talk", "recording_create", { kind: "dictation", projectId, threadId: null });
+  await call("talk", "talk", "recording_rename", { id: dictation.id, title: "ORBIT-42 dictation fixture" });
+  await call("talk", "talk", "recording_state", { id: dictation.id, status: "paused" });
+  const expected = { page: page.id, drawing: drawing.id, table: table.id, task: task.id, artifact: artifact.id, recording: recording.id, dictation: dictation.id };
   const { providers, items } = await pluginRpc("studio", "overview", null);
   for (const [kind, id] of Object.entries(expected)) {
     if (!items.some(item => item.id === id && item.kind === kind)) throw new Error(`Staged overview is missing ${kind} ${id}`);
