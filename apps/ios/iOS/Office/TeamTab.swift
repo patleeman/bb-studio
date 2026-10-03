@@ -177,7 +177,7 @@ struct BotDeskView: View {
                 Text("You haven't talked with \(desk.bot.name) directly yet.").foregroundStyle(.secondary)
                 Button("Message \(desk.bot.name)") {
                     Task {
-                        _ = try? await app.client.officePendingCall("talk_dm", ["botId": .string(botId)])
+                        try? await app.client.officeDirectMessage(botId: botId)
                         await load()
                     }
                 }
