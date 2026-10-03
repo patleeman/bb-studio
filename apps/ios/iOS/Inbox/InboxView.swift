@@ -260,7 +260,12 @@ final class InboxModel: ObservableObject {
 }
 
 struct InboxView: View {
+    /// `work` is the office's Work tab: the current Space's folders, threads and
+    /// items together. `all` is every thread, grouped as BB's sidebar groups them.
+    enum Mode { case all, work }
+    var mode: Mode = .all
     @EnvironmentObject private var app: AppModel
+    @Environment(OfficeContext.self) private var office: OfficeContext?
     @StateObject private var model = InboxModel()
     @State private var query = ""
     @State private var renaming: ThreadEntry?
@@ -288,7 +293,9 @@ struct InboxView: View {
             } else {
                 // Plain rows under no header, like the sidebar's nav.
                 let plugins = runningPlugins.split(separator: ",")
-                if query.isEmpty, plugins.contains("automations") || plugins.contains("feed") {
+                if mode == .work, let work = office?.work {
+                    workSections(work)
+                } else if query.isEmpty, plugins.contains("automations") || plugins.contains("feed") {
                     Section {
                         if plugins.contains("feed") {
                             NavigationLink(value: Route.feed) {
@@ -301,14 +308,15 @@ struct InboxView: View {
                         }
                     }
                 }
-                ForEach(model.groups) { group in threadSection(group) }
+                if mode == .all { ForEach(model.groups) { group in threadSection(group) } }
             }
         }
         .listStyle(.sidebar)
         .overlay {
             if !model.loaded { ProgressView() }
         }
-        .navigationTitle("Home")
+        .navigationTitle(mode == .work ? "Work" : "Home")
+        .navigationBarTitleDisplayMode(mode == .work ? .inline : .automatic)
         .searchable(text: $query, prompt: "Search threads and messages")
         .task(id: query) { await model.search(app.client, query) }
         .sensoryFeedback(.impact(weight: .light), trigger: model.actions)
@@ -337,6 +345,13 @@ struct InboxView: View {
         }
         .refreshable { await model.load(app.client) }
         .toolbar {
+            if mode == .work {
+                ToolbarItem(placement: .principal) { SpaceSwitcher() }
+                ToolbarItem(placement: .topBarLeading) {
+                    NavigationLink(value: Route.studioCollection) { Image(systemName: "square.stack") }
+                        .accessibilityLabel("All items")
+                }
+            }
             ToolbarItemGroup(placement: .topBarTrailing) {
                 Button { app.startDictation() } label: { Image(systemName: "mic") }
                 Menu {
@@ -370,6 +385,46 @@ struct InboxView: View {
             model.restore()
             model.attach(app)
             await model.load(app.client)
+        }
+        .onChange(of: model.threads) { _, threads in office?.work?.mergeThreadList(threads) }
+    }
+
+    /// Work: favorites, then each folder of the Space with its threads and items,
+    /// newest first. Threads bots started stay with the bot's task.
+    @ViewBuilder
+    private func workSections(_ work: WorkStore) -> some View {
+        let folders = work.folders.filter { !$0.archived }
+        let folderIds = Set(folders.map(\.id))
+        let mine = model.threads.filter { folderIds.contains($0.projectId) && $0.parentThreadId == nil }
+        let filtered = query.isEmpty ? mine : mine.filter { $0.displayTitle.localizedCaseInsensitiveContains(query) }
+        let favorites = filtered.filter { $0.pinnedAt != nil }
+        if let error = work.error, work.tree == nil {
+            Section { ConnectionBanner(message: error) { await work.refresh() } }
+        }
+        if !favorites.isEmpty {
+            collapsible("work:favorites", "Favorites") {
+                ForEach(favorites) { thread in threadLink(thread, showsProject: true, depth: 0) }
+            }
+        }
+        ForEach(folders) { folder in
+            let threads = InboxModel.sidebarSorted(filtered.filter { $0.projectId == folder.id && $0.pinnedAt == nil })
+            let items = (folder.items ?? []).filter {
+                query.isEmpty || $0.title.localizedCaseInsensitiveContains(query)
+            }
+            collapsible("work:\(folder.id)", folder.name) {
+                ForEach(threads) { thread in threadLink(thread, showsProject: false, depth: 0) }
+                ForEach(items.sorted { $0.updatedAt > $1.updatedAt }) { item in
+                    OfficeItemRow(item: item, author: office?.bot(item.authorBotId))
+                }
+                if threads.isEmpty && items.isEmpty {
+                    Text("Empty").foregroundStyle(.secondary)
+                }
+                Button {
+                    app.newThread()
+                } label: {
+                    Label("New Thread", systemImage: "plus").foregroundStyle(.secondary)
+                }
+            }
         }
     }
 

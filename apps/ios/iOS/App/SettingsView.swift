@@ -80,6 +80,17 @@ struct SettingsView: View {
                 NavigationLink { ArchivedView() } label: {
                     Label("Archived threads", systemImage: "archivebox")
                 }
+                NavigationLink {
+                    WebView(url: AppModel.shared.serverURL)
+                        .ignoresSafeArea(edges: .bottom)
+                        .navigationTitle("BB Web")
+                        .navigationBarTitleDisplayMode(.inline)
+                } label: {
+                    Label("BB Web", systemImage: "globe")
+                }
+                NavigationLink { AutomationsView() } label: {
+                    Label("Automations", systemImage: "clock.arrow.circlepath")
+                }
             } header: {
                 Text("Threads").foregroundStyle(Color.primary.opacity(0.75))
             }

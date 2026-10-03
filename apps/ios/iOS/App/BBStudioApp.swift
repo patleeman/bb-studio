@@ -138,6 +138,8 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
                     await MainActor.run { AppModel.shared.openFeedPost(id) }
                 } else if let threadId = userInfo["threadId"] as? String {
                     await MainActor.run { AppModel.shared.openThread(threadId) }
+                } else if userInfo["inboxKey"] is String {
+                    await MainActor.run { AppModel.shared.tab = .inbox }
                 }
             }
             completionHandler()

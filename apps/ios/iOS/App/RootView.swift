@@ -2,26 +2,26 @@ import SwiftUI
 
 struct RootView: View {
     @EnvironmentObject private var model: AppModel
+    @State private var office = OfficeContext(client: AppModel.shared.client)
 
     var body: some View {
         TabView(selection: $model.tab) {
-            InboxTab()
+            OfficeInboxTab()
+                .tabItem { Label("Inbox", systemImage: "tray") }
+                .badge(office.inboxBadge)
+                .tag(Tab.inbox)
+
+            HomeTab()
                 .tabItem { Label("Home", systemImage: "house") }
-            .tag(Tab.inbox)
+                .tag(Tab.home)
 
-            NavigationStack(path: $model.studioPath) {
-                StudioHomeView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-            }
-            .tabItem { Label("Studio", systemImage: "square.stack") }
-            .tag(Tab.studio)
+            WorkTab()
+                .tabItem { Label("Work", systemImage: "folder") }
+                .tag(Tab.work)
 
-            NavigationStack {
-                WebTab()
-                    .navigationTitle("BB Web")
-                    .navigationBarTitleDisplayMode(.inline)
-            }
-            .tabItem { Label("Web", systemImage: "globe") }
-            .tag(Tab.web)
+            TeamTab()
+                .tabItem { Label("Team", systemImage: "person.2") }
+                .tag(Tab.team)
 
             NavigationStack { SettingsView() }
                 .tabItem { Label("Settings", systemImage: "gear") }
@@ -36,6 +36,13 @@ struct RootView: View {
         } message: {
             Text(model.notificationError ?? "")
         }
+        .environment(office)
+        .task(id: model.serverURL) {
+            if office.spaces.currentSpaceId == nil || office.home == nil { office = OfficeContext(client: model.client) }
+            office.observe(model.realtime)
+            await office.load()
+        }
+        .onDisappear { office.stopObserving() }
         .sheet(item: $model.sheet) { sheet in
             switch sheet {
             case .capture:
@@ -55,15 +62,16 @@ struct RootView: View {
     }
 }
 
-/// A stack on iPhone; on iPad, the inbox beside the open thread.
-struct InboxTab: View {
+/// Work: the current Space's folders, with threads and items together. A stack
+/// on iPhone; on iPad, the folders beside the open thread.
+struct WorkTab: View {
     @EnvironmentObject private var model: AppModel
     @Environment(\.horizontalSizeClass) private var sizeClass
 
     var body: some View {
         if sizeClass == .regular {
             NavigationSplitView {
-                InboxView().navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 480)
+                InboxView(mode: .work).navigationSplitViewColumnWidth(min: 320, ideal: 380, max: 480)
             } detail: {
                 NavigationStack(path: $model.path) {
                     ContentUnavailableView("No thread selected", systemImage: "bubble.left.and.bubble.right")
@@ -72,7 +80,7 @@ struct InboxTab: View {
             }
         } else {
             NavigationStack(path: $model.path) {
-                InboxView().navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+                InboxView(mode: .work).navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             }
         }
     }
@@ -104,31 +112,7 @@ struct RouteDestination: View {
         case .space(let id): SpaceRouteView(id: id).id(id)
         case .feed: FeedView()
         case .feedPost(let id): FeedPostView(id: id).id(id)
-        }
-    }
-}
-
-/// BB Web keeps its own socket and re-renders on every change, even on another
-/// tab, so it unloads once it has been out of sight for a while.
-private struct WebTab: View {
-    @EnvironmentObject private var model: AppModel
-    @State private var mounted = false
-
-    var body: some View {
-        Group {
-            if mounted {
-                WebView(url: model.serverURL).ignoresSafeArea(edges: .bottom)
-            } else {
-                Color.clear
-            }
-        }
-        .task(id: model.tab == .web) {
-            guard model.tab != .web else {
-                mounted = true
-                return
-            }
-            try? await Task.sleep(for: .seconds(120))
-            if !Task.isCancelled { mounted = false }
+        case .studioCollection: StudioHomeView()
         }
     }
 }
