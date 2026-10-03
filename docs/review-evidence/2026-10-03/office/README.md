@@ -13,6 +13,11 @@ the native screenshot fixture; `fixtures.json` preserves the first capture fixtu
 
 ## Web captures
 
+The [final capture pass](final-web-captures.json) passed all 14 live captures:
+nine Office views and all six primary plugin previews (Home serves both).
+The staged commit `09bb66a8` includes `f2d4c41`; Home/Inbox icon sizes and the
+tables ListView icon were visually checked. Float capture cleanup now closes
+its temporary tab before deleting the page, keeping later images unobstructed.
 All assertions passed against the real rendered BB application. Home, both Inbox
 views, and the sidebar were refreshed on 52586 at `09bb66a8`, which includes
 `6089c1d` (Home/Inbox headings) and the later item-icon fix. The images were checked for the

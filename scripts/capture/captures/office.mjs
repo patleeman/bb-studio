@@ -28,7 +28,10 @@ export default ({ seedPages }) => {
         await client.clickElementWithTextAndPointer('button','Home');
         await client.waitForText('ORBIT-42 checks are ready');
         if(!await client.evaluate(`document.querySelector(${JSON.stringify(selector)})===window.officeFloatEditor`)) throw Error('Float replaced the live editor');
-        return fixture.cleanup;
+        return async () => {
+          await client.evaluate(`document.querySelector('[role="button"][aria-label="Close tab"]').click()`);
+          await fixture.cleanup();
+        };
       },
     },
     capture('office-home','staged-preview.png','/plugins/studio/office',['ORBIT-42 checks are ready','Atlas wants to edit the release checklist']),
