@@ -127,7 +127,8 @@ struct AutomationEditor: View {
 
     private var trigger: JSONValue {
         if repeatMode == "Once" {
-            return ["triggerType": "once", "runAt": .number(runAt.timeIntervalSince1970 * 1000)]
+            // The automations API takes whole milliseconds.
+            return ["triggerType": "once", "runAt": .number((runAt.timeIntervalSince1970 * 1000).rounded(.down))]
         }
         let parts = Calendar.current.dateComponents([.hour, .minute], from: time)
         let at = "\(parts.minute ?? 0) \(parts.hour ?? 9)"
