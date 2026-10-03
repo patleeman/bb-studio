@@ -5,6 +5,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type Table, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
 import { TableView, type TableApi, type TableHost, type TableItem } from "@bb-studio/kit/table-grid";
 import { toast } from "sonner";
+import { loadTable, type TableLoad } from "./load-table";
 
 function download(name: string, text: string) {
   const url = URL.createObjectURL(new Blob([text], { type: "text/csv" }));
@@ -26,21 +27,15 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
 }) {
   const rpc = useRpc<TablesContract>();
   const { tableId } = target;
-  const [table, setTable] = useState<Table | null>(null);
+  const [{ table, error }, setLoad] = useState<TableLoad>({ table: null, error: "" });
   const [items, setItems] = useState<TableItem[]>([]);
-  const [error, setError] = useState("");
   const [version, setVersion] = useState(0);
   const file = useRef<HTMLInputElement>(null);
   useRealtime(TABLES_CHANNEL, (event) => {
     const changed = (event as { tableId?: string } | null)?.tableId;
     if (!changed || changed === tableId) setVersion((n) => n + 1);
   });
-  useEffect(() => {
-    void rpc
-      .call("get", { id: tableId })
-      .then(({ table }) => (table ? setTable(table) : setError("This table was deleted.")))
-      .catch((error) => setError(errorMessage(error)));
-  }, [rpc, tableId, version]);
+  useEffect(() => loadTable(() => rpc.call("get", { id: tableId }), setLoad), [rpc, tableId, version]);
   useEffect(() => {
     void rpc.call("items", null).then(({ items }) => setItems(items), () => undefined);
   }, [rpc]);
