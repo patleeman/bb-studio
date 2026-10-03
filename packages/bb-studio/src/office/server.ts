@@ -15,6 +15,7 @@ import type { ModuleServices } from "../modules/services";
 import { moduleInboxSources } from "./module-sources";
 import { officeHome } from "./home";
 import { officeTeam } from "./team";
+import { startOffice } from "./start";
 import { delegateOffice } from "./delegation";
 import { legacyAttentionSource } from "./legacy-attention";
 import { Inbox } from "./inbox";
@@ -57,6 +58,10 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
+    office_start: async input => {
+      const result = await startOffice(input, bb.sdk.threads, spaces.office, folders, hub, options.moduleServices);
+      changed(); return result;
+    },
     talk_dm: async ({ botId }) => {
       if (!options.moduleServices?.has("bot-teams")) throw new Error("Teams must finish loading before starting a conversation.");
       const result = await options.moduleServices.client("bot-teams", officeTeamServiceContract).call("office_dm", { botId }); changed(); return result;

@@ -1,5 +1,6 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { conversationRequestSchema } from "@bb-studio/kit/contract";
 import { inboxEventSchema, inboxContract } from "./inbox-contract";
 export { inboxEventSchema, type InboxEvent } from "./inbox-contract";
 
@@ -68,6 +69,10 @@ export const officeTeamContract = defineRpcContract({
 export const officeContract = defineRpcContract({
   ...inboxContract,
   ...officeTeamContract,
+  office_start: {
+    input: z.object({ spaceId: id, request: conversationRequestSchema(z) }),
+    output: z.union([z.object({ threadId: id }), z.object({ taskId: id, botId: id })]),
+  },
   home: { input: z.object({ spaceId: id }), output: z.object({
     needsYou: z.array(inboxEventSchema), reports: z.array(inboxEventSchema), recent: z.array(officeItemSchema),
     working: z.array(workingTaskSchema),

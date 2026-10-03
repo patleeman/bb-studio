@@ -74,6 +74,7 @@ public enum Studio {
     public static let talk_dm = "talk_dm"
     public static let talk_list = "talk_list"
     public static let delegate = "delegate"
+    public static let office_start = "office_start"
     public static let spaces_list = "spaces_list"
     public static let space_create = "space_create"
     public static let space_update = "space_update"
@@ -400,6 +401,10 @@ public enum Studio {
   public typealias TalkList = TalkListOutput
 
   public typealias Delegate = DelegateOutput
+
+  public typealias OfficeStartOutput = StudioJSONValue
+
+  public typealias OfficeStart = OfficeStartOutput
 
   public typealias SpacesList = SpacesListOutput
 
@@ -5790,6 +5795,271 @@ public enum Studio {
     public init(taskId: String? = nil, task: DelegateOutputTask? = nil) {
       self.taskId = taskId
       self.task = task
+    }
+  }
+
+  public enum OfficeStartInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeStartInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct OfficeStartInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: OfficeStartInputRequestExecutionInputSourcesModel?
+    public var permissionMode: OfficeStartInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: OfficeStartInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: OfficeStartInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: OfficeStartInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: OfficeStartInputRequestExecutionInputSourcesModel? = nil, permissionMode: OfficeStartInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: OfficeStartInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: OfficeStartInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: OfficeStartInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct OfficeStartInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: OfficeStartInputRequestReasoningLevel?
+    public var permissionMode: OfficeStartInputRequestPermissionMode?
+    public var serviceTier: OfficeStartInputRequestServiceTier?
+    public var executionInputSources: OfficeStartInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: OfficeStartInputRequestReasoningLevel? = nil, permissionMode: OfficeStartInputRequestPermissionMode? = nil, serviceTier: OfficeStartInputRequestServiceTier? = nil, executionInputSources: OfficeStartInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct OfficeStartInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var request: OfficeStartInputRequest?
+
+    public init(spaceId: String? = nil, request: OfficeStartInputRequest? = nil) {
+      self.spaceId = spaceId
+      self.request = request
     }
   }
 
