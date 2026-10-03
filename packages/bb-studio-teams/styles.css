@@ -1287,8 +1287,6 @@
   box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.12);
 }
 .channel-layout-picker > button:focus-visible,
-.channel-member-rail > button:focus-visible,
-.channel-roster > button:focus-visible,
 .channel-pane-action:focus-visible {
   outline: 2px solid var(--ring);
   outline-offset: 1px;
@@ -1337,7 +1335,10 @@
   flex-direction: column;
   overflow: hidden;
 }
-.channel-thread-layout[data-channel-layout="focus"] { flex-direction: row; }
+.channel-thread-layout:not([data-channel-layout="grid"]) {
+  position: relative;
+  container-type: inline-size;
+}
 .channel-thread-stage {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(min(100%, 360px), 1fr));
@@ -1477,49 +1478,19 @@
   gap: 6px 10px;
   padding: 0 12px 12px;
 }
-.channel-unstarted-chip {
-  display: inline-flex;
-  max-width: 220px;
-  align-items: center;
-  gap: 6px;
-  color: var(--muted-foreground);
-  font-size: var(--text-sm);
-}
-
-/* Active: every member in one strip, working transcripts below. */
-.channel-roster {
-  display: flex;
-  flex: 0 0 auto;
-  gap: 6px;
-  padding: 8px 12px;
-  overflow-x: auto;
-  border-bottom: 1px solid var(--border);
-  scrollbar-width: none;
-}
-.channel-roster > button,
-.channel-roster > .channel-member-unstarted {
+/* Members that haven't started: a dashed outline wherever they appear. */
+.channel-member-unstarted {
   display: inline-flex;
   height: 32px;
-  max-width: 240px;
+  max-width: 220px;
   flex: 0 0 auto;
   align-items: center;
   gap: 8px;
-  border: 1px solid var(--border);
+  border: 1px dashed var(--border);
   border-radius: 8px;
   padding: 0 10px 0 4px;
+  color: var(--muted-foreground);
   font-size: var(--text-sm);
-}
-.channel-roster > button:hover { background: var(--state-hover); }
-.channel-roster > button[data-activity="Working"] { border-color: color-mix(in srgb, var(--channel-working) 60%, var(--border)); }
-.channel-roster > button[data-activity="Needs input"] { border-color: color-mix(in srgb, var(--warning, #bf973f) 65%, var(--border)); }
-.channel-roster > .channel-member-unstarted { border-style: dashed; color: var(--muted-foreground); }
-.channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
-  grid-template-columns: repeat(auto-fit, minmax(min(100%, 420px), 1fr));
-  grid-auto-rows: minmax(360px, 1fr);
-}
-.channel-thread-layout[data-channel-layout="active"] .channel-thread-stage[data-thread-count="1"] {
-  grid-template-columns: minmax(0, 960px);
-  justify-content: center;
 }
 .channel-rail-name {
   min-width: 0;
@@ -1529,23 +1500,38 @@
   white-space: nowrap;
 }
 
-/* Focus: a single-line member list and a frameless transcript that lines up with the composer. */
-.channel-member-rail {
+/* Focus and Active: one transcript laid out like a thread page, with a
+   floating member box in the left margin to swap threads. */
+.channel-switcher {
+  position: absolute;
+  z-index: 3;
+  top: 12px;
+  left: 12px;
   display: flex;
-  width: 212px;
-  flex: 0 0 auto;
+  width: 216px;
+  max-height: calc(100% - 24px);
   flex-direction: column;
-  gap: 1px;
-  overflow: auto;
-  border-right: 1px solid var(--border);
-  padding: 8px;
+  gap: 2px;
+  overflow-y: auto;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px;
+  background: color-mix(in srgb, var(--foreground) 3%, var(--background));
+  box-shadow: 0 4px 16px rgb(0 0 0 / 0.12);
+  scrollbar-width: thin;
 }
-.channel-member-rail > button,
-.channel-member-rail > .channel-member-unstarted {
+.channel-switcher-row {
+  display: flex;
+  min-width: 0;
+  flex: 0 0 auto;
+  align-items: center;
+  border-radius: 6px;
+}
+.channel-switcher-row > button {
   display: flex;
   height: 32px;
-  width: 100%;
-  flex: 0 0 auto;
+  min-width: 0;
+  flex: 1;
   align-items: center;
   gap: 8px;
   border-radius: 6px;
@@ -1553,35 +1539,71 @@
   font-size: var(--text-sm);
   text-align: left;
 }
-.channel-member-rail > button[data-fork] { padding-left: 28px; color: var(--muted-foreground); font-size: var(--text-xs); }
-.channel-member-rail > button:hover { background: var(--state-hover); }
-.channel-member-rail > button[aria-current] {
-  background: var(--state-hover);
-  color: var(--foreground);
-  font-weight: 500;
-}
-.channel-member-rail > button[data-activity="Idle"] .channel-status-dot { visibility: hidden; }
-.channel-member-rail > .channel-member-unstarted { color: var(--muted-foreground); opacity: 0.7; }
-.channel-member-rail > .channel-member-unstarted:first-of-type { margin-top: 8px; }
-.channel-thread-layout[data-channel-layout="focus"] .channel-thread-stage {
+.channel-switcher-row:hover,
+.channel-switcher-row[data-current] { background: var(--state-hover); }
+.channel-switcher-row[data-current] > button { font-weight: 500; }
+.channel-switcher-row[data-fork] > button { padding-left: 28px; color: var(--muted-foreground); font-size: var(--text-xs); }
+.channel-switcher-row[data-activity="Idle"] .channel-status-dot { display: none; }
+.channel-switcher-row > button:focus-visible { outline: 2px solid var(--ring); outline-offset: -2px; }
+.channel-switcher-actions { display: inline-flex; flex: 0 0 auto; padding-right: 2px; }
+.channel-switcher-actions .channel-pane-action { width: 24px; height: 24px; }
+.channel-switcher > .channel-member-unstarted { width: 100%; max-width: none; margin-top: 2px; }
+.channel-switcher > .channel-member-unstarted:first-of-type { margin-top: 6px; }
+.channel-thread-layout:not([data-channel-layout="grid"]) .channel-thread-stage {
   display: flex;
   padding: 0;
 }
-.channel-thread-layout[data-channel-layout="focus"] .channel-thread-pane {
+.channel-single {
+  display: flex;
+  min-width: 0;
+  min-height: 0;
   flex: 1;
-  border: none;
-  border-radius: 0;
-  background: transparent;
+  flex-direction: column;
 }
-.channel-thread-layout[data-channel-layout="focus"] .channel-thread-pane > header,
-.channel-thread-layout[data-channel-layout="focus"] .channel-pane-body {
-  width: 100%;
-  max-width: 760px;
-  margin-inline: auto;
+/* BB's transcript scrolls edge to edge; its content keeps the composer's width. */
+.channel-single .channel-pane-body > div > [class~="overflow-y-auto"] {
+  padding-inline: max(16px, calc((100% - 760px) / 2));
+  padding-top: 16px;
 }
-.channel-thread-layout[data-channel-layout="focus"] .channel-thread-pane > header {
-  min-height: 52px;
-  padding: 8px 16px;
+
+/* When the margin is too narrow for names, the box shows avatars only. */
+@container (max-width: 1240px) {
+  .channel-switcher { width: 48px; padding: 6px 4px; }
+  .channel-switcher-row > button { justify-content: center; padding: 0; position: relative; }
+  .channel-switcher-row > button > .channel-rail-name,
+  .channel-switcher-actions { display: none; }
+  .channel-switcher-row[data-fork] > button { padding: 0; }
+  .channel-switcher-row > button > .channel-status-dot { position: absolute; top: 4px; right: 4px; }
+  .channel-switcher > .channel-member-unstarted { justify-content: center; padding: 0; }
+  .channel-switcher > .channel-member-unstarted > .channel-rail-name { display: none; }
+  .channel-single .channel-pane-body > div > [class~="overflow-y-auto"] {
+    padding-inline: max(72px, calc((100% - 760px) / 2)) max(16px, calc((100% - 760px) / 2));
+  }
+}
+/* Phones: the box becomes a row above the transcript. */
+@container (max-width: 640px) {
+  .channel-switcher {
+    position: static;
+    width: 100%;
+    max-height: none;
+    flex-direction: row;
+    gap: 4px;
+    overflow-x: auto;
+    border: none;
+    border-bottom: 1px solid var(--border);
+    border-radius: 0;
+    padding: 6px 8px;
+    box-shadow: none;
+    scrollbar-width: none;
+  }
+  .channel-switcher-row > button { height: 36px; padding: 0 10px 0 4px; justify-content: flex-start; }
+  .channel-switcher-row > button > .channel-rail-name { display: block; max-width: 140px; }
+  .channel-switcher-row > button > .channel-status-dot { position: static; }
+  .channel-switcher-row[data-fork] > button { padding: 0 10px 0 6px; }
+  .channel-switcher > .channel-member-unstarted { width: auto; height: 36px; margin-top: 0; padding: 0 10px 0 4px; }
+  .channel-switcher > .channel-member-unstarted:first-of-type { margin-top: 0; }
+  .channel-switcher > .channel-member-unstarted > .channel-rail-name { display: block; }
+  .channel-single .channel-pane-body > div > [class~="overflow-y-auto"] { padding-inline: 12px; }
 }
 
 .channel-stage-empty {
@@ -1601,30 +1623,10 @@
 @media (max-width: 700px) {
   .channel-layout-toolbar { padding: 6px 8px; overflow-x: auto; }
   .channel-layout-picker > button { height: 32px; padding: 0 10px; }
-  .channel-thread-layout[data-channel-layout="focus"] { flex-direction: column; }
-  .channel-member-rail {
-    width: 100%;
-    flex-direction: row;
-    gap: 4px;
-    overflow-x: auto;
-    border-right: none;
-    border-bottom: 1px solid var(--border);
-    scrollbar-width: none;
-  }
-  .channel-member-rail > button,
-  .channel-member-rail > .channel-member-unstarted {
-    width: auto;
-    max-width: 180px;
-    height: 36px;
-  }
-  .channel-member-rail > button[data-fork] { padding-left: 8px; }
-  .channel-member-rail > .channel-member-unstarted:first-of-type { margin-top: 0; }
-  .channel-thread-stage,
-  .channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
+  .channel-thread-stage {
     grid-template-columns: minmax(0, 1fr);
     grid-auto-rows: minmax(420px, 70svh);
     padding: 8px;
     gap: 8px;
   }
-  .channel-thread-layout[data-channel-layout="focus"] .channel-thread-pane > header { padding: 6px 12px; }
 }

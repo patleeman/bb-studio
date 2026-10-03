@@ -40,3 +40,12 @@ export function movePane(ids: string[], id: string, target: string, place: "befo
   const at = rest.indexOf(target) + (place === "after" ? 1 : 0);
   return [...rest.slice(0, at), id, ...rest.slice(at)];
 }
+/**
+ * Active follows the work: a thread the owner picked, else the thread that most
+ * needs attention while working, else the one it showed last, else the latest.
+ */
+export function followedThread(threads: ViewThread[], pinned: string | null, previous: string | null) {
+  const find = (id: string | null) => id ? threads.find(thread => thread.id === id) : undefined;
+  return find(pinned) ?? byAttention(activeThreads(threads))[0] ?? find(previous)
+    ?? [...threads].filter(thread => !thread.parentThreadId && !thread.error).sort((a, b) => b.updatedAt - a.updatedAt)[0] ?? threads[0];
+}

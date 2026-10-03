@@ -48,6 +48,8 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    throw error;
   }
  };
+ const margin = client => client.evaluate("(()=>{const box=document.querySelector('.channel-switcher');const scroller=document.querySelector('.channel-single .channel-pane-body > div > [class~=\\'overflow-y-auto\\']');if(!box||!scroller)throw new Error('Missing member box or thread transcript');const content=scroller.getBoundingClientRect().left+parseFloat(getComputedStyle(scroller).paddingLeft);if(box.getBoundingClientRect().right>content)throw new Error('Member box overlaps the transcript');if(scroller.getBoundingClientRect().width<innerWidth*0.6)throw new Error('Transcript does not scroll edge to edge');})()");
+ const rows = "document.querySelectorAll('.channel-switcher-row > button').length";
  const clearDraft = async client => {
   await client.evaluate("document.querySelector('[data-view-composer] .ProseMirror').focus()");
   for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "a", code: "KeyA", windowsVirtualKeyCode: 65, modifiers: 4 });
@@ -111,22 +113,24 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.clickAriaButtonWithPointer("Focus Release checklist");
    await wait(client, `document.querySelectorAll('[data-channel-thread]').length===1&&!!document.querySelector('[data-channel-thread="${data.threadId}"]')`);
    await client.waitForSelector(`[data-channel-thread="${data.threadId}"] [aria-label="Suggested reactions"]`);
-   await client.evaluate("(()=>{if(document.querySelectorAll('[aria-label=\"Channel threads\"] button').length!==3)throw new Error('Focus lost its other members');})()");
+   await wait(client, `${rows}===3&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Release checklist')`);
+   await margin(client);
   }) },
   { id: "bots-active", packageDir: "bb-studio-teams", fileName: "channel-active.png", setup: guard(async client => {
    const data = await open(client, "active");
    await bbCli(["thread", "tell", data.threadId, "For a staged UI activity check, use the terminal to run sleep 45, then reply only Check finished. Change no files."]);
    try {
-    await client.waitForSelector(`[data-channel-thread="${data.threadId}"]`);
-    await client.waitForText("Working");
-    await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('[aria-label=\"Channel threads\"] button').length!==3)throw new Error('Active view did not retain idle members in its roster');})()");
+    // Active follows the thread that starts working.
+    await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&!!document.querySelector('.channel-switcher-row[data-current][data-activity="Working"]')`);
+    await wait(client, `document.querySelectorAll('[data-channel-thread]').length===1&&${rows}===3`);
+    await margin(client);
    } catch (error) { await bbCli(["thread", "stop", data.threadId]).catch(() => {}); throw error; }
    return async () => {
     await bbCli(["thread", "stop", data.threadId]);
-    await client.waitForText("Nobody is working right now");
-    await client.waitForText("Last reply from");
-    await client.clickElementWithTextAndPointer('[aria-label="Channel threads"] button .channel-rail-name', "Release checklist");
-    await client.waitForSelector('[data-channel-layout="focus"]');
+    // It keeps the finished thread on screen, and a pick swaps threads without leaving Active.
+    await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&!document.querySelector('.channel-switcher-row[data-activity="Working"]')`);
+    await client.clickElementWithTextAndPointer('.channel-switcher-row > button .channel-rail-name', "Scribe");
+    await wait(client, `!!document.querySelector('[data-channel-layout="active"]')&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Scribe')`);
    };
   }) },
   { id: "bots-grid-mobile", packageDir: "bb-studio-teams", fileName: "channel-grid-mobile.png", privateSidebar: false, setup: guard(async client => {
@@ -149,7 +153,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.waitForSelector('[data-channel-layout="focus"]');
    await client.waitForText("Ready. I checked the brief:");
    await concise(client);
-   await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('[aria-label=\"Channel threads\"] button').length!==3)throw new Error('Phone focus lost its selected thread or member rail');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-view-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone focus exceeds the viewport');})()");
+   await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('.channel-switcher-row > button').length!==3)throw new Error('Phone focus lost its selected thread or member row');if(document.documentElement.scrollWidth>innerWidth||document.querySelector('[data-view-composer]').getBoundingClientRect().bottom>innerHeight)throw new Error('Phone focus exceeds the viewport');})()");
    return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
   }) },
   { id: "bots-thread-drop", packageDir: "bb-studio-teams", fileName: "channel-thread-drop.png", showSidebar: true, setup: guard(async client => {
