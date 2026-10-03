@@ -215,13 +215,17 @@ export class PageStore {
     id: string,
     patch: Partial<Pick<PageRow, "title" | "icon" | "parent_id" | "project_id" | "position" | "archived_at">>,
     actor: string,
+    expectedTitle?: string,
   ): PageMeta | null {
     const entries = Object.entries(patch).filter(([, value]) => value !== undefined);
     if (entries.length) {
       const sets = entries.map(([key]) => `${key} = ?`).join(", ");
-      this.db
-        .prepare(`UPDATE pages SET ${sets}, updated_at = ?, updated_by = ? WHERE id = ?`)
-        .run(...entries.map(([, value]) => value), Date.now(), actor, id);
+      const result = this.db
+        .prepare(`UPDATE pages SET ${sets}, updated_at = ?, updated_by = ? WHERE id = ?${expectedTitle === undefined ? "" : " AND title = ?"}`)
+        .run(...entries.map(([, value]) => value), Date.now(), actor, id, ...(expectedTitle === undefined ? [] : [expectedTitle]));
+      if (expectedTitle !== undefined && !result.changes && this.meta(id)) {
+        throw new Error("Page title changed. Review the current title before retrying.");
+      }
     }
     return this.meta(id);
   }

@@ -21,6 +21,7 @@ import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, FLOATING, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
+import { usePageTitle } from "./use-page-title";
 
 const PAGE_ICONS = ["📄", "📝", "📋", "✅", "📊", "📈", "🗺️", "🧭", "💡", "🚀", "🧪", "🛠️", "📚", "🗓️", "🎯", "🔥", "⭐", "🧠", "🤖", "📣"];
 type Chat = { threadId: string; createdAt: number };
@@ -390,13 +391,8 @@ export function PageView({
   const [requests, setRequests] = useState<RequestView[]>([]);
   const [chats, setChats] = useState<Chat[]>([]);
   const [chatThread, setChatThread] = useState<string | null>(chatThreadId);
-  const [title, setTitle] = useState(page.title);
-  const titleTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const editingTitle = useRef(false);
-
-  useEffect(() => {
-    if (!editingTitle.current) setTitle(page.title);
-  }, [page.title]);
+  const titleSave = usePageTitle(page, rpc);
+  const { title } = titleSave;
   useEffect(() => {
     rpc.call("requests", { pageId: page.id }).then((result) => setRequests(result.requests), () => {});
   }, [rpc, page.id, requestsVersion]);
@@ -412,11 +408,6 @@ export function PageView({
     }
   });
 
-  const saveTitle = (next: string) => {
-    setTitle(next);
-    if (titleTimer.current) clearTimeout(titleTimer.current);
-    titleTimer.current = setTimeout(() => void rpc.call("update", { id: page.id, title: next.trim() }), 400);
-  };
   const floatAvailable = useFloatAvailable();
   const inFloat = useInFloat();
   const studioChat = useStudioChatPresent();
@@ -472,11 +463,10 @@ export function PageView({
               ) : null}
               <TitleField
                 value={title}
+                maxLength={200}
                 // A new page starts with its title, like a new document.
                 autoFocus={!page.title && !page.archived}
-                onFocus={() => (editingTitle.current = true)}
-                onBlur={() => (editingTitle.current = false)}
-                onChange={(event) => saveTitle(event.target.value)}
+                onChange={(event) => titleSave.controller.edit(event.target.value)}
                 onKeyDown={(event) => {
                   if (event.key === "Enter") {
                     event.preventDefault();
@@ -485,6 +475,41 @@ export function PageView({
                 }}
               />
             </div>
+            {titleSave.status !== "saved" || titleSave.localError || titleSave.alternatives.length ? (
+              <div className="mt-3 rounded-md border border-border px-3 py-2 text-sm">
+                <p role="status" aria-live="polite" className={cn(titleSave.status === "failed" || titleSave.status === "conflict" || titleSave.localError ? "text-destructive" : "text-muted-foreground")}>
+                  {titleSave.status === "conflict" ? "The title changed in BB. Your title draft is kept here."
+                    : titleSave.status === "failed" ? "Title save failed."
+                    : titleSave.status === "recovered" ? "Recovered an unsaved title draft."
+                    : titleSave.status === "saved" ? "Title saved to BB."
+                    : "Saving title to BB…"}
+                  {titleSave.localError ? " Local title recovery failed. Keep this page open or download the draft."
+                    : titleSave.status !== "saved" ? " Title draft saved on this browser." : ""}
+                </p>
+                {titleSave.error ? <p className="mt-1 break-words text-muted-foreground">{titleSave.error}</p> : null}
+                {titleSave.status === "conflict" ? <p className="mt-1 break-words">Current title in BB: {untitled(titleSave.currentTitle)}</p> : null}
+                <div className="flex flex-wrap gap-1">
+                  {titleSave.localError ? (
+                    <button type="button" className="min-h-11 rounded-md px-2 underline focus-visible:ring-2 focus-visible:ring-ring" onClick={titleSave.controller.retryLocal}>Retry local title recovery</button>
+                  ) : null}
+                  {["failed", "recovered", "conflict"].includes(titleSave.status) ? (
+                    <button type="button" className="min-h-11 rounded-md px-2 underline focus-visible:ring-2 focus-visible:ring-ring" onClick={titleSave.controller.retry}>Retry title save</button>
+                  ) : null}
+                  {titleSave.status === "conflict" ? (
+                    <button type="button" className="min-h-11 rounded-md px-2 underline focus-visible:ring-2 focus-visible:ring-ring" onClick={titleSave.controller.useMine}>Use my title</button>
+                  ) : null}
+                  {titleSave.status !== "saved" || titleSave.localError ? (
+                    <>
+                      <button type="button" className="min-h-11 rounded-md px-2 underline focus-visible:ring-2 focus-visible:ring-ring" onClick={titleSave.controller.export}>Download title draft</button>
+                      {titleSave.status !== "saved" ? <button type="button" disabled={titleSave.status === "saving"} className="min-h-11 rounded-md px-2 underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" onClick={titleSave.controller.discard}>Discard title draft</button> : null}
+                    </>
+                  ) : null}
+                  {titleSave.alternatives.map(draft => (
+                    <button key={draft.id} type="button" disabled={titleSave.status === "saving"} className="min-h-11 max-w-full rounded-md px-2 text-left underline focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-50" onClick={() => titleSave.controller.choose(draft.id)}>Recover other title: {untitled(draft.title)}</button>
+                  ))}
+                </div>
+              </div>
+            ) : null}
             {page.archived ? (
               <div className="mt-3 flex items-center gap-2 text-sm text-muted-foreground">
                 <Icon name="Archive" className="size-3.5" /> Archived

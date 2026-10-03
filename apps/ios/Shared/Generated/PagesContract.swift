@@ -275,15 +275,17 @@ public enum Pages {
   public struct UpdateInput: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
+    public var expectedTitle: String?
     public var icon: String?
     public var parentId: String?
     public var projectId: String?
     public var position: Double?
     public var archived: Bool?
 
-    public init(id: String? = nil, title: String? = nil, icon: String? = nil, parentId: String? = nil, projectId: String? = nil, position: Double? = nil, archived: Bool? = nil) {
+    public init(id: String? = nil, title: String? = nil, expectedTitle: String? = nil, icon: String? = nil, parentId: String? = nil, projectId: String? = nil, position: Double? = nil, archived: Bool? = nil) {
       self.id = id
       self.title = title
+      self.expectedTitle = expectedTitle
       self.icon = icon
       self.parentId = parentId
       self.projectId = projectId

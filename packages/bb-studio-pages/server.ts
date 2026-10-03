@@ -180,7 +180,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.rpc.register(rpcContract, {
     tree: ({ projectId }) => ({ pages: store.list({ projectId, includeArchived: true }).map(toView) }),
     create: (input) => ({ page: toView(service.createPage({ ...input, actor: HUMAN_USER_ID })) }),
-    update: ({ id, title, icon, parentId, projectId, position, archived }) => {
+    update: ({ id, title, expectedTitle, icon, parentId, projectId, position, archived }) => {
       const meta = requireMeta(id);
       let nextProject = projectId === undefined ? meta.project_id : projectId;
       if (parentId) {
@@ -198,6 +198,7 @@ export default async function plugin(bb: BbPluginApi) {
           archived_at: archived === undefined ? undefined : archived ? Date.now() : null,
         },
         HUMAN_USER_ID,
+        expectedTitle,
       )!;
       if (nextProject !== meta.project_id) {
         for (const child of store.descendants(id)) store.update(child, { project_id: nextProject }, HUMAN_USER_ID);

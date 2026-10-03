@@ -188,6 +188,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({
       id: pageId,
       title: z.string().max(200).optional(),
+      expectedTitle: z.string().max(200).optional(),
       icon: z.string().max(16).optional(),
       parentId: pageId.nullable().optional(),
       projectId: projectId.optional(),

@@ -303,6 +303,10 @@
             "type": "string",
             "maxLength": 200
           },
+          "expectedTitle": {
+            "type": "string",
+            "maxLength": 200
+          },
           "icon": {
             "type": "string",
             "maxLength": 16

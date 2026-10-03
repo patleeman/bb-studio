@@ -4,6 +4,20 @@ import { MIGRATIONS, PageStore } from "./store";
 
 afterEach(() => vi.restoreAllMocks());
 
+it("compares a recovered title in the same SQL write and preserves other writers", () => {
+  const db = new Database(":memory:");
+  try {
+    for (const sql of MIGRATIONS) db.exec(sql);
+    const store = new PageStore(db);
+    const page = store.create({ title: "Original", projectId: null, parentId: null, actor: "user" });
+    store.update(page.id, { title: "Remote" }, "other");
+    expect(() => store.update(page.id, { title: "Recovered", icon: "📄" }, "user", "Original")).toThrow("Page title changed");
+    expect(store.meta(page.id)).toMatchObject({ title: "Remote", icon: "", updated_by: "other" });
+    expect(store.update(page.id, { title: "Recovered" }, "user", "Remote")?.title).toBe("Recovered");
+    expect(store.update(page.id, { icon: "📄" }, "user")?.title).toBe("Recovered");
+  } finally { db.close(); }
+});
+
 it("retains the newest versions at the live limit and supports keeping all", () => {
   vi.spyOn(Date, "now").mockReturnValue(1000);
   const db = new Database(":memory:");
