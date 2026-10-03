@@ -154,6 +154,7 @@ public enum Studio {
     public static let tasks_handoffDefaults = "tasks_handoffDefaults"
     public static let tasks_handOff = "tasks_handOff"
     public static let tasks_bots = "tasks_bots"
+    public static let tasks_scheduleBot = "tasks_scheduleBot"
     public static let tasks_handOffBot = "tasks_handOffBot"
     public static let tasks_syncCheckbox = "tasks_syncCheckbox"
     public static let tasks_sendBack = "tasks_sendBack"
@@ -527,6 +528,8 @@ public enum Studio {
   public typealias TasksBotsInput = StudioJSONValue
 
   public typealias TasksBots = TasksBotsOutput
+
+  public typealias TasksScheduleBot = TasksScheduleBotOutput
 
   public typealias TasksHandOffBot = TasksHandOffBotOutput
 
@@ -11808,6 +11811,7 @@ public enum Studio {
     public var parentId: String?
     public var subtasks: TasksTrackFindingOutputTaskSubtasks?
     public var recurrence: TasksTrackFindingOutputTaskRecurrence?
+    public var schedule: String?
     public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
@@ -11818,7 +11822,7 @@ public enum Studio {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksTrackFindingOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksTrackFindingOutputTaskSubtasks? = nil, recurrence: TasksTrackFindingOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksTrackFindingOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksTrackFindingOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksTrackFindingOutputTaskSubtasks? = nil, recurrence: TasksTrackFindingOutputTaskRecurrence? = nil, schedule: String? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksTrackFindingOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -11833,6 +11837,7 @@ public enum Studio {
       self.parentId = parentId
       self.subtasks = subtasks
       self.recurrence = recurrence
+      self.schedule = schedule
       self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
@@ -12099,6 +12104,7 @@ public enum Studio {
     public var parentId: String?
     public var subtasks: TasksBoardOutputTasksItemSubtasks?
     public var recurrence: TasksBoardOutputTasksItemRecurrence?
+    public var schedule: String?
     public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
@@ -12109,7 +12115,7 @@ public enum Studio {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksBoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksBoardOutputTasksItemSubtasks? = nil, recurrence: TasksBoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksBoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksBoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksBoardOutputTasksItemSubtasks? = nil, recurrence: TasksBoardOutputTasksItemRecurrence? = nil, schedule: String? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksBoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -12124,6 +12130,7 @@ public enum Studio {
       self.parentId = parentId
       self.subtasks = subtasks
       self.recurrence = recurrence
+      self.schedule = schedule
       self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
@@ -12466,6 +12473,7 @@ public enum Studio {
     public var parentId: String?
     public var subtasks: TasksGetOutputTaskSubtasks?
     public var recurrence: TasksGetOutputTaskRecurrence?
+    public var schedule: String?
     public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
@@ -12476,7 +12484,7 @@ public enum Studio {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksGetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksGetOutputTaskSubtasks? = nil, recurrence: TasksGetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksGetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksGetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksGetOutputTaskSubtasks? = nil, recurrence: TasksGetOutputTaskRecurrence? = nil, schedule: String? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksGetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -12491,6 +12499,7 @@ public enum Studio {
       self.parentId = parentId
       self.subtasks = subtasks
       self.recurrence = recurrence
+      self.schedule = schedule
       self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
@@ -12856,6 +12865,7 @@ public enum Studio {
     public var parentId: String?
     public var subtasks: TasksCreateOutputTaskSubtasks?
     public var recurrence: TasksCreateOutputTaskRecurrence?
+    public var schedule: String?
     public var reminderAt: Double?
     public var createdAt: Double?
     public var updatedAt: Double?
@@ -12866,7 +12876,7 @@ public enum Studio {
     public var openThreads: Double?
     public var links: Double?
 
-    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksCreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksCreateOutputTaskSubtasks? = nil, recurrence: TasksCreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksCreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksCreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksCreateOutputTaskSubtasks? = nil, recurrence: TasksCreateOutputTaskRecurrence? = nil, schedule: String? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksCreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
       self.id = id
       self.title = title
       self.description = description
@@ -12881,6 +12891,7 @@ public enum Studio {
       self.parentId = parentId
       self.subtasks = subtasks
       self.recurrence = recurrence
+      self.schedule = schedule
       self.reminderAt = reminderAt
       self.createdAt = createdAt
       self.updatedAt = updatedAt
@@ -13309,6 +13320,56 @@ public enum Studio {
 
     public init(bots: [TasksBotsOutputBotsItem]? = nil) {
       self.bots = bots
+    }
+  }
+
+  public enum TasksScheduleBotInputSchedule: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case weekly
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "weekly": self = .weekly
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .weekly: try container.encode("weekly")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksScheduleBotInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var schedule: TasksScheduleBotInputSchedule?
+
+    public init(id: String? = nil, botId: String? = nil, schedule: TasksScheduleBotInputSchedule? = nil) {
+      self.id = id
+      self.botId = botId
+      self.schedule = schedule
+    }
+  }
+
+  public struct TasksScheduleBotOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 

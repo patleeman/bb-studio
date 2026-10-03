@@ -17119,6 +17119,12 @@
                       }
                     ]
                   },
+                  "schedule": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "reminderAt": {
                     "type": [
                       "number",
@@ -17536,6 +17542,12 @@
                     {
                       "type": "null"
                     }
+                  ]
+                },
+                "schedule": {
+                  "type": [
+                    "string",
+                    "null"
                   ]
                 },
                 "reminderAt": {
@@ -18110,6 +18122,12 @@
                       }
                     ]
                   },
+                  "schedule": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
                   "reminderAt": {
                     "type": [
                       "number",
@@ -18545,6 +18563,12 @@
                   {
                     "type": "null"
                   }
+                ]
+              },
+              "schedule": {
+                "type": [
+                  "string",
+                  "null"
                 ]
               },
               "reminderAt": {
@@ -19282,6 +19306,50 @@
         },
         "required": [
           "bots"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tasks_scheduleBot": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "botId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "schedule": {
+            "type": "string",
+            "enum": [
+              "hourly",
+              "daily",
+              "weekdays",
+              "weekly"
+            ]
+          }
+        },
+        "required": [
+          "id",
+          "botId",
+          "schedule"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "threadId"
         ],
         "additionalProperties": false
       }
