@@ -57,3 +57,21 @@ Captured on stable BB 0.45.0 in an isolated staged app. The Release review chann
 ![A channel, bot profile, and conversation in shared companion tabs](assets/companion-preview.png)
 
 Captured on stable BB 0.45.0 with the full suite installed from pushed commit adc6638. The live check retains the channel’s exact composer DOM, an unsent draft, and `release-review.txt` through switching and folding. Atlas’s Chat action reuses its existing direct conversation, and the channel keeps its own title and member controls without an extra Studio Chat action.
+
+![Grid view with three native BB transcripts and working reaction buttons](assets/channel-grid.png)
+
+The [Focus view](assets/channel-focus.png) keeps one transcript large and the other
+members in a rail. The [Active view](assets/channel-active.png) promotes a running
+thread, while the [phone grid](assets/channel-grid-mobile.png) stacks the transcripts
+above the shared composer.
+
+These captures run in the full stable BB 0.45.0 application with Studio Teams
+installed from pushed commit 7edce33. Live assertions check native reaction rendering and reply routing,
+retention of the exact composer and its draft across all four views, and promotion
+and removal of a running thread in Active.
+
+![Dragging ordinary threads opens the Combine threads dialog](assets/channel-thread-drop.png)
+
+The live sidebar check drags two ordinary threads together, creates a channel
+with both references, and verifies that their projects and parent links stay the
+same. The dialog also offers the existing **Nest threads** action.
