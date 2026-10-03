@@ -1,7 +1,7 @@
 From bda6f61ef39120067f248c095f495d4d37bebf39 Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Fri, 2 Oct 2026 18:09:15 -0400
-Subject: [PATCH 1/6] feat(plugin): retain companion views across native panel
+Subject: [PATCH 1/8] feat(plugin): retain companion views across native panel
  and main outlets
 
 ---
@@ -1266,7 +1266,7 @@ index 4af7e39f6..f6e0c3a49 100644
 From 24d2201fc7094bddbc31ad5bd15287d8e04dcebf Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Fri, 2 Oct 2026 23:41:48 -0400
-Subject: [PATCH 2/6] Control existing companion placement through SDK and CLI
+Subject: [PATCH 2/8] Control existing companion placement through SDK and CLI
 
 ---
  .../plugin/PluginCompanionView.test.tsx       | 46 +++++++++
@@ -1878,7 +1878,7 @@ index f6e0c3a49..1539eb79a 100644
 From 1050e72f34e7c98c54152f79bc88c7bebfe682ec Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Fri, 2 Oct 2026 23:47:50 -0400
-Subject: [PATCH 3/6] Scope embedded leading context to its own composer
+Subject: [PATCH 3/8] Scope embedded leading context to its own composer
 
 ---
  .../embedded-chat/EmbeddedThreadChat.test.tsx | 80 ++++++++++++++++++-
@@ -2101,7 +2101,7 @@ index 1539eb79a..61e95605a 100644
 From 99e2d01ac798fea8191b688877c89805a2893f10 Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Sat, 3 Oct 2026 00:38:50 -0400
-Subject: [PATCH 4/6] Keep distinct main companions visible in unfocused split
+Subject: [PATCH 4/8] Keep distinct main companions visible in unfocused split
  panes
 
 ---
@@ -2288,7 +2288,7 @@ index 61e95605a..f309e429c 100644
 From a91ced4bcd90a9b24888bd3cd62323630775d0a7 Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Sat, 3 Oct 2026 00:46:18 -0400
-Subject: [PATCH 5/6] Observe main outlet ownership in the optimized app
+Subject: [PATCH 5/8] Observe main outlet ownership in the optimized app
 
 ---
  apps/app/src/components/plugin/PluginCompanionView.tsx | 8 ++++++--
@@ -2327,7 +2327,7 @@ index 8da9923d8..3904fb3b1 100644
 From f86b430c0e1b862a2a508029a13f5fbe3b19badd Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Sat, 3 Oct 2026 00:51:37 -0400
-Subject: [PATCH 6/6] Distinguish plugin items when opening split panes
+Subject: [PATCH 6/8] Distinguish plugin items when opening split panes
 
 ---
  .../sidebar/paneContentSplitIndicator.ts      |  4 +-
@@ -2518,6 +2518,1076 @@ index f309e429c..a1ca49cd2 100644
            "Control an existing owner-scoped companion with bb.sdk.plugins.experimental_companionAction or bb plugin companion: dock, float, main, focus, close, pin, unpin and back; delivery counts connected apps, pinned tabs resist close, and absent views are not created",
            "Add headerContent to the page title bar, or a non-interactive experimental_sidebarAccessory to the desktop sidebar row",
          ],
+--
+2.50.1 (Apple Git-155)
+
+
+From 86e090d60342daeda0a78f2514db12f2e5b5261b Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Sat, 3 Oct 2026 01:37:47 -0400
+Subject: [PATCH 7/8] Adopt the original main-thread composer in native
+ companions
+
+---
+ apps/app/src/App.tsx                          |  33 +-
+ .../components/plugin/PluginCompanionView.tsx |  20 +-
+ .../promptbox/FollowUpPromptBox.tsx           |  20 +-
+ .../thread-composer-retention.test.tsx        | 204 +++++++++++
+ .../promptbox/thread-composer-retention.tsx   | 319 ++++++++++++++++++
+ .../thread-detail/ThreadDetailPromptArea.tsx  |   1 +
+ docs/api_to_audit.md                          |  10 +-
+ packages/plugin-sdk/src/app-contract.ts       |   4 +
+ .../references/frontend-hooks-and-ui.md       |   9 +
+ 9 files changed, 596 insertions(+), 24 deletions(-)
+ create mode 100644 apps/app/src/components/promptbox/thread-composer-retention.test.tsx
+ create mode 100644 apps/app/src/components/promptbox/thread-composer-retention.tsx
+
+diff --git a/apps/app/src/App.tsx b/apps/app/src/App.tsx
+index 14e0db6a7..1ae9e438c 100644
+--- a/apps/app/src/App.tsx
++++ b/apps/app/src/App.tsx
+@@ -13,6 +13,7 @@ import { AppLayout } from "./components/layout/AppLayout";
+ import { AuthCallbackView } from "./views/AuthCallbackView";
+ import { QuickCreateProjectProvider } from "./hooks/useQuickCreateProject";
+ import { RouteNavigationProvider } from "./components/ui/app-route-anchor";
++import { ThreadComposerRetentionProvider } from "./components/promptbox/thread-composer-retention";
+ import { RouteNavigationIndicator } from "./components/ui/route-navigation-indicator";
+ import { AppNavigationUrlHost } from "./lib/url-open-routing";
+ import { NativeShellReporter } from "./lib/native-shell";
+@@ -449,21 +450,23 @@ export function App() {
+           <RouteNavigationIndicator />
+           <AppNavigationUrlHost>
+             <AppFileExternalNavigationHost>
+-              <HashNavigationScroll />
+-              <NativeShellReporter />
+-              <UiPreferencesSync />
+-              <Routes>
+-                <Route
+-                  path={AUTH_CALLBACK_ROUTE_PATH}
+-                  element={<AuthCallbackView />}
+-                />
+-                <Route path="*" element={<AppRoutes />} />
+-              </Routes>
+-              <WindowFindHost />
+-              <DesktopZoomIndicator />
+-              <ProviderCliInstallLogDialogHost />
+-              <ServerMoveOverlay />
+-              <AppUpdateHost />
++              <ThreadComposerRetentionProvider>
++                <HashNavigationScroll />
++                <NativeShellReporter />
++                <UiPreferencesSync />
++                <Routes>
++                  <Route
++                    path={AUTH_CALLBACK_ROUTE_PATH}
++                    element={<AuthCallbackView />}
++                  />
++                  <Route path="*" element={<AppRoutes />} />
++                </Routes>
++                <WindowFindHost />
++                <DesktopZoomIndicator />
++                <ProviderCliInstallLogDialogHost />
++                <ServerMoveOverlay />
++                <AppUpdateHost />
++              </ThreadComposerRetentionProvider>
+             </AppFileExternalNavigationHost>
+           </AppNavigationUrlHost>
+         </RouteNavigationProvider>
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.tsx b/apps/app/src/components/plugin/PluginCompanionView.tsx
+index 3904fb3b1..54e3d8136 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.tsx
+@@ -22,6 +22,7 @@ import {
+   type CompanionViewEntry,
+ } from "./companion-view-store";
+ import { mainCompanionOutlets } from "./main-companion-outlets";
++import { CompanionComposerContext } from "@/components/promptbox/thread-composer-retention";
+
+ export const useCompanionViews = () =>
+   useSyncExternalStore(
+@@ -79,7 +80,15 @@ export function PluginCompanionView(props: ExperimentalCompanionViewProps) {
+           : "hidden"
+       }
+     >
+-      {createPortal(props.children, element, key)}
++      {createPortal(
++        <CompanionComposerContext.Provider
++          value={{ show: () => companionViewStore.control(key, "focus") }}
++        >
++          {props.children}
++        </CompanionComposerContext.Provider>,
++        element,
++        key,
++      )}
+     </div>
+   );
+ }
+@@ -130,12 +139,13 @@ export function PluginCompanionOutlet({
+   useLayoutEffect(() => {
+     mainCompanionOutlets.put(key, token, pane?.isFocused ?? true);
+   }, [key, token, pane?.isFocused]);
+-  useLayoutEffect(() => () => mainCompanionOutlets.remove(key, token), [key, token]);
++  useLayoutEffect(
++    () => () => mainCompanionOutlets.remove(key, token),
++    [key, token],
++  );
+   const entry = useCompanionViews().entries.find(
+     (candidate) =>
+       candidate.key === key && candidate.props.placement === "main",
+   );
+-  return entry && ownsOutlet ? (
+-    <CompanionViewOutlet entry={entry} />
+-  ) : null;
++  return entry && ownsOutlet ? <CompanionViewOutlet entry={entry} /> : null;
+ }
+diff --git a/apps/app/src/components/promptbox/FollowUpPromptBox.tsx b/apps/app/src/components/promptbox/FollowUpPromptBox.tsx
+index 073d065cf..6b9c79533 100644
+--- a/apps/app/src/components/promptbox/FollowUpPromptBox.tsx
++++ b/apps/app/src/components/promptbox/FollowUpPromptBox.tsx
+@@ -57,6 +57,7 @@ import { useBottomAnchoredScroll } from "@/components/ui/bottom-anchored-scroll-
+ import { useIsCompactViewport } from "@bb/shared-ui/hooks/use-compact-viewport";
+ import { usePointerCoarse } from "@bb/shared-ui/hooks/use-pointer-coarse";
+ import { ThreadTimelineScrollToBottomButton } from "@/views/thread-detail/ThreadTimelineScrollToBottomButton";
++import { RetainThreadComposer } from "./thread-composer-retention";
+ import { ThreadContextWindowIndicator } from "@/components/thread/timeline";
+ import {
+   PROMPT_STACK_CARD_ROW_HEIGHT,
+@@ -144,6 +145,7 @@ type ContextWindowUsage = ComponentProps<
+ >["usage"];
+
+ export interface FollowUpPromptBoxProps {
++  retainMainComposer?: boolean;
+   id?: string;
+   attachments: AttachmentsConfig;
+   stack: ReactNode | null;
+@@ -885,9 +887,7 @@ function DefaultFollowUpComposer({
+   );
+ }
+
+-export const FollowUpPromptBox = memo(function FollowUpPromptBox(
+-  props: FollowUpPromptBoxProps,
+-) {
++function FollowUpPromptBoxContent(props: FollowUpPromptBoxProps) {
+   if (props.composer === null) {
+     return (
+       <FollowUpPromptBoxStackOnly
+@@ -898,4 +898,18 @@ export const FollowUpPromptBox = memo(function FollowUpPromptBox(
+     );
+   }
+   return <FollowUpPromptBoxWithComposer {...props} composer={props.composer} />;
++}
++
++export const FollowUpPromptBox = memo(function FollowUpPromptBox(
++  props: FollowUpPromptBoxProps,
++) {
++  const scope = props.pluginComposerScope ?? props.pluginComposerHost?.scope;
++  return (
++    <RetainThreadComposer
++      threadId={scope?.kind === "thread" ? scope.threadId : null}
++      main={props.retainMainComposer}
++    >
++      <FollowUpPromptBoxContent {...props} />
++    </RetainThreadComposer>
++  );
+ });
+diff --git a/apps/app/src/components/promptbox/thread-composer-retention.test.tsx b/apps/app/src/components/promptbox/thread-composer-retention.test.tsx
+new file mode 100644
+index 000000000..2a653b82f
+--- /dev/null
++++ b/apps/app/src/components/promptbox/thread-composer-retention.test.tsx
+@@ -0,0 +1,204 @@
++// @vitest-environment jsdom
++import { useContext, useState } from "react";
++import {
++  act,
++  cleanup,
++  fireEvent,
++  render,
++  screen,
++} from "@testing-library/react";
++import { afterEach, describe, expect, it, vi } from "vitest";
++import {
++  CompanionComposerContext,
++  RetainThreadComposer,
++  ThreadComposerRetentionProvider,
++} from "./thread-composer-retention";
++import { ThreadProviderContext } from "@/components/thread/thread-provider-context";
++
++afterEach(cleanup);
++
++function Editor({ submit }: { submit: () => void }) {
++  const [draft, setDraft] = useState("");
++  const provider = useContext(ThreadProviderContext);
++  return (
++    <div>
++      <textarea
++        aria-label="Draft"
++        value={draft}
++        onChange={(event) => setDraft(event.target.value)}
++      />
++      <input type="file" aria-label="File" />
++      <button onClick={submit}>Send with {provider.providerId}</button>
++    </div>
++  );
++}
++
++describe("original main-thread composer adoption", () => {
++  it("moves the original editor and file input, changes callbacks/context, and returns it after closing the companion", () => {
++    const mainSubmit = vi.fn();
++    const companionSubmit = vi.fn();
++    const show = vi.fn();
++    const experience = (companion: boolean, main = true) => (
++      <ThreadComposerRetentionProvider>
++        {main ? (
++          <div data-testid="main">
++            <ThreadProviderContext.Provider
++              value={{ providerId: "main-provider", pluginId: null }}
++            >
++              <RetainThreadComposer threadId="one" main>
++                <Editor submit={mainSubmit} />
++              </RetainThreadComposer>
++            </ThreadProviderContext.Provider>
++          </div>
++        ) : null}
++        {companion ? (
++          <div data-testid="companion">
++            <CompanionComposerContext.Provider value={{ show }}>
++              <ThreadProviderContext.Provider
++                value={{ providerId: "companion-provider", pluginId: null }}
++              >
++                <RetainThreadComposer threadId="one">
++                  <Editor submit={companionSubmit} />
++                </RetainThreadComposer>
++              </ThreadProviderContext.Provider>
++            </CompanionComposerContext.Provider>
++          </div>
++        ) : null}
++      </ThreadComposerRetentionProvider>
++    );
++    const view = render(experience(false));
++    const editor = screen.getByRole("textbox");
++    const input = screen.getByLabelText("File");
++    fireEvent.change(editor, { target: { value: "Keep this exact draft" } });
++    editor.focus();
++    view.rerender(experience(true));
++    expect(screen.getAllByRole("textbox")).toEqual([editor]);
++    expect(screen.getByLabelText("File")).toBe(input);
++    expect(screen.getByTestId("companion").contains(editor)).toBe(true);
++    expect(document.activeElement).toBe(editor);
++    fireEvent.click(screen.getByText("Show companion"));
++    expect(show).toHaveBeenCalledOnce();
++    fireEvent.click(screen.getByText("Send with companion-provider"));
++    expect(companionSubmit).toHaveBeenCalledOnce();
++    expect(mainSubmit).not.toHaveBeenCalled();
++    view.rerender(experience(true, false));
++    expect(screen.getByRole("textbox")).toBe(editor);
++    view.rerender(experience(true));
++    expect(screen.getAllByRole("textbox")).toEqual([editor]);
++    view.rerender(experience(false));
++    expect(screen.getByRole("textbox")).toBe(editor);
++    expect(screen.getByTestId("main").contains(editor)).toBe(true);
++  });
++
++  it("returns the original owner to an available main anchor after the companion closes", () => {
++    const experience = (companion: boolean) => (
++      <ThreadComposerRetentionProvider>
++        <div data-testid="main">
++          <RetainThreadComposer threadId="one" main>
++            <Editor submit={() => {}} />
++          </RetainThreadComposer>
++        </div>
++        {companion ? (
++          <div>
++            <CompanionComposerContext.Provider value={{ show() {} }}>
++              <RetainThreadComposer threadId="one">
++                <Editor submit={() => {}} />
++              </RetainThreadComposer>
++            </CompanionComposerContext.Provider>
++          </div>
++        ) : null}
++      </ThreadComposerRetentionProvider>
++    );
++    const view = render(experience(false));
++    const editor = screen.getByRole("textbox");
++    fireEvent.change(editor, { target: { value: "Return me" } });
++    view.rerender(experience(true));
++    view.rerender(experience(false));
++    expect(screen.getByRole("textbox")).toBe(editor);
++    expect(screen.getByTestId("main").contains(editor)).toBe(true);
++    expect(editor instanceof HTMLTextAreaElement && editor.value).toBe(
++      "Return me",
++    );
++  });
++
++  it("adopts the recently focused main pane and leaves other main editors independent", () => {
++    const experience = (companion: boolean, threadId = "one") => (
++      <ThreadComposerRetentionProvider>
++        {["first", "second"].map((id) => (
++          <div key={id} data-testid={id}>
++            <RetainThreadComposer threadId={threadId} main>
++              <Editor submit={() => {}} />
++            </RetainThreadComposer>
++          </div>
++        ))}
++        {companion ? (
++          <div data-testid="companion">
++            <CompanionComposerContext.Provider value={{ show() {} }}>
++              <RetainThreadComposer threadId={threadId}>
++                <Editor submit={() => {}} />
++              </RetainThreadComposer>
++            </CompanionComposerContext.Provider>
++          </div>
++        ) : null}
++      </ThreadComposerRetentionProvider>
++    );
++    const view = render(experience(false));
++    const [first, second] = screen.getAllByRole("textbox");
++    fireEvent.change(first!, { target: { value: "First pane" } });
++    fireEvent.change(second!, { target: { value: "Second pane" } });
++    act(() => second!.focus());
++    view.rerender(experience(true));
++    expect(screen.getByTestId("companion").contains(second!)).toBe(true);
++    expect(screen.getByTestId("first").contains(first!)).toBe(true);
++    expect(screen.getAllByRole("textbox")).toHaveLength(2);
++    view.rerender(experience(false, "different"));
++    expect(screen.getAllByRole("textbox")).not.toContain(first);
++    expect(screen.getAllByRole("textbox")).not.toContain(second);
++  });
++  it("preserves a contenteditable selection while moving its original nodes", () => {
++    const experience = (companion: boolean) => (
++      <ThreadComposerRetentionProvider>
++        <RetainThreadComposer threadId="one" main>
++          <div contentEditable suppressContentEditableWarning role="textbox">
++            Original selected draft
++          </div>
++        </RetainThreadComposer>
++        {companion ? (
++          <CompanionComposerContext.Provider value={{ show() {} }}>
++            <RetainThreadComposer threadId="one">
++              <div
++                contentEditable
++                suppressContentEditableWarning
++                role="textbox"
++              >
++                Original selected draft
++              </div>
++            </RetainThreadComposer>
++          </CompanionComposerContext.Provider>
++        ) : null}
++      </ThreadComposerRetentionProvider>
++    );
++    const view = render(experience(false));
++    const editor = screen.getByRole("textbox");
++    const text = editor.firstChild!;
++    const range = document.createRange();
++    range.setStart(text, 9);
++    range.setEnd(text, 17);
++    const selection = window.getSelection()!;
++    selection.removeAllRanges();
++    selection.addRange(range);
++    view.rerender(experience(true));
++    expect(screen.getByRole("textbox")).toBe(editor);
++    expect(selection.toString()).toBe("selected");
++    expect(selection.anchorNode).toBe(text);
++    expect(selection.focusNode).toBe(text);
++    expect(selection.anchorOffset).toBe(9);
++    expect(selection.focusOffset).toBe(17);
++    selection.setBaseAndExtent(text, 17, text, 9);
++    view.rerender(experience(false));
++    expect(screen.getByRole("textbox")).toBe(editor);
++    expect(selection.toString()).toBe("selected");
++    expect(selection.anchorOffset).toBe(17);
++    expect(selection.focusOffset).toBe(9);
++  });
++});
+diff --git a/apps/app/src/components/promptbox/thread-composer-retention.tsx b/apps/app/src/components/promptbox/thread-composer-retention.tsx
+new file mode 100644
+index 000000000..1d72bb6f8
+--- /dev/null
++++ b/apps/app/src/components/promptbox/thread-composer-retention.tsx
+@@ -0,0 +1,319 @@
++import {
++  createContext,
++  useContext,
++  useLayoutEffect,
++  useRef,
++  useState,
++  useSyncExternalStore,
++  type ReactNode,
++} from "react";
++import { createPortal } from "react-dom";
++import { PaneContext } from "@/views/thread-detail/PaneContext";
++import { BottomAnchorContext } from "@/components/ui/bottom-anchored-scroll-body";
++import { ThreadProviderContext } from "@/components/thread/thread-provider-context";
++import { PluginContext } from "@/components/plugin/plugin-context";
++
++export const CompanionComposerContext = createContext<{ show(): void } | null>(
++  null,
++);
++
++interface Registration {
++  id: string;
++  threadId: string;
++  element: HTMLElement;
++  content: ReactNode;
++  companion: { show(): void } | null;
++  focused: boolean;
++  focusOrder: number;
++}
++
++interface View {
++  element: HTMLDivElement;
++  id: string;
++  threadId: string;
++  mainId?: string;
++  destination: Registration;
++}
++
++export function createThreadComposerRetentionStore() {
++  const registrations = new Map<string, Registration>();
++  const listeners = new Set<() => void>();
++  let views: View[] = [];
++  let focusOrder = 0;
++  const refresh = () => {
++    const next: View[] = [];
++    const used = new Set<string>();
++    const all = [...registrations.values()];
++    const mains = all.filter((entry) => !entry.companion);
++    const take = (view: View) => {
++      used.add(view.id);
++      next.push(view);
++    };
++    for (const companion of all.filter((entry) => entry.companion)) {
++      const main = mains
++        .filter((entry) => entry.threadId === companion.threadId)
++        .sort(
++          (a, b) =>
++            b.focusOrder - a.focusOrder ||
++            Number(b.focused) - Number(a.focused),
++        )[0];
++      const existing =
++        views.find(
++          (view) =>
++            !used.has(view.id) &&
++            view.threadId === companion.threadId &&
++            view.destination.id === companion.id,
++        ) ??
++        views.find(
++          (view) =>
++            !used.has(view.id) &&
++            view.threadId === companion.threadId &&
++            view.mainId === main?.id,
++        );
++      const mainId = mains.some(
++        (candidate) => candidate.id === existing?.mainId,
++      )
++        ? existing?.mainId
++        : (main?.id ?? existing?.mainId);
++      take({
++        element: existing?.element ?? document.createElement("div"),
++        id: existing?.id ?? `${companion.id}:${companion.threadId}`,
++        threadId: companion.threadId,
++        mainId,
++        destination: companion,
++      });
++    }
++    for (const main of mains) {
++      if (next.some((view) => view.mainId === main.id)) continue;
++      const existing = views.find(
++        (view) =>
++          !used.has(view.id) &&
++          view.threadId === main.threadId &&
++          view.mainId === main.id,
++      );
++      take({
++        element: existing?.element ?? document.createElement("div"),
++        id: existing?.id ?? `${main.id}:${main.threadId}`,
++        threadId: main.threadId,
++        mainId: main.id,
++        destination: main,
++      });
++    }
++    views = next;
++    views.forEach((view) =>
++      moveComposerElement(view.element, view.destination.element),
++    );
++    listeners.forEach((listener) => listener());
++  };
++  return {
++    subscribe: (listener: () => void) => {
++      listeners.add(listener);
++      return () => {
++        listeners.delete(listener);
++      };
++    },
++    getSnapshot: () => views,
++    put: (entry: Omit<Registration, "focusOrder">) => {
++      registrations.set(entry.id, {
++        ...entry,
++        focusOrder: registrations.get(entry.id)?.focusOrder ?? 0,
++      });
++      refresh();
++    },
++    remove: (id: string) => {
++      if (registrations.delete(id)) refresh();
++    },
++    focus: (id: string) => {
++      const entry = registrations.get(id);
++      if (entry) {
++        entry.focusOrder = ++focusOrder;
++        refresh();
++      }
++    },
++    isMoved: (id: string) =>
++      views.some((view) => view.mainId === id && view.destination.id !== id),
++    show: (id: string) =>
++      views.find((view) => view.mainId === id)?.destination.companion?.show(),
++  };
++}
++
++const RetentionContext = createContext<ReturnType<
++  typeof createThreadComposerRetentionStore
++> | null>(null);
++
++function moveComposerElement(
++  element: HTMLDivElement,
++  destination: HTMLElement,
++) {
++  if (element.parentElement === destination) return;
++  element.className = "min-w-0";
++  const focused = element.contains(document.activeElement)
++    ? document.activeElement
++    : null;
++  const selection = window.getSelection();
++  const range =
++    selection?.rangeCount && element.contains(selection.anchorNode)
++      ? (() => {
++          return {
++            anchor: selection.anchorNode!,
++            anchorOffset: selection.anchorOffset,
++            focus: selection.focusNode!,
++            focusOffset: selection.focusOffset,
++          };
++        })()
++      : null;
++  const scroll = [element, ...element.querySelectorAll<HTMLElement>("*")]
++    .filter((node) => node.scrollTop || node.scrollLeft)
++    .map((node) => ({ node, top: node.scrollTop, left: node.scrollLeft }));
++  destination.append(element);
++  scroll.forEach(({ node, top, left }) => {
++    node.scrollTop = top;
++    node.scrollLeft = left;
++  });
++  if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
++  if (range && selection) {
++    selection.setBaseAndExtent(
++      range.anchor,
++      range.anchorOffset,
++      range.focus,
++      range.focusOffset,
++    );
++  }
++}
++
++function RetainedComposerView({ view }: { view: View }) {
++  useLayoutEffect(() => () => view.element.remove(), [view.element]);
++  return createPortal(view.destination.content, view.element, view.id);
++}
++
++function RetainedComposerViews({
++  store,
++}: {
++  store: ReturnType<typeof createThreadComposerRetentionStore>;
++}) {
++  const views = useSyncExternalStore(
++    store.subscribe,
++    store.getSnapshot,
++    store.getSnapshot,
++  );
++  return (
++    <>
++      {views.map((view) => (
++        <RetainedComposerView key={view.id} view={view} />
++      ))}
++    </>
++  );
++}
++
++export function ThreadComposerRetentionProvider({
++  children,
++}: {
++  children: ReactNode;
++}) {
++  const [store] = useState(createThreadComposerRetentionStore);
++  return (
++    <RetentionContext.Provider value={store}>
++      {children}
++      <RetainedComposerViews store={store} />
++    </RetentionContext.Provider>
++  );
++}
++
++export function RetainThreadComposer({
++  threadId,
++  main = false,
++  children,
++}: {
++  threadId: string | null;
++  main?: boolean;
++  children: ReactNode;
++}) {
++  const store = useContext(RetentionContext);
++  const companion = useContext(CompanionComposerContext);
++  if (!store || !threadId || (!main && !companion)) return <>{children}</>;
++  return (
++    <ThreadComposerSlot store={store} threadId={threadId} companion={companion}>
++      {children}
++    </ThreadComposerSlot>
++  );
++}
++
++function ThreadComposerSlot({
++  store,
++  threadId,
++  companion,
++  children,
++}: {
++  store: ReturnType<typeof createThreadComposerRetentionStore>;
++  threadId: string;
++  companion: { show(): void } | null;
++  children: ReactNode;
++}) {
++  const pane = useContext(PaneContext);
++  const anchor = useContext(BottomAnchorContext);
++  const provider = useContext(ThreadProviderContext);
++  const plugin = useContext(PluginContext);
++  const [id] = useState(() => crypto.randomUUID());
++  const destination = useRef<HTMLDivElement>(null);
++  const moved = useSyncExternalStore(
++    store.subscribe,
++    () => store.isMoved(id),
++    () => false,
++  );
++  useLayoutEffect(() => {
++    if (!destination.current) return;
++    store.put({
++      id,
++      threadId,
++      element: destination.current,
++      companion,
++      focused: pane?.isFocused ?? false,
++      content: (
++        <PaneContext.Provider value={pane}>
++          <BottomAnchorContext.Provider value={anchor}>
++            <ThreadProviderContext.Provider value={provider}>
++              <PluginContext.Provider value={plugin}>
++                {children}
++              </PluginContext.Provider>
++            </ThreadProviderContext.Provider>
++          </BottomAnchorContext.Provider>
++        </PaneContext.Provider>
++      ),
++    });
++  }, [
++    store,
++    id,
++    threadId,
++    companion,
++    pane,
++    anchor,
++    provider,
++    plugin,
++    children,
++  ]);
++  useLayoutEffect(() => {
++    const node = destination.current;
++    const focus = () => store.focus(id);
++    node?.addEventListener("focusin", focus);
++    return () => {
++      node?.removeEventListener("focusin", focus);
++      store.remove(id);
++    };
++  }, [store, id]);
++  return (
++    <div ref={destination} data-retained-thread-composer={threadId}>
++      {moved ? (
++        <div className="flex items-center justify-center gap-3 p-3 text-sm text-muted-foreground">
++          <span>This composer is open in a companion.</span>
++          <button
++            type="button"
++            className="rounded-md border border-border px-2 py-1 text-foreground"
++            onClick={() => store.show(id)}
++          >
++            Show companion
++          </button>
++        </div>
++      ) : null}
++    </div>
++  );
++}
+diff --git a/apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx b/apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx
+index 552c524c7..62ba1a7df 100644
+--- a/apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx
++++ b/apps/app/src/views/thread-detail/ThreadDetailPromptArea.tsx
+@@ -2298,6 +2298,7 @@ export function ThreadDetailPromptArea({
+   const bottomContent = (
+     <FollowUpPromptBox
+       id={THREAD_DETAIL_COMPOSER_TEXTAREA_ID}
++      retainMainComposer
+       attachments={bottomAttachmentsConfig}
+       stack={pendingInteractionNode ? pendingInteractionStack : promptStack}
+       pendingInteraction={pendingInteractionNode}
+diff --git a/docs/api_to_audit.md b/docs/api_to_audit.md
+index fb4ba41d4..46ea84c0d 100644
+--- a/docs/api_to_audit.md
++++ b/docs/api_to_audit.md
+@@ -64,9 +64,17 @@ plugin CSS root, draft and attachment inputs, editor state, and scroll during
+ placement and route changes. Increment `activation` for explicit focus;
+ zero registers in the background. Metadata updates do not reverse dismissal
+ or steal selection from native Browser/Terminal tabs. Pins participate in the
+-native tab strip's close policy. Only the focused main pane hosts companions.
++native tab strip's close policy. Only the focused main pane hosts workbench companions.
+ The owner persists identities and placement; the host keeps native selection,
+ tab order, dismissal, and activation baselines in per-window session storage.
++A native `ThreadChat` companion adopts the original main thread's bottom
++composer when one is mounted, preferring the most recently focused main pane.
++The retained editor and file input move with their undo history and selection;
++current destination callbacks and provider context replace the source bindings.
++Main anchors show a Show companion action. Closing returns the original
++composer to an available main anchor, including a newly mounted thread route.
++Other main panes remain independent. When no anchor or companion remains,
++its live view is disposed. Queued prompts and message editors stay inline.
+ Removing the owner disposes its live view. The test runtime renders
+ View children inline and has no native panel or main outlet implementation.
+
+diff --git a/packages/plugin-sdk/src/app-contract.ts b/packages/plugin-sdk/src/app-contract.ts
+index 63f6d94dc..299693fdc 100644
+--- a/packages/plugin-sdk/src/app-contract.ts
++++ b/packages/plugin-sdk/src/app-contract.ts
+@@ -3306,6 +3306,10 @@ export type ExperimentalCompanionPlacement = "floating" | "workbench" | "main";
+  * identity are scoped to the calling plugin and `id` in the current window.
+  * The plugin persists its own tab identities and placement across reloads.
+  * BB keeps native tab selection, order, and dismissal in per-window session storage.
++ * An embedded `ThreadChat` adopts an existing main thread's bottom composer,
++ * retaining its original editor, file input, and undo history. Destination
++ * callbacks and provider context remain current. Closing returns that composer
++ * to an available main anchor; other main panes retain independent composers.
+  */
+ export interface ExperimentalCompanionViewProps {
+   id: string;
+diff --git a/plugins/bb-guide/skills/bb-plugin-authoring/references/frontend-hooks-and-ui.md b/plugins/bb-guide/skills/bb-plugin-authoring/references/frontend-hooks-and-ui.md
+index 619d2c87e..4f76b146b 100644
+--- a/plugins/bb-guide/skills/bb-plugin-authoring/references/frontend-hooks-and-ui.md
++++ b/plugins/bb-guide/skills/bb-plugin-authoring/references/frontend-hooks-and-ui.md
+@@ -182,6 +182,15 @@ component kit is removed. The app module still exports focused BB capability
+ components such as `ThreadChat`, `Markdown`, file links, pickers, source and
+ diff viewers, and the new-thread composer.
+
++`experimental_CompanionView` and `experimental_CompanionOutlet` retain one
++live view across floating, native workbench, and main placement. A `ThreadChat`
++inside a companion adopts the existing main thread's bottom composer. Its
++original editor and attachment input keep their local state and undo history;
++callbacks and provider context follow the destination. Closing the companion
++returns that composer to an available main thread. Keep the overlay owner
++mounted and use a stable companion ID throughout placement changes.
++
++
+ - Most builtin plugins in this repo import shared UI from `@bb/shared-ui`
+   (the single source of truth the app also consumes and the registry
+   generates from). Forkable builtins (`scripts/forkable-plugins.json`) import
+--
+2.50.1 (Apple Git-155)
+
+
+From c3191cf76834845494ec04a251cad6ffdbfaadb5 Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Sat, 3 Oct 2026 01:38:03 -0400
+Subject: [PATCH 8/8] Keep native companions visible across plugin-page
+ navigation
+
+---
+ .../plugin/PluginCompanionView.test.tsx       | 45 ++++++++++++++++
+ .../plugin/PluginPanelRightPanelHost.test.tsx | 53 +++++++++++++++++++
+ .../plugin/PluginPanelRightPanelHost.tsx      | 27 ++++++++--
+ .../components/plugin/useCompanionPanel.tsx   | 17 ++++--
+ .../secondary-panel/SecondaryPanelLayout.tsx  |  2 +
+ docs/api_to_audit.md                          |  4 ++
+ 6 files changed, 141 insertions(+), 7 deletions(-)
+
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.test.tsx b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+index 832492431..619c50c02 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.test.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+@@ -331,6 +331,51 @@ describe("retained native companion views", () => {
+ });
+
+ describe("companion selection policy", () => {
++  it("keeps a visible companion open when navigation selects a different closed native panel", () => {
++    const toggle = vi.fn();
++    function Owner({
++      open,
++      contextKey,
++    }: {
++      open: boolean;
++      contextKey: string;
++    }) {
++      const visibility = useCompanionPanelVisibility(
++        open,
++        toggle,
++        noop,
++        true,
++        contextKey,
++      );
++      return (
++        <PluginContext.Provider value="owner">
++          <output>{visibility.open ? "Visible" : "Hidden"}</output>
++          <PluginCompanionView
++            id="one"
++            title="One"
++            placement="workbench"
++            activation={1}
++            onSelect={noop}
++            onClose={noop}
++            onPlacementChange={noop}
++          >
++            <textarea />
++          </PluginCompanionView>
++        </PluginContext.Provider>
++      );
++    }
++    const view = render(<Owner open contextKey="first" />);
++    expect(screen.getByText("Visible")).toBeTruthy();
++    toggle.mockClear();
++    view.rerender(<Owner open={false} contextKey="second" />);
++    expect(screen.getByText("Visible")).toBeTruthy();
++    expect(toggle).toHaveBeenCalledOnce();
++    expect(companionViewStore.getSnapshot().visible).toBe(true);
++    view.rerender(<Owner open contextKey="second" />);
++    view.rerender(<Owner open={false} contextKey="second" />);
++    expect(screen.getByText("Hidden")).toBeTruthy();
++  });
++
+   it("keeps native header and keyboard toggles consistent with companion requests and dismissal", () => {
+     function Owner({
+       activation,
+diff --git a/apps/app/src/components/plugin/PluginPanelRightPanelHost.test.tsx b/apps/app/src/components/plugin/PluginPanelRightPanelHost.test.tsx
+index 1c29db539..1d0d21639 100644
+--- a/apps/app/src/components/plugin/PluginPanelRightPanelHost.test.tsx
++++ b/apps/app/src/components/plugin/PluginPanelRightPanelHost.test.tsx
+@@ -36,6 +36,7 @@ import {
+ } from "@/lib/fixed-panel-tabs-state";
+ import * as panelSplits from "@/components/secondary-panel/lazySecondaryPanelComponents";
+ import { PluginPanelRightPanelHost } from "./PluginPanelRightPanelHost";
++import { companionViewStore } from "./companion-view-store";
+ import { openPluginDetailsInWorkspace } from "./plugin-detail-opener";
+ import { getPluginPagePanelStateId } from "./plugin-page-panel-state";
+ import { useAppNavigationHost } from "@/lib/app-navigation-host";
+@@ -743,6 +744,58 @@ describe("PluginPanelRightPanelHost", () => {
+     resetPluginLogoStoreForTest();
+   });
+
++  it("keeps a workbench companion visible with no persisted native tabs and honors explicit hide/show", async () => {
++    const element = document.createElement("div");
++    const home = document.createElement("div");
++    const key = JSON.stringify(["capture-owner", "thread"]);
++    companionViewStore.put({
++      key,
++      element,
++      home,
++      props: {
++        id: "thread",
++        title: "Thread",
++        placement: "workbench",
++        activation: 1,
++        onSelect() {},
++        onClose() {},
++        onPlacementChange() {},
++        children: null,
++      },
++    });
++    try {
++      renderHost();
++      await waitFor(() =>
++        expect(
++          screen
++            .getByTestId("shared-secondary-panel-region")
++            .hasAttribute("hidden"),
++        ).toBe(false),
++      );
++      expect(companionViewStore.getSnapshot().visible).toBe(true);
++      fireEvent.click(
++        await screen.findByRole("button", { name: "Hide right panel" }),
++      );
++      await waitFor(() =>
++        expect(companionViewStore.getSnapshot().visible).toBe(false),
++      );
++      fireEvent.click(
++        await screen.findByRole("button", { name: "Show right panel" }),
++      );
++      await waitFor(() =>
++        expect(companionViewStore.getSnapshot().visible).toBe(true),
++      );
++      expect(
++        screen
++          .getByTestId("shared-secondary-panel-region")
++          .hasAttribute("hidden"),
++      ).toBe(false);
++    } finally {
++      cleanup();
++      companionViewStore.remove(key, element);
++    }
++  });
++
+   it.each([
+     ["compact", true],
+     ["wide", false],
+diff --git a/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx b/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx
+index 8b458535a..bcc468c2e 100644
+--- a/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx
++++ b/apps/app/src/components/plugin/PluginPanelRightPanelHost.tsx
+@@ -1,3 +1,5 @@
++import { useCompanionViews } from "./PluginCompanionView";
++import { companionViewStore } from "./companion-view-store";
+ import {
+   useCallback,
+   useEffect,
+@@ -316,10 +318,15 @@ export function PluginPanelRightPanelHost({
+   const persistedPanelOpen = isCompactViewport
+     ? isCompactDrawerOpen
+     : panelState.secondary.isOpen;
++  const companions = useCompanionViews();
++  const hasWorkbenchCompanions =
++    isFocused &&
++    companions.entries.some((entry) => entry.props.placement === "workbench");
+   const isOpen =
+-    activePluginDetailId === null
++    (hasWorkbenchCompanions && companions.visible) ||
++    (activePluginDetailId === null
+       ? persistedPanelOpen
+-      : isPluginDetailPanelOpen;
++      : isPluginDetailPanelOpen);
+   const activeTab =
+     activePluginDetailId === null
+       ? (panelState.secondary.tabs.find(
+@@ -406,6 +413,7 @@ export function PluginPanelRightPanelHost({
+   }, [closeCompactDrawer, subPath]);
+
+   const revealPanel = useCallback(() => {
++    if (hasWorkbenchCompanions) companionViewStore.show(true);
+     setIsPluginDetailPanelOpen(true);
+     if (isCompactViewport) {
+       setCompactDrawerOpen(true);
+@@ -415,7 +423,12 @@ export function PluginPanelRightPanelHost({
+       ...state,
+       secondary: { ...state.secondary, isOpen: true },
+     }));
+-  }, [isCompactViewport, setCompactDrawerOpen, updatePanelState]);
++  }, [
++    isCompactViewport,
++    setCompactDrawerOpen,
++    updatePanelState,
++    hasWorkbenchCompanions,
++  ]);
+   const selectPersistedPanelTab = useCallback(() => {
+     setActivePluginDetailId(null);
+     setIsPluginDetailPanelOpen(false);
+@@ -553,6 +566,7 @@ export function PluginPanelRightPanelHost({
+     [openFilePreview, openFixedTab],
+   );
+   const hidePanel = useCallback(() => {
++    if (hasWorkbenchCompanions) companionViewStore.show(false);
+     setIsPluginDetailPanelOpen(false);
+     setIsPluginDetailFullPage(false);
+     if (isCompactViewport) {
+@@ -560,7 +574,12 @@ export function PluginPanelRightPanelHost({
+       return;
+     }
+     closePersistedPanel();
+-  }, [closeCompactDrawer, closePersistedPanel, isCompactViewport]);
++  }, [
++    closeCompactDrawer,
++    closePersistedPanel,
++    isCompactViewport,
++    hasWorkbenchCompanions,
++  ]);
+   const openNewTab = useCallback(() => {
+     selectPersistedPanelTab();
+     openTab({ kind: "new-tab" });
+diff --git a/apps/app/src/components/plugin/useCompanionPanel.tsx b/apps/app/src/components/plugin/useCompanionPanel.tsx
+index 3f3a42971..e3cbd4247 100644
+--- a/apps/app/src/components/plugin/useCompanionPanel.tsx
++++ b/apps/app/src/components/plugin/useCompanionPanel.tsx
+@@ -15,6 +15,7 @@ export function useCompanionPanelVisibility(
+   onToggle: () => void,
+   onClose: () => void,
+   syncNative = true,
++  contextKey: string | null = null,
+ ) {
+   const pane = useOptionalPaneContext();
+   const state = useCompanionViews();
+@@ -23,21 +24,31 @@ export function useCompanionPanelVisibility(
+     ownsCompanions &&
+     state.entries.some((entry) => entry.props.placement === "workbench");
+   const isOpen = open || (hasCompanions && state.visible);
+-  const previous = useRef({ open, hasCompanions: false, focusRequest: 0 });
++  const previous = useRef({
++    open,
++    hasCompanions: false,
++    focusRequest: 0,
++    contextKey,
++  });
+   useLayoutEffect(() => {
+     const before = previous.current;
+     previous.current = {
+       open,
+       hasCompanions,
+       focusRequest: state.focusRequest,
++      contextKey,
+     };
+     if (!syncNative || !hasCompanions) return;
+     const requested =
+       state.visible &&
+-      (!before.hasCompanions || before.focusRequest !== state.focusRequest);
++      (!before.hasCompanions ||
++        before.focusRequest !== state.focusRequest ||
++        before.contextKey !== contextKey);
+     if (requested && !open) onToggle();
+-    else if (before.open && !open) companionViewStore.show(false);
++    else if (before.contextKey === contextKey && before.open && !open)
++      companionViewStore.show(false);
+   }, [
++    contextKey,
+     hasCompanions,
+     onToggle,
+     open,
+diff --git a/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx b/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx
+index 0b3ddaee0..c9dee37c0 100644
+--- a/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx
++++ b/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx
+@@ -82,6 +82,8 @@ export function SecondaryPanelLayout(props: SecondaryPanelLayoutProps) {
+     props.open,
+     props.onToggle,
+     props.onClose,
++    true,
++    props.contentKey,
+   );
+   return <SecondaryPanelLayoutContent {...props} {...visibility} />;
+ }
+diff --git a/docs/api_to_audit.md b/docs/api_to_audit.md
+index 46ea84c0d..8d2ae0aa2 100644
+--- a/docs/api_to_audit.md
++++ b/docs/api_to_audit.md
+@@ -65,6 +65,10 @@ placement and route changes. Increment `activation` for explicit focus;
+ zero registers in the background. Metadata updates do not reverse dismissal
+ or steal selection from native Browser/Terminal tabs. Pins participate in the
+ native tab strip's close policy. Only the focused main pane hosts workbench companions.
++Navigating to a different native panel context retains their visible state.
++Plugin-page hosts count visible companions even when their persisted native
++panel has no tabs. Explicit Hide, Show, and native header toggles update the
++shared companion visibility; native-state reconciliation does not dismiss it.
+ The owner persists identities and placement; the host keeps native selection,
+ tab order, dismissal, and activation baselines in per-window session storage.
+ A native `ThreadChat` companion adopts the original main thread's bottom
 --
 2.50.1 (Apple Git-155)
 

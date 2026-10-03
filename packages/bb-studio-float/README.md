@@ -82,6 +82,20 @@ BB_CAPTURE_COMPANION_SPLIT=1 BB_CAPTURE_ONLY=float-native-split \
   node scripts/capture-plugin-screenshots.mjs --plugin float
 ```
 
+![Original main-thread draft and attachment retained in the workbench](assets/native-first-thread-preview.png)
+
+The first-thread capture writes a draft and selects a real file in the main
+thread before opening Float. It checks the exact original editor and file
+input through undo/redo, navigation away, workbench and main placement, and
+closing the companion back into the main thread. It also checks the displayed
+model, one live composer, and that the original editor is inside the final
+screenshot after the sidebar collapses. No agent runs for this fixture.
+
+```sh
+BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \
+  node scripts/capture-plugin-screenshots.mjs --plugin float
+```
+
 ## What you get
 
 - **Float from the sidebar.** **Float** is in the menu of every thread row (with

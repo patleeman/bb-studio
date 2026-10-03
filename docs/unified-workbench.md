@@ -384,3 +384,21 @@ six commits. Split routing/navigation/outlet checks pass 112 tests, existing
 split workspace UI checks pass 75, app types and the 50-task optimized build
 pass, and Plugin Guide's 75 tests pass. Legacy-host transfers, original core
 main-thread adoption, playback continuity, and the final audit remain open.
+
+
+Original core main-thread adoption now has live proof. The persistent app
+owner adopts the main thread's exact editor and file input, preserves undo
+and selection direction, and refreshes callbacks and provider context from
+the destination. Returning to a new main anchor and closing the companion
+returns the same editor. Other main panes remain independent. Four retention
+regressions plus existing composer/native panel checks pass 107 tests; app
+types, SDK/Guide tests, and the 50-task optimized build pass.
+
+The [first-thread capture](../packages/bb-studio-float/assets/native-first-thread-preview.png)
+checks original nodes, draft/file, undo/redo, displayed model, navigation,
+workbench/main placement, close/return, and the final viewport. Its final-frame
+assertion caught native panel reconciliation treating navigation as dismissal.
+The host now counts visible companions even without persisted native tabs;
+explicit Hide/Show remain effective. The saved core patch contains eight
+verified commits. Legacy-host transfers, playback continuity, native desktop
+Reactions menu QA, and the final suite audit remain open.
