@@ -78,7 +78,8 @@ plugins.** Keep what the SDK allows, migrate what we own, and accept the rest:
   posts, task links, Teams data, and Pages markdown (the pages plugin runs the
   same rewrite in its own migration). Idempotent, logged, counted.
 - **Moved**: CLI commands move under `bb studio <old-id> …` (for example
-  `bb studio feed post`). Update every skill, agent instruction string, README
+  `bb studio feed post`). Explore belongs to Pages and uses `bb pages explore …`.
+  Update every skill, agent instruction string, README
   and doc that names an old command in the same change.
 - **Accepted loss**: refs and links inside past BB thread transcripts (core
   data) and external bookmarks stop resolving. Studio's own resolver
