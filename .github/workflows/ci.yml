@@ -24,3 +24,4 @@ jobs:
       - run: pnpm check:docs
       - run: pnpm check:marketplace
       - run: pnpm check:contracts
+      - run: pnpm check:kit
