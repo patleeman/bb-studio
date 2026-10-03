@@ -21,7 +21,8 @@ function place(view: View, destination: HTMLElement) {
   } : null;
   const scroll = [...view.element.querySelectorAll<HTMLElement>("*")].filter(node => node.scrollTop || node.scrollLeft)
     .map(node => ({ node, top: node.scrollTop, left: node.scrollLeft }));
-  destination.append(view.element);
+  if (view.element.isConnected && destination.isConnected && "moveBefore" in destination && typeof destination.moveBefore === "function") destination.moveBefore(view.element, null);
+  else destination.append(view.element);
   scroll.forEach(({ node, top, left }) => { node.scrollTop = top; node.scrollLeft = left; });
   if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
   if (range && selection) selection.setBaseAndExtent(range.anchor, range.anchorOffset, range.focus, range.focusOffset);

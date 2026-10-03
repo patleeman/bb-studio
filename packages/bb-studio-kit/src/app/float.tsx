@@ -5,7 +5,7 @@
 // can show in a window renders <FloatPanels> from an `experimental_appOverlay`;
 // its panel then renders in its own React tree, portalled into the window.
 import { experimental_usePluginId } from "@get-bb/plugin-sdk/app";
-import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode } from "react";
+import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
 import {
   floatBodies,
@@ -22,6 +22,7 @@ import {
   floatRevision,
   registerFloatPanel,
   subscribeFloat,
+  MAIN_REMOVING_EVENT,
   type FloatOpenOptions,
   type FloatTarget,
 } from "./float-registry";
@@ -144,8 +145,23 @@ function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAn
   return next;
 }
 
-function RetainedPanel({ view, pluginId, children }: { view: PanelView; pluginId: string; children: ReactNode }) {
+function moveElement(element: HTMLElement, destination: HTMLElement) {
+  if (element.parentElement === destination) return;
+  if (element.isConnected && destination.isConnected && "moveBefore" in destination && typeof destination.moveBefore === "function") destination.moveBefore(element, null);
+  else destination.append(element);
+}
+
+function RetainedPanel({ view, pluginId, parking, children }: { view: PanelView; pluginId: string; parking: RefObject<HTMLDivElement | null>; children: ReactNode }) {
   const [element] = useState(() => document.createElement("div"));
+  useLayoutEffect(() => {
+    const park = () => { if (parking.current && element.parentElement === view.element) moveElement(element, parking.current); };
+    const pending = () => {
+      if (view.windowKey === undefined && floatTransfers().some(target => target.kind === "path" && viewPath(target.path) === viewPath(view.target.path))) park();
+    };
+    view.element.addEventListener(MAIN_REMOVING_EVENT, park);
+    const unsubscribe = subscribeFloat(pending);
+    return () => { view.element.removeEventListener(MAIN_REMOVING_EVENT, park); unsubscribe(); };
+  }, [element, parking, view.element, view.target.path, view.windowKey]);
   useLayoutEffect(() => {
     element.className = "flex h-full min-h-0 min-w-0 flex-1 flex-col";
     element.dataset.bbPortaledOverlay = "";
@@ -158,7 +174,7 @@ function RetainedPanel({ view, pluginId, children }: { view: PanelView; pluginId
       ? { anchor: selection.anchorNode!, anchorOffset: selection.anchorOffset, focus: selection.focusNode!, focusOffset: selection.focusOffset } : null;
     const scroll = [element, ...element.querySelectorAll<HTMLElement>("*")].filter(node => node.scrollTop || node.scrollLeft)
       .map(node => ({ node, top: node.scrollTop, left: node.scrollLeft }));
-    view.element.append(element);
+    moveElement(element, view.element);
     scroll.forEach(({ node, top, left }) => { node.scrollTop = top; node.scrollLeft = left; });
     if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
     if (range && selection) selection.setBaseAndExtent(range.anchor, range.anchorOffset, range.focus, range.focusOffset);
@@ -172,6 +188,7 @@ function RetainedPanel({ view, pluginId, children }: { view: PanelView; pluginId
 /** Owns each main or companion panel in this plugin's persistent overlay. */
 export function FloatPanels({ path, render }: { path: string; render(subPath: string, context: { companion: boolean }): ReactNode }) {
   const pluginId = experimental_usePluginId();
+  const parking = useRef<HTMLDivElement>(null);
   useLayoutEffect(() => registerFloatPanel({ pluginId, path }), [pluginId, path]);
   const revision = useFloatRevision();
   const matches = (target: FloatTarget) => {
@@ -187,7 +204,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
   useLayoutEffect(() => {
     mains.forEach(main => main.setMoved(views.some(view => view.mainId === main.id && viewPath(view.target.path) === viewPath(main.target.path) && view.windowKey !== undefined)));
   }, [views]);
-  return <>{views.map(view => <RetainedPanel key={`${view.id}:${viewPath(view.target.path)}`} view={view} pluginId={pluginId}>
+  return <><div ref={parking} hidden data-studio-retained-parking="" />{views.map(view => <RetainedPanel key={`${view.id}:${viewPath(view.target.path)}`} view={view} pluginId={pluginId} parking={parking}>
     {render(floatPanelFor(viewPath(view.target.path))!.subPath, { companion: view.windowKey !== undefined })}
   </RetainedPanel>)}</>;
 }

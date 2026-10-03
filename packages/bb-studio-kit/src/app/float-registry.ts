@@ -73,6 +73,7 @@ interface Registry {
 
 const REGISTRY_KEY = "__bbStudioFloat_v1";
 export const FLOAT_CHANGE_EVENT = "bb-studio-float-change";
+export const MAIN_REMOVING_EVENT = "bb-studio-main-removing";
 
 function registry(): Registry {
   const scope = window as unknown as Record<string, Registry | undefined>;
@@ -116,6 +117,7 @@ export function publishMainBody(anchor: MainAnchor): () => void {
   main.set(anchor.id, anchor);
   changed();
   return () => {
+    anchor.element.dispatchEvent(new Event(MAIN_REMOVING_EVENT));
     anchor.element.removeEventListener("focusin", focused);
     if (main.get(anchor.id) !== anchor) return;
     queueMicrotask(() => {

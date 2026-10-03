@@ -199,6 +199,22 @@ it("keeps the original editor alive when Float this leaves the main route before
   expect(document.querySelector("textarea")).toBeNull();
 });
 
+it("parks the original embedded view while its main route leaves before a companion body exists", async () => {
+  function Viewer() { return <iframe title="Embedded report" />; }
+  const Main = retainPanel("pages", Viewer);
+  act(() => setFloatHost({ open: () => {} }));
+  mount(<FloatPanels path="pages" render={() => <Viewer />} />);
+  const main = mount(<Main subPath="one" />);
+  const frame = main.host.querySelector("iframe")!;
+  act(() => openFloat(target));
+  expect(document.querySelector('[data-studio-retained-parking] iframe')).toBe(frame);
+  await act(() => main.root.render(null));
+  expect(frame.isConnected).toBe(true);
+  const body = floatBody();
+  expect(body.querySelector("iframe")).toBe(frame);
+  expect(document.querySelector('[data-studio-retained-parking] iframe')).toBeNull();
+});
+
 
 it("keeps the neighboring ordinary editor when splitting remounts its main pane", async () => {
   const disposed = vi.fn();
