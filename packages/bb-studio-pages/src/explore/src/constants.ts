@@ -1,6 +1,6 @@
 // Shared by server and app. Keep runtime-free of server-only imports.
 
-export const PLUGIN_ID = "explore";
+export const PLUGIN_ID = "pages";
 export const REALTIME_CHANNEL = "explore";
 /** Where explainers are saved. */
 export const PAGES_PLUGIN_ID = "pages";

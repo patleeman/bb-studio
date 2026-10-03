@@ -1,3 +1,4 @@
+import { registerPagesWithExplore } from "./src/explore/integration";
 import { migratePageModuleRefs } from "./src/module-refs";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
@@ -26,7 +27,7 @@ import { agentConfiguration, registerTools } from "./src/tools";
 
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
-export default async function plugin(bb: BbPluginApi) {
+async function registerPages(bb: BbPluginApi) {
   const settings = bb.settings.define({
     snapshotsPerPage: {
       type: "number",
@@ -554,3 +555,5 @@ export default async function plugin(bb: BbPluginApi) {
     service.dispose();
   });
 }
+
+export default async function plugin(bb: BbPluginApi) { await registerPagesWithExplore(bb, registerPages); }

@@ -198,7 +198,7 @@ Explore now registers shared companion views for its explainers and lists.
 Finding rows and the thread launcher use that policy; the legacy thread panel
 remains available without Float. Open in Pages now targets Pages rather than
 the owner-only SDK panel route. Its 67 tests and typecheck pass. The repeatable
-stable BB 0.45.0 [companion capture](../packages/bb-studio-explore/assets/companion-preview.png)
+stable BB 0.45.0 [companion capture](../packages/bb-studio-pages/src/explore/assets/companion-preview.png)
 uses Explore from pushed 6d900de with the suite installed from 786fd2f. Seeded
 writing/ready job states verify both list routes, progress becoming the saved
 document, destination reuse, exact iframe and scroll retention after switching

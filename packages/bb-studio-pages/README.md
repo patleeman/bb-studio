@@ -261,3 +261,9 @@ run `pnpm tailwind:blocknote` to regenerate it.
 ## Templates and export
 
 Studio can duplicate a page with its subpages, mark a page as a template, and instantiate it with `{{name}}` variables. The provider exports Markdown with uploaded assets, printable HTML with those assets, or a text PDF. Use Studio's New menu to start from a saved template.
+
+## Explore
+
+[Explore](src/explore/README.md) is included in Pages. The Suggest things to explore setting adds findings to agent answers; the existing Explore tool, directive, and explainer views remain available. CLI commands use `bb pages explore …`.
+
+For an existing installation, disable the old Explore plugin, reload Pages to import its explainers and settings, and then uninstall the old plugin. Pages keeps the original database and records a one-time import into its separate `explore.db`.

@@ -67,9 +67,9 @@ export default async function plugin(bb: BbPluginApi) {
     name: "explore",
     summary: "Explore explainers: list, open (link, state, follow-ups), regenerate in place",
     commands: [
-      { name: "list", summary: "List explainers, newest first", usage: "bb explore list [--thread <thread id>]" },
-      { name: "open", summary: "Show an explainer's page link, state and follow-ups", usage: "bb explore open <explainer id>" },
-      { name: "regenerate", summary: "Write an explainer again, in place", usage: "bb explore regenerate <explainer id> [--wait]" },
+      { name: "list", summary: "List explainers, newest first", usage: "bb pages explore list [--thread <thread id>]" },
+      { name: "open", summary: "Show an explainer's page link, state and follow-ups", usage: "bb pages explore open <explainer id>" },
+      { name: "regenerate", summary: "Write an explainer again, in place", usage: "bb pages explore regenerate <explainer id> [--wait]" },
     ],
     async run(argv, ctx) {
       if (!argv.length) return usage(EXPLORE_USAGE);

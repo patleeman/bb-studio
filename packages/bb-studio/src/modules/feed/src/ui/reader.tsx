@@ -593,7 +593,7 @@ function ExploreButton({ post }: { post: PostView }) {
       title={state === "unavailable" ? "Studio Explore isn't installed or couldn't find this finding" : "Write a page explaining this"}
       onClick={explore}
     >
-      <Icon name={state === "working" ? "Loading" : "explore/explore"} fallback="Search" className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
+      <Icon name={state === "working" ? "Loading" : "pages/explore"} fallback="Search" className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
       {state === "working" ? "Exploring…" : state === "unavailable" ? "Can't explore" : "Explore"}
     </button>
   );

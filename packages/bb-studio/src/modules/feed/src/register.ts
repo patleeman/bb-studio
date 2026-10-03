@@ -263,7 +263,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       return { post: (await one(row))! };
     },
     explore: ({ postId }: { postId: string }) =>
-      callRpc(EXPLORE_PLUGIN_ID, "exploreFeedPost", { postId }, z.object({ status: z.enum(["started", "ready", "unavailable"]), href: z.string().nullable() })).catch(() => ({
+      callRpc(EXPLORE_PLUGIN_ID, "explore_exploreFeedPost", { postId }, z.object({ status: z.enum(["started", "ready", "unavailable"]), href: z.string().nullable() })).catch(() => ({
         status: "unavailable" as const,
         href: null,
       })),

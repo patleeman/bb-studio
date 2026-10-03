@@ -1,3 +1,4 @@
+import { useExploreRpc } from "../../client";
 // Explore's findings as full-width rows: "Along the way" at the bottom of a
 // reply (the `::explore{items="🐛 …|🏗️ …"}` directive), and "Explore next"
 // under an explainer. A row shows its explainer's state (Explore →
@@ -6,7 +7,7 @@
 // A reply's findings can also be saved to Studio Feed, to read later.
 import { errorMessage } from "@bb-studio/kit/format";
 import { useOpenCompanion } from "@bb-studio/kit/app";
-import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime,  type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
@@ -42,7 +43,7 @@ export interface ExploreRowsProps {
 }
 
 export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, className }: ExploreRowsProps) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useExploreRpc();
   const navigate = useBbNavigate();
   const openCompanion = useOpenCompanion();
   useMinuteTick();
@@ -291,7 +292,7 @@ function ExploreRow({
           )}
         >
           <Icon
-            name={feed.saving === "busy" ? "Loading" : feed.saved ? "explore/bookmark-check" : "explore/bookmark-add"}
+            name={feed.saving === "busy" ? "Loading" : feed.saved ? "pages/bookmark-check" : "pages/bookmark-add"}
             className={cn("size-3.5", feed.saving === "busy" && "animate-spin motion-reduce:animate-none")}
           />
         </button>

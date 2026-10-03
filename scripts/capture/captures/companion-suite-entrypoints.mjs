@@ -38,11 +38,11 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
       const { post, cleanup } = await seedPost();
       return { path: `/plugins/studio/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
     } },
-    { id: "explore", packageDir: "bb-studio-explore", seed: async () => {
+    { id: "explore", packageDir: "bb-studio-pages/src/explore", seed: async () => {
       const dataDir = await requireStage();
-      const require = createRequire(new URL("../../../packages/bb-studio-explore/package.json", import.meta.url));
+      const require = createRequire(new URL("../../../packages/bb-studio-pages/package.json", import.meta.url));
       const Database = require("better-sqlite3");
-      const db = new Database(join(dataDir, "plugins/explore/data.db"), { fileMustExist: true });
+      const db = new Database(join(dataDir, "plugins/pages/explore.db"), { fileMustExist: true });
       const id = `expl_transfer_${randomUUID()}`, now = Date.now();
       let page;
       const cleanup = async () => {
@@ -54,9 +54,9 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         ({ page } = await pluginRpc("pages", "create", { title: "Release usage explainer", projectId, parentId: null, markdown: `\`\`\`html\n${usageReportHtml({ draft: false })}\n\`\`\`` }));
         db.prepare("INSERT INTO explore_explainers (id,key,thread_id,message_id,emoji,label,project_id,status,page_id,generated_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
           .run(id, id, threadId, `msg_transfer_${id}`, "🏗️", page.title, projectId, "ready", page.id, now, now, now);
-        const { explainers } = await pluginRpc("explore", "explainers", {});
+        const { explainers } = await pluginRpc("pages", "explore_explainers", {});
         if (!explainers.some(explainer => explainer.id === id)) throw new Error("Explore RPC cannot read the transfer fixture");
-        return { path: `/plugins/explore/explainers/${id}`, ready: `iframe[title="${page.title}"]`, embedded: true, cleanup };
+        return { path: `/plugins/pages/explainers/${id}`, ready: `iframe[title="${page.title}"]`, embedded: true, cleanup };
       } catch (error) { await cleanup(); throw error; }
     } },
   ];
@@ -113,10 +113,10 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         };
       } catch (error) { await cleanup(); throw error; }
     } },
-    ...["list", "thread"].map(kind => ({ id: `explore-${kind}`, packageDir: "bb-studio-explore", seed: async () => {
+    ...["list", "thread"].map(kind => ({ id: `explore-${kind}`, packageDir: "bb-studio-pages/src/explore", seed: async () => {
       const seeded = await explore.seed();
       const id = seeded.path.split('/').at(-1);
-      return { ...seeded, path: `/plugins/explore/explainers${kind === "thread" ? `/thread/${threadId}` : ""}`, ready: `button[data-explainer-open="${id}"]`, embedded: false, visibleText: "Release usage explainer" };
+      return { ...seeded, path: `/plugins/pages/explainers${kind === "thread" ? `/thread/${threadId}` : ""}`, ready: `button[data-explainer-open="${id}"]`, embedded: false, visibleText: "Release usage explainer" };
     } })),
   ];
 };

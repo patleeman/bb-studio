@@ -5,7 +5,7 @@ import { EXPLAINERS_PATH, EXPLORE_ICON, threadExplainersPath } from "./src/ui/ex
 import { ExplainersPage, ExplainerTab } from "./src/ui/panel";
 import { ExploreDirective } from "./src/ui/rows";
 
-export default definePluginApp((app) => {
+export function registerApp(app: import("@get-bb/plugin-sdk/app").PluginAppBuilder) {
   // "Along the way" findings at the end of a reply.
   app.slots.messageDirective({ id: DIRECTIVE, component: ExploreDirective });
   // An explainer next to its thread, opened with `{ explainerId }`.
@@ -16,4 +16,4 @@ export default definePluginApp((app) => {
   });
   app.slots.navPanel({ id: EXPLAINERS_PATH, path: EXPLAINERS_PATH, title: "Explore", icon: EXPLORE_ICON, component: retainPanel(EXPLAINERS_PATH, ExplainersPage) });
   app.slots.experimental_appOverlay({ id: "explainer-companions", component: () => <FloatPanels path={EXPLAINERS_PATH} render={subPath => <ExplainersPage subPath={subPath} />} /> });
-});
+}

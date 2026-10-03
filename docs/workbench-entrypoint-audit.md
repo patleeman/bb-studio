@@ -34,7 +34,7 @@ another desktop chat panel.
 | Tasks | Shared task/board header; current/earlier handoffs, discussions and dispatch use companions | [Retained handoff composer and real bot dispatch](../packages/bb-studio/src/modules/tasks/README.md) |
 | Teams | Bot Chat, channels and member-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Channel composer/file retention and conversation reuse](../packages/bb-studio/src/modules/teams/README.md) |
 | Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio/src/modules/feed/README.md) |
-| Explore | Shared explainer/page destinations; old owner-scoped panel and main fallback when companions are absent | [Explainer/page reuse and retained state](../packages/bb-studio-explore/README.md) |
+| Explore | Shared explainer/page destinations; old owner-scoped panel and main fallback when companions are absent | [Explainer/page reuse and retained state](../packages/bb-studio-pages/src/explore/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
 | Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](review-evidence/2026-10-02/search-accessibility/README.md) |
 | Reactions | Composer bridge selects the displayed message's thread; drafts quotes/reactions into it | [Settings, selection and message actions](review-evidence/2026-10-02/reactions-explore/README.md); native right-click remains open |
@@ -124,7 +124,7 @@ Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
 | Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio/src/modules/feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/feed/assets/companion-transfers-native.png) |
 | Feed post | Original post heading | [Main](../packages/bb-studio/src/modules/feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/feed/assets/feed-post-companion-transfers-native.png) |
 | Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio/src/modules/feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/feed/assets/feed-discussion-companion-transfers-native.png) |
-| Explore explainer | Iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-explore/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/companion-transfers-native.png) |
+| Explore explainer | Iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-pages/src/explore/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-pages/src/explore/assets/companion-transfers-native.png) |
 
 The chat check reproduced double encoding: the host passes an already-encoded
 item subpath, but main-view ownership encoded it again. Kit's shared
@@ -165,8 +165,8 @@ placement assertions. All initial moves use the displayed Move menu.
 | Studio space without Pages | Original space-options control and synthetic fallback space | [Main](../packages/bb-studio/assets/studio-space-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-space-companion-transfers-native.png) |
 | Plain chat draft | Original prompt/file input, unsent wording and one selected attachment control | [Main](../packages/bb-studio/src/modules/chat/assets/chat-plain-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/chat/assets/chat-plain-companion-transfers-native.png) |
 | Saved quote draft | Original prompt/file input, source quote, location, note, appended wording and one attachment control | [Main](../packages/bb-studio/src/modules/chat/assets/chat-quote-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/chat/assets/chat-quote-companion-transfers-native.png) |
-| Explore collection | Original seeded explainer-row button and collection route | [Main](../packages/bb-studio-explore/assets/explore-list-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-list-companion-transfers-native.png) |
-| Explore thread list | Original seeded explainer-row button and thread-specific route | [Main](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-native.png) |
+| Explore collection | Original seeded explainer-row button and collection route | [Main](../packages/bb-studio-pages/src/explore/assets/explore-list-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-pages/src/explore/assets/explore-list-companion-transfers-native.png) |
+| Explore thread list | Original seeded explainer-row button and thread-specific route | [Main](../packages/bb-studio-pages/src/explore/assets/explore-thread-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-pages/src/explore/assets/explore-thread-companion-transfers-native.png) |
 
 The legacy Studio alias exposed another route mismatch: the main wrapper
 registered `/collection`, while the inner view constructed Move for the root

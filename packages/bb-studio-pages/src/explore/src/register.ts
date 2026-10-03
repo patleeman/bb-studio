@@ -6,7 +6,7 @@ import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 //     hidden forks of the thread (worker.ts); pages are written in Pages over
 //     RPC, under the project's "Explore" page, and tagged in Studio (pages.ts).
 //   - This file adds the RPC handlers, the `explore_explain` tool, the
-//     instructions for `bb.agents.configure`, and `bb explore …`.
+//     instructions for `bb.agents.configure`, and `bb pages explore …`.
 import type { BbPluginApi, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { exploreFeed, replyFindings } from "./feed";
@@ -24,11 +24,11 @@ import { exploreTasks } from "./tasks";
 export const EXPLORE_TOOL = "explore_explain";
 
 const USAGE = {
-  list: "bb explore list [--thread <thread id>]",
-  open: "bb explore open <explainer id>",
-  regenerate: "bb explore regenerate <explainer id> [--wait]",
+  list: "bb pages explore list [--thread <thread id>]",
+  open: "bb pages explore open <explainer id>",
+  regenerate: "bb pages explore regenerate <explainer id> [--wait]",
 };
-export const EXPLORE_USAGE = `bb explore <list|open|regenerate> …`;
+export const EXPLORE_USAGE = `bb pages explore <list|open|regenerate> …`;
 
 type CliResult = PluginCliResult;
 
@@ -90,7 +90,7 @@ export function registerExplore(bb: BbPluginApi, options: {
   // Every reply's findings are kept, for saving to the Feed and its daily digest.
   bb.events.on("thread.idle", async ({ thread, lastAssistantText }) => {
     const items = replyFindings(lastAssistantText);
-    if (!items.length || thread.originPluginId === PLUGIN_ID || thread.visibility === "hidden") return;
+    if (!items.length || (thread.originPluginId === PLUGIN_ID || thread.originPluginId === "explore") || thread.visibility === "hidden") return;
     try {
       const message = await latestAssistantMessage(thread.id, AbortSignal.timeout(RPC_TIMEOUT_MS));
       if (!message) return;
@@ -232,7 +232,7 @@ export function registerExplore(bb: BbPluginApi, options: {
 
   const instructions = exploreInstructions();
 
-  // CLI: `bb explore …` -----------------------------------------------------------
+  // CLI: `bb pages explore …` -----------------------------------------------------------
 
   const line = (row: ExplainerRow) => {
     const explainer = service.view(row);

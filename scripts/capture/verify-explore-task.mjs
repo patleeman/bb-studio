@@ -13,7 +13,7 @@ export async function verifyExploreTask(client, {
   assert.ok(manifest.includes(`export BB_DATA_DIR=${JSON.stringify(dataDir)}`));
   assert.ok(manifest.includes(`export BB_SERVER_URL=${process.env.BB_SERVER_URL}`));
   const finding = { threadId, messageId, label, parentId: null };
-  const lookup = () => pluginRpc("explore", "taskForFinding", { ...finding, create: false });
+  const lookup = () => pluginRpc("pages", "explore_taskForFinding", { ...finding, create: false });
   const before = await lookup();
   assert.equal(before.available, true, "Studio Tasks must initially be running");
   assert.equal(before.task, null, "Use a fresh finding; existing tasks are never removed");
@@ -33,7 +33,7 @@ export async function verifyExploreTask(client, {
     assert.ok(taskId, "UI click must create a persistent task");
     evidence.taskId = taskId;
     const retries = await Promise.all(Array.from({ length: 3 }, () =>
-      pluginRpc("explore", "taskForFinding", { ...finding, create: true })));
+      pluginRpc("pages", "explore_taskForFinding", { ...finding, create: true })));
     evidence.retryIds = retries.map(result => result.task?.id);
     assert.ok(evidence.retryIds.every(id => id === taskId));
     const { task, links } = await pluginRpc("studio", "tasks_get", { id: taskId });

@@ -1,3 +1,5 @@
+import { rpcContract as exploreContract } from "../packages/bb-studio-pages/src/explore/src/contract.ts";
+import { exploreStatusContract } from "../packages/bb-studio-pages/src/explore/status.ts";
 import { threadListRpcContract as sidebarContract } from "../packages/bb-studio/src/modules/sidebar/source/server.ts";
 import { rpcContract as talkContract } from "../packages/bb-studio/src/modules/talk/src/shared/contract.ts";
 import { rpcContract as decisionsContract } from "../packages/bb-studio/src/modules/decisions/contract.ts";
@@ -147,7 +149,7 @@ const item = schemaOf(studioSchemas(z).item, "output");
 const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
-  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract), ...prefixed("feed_", feedContract), ...prefixed("tasks_", tasksContract), ...prefixed("teams_", teamsContract), ...prefixed("artifacts_", artifactsContract), ...prefixed("decisions_", decisionsContract), ...prefixed("talk_", talkContract), ...prefixed("sidebar_", sidebarContract) } : mod[exportName];
+  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract), ...prefixed("feed_", feedContract), ...prefixed("tasks_", tasksContract), ...prefixed("teams_", teamsContract), ...prefixed("artifacts_", artifactsContract), ...prefixed("decisions_", decisionsContract), ...prefixed("talk_", talkContract), ...prefixed("sidebar_", sidebarContract) } : pluginId === "pages" ? { ...mod[exportName], ...exploreStatusContract, ...prefixed("explore_", exploreContract) } : mod[exportName];
   if (!contract) throw new Error(`Missing ${exportName} in ${path}`);
   const methods = Object.fromEntries(Object.entries(contract).map(([name, value]) => [name, {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),

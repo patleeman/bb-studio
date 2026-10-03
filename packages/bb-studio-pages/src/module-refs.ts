@@ -1,6 +1,6 @@
 import type Database from "better-sqlite3";
 import * as Y from "yjs";
-import { absorbedPluginIds, rewriteLegacyValue } from "@bb-studio/kit/contract";
+import { legacyReferencePluginIds, rewriteLegacyValue } from "@bb-studio/kit/contract";
 import { DOCUMENT_FRAGMENT, THREADS_MAP } from "./schema-config";
 import { readMarkdown } from "./doc";
 
@@ -43,7 +43,7 @@ export function migratePageModuleRefs(db: Database.Database): number {
     CREATE TABLE IF NOT EXISTS studio_ref_backups (source_table TEXT NOT NULL, source_id TEXT NOT NULL, legacy_id TEXT NOT NULL, state BLOB NOT NULL, PRIMARY KEY(source_table, source_id, legacy_id))`);
   return db.transaction(() => {
     let total = 0;
-    for (const legacyId of absorbedPluginIds) {
+    for (const legacyId of legacyReferencePluginIds) {
       if (db.prepare("SELECT 1 FROM studio_ref_migrations WHERE legacy_id = ?").get(legacyId)) continue;
       let changed = 0;
       for (const table of ["pages", "snapshots"] as const) {

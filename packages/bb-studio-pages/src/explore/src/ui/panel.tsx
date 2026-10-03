@@ -1,3 +1,4 @@
+import { useExploreRpc } from "../../client";
 // An explainer in Explore's side-panel tab (`{ explainerId }` params): live
 // progress (with Stop) while it's written, the error with Retry when it
 // failed, and once it's ready the explainer's HTML document under a header
@@ -5,7 +6,7 @@
 // findings below. A Markdown explainer opens in Pages instead.
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
 import { ViewMoveMenu } from "@bb-studio/kit/app";
-import { useBbNavigate, useRealtime, useRpc, type PluginNavPanelProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime,  type PluginNavPanelProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
@@ -22,7 +23,7 @@ const MAX_DOCUMENT_HEIGHT = 40_000;
 
 /** The explainer's HTML document, refetched when it's rewritten: undefined while loading, null for Markdown. */
 function useExplainerHtml(explainerId: string, version: string | null): string | null | undefined {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useExploreRpc();
   const [html, setHtml] = useState<{ version: string; html: string | null } | null>(null);
   useEffect(() => {
     if (!version) return;
@@ -57,14 +58,14 @@ function ThreadExplainers({ threadId }: { threadId?: string }) {
   return <>
     <header className="flex items-center justify-between gap-3 border-b border-border px-3 py-2">
       <span className="text-sm font-medium">Explore</span>
-      <ViewMoveMenu item={{ href: `/plugins/explore/explainers${threadId ? `/thread/${encodeURIComponent(threadId)}` : ""}`, title: "Explore" }} />
+      <ViewMoveMenu item={{ href: `/plugins/pages/explainers${threadId ? `/thread/${encodeURIComponent(threadId)}` : ""}`, title: "Explore" }} />
     </header>
     <ThreadExplainerRows {...(threadId ? { threadId } : {})} />
   </>;
 }
 
 function ThreadExplainerRows({ threadId }: { threadId?: string }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useExploreRpc();
   const navigate = useBbNavigate();
   useMinuteTick();
   const [explainers, setExplainers] = useState<ExplainerView[] | null>(null);
@@ -112,7 +113,7 @@ function ThreadExplainerRows({ threadId }: { threadId?: string }) {
 }
 
 function ExplainerPanel({ explainerId }: { explainerId: string }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useExploreRpc();
   useMinuteTick();
   const [explainer, setExplainer] = useState<ExplainerView | null | undefined>(undefined);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -266,7 +267,7 @@ function ExplainerHeader({
           {writtenLine(explainer, state)}
         </div>
       </div>
-      <ViewMoveMenu item={{ href: `/plugins/explore/explainers/${encodeURIComponent(explainer.id)}`, title }} />
+      <ViewMoveMenu item={{ href: `/plugins/pages/explainers/${encodeURIComponent(explainer.id)}`, title }} />
       {state === "running" ? (
         <button type="button" className={button} disabled={acting} onClick={onStop} title="Stop writing this explainer">
           <Icon name="Square" className="size-3.5" /> Stop

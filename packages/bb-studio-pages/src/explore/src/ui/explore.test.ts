@@ -20,8 +20,8 @@ describe("explainer navigation", () => {
     openExplainer(navigate, explainer);
     openExplainer(navigate, { ...explainer });
     expect(companion.mock.calls).toEqual([
-      [{ kind: "path", path: "/plugins/explore/explainers/expl_42", title: explainer.label }],
-      [{ kind: "path", path: "/plugins/explore/explainers/expl_42", title: explainer.label }],
+      [{ kind: "path", path: "/plugins/pages/explainers/expl_42", title: explainer.label }],
+      [{ kind: "path", path: "/plugins/pages/explainers/expl_42", title: explainer.label }],
     ]);
     expect(navigate.openThreadPanel).not.toHaveBeenCalled();
     expect(appPath).not.toHaveBeenCalled();

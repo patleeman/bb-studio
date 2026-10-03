@@ -5,7 +5,7 @@ description: Use when the user asks about Explore findings ("Along the way" rows
 
 # Explore (experimental)
 
-In **Settings → Studio Explore**, **Daily digest in Studio Feed** controls
+In **Settings → Studio Pages → explore**, **Daily digest in Studio Feed** controls
 automatic posting. **Daily digest hour** accepts 0 to 23 in the BB server's
 local time (default 18); checks run every 10 minutes. **Explainer time limit
 (minutes)** accepts 1 to 120 (default 20), applies to new runs, and stops and
@@ -34,9 +34,9 @@ Use it when the user asks you to explore something yourself.
 ## CLI
 
 ```sh
-bb explore list [--thread <thread id>]            # explainers: id, state, finding, page, thread
-bb explore open <explainer id>                    # page link, state and follow-ups
-bb explore regenerate <explainer id> [--wait]     # write it again in place (old version kept)
+bb pages explore list [--thread <thread id>]            # explainers: id, state, finding, page, thread
+bb pages explore open <explainer id>                    # page link, state and follow-ups
+bb pages explore regenerate <explainer id> [--wait]     # write it again in place (old version kept)
 ```
 
 ## Limits

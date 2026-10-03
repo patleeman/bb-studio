@@ -5397,6 +5397,1692 @@
         ],
         "additionalProperties": false
       }
+    },
+    "exploreStatus": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "active": {
+            "type": "boolean"
+          },
+          "legacyInstalled": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "active",
+          "legacyInstalled"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_taskForFinding": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "create": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId",
+          "label"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "available": {
+            "type": "boolean"
+          },
+          "task": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "available",
+          "task"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_explore": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "turnId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emoji": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId",
+          "label"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "turnId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "generating",
+                  "ready",
+                  "error"
+                ]
+              },
+              "followUps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emoji": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "emoji",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "generatedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "regeneratedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "job": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "explainerId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "generate",
+                          "regenerate"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "collecting",
+                          "starting",
+                          "writing",
+                          "saving",
+                          "ready",
+                          "error",
+                          "cancelled",
+                          "interrupted"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "progress": {
+                        "type": "number"
+                      },
+                      "error": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "explainerId",
+                      "kind",
+                      "status",
+                      "label",
+                      "detail",
+                      "progress",
+                      "error",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "parentId",
+              "threadId",
+              "messageId",
+              "turnId",
+              "emoji",
+              "label",
+              "pageId",
+              "projectId",
+              "href",
+              "status",
+              "followUps",
+              "generatedAt",
+              "regeneratedAt",
+              "error",
+              "createdAt",
+              "updatedAt",
+              "job"
+            ],
+            "additionalProperties": false
+          },
+          "started": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "explainer",
+          "started"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_saveToFeed": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "turnId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "emoji": {
+            "type": "string",
+            "maxLength": 16
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId",
+          "label"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string"
+          }
+        },
+        "required": [
+          "postId"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_savedForMessage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "labels": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          }
+        },
+        "required": [
+          "labels"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_exploreFeedPost": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "postId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "postId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "ready",
+              "unavailable"
+            ]
+          },
+          "href": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "status",
+          "href"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_exploreRegenerate": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "parentId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "threadId": {
+                "type": "string"
+              },
+              "messageId": {
+                "type": "string"
+              },
+              "turnId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "emoji": {
+                "type": "string"
+              },
+              "label": {
+                "type": "string"
+              },
+              "pageId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "href": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "status": {
+                "type": "string",
+                "enum": [
+                  "pending",
+                  "generating",
+                  "ready",
+                  "error"
+                ]
+              },
+              "followUps": {
+                "type": "array",
+                "items": {
+                  "type": "object",
+                  "properties": {
+                    "emoji": {
+                      "type": "string"
+                    },
+                    "label": {
+                      "type": "string"
+                    }
+                  },
+                  "required": [
+                    "emoji",
+                    "label"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "generatedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "regeneratedAt": {
+                "type": [
+                  "number",
+                  "null"
+                ]
+              },
+              "error": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "job": {
+                "anyOf": [
+                  {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string"
+                      },
+                      "explainerId": {
+                        "type": "string"
+                      },
+                      "kind": {
+                        "type": "string",
+                        "enum": [
+                          "generate",
+                          "regenerate"
+                        ]
+                      },
+                      "status": {
+                        "type": "string",
+                        "enum": [
+                          "queued",
+                          "collecting",
+                          "starting",
+                          "writing",
+                          "saving",
+                          "ready",
+                          "error",
+                          "cancelled",
+                          "interrupted"
+                        ]
+                      },
+                      "label": {
+                        "type": "string"
+                      },
+                      "detail": {
+                        "type": "string"
+                      },
+                      "progress": {
+                        "type": "number"
+                      },
+                      "error": {
+                        "type": [
+                          "string",
+                          "null"
+                        ]
+                      },
+                      "createdAt": {
+                        "type": "number"
+                      },
+                      "updatedAt": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "id",
+                      "explainerId",
+                      "kind",
+                      "status",
+                      "label",
+                      "detail",
+                      "progress",
+                      "error",
+                      "createdAt",
+                      "updatedAt"
+                    ],
+                    "additionalProperties": false
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "id",
+              "parentId",
+              "threadId",
+              "messageId",
+              "turnId",
+              "emoji",
+              "label",
+              "pageId",
+              "projectId",
+              "href",
+              "status",
+              "followUps",
+              "generatedAt",
+              "regeneratedAt",
+              "error",
+              "createdAt",
+              "updatedAt",
+              "job"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "explainer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_exploreStop": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "turnId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "pageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "generating",
+                      "ready",
+                      "error"
+                    ]
+                  },
+                  "followUps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "emoji": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "emoji",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "generatedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "regeneratedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "job": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "explainerId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "regenerate"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "collecting",
+                              "starting",
+                              "writing",
+                              "saving",
+                              "ready",
+                              "error",
+                              "cancelled",
+                              "interrupted"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "progress": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "explainerId",
+                          "kind",
+                          "status",
+                          "label",
+                          "detail",
+                          "progress",
+                          "error",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "parentId",
+                  "threadId",
+                  "messageId",
+                  "turnId",
+                  "emoji",
+                  "label",
+                  "pageId",
+                  "projectId",
+                  "href",
+                  "status",
+                  "followUps",
+                  "generatedAt",
+                  "regeneratedAt",
+                  "error",
+                  "createdAt",
+                  "updatedAt",
+                  "job"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "explainer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_explainer": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainer": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "threadId": {
+                    "type": "string"
+                  },
+                  "messageId": {
+                    "type": "string"
+                  },
+                  "turnId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "emoji": {
+                    "type": "string"
+                  },
+                  "label": {
+                    "type": "string"
+                  },
+                  "pageId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "pending",
+                      "generating",
+                      "ready",
+                      "error"
+                    ]
+                  },
+                  "followUps": {
+                    "type": "array",
+                    "items": {
+                      "type": "object",
+                      "properties": {
+                        "emoji": {
+                          "type": "string"
+                        },
+                        "label": {
+                          "type": "string"
+                        }
+                      },
+                      "required": [
+                        "emoji",
+                        "label"
+                      ],
+                      "additionalProperties": false
+                    }
+                  },
+                  "generatedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "regeneratedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "error": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "job": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "id": {
+                            "type": "string"
+                          },
+                          "explainerId": {
+                            "type": "string"
+                          },
+                          "kind": {
+                            "type": "string",
+                            "enum": [
+                              "generate",
+                              "regenerate"
+                            ]
+                          },
+                          "status": {
+                            "type": "string",
+                            "enum": [
+                              "queued",
+                              "collecting",
+                              "starting",
+                              "writing",
+                              "saving",
+                              "ready",
+                              "error",
+                              "cancelled",
+                              "interrupted"
+                            ]
+                          },
+                          "label": {
+                            "type": "string"
+                          },
+                          "detail": {
+                            "type": "string"
+                          },
+                          "progress": {
+                            "type": "number"
+                          },
+                          "error": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "id",
+                          "explainerId",
+                          "kind",
+                          "status",
+                          "label",
+                          "detail",
+                          "progress",
+                          "error",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  }
+                },
+                "required": [
+                  "id",
+                  "parentId",
+                  "threadId",
+                  "messageId",
+                  "turnId",
+                  "emoji",
+                  "label",
+                  "pageId",
+                  "projectId",
+                  "href",
+                  "status",
+                  "followUps",
+                  "generatedAt",
+                  "regeneratedAt",
+                  "error",
+                  "createdAt",
+                  "updatedAt",
+                  "job"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "explainer"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_explainerDocument": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainerId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "explainerId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "html": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "html"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_explainersForMessage": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "parentId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "threadId",
+          "messageId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "generating",
+                    "ready",
+                    "error"
+                  ]
+                },
+                "followUps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "emoji": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "emoji",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "generatedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "regeneratedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "job": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "explainerId": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "generate",
+                            "regenerate"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "collecting",
+                            "starting",
+                            "writing",
+                            "saving",
+                            "ready",
+                            "error",
+                            "cancelled",
+                            "interrupted"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "explainerId",
+                        "kind",
+                        "status",
+                        "label",
+                        "detail",
+                        "progress",
+                        "error",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "parentId",
+                "threadId",
+                "messageId",
+                "turnId",
+                "emoji",
+                "label",
+                "pageId",
+                "projectId",
+                "href",
+                "status",
+                "followUps",
+                "generatedAt",
+                "regeneratedAt",
+                "error",
+                "createdAt",
+                "updatedAt",
+                "job"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "explainers"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "explore_explainers": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 200
+          }
+        }
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "explainers": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "parentId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "threadId": {
+                  "type": "string"
+                },
+                "messageId": {
+                  "type": "string"
+                },
+                "turnId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "emoji": {
+                  "type": "string"
+                },
+                "label": {
+                  "type": "string"
+                },
+                "pageId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "projectId": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "pending",
+                    "generating",
+                    "ready",
+                    "error"
+                  ]
+                },
+                "followUps": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "emoji": {
+                        "type": "string"
+                      },
+                      "label": {
+                        "type": "string"
+                      }
+                    },
+                    "required": [
+                      "emoji",
+                      "label"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "generatedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "regeneratedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "error": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "createdAt": {
+                  "type": "number"
+                },
+                "updatedAt": {
+                  "type": "number"
+                },
+                "job": {
+                  "anyOf": [
+                    {
+                      "type": "object",
+                      "properties": {
+                        "id": {
+                          "type": "string"
+                        },
+                        "explainerId": {
+                          "type": "string"
+                        },
+                        "kind": {
+                          "type": "string",
+                          "enum": [
+                            "generate",
+                            "regenerate"
+                          ]
+                        },
+                        "status": {
+                          "type": "string",
+                          "enum": [
+                            "queued",
+                            "collecting",
+                            "starting",
+                            "writing",
+                            "saving",
+                            "ready",
+                            "error",
+                            "cancelled",
+                            "interrupted"
+                          ]
+                        },
+                        "label": {
+                          "type": "string"
+                        },
+                        "detail": {
+                          "type": "string"
+                        },
+                        "progress": {
+                          "type": "number"
+                        },
+                        "error": {
+                          "type": [
+                            "string",
+                            "null"
+                          ]
+                        },
+                        "createdAt": {
+                          "type": "number"
+                        },
+                        "updatedAt": {
+                          "type": "number"
+                        }
+                      },
+                      "required": [
+                        "id",
+                        "explainerId",
+                        "kind",
+                        "status",
+                        "label",
+                        "detail",
+                        "progress",
+                        "error",
+                        "createdAt",
+                        "updatedAt"
+                      ],
+                      "additionalProperties": false
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                }
+              },
+              "required": [
+                "id",
+                "parentId",
+                "threadId",
+                "messageId",
+                "turnId",
+                "emoji",
+                "label",
+                "pageId",
+                "projectId",
+                "href",
+                "status",
+                "followUps",
+                "generatedAt",
+                "regeneratedAt",
+                "error",
+                "createdAt",
+                "updatedAt",
+                "job"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "explainers"
+        ],
+        "additionalProperties": false
+      }
     }
   }
 }

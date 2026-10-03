@@ -1,13 +1,13 @@
 # Studio Explore
 
-> **Studio Explore** is an experimental part of **[BB Studio](../../README.md)**. It needs [Studio Pages](../bb-studio-pages), where it saves explainers.
+> **Studio Explore** is an experimental part of **[BB Studio](../../../../README.md)**. It is built into [Studio Pages](../../README.md), where it saves explainers.
 
 > [!WARNING]
 > Explore is experimental. Its behavior, prompts, and storage may change or
 > go away.
 
 Explore turns what an agent noticed while answering into pages you can read
-later. It used to be part of Studio Pages.
+later. Its settings are under Studio Pages; CLI commands use `bb pages explore …`.
 
 ## Staged preview
 
@@ -157,9 +157,9 @@ workers (the hidden threads that write explainers) get neither the tool nor
 the instructions.
 
 ```sh
-bb explore list [--thread <thread id>]
-bb explore open <explainer id>
-bb explore regenerate <explainer id> [--wait]
+bb pages explore list [--thread <thread id>]
+bb pages explore open <explainer id>
+bb pages explore regenerate <explainer id> [--wait]
 ```
 
 [skills/explore/SKILL.md](skills/explore/SKILL.md) documents the directive,

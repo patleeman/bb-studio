@@ -10,7 +10,7 @@ import { PAGES_PLUGIN_ID, PLUGIN_ID } from "../constants";
 
 export type { ExplainerView };
 
-export const EXPLORE_ICON = "explore/explore";
+export const EXPLORE_ICON = "pages/explore";
 export const EXPLAINERS_PATH = "explainers";
 
 export const explainerPath = (id: string): string => `/plugins/${PLUGIN_ID}/${EXPLAINERS_PATH}/${encodeURIComponent(id)}`;

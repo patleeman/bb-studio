@@ -162,6 +162,7 @@ public enum Studio {
     public static let tasks_sendBack = "tasks_sendBack"
     public static let tasks_archiveThreads = "tasks_archiveThreads"
     public static let tasks_settings = "tasks_settings"
+    public static let teams_office_authors = "teams_office_authors"
     public static let teams_office_dm = "teams_office_dm"
     public static let teams_office_direct = "teams_office_direct"
     public static let teams_office_talk = "teams_office_talk"
@@ -589,6 +590,10 @@ public enum Studio {
   public typealias TasksSettingsInput = StudioJSONValue
 
   public typealias TasksSettings = TasksSettingsOutput
+
+  public typealias TeamsOfficeAuthorsOutput = [TeamsOfficeAuthorsOutputItem]
+
+  public typealias TeamsOfficeAuthors = TeamsOfficeAuthorsOutput
 
   public typealias TeamsOfficeDm = TeamsOfficeDmOutput
 
@@ -13658,6 +13663,22 @@ public enum Studio {
     }
   }
 
+  public struct TeamsOfficeAuthorsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct TeamsOfficeAuthorsOutputItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var botId: String?
+
+    public init(threadId: String? = nil, botId: String? = nil) {
+      self.threadId = threadId
+      self.botId = botId
+    }
+  }
+
   public struct TeamsOfficeDmInput: Sendable, Hashable, Codable {
     public var botId: String?
 
@@ -14301,6 +14322,7 @@ public enum Studio {
   }
 
   public struct TeamsListOutputBotsItem: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsListOutputBotsItemTrust?
     public var limits: TeamsListOutputBotsItemLimits?
     public var name: String?
@@ -14317,7 +14339,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -14327,7 +14348,8 @@ public enum Studio {
     public var working: Bool?
     public var lastActivityAt: Double?
 
-    public init(trust: TeamsListOutputBotsItemTrust? = nil, limits: TeamsListOutputBotsItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsListOutputBotsItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsListOutputBotsItemReasoningLevel? = nil, permissionMode: TeamsListOutputBotsItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil, working: Bool? = nil, lastActivityAt: Double? = nil) {
+    public init(projectId: String? = nil, trust: TeamsListOutputBotsItemTrust? = nil, limits: TeamsListOutputBotsItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsListOutputBotsItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsListOutputBotsItemReasoningLevel? = nil, permissionMode: TeamsListOutputBotsItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil, working: Bool? = nil, lastActivityAt: Double? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -14344,7 +14366,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt
@@ -15046,6 +15067,7 @@ public enum Studio {
   }
 
   public struct TeamsCreateInput: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsCreateInputTrust?
     public var limits: TeamsCreateInputLimits?
     public var name: String?
@@ -15061,7 +15083,8 @@ public enum Studio {
     public var intervalMinutes: Int?
     public var mission: String?
 
-    public init(trust: TeamsCreateInputTrust? = nil, limits: TeamsCreateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateInputReasoningLevel? = nil, permissionMode: TeamsCreateInputPermissionMode? = nil, intervalMinutes: Int? = nil, mission: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsCreateInputTrust? = nil, limits: TeamsCreateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateInputReasoningLevel? = nil, permissionMode: TeamsCreateInputPermissionMode? = nil, intervalMinutes: Int? = nil, mission: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -15229,6 +15252,7 @@ public enum Studio {
   }
 
   public struct TeamsCreateOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsCreateOutputTrust?
     public var limits: TeamsCreateOutputLimits?
     public var name: String?
@@ -15245,7 +15269,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -15253,7 +15276,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(trust: TeamsCreateOutputTrust? = nil, limits: TeamsCreateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateOutputReasoningLevel? = nil, permissionMode: TeamsCreateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsCreateOutputTrust? = nil, limits: TeamsCreateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateOutputReasoningLevel? = nil, permissionMode: TeamsCreateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -15270,7 +15294,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt
@@ -15633,6 +15656,7 @@ public enum Studio {
   }
 
   public struct TeamsUpdateOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsUpdateOutputTrust?
     public var limits: TeamsUpdateOutputLimits?
     public var name: String?
@@ -15649,7 +15673,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -15657,7 +15680,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(trust: TeamsUpdateOutputTrust? = nil, limits: TeamsUpdateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateOutputReasoningLevel? = nil, permissionMode: TeamsUpdateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsUpdateOutputTrust? = nil, limits: TeamsUpdateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateOutputReasoningLevel? = nil, permissionMode: TeamsUpdateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -15674,7 +15698,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt
@@ -15844,6 +15867,7 @@ public enum Studio {
   }
 
   public struct TeamsSwapModelOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsSwapModelOutputTrust?
     public var limits: TeamsSwapModelOutputLimits?
     public var name: String?
@@ -15860,7 +15884,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -15868,7 +15891,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(trust: TeamsSwapModelOutputTrust? = nil, limits: TeamsSwapModelOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsSwapModelOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsSwapModelOutputReasoningLevel? = nil, permissionMode: TeamsSwapModelOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsSwapModelOutputTrust? = nil, limits: TeamsSwapModelOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsSwapModelOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsSwapModelOutputReasoningLevel? = nil, permissionMode: TeamsSwapModelOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -15885,7 +15909,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt
@@ -16055,6 +16078,7 @@ public enum Studio {
   }
 
   public struct TeamsRetireOutput: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsRetireOutputTrust?
     public var limits: TeamsRetireOutputLimits?
     public var name: String?
@@ -16071,7 +16095,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -16079,7 +16102,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(trust: TeamsRetireOutputTrust? = nil, limits: TeamsRetireOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsRetireOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsRetireOutputReasoningLevel? = nil, permissionMode: TeamsRetireOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsRetireOutputTrust? = nil, limits: TeamsRetireOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsRetireOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsRetireOutputReasoningLevel? = nil, permissionMode: TeamsRetireOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -16096,7 +16120,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt
@@ -16549,6 +16572,7 @@ public enum Studio {
   }
 
   public struct TeamsProfilesOutputItem: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsProfilesOutputItemTrust?
     public var limits: TeamsProfilesOutputItemLimits?
     public var name: String?
@@ -16565,7 +16589,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -16573,7 +16596,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(trust: TeamsProfilesOutputItemTrust? = nil, limits: TeamsProfilesOutputItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsProfilesOutputItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsProfilesOutputItemReasoningLevel? = nil, permissionMode: TeamsProfilesOutputItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsProfilesOutputItemTrust? = nil, limits: TeamsProfilesOutputItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsProfilesOutputItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsProfilesOutputItemReasoningLevel? = nil, permissionMode: TeamsProfilesOutputItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -16590,7 +16614,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt
@@ -16898,6 +16921,7 @@ public enum Studio {
   }
 
   public struct TeamsGetOutputBot: Sendable, Hashable, Codable {
+    public var projectId: String?
     public var trust: TeamsGetOutputBotTrust?
     public var limits: TeamsGetOutputBotLimits?
     public var name: String?
@@ -16914,7 +16938,6 @@ public enum Studio {
     public var id: String?
     public var handle: String?
     public var home: String?
-    public var projectId: String?
     public var hostId: String?
     public var retired: Bool?
     public var createdAt: Double?
@@ -16922,7 +16945,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(trust: TeamsGetOutputBotTrust? = nil, limits: TeamsGetOutputBotLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsGetOutputBotFallbackReasoningLevel? = nil, reasoningLevel: TeamsGetOutputBotReasoningLevel? = nil, permissionMode: TeamsGetOutputBotPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(projectId: String? = nil, trust: TeamsGetOutputBotTrust? = nil, limits: TeamsGetOutputBotLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsGetOutputBotFallbackReasoningLevel? = nil, reasoningLevel: TeamsGetOutputBotReasoningLevel? = nil, permissionMode: TeamsGetOutputBotPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.projectId = projectId
       self.trust = trust
       self.limits = limits
       self.name = name
@@ -16939,7 +16963,6 @@ public enum Studio {
       self.id = id
       self.handle = handle
       self.home = home
-      self.projectId = projectId
       self.hostId = hostId
       self.retired = retired
       self.createdAt = createdAt

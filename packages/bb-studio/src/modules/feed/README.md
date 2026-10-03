@@ -151,7 +151,7 @@ longer publishes anything; cards in older replies still find their posts.
   **Show more**. Images show as pictures, and HTML artifacts and PDFs run in a
   frame. **Open** goes to the item's companion tab. An image artifact also stands in for a
   post's picture. Agents are told the feed previews what they link.
-- **Explore findings**: [Studio Explore](../../../../bb-studio-explore) can save what
+- **Explore findings**: [Studio Explore](../../../../bb-studio-pages/src/explore) can save what
   an agent noticed to the feed, under **Follow-ups**. Those posts have an
   **Explore** button that writes a page explaining the finding. The post then
   links the page and previews it. Explore also posts a daily digest of

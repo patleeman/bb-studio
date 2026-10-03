@@ -335,4 +335,4 @@ export { copyTitle, fillTemplate, fillTemplateJson } from "./template";
 
 export { parseStudioItemReference, parseStudioMentionReference, parseStudioItemHref, studioTextReferences, STUDIO_REFERENCE_ROUTES, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";
 
-export { absorbedPluginIds, rewriteLegacyText, rewriteLegacyValue } from "./legacy-refs";
+export { absorbedPluginIds, legacyReferencePluginIds, rewriteLegacyText, rewriteLegacyValue } from "./legacy-refs";

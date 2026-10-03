@@ -22,7 +22,8 @@
     "./modules/import": "./src/modules/import.ts",
     "./modules/settings": "./src/modules/settings.ts",
     "./modules/agents": "./src/modules/agents.ts",
-    "./modules/services": "./src/modules/services.ts"
+    "./modules/services": "./src/modules/services.ts",
+    "./modules/refs": "./src/modules/refs.ts"
   },
   "scripts": {
     "test": "vitest run --config vitest.config.mts",
