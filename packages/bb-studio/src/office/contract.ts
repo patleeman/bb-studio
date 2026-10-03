@@ -10,8 +10,12 @@ export { officeTabsContract, officeTabSchema, tabFolderSchema, type Tab, type Ta
 const id = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(100);
 export const trustSchema = z.enum(["ask", "act"]);
+/** A Space's color, like an Arc Space's: it tints the sidebar and marks the Space in the footer. */
+export const spaceColorSchema = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+/** The colors offered when picking one, and handed out in turn to new Spaces. */
+export const SPACE_COLORS = ["#3b82f6", "#8b5cf6", "#ec4899", "#f97316", "#22c55e", "#14b8a6", "#eab308", "#ef4444", "#64748b"] as const;
 export const officeSpaceSchema = z.object({
-  id, name, icon: z.string().max(100).nullable(), description: z.string(),
+  id, name, icon: z.string().max(100).nullable(), color: spaceColorSchema, description: z.string(),
   isDefault: z.boolean(), defaultProjectId: id.nullable(),
   projectIds: z.array(id), createdAt: z.number(), updatedAt: z.number(),
 });
@@ -34,7 +38,7 @@ export const folderSchema = z.object({
   id, spaceId: id, name: z.string(), path: z.string().nullable(),
   archived: z.boolean(), isDefault: z.boolean(),
 });
-const spaceInput = z.object({ name, icon: z.string().max(100).nullable().optional(), description: z.string().max(500).optional() });
+const spaceInput = z.object({ name, icon: z.string().max(100).nullable().optional(), color: spaceColorSchema.optional(), description: z.string().max(500).optional() });
 
 export const workingTaskSchema = z.object({
   id, botId: id.nullable(), title: z.string(),

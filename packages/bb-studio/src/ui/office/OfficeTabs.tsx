@@ -15,7 +15,6 @@ import { openCommandBar } from "./CommandBar";
 import { useLocationHref } from "./location";
 import { requestCount, setCurrentSpaceId, useInboxCounts, useSpaces } from "./model";
 import { openOffice } from "./routes";
-import { SpaceMark } from "./SpaceSwitcher";
 import { TAB, TabRow, openTab, type TabMoves } from "./TabRow";
 import { isTabActive, useTabActions, useTabs, useTrackOpen, type ShownTab, type TabFolder } from "./tabs";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE, cn } from "./styles";
@@ -79,10 +78,18 @@ function SpacesFooter() {
               aria-label={`${space.name}${waiting ? `, ${waiting} waiting` : ""}`}
               title={space.name}
               onClick={() => setCurrentSpaceId(space.id)}
-              className={cn("relative rounded-md p-0.5 outline-none focus-visible:outline-2 focus-visible:outline-ring", isCurrent ? "ring-1 ring-foreground/50" : "opacity-60 hover:opacity-100")}
+              // Arc's Space dots: its emoji, or a dot in its color; the one
+              // you're in sits on a soft circle of that color.
+              style={isCurrent ? { backgroundColor: `color-mix(in oklab, ${space.color} 32%, transparent)` } : undefined}
+              className={cn(
+                "relative inline-flex size-7 shrink-0 items-center justify-center rounded-full outline-none transition-colors focus-visible:outline-2 focus-visible:outline-ring",
+                !isCurrent && "hover:bg-sidebar-accent",
+              )}
             >
-              <SpaceMark space={space} size="sm" />
-              {waiting && !isCurrent ? <span aria-hidden className="absolute -top-0.5 -right-0.5 size-1.5 rounded-full bg-warning-foreground" /> : null}
+              {space.icon
+                ? <span aria-hidden className={cn("text-[15px] leading-none", !isCurrent && "opacity-55 grayscale-[35%]")}>{space.icon}</span>
+                : <span aria-hidden className={cn("rounded-full", isCurrent ? "size-2.5" : "size-2 opacity-55")} style={{ backgroundColor: space.color }} />}
+              {waiting && !isCurrent ? <span aria-hidden className="absolute top-0.5 right-0.5 size-1.5 rounded-full bg-warning-foreground" /> : null}
             </button>
           );
         })}

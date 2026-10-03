@@ -12,6 +12,19 @@ function setup() {
   return { db, store: new OfficeSpaceStore(db) };
 }
 
+describe("Space colors", () => {
+  it("gives new Spaces the next palette color, takes a chosen one, and spreads stock blues once", () => {
+    const { db, store } = setup();
+    const work = store.create({ name: "Work" });
+    expect(work.color).not.toBe(store.defaultSpace().color);
+    expect(store.update({ spaceId: work.id, color: "#ef4444" }).color).toBe("#ef4444");
+    db.prepare("UPDATE spaces SET color = '#3b82f6'").run();
+    db.prepare("DELETE FROM office_migrations WHERE id = 'space-colors-v1'").run();
+    migrateOfficeSpaces(db, { projectIds: [], projectForMember: () => undefined, logConflict: () => {} });
+    expect(new Set(store.list().map((space) => space.color)).size).toBe(2);
+  });
+});
+
 describe("Office Space ownership", () => {
   it("assigns unknown and null-project work to Personal and moves whole projects", () => {
     const { db, store } = setup();

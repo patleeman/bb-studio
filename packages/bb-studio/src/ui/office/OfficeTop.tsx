@@ -8,6 +8,7 @@ import {
   type ExperimentalSidebarNavigationProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@bb-studio/kit/app";
+import { useLayoutEffect, useRef, type RefObject } from "react";
 import { CommandBar, openCommandBar } from "./CommandBar";
 import { useLocationHref } from "./location";
 import { useSpaces } from "./model";
@@ -74,9 +75,31 @@ function EssentialTile({ tab, active, onRemove }: { tab: ShownTab; active: boole
   );
 }
 
+/**
+ * Tints BB's whole sidebar with the Space's color, as Arc does, by mixing it
+ * into the sidebar's own color variable. Leaving the Space, or unmounting,
+ * puts BB's color back.
+ */
+function useSpaceTint(anchor: RefObject<HTMLElement | null>, color: string | null) {
+  useLayoutEffect(() => {
+    const sidebar = anchor.current?.closest<HTMLElement>('[data-sidebar="sidebar"]');
+    if (!sidebar || !color) return;
+    const base = getComputedStyle(sidebar).backgroundColor;
+    const tint = `color-mix(in oklab, ${base} 84%, ${color})`;
+    sidebar.style.setProperty("--color-sidebar", tint);
+    sidebar.style.setProperty("--sidebar", tint);
+    return () => {
+      sidebar.style.removeProperty("--color-sidebar");
+      sidebar.style.removeProperty("--sidebar");
+    };
+  }, [anchor, color]);
+}
+
 export function OfficeTop(_props: ExperimentalSidebarNavigationProps) {
   const { current } = useSpaces();
   const spaceId = current?.id ?? null;
+  const nav = useRef<HTMLElement>(null);
+  useSpaceTint(nav, current?.color ?? null);
   const { threadId } = useBbContext();
   const locationHref = useLocationHref();
   const tabs = useTabs(spaceId);
@@ -87,7 +110,7 @@ export function OfficeTop(_props: ExperimentalSidebarNavigationProps) {
   const where = here?.title ?? (threadId ? tabs.threads.find((thread) => thread.id === threadId)?.displayTitle ?? null : null);
 
   return (
-    <nav aria-label="Office" className="shrink-0 space-y-2 px-2 pt-1 pb-1">
+    <nav ref={nav} aria-label="Office" className="shrink-0 space-y-2 px-2 pt-1 pb-1">
       <AddressBar where={where} />
       {tabs.essentials.length
         ? <div className="grid grid-cols-4 gap-1.5">

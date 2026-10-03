@@ -1,9 +1,9 @@
 import type Database from "better-sqlite3";
 import { newId } from "@bb-studio/kit/ids";
-import { officeContract, spaceSettingsSchema, spaceSettingsPatchSchema, type OfficeInput, type OfficeSpace, type SpaceSettings } from "./contract";
+import { officeContract, SPACE_COLORS, spaceSettingsSchema, spaceSettingsPatchSchema, type OfficeInput, type OfficeSpace, type SpaceSettings } from "./contract";
 import { PERSONAL_PROJECT_ID } from "./migration";
 
-type Row = { id: string; name: string; icon: string | null; description: string; is_default: number; default_project_id: string | null; created_at: number; updated_at: number };
+type Row = { id: string; name: string; icon: string | null; color: string; description: string; is_default: number; default_project_id: string | null; created_at: number; updated_at: number };
 const defaults: SpaceSettings = { todayArchiveAfter: "3d", enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null };
 
 /** Project ownership is authoritative. No membership is inferred from tags. */
@@ -14,7 +14,7 @@ export class OfficeSpaceStore {
     const rows = this.db.prepare("SELECT * FROM spaces ORDER BY is_default DESC, name COLLATE NOCASE, id").all() as Row[];
     const projects = this.db.prepare("SELECT project_id, space_id FROM space_projects ORDER BY sort_key, created_at, project_id").all() as { project_id: string; space_id: string }[];
     return rows.map(row => ({
-      id: row.id, name: row.name, icon: row.icon, description: row.description,
+      id: row.id, name: row.name, icon: row.icon, color: /^#[0-9a-fA-F]{6}$/.test(row.color) ? row.color : SPACE_COLORS[0], description: row.description,
       isDefault: !!row.is_default, defaultProjectId: row.default_project_id,
       createdAt: row.created_at, updatedAt: row.updated_at,
       projectIds: projects.filter(p => p.space_id === row.id).map(p => p.project_id),
@@ -48,16 +48,18 @@ export class OfficeSpaceStore {
     const parsed = officeContract.space_create.input.parse(input);
     const id = newId("spc");
     const now = Date.now();
-    this.db.prepare("INSERT INTO spaces(id,name,color,icon,description,created_at,updated_at) VALUES (?,?,'#3b82f6',?,?,?,?)")
-      .run(id, parsed.name, parsed.icon ?? null, parsed.description ?? "", now, now);
+    // New Spaces take the next color in turn, so each one reads apart in the footer.
+    const count = (this.db.prepare("SELECT COUNT(*) AS n FROM spaces").get() as { n: number }).n;
+    this.db.prepare("INSERT INTO spaces(id,name,color,icon,description,created_at,updated_at) VALUES (?,?,?,?,?,?,?)")
+      .run(id, parsed.name, parsed.color ?? SPACE_COLORS[count % SPACE_COLORS.length], parsed.icon ?? null, parsed.description ?? "", now, now);
     return this.get(id);
   }
 
   update(input: OfficeInput<"space_update">): OfficeSpace {
     const parsed = officeContract.space_update.input.parse(input);
     const old = this.get(parsed.spaceId);
-    this.db.prepare("UPDATE spaces SET name=?,icon=?,description=?,updated_at=? WHERE id=?")
-      .run(parsed.name ?? old.name, parsed.icon === undefined ? old.icon : parsed.icon, parsed.description ?? old.description, Date.now(), old.id);
+    this.db.prepare("UPDATE spaces SET name=?,icon=?,color=?,description=?,updated_at=? WHERE id=?")
+      .run(parsed.name ?? old.name, parsed.icon === undefined ? old.icon : parsed.icon, parsed.color ?? old.color, parsed.description ?? old.description, Date.now(), old.id);
     return this.get(old.id);
   }
 

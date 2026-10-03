@@ -8,7 +8,8 @@ import { useCall, useLive, useSpaces, useSpaceTree, useTeam, setCurrentSpaceId, 
 import { OfficeHome } from "./OfficeHome";
 import { openOffice, parseOfficeRoute } from "./routes";
 import { SpaceMark } from "./SpaceSwitcher";
-import type { OfficeOutput } from "../../office/contract";
+import { cn } from "./styles";
+import { SPACE_COLORS, type OfficeOutput } from "../../office/contract";
 import { EXTERNAL_PROVIDERS, useExternalHealth } from "./external";
 
 export function OfficePanel({ subPath }: { subPath: string }) {
@@ -150,6 +151,22 @@ function SettingsPage({ space }: { space: Space }) {
           <label className="flex-1 text-xs text-muted-foreground">Name<input value={name} maxLength={100} onChange={(change) => setName(change.target.value)} className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
           <button type="submit" disabled={!name.trim() || (name === space.name && icon === (space.icon ?? ""))} className={OUTLINE_BUTTON}>Save</button>
         </form>
+        {/* Like an Arc Space's color: it tints the sidebar and marks the Space in the footer. */}
+        <div role="radiogroup" aria-label="Color" className="mt-4 flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-xs text-muted-foreground">Color</span>
+          {SPACE_COLORS.map((color) => (
+            <button
+              key={color}
+              type="button"
+              role="radio"
+              aria-checked={space.color === color}
+              aria-label={color}
+              onClick={() => void run("space_update", { spaceId: space.id, color })}
+              style={{ backgroundColor: color }}
+              className={cn("size-6 rounded-full outline-none focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring", space.color === color && "ring-2 ring-foreground ring-offset-2 ring-offset-background")}
+            />
+          ))}
+        </div>
       </section>
 
       <section className="mt-10">
