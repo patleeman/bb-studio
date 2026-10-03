@@ -79,6 +79,18 @@ it("starts a new bot thread after its previous one is archived", async () => {
   } finally { await harness.lifecycle.dispose(); }
 });
 
+it("reuses its bot handoff after the conversation link gets a human title", async () => {
+  const { harness, create, hand, get } = await setup();
+  try {
+    const id = await create();
+    const { threadId } = await hand(id);
+    await harness.behavior.callRpc("link", { id, link: { target: "thread", pluginId: null, itemId: threadId, label: "Reviewed the launch", href: `/threads/${threadId}` } });
+    expect(await hand(id)).toEqual({ threadId });
+    expect((await get(id)).handoffs).toHaveLength(1);
+    expect(harness.inspection.sdk.callsTo("plugins.callRpc").filter(args => (args[0] as { method: string }).method === "newConversation")).toHaveLength(1);
+  } finally { await harness.lifecycle.dispose(); }
+});
+
 it("shows send failures in the recorded handoff", async () => {
   const { harness, create, hand, get } = await setup();
   try {

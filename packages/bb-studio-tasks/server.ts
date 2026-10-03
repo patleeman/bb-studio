@@ -834,7 +834,7 @@ export default async function plugin(bb: BbPluginApi) {
         // A thread can identify one task, and only its newest handoff moves it.
         return !handoff || (handoff.task_id === id && latest?.thread_id === link.item_id);
       });
-      let threadId = existing?.item_id;
+      let threadId = latest?.thread_id ?? existing?.item_id;
       if (threadId) {
         const profile = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "threadProfile", input: { threadId } as never,
           outputSchema: z.object({ botId: z.string().nullable() }).nullable() });
