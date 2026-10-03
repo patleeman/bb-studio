@@ -7,7 +7,9 @@ Explore what an agent noticed along the way. Experimental.
   subsystem, connected code, a recent change.
 - **An explainer per finding.** Click one and a hidden copy of the thread
   investigates it and writes a page explaining it, in the background. It
-  opens beside the thread with its own follow-ups to explore next.
+  opens in a shared companion tab with its own follow-ups to explore next.
+  Reopening it focuses that tab, and Open in Pages uses the same companion
+  destination policy.
 - **Saved in Pages.** Explainers live under an **Explore** page in each
   project's Pages tree, and Regenerate keeps the old version.
 

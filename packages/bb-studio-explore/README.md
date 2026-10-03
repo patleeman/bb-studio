@@ -45,12 +45,19 @@ The rows' wording is the agent's, so it changes from run to run.
   **Explore** page in each project's Pages tree, with the finding's emoji as
   their icon, and are tagged **Explore** in [Studio](../bb-studio)
   when it's installed.
-- **In the side panel.** The **Explore** tab shows progress while an explainer
+- **In shared companion tabs.** Clicking a finding opens its **Explore** tab
+  beside your work, using the same placement, pins, dismissal, and restoration
+  as other Studio companions. Reopening the same finding focuses its existing
+  tab. Progress and the finished document keep that destination. The Explore
+  navigation panel also lists your explainers. Without Float, the existing
+  thread panel remains available.
+  The tab shows progress while an explainer
   is written (stage, percent, time so far, **Stop**), the error with
   **Retry** if it failed, and then the explainer with when it was
   generated, **Regenerate**, **Open in Pages**, and its own follow-up
-  findings below it. Clicking a follow-up keeps exploring from the original
-  thread.
+  findings below it. **Open in Pages** opens the saved page through the shared
+  companion policy, or in the main view when Float is absent. Clicking a
+  follow-up keeps exploring from the original thread.
 - **Regenerate** writes the explainer again in place. The old version is
   kept in the page's version history ("Before regenerate …").
 - **Settings:** *Daily digest in Studio Feed* (on by default) is described

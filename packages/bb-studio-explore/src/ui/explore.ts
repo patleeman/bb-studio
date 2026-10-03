@@ -1,14 +1,19 @@
 // Explore in the app: an explainer's state, realtime events about it, and
 // opening it in Explore's side-panel tab.
 import type { BbNavigate } from "@get-bb/plugin-sdk/app";
+import { openAppPath, openCompanion } from "@bb-studio/kit/app";
 import { useEffect, useState } from "react";
 import type { RealtimeEvent } from "../constants";
 import type { ExplainerView } from "../contract";
 import { isActiveJob, PANEL_ACTION } from "../shared";
+import { PAGES_PLUGIN_ID, PLUGIN_ID } from "../constants";
 
 export type { ExplainerView };
 
 export const EXPLORE_ICON = "explore/explore";
+export const EXPLAINERS_PATH = "explainers";
+
+export const explainerPath = (id: string): string => `/plugins/${PLUGIN_ID}/${EXPLAINERS_PATH}/${encodeURIComponent(id)}`;
 
 /** What a finding's row shows. */
 export type RowState = "idle" | "running" | "ready" | "error";
@@ -36,9 +41,18 @@ export function explainerIdFrom(params: unknown): string | null {
   return typeof explainerId === "string" && explainerId ? explainerId : null;
 }
 
-/** Opens an explainer (its progress, or its page once written) in the thread's side panel. */
+/** Opens one shared companion for an explainer; older installations retain their thread panel. */
 export function openExplainer(navigate: BbNavigate, explainer: Pick<ExplainerView, "id" | "label">): boolean {
-  return navigate.openThreadPanel({ actionId: PANEL_ACTION, title: explainer.label, params: { explainerId: explainer.id } });
+  if (openCompanion({ kind: "path", path: explainerPath(explainer.id), title: explainer.label })) return true;
+  if (navigate.openThreadPanel({ actionId: PANEL_ACTION, title: explainer.label, params: { explainerId: explainer.id } })) return true;
+  openAppPath(explainerPath(explainer.id), { main: true });
+  return true;
+}
+
+/** Pages belongs to another plugin, so use its shared destination rather than an owner-only SDK route. */
+export function openExplainerPage(pageId: string): void {
+  const path = `/plugins/${PAGES_PLUGIN_ID}/pages/${encodeURIComponent(pageId)}`;
+  if (!openCompanion({ kind: "path", path })) openAppPath(path, { main: true });
 }
 
 /** Re-renders every minute so "2m ago" stays true. */

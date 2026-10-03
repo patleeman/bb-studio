@@ -1,4 +1,9 @@
-export default ({ projectId, threadId }) => [
+import companions from "./explore-companions.mjs";
+
+export default context => {
+  const { projectId, threadId } = context;
+  return [
+  ...(process.env.BB_CAPTURE_EXPLORE_COMPANIONS === "1" ? [companions(context)] : []),
   {
     id: "explore",
     packageDir: "bb-studio-explore",
@@ -29,3 +34,4 @@ export default ({ projectId, threadId }) => [
       })()`),
   },
 ];
+};

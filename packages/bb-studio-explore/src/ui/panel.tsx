@@ -4,14 +4,14 @@
 // (when it was written, Regenerate, Open in Pages) with its follow-up
 // findings below. A Markdown explainer opens in Pages instead.
 import { errorMessage, shortDateTime } from "@bb-studio/kit/format";
-import { useBbNavigate, useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime, useRpc, type PluginNavPanelProps, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { relativeTime } from "@bb-studio/kit/format";
-import { PAGES_PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
+import { REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
-import { EXPLORE_ICON, explainerEvent, explainerIdFrom, openExplainer, rowState, useMinuteTick, type ExplainerView, type RowState } from "./explore";
+import { EXPLORE_ICON, explainerEvent, explainerIdFrom, openExplainer, openExplainerPage, rowState, useMinuteTick, type ExplainerView, type RowState } from "./explore";
 import { HtmlFrame } from "./html";
 import { ExploreRows } from "./rows";
 
@@ -46,7 +46,12 @@ export function ExplainerTab({ threadId, params }: PluginThreadPanelProps) {
   return <ThreadExplainers threadId={threadId} />;
 }
 
-function ThreadExplainers({ threadId }: { threadId: string }) {
+export function ExplainersPage({ subPath }: PluginNavPanelProps) {
+  if (subPath) return <ExplainerPanel key={subPath} explainerId={subPath} />;
+  return <ThreadExplainers />;
+}
+
+function ThreadExplainers({ threadId }: { threadId?: string }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   useMinuteTick();
@@ -59,11 +64,12 @@ function ThreadExplainers({ threadId }: { threadId: string }) {
   }, [rpc, threadId]);
   useEffect(load, [load]);
   useRealtime(REALTIME_CHANNEL, (payload) => {
-    if (explainerEvent(payload)?.threadId === threadId) load();
+    const event = explainerEvent(payload);
+    if (event && (!threadId || event.threadId === threadId)) load();
   });
   if (explainers === null) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
   if (!explainers.length) {
-    return <PanelMessage title="Nothing explored in this thread yet" detail="Click a finding under an answer to write a page explaining it." />;
+    return <PanelMessage title={threadId ? "Nothing explored in this thread yet" : "Nothing explored yet"} detail="Click a finding under an answer to write a page explaining it." />;
   }
   return (
     <ul className="divide-y divide-border/60 overflow-auto">
@@ -87,7 +93,6 @@ function ThreadExplainers({ threadId }: { threadId: string }) {
 
 function ExplainerPanel({ explainerId }: { explainerId: string }) {
   const rpc = useRpc<typeof rpcContract>();
-  const navigate = useBbNavigate();
   useMinuteTick();
   const [explainer, setExplainer] = useState<ExplainerView | null | undefined>(undefined);
   const [actionError, setActionError] = useState<string | null>(null);
@@ -116,7 +121,8 @@ function ExplainerPanel({ explainerId }: { explainerId: string }) {
   }, [state, load]);
 
   const html = useExplainerHtml(explainerId, explainer?.pageId ? `${explainer.pageId}:${explainer.updatedAt}` : null);
-  const openPage = explainer?.pageId ? () => navigate.toPluginPanel(PAGES_PLUGIN_ID, { subPath: explainer.pageId! }) : null;
+  const pageId = explainer?.pageId;
+  const openPage = pageId ? () => openExplainerPage(pageId) : null;
 
   async function run(method: "exploreRegenerate" | "exploreStop") {
     setActing(true);
@@ -175,7 +181,7 @@ function ExplainerPanel({ explainerId }: { explainerId: string }) {
 
   if (explainer.pageId && html) {
     return (
-      <div className="relative flex h-full min-h-0 flex-col bg-background text-foreground">
+      <div data-explainer-panel={explainerId} className="relative flex h-full min-h-0 flex-col bg-background text-foreground">
         {header}
         <div className="min-h-0 flex-1 overflow-auto">
           <div className="pt-2">
@@ -187,7 +193,7 @@ function ExplainerPanel({ explainerId }: { explainerId: string }) {
     );
   }
   return (
-    <div className="relative flex h-full min-h-0 flex-col overflow-auto bg-background text-foreground">
+    <div data-explainer-panel={explainerId} className="relative flex h-full min-h-0 flex-col overflow-auto bg-background text-foreground">
       {header}
       {explainer.pageId && html === undefined ? (
         <p className="p-4 text-sm text-muted-foreground">Loading…</p>
