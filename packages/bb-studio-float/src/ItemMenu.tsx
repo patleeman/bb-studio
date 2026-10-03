@@ -18,9 +18,7 @@ import {
   DropdownMenuTrigger,
   Icon,
   openNewItemThread,
-  setDragTarget,
   STUDIO_ITEM_CLICKS_OFF,
-  STUDIO_TARGET_TYPE,
   studioTargetAt,
   targetHref,
   useCanFloat,
@@ -31,6 +29,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { update } from "./store";
 import { openTab } from "./stack";
+import { useItemDrag } from "./useItemDrag";
 
 interface Menu {
   x: number;
@@ -65,35 +64,6 @@ function useModifierClicks(split: (target: FloatTarget) => void) {
     document.addEventListener("click", onClick, true);
     return () => document.removeEventListener("click", onClick, true);
   }, [split]);
-}
-
-/** Puts dragged items on the drag, and says whether one is being dragged. */
-function useItemDrag(): boolean {
-  const [dragging, setDragging] = useState(false);
-  useEffect(() => {
-    const onDragStart = (event: DragEvent) => {
-      const target = targetAt(event);
-      if (!target || !event.dataTransfer) return;
-      setDragTarget(event.dataTransfer, target);
-      setDragging(true);
-    };
-    const onDragOver = (event: DragEvent) => {
-      // A link dragged in from elsewhere in the app floats too.
-      if (event.dataTransfer?.types.includes(STUDIO_TARGET_TYPE)) setDragging(true);
-    };
-    const stop = () => setDragging(false);
-    document.addEventListener("dragstart", onDragStart);
-    document.addEventListener("dragover", onDragOver);
-    document.addEventListener("dragend", stop);
-    document.addEventListener("drop", stop);
-    return () => {
-      document.removeEventListener("dragstart", onDragStart);
-      document.removeEventListener("dragover", onDragOver);
-      document.removeEventListener("dragend", stop);
-      document.removeEventListener("drop", stop);
-    };
-  }, []);
-  return dragging;
 }
 
 /** Where a dragged item can float: over the panel, or in the corner when there's none. */

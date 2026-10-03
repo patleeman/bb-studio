@@ -1,0 +1,51 @@
+import { setDragTarget, STUDIO_TARGET_TYPE, studioTargetAt } from "@bb-studio/kit/app";
+import { useEffect, useState } from "react";
+
+export function useItemDrag(): boolean {
+  const [dragging, setDragging] = useState(false);
+  useEffect(() => {
+    const onDragStart = (event: DragEvent) => {
+      const target = studioTargetAt(event.target instanceof Element ? event.target : null);
+      if (!target || !event.dataTransfer) return;
+      setDragTarget(event.dataTransfer, target);
+      setDragging(true);
+    };
+    const onDragOver = (event: DragEvent) => {
+      if (event.dataTransfer?.types.includes(STUDIO_TARGET_TYPE)) setDragging(true);
+    };
+    const stop = () => setDragging(false);
+    const onKeyDown = (event: KeyboardEvent) => { if (event.key === "Escape") stop(); };
+    const onPointerMove = (event: MouseEvent) => { if (event.buttons === 0) stop(); };
+    const onDragLeave = (event: DragEvent) => {
+      if ((event.target === document.documentElement || event.target === document) && !event.relatedTarget) stop();
+    };
+    const onVisibility = () => { if (document.hidden) stop(); };
+    document.addEventListener("dragstart", onDragStart, true);
+    document.addEventListener("dragover", onDragOver, true);
+    document.addEventListener("dragleave", onDragLeave, true);
+    document.addEventListener("visibilitychange", onVisibility);
+    window.addEventListener("dragend", stop, true);
+    window.addEventListener("drop", stop, true);
+    window.addEventListener("keydown", onKeyDown, true);
+    window.addEventListener("pointerdown", stop, true);
+    window.addEventListener("pointermove", onPointerMove, true);
+    window.addEventListener("mousemove", onPointerMove, true);
+    window.addEventListener("mouseup", stop, true);
+    window.addEventListener("blur", stop);
+    return () => {
+      document.removeEventListener("dragstart", onDragStart, true);
+      document.removeEventListener("dragover", onDragOver, true);
+      document.removeEventListener("dragleave", onDragLeave, true);
+      document.removeEventListener("visibilitychange", onVisibility);
+      window.removeEventListener("dragend", stop, true);
+      window.removeEventListener("drop", stop, true);
+      window.removeEventListener("keydown", onKeyDown, true);
+      window.removeEventListener("pointerdown", stop, true);
+      window.removeEventListener("pointermove", onPointerMove, true);
+      window.removeEventListener("mousemove", onPointerMove, true);
+      window.removeEventListener("mouseup", stop, true);
+      window.removeEventListener("blur", stop);
+    };
+  }, []);
+  return dragging;
+}
