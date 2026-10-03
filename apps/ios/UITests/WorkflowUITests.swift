@@ -31,12 +31,13 @@ final class WorkflowUITests: XCTestCase {
         app.terminate()
         app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "home"]
         app.launch()
+        app.openOfficeScreen("Home")
         let newThread = app.buttons["New Thread"]
         XCTAssertTrue(newThread.waitForExistence(timeout: 10))
         newThread.tap()
         XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
         app.buttons["Cancel"].tap()
-        app.buttons["Team"].tap()
+        app.openOfficeScreen("Team")
         app.open(URL(string: "bbstudio://new")!)
         XCTAssertTrue(app.navigationBars["New thread"].waitForExistence(timeout: 10))
         app.buttons["Cancel"].tap()

@@ -118,7 +118,7 @@ final class ReviewQualityUITests: XCTestCase {
     func testHomeContrastNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
-        app.tabBars.buttons["Home"].tap()
+        app.openOfficeScreen("Home")
         XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
         try captureNativeDiagnostic(app, "home-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
@@ -139,7 +139,7 @@ final class ReviewQualityUITests: XCTestCase {
         if app.buttons["captureClose"].exists { app.buttons["captureClose"].tap() }
         app.open(URL(string: "bbstudio://studio")!)
         try verifyLargeContentViewer(app.buttons["studioSelect"], title: "Select", app: app)
-        app.tabBars.buttons["Home"].tap()
+        app.openOfficeScreen("Home")
         let space = app.buttons["officeSpaceSwitcher"]
         XCTAssertTrue(space.waitForExistence(timeout: 10))
         let title = space.label.replacingOccurrences(of: "Space: ", with: "").replacingOccurrences(of: ". Switch space", with: "")
@@ -319,7 +319,7 @@ final class ReviewQualityUITests: XCTestCase {
     func testHomeClippingAtDefaultText() throws {
         let app = try diagnosticApplication(largeText: false)
         defer { app.terminate() }
-        app.tabBars.buttons["Home"].tap()
+        app.openOfficeScreen("Home")
         XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
         retainScreen(app, "home-clipping-native-default")
         try app.performAccessibilityAudit(for: [.textClipped])
@@ -328,7 +328,7 @@ final class ReviewQualityUITests: XCTestCase {
     func testHomeClippingNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
-        app.tabBars.buttons["Home"].tap()
+        app.openOfficeScreen("Home")
         XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
         try captureNativeDiagnostic(app, "home-clipping-native-accessibility-xxxl", audit: [.textClipped])
     }
@@ -370,8 +370,8 @@ final class ReviewQualityUITests: XCTestCase {
         for label in ["Approve", "Deny"] {
             let request = app.cells.containing(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "officeRequestOpen", "Native approval card QA")).firstMatch
             let action = request.buttons[label].firstMatch
-            XCTAssertTrue(action.waitForExistence(timeout: 10))
             reveal(action, in: app)
+            XCTAssertTrue(action.waitForExistence(timeout: 10))
             checkTarget(action)
             XCTAssertGreaterThanOrEqual(action.frame.width, 44 - 0.001)
             XCTAssertGreaterThanOrEqual(action.frame.height, 44 - 0.001)
@@ -420,8 +420,8 @@ final class ReviewQualityUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
         let request = app.cells.containing(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "officeRequestOpen", "Native approval card QA")).firstMatch
         let open = request.buttons["officeRequestOpen"]
-        XCTAssertTrue(open.waitForExistence(timeout: 20))
         reveal(open, in: app)
+        XCTAssertTrue(open.waitForExistence(timeout: 20))
         open.tap()
         XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
         for label in ["Approve plan", "Keep planning"] {
@@ -700,7 +700,9 @@ final class ReviewQualityUITests: XCTestCase {
         app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         try captureAndAudit(app, "studio-\(size)")
-        app.tabBars.buttons["Home"].tap()
+        app.showOfficeTabs()
+        try captureAndAudit(app, "tabs-\(size)")
+        app.openOfficeScreen("Home")
         let handoff = app.buttons["Hand Off to a Bot"]
         XCTAssertTrue(handoff.waitForExistence(timeout: 20))
         checkTarget(handoff)

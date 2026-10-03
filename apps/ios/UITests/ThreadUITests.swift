@@ -9,16 +9,16 @@ final class ThreadUITests: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = true
-        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "work"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "tabs"]
         app.launch()
     }
 
-    func testWork() {
-        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 10))
-        shot("work-top")
+    func testTabs() {
+        XCTAssertTrue(app.buttons["officeTabsNew"].waitForExistence(timeout: 10))
+        shot("tabs-top")
         app.swipeUp()
         app.swipeUp()
-        shot("work-bottom")
+        shot("tabs-bottom")
     }
 
     /// The split view and keyboard shortcuts; run on an iPad simulator. Nothing is sent.
@@ -319,14 +319,12 @@ final class ThreadUITests: XCTestCase {
 
     /// Read-only: browses a channel and custom instructions.
     func testPluginScreens() {
-        app.open(URL(string: "bbstudio://home")!)
-        let channel = app.buttons.containing(.image, identifier: "number").firstMatch
-        if channel.waitForExistence(timeout: 10) {
-            channel.tap()
-            sleep(3)
-            shot("plugins-channel")
-            app.navigationBars.buttons.element(boundBy: 0).tap()
-        }
+        app.openOfficeScreen("Team")
+        let channel = app.staticTexts["ORBIT-42 release room"].firstMatch
+        XCTAssertTrue(channel.waitForExistence(timeout: 10))
+        channel.tap()
+        XCTAssertTrue(app.buttons["Edit channel"].waitForExistence(timeout: 10))
+        shot("plugins-channel")
         app.tabBars.buttons["Settings"].tap()
         let instructions = app.buttons["Custom Instructions"]
         if instructions.waitForExistence(timeout: 5) {
@@ -506,7 +504,7 @@ final class ThreadUITests: XCTestCase {
 
     func testShelfDemo() {
         app.terminate()
-        app.launchArguments = ["-qaShelfDemo", "-skipPushPrompt", "YES", "-officeTab", "work"]
+        app.launchArguments = ["-qaShelfDemo", "-skipPushPrompt", "YES", "-officeTab", "tabs"]
         app.launch()
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
@@ -534,7 +532,7 @@ final class ThreadUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 4))
     }
 
-    /// The Studio deep link opens All items in Work.
+    /// The Studio deep link opens the Library on the Tabs stack.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio collection")
@@ -544,20 +542,29 @@ final class ThreadUITests: XCTestCase {
     /// changed meanwhile, then stays live. Creates two scratch threads, held
     /// with a far-off send, and deletes them.
     func testResumeReconnects() throws {
-        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.buttons["officeTabsNew"].waitForExistence(timeout: 10))
         let tag = String(UUID().uuidString.prefix(6))
         XCUIDevice.shared.press(.home)
         sleep(3)
         let away = try XCTUnwrap(scratchThread("QA away \(tag)"))
+        try registerTab(away)
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(away)", ["childThreadsConfirmed": false]) }
         app.activate()
         sleep(3)
         XCTAssertTrue(scrollTo("QA away \(tag)"), "picks up changes made while in the background")
         let live = try XCTUnwrap(scratchThread("QA live \(tag)"))
+        try registerTab(live)
         addTeardownBlock { _ = self.api("DELETE", "/threads/\(live)", ["childThreadsConfirmed": false]) }
         sleep(4)
         XCTAssertTrue(scrollTo("QA live \(tag)"), "live again after returning")
         shot("resume")
+    }
+
+    private func registerTab(_ threadId: String) throws {
+        let spaces = try XCTUnwrap(rpc("studio", "spaces_list", [:])?["spaces"] as? [[String: Any]])
+        let space = try XCTUnwrap(spaces.first { ($0["projectIds"] as? [String])?.contains(StagedFixture.projectId) == true })
+        let id = try XCTUnwrap(space["id"] as? String)
+        XCTAssertNotNil(rpc("studio", "tabs_open", ["spaceId": id, "ref": "thread:\(threadId)"])?["tab"])
     }
 
     /// The inbox list renders only the rows on screen: look further down, then back up.
@@ -759,7 +766,7 @@ final class ThreadUITests: XCTestCase {
         let id = try XCTUnwrap(created["id"] as? String)
         addTeardownBlock { _ = self.rpc("studio", "teams_viewDelete", ["id": id]) }
         func channel() -> [String: Any]? { rpc("studio", "teams_view", ["id": id])?["view"] as? [String: Any] }
-        app.buttons["Team"].tap()
+        app.openOfficeScreen("Team")
         let row = app.staticTexts[name].firstMatch
         for _ in 0..<5 where !row.isHittable { app.swipeUp() }
         XCTAssertTrue(row.waitForExistence(timeout: 10), "conversation on Team")
@@ -1149,7 +1156,7 @@ final class ThreadUITests: XCTestCase {
     /// The scratch run is scheduled an hour ahead and deleted in teardown.
     func testChannelAutomations() throws {
         continueAfterFailure = false
-        app.buttons["Team"].tap()
+        app.openOfficeScreen("Team")
         let channel = app.staticTexts["ORBIT-42 release room"].firstMatch
         XCTAssertTrue(channel.waitForExistence(timeout: 10)); channel.tap()
         XCTAssertTrue(app.buttons["Edit channel"].waitForExistence(timeout: 10))
@@ -1219,7 +1226,7 @@ final class ThreadUITests: XCTestCase {
         let bots = try XCTUnwrap(rpc("studio", "teams_list", NSNull())?["bots"] as? [[String: Any]])
         let bot = try XCTUnwrap(bots.first { $0["name"] as? String == "Atlas" })
         let id = try XCTUnwrap(bot["id"] as? String)
-        app.buttons["Team"].tap()
+        app.openOfficeScreen("Team")
         XCTAssertTrue(app.buttons["Atlas"].waitForExistence(timeout: 10)); app.buttons["Atlas"].tap()
         XCTAssertTrue(app.buttons["Chat"].waitForExistence(timeout: 10))
         XCTAssertTrue(app.staticTexts["Atlas"].exists)

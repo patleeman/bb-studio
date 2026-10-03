@@ -22,8 +22,7 @@ final class ReviewPerformanceUITests: XCTestCase {
         let server = app.descendants(matching: .any)["settingsServerURL"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         XCTAssertEqual(server.value as? String, fixture)
-        app.tabBars.buttons["Work"].tap()
-        app.buttons["All items"].tap()
+        app.openOfficeScreen("Library")
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.buttons["Pages"].tap()
         app.swipeUp()

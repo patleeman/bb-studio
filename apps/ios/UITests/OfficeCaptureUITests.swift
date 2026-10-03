@@ -27,19 +27,21 @@ final class OfficeCaptureUITests: XCTestCase {
         try capture(app, "office-inbox")
     }
     func testHome() throws {
-        let app = try launch("home")
+        let app = try launch("tabs")
+        app.openOfficeScreen("Home")
         XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
         XCTAssertTrue(app.staticTexts["Atlas wants to edit the release checklist"].waitForExistence(timeout: 20))
         try capture(app, "office-home")
     }
-    func testWork() throws {
-        let app = try launch("work")
-        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 20))
-        XCTAssertTrue(app.staticTexts["Orbit"].waitForExistence(timeout: 20))
-        try capture(app, "office-work")
+    func testTabs() throws {
+        let app = try launch("tabs")
+        XCTAssertTrue(app.buttons["officeTabsNew"].waitForExistence(timeout: 20))
+        XCTAssertTrue(app.buttons["officeEssential"].firstMatch.waitForExistence(timeout: 20))
+        try capture(app, "office-tabs")
     }
     func testTeamAndDesk() throws {
-        let app = try launch("team")
+        let app = try launch("tabs")
+        app.openOfficeScreen("Team")
         XCTAssertTrue(app.staticTexts["ORBIT-42 release room"].waitForExistence(timeout: 20))
         let atlas = app.buttons.matching(NSPredicate(format: "label == %@", "Atlas")).firstMatch
         XCTAssertTrue(atlas.waitForExistence(timeout: 20), "Atlas team face")

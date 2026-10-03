@@ -12,7 +12,7 @@ final class NewSurfacesUITests: XCTestCase {
         let app = launch(tab: "inbox")
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 15))
         shot(app, "inbox")
-        app.tabBars.buttons["Home"].tap()
+        app.openOfficeScreen("Home")
         XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 15))
         shot(app, "home")
         openCollection(app)
@@ -35,7 +35,7 @@ final class NewSurfacesUITests: XCTestCase {
 
     /// The collection's search field sits in the navigation drawer, hidden until the list is pulled down.
     private func studioSearch(_ app: XCUIApplication) -> XCUIElement {
-        let search = app.searchFields["Search Studio"]
+        let search = app.searchFields["Search"]
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
         if !search.waitForExistence(timeout: 3) {
             let window = app.windows.firstMatch
@@ -114,7 +114,7 @@ final class NewSurfacesUITests: XCTestCase {
         shot(app, "meeting-notes")
     }
 
-    private func launch(tab: String = "work") -> XCUIApplication {
+    private func launch(tab: String = "tabs") -> XCUIApplication {
         let app = XCUIApplication()
         app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", tab]
         app.launch()
