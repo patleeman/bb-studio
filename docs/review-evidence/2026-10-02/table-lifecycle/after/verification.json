@@ -1,0 +1,2318 @@
+{
+  "environment": {
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Chrome/154.0.8037.93",
+      "revision": "@f89f3a4363808e117c592adedcf9947882ac3b79",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+      "jsVersion": "15.4.80.19"
+    },
+    "source": "c2bc4da5c2019fee6704b891a9d11e5ad954d472",
+    "expectedPaging": true,
+    "fixtureMonth": "2026-10",
+    "document": {
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    }
+  },
+  "views": [
+    {
+      "kind": "board",
+      "readyMs": 114.7,
+      "heapUsed": 45948576,
+      "heapTotal": 47710208,
+      "nodes": 2426,
+      "documents": 17,
+      "listeners": 1244,
+      "layoutCount": 23,
+      "taskDuration": 0.894702,
+      "documentNodes": 1705,
+      "cards": 150,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457",
+      "layout": {
+        "controls": [
+          {
+            "label": "First Ready cards",
+            "width": 36,
+            "height": 28
+          },
+          {
+            "label": "Previous Ready cards",
+            "width": 28,
+            "height": 28
+          },
+          {
+            "label": "Next Ready cards",
+            "width": 28,
+            "height": 28
+          },
+          {
+            "label": "Last Ready cards",
+            "width": 36,
+            "height": 28
+          },
+          {
+            "label": "First In review cards",
+            "width": 36,
+            "height": 28
+          },
+          {
+            "label": "Previous In review cards",
+            "width": 28,
+            "height": 28
+          },
+          {
+            "label": "Next In review cards",
+            "width": 28,
+            "height": 28
+          },
+          {
+            "label": "Last In review cards",
+            "width": 36,
+            "height": 28
+          },
+          {
+            "label": "First Done cards",
+            "width": 36,
+            "height": 28
+          },
+          {
+            "label": "Previous Done cards",
+            "width": 28,
+            "height": 28
+          },
+          {
+            "label": "Next Done cards",
+            "width": 28,
+            "height": 28
+          },
+          {
+            "label": "Last Done cards",
+            "width": 36,
+            "height": 28
+          }
+        ],
+        "days": []
+      },
+      "mobile": {
+        "width": 390,
+        "documentWidth": 390,
+        "cards": 150,
+        "layout": {
+          "controls": [
+            {
+              "label": "First Ready cards",
+              "width": 36,
+              "height": 28
+            },
+            {
+              "label": "Previous Ready cards",
+              "width": 28,
+              "height": 28
+            },
+            {
+              "label": "Next Ready cards",
+              "width": 28,
+              "height": 28
+            },
+            {
+              "label": "Last Ready cards",
+              "width": 36,
+              "height": 28
+            },
+            {
+              "label": "First In review cards",
+              "width": 36,
+              "height": 28
+            },
+            {
+              "label": "Previous In review cards",
+              "width": 28,
+              "height": 28
+            },
+            {
+              "label": "Next In review cards",
+              "width": 28,
+              "height": 28
+            },
+            {
+              "label": "Last In review cards",
+              "width": 36,
+              "height": 28
+            },
+            {
+              "label": "First Done cards",
+              "width": 36,
+              "height": 28
+            },
+            {
+              "label": "Previous Done cards",
+              "width": 28,
+              "height": 28
+            },
+            {
+              "label": "Next Done cards",
+              "width": 28,
+              "height": 28
+            },
+            {
+              "label": "Last Done cards",
+              "width": 36,
+              "height": 28
+            }
+          ],
+          "days": []
+        }
+      }
+    },
+    {
+      "kind": "calendar",
+      "readyMs": 167.8,
+      "heapUsed": 48402552,
+      "heapTotal": 50069504,
+      "nodes": 2408,
+      "documents": 14,
+      "listeners": 1544,
+      "layoutCount": 74,
+      "taskDuration": 2.59415,
+      "documentNodes": 1713,
+      "cards": 280,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457",
+      "layout": {
+        "controls": [
+          {
+            "label": "First rows on 2026-10-01",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-01",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-01",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-01",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-02",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-02",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-02",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-02",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-03",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-03",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-03",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-03",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-04",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-04",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-04",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-04",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-05",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-05",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-05",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-05",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-06",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-06",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-06",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-06",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-07",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-07",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-07",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-07",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-08",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-08",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-08",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-08",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-09",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-09",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-09",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-09",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-10",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-10",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-10",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-10",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-11",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-11",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-11",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-11",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-12",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-12",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-12",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-12",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-13",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-13",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-13",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-13",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-14",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-14",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-14",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-14",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-15",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-15",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-15",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-15",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-16",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-16",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-16",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-16",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-17",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-17",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-17",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-17",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-18",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-18",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-18",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-18",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-19",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-19",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-19",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-19",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-20",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-20",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-20",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-20",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-21",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-21",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-21",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-21",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-22",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-22",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-22",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-22",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-23",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-23",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-23",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-23",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-24",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-24",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-24",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-24",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-25",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-25",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-25",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-25",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-26",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-26",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-26",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-26",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-27",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-27",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-27",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-27",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "First rows on 2026-10-28",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Previous rows on 2026-10-28",
+            "width": 71.9375,
+            "height": 28
+          },
+          {
+            "label": "Next rows on 2026-10-28",
+            "width": 71.921875,
+            "height": 28
+          },
+          {
+            "label": "Last rows on 2026-10-28",
+            "width": 71.9375,
+            "height": 28
+          }
+        ],
+        "days": [
+          {
+            "day": "Add a row on 2026-10-01",
+            "bottom": 547,
+            "contentBottom": 542
+          },
+          {
+            "day": "Add a row on 2026-10-02",
+            "bottom": 547,
+            "contentBottom": 542
+          },
+          {
+            "day": "Add a row on 2026-10-03",
+            "bottom": 547,
+            "contentBottom": 542
+          },
+          {
+            "day": "Add a row on 2026-10-04",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-05",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-06",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-07",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-08",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-09",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-10",
+            "bottom": 879,
+            "contentBottom": 874
+          },
+          {
+            "day": "Add a row on 2026-10-11",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-12",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-13",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-14",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-15",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-16",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-17",
+            "bottom": 1211,
+            "contentBottom": 1206
+          },
+          {
+            "day": "Add a row on 2026-10-18",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-19",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-20",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-21",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-22",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-23",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-24",
+            "bottom": 1543,
+            "contentBottom": 1538
+          },
+          {
+            "day": "Add a row on 2026-10-25",
+            "bottom": 1875,
+            "contentBottom": 1870
+          },
+          {
+            "day": "Add a row on 2026-10-26",
+            "bottom": 1875,
+            "contentBottom": 1870
+          },
+          {
+            "day": "Add a row on 2026-10-27",
+            "bottom": 1875,
+            "contentBottom": 1870
+          },
+          {
+            "day": "Add a row on 2026-10-28",
+            "bottom": 1875,
+            "contentBottom": 1870
+          },
+          {
+            "day": "Add a row on 2026-10-29",
+            "bottom": 1875,
+            "contentBottom": 0
+          },
+          {
+            "day": "Add a row on 2026-10-30",
+            "bottom": 1875,
+            "contentBottom": 0
+          },
+          {
+            "day": "Add a row on 2026-10-31",
+            "bottom": 1875,
+            "contentBottom": 0
+          }
+        ]
+      },
+      "mobile": {
+        "width": 390,
+        "documentWidth": 390,
+        "cards": 280,
+        "calendarWidth": 390,
+        "layout": {
+          "controls": [
+            {
+              "label": "First rows on 2026-10-01",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-01",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-01",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-01",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-02",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-02",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-02",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-02",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-03",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-03",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-03",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-03",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-04",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-04",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-04",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-04",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-05",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-05",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-05",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-05",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-06",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-06",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-06",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-06",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-07",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-07",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-07",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-07",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-08",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-08",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-08",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-08",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-09",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-09",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-09",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-09",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-10",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-10",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-10",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-10",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-11",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-11",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-11",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-11",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-12",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-12",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-12",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-12",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-13",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-13",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-13",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-13",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-14",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-14",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-14",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-14",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-15",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-15",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-15",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-15",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-16",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-16",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-16",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-16",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-17",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-17",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-17",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-17",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-18",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-18",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-18",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-18",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-19",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-19",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-19",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-19",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-20",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-20",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-20",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-20",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-21",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-21",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-21",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-21",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-22",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-22",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-22",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-22",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-23",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-23",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-23",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-23",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-24",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-24",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-24",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-24",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-25",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-25",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-25",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-25",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-26",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-26",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-26",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-26",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-27",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-27",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-27",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-27",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "First rows on 2026-10-28",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Previous rows on 2026-10-28",
+              "width": 42.4375,
+              "height": 28
+            },
+            {
+              "label": "Next rows on 2026-10-28",
+              "width": 42.421875,
+              "height": 28
+            },
+            {
+              "label": "Last rows on 2026-10-28",
+              "width": 42.4375,
+              "height": 28
+            }
+          ],
+          "days": [
+            {
+              "day": "Add a row on 2026-10-01",
+              "bottom": 539,
+              "contentBottom": 534
+            },
+            {
+              "day": "Add a row on 2026-10-02",
+              "bottom": 539,
+              "contentBottom": 534
+            },
+            {
+              "day": "Add a row on 2026-10-03",
+              "bottom": 539,
+              "contentBottom": 534
+            },
+            {
+              "day": "Add a row on 2026-10-04",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-05",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-06",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-07",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-08",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-09",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-10",
+              "bottom": 871,
+              "contentBottom": 866
+            },
+            {
+              "day": "Add a row on 2026-10-11",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-12",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-13",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-14",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-15",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-16",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-17",
+              "bottom": 1203,
+              "contentBottom": 1198
+            },
+            {
+              "day": "Add a row on 2026-10-18",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-19",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-20",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-21",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-22",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-23",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-24",
+              "bottom": 1535,
+              "contentBottom": 1530
+            },
+            {
+              "day": "Add a row on 2026-10-25",
+              "bottom": 1867,
+              "contentBottom": 1862
+            },
+            {
+              "day": "Add a row on 2026-10-26",
+              "bottom": 1867,
+              "contentBottom": 1862
+            },
+            {
+              "day": "Add a row on 2026-10-27",
+              "bottom": 1867,
+              "contentBottom": 1862
+            },
+            {
+              "day": "Add a row on 2026-10-28",
+              "bottom": 1867,
+              "contentBottom": 1862
+            },
+            {
+              "day": "Add a row on 2026-10-29",
+              "bottom": 1867,
+              "contentBottom": 0
+            },
+            {
+              "day": "Add a row on 2026-10-30",
+              "bottom": 1867,
+              "contentBottom": 0
+            },
+            {
+              "day": "Add a row on 2026-10-31",
+              "bottom": 1867,
+              "contentBottom": 0
+            }
+          ]
+        }
+      }
+    },
+    {
+      "kind": "grid",
+      "readyMs": 181.4,
+      "heapUsed": 49380468,
+      "heapTotal": 51118080,
+      "nodes": 2123,
+      "documents": 14,
+      "listeners": 1176,
+      "layoutCount": 131,
+      "taskDuration": 4.551692,
+      "documentNodes": 1679,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457",
+      "mobile": {
+        "width": 390,
+        "documentWidth": 390,
+        "cards": 0
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "kind": "board",
+      "lastRowReachable": true,
+      "lastRowMouseOpened": true,
+      "returnedToFirstPage": true
+    },
+    {
+      "kind": "board",
+      "mouseOpenedRow": true,
+      "titleEditPersisted": true,
+      "closedDialog": true
+    },
+    {
+      "kind": "calendar",
+      "lastRowReachable": true,
+      "lastRowMouseOpened": true,
+      "returnedToFirstPage": true
+    },
+    {
+      "kind": "calendar",
+      "mouseOpenedRow": true,
+      "titleEditPersisted": true,
+      "closedDialog": true
+    },
+    {
+      "kind": "calendar",
+      "monthRoundTrip": true
+    }
+  ],
+  "lifecycle": [
+    {
+      "cycle": 1,
+      "timings": {
+        "board": 162.5,
+        "calendar": 177.4,
+        "grid": 167.5,
+        "closed": 36.4
+      },
+      "heapUsed": 48751360,
+      "heapTotal": 50593792,
+      "nodes": 1040,
+      "documents": 14,
+      "listeners": 1225,
+      "layoutCount": 225,
+      "taskDuration": 7.857479,
+      "documentNodes": 769,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 2,
+      "timings": {
+        "board": 145.1,
+        "calendar": 229.7,
+        "grid": 168.5,
+        "closed": 36.4
+      },
+      "heapUsed": 48872396,
+      "heapTotal": 50593792,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 241,
+      "taskDuration": 8.477901,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 3,
+      "timings": {
+        "board": 144.3,
+        "calendar": 175.8,
+        "grid": 182.7,
+        "closed": 30.6
+      },
+      "heapUsed": 48991088,
+      "heapTotal": 51118080,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 256,
+      "taskDuration": 9.045827,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 4,
+      "timings": {
+        "board": 144.9,
+        "calendar": 176.1,
+        "grid": 168.5,
+        "closed": 36.5
+      },
+      "heapUsed": 49022860,
+      "heapTotal": 51118080,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 271,
+      "taskDuration": 9.60915,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 5,
+      "timings": {
+        "board": 144.1,
+        "calendar": 157.6,
+        "grid": 169.5,
+        "closed": 36.1
+      },
+      "heapUsed": 49049552,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 286,
+      "taskDuration": 10.167504,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 6,
+      "timings": {
+        "board": 145.4,
+        "calendar": 178.5,
+        "grid": 167.8,
+        "closed": 36
+      },
+      "heapUsed": 49116252,
+      "heapTotal": 51118080,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 301,
+      "taskDuration": 10.722182,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 7,
+      "timings": {
+        "board": 135.1,
+        "calendar": 172.1,
+        "grid": 169.1,
+        "closed": 35.4
+      },
+      "heapUsed": 49208640,
+      "heapTotal": 51118080,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 315,
+      "taskDuration": 11.277502,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 8,
+      "timings": {
+        "board": 163,
+        "calendar": 160.5,
+        "grid": 168.9,
+        "closed": 37
+      },
+      "heapUsed": 49262892,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 330,
+      "taskDuration": 11.84629,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 9,
+      "timings": {
+        "board": 142.7,
+        "calendar": 167.4,
+        "grid": 167.6,
+        "closed": 36
+      },
+      "heapUsed": 49304112,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 344,
+      "taskDuration": 12.413635,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 10,
+      "timings": {
+        "board": 163.8,
+        "calendar": 180.1,
+        "grid": 187.4,
+        "closed": 32.6
+      },
+      "heapUsed": 49370268,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 359,
+      "taskDuration": 13.02306,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 11,
+      "timings": {
+        "board": 158.7,
+        "calendar": 193.3,
+        "grid": 190.9,
+        "closed": 32.3
+      },
+      "heapUsed": 49442964,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 374,
+      "taskDuration": 13.633057,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 12,
+      "timings": {
+        "board": 174.5,
+        "calendar": 187.9,
+        "grid": 208.4,
+        "closed": 109
+      },
+      "heapUsed": 49526392,
+      "heapTotal": 51642368,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 389,
+      "taskDuration": 14.271083,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 13,
+      "timings": {
+        "board": 164.8,
+        "calendar": 190.5,
+        "grid": 200.8,
+        "closed": 33.2
+      },
+      "heapUsed": 49540324,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 404,
+      "taskDuration": 14.898972,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 14,
+      "timings": {
+        "board": 174.7,
+        "calendar": 177.1,
+        "grid": 188.4,
+        "closed": 32.5
+      },
+      "heapUsed": 49549068,
+      "heapTotal": 51380224,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 419,
+      "taskDuration": 15.521493,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 15,
+      "timings": {
+        "board": 156.5,
+        "calendar": 205.2,
+        "grid": 191,
+        "closed": 31.9
+      },
+      "heapUsed": 49605084,
+      "heapTotal": 51642368,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 433,
+      "taskDuration": 16.152475,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 16,
+      "timings": {
+        "board": 161.4,
+        "calendar": 195.4,
+        "grid": 201.5,
+        "closed": 34.2
+      },
+      "heapUsed": 49656376,
+      "heapTotal": 51642368,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 448,
+      "taskDuration": 16.782332,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 17,
+      "timings": {
+        "board": 169.4,
+        "calendar": 192,
+        "grid": 194.7,
+        "closed": 36.5
+      },
+      "heapUsed": 49715560,
+      "heapTotal": 51904512,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 463,
+      "taskDuration": 17.424835,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 18,
+      "timings": {
+        "board": 103.4,
+        "calendar": 185.1,
+        "grid": 208.1,
+        "closed": 104.8
+      },
+      "heapUsed": 49761068,
+      "heapTotal": 52166656,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 477,
+      "taskDuration": 18.014284,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 19,
+      "timings": {
+        "board": 161.9,
+        "calendar": 206.1,
+        "grid": 209.5,
+        "closed": 33.4
+      },
+      "heapUsed": 49799092,
+      "heapTotal": 52428800,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 492,
+      "taskDuration": 18.655643,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    },
+    {
+      "cycle": 20,
+      "timings": {
+        "board": 174.2,
+        "calendar": 208.8,
+        "grid": 193.2,
+        "closed": 32.6
+      },
+      "heapUsed": 49835144,
+      "heapTotal": 51904512,
+      "nodes": 1013,
+      "documents": 14,
+      "listeners": 1217,
+      "layoutCount": 507,
+      "taskDuration": 19.303466,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791003909489.9,
+      "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457"
+    }
+  ],
+  "limits": [
+    "Host headless Chrome, not physical iPhone/WKWebView or battery measurements.",
+    "Readiness is the requested view mounted followed by two animation frames; includes local RPC and host scheduling.",
+    "Performance Nodes includes detached nodes; documentNodes counts only the live document. Explicit GC is not normal user behavior.",
+    "Twenty measured navigation cycles after three warmup cycles can bound this run; they do not prove the absence of all leaks.",
+    "Whole-table loading and queryRows remain client-side. Fixtures have short card content, three lanes, and dates in the current month.",
+    "The host is shared with other QA/build work. Sequential fixture timings are observations, not a controlled causal benchmark."
+  ],
+  "denseCalendar": {
+    "readyMs": 80.6,
+    "heapUsed": 50823424,
+    "heapTotal": 52953088,
+    "nodes": 1246,
+    "documents": 14,
+    "listeners": 1256,
+    "layoutCount": 511,
+    "taskDuration": 19.462753,
+    "documentNodes": 931,
+    "cards": 10,
+    "dialogs": 0,
+    "timeOrigin": 1791003909489.9,
+    "token": "16fe9e9b-c607-4349-92b5-0989e1b7e457",
+    "mobileLastRowReachable": true,
+    "mobileLayout": {
+      "controls": [
+        {
+          "label": "First rows on 2026-10-01",
+          "width": 42.421875,
+          "height": 28
+        },
+        {
+          "label": "Previous rows on 2026-10-01",
+          "width": 42.4375,
+          "height": 28
+        },
+        {
+          "label": "Next rows on 2026-10-01",
+          "width": 42.421875,
+          "height": 28
+        },
+        {
+          "label": "Last rows on 2026-10-01",
+          "width": 42.4375,
+          "height": 28
+        }
+      ],
+      "days": [
+        {
+          "day": "Add a row on 2026-10-01",
+          "bottom": 554,
+          "contentBottom": 549
+        },
+        {
+          "day": "Add a row on 2026-10-02",
+          "bottom": 554,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-03",
+          "bottom": 554,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-04",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-05",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-06",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-07",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-08",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-09",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-10",
+          "bottom": 650,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-11",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-12",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-13",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-14",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-15",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-16",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-17",
+          "bottom": 746,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-18",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-19",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-20",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-21",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-22",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-23",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-24",
+          "bottom": 842,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-25",
+          "bottom": 938,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-26",
+          "bottom": 938,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-27",
+          "bottom": 938,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-28",
+          "bottom": 938,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-29",
+          "bottom": 938,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-30",
+          "bottom": 938,
+          "contentBottom": 0
+        },
+        {
+          "day": "Add a row on 2026-10-31",
+          "bottom": 938,
+          "contentBottom": 0
+        }
+      ]
+    },
+    "mobile": {
+      "width": 390,
+      "documentWidth": 390,
+      "cards": 10
+    }
+  }
+}

@@ -1,0 +1,543 @@
+{
+  "environment": {
+    "browser": {
+      "protocolVersion": "1.3",
+      "product": "Chrome/154.0.8037.93",
+      "revision": "@f89f3a4363808e117c592adedcf9947882ac3b79",
+      "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+      "jsVersion": "15.4.80.19"
+    },
+    "document": {
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    }
+  },
+  "views": [
+    {
+      "kind": "board",
+      "readyMs": 1466.2,
+      "heapUsed": 53724692,
+      "heapTotal": 55836672,
+      "nodes": 45963,
+      "documents": 14,
+      "listeners": 6065,
+      "layoutCount": 21,
+      "taskDuration": 3.4083,
+      "documentNodes": 30722,
+      "cards": 5000,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d",
+      "mobile": {
+        "width": 390,
+        "documentWidth": 390,
+        "cards": 5000
+      }
+    },
+    {
+      "kind": "calendar",
+      "readyMs": 1020.7,
+      "heapUsed": 48618784,
+      "heapTotal": 50593792,
+      "nodes": 11175,
+      "documents": 14,
+      "listeners": 6138,
+      "layoutCount": 62,
+      "taskDuration": 25.220108,
+      "documentNodes": 5903,
+      "cards": 5000,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d",
+      "mobile": {
+        "width": 390,
+        "documentWidth": 390,
+        "cards": 5000,
+        "calendarWidth": 390
+      }
+    },
+    {
+      "kind": "grid",
+      "readyMs": 198.7,
+      "heapUsed": 48765016,
+      "heapTotal": 50855936,
+      "nodes": 2094,
+      "documents": 14,
+      "listeners": 1154,
+      "layoutCount": 103,
+      "taskDuration": 32.111951,
+      "documentNodes": 1653,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d",
+      "mobile": {
+        "width": 390,
+        "documentWidth": 390,
+        "cards": 0
+      }
+    }
+  ],
+  "interactions": [
+    {
+      "kind": "board",
+      "mouseOpenedRow": true,
+      "titleEditPersisted": true,
+      "closedDialog": true
+    },
+    {
+      "kind": "calendar",
+      "mouseOpenedRow": true,
+      "titleEditPersisted": true,
+      "closedDialog": true
+    },
+    {
+      "kind": "calendar",
+      "monthRoundTrip": true
+    }
+  ],
+  "lifecycle": [
+    {
+      "cycle": 1,
+      "timings": {
+        "board": 2741.4,
+        "calendar": 1082.1,
+        "grid": 198.3,
+        "closed": 31.3
+      },
+      "heapUsed": 48406936,
+      "heapTotal": 50331648,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 198,
+      "taskDuration": 50.282994,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 2,
+      "timings": {
+        "board": 2874.9,
+        "calendar": 1030.4,
+        "grid": 198.3,
+        "closed": 31.6
+      },
+      "heapUsed": 48488860,
+      "heapTotal": 50855936,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 213,
+      "taskDuration": 54.461401,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 3,
+      "timings": {
+        "board": 2684.2,
+        "calendar": 1009,
+        "grid": 189.2,
+        "closed": 35.7
+      },
+      "heapUsed": 48708476,
+      "heapTotal": 50855936,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 228,
+      "taskDuration": 58.444466,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 4,
+      "timings": {
+        "board": 2710.7,
+        "calendar": 1030.1,
+        "grid": 186.9,
+        "closed": 35.9
+      },
+      "heapUsed": 48710044,
+      "heapTotal": 51118080,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 244,
+      "taskDuration": 62.459867,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 5,
+      "timings": {
+        "board": 2705.4,
+        "calendar": 987.8,
+        "grid": 192.1,
+        "closed": 35.8
+      },
+      "heapUsed": 48911188,
+      "heapTotal": 50855936,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 259,
+      "taskDuration": 66.430004,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 6,
+      "timings": {
+        "board": 2711.4,
+        "calendar": 613.7,
+        "grid": 132.5,
+        "closed": 29.5
+      },
+      "heapUsed": 49013916,
+      "heapTotal": 51118080,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 272,
+      "taskDuration": 69.990934,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 7,
+      "timings": {
+        "board": 2729.9,
+        "calendar": 1000.2,
+        "grid": 189,
+        "closed": 35.9
+      },
+      "heapUsed": 49043624,
+      "heapTotal": 51118080,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 287,
+      "taskDuration": 73.980843,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 8,
+      "timings": {
+        "board": 2704.9,
+        "calendar": 1001.2,
+        "grid": 177.5,
+        "closed": 33.7
+      },
+      "heapUsed": 49073416,
+      "heapTotal": 51118080,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 302,
+      "taskDuration": 77.951765,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 9,
+      "timings": {
+        "board": 2694,
+        "calendar": 990,
+        "grid": 174.9,
+        "closed": 34
+      },
+      "heapUsed": 49118152,
+      "heapTotal": 51118080,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 317,
+      "taskDuration": 81.902672,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 10,
+      "timings": {
+        "board": 3150.7,
+        "calendar": 1235.6,
+        "grid": 213.3,
+        "closed": 30.6
+      },
+      "heapUsed": 49211312,
+      "heapTotal": 51118080,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 332,
+      "taskDuration": 86.588361,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 11,
+      "timings": {
+        "board": 3410.6,
+        "calendar": 1281,
+        "grid": 225.3,
+        "closed": 115
+      },
+      "heapUsed": 49296580,
+      "heapTotal": 51642368,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 347,
+      "taskDuration": 91.615022,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 12,
+      "timings": {
+        "board": 3523.3,
+        "calendar": 814.2,
+        "grid": 886.8,
+        "closed": 37.6
+      },
+      "heapUsed": 49375296,
+      "heapTotal": 51380224,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 362,
+      "taskDuration": 96.979564,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 13,
+      "timings": {
+        "board": 3991.9,
+        "calendar": 1477.8,
+        "grid": 278.4,
+        "closed": 165.7
+      },
+      "heapUsed": 49451516,
+      "heapTotal": 51642368,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 377,
+      "taskDuration": 102.821027,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 14,
+      "timings": {
+        "board": 4051.8,
+        "calendar": 1477.8,
+        "grid": 261.2,
+        "closed": 114.8
+      },
+      "heapUsed": 49482456,
+      "heapTotal": 51904512,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 392,
+      "taskDuration": 108.730177,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 15,
+      "timings": {
+        "board": 4305.8,
+        "calendar": 1609.6,
+        "grid": 353.3,
+        "closed": 151.8
+      },
+      "heapUsed": 49747788,
+      "heapTotal": 52428800,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 407,
+      "taskDuration": 115.027338,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 16,
+      "timings": {
+        "board": 4535.8,
+        "calendar": 1686,
+        "grid": 436.7,
+        "closed": 49.9
+      },
+      "heapUsed": 49603980,
+      "heapTotal": 51904512,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 423,
+      "taskDuration": 121.578126,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 17,
+      "timings": {
+        "board": 4349.9,
+        "calendar": 1833.3,
+        "grid": 255.7,
+        "closed": 112.4
+      },
+      "heapUsed": 49643096,
+      "heapTotal": 52166656,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 438,
+      "taskDuration": 127.894084,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 18,
+      "timings": {
+        "board": 4352.3,
+        "calendar": 1534.8,
+        "grid": 263.9,
+        "closed": 153.2
+      },
+      "heapUsed": 49711352,
+      "heapTotal": 51904512,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 453,
+      "taskDuration": 134.205974,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 19,
+      "timings": {
+        "board": 4293.4,
+        "calendar": 1656.1,
+        "grid": 282.1,
+        "closed": 118.8
+      },
+      "heapUsed": 49703288,
+      "heapTotal": 51904512,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 468,
+      "taskDuration": 140.615259,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    },
+    {
+      "cycle": 20,
+      "timings": {
+        "board": 4446.6,
+        "calendar": 1640.7,
+        "grid": 298.3,
+        "closed": 135.7
+      },
+      "heapUsed": 49761280,
+      "heapTotal": 51904512,
+      "nodes": 1011,
+      "documents": 14,
+      "listeners": 1213,
+      "layoutCount": 483,
+      "taskDuration": 147.163956,
+      "documentNodes": 743,
+      "cards": 0,
+      "dialogs": 0,
+      "timeOrigin": 1791002825851.3,
+      "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+    }
+  ],
+  "limits": [
+    "Host headless Chrome, not physical iPhone/WKWebView or battery measurements.",
+    "Readiness is the requested view mounted followed by two animation frames; includes local RPC and host scheduling.",
+    "Performance Nodes includes detached nodes; documentNodes counts only the live document. Explicit GC is not normal user behavior.",
+    "Twenty measured navigation cycles after three warmup cycles can bound this run; they do not prove the absence of all leaks.",
+    "Whole-table loading and queryRows remain client-side. Fixtures have short card content, three lanes, and dates in the current month."
+  ],
+  "denseCalendar": {
+    "readyMs": 1509.5,
+    "heapUsed": 52176120,
+    "heapTotal": 54263808,
+    "nodes": 11201,
+    "documents": 14,
+    "listeners": 6238,
+    "layoutCount": 487,
+    "taskDuration": 148.788576,
+    "documentNodes": 5903,
+    "cards": 5000,
+    "dialogs": 0,
+    "timeOrigin": 1791002825851.3,
+    "token": "f838e5d7-7b33-4937-8a6d-8137ce6f1b9d"
+  }
+}
