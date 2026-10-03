@@ -61,7 +61,7 @@ enum NotificationActions {
                 guard let question = interaction.allQuestions?.first,
                     let options = question.options, options.indices.contains(index)
                 else {
-                    await confirm(threadId, "That question isn't waiting anymore. Tap to open the thread.")
+                    await confirm(threadId, "That question isn't waiting anymore. Tap to open the thread.", serverId: info["serverId"] as? String)
                     return true
                 }
                 try await client.settle(interaction, interaction.answer([question.id: InteractionAnswer(selected: [options[index].value])]))
@@ -73,7 +73,7 @@ enum NotificationActions {
                     let interaction = try await client.pendingInteraction(threadId: threadId, interactionId: interactionId)
                     guard let resolution = interaction.textAnswer(text)
                     else {
-                        await confirm(threadId, "Couldn't answer from here. Tap to open the thread.")
+                        await confirm(threadId, "Couldn't answer from here. Tap to open the thread.", serverId: info["serverId"] as? String)
                         return true
                     }
                     try await client.settle(interaction, resolution)
@@ -84,7 +84,7 @@ enum NotificationActions {
                 return false
             }
         } catch {
-            await confirm(threadId, "Didn't go through: \(BBClient.describe(error))")
+            await confirm(threadId, "Didn't go through: \(BBClient.describe(error))", serverId: info["serverId"] as? String)
         }
         return true
     }
@@ -108,11 +108,12 @@ enum NotificationActions {
     }
 
     /// A quiet follow-up notification when an action fails.
-    private static func confirm(_ threadId: String, _ body: String) async {
+    private static func confirm(_ threadId: String, _ body: String, serverId: String?) async {
         let content = UNMutableNotificationContent()
         content.title = "BB"
         content.body = body
         content.userInfo = ["threadId": threadId]
+        if let serverId { content.userInfo["serverId"] = serverId }
         content.threadIdentifier = threadId
         try? await UNUserNotificationCenter.current().add(
             UNNotificationRequest(identifier: UUID().uuidString, content: content, trigger: nil))
