@@ -54,12 +54,12 @@ describe("Explore and the Feed", () => {
     const row = finding("How the queue works");
     expect(store.addFinding({ threadId: "thr_1", messageId: "msg_1", turnId: null, emoji: "🏗️", label: "how the  queue works", projectId: null, threadTitle: "" }).id).toBe(row.id);
     expect(await feed.save(row)).toBe("post_1");
-    expect(calls[0]).toMatchObject({ method: "publish", input: { title: "How the queue works", topic: "Follow-ups", story: `explore-${row.id}`, threadId: "thr_1" } });
+    expect(calls[0]).toMatchObject({ method: "feed_publish", input: { title: "How the queue works", topic: "Follow-ups", story: `explore-${row.id}`, threadId: "thr_1" } });
     expect(calls[0]!.input.body).toBe("🏗️ Noticed in [Fix the queue](/threads/thr_1).");
 
     pages.set(row.key, { pageId: "pg_1", href: "/plugins/pages/pages/pg_1" });
     await feed.explainerChanged(row.key);
-    expect(calls[1]).toMatchObject({ method: "edit", input: { postId: "post_1" } });
+    expect(calls[1]).toMatchObject({ method: "feed_edit", input: { postId: "post_1" } });
     expect(calls[1]!.input.body).toContain("Explainer: [How the queue works](/plugins/pages/pages/pg_1)");
     await feed.explainerChanged(row.key);
     expect(calls).toHaveLength(2);

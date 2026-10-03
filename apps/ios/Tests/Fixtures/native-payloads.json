@@ -270,8 +270,8 @@
   },
   {
     "id": "feed-list",
-    "plugin": "feed",
-    "method": "list",
+    "plugin": "studio",
+    "method": "feed_list",
     "input": {
       "limit": 40,
       "cursor": "older",

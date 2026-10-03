@@ -1,3 +1,4 @@
+import { registerServer as registerFeed } from "./src/modules/feed/server";
 import type { ModuleServices } from "./src/modules/services";
 import { ModuleRuntime } from "./src/modules/runtime";
 import type { LocalProvider } from "./src/hub";
@@ -63,6 +64,7 @@ export default async function plugin(host: BbPluginApi) {
   const runtime = new ModuleRuntime(host);
   await registerCore(runtime.coreApi(), runtime.provider, runtime.services);
   await runtime.register([
+    { name: "feed", legacyPluginId: "feed", registerServer: registerFeed },
     { name: "tables", legacyPluginId: "studio-tables", registerServer: registerTables },
     { name: "chat", legacyPluginId: "studio-chat", registerServer: registerChat },
   ]);

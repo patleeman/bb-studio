@@ -39,7 +39,7 @@ describe("Feed discussion creation", () => {
   });
 
   it("gives each post a canonical discussion route and keeps tool instructions out of the draft", () => {
-    expect(discussionHref(post.id)).toBe("/plugins/feed/feed/post_release/discussion");
+    expect(discussionHref(post.id)).toBe("/plugins/studio/feed/post_release/discussion");
     expect(discussionPrompt({ id: post.id, title: post.title, author: post.author, channelName: post.channel_name })).toBe('Let\'s discuss "Updated release window".\n\n');
   });
 });

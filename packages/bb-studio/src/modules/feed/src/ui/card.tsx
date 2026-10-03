@@ -1,3 +1,4 @@
+import { useModuleRpc } from "../../../app";
 // `::post{id="…"}` at the end of a reply: the post it made, as a card
 // in the thread or channel. The card finds its post by the directive line. It
 // says what kind of post it is (urgent, its topic, which update of a story),
@@ -5,7 +6,7 @@
 import { Badge, GHOST_BUTTON, ItemDirectiveCard, cn } from "@bb-studio/kit/app";
 import { relativeTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
-import { useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { useRealtime, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import type { rpcContract } from "../contract";
 import { FEED_ICON, REALTIME_CHANNEL } from "../shared";
@@ -16,7 +17,7 @@ const RETRY_MS = 1_500;
 const RETRIES = 8;
 
 export function PostCard({ attributes, source }: PluginMessageDirectiveProps) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const discuss = useDiscuss();
   useMinuteTick();
   const [post, setPost] = useState<PostView | null | undefined>(undefined);

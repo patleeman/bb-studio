@@ -1,6 +1,6 @@
 import companions from "./feed-companions.mjs";
 
-// Studio Feed's reader, seeded with posts through `bb feed post`: a commute
+// Studio Feed's reader, seeded with posts through `bb studio feed post`: a commute
 // story with two earlier updates, an urgent alert, and posts with and
 // without pictures, and a launch post that links a checklist page. Two are
 // marked read, the commute story is opened in place and closed, and the
@@ -44,12 +44,12 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
   ...(process.env.BB_CAPTURE_FEED_COMPANIONS === "1" ? [companions({ bbCli, sleep, pluginRpc, projectId, threadId: process.env.BB_CAPTURE_THREAD_ID })] : []),
   {
     id: "feed",
-    packageDir: "bb-studio-feed",
+    packageDir: "bb-studio/src/modules/feed",
     privateSidebar: true,
     setup: async (client) => {
       const ids = [];
       const cleanup = async () => {
-        for (const id of ids) await bbCli(["feed", "remove", id]).catch(() => undefined);
+        for (const id of ids) await bbCli(["studio", "feed", "remove", id]).catch(() => undefined);
         if (pageId) await pluginRpc("pages", "remove", { id: pageId }).catch(() => undefined);
       };
       let pageId = null;
@@ -62,16 +62,16 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
             : args,
         );
         for (const args of posts) {
-          ids.push((await bbCli(["feed", "post", ...args])).split("\t")[0].trim());
+          ids.push((await bbCli(["studio", "feed", "post", ...args])).split("\t")[0].trim());
           await sleep(50);
         }
         // Other staged captures can leave a daily Explore digest. Verify the
         // seven fixture stories, then include those existing rows in the count.
-        const listed = await pluginRpc("feed", "list", { limit: 30 });
+        const listed = await pluginRpc("studio", "feed_list", { limit: 30 });
         const fixtures = listed.posts.filter((post) => ids.includes(post.id));
         if (fixtures.length !== 7 || fixtures.some((post) => post.read)) throw new Error("Expected seven unread fixture stories");
         const unread = listed.posts.filter((post) => !post.read).length;
-        await client.navigate("/plugins/feed/feed");
+        await client.navigate("/plugins/studio/feed");
         await client.waitForText("Mark entire feed read");
         // The reader intentionally restores filters from earlier captures.
         // This fixture shows the complete feed, so clear them through its UI.

@@ -35,7 +35,7 @@ describe("helpers", () => {
   it("finds the Studio items a post links to", () => {
     const body = [
       "Wrote [the plan](http://127.0.0.1:38886/plugins/pages/pages/pg_0123456789ab) and @[Report](item:artifacts:art_1).",
-      "Also [same plan](/plugins/pages/pages/pg_0123456789ab), @[Notes](page:pg_aaaaaaaaaaaa), [feed](/plugins/feed/feed/p1) and [web](https://a.com/x).",
+      "Also [same plan](/plugins/pages/pages/pg_0123456789ab), @[Notes](page:pg_aaaaaaaaaaaa), [feed](/plugins/studio/feed/p1) and [web](https://a.com/x).",
     ].join("\n");
     expect(studioRefs(body)).toEqual([{ path: "/plugins/pages/pages/pg_0123456789ab" }, { pluginId: "artifacts", id: "art_1" }, { pluginId: "pages", id: "pg_aaaaaaaaaaaa" }]);
     expect(firstLink(body)).toBe("https://a.com/x");

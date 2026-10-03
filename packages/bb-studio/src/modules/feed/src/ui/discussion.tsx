@@ -1,12 +1,12 @@
+import { useModuleRpc } from "../../../app";
 import { NewConversationComposer, useOpenCompanion } from "@bb-studio/kit/app";
-import { useRpc } from "@get-bb/plugin-sdk/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useEffect, useState } from "react";
 import type { PostView, rpcContract } from "../contract";
 import { discussionPrompt, postHref } from "../shared";
 
 export function PostDiscussion({ postId }: { postId: string }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const open = useOpenCompanion();
   const [post, setPost] = useState<PostView | null>(null);
   const [error, setError] = useState<string | null>(null);

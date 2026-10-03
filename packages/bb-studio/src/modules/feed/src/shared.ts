@@ -1,10 +1,10 @@
 // Names and the `::post` directive, shared by the server and the app. Keep it
 // free of server-only imports.
 
-export const PLUGIN_ID = "feed";
+export const PLUGIN_ID = "studio";
 export const PANEL_PATH = "feed";
 export const REALTIME_CHANNEL = "feed";
-export const FEED_ICON = "feed/feed";
+export const FEED_ICON = "studio/feed";
 
 /** The card directive a reply ends with: `::post{id="post_…"}` (older replies: `::post{title="…"}`). */
 export const DIRECTIVE = "post";
@@ -160,7 +160,7 @@ function itemPath(url: string): string | null {
     }
   }
   const match = ITEM_PATH.exec(path);
-  return match && match[1] !== PLUGIN_ID ? match[0] : null;
+  return match && !match[0].startsWith("/plugins/studio/feed/") && match[1] !== "feed" ? match[0] : null;
 }
 
 /**

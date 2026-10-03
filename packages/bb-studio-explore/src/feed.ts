@@ -7,7 +7,7 @@ import { z } from "zod";
 import { DIRECTIVE, parseExploreItems, type ExploreItem } from "./shared";
 import type { ExploreStore, FindingRow } from "./store";
 
-export const FEED_PLUGIN_ID = "feed";
+export const FEED_PLUGIN_ID = "studio";
 /** Feed's prefix for a saved finding's story; its reader offers Explore on them. */
 export const FEED_STORY_PREFIX = "explore-";
 export const FEED_TOPIC = "Follow-ups";
@@ -74,7 +74,7 @@ export function exploreFeed(deps: FeedDeps) {
   async function linkExplainer(finding: FindingRow): Promise<void> {
     const page = deps.explainerPage(finding);
     if (!finding.post_id || !page || finding.linked_page_id === page.pageId) return;
-    const { post } = await deps.callRpc(FEED_PLUGIN_ID, "edit", { postId: finding.post_id, body: savedBody(finding, page) }, feedEdited);
+    const { post } = await deps.callRpc(FEED_PLUGIN_ID, "feed_edit", { postId: finding.post_id, body: savedBody(finding, page) }, feedEdited);
     store.setFindingPost(finding.id, post ? finding.post_id : null, post ? page.pageId : null);
   }
 
@@ -82,13 +82,13 @@ export function exploreFeed(deps: FeedDeps) {
     /** Posts a finding to the Feed, once; again if its post was removed. */
     async save(finding: FindingRow): Promise<string> {
       if (finding.post_id) {
-        const { post } = await deps.callRpc(FEED_PLUGIN_ID, "post", { postId: finding.post_id }, feedEdited);
+        const { post } = await deps.callRpc(FEED_PLUGIN_ID, "feed_post", { postId: finding.post_id }, feedEdited);
         if (post) return post.id;
       }
       const page = deps.explainerPage(finding);
       const { post } = await deps.callRpc(
         FEED_PLUGIN_ID,
-        "publish",
+        "feed_publish",
         {
           title: finding.label,
           body: savedBody(finding, page),
@@ -129,7 +129,7 @@ export function exploreFeed(deps: FeedDeps) {
         for (const [projectId, group] of byProject) {
           const name = projectId ? await deps.projectName(projectId).catch(() => null) : null;
           const { title, body } = digestPost(group, name);
-          await deps.callRpc(FEED_PLUGIN_ID, "publish", { title, body, topic: FEED_TOPIC, author: "Explore", projectId: projectId || null }, feedPost);
+          await deps.callRpc(FEED_PLUGIN_ID, "feed_publish", { title, body, topic: FEED_TOPIC, author: "Explore", projectId: projectId || null }, feedPost);
           store.markDigested(group.map((finding) => finding.id));
           posted += 1;
         }

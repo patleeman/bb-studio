@@ -31,7 +31,7 @@ extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
-        if parts == ["plugins", "feed", "feed"] {
+        if (parts == ["plugins", "feed", "feed"] || parts == ["plugins", "studio", "feed"]) {
             self = .feed
             return
         }
@@ -51,7 +51,7 @@ extension Route {
         case ("bot-teams", "bots"): self = .bot(id: id)
         // Channels lived at /views/<id>; both open the same channel.
         case ("bot-teams", "channels"), ("bot-teams", "views"): self = .savedView(id: id)
-        case ("feed", "feed"): self = .feedPost(id: id)
+        case ("feed", "feed"), ("studio", "feed"): self = .feedPost(id: id)
         default: return nil
         }
     }

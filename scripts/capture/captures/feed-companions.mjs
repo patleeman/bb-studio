@@ -3,7 +3,7 @@ import { join } from "node:path";
 import { tmpdir } from "node:os";
 
 export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => ({
-  id: "feed-companions", packageDir: "bb-studio-feed", fileName: "discussion-preview.png", privateSidebar: true,
+  id: "feed-companions", packageDir: "bb-studio/src/modules/feed", fileName: "discussion-preview.png", privateSidebar: true,
   setup: async client => {
     const directory = await mkdtemp(join(tmpdir(), "bb-feed-capture-"));
     const attachment = join(directory, "release-review.txt");
@@ -11,21 +11,21 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => ({
     let post, page, createdThreadId;
     const forget = async () => {
       if (createdThreadId) await bbCli(["thread", "delete", createdThreadId, "--yes", "--json"]);
-      if (post) await pluginRpc("feed", "remove", { postId: post.id });
+      if (post) await pluginRpc("studio", "feed_remove", { postId: post.id });
       if (page) await pluginRpc("pages", "remove", { id: page.id });
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbFeedDraft").catch(() => {});
       await rm(directory, { recursive: true, force: true });
     };
     try {
       ({ page } = await pluginRpc("pages", "create", { projectId, parentId: null, title: "Release window checklist", markdown: "- [ ] Confirm the owner\n- [ ] Review the rollback plan" }));
-      ({ post } = await pluginRpc("feed", "publish", { projectId, threadId, author: "Atlas", title: "Release window ready for review", body: `The launch owner and rollback plan are ready.\n\n[Release window checklist](/plugins/pages/pages/${page.id})` }));
+      ({ post } = await pluginRpc("studio", "feed_publish", { projectId, threadId, author: "Atlas", title: "Release window ready for review", body: `The launch owner and rollback plan are ready.\n\n[Release window checklist](/plugins/pages/pages/${page.id})` }));
       await client.navigate(`/plugins/pages/pages/${page.id}`);
       await client.waitForText("Review the rollback plan");
-      await client.navigate(`/plugins/feed/feed/${post.id}`);
+      await client.navigate(`/plugins/studio/feed/${post.id}`);
       await client.waitForText(post.title);
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows')");
       const main = "main";
-      const path = `/plugins/feed/feed/${post.id}/discussion`, key = `path:${path}`;
+      const path = `/plugins/studio/feed/${post.id}/discussion`, key = `path:${path}`;
       const root = `[data-float-window=${JSON.stringify(key)}]`, prompt = `${root} [data-promptbox] [contenteditable=true]`;
       const newThread = () => client.clickElementWithTextAndPointer(`${main} button`, "New thread");
       await newThread();
@@ -74,7 +74,7 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => ({
       await retained(true);
       await client.dragBy('[data-float-resize="nw"]', -240, -100);
       await sleep(500);
-      await client.capture(join(process.cwd(), "packages/bb-studio-feed/assets/discussion-draft.png"));
+      await client.capture(join(process.cwd(), "packages/bb-studio/src/modules/feed/assets/discussion-draft.png"));
       await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
       await sleep(500);
       await retained(true);
@@ -83,7 +83,7 @@ export default ({ projectId, threadId, pluginRpc, bbCli, sleep }) => ({
         return rect.left < 0 || rect.right > innerWidth || rect.top < 0 || rect.bottom > innerHeight;
       }).map(button => button.getAttribute('aria-label') ?? button.innerText))()`);
       if (clipped.length) throw new Error(`Feed's compact composer clips controls: ${JSON.stringify(clipped)}`);
-      await client.capture(join(process.cwd(), "packages/bb-studio-feed/assets/discussion-mobile.png"));
+      await client.capture(join(process.cwd(), "packages/bb-studio/src/modules/feed/assets/discussion-mobile.png"));
       await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
       await sleep(500);
       await retained(true);

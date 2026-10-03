@@ -12,7 +12,6 @@ agent.
 | [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tasks, tables and bots, with search, tags, project filters, templates and tabs. |
 | [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents. |
 | [Studio Explore](packages/bb-studio-explore/) | `explore` | Experimental. Agents end answers with things they noticed along the way; click one for a page explaining it. Needs Studio Pages. |
-| [Studio Feed](packages/bb-studio-feed/) | `feed` | One feed of what your agents report. An agent ends a reply with a `::post` line, from any thread, channel or automation; read it on desktop and phone and discuss any post. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
@@ -25,7 +24,7 @@ agent.
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and chooses recipients in Studio Teams views. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
-Tables and Chat are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
+Tables, Chat and Feed are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
 all. Studio Teams needs Studio Decisions to choose recipients in views, and Studio
 Explore needs Studio Pages.
@@ -55,7 +54,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - pages: collaborative pages
    - explore: Studio Explore (experimental); pages explaining what an agent
      noticed along the way; needs pages
-   - feed: Studio Feed; one feed of what agents and automations post
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make

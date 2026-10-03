@@ -14,8 +14,8 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
     return dataDir;
   };
   const seedPost = async () => {
-    const { post } = await pluginRpc("feed", "publish", { projectId, threadId, author: "Atlas", title: "Release notes ready for review", body: "The release checklist and notes are ready. Review the wording before sharing." });
-    return { post, cleanup: () => pluginRpc("feed", "remove", { postId: post.id }) };
+    const { post } = await pluginRpc("studio", "feed_publish", { projectId, threadId, author: "Atlas", title: "Release notes ready for review", body: "The release checklist and notes are ready. Review the wording before sharing." });
+    return { post, cleanup: () => pluginRpc("studio", "feed_remove", { postId: post.id }) };
   };
   const fixtures = [
     { id: "studio", packageDir: "bb-studio", seed: async () => {
@@ -26,17 +26,17 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
       const { page, cleanup } = await seedPages();
       return { path: `/plugins/studio/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: "pages", id: page.id }))}`, ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent item conversation", attachment: true, cleanup };
     } },
-    { id: "feed", packageDir: "bb-studio-feed", seed: async () => {
+    { id: "feed", packageDir: "bb-studio/src/modules/feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: "/plugins/feed/feed", ready: 'form[aria-label="Filter feed"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
+      return { path: "/plugins/studio/feed", ready: 'form[aria-label="Filter feed"] input[type="search"]', draft: "Unapplied feed filter", visibleText: post.title, cleanup };
     } },
-    { id: "feed-post", packageDir: "bb-studio-feed", seed: async () => {
+    { id: "feed-post", packageDir: "bb-studio/src/modules/feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: `/plugins/feed/feed/${post.id}`, ready: 'article h1', cleanup };
+      return { path: `/plugins/studio/feed/${post.id}`, ready: 'article h1', cleanup };
     } },
-    { id: "feed-discussion", packageDir: "bb-studio-feed", seed: async () => {
+    { id: "feed-discussion", packageDir: "bb-studio/src/modules/feed", seed: async () => {
       const { post, cleanup } = await seedPost();
-      return { path: `/plugins/feed/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
+      return { path: `/plugins/studio/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
     } },
     { id: "explore", packageDir: "bb-studio-explore", seed: async () => {
       const dataDir = await requireStage();

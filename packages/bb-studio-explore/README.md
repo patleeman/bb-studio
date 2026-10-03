@@ -128,7 +128,7 @@ most once per day. Changing the hour takes effect at the next check.
 minutes (default 20). An unfinished worker is stopped and archived at the
 limit. Its model and reasoning follow the source thread.
 
-When [Studio Feed](../bb-studio-feed) is installed, findings don't have to be
+When [Studio Feed](../bb-studio/src/modules/feed) is available in Studio, findings don't have to be
 explored right away:
 
 - **Save to the feed.** Each finding at the end of a reply has a bookmark

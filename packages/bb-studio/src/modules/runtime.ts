@@ -1,3 +1,4 @@
+import { moduleSettings } from "./settings";
 import { moduleStatusContract } from "./status";
 import { migrateModuleRefs } from "./refs";
 import type Database from "better-sqlite3";
@@ -99,7 +100,7 @@ export class ModuleRuntime {
     this.host.onDispose(() => { if (db.open) db.close(); });
     const contract: Record<string, PluginRpcContract[string]> = {};
     const handlers: Record<string, PluginRpcHandlers<PluginRpcContract>[string]> = {};
-    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), storage: {
+    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), settings: moduleSettings(this.host.settings, db, module.name), storage: {
       ...this.host.storage, database: () => db, kv: moduleKv(db),
     }, rpc: { register: (methods, implementations, options) => {
       const exposed: Record<string, PluginRpcContract[string]> = {};

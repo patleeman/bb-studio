@@ -44,11 +44,11 @@ export default async function plugin(bb: BbPluginApi) {
     name: "feed",
     summary: "Studio Feed: list, show, post, edit and remove posts",
     commands: [
-      { name: "list", summary: "List posts, newest first (a story once)", usage: "bb feed list [--topic <topic>] [--limit <n>] [--all]" },
-      { name: "show", summary: "Show a post, or every post in a story", usage: "bb feed show <post id | story>" },
-      { name: "post", summary: "Publish a post", usage: 'bb feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent] [--author <name>]' },
-      { name: "edit", summary: "Edit a post, or mark it resolved", usage: "bb feed edit <post id> [--title <title>] [--body <markdown>] [--topic <topic>] [--resolve | --reopen]" },
-      { name: "remove", summary: "Remove a post", usage: "bb feed remove <post id>" },
+      { name: "list", summary: "List posts, newest first (a story once)", usage: "bb studio feed list [--topic <topic>] [--limit <n>] [--all]" },
+      { name: "show", summary: "Show a post, or every post in a story", usage: "bb studio feed show <post id | story>" },
+      { name: "post", summary: "Publish a post", usage: 'bb studio feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent] [--author <name>]' },
+      { name: "edit", summary: "Edit a post, or mark it resolved", usage: "bb studio feed edit <post id> [--title <title>] [--body <markdown>] [--topic <topic>] [--resolve | --reopen]" },
+      { name: "remove", summary: "Remove a post", usage: "bb studio feed remove <post id>" },
     ],
     async run(argv, ctx) {
       if (!argv.length) return usage(FEED_USAGE);
@@ -60,3 +60,5 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 }
+
+export async function registerServer(ctx: import("../runtime").ModuleContext) { await plugin(ctx.bb); }

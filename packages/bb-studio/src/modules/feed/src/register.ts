@@ -1,4 +1,4 @@
-// Studio Feed's server: agents publish with the feed_post tool (or `bb feed
+// Studio Feed's server: agents publish with the feed_post tool (or `bb studio feed
 // post`), from any thread, Teams channel or automation, and end their reply
 // with the post's card line.
 //
@@ -6,7 +6,7 @@
 //     gives it BB: who a thread is (its bot and channel, from Studio Teams
 //     when it's installed), realtime, and phone notifications (Studio Mobile).
 //   - It adds the RPC handlers, the feed_* tools, the instructions for
-//     `bb.agents.configure`, and `bb feed …`.
+//     `bb.agents.configure`, and `bb studio feed …`.
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import { STUDIO_PLUGIN_ID, studioSchemas } from "@bb-studio/kit/contract";
 import { relativeTime } from "@bb-studio/kit/format";
@@ -30,13 +30,13 @@ const TEAMS_CACHE_MS = 30_000;
 const RPC_TIMEOUT_MS = 10_000;
 
 const USAGE = {
-  list: "bb feed list [--topic <topic>] [--limit <n>] [--all]",
-  show: "bb feed show <post id | story>",
-  post: 'bb feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent] [--author <name>]',
-  edit: "bb feed edit <post id> [--title <title>] [--body <markdown>] [--topic <topic>] [--resolve | --reopen]",
-  remove: "bb feed remove <post id>",
+  list: "bb studio feed list [--topic <topic>] [--limit <n>] [--all]",
+  show: "bb studio feed show <post id | story>",
+  post: 'bb studio feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent] [--author <name>]',
+  edit: "bb studio feed edit <post id> [--title <title>] [--body <markdown>] [--topic <topic>] [--resolve | --reopen]",
+  remove: "bb studio feed remove <post id>",
 };
-export const FEED_USAGE = "bb feed <list|show|post|edit|remove> …";
+export const FEED_USAGE = "bb studio feed <list|show|post|edit|remove> …";
 
 const teamsList = z.object({
   bots: z.array(z.object({ id: z.string(), name: z.string(), avatar: z.string().optional() })),
@@ -409,7 +409,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
 
   const instructions = feedInstructions();
 
-  // CLI: `bb feed …` ---------------------------------------------------------------
+  // CLI: `bb studio feed …` ---------------------------------------------------------------
 
   const line = (post: PostView) =>
     [post.id, relativeTime(post.createdAt), post.priority === "urgent" ? "urgent" : "", post.topic ?? "", from(post), post.title, post.story ? `${post.story} (${post.storyPosts})` : ""].join("\t");

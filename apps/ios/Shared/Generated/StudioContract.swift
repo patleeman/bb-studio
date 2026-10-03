@@ -69,6 +69,11 @@ public enum Studio {
     public static let inbox_act = "inbox_act"
     public static let inbox_done = "inbox_done"
     public static let inbox_read = "inbox_read"
+    public static let team_list = "team_list"
+    public static let bot_desk = "bot_desk"
+    public static let talk_dm = "talk_dm"
+    public static let talk_list = "talk_list"
+    public static let delegate = "delegate"
     public static let spaces_list = "spaces_list"
     public static let space_create = "space_create"
     public static let space_update = "space_update"
@@ -114,6 +119,20 @@ public enum Studio {
     public static let chat_link = "chat_link"
     public static let chat_unlink = "chat_unlink"
     public static let chat_send = "chat_send"
+    public static let feed_attention = "feed_attention"
+    public static let feed_list = "feed_list"
+    public static let feed_read = "feed_read"
+    public static let feed_post = "feed_post"
+    public static let feed_discussion = "feed_discussion"
+    public static let feed_story = "feed_story"
+    public static let feed_forDirective = "feed_forDirective"
+    public static let feed_topics = "feed_topics"
+    public static let feed_publish = "feed_publish"
+    public static let feed_explore = "feed_explore"
+    public static let feed_edit = "feed_edit"
+    public static let feed_remove = "feed_remove"
+    public static let feed_seen = "feed_seen"
+    public static let feed_unread = "feed_unread"
   }
 
   public typealias Home = HomeOutput
@@ -268,6 +287,16 @@ public enum Studio {
 
   public typealias InboxRead = InboxReadOutput
 
+  public typealias TeamList = TeamListOutput
+
+  public typealias BotDesk = BotDeskOutput
+
+  public typealias TalkDm = TalkDmOutput
+
+  public typealias TalkList = TalkListOutput
+
+  public typealias Delegate = DelegateOutput
+
   public typealias SpacesList = SpacesListOutput
 
   public typealias SpaceCreate = SpaceCreateOutput
@@ -367,6 +396,34 @@ public enum Studio {
   public typealias ChatUnlink = ChatUnlinkOutput
 
   public typealias ChatSend = ChatSendOutput
+
+  public typealias FeedAttention = FeedAttentionOutput
+
+  public typealias FeedList = FeedListOutput
+
+  public typealias FeedRead = FeedReadOutput
+
+  public typealias FeedPost = FeedPostOutput
+
+  public typealias FeedDiscussion = FeedDiscussionOutput
+
+  public typealias FeedStory = FeedStoryOutput
+
+  public typealias FeedForDirective = FeedForDirectiveOutput
+
+  public typealias FeedTopics = FeedTopicsOutput
+
+  public typealias FeedPublish = FeedPublishOutput
+
+  public typealias FeedExplore = FeedExploreOutput
+
+  public typealias FeedEdit = FeedEditOutput
+
+  public typealias FeedRemove = FeedRemoveOutput
+
+  public typealias FeedSeen = FeedSeenOutput
+
+  public typealias FeedUnread = FeedUnreadOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -4960,6 +5017,422 @@ public enum Studio {
     }
   }
 
+  public struct TeamListInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public enum TeamListOutputBotsItemTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TeamListOutputBotsItemState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TeamListOutputBotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var avatar: String?
+    public var role: String?
+    public var spaceId: String?
+    public var model: String?
+    public var trust: TeamListOutputBotsItemTrust?
+    public var state: TeamListOutputBotsItemState?
+    public var activeTaskCount: Int?
+
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, role: String? = nil, spaceId: String? = nil, model: String? = nil, trust: TeamListOutputBotsItemTrust? = nil, state: TeamListOutputBotsItemState? = nil, activeTaskCount: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.avatar = avatar
+      self.role = role
+      self.spaceId = spaceId
+      self.model = model
+      self.trust = trust
+      self.state = state
+      self.activeTaskCount = activeTaskCount
+    }
+  }
+
+  public struct TeamListOutput: Sendable, Hashable, Codable {
+    public var bots: [TeamListOutputBotsItem]?
+
+    public init(bots: [TeamListOutputBotsItem]? = nil) {
+      self.bots = bots
+    }
+  }
+
+  public struct BotDeskInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public enum BotDeskOutputBotTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum BotDeskOutputBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotDeskOutputBot: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var avatar: String?
+    public var role: String?
+    public var spaceId: String?
+    public var model: String?
+    public var trust: BotDeskOutputBotTrust?
+    public var state: BotDeskOutputBotState?
+    public var activeTaskCount: Int?
+
+    public init(id: String? = nil, name: String? = nil, avatar: String? = nil, role: String? = nil, spaceId: String? = nil, model: String? = nil, trust: BotDeskOutputBotTrust? = nil, state: BotDeskOutputBotState? = nil, activeTaskCount: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.avatar = avatar
+      self.role = role
+      self.spaceId = spaceId
+      self.model = model
+      self.trust = trust
+      self.state = state
+      self.activeTaskCount = activeTaskCount
+    }
+  }
+
+  public enum BotDeskOutputTasksItemStatus: Sendable, Hashable, Codable {
+    case working
+    case waiting
+    case review
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "working": self = .working
+      case "waiting": self = .waiting
+      case "review": self = .review
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .working: try container.encode("working")
+      case .waiting: try container.encode("waiting")
+      case .review: try container.encode("review")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct BotDeskOutputTasksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var title: String?
+    public var status: BotDeskOutputTasksItemStatus?
+    public var note: String?
+    public var recurring: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, botId: String? = nil, title: String? = nil, status: BotDeskOutputTasksItemStatus? = nil, note: String? = nil, recurring: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.botId = botId
+      self.title = title
+      self.status = status
+      self.note = note
+      self.recurring = recurring
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct BotDeskOutputMemory: Sendable, Hashable, Codable {
+    public var mission: String?
+    public var memory: String?
+
+    public init(mission: String? = nil, memory: String? = nil) {
+      self.mission = mission
+      self.memory = memory
+    }
+  }
+
+  public struct BotDeskOutput: Sendable, Hashable, Codable {
+    public var bot: BotDeskOutputBot?
+    public var tasks: [BotDeskOutputTasksItem]?
+    public var directConversationId: String?
+    public var directThreadId: String?
+    public var profileHref: String?
+    public var memory: BotDeskOutputMemory?
+
+    public init(bot: BotDeskOutputBot? = nil, tasks: [BotDeskOutputTasksItem]? = nil, directConversationId: String? = nil, directThreadId: String? = nil, profileHref: String? = nil, memory: BotDeskOutputMemory? = nil) {
+      self.bot = bot
+      self.tasks = tasks
+      self.directConversationId = directConversationId
+      self.directThreadId = directThreadId
+      self.profileHref = profileHref
+      self.memory = memory
+    }
+  }
+
+  public struct TalkDmInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct TalkDmOutput: Sendable, Hashable, Codable {
+    public var conversationId: String?
+    public var threadId: String?
+
+    public init(conversationId: String? = nil, threadId: String? = nil) {
+      self.conversationId = conversationId
+      self.threadId = threadId
+    }
+  }
+
+  public struct TalkListInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct TalkListOutputConversationsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var memberBotIds: [String]?
+    public var isDirect: Bool?
+    public var needsYou: Bool?
+    public var unread: Bool?
+    public var href: String?
+
+    public init(id: String? = nil, title: String? = nil, memberBotIds: [String]? = nil, isDirect: Bool? = nil, needsYou: Bool? = nil, unread: Bool? = nil, href: String? = nil) {
+      self.id = id
+      self.title = title
+      self.memberBotIds = memberBotIds
+      self.isDirect = isDirect
+      self.needsYou = needsYou
+      self.unread = unread
+      self.href = href
+    }
+  }
+
+  public struct TalkListOutput: Sendable, Hashable, Codable {
+    public var conversations: [TalkListOutputConversationsItem]?
+
+    public init(conversations: [TalkListOutputConversationsItem]? = nil) {
+      self.conversations = conversations
+    }
+  }
+
+  public enum DelegateInputSchedule: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case weekly
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      case "weekly": self = .weekly
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .weekly: try container.encode("weekly")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DelegateInput: Sendable, Hashable, Codable {
+    public var botId: String?
+    public var brief: String?
+    public var context: [String]?
+    public var folderId: String?
+    public var schedule: DelegateInputSchedule?
+
+    public init(botId: String? = nil, brief: String? = nil, context: [String]? = nil, folderId: String? = nil, schedule: DelegateInputSchedule? = nil) {
+      self.botId = botId
+      self.brief = brief
+      self.context = context
+      self.folderId = folderId
+      self.schedule = schedule
+    }
+  }
+
+  public enum DelegateOutputTaskStatus: Sendable, Hashable, Codable {
+    case working
+    case waiting
+    case review
+    case done
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "working": self = .working
+      case "waiting": self = .waiting
+      case "review": self = .review
+      case "done": self = .done
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .working: try container.encode("working")
+      case .waiting: try container.encode("waiting")
+      case .review: try container.encode("review")
+      case .done: try container.encode("done")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DelegateOutputTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var botId: String?
+    public var title: String?
+    public var status: DelegateOutputTaskStatus?
+    public var note: String?
+    public var recurring: String?
+    public var href: String?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, botId: String? = nil, title: String? = nil, status: DelegateOutputTaskStatus? = nil, note: String? = nil, recurring: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.botId = botId
+      self.title = title
+      self.status = status
+      self.note = note
+      self.recurring = recurring
+      self.href = href
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct DelegateOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+    public var task: DelegateOutputTask?
+
+    public init(taskId: String? = nil, task: DelegateOutputTask? = nil) {
+      self.taskId = taskId
+      self.task = task
+    }
+  }
+
   public struct SpacesListInput: Sendable, Hashable, Codable {
 
 
@@ -9015,6 +9488,1960 @@ public enum Studio {
 
     public init(threadId: String? = nil) {
       self.threadId = threadId
+    }
+  }
+
+  public struct FeedAttentionInput: Sendable, Hashable, Codable {
+    public var cursor: String?
+    public var limit: Int?
+
+    public init(cursor: String? = nil, limit: Int? = nil) {
+      self.cursor = cursor
+      self.limit = limit
+    }
+  }
+
+  public struct FeedAttentionOutputPostsItemLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedAttentionOutputPostsItemEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedAttentionOutputPostsItemEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedAttentionOutputPostsItemEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedAttentionOutputPostsItemEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedAttentionOutputPostsItemEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedAttentionOutputPostsItemEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedAttentionOutputPostsItemEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedAttentionOutputPostsItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedAttentionOutputPostsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedAttentionOutputPostsItemLink?
+    public var embeds: [FeedAttentionOutputPostsItemEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedAttentionOutputPostsItemPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedAttentionOutputPostsItemLink? = nil, embeds: [FeedAttentionOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedAttentionOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedAttentionOutput: Sendable, Hashable, Codable {
+    public var posts: [FeedAttentionOutputPostsItem]?
+    public var nextCursor: String?
+
+    public init(posts: [FeedAttentionOutputPostsItem]? = nil, nextCursor: String? = nil) {
+      self.posts = posts
+      self.nextCursor = nextCursor
+    }
+  }
+
+  public struct FeedListInput: Sendable, Hashable, Codable {
+    public var cursor: String?
+    public var limit: Int?
+    public var topic: String?
+    public var query: String?
+    public var unread: Bool?
+    public var since: Double?
+    public var until: Double?
+
+    public init(cursor: String? = nil, limit: Int? = nil, topic: String? = nil, query: String? = nil, unread: Bool? = nil, since: Double? = nil, until: Double? = nil) {
+      self.cursor = cursor
+      self.limit = limit
+      self.topic = topic
+      self.query = query
+      self.unread = unread
+      self.since = since
+      self.until = until
+    }
+  }
+
+  public struct FeedListOutputPostsItemLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedListOutputPostsItemEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedListOutputPostsItemEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedListOutputPostsItemEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedListOutputPostsItemEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedListOutputPostsItemEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedListOutputPostsItemEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedListOutputPostsItemEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedListOutputPostsItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedListOutputPostsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedListOutputPostsItemLink?
+    public var embeds: [FeedListOutputPostsItemEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedListOutputPostsItemPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedListOutputPostsItemLink? = nil, embeds: [FeedListOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedListOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedListOutput: Sendable, Hashable, Codable {
+    public var posts: [FeedListOutputPostsItem]?
+    public var nextCursor: String?
+    public var lastSeenAt: Double?
+
+    public init(posts: [FeedListOutputPostsItem]? = nil, nextCursor: String? = nil, lastSeenAt: Double? = nil) {
+      self.posts = posts
+      self.nextCursor = nextCursor
+      self.lastSeenAt = lastSeenAt
+    }
+  }
+
+  public struct FeedReadInput: Sendable, Hashable, Codable {
+    public var postId: String?
+    public var read: Bool?
+
+    public init(postId: String? = nil, read: Bool? = nil) {
+      self.postId = postId
+      self.read = read
+    }
+  }
+
+  public struct FeedReadOutputPostLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedReadOutputPostEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedReadOutputPostEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedReadOutputPostEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedReadOutputPostEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedReadOutputPostEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedReadOutputPostEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedReadOutputPostEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedReadOutputPostPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedReadOutputPost: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedReadOutputPostLink?
+    public var embeds: [FeedReadOutputPostEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedReadOutputPostPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedReadOutputPostLink? = nil, embeds: [FeedReadOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedReadOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedReadOutput: Sendable, Hashable, Codable {
+    public var post: FeedReadOutputPost?
+
+    public init(post: FeedReadOutputPost? = nil) {
+      self.post = post
+    }
+  }
+
+  public struct FeedPostInput: Sendable, Hashable, Codable {
+    public var postId: String?
+
+    public init(postId: String? = nil) {
+      self.postId = postId
+    }
+  }
+
+  public struct FeedPostOutputPostLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedPostOutputPostEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedPostOutputPostEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedPostOutputPostEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedPostOutputPostEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedPostOutputPostEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedPostOutputPostEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedPostOutputPostEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedPostOutputPostPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedPostOutputPost: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedPostOutputPostLink?
+    public var embeds: [FeedPostOutputPostEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedPostOutputPostPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedPostOutputPostLink? = nil, embeds: [FeedPostOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedPostOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedPostOutput: Sendable, Hashable, Codable {
+    public var post: FeedPostOutputPost?
+
+    public init(post: FeedPostOutputPost? = nil) {
+      self.post = post
+    }
+  }
+
+  public enum FeedDiscussionInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum FeedDiscussionInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedDiscussionInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: FeedDiscussionInputRequestExecutionInputSourcesModel?
+    public var permissionMode: FeedDiscussionInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: FeedDiscussionInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: FeedDiscussionInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: FeedDiscussionInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: FeedDiscussionInputRequestExecutionInputSourcesModel? = nil, permissionMode: FeedDiscussionInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: FeedDiscussionInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: FeedDiscussionInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: FeedDiscussionInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct FeedDiscussionInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: FeedDiscussionInputRequestReasoningLevel?
+    public var permissionMode: FeedDiscussionInputRequestPermissionMode?
+    public var serviceTier: FeedDiscussionInputRequestServiceTier?
+    public var executionInputSources: FeedDiscussionInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: FeedDiscussionInputRequestReasoningLevel? = nil, permissionMode: FeedDiscussionInputRequestPermissionMode? = nil, serviceTier: FeedDiscussionInputRequestServiceTier? = nil, executionInputSources: FeedDiscussionInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct FeedDiscussionInput: Sendable, Hashable, Codable {
+    public var postId: String?
+    public var request: FeedDiscussionInputRequest?
+
+    public init(postId: String? = nil, request: FeedDiscussionInputRequest? = nil) {
+      self.postId = postId
+      self.request = request
+    }
+  }
+
+  public struct FeedDiscussionOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct FeedStoryInput: Sendable, Hashable, Codable {
+    public var story: String?
+
+    public init(story: String? = nil) {
+      self.story = story
+    }
+  }
+
+  public struct FeedStoryOutputPostsItemLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedStoryOutputPostsItemEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedStoryOutputPostsItemEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedStoryOutputPostsItemEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedStoryOutputPostsItemEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedStoryOutputPostsItemEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedStoryOutputPostsItemEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedStoryOutputPostsItemEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedStoryOutputPostsItemPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedStoryOutputPostsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedStoryOutputPostsItemLink?
+    public var embeds: [FeedStoryOutputPostsItemEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedStoryOutputPostsItemPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedStoryOutputPostsItemLink? = nil, embeds: [FeedStoryOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedStoryOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedStoryOutput: Sendable, Hashable, Codable {
+    public var posts: [FeedStoryOutputPostsItem]?
+
+    public init(posts: [FeedStoryOutputPostsItem]? = nil) {
+      self.posts = posts
+    }
+  }
+
+  public struct FeedForDirectiveInput: Sendable, Hashable, Codable {
+    public var source: String?
+
+    public init(source: String? = nil) {
+      self.source = source
+    }
+  }
+
+  public struct FeedForDirectiveOutputPostLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedForDirectiveOutputPostEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedForDirectiveOutputPostEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedForDirectiveOutputPostEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedForDirectiveOutputPostEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedForDirectiveOutputPostEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedForDirectiveOutputPostEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedForDirectiveOutputPostEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedForDirectiveOutputPostPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedForDirectiveOutputPost: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedForDirectiveOutputPostLink?
+    public var embeds: [FeedForDirectiveOutputPostEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedForDirectiveOutputPostPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedForDirectiveOutputPostLink? = nil, embeds: [FeedForDirectiveOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedForDirectiveOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedForDirectiveOutput: Sendable, Hashable, Codable {
+    public var post: FeedForDirectiveOutputPost?
+
+    public init(post: FeedForDirectiveOutputPost? = nil) {
+      self.post = post
+    }
+  }
+
+  public struct FeedTopicsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct FeedTopicsOutputTopicsItem: Sendable, Hashable, Codable {
+    public var topic: String?
+    public var posts: Double?
+
+    public init(topic: String? = nil, posts: Double? = nil) {
+      self.topic = topic
+      self.posts = posts
+    }
+  }
+
+  public struct FeedTopicsOutput: Sendable, Hashable, Codable {
+    public var topics: [FeedTopicsOutputTopicsItem]?
+
+    public init(topics: [FeedTopicsOutputTopicsItem]? = nil) {
+      self.topics = topics
+    }
+  }
+
+  public enum FeedPublishInputPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedPublishInput: Sendable, Hashable, Codable {
+    public var title: String?
+    public var body: String?
+    public var topic: String?
+    public var story: String?
+    public var priority: FeedPublishInputPriority?
+    public var author: String?
+    public var threadId: String?
+    public var projectId: String?
+
+    public init(title: String? = nil, body: String? = nil, topic: String? = nil, story: String? = nil, priority: FeedPublishInputPriority? = nil, author: String? = nil, threadId: String? = nil, projectId: String? = nil) {
+      self.title = title
+      self.body = body
+      self.topic = topic
+      self.story = story
+      self.priority = priority
+      self.author = author
+      self.threadId = threadId
+      self.projectId = projectId
+    }
+  }
+
+  public struct FeedPublishOutputPostLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedPublishOutputPostEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedPublishOutputPostEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedPublishOutputPostEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedPublishOutputPostEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedPublishOutputPostEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedPublishOutputPostEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedPublishOutputPostEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedPublishOutputPostPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedPublishOutputPost: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedPublishOutputPostLink?
+    public var embeds: [FeedPublishOutputPostEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedPublishOutputPostPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedPublishOutputPostLink? = nil, embeds: [FeedPublishOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedPublishOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedPublishOutput: Sendable, Hashable, Codable {
+    public var post: FeedPublishOutputPost?
+
+    public init(post: FeedPublishOutputPost? = nil) {
+      self.post = post
+    }
+  }
+
+  public struct FeedExploreInput: Sendable, Hashable, Codable {
+    public var postId: String?
+
+    public init(postId: String? = nil) {
+      self.postId = postId
+    }
+  }
+
+  public enum FeedExploreOutputStatus: Sendable, Hashable, Codable {
+    case started
+    case ready
+    case unavailable
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "started": self = .started
+      case "ready": self = .ready
+      case "unavailable": self = .unavailable
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .started: try container.encode("started")
+      case .ready: try container.encode("ready")
+      case .unavailable: try container.encode("unavailable")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedExploreOutput: Sendable, Hashable, Codable {
+    public var status: FeedExploreOutputStatus?
+    public var href: String?
+
+    public init(status: FeedExploreOutputStatus? = nil, href: String? = nil) {
+      self.status = status
+      self.href = href
+    }
+  }
+
+  public enum FeedEditInputPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedEditInput: Sendable, Hashable, Codable {
+    public var postId: String?
+    public var title: String?
+    public var body: String?
+    public var topic: String?
+    public var priority: FeedEditInputPriority?
+    public var resolved: Bool?
+
+    public init(postId: String? = nil, title: String? = nil, body: String? = nil, topic: String? = nil, priority: FeedEditInputPriority? = nil, resolved: Bool? = nil) {
+      self.postId = postId
+      self.title = title
+      self.body = body
+      self.topic = topic
+      self.priority = priority
+      self.resolved = resolved
+    }
+  }
+
+  public struct FeedEditOutputPostLink: Sendable, Hashable, Codable {
+    public var url: String?
+    public var domain: String?
+    public var title: String?
+    public var description: String?
+    public var image: String?
+
+    public init(url: String? = nil, domain: String? = nil, title: String? = nil, description: String? = nil, image: String? = nil) {
+      self.url = url
+      self.domain = domain
+      self.title = title
+      self.description = description
+      self.image = image
+    }
+  }
+
+  public enum FeedEditOutputPostEmbedsItemContentType: Sendable, Hashable, Codable {
+    case markdown
+    case image
+    case html
+    case pdf
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "markdown": self = .markdown
+      case "image": self = .image
+      case "html": self = .html
+      case "pdf": self = .pdf
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .markdown: try container.encode("markdown")
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .pdf: try container.encode("pdf")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedEditOutputPostEmbedsItemContent: Sendable, Hashable, Codable {
+    public var type: FeedEditOutputPostEmbedsItemContentType?
+    public var text: String?
+    public var url: String?
+
+    public init(type: FeedEditOutputPostEmbedsItemContentType? = nil, text: String? = nil, url: String? = nil) {
+      self.type = type
+      self.text = text
+      self.url = url
+    }
+  }
+
+  public struct FeedEditOutputPostEmbedsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var icon: String?
+    public var thumbnailUrl: String?
+    public var href: String?
+    public var updatedAt: Double?
+    public var content: FeedEditOutputPostEmbedsItemContent?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, icon: String? = nil, thumbnailUrl: String? = nil, href: String? = nil, updatedAt: Double? = nil, content: FeedEditOutputPostEmbedsItemContent? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.thumbnailUrl = thumbnailUrl
+      self.href = href
+      self.updatedAt = updatedAt
+      self.content = content
+    }
+  }
+
+  public enum FeedEditOutputPostPriority: Sendable, Hashable, Codable {
+    case urgent
+    case normal
+    case low
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "urgent": self = .urgent
+      case "normal": self = .normal
+      case "low": self = .low
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .urgent: try container.encode("urgent")
+      case .normal: try container.encode("normal")
+      case .low: try container.encode("low")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct FeedEditOutputPost: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var body: String?
+    public var preview: String?
+    public var domains: [String]?
+    public var image: String?
+    public var avatar: String?
+    public var link: FeedEditOutputPostLink?
+    public var embeds: [FeedEditOutputPostEmbedsItem]?
+    public var explorable: Bool?
+    public var threadTitle: String?
+    public var read: Bool?
+    public var topic: String?
+    public var story: String?
+    public var storyPosts: Double?
+    public var priority: FeedEditOutputPostPriority?
+    public var author: String?
+    public var botId: String?
+    public var threadId: String?
+    public var projectId: String?
+    public var channelId: String?
+    public var channelName: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var editedBy: String?
+    public var resolvedAt: Double?
+
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: FeedEditOutputPostLink? = nil, embeds: [FeedEditOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: FeedEditOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.body = body
+      self.preview = preview
+      self.domains = domains
+      self.image = image
+      self.avatar = avatar
+      self.link = link
+      self.embeds = embeds
+      self.explorable = explorable
+      self.threadTitle = threadTitle
+      self.read = read
+      self.topic = topic
+      self.story = story
+      self.storyPosts = storyPosts
+      self.priority = priority
+      self.author = author
+      self.botId = botId
+      self.threadId = threadId
+      self.projectId = projectId
+      self.channelId = channelId
+      self.channelName = channelName
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.editedBy = editedBy
+      self.resolvedAt = resolvedAt
+    }
+  }
+
+  public struct FeedEditOutput: Sendable, Hashable, Codable {
+    public var post: FeedEditOutputPost?
+
+    public init(post: FeedEditOutputPost? = nil) {
+      self.post = post
+    }
+  }
+
+  public struct FeedRemoveInput: Sendable, Hashable, Codable {
+    public var postId: String?
+
+    public init(postId: String? = nil) {
+      self.postId = postId
+    }
+  }
+
+  public struct FeedRemoveOutput: Sendable, Hashable, Codable {
+    public var removed: Bool?
+
+    public init(removed: Bool? = nil) {
+      self.removed = removed
+    }
+  }
+
+  public struct FeedSeenInput: Sendable, Hashable, Codable {
+    public var at: Double?
+
+    public init(at: Double? = nil) {
+      self.at = at
+    }
+  }
+
+  public struct FeedSeenOutput: Sendable, Hashable, Codable {
+    public var lastSeenAt: Double?
+
+    public init(lastSeenAt: Double? = nil) {
+      self.lastSeenAt = lastSeenAt
+    }
+  }
+
+  public struct FeedUnreadInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct FeedUnreadOutput: Sendable, Hashable, Codable {
+    public var count: Double?
+    public var lastSeenAt: Double?
+
+    public init(count: Double? = nil, lastSeenAt: Double? = nil) {
+      self.count = count
+      self.lastSeenAt = lastSeenAt
     }
   }
 

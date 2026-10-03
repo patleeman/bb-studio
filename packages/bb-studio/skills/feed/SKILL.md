@@ -30,7 +30,7 @@ It returns a card line, `::post{id="post_…"}`. End your reply with it, on its
 own line, outside code blocks and before any `::explore` or `::reactions`
 line, so the post shows as a card in your thread or channel.
 
-If `feed_post` isn't available, `bb feed post` does the same and prints the
+If `feed_post` isn't available, `bb studio feed post` does the same and prints the
 card line.
 
 ## Tools
@@ -46,9 +46,9 @@ card line.
 ## CLI
 
 ```sh
-bb feed list [--topic <topic>] [--limit <n>] [--all]   # --all lists every post, not one per story
-bb feed show <post id | story>
-bb feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent]
-bb feed edit <post id> [--title …] [--body …] [--topic …] [--resolve | --reopen]
-bb feed remove <post id>
+bb studio feed list [--topic <topic>] [--limit <n>] [--all]   # --all lists every post, not one per story
+bb studio feed show <post id | story>
+bb studio feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent]
+bb studio feed edit <post id> [--title …] [--body …] [--topic …] [--resolve | --reopen]
+bb studio feed remove <post id>
 ```

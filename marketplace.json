@@ -108,31 +108,6 @@
       }
     },
     {
-      "id": "feed",
-      "displayName": "Studio Feed",
-      "description": "Part of BB Studio. One feed of what your agents report. Agents post with the feed_post tool from any thread, channel or automation, and the post shows as a card where they wrote it. Read it like a news reader on desktop and mobile: unread first, posts open in place, stories group their updates, and linked pages and artifacts are previewed.",
-      "icon": {
-        "url": "./packages/bb-studio-feed/icons/feed.svg"
-      },
-      "tags": [
-        "agents",
-        "automation",
-        "notifications",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-feed",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "talk",
       "displayName": "Studio Talk",
       "description": "Part of BB Studio. Long-form, durable dictation and recording: saves audio as you speak, transcribes it with your voice subscription, and keeps every recording linkable and @-mentionable.",

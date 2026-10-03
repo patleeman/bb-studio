@@ -49,7 +49,7 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
     }
 
     /// App path that opens it in BB web, and that notifications carry.
-    public var href: String { "/plugins/feed/feed/\(id)" }
+    public var href: String { "/plugins/studio/feed/\(id)" }
 
     /// What a new thread about it starts with, as BB web's Discuss does.
     public var discussPrompt: String {
@@ -83,26 +83,26 @@ extension BBClient {
         if let cursor { input["cursor"] = .string(cursor) }
         if let topic { input["topic"] = .string(topic) }
         if let query, !query.isEmpty { input["query"] = .string(String(query.prefix(200))) }
-        return try await rpc("feed", Feed.Method.list, .object(input))
+        return try await rpc("studio", Studio.Method.feed_list, .object(input))
     }
 
     public func feedPost(_ id: String) async throws -> FeedPost? {
         struct Result: Decodable { var post: FeedPost? }
-        let result: Result = try await rpc("feed", Feed.Method.post, ["postId": .string(id)])
+        let result: Result = try await rpc("studio", Studio.Method.feed_post, ["postId": .string(id)])
         return result.post
     }
 
     /// A story's posts, oldest first.
     public func feedStory(_ story: String) async throws -> [FeedPost] {
         struct Result: Decodable { var posts: [FeedPost] }
-        let result: Result = try await rpc("feed", Feed.Method.story, ["story": .string(story)])
+        let result: Result = try await rpc("studio", Studio.Method.feed_story, ["story": .string(story)])
         return result.posts
     }
 
     /// The post a reply's `::post` line made.
     public func feedPost(directive source: String) async throws -> FeedPost? {
         struct Result: Decodable { var post: FeedPost? }
-        let result: Result = try await rpc("feed", Feed.Method.forDirective, ["source": .string(String(source.prefix(4000)))])
+        let result: Result = try await rpc("studio", Studio.Method.feed_forDirective, ["source": .string(String(source.prefix(4000)))])
         return result.post
     }
 
@@ -110,31 +110,31 @@ extension BBClient {
     public func feedTopics() async throws -> [String] {
         struct Topic: Decodable { var topic: String }
         struct Result: Decodable { var topics: [Topic] }
-        let result: Result = try await rpc("feed", Feed.Method.topics, .object([:]))
+        let result: Result = try await rpc("studio", Studio.Method.feed_topics, .object([:]))
         return result.topics.map(\.topic)
     }
 
     public func removeFeedPost(_ id: String) async throws {
-        let _: JSONValue = try await rpc("feed", Feed.Method.remove, ["postId": .string(id)])
+        let _: JSONValue = try await rpc("studio", Studio.Method.feed_remove, ["postId": .string(id)])
     }
 
     /// Marks a post read or unread, with the rest of its story.
     @discardableResult
     public func markFeedPost(_ id: String, read: Bool) async throws -> FeedPost? {
         struct Result: Decodable { var post: FeedPost? }
-        let result: Result = try await rpc("feed", Feed.Method.read, ["postId": .string(id), "read": .bool(read)])
+        let result: Result = try await rpc("studio", Studio.Method.feed_read, ["postId": .string(id), "read": .bool(read)])
         return result.post
     }
 
     /// Marks everything up to now read, on every device.
     public func markFeedSeen() async throws {
-        let _: JSONValue = try await rpc("feed", Feed.Method.seen, .object([:]))
+        let _: JSONValue = try await rpc("studio", Studio.Method.feed_seen, .object([:]))
     }
 
     /// Stories with an unread post.
     public func feedUnread() async throws -> Int {
         struct Result: Decodable { var count: Int }
-        let result: Result = try await rpc("feed", Feed.Method.unread, .object([:]))
+        let result: Result = try await rpc("studio", Studio.Method.feed_unread, .object([:]))
         return result.count
     }
 }

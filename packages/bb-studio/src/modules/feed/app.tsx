@@ -1,3 +1,4 @@
+import { moduleApp } from "../app";
 // Studio Feed — frontend entry.
 //
 // Surfaces:
@@ -11,7 +12,8 @@ import { DIRECTIVE, FEED_ICON, PANEL_PATH } from "./src/shared";
 import { PostCard } from "./src/ui/card";
 import { FeedPanel, UnreadCount } from "./src/ui/reader";
 
-export default definePluginApp((app) => {
+export function registerApp(host: import("@get-bb/plugin-sdk/app").PluginAppBuilder) {
+  const app = moduleApp(host, "feed");
   app.slots.navPanel({
     id: "feed",
     title: "Feed",
@@ -21,6 +23,8 @@ export default definePluginApp((app) => {
     experimental_sidebarAccessory: UnreadCount,
   });
   // Shows the panel in Float windows open on its paths.
-  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <FeedPanel subPath={subPath} />} /> });
+  app.slots.experimental_appOverlay({ id: "feed-float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <FeedPanel subPath={subPath} />} /> });
   app.slots.messageDirective({ id: DIRECTIVE, component: PostCard });
-});
+}
+
+export default definePluginApp(registerApp);

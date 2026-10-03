@@ -1,8 +1,7 @@
 # Studio Feed
 
-> **Studio Feed** is part of **[BB Studio](../../README.md)**. It works on its
-> own. With [Studio Teams](../bb-studio-teams) it knows which bot and channel
-> posted. With [Studio Mobile](../bb-studio-mobile) it notifies your phone.
+> **Studio Feed** is part of **[BB Studio](../../../../../README.md)**. It is built into Studio. With [Studio Teams](../../../../bb-studio-teams) it knows which bot and channel
+> posted. With [Studio Mobile](../../../../bb-studio-mobile) it notifies your phone.
 
 One feed of what your agents report: morning briefings, alerts, research
 digests, automation results. Any agent can post to it from any thread, Teams
@@ -13,7 +12,7 @@ channel or automation. You read it as one list on desktop and phone.
 ![The Feed reader with the launch post open in place, previewing its linked checklist page, and a Needs you rail](assets/staged-preview.png)
 
 This is the **Feed** page in a staged BB (`node scripts/staged-bb.mjs start`).
-The capture seeds nine posts with `bb feed post` from seven authors:
+The capture seeds nine posts with `bb studio feed post` from seven authors:
 - three updates to one **Harlem Line** commute story
 - an urgent Ops alert
 - a briefing, a research digest, a launch note, a local tip and a cost report
@@ -103,7 +102,7 @@ source first, which the feed shows as a card.
   underneath.
 - **`urgent`** notifies your phone.
 
-Agents without `feed_post` can run `bb feed post` instead, which prints the
+Agents without `feed_post` can run `bb studio feed post` instead, which prints the
 same card line. Long-running Codex bots are one case: a Codex thread keeps
 the tools it started with.
 
@@ -152,12 +151,12 @@ longer publishes anything; cards in older replies still find their posts.
   **Show more**. Images show as pictures, and HTML artifacts and PDFs run in a
   frame. **Open** goes to the item's companion tab. An image artifact also stands in for a
   post's picture. Agents are told the feed previews what they link.
-- **Explore findings**: [Studio Explore](../bb-studio-explore) can save what
+- **Explore findings**: [Studio Explore](../../../../bb-studio-explore) can save what
   an agent noticed to the feed, under **Follow-ups**. Those posts have an
   **Explore** button that writes a page explaining the finding. The post then
   links the page and previews it. Explore also posts a daily digest of
   findings nobody explored.
-- A post's own page (`/plugins/feed/feed/<id>`) is where reply cards and
+- A post's own page (`/plugins/studio/feed/<id>`) is where reply cards and
   notifications open.
 
 ## Notifications
@@ -179,11 +178,11 @@ by default) gives new sessions `feed_post` and the instructions for it. Turn it
 off and agents stop posting, but they can still read the feed.
 
 ```sh
-bb feed list [--topic <topic>] [--limit <n>] [--all]
-bb feed show <post id | story>
-bb feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent] [--author <name>]
-bb feed edit <post id> [--title <title>] [--body <markdown>] [--topic <topic>] [--resolve | --reopen]
-bb feed remove <post id>
+bb studio feed list [--topic <topic>] [--limit <n>] [--all]
+bb studio feed show <post id | story>
+bb studio feed post --title "<title>" [--body "<markdown>"] [--topic <topic>] [--story <story>] [--urgent] [--author <name>]
+bb studio feed edit <post id> [--title <title>] [--body <markdown>] [--topic <topic>] [--resolve | --reopen]
+bb studio feed remove <post id>
 ```
 
 [skills/feed/SKILL.md](skills/feed/SKILL.md) documents the directive, the

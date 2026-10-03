@@ -33,7 +33,7 @@ another desktop chat panel.
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio/src/modules/tables/README.md) |
 | Tasks | Shared task/board header; current/earlier handoffs, discussions and dispatch use companions | [Retained handoff composer and real bot dispatch](../packages/bb-studio-tasks/README.md) |
 | Teams | Bot Chat, channels and member-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Channel composer/file retention and conversation reuse](../packages/bb-studio-teams/README.md) |
-| Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio-feed/README.md) |
+| Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio/src/modules/feed/README.md) |
 | Explore | Shared explainer/page destinations; old owner-scoped panel and main fallback when companions are absent | [Explainer/page reuse and retained state](../packages/bb-studio-explore/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
 | Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](review-evidence/2026-10-02/search-accessibility/README.md) |
@@ -121,9 +121,9 @@ Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
 | --- | --- | --- | --- |
 | Studio collection | Search input, query and seeded release-note result | [Main](../packages/bb-studio/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/companion-transfers-native.png) |
 | Item-chat draft | Prompt, unsent wording, file input, selected attachment control and encoded item path | [Main](../packages/bb-studio/src/modules/chat/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/chat/assets/companion-transfers-native.png) |
-| Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio-feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/companion-transfers-native.png) |
-| Feed post | Original post heading | [Main](../packages/bb-studio-feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-post-companion-transfers-native.png) |
-| Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-native.png) |
+| Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio/src/modules/feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/feed/assets/companion-transfers-native.png) |
+| Feed post | Original post heading | [Main](../packages/bb-studio/src/modules/feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/feed/assets/feed-post-companion-transfers-native.png) |
+| Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio/src/modules/feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/feed/assets/feed-discussion-companion-transfers-native.png) |
 | Explore explainer | Iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-explore/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/companion-transfers-native.png) |
 
 The chat check reproduced double encoding: the host passes an already-encoded

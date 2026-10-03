@@ -1,3 +1,4 @@
+import { useModuleRpc } from "../../../app";
 // The Feed page, read like an RSS reader: one continuous stream, newest
 // first, one row per story, the day in the margin. Unread is bold; read is
 // dimmed. A row opens in place to the whole post, and reading it marks it
@@ -8,7 +9,7 @@
 import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
-import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { Markdown, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState, useLayoutEffect, useMemo, type ReactNode } from "react";
 import type { rpcContract } from "../contract";
 import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
@@ -49,7 +50,7 @@ function dayMarker(at: number): { day: string; date: string | null } {
 
 /** Read and unread, kept in the list as you read so rows don't jump. */
 function useReadState(setPosts: (update: (posts: PostView[] | null) => PostView[] | null) => void) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   return useCallback(
     (post: PostView, read: boolean) => {
       setPosts((posts) => posts?.map((each) => (sameStory(each, post) ? { ...each, read } : each)) ?? null);
@@ -60,7 +61,7 @@ function useReadState(setPosts: (update: (posts: PostView[] | null) => PostView[
 }
 
 function FeedReader() {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const discuss = useDiscuss();
   const [saved] = useState(readReaderState);
   const [filters, setFilters] = useState(saved.filters);
@@ -270,10 +271,10 @@ function FeedReader() {
     <div ref={readerRoot} onClickCapture={() => capturePosition.current()} className="min-w-0">
       <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">Feed</h1>
-        <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: "Feed" }} />
+        <ViewMoveMenu item={{ href: "/plugins/studio/feed", title: "Feed" }} />
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
         <button type="button" className={OUTLINE_BUTTON} disabled={posts === null} onClick={markAllRead}>
-          <Icon name="feed/mark-read" /> Mark entire feed read
+          <Icon name="studio/mark-read" /> Mark entire feed read
         </button>
       </header>
       <form role="search" aria-label="Filter feed" className="mb-4 flex flex-wrap items-end gap-3" noValidate onSubmit={(event) => { event.preventDefault(); applyFilters(draft); }}>
@@ -484,7 +485,7 @@ function RowActions({ post, onRead }: { post: PostView; onRead(read: boolean): v
 }
 
 function PostMenu({ post, onRemoved }: { post: PostView; onRemoved?(): void }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const discuss = useDiscuss();
   return (
     <DropdownMenu>
@@ -542,7 +543,7 @@ function PostActions({ post, onRead, onRemoved, className }: { post: PostView; o
 
 /** Reading and resolving a post are independent actions. */
 function ResolutionButton({ post }: { post: PostView }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const [resolved, setResolved] = useState(post.resolvedAt !== null);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -571,7 +572,7 @@ function ResolutionButton({ post }: { post: PostView }) {
 
 /** A finding Studio Explore saved: write the page explaining it. The post links the page when it's done. */
 function ExploreButton({ post }: { post: PostView }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const open = useOpenCompanion();
   const [state, setState] = useState<"idle" | "working" | "unavailable">("idle");
   const explore = () => {
@@ -685,7 +686,7 @@ function LinkCard({ link }: { link: NonNullable<PostView["link"]> }) {
 
 /** The story's earlier posts, newest first. */
 function EarlierUpdates({ post }: { post: PostView }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const [earlier, setEarlier] = useState<PostView[]>([]);
   useEffect(() => {
     if (!post.story || post.storyPosts < 2) return setEarlier([]);
@@ -742,7 +743,7 @@ function RailItem({ post, detail, onOpen }: { post: PostView; detail: string; on
 // A post's own page -------------------------------------------------------------
 
 function PostPage({ postId }: { postId: string }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const navigate = useBbNavigate();
   useMinuteTick();
   const [post, setPost] = useState<PostView | null | undefined>(undefined);
@@ -802,7 +803,7 @@ function PostPage({ postId }: { postId: string }) {
 
 /** Stories with an unread post, next to Feed in the sidebar. */
 export function UnreadCount() {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("feed");
   const [count, setCount] = useState(0);
   const load = useCallback(() => {
     rpc.call("unread", {}).then((result) => setCount(result.count), () => undefined);

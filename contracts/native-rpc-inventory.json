@@ -100,18 +100,6 @@
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "studio",
-      "method": "home",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio",
-      "method": "homeRespond",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio",
       "method": "searchAll",
       "coverage": "generated method"
     },
@@ -369,56 +357,56 @@
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "list",
+      "plugin": "studio",
+      "method": "feed_list",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "post",
+      "plugin": "studio",
+      "method": "feed_post",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "story",
+      "plugin": "studio",
+      "method": "feed_story",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "forDirective",
+      "plugin": "studio",
+      "method": "feed_forDirective",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "topics",
+      "plugin": "studio",
+      "method": "feed_topics",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "remove",
+      "plugin": "studio",
+      "method": "feed_remove",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "read",
+      "plugin": "studio",
+      "method": "feed_read",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "seen",
+      "plugin": "studio",
+      "method": "feed_seen",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/Feed.swift",
-      "plugin": "feed",
-      "method": "unread",
+      "plugin": "studio",
+      "method": "feed_unread",
       "coverage": "generated method"
     },
     {
