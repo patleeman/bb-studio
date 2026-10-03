@@ -86,8 +86,21 @@ export const rpcContract = defineRpcContract({
       id: z.string(),
       name: nameSchema.optional(),
       data: z.string(),
+      /** Recovery only: refuse a draft based on an older server revision. */
+      expectedUpdatedAt: z.number().optional(),
     }),
     output: z.object({ ok: z.boolean(), updatedAt: z.number() }),
+  },
+  recoverDrawingCopy: {
+    input: z.object({
+      sourceDrawingId: z.string().min(1).max(200),
+      draftId: z.string().min(1).max(200),
+      draftToken: z.string().min(1).max(200),
+      name: nameSchema,
+      data: z.string(),
+      projectId: z.string().min(1).max(200).nullable().optional(),
+    }),
+    output: z.object({ drawing: drawingMetaSchema }),
   },
   renameDrawing: {
     input: z.object({ id: z.string(), name: nameSchema }),
@@ -202,13 +215,29 @@ export default async function plugin(bb: BbPluginApi) {
     getDrawingUpdatedAt({ id }) {
       return { updatedAt: store.get(id)?.updated_at ?? 0 };
     },
-    saveDrawing({ id, name, data }) {
-      const row = mustGet(id);
-      // Multi-writer merge: element-level union, higher `version` wins,
-      // tombstones preserved — so concurrent user edits and agent writes
-      // both survive instead of last-writer-wins clobbering.
-      const updatedAt = write(row, mergeFullScene(row.data, data), "editor", { name });
-      return { ok: true, updatedAt };
+    saveDrawing({ id, name, data, expectedUpdatedAt }) {
+      return db.transaction(() => {
+        const row = mustGet(id);
+        if (expectedUpdatedAt !== undefined && row.updated_at !== expectedUpdatedAt)
+          throw new Error("The drawing changed on the server. Save this draft as a copy to keep both versions.");
+        // Multi-writer merge: element-level union, higher `version` wins,
+        // tombstones preserved — so concurrent user edits and agent writes
+        // both survive instead of last-writer-wins clobbering.
+        const updatedAt = write(row, mergeFullScene(row.data, data), "editor", { name });
+        return { ok: true, updatedAt };
+      })();
+    },
+    recoverDrawingCopy({ sourceDrawingId, draftId, draftToken, name, data, projectId }) {
+      const scene = parseSceneData(data);
+      if (!scene) throw new Error("This recovery draft is not a valid drawing scene.");
+      const source = store.get(sourceDrawingId);
+      const { row, created } = store.recoverCopy({
+        key: JSON.stringify([sourceDrawingId, draftId, draftToken]),
+        name, data: serializeSceneData(scene), projectId: source ? source.project_id : projectId,
+      });
+      // Notify only after the transaction has committed a complete scene.
+      if (created) changed(row.id, row.updated_at, "editor");
+      return { drawing: toMeta(row) };
     },
     renameDrawing({ id, name }) {
       mustGet(id);

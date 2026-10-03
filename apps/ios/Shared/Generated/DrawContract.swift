@@ -8,6 +8,7 @@ public enum Draw {
     public static let getDrawing = "getDrawing"
     public static let getDrawingUpdatedAt = "getDrawingUpdatedAt"
     public static let saveDrawing = "saveDrawing"
+    public static let recoverDrawingCopy = "recoverDrawingCopy"
     public static let renameDrawing = "renameDrawing"
     public static let deleteDrawing = "deleteDrawing"
     public static let attachDrawingImage = "attachDrawingImage"
@@ -25,6 +26,8 @@ public enum Draw {
   public typealias GetDrawingUpdatedAt = GetDrawingUpdatedAtOutput
 
   public typealias SaveDrawing = SaveDrawingOutput
+
+  public typealias RecoverDrawingCopy = RecoverDrawingCopyOutput
 
   public typealias RenameDrawing = RenameDrawingOutput
 
@@ -156,11 +159,13 @@ public enum Draw {
     public var id: String?
     public var name: String?
     public var data: String?
+    public var expectedUpdatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, data: String? = nil) {
+    public init(id: String? = nil, name: String? = nil, data: String? = nil, expectedUpdatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.data = data
+      self.expectedUpdatedAt = expectedUpdatedAt
     }
   }
 
@@ -171,6 +176,52 @@ public enum Draw {
     public init(ok: Bool? = nil, updatedAt: Double? = nil) {
       self.ok = ok
       self.updatedAt = updatedAt
+    }
+  }
+
+  public struct RecoverDrawingCopyInput: Sendable, Hashable, Codable {
+    public var sourceDrawingId: String?
+    public var draftId: String?
+    public var draftToken: String?
+    public var name: String?
+    public var data: String?
+    public var projectId: String?
+
+    public init(sourceDrawingId: String? = nil, draftId: String? = nil, draftToken: String? = nil, name: String? = nil, data: String? = nil, projectId: String? = nil) {
+      self.sourceDrawingId = sourceDrawingId
+      self.draftId = draftId
+      self.draftToken = draftToken
+      self.name = name
+      self.data = data
+      self.projectId = projectId
+    }
+  }
+
+  public struct RecoverDrawingCopyOutputDrawing: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var elementCount: Double?
+    public var projectId: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, name: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, elementCount: Double? = nil, projectId: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.name = name
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.elementCount = elementCount
+      self.projectId = projectId
+      self.archived = archived
+    }
+  }
+
+  public struct RecoverDrawingCopyOutput: Sendable, Hashable, Codable {
+    public var drawing: RecoverDrawingCopyOutputDrawing?
+
+    public init(drawing: RecoverDrawingCopyOutputDrawing? = nil) {
+      self.drawing = drawing
     }
   }
 

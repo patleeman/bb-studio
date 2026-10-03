@@ -61,3 +61,22 @@ describe("the migrations", () => {
     );
   });
 });
+
+describe("atomic recovery copies", () => {
+  it("rolls back the empty drawing and retry key when saving its scene fails", () => {
+    const { db, store } = memoryStore();
+    const input = { key: "draft-token", name: "Recovered", data: scene([element("rectangle")]), projectId: "proj_a" };
+    try {
+      db.exec(`CREATE TRIGGER reject_recovery_scene BEFORE UPDATE OF data ON drawings
+        BEGIN SELECT RAISE(ABORT, 'disk failure'); END`);
+      expect(() => store.recoverCopy(input)).toThrow("disk failure");
+      expect(store.list()).toEqual([]);
+      expect(db.prepare("SELECT * FROM drawing_recovery_copies").all()).toEqual([]);
+      db.exec("DROP TRIGGER reject_recovery_scene");
+      const result = store.recoverCopy(input);
+      expect(result.created).toBe(true);
+      expect(result.row.data).toBe(input.data);
+      expect(store.recoverCopy(input)).toMatchObject({ row: { id: result.row.id }, created: false });
+    } finally { db.close(); }
+  });
+});

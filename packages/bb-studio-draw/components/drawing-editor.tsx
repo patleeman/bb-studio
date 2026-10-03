@@ -26,6 +26,7 @@ import {
   ItemMenu,
   openNewItemThread,
   useStudioChatPresent,
+  useOpenCompanion,
   cn,
 } from "@bb-studio/kit/app";
 
@@ -47,6 +48,7 @@ import {
 } from "../lib/scene";
 import { useDrawingSync } from "../lib/sync";
 import { DrawingSaveQueue } from "../lib/save-queue";
+import { DrawingDraftSession, drawingDraftStore, type DrawingDraft } from "../lib/drafts";
 import { DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref } from "../src/shared";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
@@ -66,6 +68,7 @@ export function DrawingEditor({
 }) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
+  const openCompanion = useOpenCompanion();
   // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
   const studioChat = useStudioChatPresent();
   const isDark = useIsDark();
@@ -77,6 +80,22 @@ export function DrawingEditor({
   const [saving, setSaving] = useState(false);
   const [saveError, setSaveError] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
+  const [draftStore] = useState(drawingDraftStore);
+  const [draftLoadError, setDraftLoadError] = useState<string | null>(null);
+  const [localError, setLocalError] = useState<string | null>(null);
+  const [recoveryDrafts, setRecoveryDrafts] = useState<DrawingDraft[]>([]);
+  const [selectedDraft, setSelectedDraft] = useState<string | null>(null);
+  const [recoveryBusy, setRecoveryBusy] = useState(false);
+  const [recoveryError, setRecoveryError] = useState<string | null>(null);
+  const [canvasGeneration, setCanvasGeneration] = useState(0);
+  const baseRevision = useRef(0);
+  const projectId = useRef<string | null>(null);
+  const recoveryBlocked = useRef(false);
+  recoveryBlocked.current = recoveryDrafts.length > 0;
+  const recoveryDraft = recoveryDrafts.find(draft => draft.id === selectedDraft) ?? recoveryDrafts[0];
+  const draftSessionRef = useRef<DrawingDraftSession | null>(null);
+  if (!draftSessionRef.current) draftSessionRef.current = new DrawingDraftSession(draftStore, drawingId, crypto.randomUUID(), error => setLocalError(error ? errorMessage(error) : null));
+  const draftSession = draftSessionRef.current;
 
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const canvasRef = useRef<HTMLDivElement | null>(null);
@@ -85,7 +104,12 @@ export function DrawingEditor({
   const touchedRef = useRef(false);
   const loadedRef = useRef(false);
   const saveQueueRef = useRef<DrawingSaveQueue | null>(null);
-  if (!saveQueueRef.current) saveQueueRef.current = new DrawingSaveQueue((data) => rpc.call("saveDrawing", { id: drawingId, data }));
+  if (!saveQueueRef.current) saveQueueRef.current = new DrawingSaveQueue(async (data) => {
+    const result = await rpc.call("saveDrawing", { id: drawingId, data });
+    baseRevision.current = Math.max(baseRevision.current, result.updatedAt);
+    await draftSession.acknowledged(data, result.updatedAt);
+    return result;
+  });
   const saveQueue = saveQueueRef.current;
   // The scene as last saved or loaded, serialized. Excalidraw calls onChange
   // for pointer moves, selection and scrolling too; comparing against this
@@ -104,15 +128,23 @@ export function DrawingEditor({
   useEffect(() => {
     let cancelled = false;
     setLoading(true);
+    const drafts = draftStore.list(drawingId).then((saved) => {
+      if (!cancelled) setRecoveryDrafts(saved);
+      return saved;
+    }).catch((error) => { if (!cancelled) setDraftLoadError(errorMessage(error)); return []; });
     void rpc
       .call("getDrawing", { id: drawingId })
-      .then(({ drawing }) => {
+      .then(async ({ drawing }) => {
+        const savedDrafts = await drafts;
         if (cancelled) return;
         if (!drawing) {
+          if (savedDrafts.length) { setName("Deleted drawing"); setLoading(false); return; }
           toast.error("Drawing not found");
           onBack(true);
           return;
         }
+        baseRevision.current = drawing.updatedAt;
+        projectId.current = drawing.projectId;
         setName(drawing.name);
         const scene = parseScene(drawing.data);
         if (scene) {
@@ -144,7 +176,8 @@ export function DrawingEditor({
         serverRevSetterRef.current(drawing.updatedAt);
         setLoading(false);
       })
-      .catch((error) => {
+      .catch(async (error) => {
+        await drafts;
         if (cancelled) return;
         toast.error(error instanceof Error ? error.message : "Failed to load");
         setLoading(false);
@@ -164,7 +197,7 @@ export function DrawingEditor({
     rpc as never,
     () => {
       const api = apiRef.current;
-      return api
+      return api && !recoveryBlocked.current
         ? {
             getSceneElementsIncludingDeleted: () =>
               api.getSceneElementsIncludingDeleted(),
@@ -177,6 +210,7 @@ export function DrawingEditor({
         : null;
     },
     (updatedAt) => {
+      baseRevision.current = Math.max(baseRevision.current, updatedAt);
       // The server already has the scene we just applied, so the change it
       // causes isn't saved back (that would ping-pong between writers).
       const api = apiRef.current;
@@ -260,19 +294,71 @@ export function DrawingEditor({
         // The first change after mount is Excalidraw normalizing the loaded
         // scene, and a remote scene being applied is already on the server;
         // record either as the saved scene without writing it back.
-        if (savedSceneRef.current === null || applyingRemoteRef.current) {
+        if (savedSceneRef.current === null || applyingRemoteRef.current || recoveryBlocked.current) {
           savedSceneRef.current = serialized;
           return;
         }
         if (serialized === savedSceneRef.current) return;
         savedSceneRef.current = serialized;
+        draftSession.stage(serialized, baseRevision.current);
         saveQueue.enqueue(serialized);
       } catch (error) {
         console.error("serialize failed", error);
       }
     },
-    [saveQueue],
+    [saveQueue, draftSession],
   );
+
+  async function checkDrafts() {
+    try { setRecoveryDrafts((await draftStore.list(drawingId)).filter(draft => draft.id !== draftSession.id)); setDraftLoadError(null); }
+    catch (error) { setDraftLoadError(errorMessage(error)); }
+  }
+
+  async function recoverDraft(action: "recover" | "copy" | "discard") {
+    const draft = recoveryDraft;
+    if (!draft || recoveryBusy) return;
+    setRecoveryBusy(true);
+    setRecoveryError(null);
+    try {
+      if (action !== "discard") {
+        if (!parseScene(draft.data)) throw new Error("This draft could not be read. Download it before discarding it.");
+        if (action === "copy") {
+          const { drawing } = await rpc.call("recoverDrawingCopy", {
+            sourceDrawingId: drawingId, draftId: draft.id, draftToken: draft.token,
+            data: draft.data, name: `${name || "Drawing"} (recovered)`.slice(0, 200), projectId: projectId.current,
+          });
+          await draftStore.remove(draft.id, draft.token);
+          await checkDrafts();
+          openCompanion({ kind: "path", path: drawingHref(drawing.id), title: drawing.name });
+          return;
+        }
+        await rpc.call("saveDrawing", { id: drawingId, data: draft.data, expectedUpdatedAt: draft.baseRevision });
+        const { drawing } = await rpc.call("getDrawing", { id: drawingId });
+        if (!drawing) throw new Error("The drawing was removed. Your local draft is still available.");
+        const scene = parseScene(drawing.data);
+        baseRevision.current = drawing.updatedAt;
+        loadedRef.current = true;
+        projectId.current = drawing.projectId;
+        setName(drawing.name);
+        serverRevSetterRef.current(drawing.updatedAt);
+        savedSceneRef.current = null;
+        apiRef.current = null;
+        setInitialData(scene ? { ...scene, appState: sanitizeAppStateForStorage(scene.appState), scrollToContent: true } as unknown as ExcalidrawInitialDataState : null);
+        setCanvasGeneration(value => value + 1);
+      }
+      await draftStore.remove(draft.id, draft.token);
+      await checkDrafts();
+    } catch (error) { setRecoveryError(errorMessage(error)); }
+    finally { setRecoveryBusy(false); }
+  }
+
+  function downloadDraft() {
+    if (!recoveryDraft) return;
+    const url = URL.createObjectURL(new Blob([recoveryDraft.data], { type: "application/json" }));
+    const link = document.createElement("a");
+    link.href = url; link.download = "recovered-drawing.excalidraw"; link.click();
+    setTimeout(() => URL.revokeObjectURL(url), 1000);
+  }
 
   async function renderPng(): Promise<Blob> {
     const api = apiRef.current;
@@ -364,6 +450,7 @@ export function DrawingEditor({
     try {
       await rpc.call("deleteDrawing", { id: drawingId });
       saveQueue.cancel();
+      await draftSession.discard().catch(error => toast.error(`Drawing deleted, but its local recovery draft could not be removed: ${errorMessage(error)}`));
       toast.success("Drawing deleted");
       onBack(true);
     } catch (error) {
@@ -376,7 +463,9 @@ export function DrawingEditor({
       role="status"
       aria-live="polite"
       title={
-        saveError ? "Changes are not saved. Retry saving before closing this drawing."
+        recoveryDraft ? "An unsaved local draft needs a recovery decision."
+          : !loadedRef.current ? "The drawing has not loaded."
+          : saveError ? "Changes are not saved. Retry saving before closing this drawing."
           : saving ? "Saving your changes…"
           : realtimeState === "connected"
           ? "Live — agent edits appear here automatically"
@@ -388,11 +477,11 @@ export function DrawingEditor({
         aria-hidden="true"
         className={cn(
           "size-1.5 rounded-full",
-          saveError ? "bg-destructive" : saving || realtimeState !== "connected"
+          saveError ? "bg-destructive" : recoveryDraft || !loadedRef.current || saving || realtimeState !== "connected"
             ? "animate-pulse bg-warning motion-reduce:animate-none" : "bg-success",
         )}
       />
-      {saveError ? "Not saved" : saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
+      {recoveryDraft ? "Local draft" : !loadedRef.current ? "Not loaded" : saveError ? "Not saved" : saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
     </span>
   );
 
@@ -438,7 +527,7 @@ export function DrawingEditor({
               defaultValue={name}
               placeholder="Untitled drawing"
               maxLength={200}
-              disabled={loading}
+              disabled={loading || recoveryDrafts.length > 0}
               className="h-8 w-56 min-w-0 rounded-md bg-transparent px-2 text-sm font-medium outline-none placeholder:text-muted-foreground hover:bg-state-hover focus:bg-state-hover max-md:w-32"
               onKeyDown={(event) => {
                 if (event.key === "Enter") event.currentTarget.blur();
@@ -454,6 +543,21 @@ export function DrawingEditor({
         }
         trailing={trailing}
       />
+      {localError || draftLoadError ? <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm text-destructive">
+        <span className="min-w-0 flex-1">Local recovery storage failed: {localError || draftLoadError}. Keep this drawing open until the server says Saved.</span>
+        <button type="button" className={FLOATING_BUTTON} onClick={() => void draftSession.retry().then(checkDrafts)}>Retry local storage</button>
+      </div> : null}
+      {recoveryDraft ? <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm" role="region" aria-label="Unsaved drawing recovery">
+        <span className="min-w-0 flex-1">{baseRevision.current === recoveryDraft.baseRevision ? "An unsaved local draft is available." : "The server drawing changed or is unavailable. Save the local draft as a copy to keep both versions."}</span>
+        {recoveryDrafts.length > 1 ? <select aria-label="Local draft to recover" value={recoveryDraft.id} onChange={event => setSelectedDraft(event.target.value)} disabled={recoveryBusy}>
+          {recoveryDrafts.map(draft => <option key={draft.id} value={draft.id}>{new Date(draft.updatedAt).toLocaleString()}</option>)}
+        </select> : null}
+        <button type="button" className={FLOATING_BUTTON} disabled={recoveryBusy} onClick={() => void recoverDraft("recover")}>Recover draft</button>
+        <button type="button" className={FLOATING_BUTTON} disabled={recoveryBusy} onClick={() => void recoverDraft("copy")}>Save as copy</button>
+        <button type="button" className={FLOATING_BUTTON} onClick={downloadDraft}>Download draft</button>
+        <button type="button" className={FLOATING_BUTTON} disabled={recoveryBusy} onClick={() => { if (confirm("Discard this unsaved local draft?")) void recoverDraft("discard"); }}>Discard draft</button>
+        {recoveryError ? <p role="alert" className="w-full text-destructive">{recoveryError} Your local draft is retained; retry or save a copy.</p> : null}
+      </div> : null}
       {saveError ? (
         <div role="alert" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-sm text-destructive">
           <span className="min-w-0 flex-1">Changes are not saved: {saveError}</span>
@@ -473,7 +577,8 @@ export function DrawingEditor({
           </div>
         ) : (
           <Excalidraw
-            key={drawingId}
+            key={`${drawingId}:${canvasGeneration}`}
+            viewModeEnabled={recoveryDrafts.length > 0 || !loadedRef.current}
             initialData={initialData}
             onChange={handleChange}
             excalidrawAPI={(api) => {

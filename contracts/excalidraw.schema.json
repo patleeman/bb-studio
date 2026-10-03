@@ -247,6 +247,9 @@
           },
           "data": {
             "type": "string"
+          },
+          "expectedUpdatedAt": {
+            "type": "number"
           }
         },
         "required": [
@@ -268,6 +271,104 @@
         "required": [
           "ok",
           "updatedAt"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "recoverDrawingCopy": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "sourceDrawingId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "draftId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "draftToken": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "maxLength": 200
+          },
+          "data": {
+            "type": "string"
+          },
+          "projectId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "sourceDrawingId",
+          "draftId",
+          "draftToken",
+          "name",
+          "data"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "drawing": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "name": {
+                "type": "string"
+              },
+              "createdAt": {
+                "type": "number"
+              },
+              "updatedAt": {
+                "type": "number"
+              },
+              "elementCount": {
+                "type": "number"
+              },
+              "projectId": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "archived": {
+                "type": "boolean"
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "createdAt",
+              "updatedAt",
+              "elementCount",
+              "projectId",
+              "archived"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "drawing"
         ],
         "additionalProperties": false
       }

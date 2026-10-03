@@ -22,6 +22,10 @@ export const MIGRATIONS = [
    ALTER TABLE drawings ADD COLUMN updated_by TEXT;
    ALTER TABLE drawings ADD COLUMN archived_at INTEGER;`,
   `ALTER TABLE drawings ADD COLUMN template INTEGER NOT NULL DEFAULT 0`,
+  `CREATE TABLE drawing_recovery_copies (
+     recovery_key TEXT PRIMARY KEY,
+     drawing_id TEXT NOT NULL
+   )`,
 ];
 
 export type DrawingRow = {
@@ -112,6 +116,20 @@ export class DrawingStore {
       )
       .run(id, input.name, emptySceneData(), at, at, input.projectId ?? null, writerKind(input.by));
     return this.get(id)!;
+  }
+
+  /** One complete copy per durable draft token; deletion explicitly permits recreation. */
+  recoverCopy(input: { key: string; name: string; data: string; projectId?: string | null }): { row: DrawingRow; created: boolean } {
+    return this.db.transaction(() => {
+      const previous = this.db.prepare("SELECT drawing_id FROM drawing_recovery_copies WHERE recovery_key = ?").get(input.key) as { drawing_id: string } | undefined;
+      const existing = previous ? this.get(previous.drawing_id) : null;
+      if (existing) return { row: existing, created: false };
+      const row = this.create({ name: input.name, projectId: input.projectId, by: "editor" });
+      this.write(row.id, input.data, "editor");
+      this.db.prepare(`INSERT INTO drawing_recovery_copies (recovery_key, drawing_id) VALUES (?, ?)
+        ON CONFLICT(recovery_key) DO UPDATE SET drawing_id = excluded.drawing_id`).run(input.key, row.id);
+      return { row: this.get(row.id)!, created: true };
+    }).immediate();
   }
 
   /** Writes a scene, bumping updated_at. Returns the new revision. */

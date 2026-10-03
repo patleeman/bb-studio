@@ -98,6 +98,24 @@ versa) via tombstones; edits to the *same* element resolve by Excalidraw's
   Failed saves keep the newest pending scene and retry up to three times.
   If a save still fails, the editor shows **Retry save** and warns before
   you close the browser with unsaved changes.
+- Unsaved scenes, including image files and deletion tombstones, are also
+  written to IndexedDB in this browser. Each editor has its own draft key,
+  so another tab cannot replace its recovery data. A server acknowledgement
+  removes only the matching saved draft; newer edits stay recoverable.
+  On reopening a drawing, **Recover draft** checks the server revision
+  atomically before merging. If another writer changed the drawing, recovery
+  refuses to overwrite it: use **Save as copy**, **Download draft** (an
+  `.excalidraw` file), or **Discard draft**. Saving a copy creates the complete
+  scene in one server transaction. Retrying the same draft returns the same
+  copy, including after a lost response or server restart; only deleting that
+  copy permits a replacement. The original and local draft stay intact until
+  the server confirms success. The canvas stays read-only until
+  these older drafts are handled. Recovery never starts an automatic save.
+  Browser storage is local to this server origin and browser profile, not a
+  cloud backup; clearing site data removes it. Disk/quota failures show
+  **Retry local storage**. Keep the editor open until the server says Saved
+  when local storage is unavailable. An abrupt crash before a local write
+  finishes can still lose that latest edit.
 - Every successful write (editor autosave, agent tool, CLI) publishes a
   realtime `excalidraw` signal and tells Studio the collection changed; open
   editors fetch the latest scene on every signal, fill in element defaults
