@@ -6,7 +6,7 @@ import { GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { useEffect, useId, useState } from "react";
 import { Face } from "./Face";
 import { useCall, type TeamBot } from "./model";
-import { cn } from "./styles";
+import { cn, PORTAL_SCOPE } from "./styles";
 
 const SCHEDULES = [
   { id: "once", label: "Now, once" },
@@ -69,8 +69,8 @@ export function DelegateDialog({ open, onOpenChange, bots, initialBotId, context
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 motion-safe:animate-in motion-safe:fade-in" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-xl outline-none">
+        <Dialog.Overlay {...PORTAL_SCOPE} className="fixed inset-0 z-50 bg-black/40 motion-safe:animate-in motion-safe:fade-in" />
+        <Dialog.Content {...PORTAL_SCOPE} className="fixed top-1/2 left-1/2 z-50 w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-xl outline-none">
           <Dialog.Title className="text-base font-semibold">Hand off work</Dialog.Title>
           <Dialog.Description className="mt-1 text-sm text-muted-foreground">
             {context ? <>With <span className="text-foreground">{context.title}</span> as context. </> : null}

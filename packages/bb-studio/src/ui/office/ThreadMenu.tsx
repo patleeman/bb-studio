@@ -9,7 +9,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@bb-studio/kit/app";
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { MENU, MENU_ITEM, MENU_SEPARATOR, ROW, cn } from "./styles";
+import { MENU, MENU_ITEM, MENU_SEPARATOR, ROW, cn, PORTAL_SCOPE } from "./styles";
 
 type Item = { id: string; label: string; icon: string; danger?: boolean; run: () => void };
 
@@ -48,7 +48,7 @@ export function ThreadMenu({ thread, children }: { thread: PluginSidebarThread; 
                 <Icon name="MoreHorizontal" className="size-4" />
               </Menu.Trigger>
               <Menu.Portal>
-                <Menu.Content align="end" className={MENU}>
+                <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
                   {groups.map((group, index) => (
                     <div key={index}>
                       {index > 0 ? <Menu.Separator className={MENU_SEPARATOR} /> : null}
@@ -66,7 +66,7 @@ export function ThreadMenu({ thread, children }: { thread: PluginSidebarThread; 
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={MENU}>
+        <ContextMenu.Content {...PORTAL_SCOPE} className={MENU}>
           {groups.map((group, index) => (
             <div key={index}>
               {index > 0 ? <ContextMenu.Separator className={MENU_SEPARATOR} /> : null}

@@ -6,7 +6,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Icon, openAppPath } from "@bb-studio/kit/app";
 import type { ReactNode } from "react";
 import { useCall, type TreeItem } from "./model";
-import { MENU, MENU_ITEM, MENU_SEPARATOR, cn } from "./styles";
+import { MENU, MENU_ITEM, MENU_SEPARATOR, cn, PORTAL_SCOPE } from "./styles";
 
 export interface RowAction {
   id: string;
@@ -42,13 +42,13 @@ export function RowMenu({ label, groups, children }: { label: string; groups: Ro
               <Icon name="MoreHorizontal" className="size-4" />
             </Menu.Trigger>
             <Menu.Portal>
-              <Menu.Content align="end" className={MENU}>{items(Menu.Item, Menu.Separator)}</Menu.Content>
+              <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>{items(Menu.Item, Menu.Separator)}</Menu.Content>
             </Menu.Portal>
           </Menu.Root>
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content className={MENU}>{items(ContextMenu.Item, ContextMenu.Separator)}</ContextMenu.Content>
+        <ContextMenu.Content {...PORTAL_SCOPE} className={MENU}>{items(ContextMenu.Item, ContextMenu.Separator)}</ContextMenu.Content>
       </ContextMenu.Portal>
     </ContextMenu.Root>
   );

@@ -40,3 +40,14 @@ export const ROW_HOVER_BUTTON =
   "hidden size-6 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground focus-visible:flex [&_svg]:size-3.5";
 
 export const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border";
+
+/**
+ * Spread on anything rendered through a portal (menus, dialogs, tooltips).
+ * Studio's CSS is scoped to its plugin root, and a portal leaves that root, so
+ * the content must declare it, as the kit's own overlays do.
+ */
+export const PORTAL_SCOPE = {
+  "data-bb-portaled-overlay": "",
+  "data-bb-plugin-root": "",
+  "data-bb-plugin": "studio",
+} as const;

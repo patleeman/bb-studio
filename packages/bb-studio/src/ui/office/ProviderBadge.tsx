@@ -7,7 +7,7 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import * as Tooltip from "@radix-ui/react-tooltip";
 import type { ReactNode } from "react";
-import { cn } from "./styles";
+import { cn, PORTAL_SCOPE } from "./styles";
 
 export function ProviderBadge({ providerId, label, className }: { providerId: string; label: string; className?: string }) {
   const { providers } = useProviders();
@@ -35,7 +35,7 @@ export function Hint({ label, children, side = "bottom" }: { label: ReactNode; c
       <Tooltip.Root>
         <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
         <Tooltip.Portal>
-          <Tooltip.Content
+          <Tooltip.Content {...PORTAL_SCOPE}
             side={side}
             sideOffset={6}
             className="z-50 max-w-64 rounded-md bg-foreground px-2 py-1 text-xs leading-snug text-background shadow-md motion-safe:animate-in motion-safe:fade-in"

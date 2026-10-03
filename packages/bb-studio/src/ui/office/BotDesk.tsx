@@ -90,7 +90,8 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
         {tab === "chat"
           ? directThreadId
             ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4 @max-3xl/page:px-2">
-                <ThreadChat key={directThreadId} threadId={directThreadId} variant="full" layout="contained" className="min-h-0 flex-1" />
+                {/* "inherit": send with the DM thread's own permission, which trust set, not the composer's default. */}
+                <ThreadChat key={directThreadId} threadId={directThreadId} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" />
               </div>
             : <div className="mx-auto max-w-3xl px-10 py-10 text-sm text-muted-foreground @max-3xl/page:px-4">
                 <div className="flex items-center gap-3">

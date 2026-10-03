@@ -5,7 +5,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { Icon } from "@bb-studio/kit/app";
 import { openOffice } from "./routes";
 import { requestCount, setCurrentSpaceId, useInboxCounts, useSpaces, type Space } from "./model";
-import { COUNT, COUNT_HOT, MENU, MENU_ITEM, MENU_SEPARATOR, cn } from "./styles";
+import { COUNT, COUNT_HOT, MENU, MENU_ITEM, MENU_SEPARATOR, cn, PORTAL_SCOPE } from "./styles";
 
 export interface SwitcherExtra {
   id: string;
@@ -57,7 +57,7 @@ export function SpaceSwitcher({ extras }: { extras: SwitcherExtra[] }) {
         <Icon name="ChevronDown" aria-hidden className="size-3.5 shrink-0 text-subtle-foreground" />
       </Menu.Trigger>
       <Menu.Portal>
-        <Menu.Content align="start" sideOffset={4} className={cn(MENU, "w-[var(--radix-dropdown-menu-trigger-width)] min-w-64")}>
+        <Menu.Content {...PORTAL_SCOPE} align="start" sideOffset={4} className={cn(MENU, "w-[var(--radix-dropdown-menu-trigger-width)] min-w-64")}>
           <Menu.Item className={MENU_ITEM} onSelect={() => openOffice("inbox/all")}>
             <Icon name="studio/inbox" aria-hidden />
             <span className="flex-1">Inbox · All spaces</span>
