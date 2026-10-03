@@ -1,3 +1,5 @@
+import { officeTalk, officeBotDesk } from "./talk";
+import { officeTeamServiceContract } from "./team-service-contract";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type Database from "better-sqlite3";
 import { mkdir } from "node:fs/promises";
@@ -52,8 +54,17 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
   const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
-  const { home: _homeContract, bot_desk: _desk, talk_dm: _dm, talk_list: _talk, ...registeredContract } = officeContract;
+  const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
+    talk_dm: async ({ botId }) => {
+      if (!options.moduleServices?.has("bot-teams")) throw new Error("Teams must finish loading before starting a conversation.");
+      const result = await options.moduleServices.client("bot-teams", officeTeamServiceContract).call("office_dm", { botId }); changed(); return result;
+    },
+    talk_list: ({ spaceId }) => options.moduleServices ? officeTalk(spaceId, options.moduleServices, spaces.office) : { conversations: [] },
+    bot_desk: ({ botId }) => {
+      if (!options.moduleServices) throw new Error("Office modules are unavailable.");
+      return officeBotDesk(botId, options.moduleServices, spaces.office, inbox);
+    },
     delegate: async input => {
       if (!options.moduleServices) throw new Error("Office modules are unavailable.");
       const result = await delegateOffice(input, options.moduleServices, spaces.office, folders, hub); changed(); return result;

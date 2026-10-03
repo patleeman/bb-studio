@@ -1,9 +1,11 @@
+import { officeTeamServiceContract } from "../../office/team-service-contract";
 import { z } from "zod";
 import { rpcContract as botContract } from "./contract";
 import { viewContract, threadViewSchema } from "./view-contract";
 
 /** Public Teams API. Channel execution and transcript APIs are retired. */
 export const rpcContract = {
+  ...officeTeamServiceContract,
   ...viewContract,
   list: { input: z.null(), output: botContract.list.output.omit({ rooms: true, activeRoomIds: true, roomThreads: true, roomWork: true, attentionCounts: true, approvalCounts: true }).extend({ views: z.array(threadViewSchema) }) },
   spaceConversations: { input: z.null(), output: botContract.spaceConversations.output.omit({ channels: true }) },

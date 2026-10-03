@@ -152,6 +152,7 @@ test("Message starts a visible thread with the bot's profile, and earlier ones s
     const hook = x.harness.inspection.registrations.hooks["message.dispatch"]!;
     const earlier = await hook(makeMessageDispatchHookContext({
       thread: { id: first.threadId },
+      requestedExecution: { permissionMode: "accept-edits" },
       origin: "plugin",
       originPluginId: "bot-teams",
     }));

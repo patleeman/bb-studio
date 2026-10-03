@@ -1,3 +1,8 @@
+import { officeTeamHandlers } from "../../office/team-runtime";
+import type Database from "better-sqlite3";
+import { importLegacyAttention, legacyAttentionImported } from "../../office/legacy-attention";
+import { migrateTeamOffice, retireRoomTables } from "../../office/team-migration";
+import { permissionForTrust } from "../../office/trust";
 import { randomUUID } from "node:crypto";
 import { join } from "node:path";
 import { setTimeout as delay } from "node:timers/promises";
@@ -22,9 +27,23 @@ import { registerTeamsCli } from "./teams-cli";
 import { migrateViews } from "./view-migration";
 export { rpcContract } from "./client-contract";
 
-export default async function plugin(bb: BbPluginApi) {
+export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Database) {
   const db = bb.storage.database();
-  bb.storage.migrate(db, MIGRATIONS);
+  // Historical migrations address pre-office table names; the office marker
+  // is the boundary after which new schema changes use office migrations.
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name='office_team_migrations'").get()) bb.storage.migrate(db, MIGRATIONS);
+  const threadProjects = new Map<string, string>();
+  if (!db.prepare("SELECT 1 FROM sqlite_master WHERE name='office_team_migrations'").get()) {
+    for (const row of db.prepare("SELECT json FROM thread_views").all() as { json: string }[]) {
+      for (const member of (JSON.parse(row.json) as { members: {kind:string;id:string}[] }).members) {
+        if (member.kind === "thread" && !threadProjects.has(member.id)) {
+          try { threadProjects.set(member.id, (await bb.sdk.threads.get({ threadId: member.id })).projectId); }
+          catch (error) { if (!missingThread(error)) throw error; }
+        }
+      }
+    }
+  }
+  migrateTeamOffice(db, id => threadProjects.get(id));
   const store = new Store(db), runtime = new Runtime(bb, store);
   const profiles = new ThreadProfiles(bb, store, runtime, id => !store.routingSession(id));
   const views = new ThreadViews(bb, store, profiles);
@@ -62,6 +81,8 @@ export default async function plugin(bb: BbPluginApi) {
       const handle = reserved.has(slug) ? `${slug}-${id.slice(-6)}` : slug;
       const bot: Bot = {
         ...profile,
+        trust: profile.trust ?? "ask",
+        permissionMode: permissionForTrust(profile.trust ?? "ask"),
         id,
         handle,
         home: join(store.root, id),
@@ -207,7 +228,8 @@ export default async function plugin(bb: BbPluginApi) {
       throw new Error(
         "This profile changed elsewhere. Reload the latest profile before saving.",
       );
-    const profile = { ...previous, ...patch };
+    const profile = { ...previous, ...patch, trust: patch.trust ?? previous.trust ?? "ask" };
+    profile.permissionMode = permissionForTrust(profile.trust);
     const bot = {
       ...previous,
       ...profile,
@@ -249,6 +271,7 @@ export default async function plugin(bb: BbPluginApi) {
   };
   const handlers: PluginRpcHandlers<typeof rpcContract> = {
     ...views.handlers(),
+    ...officeTeamHandlers(bb, store, profiles, views),
     createBotSetupThread: async request => ({ threadId: (await bb.sdk.threads.spawn({ ...request, origin: "app", title: "Create a bot" })).id }),
     create: input => create(input),
     usage: ({ id }) => runtime.data.usage(undefined, id),
@@ -414,6 +437,13 @@ export default async function plugin(bb: BbPluginApi) {
   bb.experimental_hooks.on("message.dispatch", context => {
     if (context.thread.status === "pending" && context.initiator === "user" && context.senderThreadId === null && !context.thread.originPluginId)
       profiles.attachPending(context.project.id, context.thread.id);
+    const attached = store.byThread(context.thread.id);
+    if (attached) {
+      const bot = store.get(attached.botId);
+      const expected = permissionForTrust(bot.trust ?? "ask");
+      if (!bot.retired && context.requestedExecution.permissionMode !== expected)
+        return { action: "reject", message: `This bot uses ${bot.trust ?? "ask"} trust. Select ${expected} permissions before sending.` };
+    }
     return { action: "proceed" };
   });
   for (const event of ["thread.created", "thread.active", "thread.idle", "thread.failed", "thread.archived", "thread.unarchived"] as const)
@@ -441,7 +471,16 @@ export default async function plugin(bb: BbPluginApi) {
     let migrationRetryAt = 0;
     while (!signal.aborted) {
       if (Date.now() >= migrationRetryAt) {
-        try { await migrateViews(bb, store, runtime, profiles, views); migrationRetryAt = Date.now() + 60_000; }
+        try {
+          if (!db.prepare("SELECT 1 FROM office_team_migrations WHERE id='retired-rooms-v1'").get()) {
+            await migrateViews(bb, store, runtime, profiles, views);
+            if (coreDatabase) {
+              importLegacyAttention(coreDatabase, db);
+              retireRoomTables(db, ids => legacyAttentionImported(coreDatabase, db, ids));
+            }
+          }
+          migrationRetryAt = Date.now() + 60_000;
+        }
         catch (cause) { migrationRetryAt = Date.now() + 60_000; bb.log.warn(`View migration will retry: ${String(cause)}`); }
       }
       try { await recoverApprovedBotCreates(signal); await runtime.tickMissions(); }
@@ -452,4 +491,4 @@ export default async function plugin(bb: BbPluginApi) {
   bb.onDispose(() => runtime.dispose());
 }
 
-export async function registerServer(ctx: import("../runtime").ModuleContext) { await plugin(ctx.bb); }
+export async function registerServer(ctx: import("../runtime").ModuleContext) { await plugin(ctx.bb, ctx.coreDatabase); }

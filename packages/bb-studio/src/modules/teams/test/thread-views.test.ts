@@ -113,19 +113,20 @@ test("attachments from the composer reach every recipient and show by name in th
     expect(() => viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: " " })).toThrow("Write a message or attach a file.");
   } finally { await x.close(); }
 });
-test("approval modes pass through per recipient, members ahead of everyone", async () => {
+test("bot trust overrides per-message approval modes", async () => {
   const x = fixture();
   try {
+    x.store.put({ ...x.b, trust: "act" });
     const view = await x.views.create("Modes", [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }]);
     x.harness.inspection.sdk.stub("threads.send", async () => ({ ok: true, delivery: "sent" }));
     const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: "@atlas @scribe go", permissionMode: "accept-edits", memberPermissionModes: [{ member: { kind: "bot", id: x.b.id }, mode: "full" }] });
     await x.views.send(input);
     const sent = x.harness.inspection.sdk.callsTo("threads.send").map(call => (call as [{ threadId: string; permissionMode?: string; executionInputSources?: unknown }])[0]);
-    expect(sent.map(s => [s.threadId, s.permissionMode])).toEqual([["thr_bot_1", "accept-edits"], ["thr_bot_2", "full"]]);
+    expect(sent.map(s => [s.threadId, s.permissionMode])).toEqual([["thr_bot_1", "accept-edits"], ["thr_bot_2", "auto"]]);
     expect(sent[0]?.executionInputSources).toEqual({ permissionMode: "explicit" });
     await x.views.send(viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: "@atlas again" }));
     const last = (x.harness.inspection.sdk.callsTo("threads.send").at(-1) as [{ permissionMode?: string }])[0];
-    expect(last.permissionMode).toBeUndefined();
+    expect(last.permissionMode).toBe("accept-edits");
   } finally { await x.close(); }
 });
 test("views share references, include descendants, and deleting a view leaves threads intact", async () => {
@@ -271,7 +272,7 @@ test.each([false, true])("hidden channel context retains merged fanout grouping 
       return (steer && Number(beforeSeq) > 11 ? [{ type: "turn/input/accepted", seq: 11, data: { clientRequestId: "source_request" } }] : [request]) as never;
     });
     expect((await x.views.page(view.id)).entries.map(entry => [entry.text, entry.groupId])).toEqual([["Check the brief", requestId]]);
-    expect(x.store.db.prepare("SELECT id FROM view_entries WHERE id LIKE 'view:%'").all()).toEqual([]);
+    expect(x.store.db.prepare("SELECT id FROM conversation_entries WHERE id LIKE 'view:%'").all()).toEqual([]);
     text = "Edited in the source";
     expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual([text]);
     deleted = true;

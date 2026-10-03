@@ -32,6 +32,7 @@ test("former direct messages become threads with a profile, listed to be shown o
   conversation("earlier", "history:1", "admin", { archivedAt: 2, originalKey: "admin" });
   conversation("work", "group:room", "group");
   db.exec(MIGRATIONS[profileMigration]!);
+  for (const statement of MIGRATIONS.slice(profileMigration + 1)) db.exec(statement);
   const store = new Store(db);
   expect(store.conversations("bot_0123456789abcdef").map((c) => [c.key, c.archivedAt, c.originalKey])).toEqual([
     ["group:room", undefined, undefined],

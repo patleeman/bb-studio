@@ -205,7 +205,7 @@ test("bot CLI creation waits for explicit owner approval", async () => {
       fallbackModel: "",
       fallbackReasoningLevel: "medium",
       reasoningLevel: "medium",
-      permissionMode: "auto",
+      permissionMode: "accept-edits",
       intervalMinutes: 0,
       mission: "Coordinate the team.",
     });

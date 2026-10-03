@@ -14,6 +14,7 @@ import { ModuleServices } from "./services";
 export interface ModuleContext {
   bb: BbPluginApi;
   services: ModuleServices;
+  coreDatabase?: Database.Database;
 }
 export interface ServerModule {
   name: string;
@@ -127,7 +128,7 @@ export class ModuleRuntime {
       if (this.commands.has(module.legacyPluginId)) throw new Error(`Duplicate module CLI: ${module.name}`);
       this.commands.set(module.legacyPluginId, command);
     } } };
-    await module.registerServer({ bb: api, services: this.services });
+    await module.registerServer({ bb: api, services: this.services, coreDatabase: core });
     this.services.register(module.legacyPluginId, contract, handlers);
     if (contract.studio_describe) await this.provider.add(module.legacyPluginId);
   }

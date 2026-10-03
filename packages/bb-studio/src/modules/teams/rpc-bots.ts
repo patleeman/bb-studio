@@ -41,8 +41,8 @@ export function botHandlers(
       runtime.locked(id, async () => ({ queued: runtime.wake(store.get(id)) })),
     conversation: ({ id }) =>
       runtime.locked(id, () => profiles.latestThread(store.get(id))),
-    newConversation: ({ id }) =>
-      runtime.locked(id, () => profiles.newThread(store.get(id))),
+    newConversation: ({ id, projectId }) =>
+      runtime.locked(id, () => profiles.newThread(store.get(id), projectId)),
     handoffSource: async ({ threadId }) => {
       const thread = await bb.sdk.threads.get({ threadId });
       return {

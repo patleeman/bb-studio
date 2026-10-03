@@ -16,7 +16,7 @@ async function setup() {
         },
       },
       threads: {
-        get: async ({ threadId }) => makeThreadResponse({ id: threadId, status: "idle", archivedAt: archived.has(threadId) ? 1 : null }),
+        get: async ({ threadId }) => makeThreadResponse({ id: threadId, projectId: "proj_test", status: "idle", archivedAt: archived.has(threadId) ? 1 : null }),
         send: async () => ({} as never),
         interactions: { list: async () => [] },
       },

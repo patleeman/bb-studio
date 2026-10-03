@@ -63,6 +63,7 @@ test("a profile picked in the new-thread composer attaches with the first messag
     const first = (threadId: string, projectId = "proj_app") => hook(makeMessageDispatchHookContext({
       thread: { id: threadId, status: "pending", originPluginId: null },
       project: { id: projectId },
+      requestedExecution: { permissionMode: "accept-edits" },
       initiator: "user",
       senderThreadId: null,
       origin: "app",
@@ -100,4 +101,15 @@ test("an archived bot's threads keep working without its profile", async () => {
   } finally {
     await x.close();
   }
+});
+
+test("dispatch rejects permissions above an attached bot's trust", async () => {
+  const x = setup(); await plugin(x.bb);
+  try {
+    await x.harness.behavior.callRpc("setThreadProfile", { threadId: "thr_work", botId: x.a.id });
+    const hook = x.harness.inspection.registrations.hooks["message.dispatch"]!;
+    const context = (permissionMode: "auto" | "accept-edits") => makeMessageDispatchHookContext({ thread: { id: "thr_work" }, requestedExecution: { permissionMode } });
+    assert.equal((await hook(context("auto"))).action, "reject");
+    assert.equal((await hook(context("accept-edits"))).action, "proceed");
+  } finally { await x.close(); }
 });

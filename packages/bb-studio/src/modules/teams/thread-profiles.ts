@@ -94,8 +94,8 @@ export class ThreadProfiles {
   }
 
   /** A new empty thread with this profile, in the bot's own project. */
-  async newThread(bot: Bot) {
-    const conversation = await this.runtime.conversation(bot, `thread:${randomUUID()}`, "admin", bot.name);
+  async newThread(bot: Bot, projectId?: string) {
+    const conversation = await this.runtime.conversation(bot, `thread:${randomUUID()}`, "admin", bot.name, undefined, [], undefined, projectId);
     this.runtime.changed("bots", bot.id);
     return conversation;
   }

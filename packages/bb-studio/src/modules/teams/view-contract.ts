@@ -6,6 +6,7 @@ export const viewMemberSchema = z.discriminatedUnion("kind", [
 ]);
 export const threadViewSchema = z.object({
   id: z.string().uuid(), name: z.string().trim().min(1).max(80),
+  projectId: z.string().optional(),
   members: z.array(viewMemberSchema).max(32), archived: z.boolean().default(false),
   createdAt: z.number(), updatedAt: z.number(),
 });

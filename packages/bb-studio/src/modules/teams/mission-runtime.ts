@@ -1,3 +1,4 @@
+import { permissionForTrust } from "../../office/trust";
 import { randomUUID } from "node:crypto";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Attachment, Bot, Conversation, Job, PermissionMode } from "./contract";
@@ -25,7 +26,7 @@ readonly onChanged = new Set<() => void>();
 readonly data: ChannelData;
 constructor(readonly bb: BbPluginApi, readonly store: Store) { this.data = new ChannelData(store); }
 changed(scope: "all"|"bots"|"channel"="all", id?:string) { publishChange(this.bb,scope,id); for(const fn of this.onChanged) fn(); }
-permissionMode(bot: Bot, _roomId?: string | null): Promise<PermissionMode> { return Promise.resolve(bot.permissionMode); }
+permissionMode(bot: Bot, _roomId?: string | null): Promise<PermissionMode> { return Promise.resolve(permissionForTrust(bot.trust ?? "ask")); }
 async locked<T>(id: string, work: () => Promise<T>): Promise<T> {
     const next = (this.locks.get(id) ?? Promise.resolve())
       .catch(() => {})
@@ -45,6 +46,7 @@ async conversation(
     prompt?: string,
     attachments: Attachment[] = [],
     permissionMode?: PermissionMode,
+    projectId?: string,
   ): Promise<Conversation> {
     if (bot.retired) throw new Error("Restore this bot before starting work.");
     const existing = this.store
@@ -52,12 +54,14 @@ async conversation(
       .find((c) => c.key === key);
     if (existing) return existing;
     const emptyDirectMessage = kind === "admin" && !prompt && !attachments.length;
+    const project = projectId ? await this.bb.sdk.projects.get({ projectId }) : null;
+    const source = project?.sources.find(source => source.isDefault) ?? project?.sources[0];
     const thread = await this.bb.sdk.threads.spawn({
-      projectId: bot.projectId,
+      projectId: projectId ?? bot.projectId,
       environment: {
         type: "host",
-        hostId: bot.hostId,
-        workspace: { type: "personal" },
+        hostId: source?.hostId ?? bot.hostId,
+        workspace: source?.path ? { type: "unmanaged", path: source.path } : { type: "personal" },
       },
       input: emptyDirectMessage ? [{
         type: "text",
@@ -86,7 +90,7 @@ async conversation(
         title: kind === "group" ? `${bot.name} work · #${title}` : `${bot.name} · ${title}`,
       }),
       // A thread with a profile is an ordinary thread; bot work stays hidden.
-      visibility: "visible",
+      visibility: projectId || kind !== "admin" ? "hidden" : "visible",
       providerId: bot.providerId,
       ...(bot.model ? { model: bot.model } : {}),
       reasoningLevel: bot.reasoningLevel,
@@ -95,7 +99,7 @@ async conversation(
         ...(bot.model ? { model: "explicit" as const } : {}),
         reasoningLevel: "explicit",
       },
-      permissionMode: permissionMode ?? bot.permissionMode,
+      permissionMode: permissionForTrust(bot.trust ?? "ask"),
       pluginMetadata: { botId: bot.id, conversationKey: key },
     });
     if (emptyDirectMessage) {

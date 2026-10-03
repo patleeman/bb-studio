@@ -618,7 +618,7 @@ export default async function plugin(bb: BbPluginApi) {
         else {
           try {
             const thread = await bb.sdk.threads.get({ threadId });
-            if (thread.deletedAt !== null || thread.archivedAt !== null) threadId = undefined;
+            if (thread.deletedAt !== null || thread.archivedAt !== null || thread.projectId !== (task.project_id ?? "proj_personal")) threadId = undefined;
           } catch { threadId = undefined; }
         }
       }

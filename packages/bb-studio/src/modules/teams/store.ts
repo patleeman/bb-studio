@@ -1,3 +1,5 @@
+import { migrateTeamOffice } from "../../office/team-migration";
+import { permissionForTrust } from "../../office/trust";
 import { createHash, randomBytes, randomUUID } from "node:crypto";
 import { mkdir, readFile, writeFile, rename, lstat } from "node:fs/promises";
 import { dirname, join } from "node:path";
@@ -18,6 +20,7 @@ export class Store {
   readonly root: string;
   readonly attention: AttentionStore;
   constructor(readonly db: Database.Database) {
+    migrateTeamOffice(db, () => undefined);
     this.root = join(dirname(db.name), "homes");
 
     this.attention = new AttentionStore(this);
@@ -76,17 +79,18 @@ export class Store {
     return row ? JSON.parse(row.json) : null;
   }
   put(bot: Bot) {
+    bot = { ...bot, trust: bot.trust ?? "ask", permissionMode: permissionForTrust(bot.trust ?? "ask") };
     this.db
       .prepare(
-        "INSERT INTO bots VALUES (?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json",
+        "INSERT INTO bots(id,json,trust) VALUES (?,?,?) ON CONFLICT(id) DO UPDATE SET json=excluded.json,trust=excluded.trust",
       )
-      .run(bot.id, JSON.stringify(bot));
+      .run(bot.id, JSON.stringify(bot), bot.trust);
   }
   conversations(id: string): Conversation[] {
     return (
       this.db
         .prepare(
-          "SELECT json FROM conversations WHERE bot_id=? ORDER BY rowid DESC",
+          "SELECT json FROM bot_threads WHERE bot_id=? ORDER BY rowid DESC",
         )
         .all(id) as { json: string }[]
     ).map((r) => JSON.parse(r.json));
@@ -94,13 +98,13 @@ export class Store {
   /** Every thread working as a bot, with the bot. */
   threadBots(): { threadId: string; botId: string }[] {
     return this.db
-      .prepare("SELECT thread_id AS threadId, bot_id AS botId FROM conversations WHERE json_extract(json,'$.kind')='admin'")
+      .prepare("SELECT thread_id AS threadId, bot_id AS botId FROM bot_threads WHERE json_extract(json,'$.kind')='admin'")
       .all() as { threadId: string; botId: string }[];
   }
   /** The bot's most recently attached thread. */
   currentDirectConversation(botId: string): Conversation | null {
     const row = this.db
-      .prepare("SELECT json FROM conversations WHERE bot_id=? AND json_extract(json,'$.kind')='admin' ORDER BY rowid DESC LIMIT 1")
+      .prepare("SELECT json FROM bot_threads WHERE bot_id=? AND json_extract(json,'$.kind')='admin' ORDER BY rowid DESC LIMIT 1")
       .get(botId) as { json: string } | undefined;
     return row ? JSON.parse(row.json) : null;
   }
@@ -113,7 +117,7 @@ export class Store {
   }
   activeGroupThreadRooms(): { threadId: string; roomId: string }[] {
     const rows = this.db.prepare(
-      "SELECT key,thread_id FROM conversations WHERE key LIKE 'group:%'",
+      "SELECT key,thread_id FROM bot_threads WHERE key LIKE 'group:%'",
     ).all() as { key: string; thread_id: string }[];
     return rows.map(({ key, thread_id }) => ({
       threadId: thread_id,
@@ -125,20 +129,20 @@ export class Store {
     return (
       this.db
         .prepare(
-          "SELECT json FROM conversations WHERE json_extract(json,'$.key')=? ORDER BY rowid",
+          "SELECT json FROM bot_threads WHERE json_extract(json,'$.key')=? ORDER BY rowid",
         )
         .all(`group:${roomId}`) as { json: string }[]
     ).map((r) => JSON.parse(r.json));
   }
   byThread(id: string): Conversation | null {
     const row = this.db
-      .prepare("SELECT json FROM conversations WHERE thread_id=?")
+      .prepare("SELECT json FROM bot_threads WHERE thread_id=?")
       .get(id) as { json: string } | undefined;
     return row ? JSON.parse(row.json) : null;
   }
   putConversation(c: Conversation) {
     this.db
-      .prepare("INSERT INTO conversations VALUES (?,?,?,?,?)")
+      .prepare("INSERT INTO bot_threads VALUES (?,?,?,?,?)")
       .run(c.id, c.botId, c.key, c.threadId, JSON.stringify(c));
   }
   archiveConversation(c: Conversation, archivedAt = Date.now()) {
@@ -149,12 +153,12 @@ export class Store {
       originalKey: c.key,
       archivedAt,
     };
-    this.db.prepare("UPDATE conversations SET key=?,json=? WHERE id=?")
+    this.db.prepare("UPDATE bot_threads SET key=?,json=? WHERE id=?")
       .run(archived.key, JSON.stringify(archived), c.id);
     return archived;
   }
   restoreConversation(c: Conversation) {
-    this.db.prepare("UPDATE conversations SET key=?,json=? WHERE id=?")
+    this.db.prepare("UPDATE bot_threads SET key=?,json=? WHERE id=?")
       .run(c.key, JSON.stringify(c), c.id);
   }
   putBotCreateRequest(request: BotCreateRequest) {
@@ -293,7 +297,7 @@ export class Store {
   }
   deleteConversation(threadId: string) {
     this.db
-      .prepare("DELETE FROM conversations WHERE thread_id=?")
+      .prepare("DELETE FROM bot_threads WHERE thread_id=?")
       .run(threadId);
   }
   jobs(id: string, limit = 100): Job[] {
@@ -474,7 +478,7 @@ export class Store {
         .prepare("DELETE FROM jobs WHERE json_extract(json,'$.roomId')=?")
         .run(id);
       this.db
-        .prepare("DELETE FROM conversations WHERE key=? OR substr(key,1,?)=?")
+        .prepare("DELETE FROM bot_threads WHERE key=? OR substr(key,1,?)=?")
         .run(`group:${id}`, `group:${id}:`.length, `group:${id}:`);
       this.db.prepare("DELETE FROM room_runs WHERE room_id=?").run(id);
       this.db.prepare("DELETE FROM channel_attention WHERE room_id=?").run(id);

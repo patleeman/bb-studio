@@ -9,6 +9,7 @@ export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
 export const profileInput = z.object({
+  trust: z.enum(["ask", "act"]).optional(),
   limits: usageLimits.optional(),
   name: z.string().trim().min(1).max(80),
   description: z.string().max(500).default(""),
@@ -32,7 +33,7 @@ export const profileInput = z.object({
       "ultracode",
     ])
     .default("medium"),
-  permissionMode: permissionModeSchema.default("auto"),
+  permissionMode: permissionModeSchema.default("accept-edits"),
   intervalMinutes: z
     .number()
     .int()
@@ -126,6 +127,7 @@ export const botCreateRequestViewSchema = z.object({
 export type BotCreateRequestView = z.infer<typeof botCreateRequestViewSchema>;
 // Creation defaults must never reset fields omitted from a partial update.
 const profilePatch = z.object({
+  trust: profileInput.shape.trust,
   limits: usageLimits.optional(),
   name: profileInput.shape.name.optional(),
   description: profileInput.shape.description.removeDefault().optional(),
@@ -501,7 +503,7 @@ export const rpcContract = {
     output: conversationSchema,
   },
   newConversation: {
-    input: z.object({ id: idSchema }),
+    input: z.object({ id: idSchema, projectId: z.string().min(1).optional() }),
     output: conversationSchema,
   },
   // Threads with a profile: the composer's profile picker and the bot page.
