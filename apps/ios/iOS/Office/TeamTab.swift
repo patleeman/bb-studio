@@ -265,7 +265,7 @@ struct BotDeskView: View {
     @ViewBuilder
     private func chat(_ desk: OfficeBotDesk) -> some View {
         if let threadId = desk.directThreadId {
-            ThreadView(threadId: threadId).id(threadId)
+            ThreadView(threadId: threadId, title: desk.bot.name).id(threadId)
         } else {
             VStack(spacing: 12) {
                 Text("You haven't talked with \(desk.bot.name) directly yet.").foregroundStyle(.secondary)

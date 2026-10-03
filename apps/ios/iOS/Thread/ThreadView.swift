@@ -56,7 +56,11 @@ struct ThreadView: View {
 
     private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("studio") }
 
-    init(threadId: String) {
+    /// Shown instead of the thread's own title, e.g. a bot's name on its desk.
+    private let titleOverride: String?
+
+    init(threadId: String, title: String? = nil) {
+        titleOverride = title
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
         _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
@@ -269,7 +273,7 @@ struct ThreadView: View {
             app.path.append(.thread(id: id))
             return .handled
         })
-        .navigationTitle(model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
+        .navigationTitle(titleOverride ?? model.thread.map { ThreadTitles.resolve($0.displayTitle) } ?? "Thread")
         .navigationBarTitleDisplayMode(.inline)
         .toolbar(sizeClass == .compact ? .hidden : .automatic, for: .tabBar)
         .toolbar {
