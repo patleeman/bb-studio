@@ -1,5 +1,6 @@
 import SwiftUI
 import UIKit
+import UniformTypeIdentifiers
 
 /// The office as tabs, like the web sidebar (docs/office-tabs.md): Essentials
 /// as big tiles, then Pinned (with folders) and Today. Search finds anything
@@ -92,6 +93,8 @@ private struct TabsList: View {
                 let loose = store.pinned.filter { $0.folderId == nil }
                 Section {
                     ForEach(loose) { tab in TabRow(store: store, tab: tab) }
+                        .onMove { from, to in Task { await store.reorder(loose, from: from, to: to, zone: .pinned) } }
+                        .onInsert(of: [.plainText]) { index, providers in store.insert(providers, at: index, zone: .pinned) }
                     ForEach(store.folders.sorted { $0.position < $1.position }) { folder in
                         FolderRows(store: store, folder: folder)
                     }
@@ -102,6 +105,8 @@ private struct TabsList: View {
                 }
                 Section {
                     ForEach(store.today) { tab in TabRow(store: store, tab: tab) }
+                        .onMove { from, to in Task { await store.reorder(store.today, from: from, to: to, zone: .today) } }
+                        .onInsert(of: [.plainText]) { index, providers in store.insert(providers, at: index, zone: .today) }
                     if store.today.isEmpty, !store.isLoading {
                         Text("What you open shows up here, and is archived after a few days.")
                             .font(.subheadline)
@@ -169,6 +174,22 @@ private struct TabsList: View {
 }
 
 extension TabsStore {
+    /// A List move within one section. `to` is SwiftUI's insertion point in
+    /// the original order; the server wants the index among the others.
+    func reorder(_ list: [OfficeTab], from: IndexSet, to: Int, zone: OfficeTabZone, folderId: String? = nil) async {
+        guard let at = from.first, list.indices.contains(at) else { return }
+        await move(list[at].ref, to: zone, folderId: folderId, index: to > at ? to - 1 : to)
+    }
+
+    /// A tab dropped into a section from another one.
+    func insert(_ providers: [NSItemProvider], at index: Int, zone: OfficeTabZone, folderId: String? = nil) {
+        guard let provider = providers.first else { return }
+        _ = provider.loadObject(ofClass: NSString.self) { object, _ in
+            guard let ref = object as? String else { return }
+            Task { @MainActor in await self.move(ref, to: zone, folderId: folderId, index: index) }
+        }
+    }
+
     /// Makes a Pinned folder and files a tab in it, like "New Folder…" on the web.
     func createFolder(name: String, filing ref: String) async {
         await createFolder(name: name)
@@ -312,7 +333,10 @@ private struct EssentialTile: View {
                 }
             }
             .accessibilityElement(children: .ignore)
-            .accessibilityLabel([title, tab.badge.flatMap { $0 > 0 ? "\($0) waiting" : nil }, tab.needsYou == true ? "needs you" : nil, tab.unread == true ? "unread" : nil]
+            .accessibilityLabel([title, tab.badge.flatMap { $0 > 0 ? "\($0) waiting" : nil },
+                tab.providerId.flatMap { ["hermes": "Hermes", "openclaw": "OpenClaw", "dot": "Dot"][$0] }.map { "\($0) agent" },
+                tab.needsYou == true || tab.botState == .needsYou ? "needs you" : nil,
+                tab.botState == .working ? "working" : nil, tab.unread == true ? "unread" : nil]
                 .compactMap { $0 }.joined(separator: ", "))
             .accessibilityAddTraits(.isButton)
             .accessibilityShowsLargeContentViewer { Text(title) }
@@ -386,12 +410,9 @@ private struct TabRow: View {
             .contentShape(Rectangle())
         }
         .accessibilityIdentifier("officeTab")
-        .draggable(tab.ref) { TabDragPreview(tab: tab, title: title) }
-        .dropDestination(for: String.self) { refs, _ in
-            guard let ref = refs.first, ref != tab.ref else { return false }
-            Task { await store.drop(ref, zone: tab.zone, folderId: tab.folderId, before: tab.ref) }
-            return true
-        }
+        // List rows reorder through the List itself (onMove/onInsert on each
+        // section); SwiftUI's generic drop targets on rows never fired here.
+        .onDrag { NSItemProvider(object: tab.ref as NSString) } preview: { TabDragPreview(tab: tab, title: title) }
         .swipeActions(edge: .trailing) {
             Button { Task { await store.archive(tab.ref) } } label: { Label("Close", systemImage: "xmark") }
                 .tint(.gray)
@@ -462,7 +483,10 @@ private struct FolderRows: View {
 
     var body: some View {
         DisclosureGroup(isExpanded: Binding(get: { folder.open }, set: { open in Task { await store.setFolderOpen(folder.id, open) } })) {
-            ForEach(store.pinned.filter { $0.folderId == folder.id }) { tab in TabRow(store: store, tab: tab) }
+            let inside = store.pinned.filter { $0.folderId == folder.id }
+            ForEach(inside) { tab in TabRow(store: store, tab: tab) }
+                .onMove { from, to in Task { await store.reorder(inside, from: from, to: to, zone: .pinned, folderId: folder.id) } }
+                .onInsert(of: [.plainText]) { index, providers in store.insert(providers, at: index, zone: .pinned, folderId: folder.id) }
         } label: {
             Label(folder.name, systemImage: "folder").fontWeight(.medium)
                 .frame(maxWidth: .infinity, alignment: .leading)
