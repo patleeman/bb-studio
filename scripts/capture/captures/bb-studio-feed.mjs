@@ -1,3 +1,5 @@
+import companions from "./feed-companions.mjs";
+
 // Studio Feed's reader, seeded with posts through `bb feed post`: a commute
 // story with two earlier updates, an urgent alert, and posts with and
 // without pictures, and a launch post that links a checklist page. Two are
@@ -39,6 +41,7 @@ const CHECKLIST = [
 ].join("\n");
 
 export default ({ bbCli, sleep, pluginRpc, projectId }) => [
+  ...(process.env.BB_CAPTURE_FEED_COMPANIONS === "1" ? [companions({ bbCli, sleep, pluginRpc, projectId, threadId: process.env.BB_CAPTURE_THREAD_ID })] : []),
   {
     id: "feed",
     packageDir: "bb-studio-feed",
