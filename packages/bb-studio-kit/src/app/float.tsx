@@ -11,6 +11,8 @@ import {
   floatBodies,
   mainBodies,
   publishMainBody,
+  floatTransfers,
+  requestFloatTransfer,
   type FloatAnchor,
   type MainAnchor,
   floatDock,
@@ -32,6 +34,7 @@ function useFloatRevision(): number {
 export function openFloat(target: FloatTarget, options?: FloatOpenOptions): boolean {
   const host = floatHost();
   if (!host) return false;
+  if (!options?.minimized && target.kind === "path") requestFloatTransfer(target);
   host.open(target, options);
   return true;
 }
@@ -107,7 +110,7 @@ type PanelView = {
 };
 const viewPath = (path: string) => path.split(/[?#]/)[0]!.replace(/\/$/, "");
 
-function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAnchor[]): PanelView[] {
+function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAnchor[], transfers: FloatTarget[]): PanelView[] {
   const next: PanelView[] = [];
   const used = new Set<string>();
   const take = (view: PanelView) => { used.add(view.id); next.push(view); };
@@ -119,10 +122,16 @@ function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAn
     const main = candidates.find(main => main.element.contains(document.activeElement))
       ?? candidates.sort((a, b) => (b.focusOrder ?? 0) - (a.focusOrder ?? 0))[0];
     const existing = previous.find(view => same(view) && view.windowKey === anchor.windowKey)
-      ?? previous.find(view => same(view) && view.mainId === main?.id);
+      ?? previous.find(view => same(view) && view.mainId === main?.id)
+      ?? (!main ? previous.find(view => same(view) && view.windowKey === undefined) : undefined);
     take({ id: existing?.id ?? (main ? `main:${main.id}:${viewPath(target.path)}` : `float:${anchor.windowKey}:${viewPath(target.path)}`), target,
       mainId: candidates.some(candidate => candidate.id === existing?.mainId) ? existing?.mainId : main?.id,
       windowKey: anchor.windowKey, element: anchor.element, placement: anchor.placement });
+  }
+  for (const target of transfers) {
+    if (target.kind !== "path" || next.some(view => viewPath(view.target.path) === viewPath(target.path)) || mains.some(main => viewPath(main.target.path) === viewPath(target.path))) continue;
+    const existing = previous.find(view => !used.has(view.id) && viewPath(view.target.path) === viewPath(target.path));
+    if (existing) take(existing);
   }
   for (const main of mains) {
     if (next.some(view => view.mainId === main.id && viewPath(view.target.path) === viewPath(main.target.path))) continue;
@@ -171,7 +180,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
   const mains = mainBodies().filter(anchor => matches(anchor.target));
   const [snapshot, setSnapshot] = useState<{ revision: number; pluginId: string; path: string; views: PanelView[] }>({ revision: -1, pluginId, path, views: [] });
   const views = snapshot.revision === revision && snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views
-    : placePanels(snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views : [], mains, floatBodies().filter(anchor => matches(anchor.target)));
+    : placePanels(snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views : [], mains, floatBodies().filter(anchor => matches(anchor.target)), floatTransfers().filter(matches));
   if (views !== snapshot.views) setSnapshot({ revision, pluginId, path, views });
   useLayoutEffect(() => {
     mains.forEach(main => main.setMoved(views.some(view => view.mainId === main.id && viewPath(view.target.path) === viewPath(main.target.path) && view.windowKey !== undefined)));

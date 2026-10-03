@@ -63,6 +63,7 @@ interface Registry {
   anchors: Map<string, FloatAnchor>;
   main?: Map<string, MainAnchor>;
   focusOrder?: number;
+  transfers?: Map<string, { target: FloatTarget; timer: ReturnType<typeof setTimeout> }>;
   /** Room above each thread window's messages, by window key. */
   leading: Map<string, FloatAnchor>;
   /** The dock's own corner, right of the windows. */
@@ -98,6 +99,10 @@ export const floatWindowKey = (target: FloatTarget): string =>
 
 export function setFloatHost(host: FloatHost | null): void {
   registry().host = host;
+  if (!host) {
+    registry().transfers?.forEach(entry => clearTimeout(entry.timer));
+    registry().transfers?.clear();
+  }
   changed();
 }
 
@@ -119,6 +124,24 @@ export function publishMainBody(anchor: MainAnchor): () => void {
 }
 
 export const mainBodies = (): MainAnchor[] => [...(registry().main?.values() ?? [])];
+
+/** Keeps a main owner alive while its opener changes route before the body mounts. */
+export function requestFloatTransfer(target: FloatTarget): void {
+  if (registry().anchors.has(floatWindowKey(target))) return;
+  const transfers = registry().transfers ??= new Map();
+  const key = floatWindowKey(target);
+  const current = transfers.get(key);
+  if (current) clearTimeout(current.timer);
+  const entry = { target, timer: setTimeout(() => {
+    if (transfers.get(key) !== entry) return;
+    transfers.delete(key);
+    changed();
+  }, 30_000) };
+  transfers.set(key, entry);
+  changed();
+}
+
+export const floatTransfers = (): FloatTarget[] => [...(registry().transfers?.values() ?? [])].map(entry => entry.target);
 
 /** The attribute on a floating tab's body naming its window key. */
 export const FLOAT_WINDOW_ATTRIBUTE = "data-float-window";
@@ -146,7 +169,15 @@ function publish(map: Map<string, FloatAnchor>, anchor: FloatAnchor | { windowKe
   changed();
 }
 
-export const publishFloatBody = (anchor: FloatAnchor | { windowKey: string; element: null }) => publish(registry().anchors, anchor);
+export function publishFloatBody(anchor: FloatAnchor | { windowKey: string; element: null }): void {
+  const key = anchor.element ? floatWindowKey(anchor.target) : anchor.windowKey;
+  const transfer = registry().transfers?.get(key);
+  if (transfer) {
+    clearTimeout(transfer.timer);
+    registry().transfers!.delete(key);
+  }
+  publish(registry().anchors, anchor);
+}
 export const publishFloatLeading = (anchor: FloatAnchor | { windowKey: string; element: null }) => publish(registry().leading, anchor);
 
 export function publishFloatDock(element: HTMLElement | null): void {

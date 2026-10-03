@@ -2,7 +2,7 @@
 import React, { act, useEffect, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
-import { FloatPanels, retainPanel, useCompanionNavigate, useInFloat } from "./float";
+import { FloatPanels, openFloat, retainPanel, useCompanionNavigate, useInFloat } from "./float";
 import { publishFloatBody, setFloatHost } from "./float-registry";
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages" }));
@@ -156,5 +156,23 @@ it("renders usable main content when there is no overlay, and disposes it after 
   expect(main.host.querySelector("textarea")!.value).toBe("Available without Float");
   act(() => main.root.render(null));
   expect(dispose).toHaveBeenCalledTimes(1);
+  expect(document.querySelector("textarea")).toBeNull();
+});
+
+it("keeps the original editor alive when Float this leaves the main route before its companion body registers", () => {
+  let mounts = 0;
+  function Editor() { useEffect(() => { mounts += 1; }, []); return <textarea defaultValue="Header move draft" />; }
+  const Main = retainPanel("pages", Editor);
+  act(() => setFloatHost({ open: () => {} }));
+  mount(<FloatPanels path="pages" render={() => <Editor />} />);
+  const main = mount(<Main subPath="one" />);
+  const input = main.host.querySelector("textarea")!;
+  act(() => openFloat(target));
+  act(() => main.root.render(null));
+  const body = floatBody();
+  expect(body.querySelector("textarea")).toBe(input);
+  expect(input.value).toBe("Header move draft");
+  expect(mounts).toBe(1);
+  act(() => publishFloatBody({ windowKey: "one", element: null }));
   expect(document.querySelector("textarea")).toBeNull();
 });
