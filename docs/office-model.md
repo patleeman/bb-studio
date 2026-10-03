@@ -63,6 +63,30 @@ packages/bb-studio/
 Each module exports `registerServer(ctx)` and `registerApp(app)`. Modules call each
 other through in-process service objects, not plugin RPC.
 
+### Compatibility decision (stable SDK 0.5.29 has no plugin-id aliases)
+
+A plugin gets one CLI namespace, and routes and mention resolution are scoped to
+the owning plugin, so core cannot answer for old plugin ids. Decision: **no shim
+plugins.** Keep what the SDK allows, migrate what we own, and accept the rest:
+
+- **Kept**: agent tool names and schemas (they are plain strings), message
+  directives, all data.
+- **Migrated**: every stored ref and href Studio-side code owns is rewritten
+  once from the old plugin id to `studio` (`item:artifacts:art_…` →
+  `item:studio:art_…`, `/plugins/artifacts/artifacts/…` →
+  `/plugins/studio/…`). This covers Studio links, comments, activity, feed
+  posts, task links, Teams data, and Pages markdown (the pages plugin runs the
+  same rewrite in its own migration). Idempotent, logged, counted.
+- **Moved**: CLI commands move under `bb studio <old-id> …` (for example
+  `bb studio feed post`). Update every skill, agent instruction string, README
+  and doc that names an old command in the same change.
+- **Accepted loss**: refs and links inside past BB thread transcripts (core
+  data) and external bookmarks stop resolving. Studio's own resolver
+  (`parseItemReference`, quick open, search) still accepts old prefixes so a
+  pasted old ref works inside Studio.
+
+The rules below apply with these exceptions.
+
 ### Compatibility rules (must hold for every merge step)
 
 - **Data**: each module keeps its own SQLite file inside core's data dir
