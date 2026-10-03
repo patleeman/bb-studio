@@ -1,0 +1,30 @@
+{
+  "source": {
+    "commit_hash": "f04ab51b4efd77ceae7669b54f4993e98514e65e",
+    "enabled": 1,
+    "artifact_hash": "sha256:c52eb824bad8681d4e0089c38e3fb28f1de09a2b8a3ee129ddb953736e992858",
+    "resolvedCommit": "f04ab51b4efd77ceae7669b54f4993e98514e65e"
+  },
+  "expectRecovery": false,
+  "limits": [
+    "Owned staged BB page and Chrome session; blocked requests affect only this browser.",
+    "Title metadata recovery is separate from Yjs body recovery.",
+    "390px viewport emulation is not physical iOS or VoiceOver."
+  ],
+  "failedRequest": {
+    "displayedTitle": "Offline title draft",
+    "serverTitle": "Title recovery baseline",
+    "bodyText": "Content saved to BB\n\nTitle recovery fixture body.\n\nStudio\nChat"
+  },
+  "reload": {
+    "oldOrigin": 1791011791686.9,
+    "newOrigin": 1791011794141,
+    "displayedTitle": "Title recovery baseline",
+    "serverTitle": "Title recovery baseline"
+  },
+  "reproducedLoss": true,
+  "cleanup": {
+    "ownedPageRemoved": true,
+    "ownedBrowserClosed": true
+  }
+}

@@ -220,7 +220,7 @@ try {
     await client.evaluate(`sessionStorage.setItem('qa-pages-fail-read','true')`);
     const previousDocument = await client.evaluate('performance.timeOrigin');
     await client.command('Page.reload');
-    await wait(`performance.timeOrigin!==${previousDocument}&&document.body.innerText.includes('Could not read local recovery')`);
+    await wait(`performance.timeOrigin!==${previousDocument}&&document.body.innerText.includes('Could not read local content recovery')`);
     await client.evaluate(`sessionStorage.setItem('qa-pages-fail-read','false')`);
     await client.clickElementWithTextAndPointer('button', 'Retry reading recovery');
     await client.waitForText('A local recovery copy is available.');

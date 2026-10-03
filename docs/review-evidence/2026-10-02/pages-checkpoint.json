@@ -1,0 +1,30 @@
+{
+  "pagesSource": "af91530fc66645a3d59f6e961eac57b22c1a4d53",
+  "suite": {
+    "command": "pnpm check",
+    "exitCode": 0,
+    "testsPassed": 1641,
+    "testPackages": 18,
+    "packageTypechecksPassed": 18,
+    "pagesTests": 131,
+    "kitTests": 106,
+    "teamsTests": 121,
+    "stableApp": "0.45.0",
+    "stableSdk": "0.6.15",
+    "nativeRpcCallSites": 147,
+    "nativePayloadFixtures": 11,
+    "gatesPassed": ["types", "tests", "stable compatibility", "documentation", "marketplace", "generated contracts", "native payloads", "packed kit"],
+    "localLog": "/tmp/bb-goal-pages-final-check.log"
+  },
+  "concurrentStudioDelta": {
+    "localCommit": "eae39ef",
+    "reason": "Studio Activity/legacy route source arrived while the aggregate ran; its affected package was independently rechecked afterward.",
+    "testsPassed": 134,
+    "typecheck": "passed",
+    "build": "passed",
+    "liveCaptureOwner": "thr_zz2itugr3h"
+  },
+  "browserEvidence": ["pages-durability/verification.json", "page-title-recovery/after/verification.json"],
+  "nativeContractBuild": "page-title-recovery/native-build.json",
+  "goalComplete": false
+}

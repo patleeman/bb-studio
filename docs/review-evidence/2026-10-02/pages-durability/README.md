@@ -5,7 +5,8 @@ two-tab IndexedDB merges, visible server-write failures, explicit retry and
 recovery export. Source `5c6d5e8` implements recovery; `54b829b` enlarges the
 recovery actions to 44px and adds visible keyboard focus. Deleted-page recovery
 reachability and metadata retry are fixed in `f04ab51`; the complete loop was
-rerun against that exact pushed source.
+rerun against that exact pushed source, then repeated at `af91530` after the
+separate title recovery integration.
 
 The [verification record](verification.json) pins the installed Git commit and
 built artifact. The [capture helper](../../../../scripts/capture/verify-pages-durability.mjs)
@@ -42,7 +43,7 @@ pushed Pages source:
 ```sh
 source /tmp/bb-studio-goal-staged/capture.env
 BB_CAPTURE_CDP_PORT=49569 \
-BB_PAGES_DURABILITY_SOURCE=f04ab51b4efd77ceae7669b54f4993e98514e65e \
+BB_PAGES_DURABILITY_SOURCE=af91530fc66645a3d59f6e961eac57b22c1a4d53 \
 BB_CAPTURE_PAGES_DELETED=1 \
 node scripts/capture/verify-pages-durability.mjs
 ```
@@ -54,8 +55,8 @@ physical disk. The quota error is injected, while the recovery and two-tab
 phases use unmodified IndexedDB. The phone viewport is emulated.
 
 The `.yjs` download preserves collaborative structure; it is not a Markdown
-document or a normal UI import workflow. Page title updates have a separate
-recovery gap tracked in the [issue ledger](../../../review-issues.md); passing
-this body-storage check does not close it. The new
+document or a normal UI import workflow. Page title updates now have
+[separate verified recovery](../page-title-recovery/README.md). The
+[issue ledger](../../../review-issues.md) tracks the remaining broader QA. The new
 [deleted-page screen](deleted-page-reloaded-phone.png) describes this export
 format and keeps its download/retry/back actions reachable.

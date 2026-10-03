@@ -1,0 +1,80 @@
+{
+  "source": {
+    "commit_hash": "08fb72de1848096fd40ea1a150159f99d44cd6f1",
+    "enabled": 1,
+    "artifact_hash": "sha256:d00ee7217a09fe670d8b7deccd60c936fa8acaf383cadb9221d42357bcfcdc0c",
+    "resolvedCommit": "08fb72de1848096fd40ea1a150159f99d44cd6f1"
+  },
+  "expectRecovery": true,
+  "limits": [
+    "Owned staged BB page and Chrome session; blocked requests affect only this browser.",
+    "Title metadata recovery is separate from Yjs body recovery.",
+    "390px viewport emulation is not physical iOS or VoiceOver."
+  ],
+  "failedRequest": {
+    "displayedTitle": "Offline title draft",
+    "serverTitle": "Title recovery baseline",
+    "bodyText": "Content saved to BB\n\nTitle save failed. Title draft saved on this browser.\n\nFailed to fetch\n\nRetry title save\nDownload title draft\nDiscard title draft\n\nTitle recovery fixture body.\n\nStudio\nChat"
+  },
+  "reload": {
+    "oldOrigin": 1791012416479.1,
+    "newOrigin": 1791012418941.7,
+    "displayedTitle": "Offline title draft",
+    "serverTitle": "Title recovery baseline"
+  },
+  "retry": {
+    "saved": true
+  },
+  "conflict": {
+    "local": "Local conflict draft",
+    "remote": "Remote title changed",
+    "explicitChoiceSaved": true,
+    "staleCompareRejected": true
+  },
+  "controls": [
+    {
+      "text": "Retry title save",
+      "left": 29,
+      "right": 135.71875,
+      "top": 346.8125,
+      "bottom": 390.8125,
+      "hit": true
+    },
+    {
+      "text": "Use my title",
+      "left": 139.71875,
+      "right": 228.03125,
+      "top": 346.8125,
+      "bottom": 390.8125,
+      "hit": true
+    },
+    {
+      "text": "Download title draft",
+      "left": 29,
+      "right": 165.0625,
+      "top": 394.8125,
+      "bottom": 438.8125,
+      "hit": true
+    },
+    {
+      "text": "Discard title draft",
+      "left": 169.0625,
+      "right": 290.421875,
+      "top": 394.8125,
+      "bottom": 438.8125,
+      "hit": true
+    }
+  ],
+  "export": {
+    "filename": "pg_04a8bdf283d3f5e8-title-recovery.json",
+    "containsLatestDraft": true
+  },
+  "discard": {
+    "restoredSavedTitle": true
+  },
+  "failure": "AssertionError [ERR_ASSERTION]: Successful newer title must not leave this editor’s superseded draft\n\n1 !== 0\n\n    at file:///Users/patrick/workingdir/bb-studio/scripts/capture/verify-page-title-recovery.mjs:153:12",
+  "cleanup": {
+    "ownedPageRemoved": true,
+    "ownedBrowserClosed": true
+  }
+}
