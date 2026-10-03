@@ -63,7 +63,7 @@ describe("apnsPayload", () => {
       apnsPayload({ to: "apns:x", title: "T", body: "B", data: { threadId: "thr_1", kind: "turn-finished" } }),
     );
     expect(payload).toEqual({
-      aps: { alert: { title: "T", body: "B" }, sound: "default", "thread-id": "thr_1", category: "BB_REPLY" },
+      aps: { alert: { title: "T", body: "B" }, sound: "default", "thread-id": "thr_1" },
       threadId: "thr_1",
       kind: "turn-finished",
     });
@@ -81,10 +81,10 @@ describe("notificationCategory", () => {
     expect(notificationCategory({ ...approval, decisions: ["allow_once"] })).toBeUndefined();
   });
 
-  it("uses a reply box for questions, finished turns, and errors", () => {
+  it("uses an answer box for questions and plain alerts for finished turns and errors", () => {
     expect(notificationCategory({ ...approval, interactionKind: "user_question" })).toBe("BB_QUESTION");
-    expect(notificationCategory({ kind: "turn-finished" })).toBe("BB_REPLY");
-    expect(notificationCategory({ kind: "thread-error" })).toBe("BB_REPLY");
+    expect(notificationCategory({ kind: "turn-finished" })).toBeUndefined();
+    expect(notificationCategory({ kind: "thread-error" })).toBeUndefined();
   });
 
   it("leaves unenriched or plugin interactions as plain alerts", () => {
@@ -101,9 +101,12 @@ describe("notificationCategory", () => {
     expect(payload.choices).toEqual(["Red"]);
   });
 
-  it("lands in aps.category", () => {
-    const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { kind: "turn-finished", threadId: "thr_1" } }));
-    expect(payload.aps.category).toBe("BB_REPLY");
+  it.each(["turn-finished", "thread-error"])("keeps %s tappable without notification actions", (kind) => {
+    const payload = JSON.parse(apnsPayload({ to: "apns:x", data: { kind, threadId: "thr_1" } }));
+    expect(payload.aps).not.toHaveProperty("category");
+    expect(payload.aps).not.toHaveProperty("mutable-content");
+    expect(payload.aps["thread-id"]).toBe("thr_1");
+    expect(payload.threadId).toBe("thr_1");
   });
 });
 

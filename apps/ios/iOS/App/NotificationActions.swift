@@ -26,17 +26,12 @@ enum NotificationActions {
             identifier: reply, title: "Answer", options: [.authenticationRequired],
             icon: UNNotificationActionIcon(systemImageName: "text.bubble"), textInputButtonTitle: "Send",
             textInputPlaceholder: "Your answer")
-        let replyAction = UNTextInputNotificationAction(
-            identifier: reply, title: "Reply", options: [.authenticationRequired],
-            icon: UNNotificationActionIcon(systemImageName: "arrowshape.turn.up.left"), textInputButtonTitle: "Send",
-            textInputPlaceholder: "Message BB")
         let fixed: Set = [
             UNNotificationCategory(identifier: "BB_APPROVAL", actions: [approve, deny], intentIdentifiers: []),
             UNNotificationCategory(identifier: "BB_PLAN", actions: [approvePlan, keepPlanning], intentIdentifiers: []),
             UNNotificationCategory(identifier: "BB_QUESTION", actions: [answer], intentIdentifiers: []),
             // The extension swaps in a per-options category; this is the fallback if it doesn't run.
             UNNotificationCategory(identifier: "BB_CHOICE", actions: [answer], intentIdentifiers: []),
-            UNNotificationCategory(identifier: "BB_REPLY", actions: [replyAction], intentIdentifiers: []),
         ]
         // Keep the extension's option categories, or delivered questions lose their buttons.
         let center = UNUserNotificationCenter.current()

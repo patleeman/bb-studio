@@ -8,6 +8,9 @@ APNs and Expo devices. Attachment-only completions use a preview of the attachme
 [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md) for settings and
 wiring.
 
+Finished turns and errors arrive as plain alerts without a Reply field. Tap an
+alert to open the thread. Approval and question notifications keep their actions.
+
 Plugin ID: `mobile`.
 
 ```sh
