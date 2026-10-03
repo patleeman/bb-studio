@@ -26,7 +26,9 @@ function inventory(path: string): Record<string, File> {
 }
 const same = (a: unknown, b: unknown) => JSON.stringify(a) === JSON.stringify(b);
 function protect(path: string) {
-  const stat = lstatSync(path); chmodSync(path, stat.isDirectory() ? 0o700 : 0o600);
+  const stat = lstatSync(path);
+  if (!stat.isDirectory() && !stat.isFile()) throw new Error("Archive contains a symbolic link or special file; sources retained");
+  chmodSync(path, stat.isDirectory() ? 0o700 : 0o600);
   if (stat.isDirectory()) for (const name of readdirSync(path)) protect(join(path, name));
 }
 function flush(path: string) {
