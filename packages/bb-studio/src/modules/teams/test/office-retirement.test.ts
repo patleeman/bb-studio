@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import plugin from "../server";
 import { setup } from "./bots-fixture";
 import { ThreadProfiles } from "../thread-profiles";
-import { ThreadViews } from "../thread-views";
+import { Conversations } from "../conversations";
 import { migrateViews } from "../view-migration";
 import { importLegacyAttention, legacyAttentionImported } from "../../../office/legacy-attention";
 import { retireRoomTables } from "../../../office/team-migration";
@@ -13,7 +13,7 @@ it("boots and serves Talk after archiving legacy rooms and dropping their tables
   const x = setup(), core = new Database(":memory:");
   try {
     const profiles = new ThreadProfiles(x.bb, x.store, x.runtime, () => true);
-    const views = new ThreadViews(x.bb, x.store, profiles);
+    const views = new Conversations(x.bb, x.store, profiles);
     await migrateViews(x.bb, x.store, x.runtime, profiles, views);
     importLegacyAttention(core, x.store.db);
     retireRoomTables(x.store.db, ids => legacyAttentionImported(core, x.store.db, ids));

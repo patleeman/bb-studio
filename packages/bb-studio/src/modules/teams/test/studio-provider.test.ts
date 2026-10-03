@@ -44,39 +44,26 @@ function setup(bots: Bot[], activity = new Map<string, BotActivity>(), views = [
   return { call, retired };
 }
 
-test("describes bots, which Studio creates through the setup chat", async () => {
-  const { call } = setup([]);
+test("teammates and conversations do not enter the Work collection", async () => {
+  const scout = bot();
+  const { call } = setup([scout], new Map(), [{ ...view }]);
   const info = await call("studio_describe", null);
   assert.ok(studioSchemas(z).info.parse(info));
-  assert.equal(info.panel, "bots");
-  assert.deepEqual(info.kinds[0].create, { mode: "event", event: "bb-studio:bot-teams:new-bot" });
-  assert.equal(info.kinds[0].canArchive, true);
+  assert.deepEqual(info.kinds, []);
+  assert.deepEqual((await call("studio_list", null)).items, []);
+  assert.deepEqual((await call("studio_get", { ids: [scout.id, view.id] })).items, []);
+  assert.deepEqual((await call("studio_search", { query: "scout" })).ids, []);
+  await assert.rejects(call("studio_create", { kind: "view" }), /from Team/);
 });
 
-test("lists bots with their avatar, profile link and state", async () => {
+test("saved links remain readable and preserve lifecycle operations", async () => {
   const scout = bot();
-  const broken = bot({ id: "22222222-2222-4222-8222-222222222222", name: "Fixer", error: "Provider missing", retired: true, description: "" });
-  const { call } = setup([scout, broken], new Map([[scout.id, { working: true, lastActivityAt: 5 }]]));
-  const { items } = await call("studio_list", null);
-  assert.ok(studioSchemas(z).provider.studio_list.output.parse({ items }));
-  assert.deepEqual(
-    items.map((item: any) => [item.title, item.icon, item.href, item.projectId, item.archived, item.badge?.label ?? null, item.preview]),
-    [
-      ["Scout", "🦉", `/plugins/studio/bots/${scout.id}`, null, false, "Working", "Finds flaky tests."],
-      ["Fixer", "🦉", `/plugins/studio/bots/${broken.id}`, null, true, "Error", "@scout"],
-    ],
-  );
-});
-
-test("archives by retiring, and refuses move and delete", async () => {
-  const scout = bot();
-  const { call, retired } = setup([scout]);
+  const { call, retired } = setup([scout], new Map(), [{ ...view }]);
+  assert.match((await call("studio_read", { id: scout.id })).content, /Finds flaky tests/);
+  assert.match((await call("studio_read", { id: view.id })).content, /Reply: Ready/);
   assert.deepEqual(await call("studio_archive", { ids: [scout.id], archived: true }), { done: [scout.id], failed: [] });
   assert.deepEqual(retired, [`${scout.id}:true`]);
-  assert.match((await call("studio_delete", { ids: [scout.id] })).failed[0].error, /Archive them/);
-  assert.match((await call("studio_move", { ids: [scout.id], projectId: "proj_a" })).failed[0].error, /own project/);
-  assert.deepEqual((await call("studio_search", { query: "@scout" })).ids, [scout.id]);
-  assert.deepEqual((await call("studio_search", { query: "@" })).ids, []);
+  assert.deepEqual(await call("studio_delete", { ids: [view.id] }), { done: [view.id], failed: [] });
 });
 
 test("the change signature ignores activity Studio doesn't show", () => {
@@ -85,33 +72,4 @@ test("the change signature ignores activity Studio doesn't show", () => {
   assert.equal(quiet, botsSignature([scout], new Map([[scout.id, { working: false, lastActivityAt: 9 }]])));
   assert.notEqual(quiet, botsSignature([scout], new Map([[scout.id, { working: true, lastActivityAt: 9 }]])));
   assert.notEqual(quiet, botsSignature([bot({ name: "Scout 2" })], new Map()));
-});
-
-test("saved views are Studio items with ordinary view links and lifecycle actions", async () => {
-  const { call } = setup([bot()], new Map(), [{ ...view }]);
-  const info = await call("studio_describe", null);
-  const kind = info.kinds.find((kind: any) => kind.id === "view");
-  assert.deepEqual(kind.create, { mode: "rpc" });
-  assert.equal(kind.mentionProviderId, "views");
-  const { items } = await call("studio_list", null);
-  assert.ok(studioSchemas(z).provider.studio_list.output.parse({ items }));
-  assert.equal(items[1].href, `/plugins/studio/channels/${view.id}`);
-  assert.equal(items[1].projectId, null);
-  assert.deepEqual((await call("studio_get", { ids: [view.id] })).items, [items[1]]);
-  // Studio indexes the title itself; the content fallback must not duplicate it.
-  assert.deepEqual((await call("studio_search", { query: "Launch" })).ids, []);
-  assert.match((await call("studio_read", { id: view.id })).content, /Reply: Ready/);
-  assert.deepEqual(await call("studio_archive", { ids: [view.id], archived: true }), { done: [view.id], failed: [] });
-  assert.equal((await call("studio_get", { ids: [view.id] })).items[0].archived, true);
-  assert.deepEqual(await call("studio_delete", { ids: [view.id, bot().id] }), { done: [view.id], failed: [{ id: bot().id, error: "Bots can't be deleted. Archive them instead." }] });
-  assert.equal((await call("studio_get", { ids: [view.id] })).items.length, 0);
-});
-
-test("Studio creates an empty view ready for editing", async () => {
-  const { call } = setup([]);
-  const { item } = await call("studio_create", { kind: "view", projectId: "proj_a" });
-  assert.equal(item.kind, "view");
-  assert.equal(item.title, "New view");
-  assert.equal(item.projectId, null);
-  assert.equal((await call("studio_list", null)).items[0].id, item.id);
 });

@@ -1,12 +1,12 @@
 import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import type { Store } from "../modules/teams/store";
 import type { ThreadProfiles } from "../modules/teams/thread-profiles";
-import type { ThreadViews } from "../modules/teams/thread-views";
+import type { Conversations } from "../modules/teams/conversations";
 import { missingThread } from "../modules/teams/mission-runtime";
 import { OfficeConversations, type ConversationRecord } from "./conversations";
 import { officeTeamServiceContract } from "./team-service-contract";
 
-export function officeTeamHandlers(bb: BbPluginApi, store: Store, profiles: ThreadProfiles, views: ThreadViews): PluginRpcHandlers<typeof officeTeamServiceContract> {
+export function officeTeamHandlers(bb: BbPluginApi, store: Store, profiles: ThreadProfiles, views: Conversations): PluginRpcHandlers<typeof officeTeamServiceContract> {
   const conversations = new OfficeConversations(store.db);
   const find = (botId: string, projectId: string) => conversations.list().filter(c => !c.archived && c.projectId === projectId && c.members.filter(m => m.kind === "bot").length === 1 && c.members.some(m => m.kind === "bot" && m.id === botId)).sort((a,b) => a.createdAt - b.createdAt || a.id.localeCompare(b.id))[0];
   const directThread = async (conversation: ConversationRecord, botId: string) => {

@@ -1,7 +1,6 @@
-// Bots and channels as Studio items.
+// Legacy item links remain readable; teammates and conversations live outside Work.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
-import { snippets } from "@bb-studio/kit/format";
 import { registerStudioProvider } from "@bb-studio/kit/server";
 import type { Bot } from "./contract";
 import type { ThreadView } from "./view-contract";
@@ -91,33 +90,17 @@ export function registerStudio(
     retire(id: string, retired: boolean): Promise<unknown>;
   },
 ): void {
-  const items = () => {
-    const activity = deps.activity();
-    return [...deps.bots().map((bot) => toStudioItem(bot, activity.get(bot.id))), ...deps.views().map(viewStudioItem)];
-  };
   registerStudioProvider(bb, schemas, {
-    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "bots", kinds: [BOT_KIND, VIEW_KIND] }),
-    studio_get: ({ ids }) => ({ items: items().filter((item) => ids.includes(item.id)) }),
+    studio_describe: () => ({ pluginId: PLUGIN_ID, version: 2, panel: "bots", kinds: [] }),
+    studio_get: () => ({ items: [] }),
     studio_read: async ({ id }) => {
       if (deps.views().some(view => view.id === id)) return { content: await deps.readView(id) };
       const bot = deps.bots().find((each) => each.id === id);
       return { content: bot ? [`# ${bot.name}`, bot.description, `@${bot.handle}`].filter(Boolean).join("\n\n") : null };
     },
-    studio_list: () => ({ items: items() }),
-    // Studio matches names itself; this finds descriptions and handles.
-    studio_search: ({ query }) => {
-      const needle = query.trim().toLowerCase().replace(/^@/, "");
-      // A bare "@" would match every bot.
-      if (!needle) return { ids: [], snippets: {} };
-      const found = deps
-        .bots()
-        .filter((bot) => bot.description.toLowerCase().includes(needle) || bot.handle.toLowerCase().includes(needle));
-      return { ids: found.map((bot) => bot.id), snippets: snippets(found, needle, (bot) => bot.description) };
-    },
-    studio_create: async ({ kind }) => {
-      if (kind === VIEW_KIND.id) return { item: viewStudioItem(await deps.createView()) };
-      throw new Error("Bots are created in a setup chat.");
-    },
+    studio_list: () => ({ items: [] }),
+    studio_search: () => ({ ids: [], snippets: {} }),
+    studio_create: async () => { throw new Error("Create teammates and conversations from Team."); },
     studio_move: ({ ids }) => ({ done: [], failed: ids.map((id) => ({ id, error: deps.views().some(view => view.id === id) ? "A channel spans projects. Add it to a Studio space instead." : "A bot keeps its own project." })) }),
     studio_archive: ({ ids, archived }) => eachId(ids, (id) => deps.views().some(view => view.id === id) ? deps.archiveView(id, archived) : deps.retire(id, archived)),
     studio_delete: ({ ids }) => eachId(ids, (id) => {

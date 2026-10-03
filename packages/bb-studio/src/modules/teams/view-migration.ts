@@ -3,13 +3,13 @@ import { z } from "zod";
 import type { Store } from "./store";
 import { missingThread, type Runtime } from "./mission-runtime";
 import type { ThreadProfiles } from "./thread-profiles";
-import type { ThreadViews } from "./thread-views";
+import type { Conversations } from "./conversations";
 
 const automation = z.object({ id: z.string(), execution: z.object({ mode: z.string(), env: z.record(z.string(), z.string()).optional() }).passthrough() }).passthrough();
 const metadata = z.object({ channelId: z.string(), botId: z.string(), prompt: z.string() });
 
 /** Resumable migration. No owner messages or old replies enter the new threads. */
-export async function migrateViews(bb: BbPluginApi, store: Store, runtime: Runtime, profiles: ThreadProfiles, views: ThreadViews) {
+export async function migrateViews(bb: BbPluginApi, store: Store, runtime: Runtime, profiles: ThreadProfiles, views: Conversations) {
   for (const room of store.rooms()) {
     if (store.db.prepare("SELECT 1 FROM view_migrations WHERE room_id=?").get(room.id)) continue;
     const members = room.memberIds.filter(id => { const b = store.findBot(id); return b && !b.retired; });

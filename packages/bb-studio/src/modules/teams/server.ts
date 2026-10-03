@@ -16,7 +16,7 @@ import { Runtime, missingThread } from "./mission-runtime";
 import { isExecuting } from "./job-state";
 import { broadcastHandles } from "./mentions";
 import { ThreadProfiles } from "./thread-profiles";
-import { ThreadViews } from "./thread-views";
+import { Conversations } from "./conversations";
 import { botHandlers } from "./rpc-bots";
 import { directThreadIndicator } from "./direct-status";
 import { personalProjectId, createStudioNotifier } from "@bb-studio/kit/server";
@@ -46,7 +46,7 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
   migrateTeamOffice(db, id => threadProjects.get(id));
   const store = new Store(db), runtime = new Runtime(bb, store);
   const profiles = new ThreadProfiles(bb, store, runtime, id => !store.routingSession(id));
-  const views = new ThreadViews(bb, store, profiles);
+  const views = new Conversations(bb, store, profiles);
   const project = () => personalProjectId(bb);
   const activeConversations = (id: string) => store.conversations(id).filter(c => c.kind === "mission" && !c.archivedAt);
   const assertConversationIdle = async (c: Conversation) => {

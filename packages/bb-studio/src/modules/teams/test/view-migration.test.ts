@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { setup } from "./bots-fixture";
 import { ThreadProfiles } from "../thread-profiles";
-import { ThreadViews } from "../thread-views";
+import { Conversations } from "../conversations";
 import { migrateViews } from "../view-migration";
 
 test("legacy single-bot channels become fresh threads without replaying retained history", async () => {
@@ -11,7 +11,7 @@ test("legacy single-bot channels become fresh threads without replaying retained
     x.store.putRoom({...x.room,memberIds:[x.a.id]});
     x.store.putMessage({id:"old",roomId:x.room.id,runId:"old",botId:null,speaker:"You",text:"Private old history",createdAt:1,attachments:[],replyTo:null});
     x.harness.inspection.sdk.stub("threads.get",async ({threadId})=>makeThreadResponse({id:threadId}));
-    const profiles = new ThreadProfiles(x.bb,x.store,x.runtime,()=>true), views = new ThreadViews(x.bb,x.store,profiles);
+    const profiles = new ThreadProfiles(x.bb,x.store,x.runtime,()=>true), views = new Conversations(x.bb,x.store,profiles);
     await migrateViews(x.bb,x.store,x.runtime,profiles,views);
     await migrateViews(x.bb,x.store,x.runtime,profiles,views);
     expect(x.harness.inspection.sdk.callsTo("threads.spawn")).toHaveLength(1);
@@ -36,7 +36,7 @@ test("automation migration targets normal bot threads, preserves scheduling, and
       if(args.method === "automations_list")return args.outputSchema.parse([{id:"automation",enabled:false,trigger:{triggerType:"schedule",cron:"0 9 * * 1-5",timezone:"America/New_York"},execution:{mode:"script",env:{BB_BOTS_CHANNEL_AUTOMATION:JSON.stringify({channelId:x.room.id,botId:x.a.id,prompt:"Review progress"})}}}]);
       updates.push(args.input);return args.outputSchema.parse({});
     });
-    const profiles = new ThreadProfiles(x.bb,x.store,x.runtime,()=>true), views = new ThreadViews(x.bb,x.store,profiles);
+    const profiles = new ThreadProfiles(x.bb,x.store,x.runtime,()=>true), views = new Conversations(x.bb,x.store,profiles);
     await expect(migrateViews(x.bb,x.store,x.runtime,profiles,views)).rejects.toThrow("Offline");
     expect(x.store.db.prepare("SELECT 1 FROM view_migrations WHERE room_id=?").get(x.room.id)).toBeUndefined();
     offline=false;

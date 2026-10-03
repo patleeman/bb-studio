@@ -2,7 +2,7 @@ import { expect, test } from "vitest";
 import { makeThreadResponse } from "@get-bb/plugin-sdk/testing";
 import { setup } from "./bots-fixture";
 import { ThreadProfiles } from "../thread-profiles";
-import { finalEntries, ThreadViews } from "../thread-views";
+import { finalEntries, Conversations } from "../conversations";
 import { viewSendInput } from "../view-contract";
 import { registerViewMentions } from "../view-mentions";
 
@@ -12,7 +12,7 @@ function fixture() {
   x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
   x.harness.inspection.sdk.stub("threads.events.list", async () => []);
   const profiles = new ThreadProfiles(x.bb, x.store, x.runtime, () => true);
-  return { ...x, views: new ThreadViews(x.bb, x.store, profiles) };
+  return { ...x, views: new Conversations(x.bb, x.store, profiles) };
 }
 
 test("explicit ordinary members stay independent when one is the other's child", async () => {

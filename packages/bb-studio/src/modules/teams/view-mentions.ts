@@ -1,9 +1,9 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Store } from "./store";
-import type { ThreadViews } from "./thread-views";
+import type { Conversations } from "./conversations";
 import { isBroadcastHandle, matchingBroadcastMentions } from "./mentions";
 
-export function registerViewMentions(bb: BbPluginApi, store: Store, views: ThreadViews) {
+export function registerViewMentions(bb: BbPluginApi, store: Store, views: Conversations) {
   bb.ui.registerMentionProvider({
     id: "broadcasts", label: "Channel mentions",
     search({ query }) {

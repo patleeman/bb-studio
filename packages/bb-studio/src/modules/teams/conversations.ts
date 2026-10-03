@@ -63,7 +63,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
 }
 
 type SendRecord = { input: ViewSend; prompt: string; targets: string[]; deliveries: ViewDelivery[]; modes?: Record<string, ViewPermissionMode> };
-export class ThreadViews {
+export class Conversations {
   private readonly locks = new Map<string, Promise<unknown>>();
   constructor(readonly bb: BbPluginApi, readonly store: Store, readonly profiles: ThreadProfiles) {}
   readonly onChanged = new Set<() => void>();
