@@ -335,6 +335,45 @@ test("an earlier follow-up does not block a later steer", async () => {
   assert.deepEqual(calls.steered, ["q_second"]);
 });
 
+test("editing a waiting steer invalidates its old decision", async () => {
+  const releases = new Map<string, (verdict: Verdict) => void>();
+  const { queue, calls, advance } = harness(steer, {
+    classify: (r) => new Promise<Verdict>((resolve) => releases.set(r.id, resolve)),
+  });
+  const first = row({ id: "q_first", createdAt: 1 });
+  const second = row({ id: "q_second", createdAt: 2 });
+  queue.queued(first);
+  queue.queued(second);
+  await settle();
+  releases.get(second.id)!(steer);
+  await settle();
+  advance(10);
+  const edited = { ...second, content: [{ type: "text" as const, text: "A separate follow-up task", mentions: [] }] };
+  queue.sync([first, edited], 1_005);
+  await settle();
+  releases.get(first.id)!(followup);
+  await settle();
+  assert.deepEqual(calls.steered, [], "the old decision cannot send the edited message");
+  releases.get(second.id)!(followup);
+  await settle();
+  assert.deepEqual(calls.steered, []);
+});
+
+test("a timed-out earlier classifier releases a later steer even if it ignores abort", async () => {
+  const { queue, calls, advance } = harness(steer, {
+    classify: (r) => r.id === "q_first" ? new Promise<Verdict>(() => {}) : Promise.resolve(steer),
+  });
+  const first = row({ id: "q_first", createdAt: 1 });
+  queue.queued(first);
+  queue.queued(row({ id: "q_second", createdAt: 2 }));
+  await settle();
+  assert.deepEqual(calls.steered, []);
+  advance(maxDecideMs);
+  await queue.dispatch(context({ queuedMessages: [first] }));
+  await settle();
+  assert.deepEqual(calls.steered, ["q_second"]);
+});
+
 test("the watcher picks up rows the app queued directly and forgets rows that left", async () => {
   const { queue, calls, advance } = harness(steer);
   const appRow = row({ id: "q_app", waitingOn: { kind: "thread-busy" } });

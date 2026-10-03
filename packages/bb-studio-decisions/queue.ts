@@ -160,6 +160,9 @@ export class SmartQueue {
       let entry = this.entries.get(row.id);
       if (entry?.state === "pending" && this.now() - entry.startedAt >= maxDecideMs) {
         entry.controller.abort();
+        // A classifier can ignore cancellation. Its replacement follow-up
+        // must still release later steers waiting for this decision.
+        entry.finish();
         entry = {
           ...entry,
           state: "decided",
@@ -345,10 +348,13 @@ export class SmartQueue {
     };
     if (!current()) return;
     decided(verdict);
+    const decision = this.entries.get(row.id);
     if (verdict.action === "steer") {
       try {
         await this.earlierApplied(row);
-        if (!this.entries.has(row.id)) return;
+        // An edit replaces the entry and starts another classification. The
+        // old result must not steer that new message while it is undecided.
+        if (this.entries.get(row.id) !== decision) return;
         await this.deps.steer(row);
       } catch (error) {
         // Cancelled, or already being sent because the owner sent it by hand.
