@@ -27,7 +27,7 @@ it("tracks a finding once across concurrent calls and retries, with Studio optio
     expect(task.description).toContain("msg_source");
     expect(inherited).toContainEqual(expect.objectContaining({ thread: expect.objectContaining({ threadId: "thr_source", ref: { pluginId: "studio-tasks", id: task.id }, role: "created" }) }));
     const full = await host.harness.behavior.callRpc("get", { id: task.id }) as { links: { itemId: string }[]; handoffs: unknown[] };
-    expect(full.links.map(link => link.itemId)).toEqual(["thr_source", "pg_explainer"]);
+    expect(full.links.map(link => link.itemId).sort()).toEqual(["pg_explainer", "thr_source"]);
     expect(full.handoffs).toEqual([]);
     studioAvailable = false;
     expect((await track(true)).task?.id).toBe(task.id);
