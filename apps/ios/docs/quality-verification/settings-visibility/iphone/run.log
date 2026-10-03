@@ -1,0 +1,290 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-share-derived/Build/Products/SettingsVisibility.xctestrun -destination "platform=iOS Simulator,id=2FF2A8F1-3BFF-49CC-A459-AD20EE8733D6" -parallel-testing-enabled NO -resultBundlePath /tmp/bb-settings-visibility-iphone2.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-settings-visibility-iphone2.xcresult
+
+2026-10-03 02:34:43.472340-0400 BBStudioUITests-Runner[73364:89545553] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 02:34:46.873.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 02:34:46.874.
+Test Suite 'SettingsVisibilityUITests' started at 2026-10-03 02:34:46.874.
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultLandscape]' started.
+    t =     0.01s Start Test at 2026-10-03 02:34:46.886
+    t =     0.12s Set Up
+    t =     0.12s Setting device orientation to Landscape Left
+    t =     0.12s     Device orientation changed to Landscape Left
+    t =     0.13s     Wait for com.apple.springboard to idle
+    t =     0.20s Open nyc.plee.bbgo
+    t =     0.20s     Launch nyc.plee.bbgo
+2026-10-03 02:34:47.120 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:34:47.120 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: no debugger version
+objc[73364]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x102314398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x106504310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     1.08s         Setting up automation session
+    t =     3.37s         Wait for nyc.plee.bbgo to idle
+    t =     5.30s Waiting 20.0s for "Settings" Button to exist
+    t =     6.38s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     6.38s         Checking existence of `"Settings" Button`
+    t =     6.49s Tap "Settings" Button
+    t =     6.49s     Wait for nyc.plee.bbgo to idle
+    t =     6.50s     Find the "Settings" Button
+    t =     6.53s     Check for interrupting elements affecting "Settings" Button
+    t =     6.57s     Synthesize event
+    t =     6.97s     Wait for nyc.plee.bbgo to idle
+    t =     8.87s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.94s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.94s         Checking existence of `"settingsServerURL" Any`
+    t =    10.01s Find the "settingsServerURL" Any
+    t =    10.04s Find the Window (First Match)
+    t =    10.05s Terminate nyc.plee.bbgo:73409
+    t =    11.07s Setting device orientation to Portrait
+    t =    11.07s     Device orientation changed to Portrait
+    t =    11.08s     Wait for com.apple.springboard to idle
+/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-share-review-vhuq54aq/ios/UITests/ReviewQualityUITests.swift:31: -[BBStudioUITests.SettingsVisibilityUITests testDefaultLandscape] : Test skipped - iPhone Info.plist supports portrait only; rotation request confirmed portrait
+    t =    11.09s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultLandscape]' skipped (11.087 seconds).
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultPortrait]' started.
+    t =     0.00s Start Test at 2026-10-03 02:34:57.973
+    t =     0.01s Set Up
+    t =     0.01s Setting device orientation to Portrait
+    t =     0.02s     Wait for com.apple.springboard to idle
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 02:34:57.997 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:34:57.997 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.24s         Setting up automation session
+    t =     2.48s         Wait for nyc.plee.bbgo to idle
+    t =     4.34s Waiting 20.0s for "Settings" Button to exist
+    t =     5.42s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.42s         Checking existence of `"Settings" Button`
+    t =     5.52s Tap "Settings" Button
+    t =     5.52s     Wait for nyc.plee.bbgo to idle
+    t =     5.52s     Find the "Settings" Button
+    t =     5.55s     Check for interrupting elements affecting "Settings" Button
+    t =     5.58s     Synthesize event
+    t =     5.86s     Wait for nyc.plee.bbgo to idle
+    t =     7.70s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     8.78s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     8.78s         Checking existence of `"settingsServerURL" Any`
+    t =     8.84s Find the "settingsServerURL" Any
+    t =     8.86s Find the Window (First Match)
+    t =     8.87s Find the TabBar (First Match)
+    t =     8.88s Find the "Settings" NavigationBar
+    t =     8.91s Checking existence of `StaticText (First Match)`
+    t =     8.97s Find the StaticText (First Match)
+    t =     9.04s Checking existence of `"Configured limit, Automatic" StaticText`
+    t =     9.11s Find the "Configured limit, Automatic" StaticText
+    t =     9.18s Find the Target Application 'nyc.plee.bbgo'
+    t =     9.28s Added attachment named 'settings-default-portrait-first-reachable'
+    t =     9.28s Requesting snapshot of accessibility hierarchy for app with pid 73516
+    t =     9.47s Requesting snapshot of accessibility hierarchy for app with pid 73516
+    t =     9.51s Added attachment named 'settings-default-portrait-first-reachable-tree'
+    t =     9.51s Find the "Configured limit, Automatic" StaticText
+    t =     9.57s Find the "Configured limit, Automatic" StaticText
+    t =     9.64s Find the "Configured limit, Automatic" StaticText
+    t =     9.71s Find the "Configured limit, Automatic" StaticText
+    t =     9.78s Find the "Configured limit, Automatic" StaticText
+    t =     9.84s Find the "Configured limit, Automatic" StaticText
+    t =     9.90s Find the Window (First Match)
+    t =     9.91s Find the Window (First Match)
+    t =     9.91s Find the TabBar (First Match)
+    t =     9.92s Find the TabBar (First Match)
+    t =     9.93s Added attachment named 'settings-default-portrait-first-reachable-bounds'
+VISIBILITY settings-default-portrait-first-reachable {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[16,502.33333333333331,370,51.999999999999943],"tabBar":[791,874],"visibleBottom":783,"visibleTop":176,"window":[402,874]}
+    t =     9.93s Find the "Configured limit, Automatic" StaticText
+    t =    10.00s Find the "Configured limit, Automatic" StaticText
+    t =    10.07s Find the Target Application 'nyc.plee.bbgo'
+    t =    10.15s Added attachment named 'settings-default-portrait-fully-visible'
+    t =    10.15s Requesting snapshot of accessibility hierarchy for app with pid 73516
+    t =    10.33s Requesting snapshot of accessibility hierarchy for app with pid 73516
+    t =    10.37s Added attachment named 'settings-default-portrait-fully-visible-tree'
+    t =    10.38s Find the "Configured limit, Automatic" StaticText
+    t =    10.44s Find the "Configured limit, Automatic" StaticText
+    t =    10.51s Find the "Configured limit, Automatic" StaticText
+    t =    10.58s Find the "Configured limit, Automatic" StaticText
+    t =    10.65s Find the "Configured limit, Automatic" StaticText
+    t =    10.71s Find the "Configured limit, Automatic" StaticText
+    t =    10.77s Find the Window (First Match)
+    t =    10.78s Find the Window (First Match)
+    t =    10.78s Find the TabBar (First Match)
+    t =    10.79s Find the TabBar (First Match)
+    t =    10.80s Added attachment named 'settings-default-portrait-fully-visible-bounds'
+VISIBILITY settings-default-portrait-fully-visible {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[16,502.33333333333331,370,51.999999999999943],"tabBar":[791,874],"visibleBottom":783,"visibleTop":176,"window":[402,874]}
+    t =    10.80s Find the "Configured limit, Automatic" StaticText
+    t =    10.87s Find the "Configured limit, Automatic" StaticText
+    t =    10.94s Find the "Configured limit, Automatic" StaticText
+    t =    11.01s Find the "Configured limit, Automatic" StaticText
+    t =    11.07s Find the "Configured limit, Automatic" StaticText
+    t =    11.14s Find the "Configured limit, Automatic" StaticText
+    t =    11.20s Find the "Configured limit, Automatic" StaticText
+    t =    11.26s Terminate nyc.plee.bbgo:73516
+    t =    12.35s Setting device orientation to Portrait
+    t =    12.36s     Wait for com.apple.springboard to idle
+    t =    12.36s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultPortrait]' passed (12.370 seconds).
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLLandscape]' started.
+    t =     0.00s Start Test at 2026-10-03 02:35:10.343
+    t =     0.01s Set Up
+    t =     0.01s Setting device orientation to Landscape Left
+    t =     0.01s     Device orientation changed to Landscape Left
+    t =     0.02s     Wait for com.apple.springboard to idle
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 02:35:10.366 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:35:10.366 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.23s         Setting up automation session
+    t =     2.32s         Wait for nyc.plee.bbgo to idle
+    t =     4.12s Waiting 20.0s for "Settings" Button to exist
+    t =     5.20s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.20s         Checking existence of `"Settings" Button`
+    t =     5.30s Tap "Settings" Button
+    t =     5.30s     Wait for nyc.plee.bbgo to idle
+    t =     5.30s     Find the "Settings" Button
+    t =     5.33s     Check for interrupting elements affecting "Settings" Button
+    t =     5.35s     Synthesize event
+    t =     5.64s     Wait for nyc.plee.bbgo to idle
+    t =     7.45s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     8.52s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     8.53s         Checking existence of `"settingsServerURL" Any`
+    t =     8.63s Find the "settingsServerURL" Any
+    t =     8.67s Find the Window (First Match)
+    t =     8.67s Terminate nyc.plee.bbgo:73813
+    t =     9.77s Setting device orientation to Portrait
+    t =     9.77s     Device orientation changed to Portrait
+    t =     9.77s     Wait for com.apple.springboard to idle
+/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-share-review-vhuq54aq/ios/UITests/ReviewQualityUITests.swift:31: -[BBStudioUITests.SettingsVisibilityUITests testXXXLLandscape] : Test skipped - iPhone Info.plist supports portrait only; rotation request confirmed portrait
+    t =     9.78s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLLandscape]' skipped (9.843 seconds).
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLPortrait]' started.
+    t =     0.00s Start Test at 2026-10-03 02:35:20.187
+    t =     0.04s Set Up
+    t =     0.04s Setting device orientation to Portrait
+    t =     0.05s     Wait for com.apple.springboard to idle
+    t =     0.05s Open nyc.plee.bbgo
+    t =     0.05s     Launch nyc.plee.bbgo
+2026-10-03 02:35:20.241 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:35:20.241 xcodebuild[73094:89544983] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.31s         Setting up automation session
+    t =     2.61s         Wait for nyc.plee.bbgo to idle
+    t =     4.40s Waiting 20.0s for "Settings" Button to exist
+    t =     5.49s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.49s         Checking existence of `"Settings" Button`
+    t =     5.60s Tap "Settings" Button
+    t =     5.60s     Wait for nyc.plee.bbgo to idle
+    t =     5.60s     Find the "Settings" Button
+    t =     5.63s     Check for interrupting elements affecting "Settings" Button
+    t =     5.65s     Synthesize event
+    t =     5.94s     Wait for nyc.plee.bbgo to idle
+    t =     7.74s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     8.79s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     8.79s         Checking existence of `"settingsServerURL" Any`
+    t =     8.85s Find the "settingsServerURL" Any
+    t =     8.86s Find the Window (First Match)
+    t =     8.87s Find the TabBar (First Match)
+    t =     8.88s Find the "Settings" NavigationBar
+    t =     8.89s Checking existence of `StaticText (First Match)`
+    t =     8.93s Press Target Application 'nyc.plee.bbgo'[0.50, 0.72] for 0.1 seconds, then drag to Target Application 'nyc.plee.bbgo'[0.50, 0.56] with velocity of 500.00 pixels per second, and then hold for 0.0 seconds 
+    t =     8.93s     Wait for nyc.plee.bbgo to idle
+    t =     8.93s     Find the Target Application 'nyc.plee.bbgo'
+    t =     8.94s     Check for interrupting elements affecting "BB Studio" Application
+    t =     8.96s     Synthesize event
+    t =     8.96s         Find the Target Application 'nyc.plee.bbgo'
+    t =     8.97s         Find the Target Application 'nyc.plee.bbgo'
+    t =     8.98s         Find the Target Application 'nyc.plee.bbgo'
+    t =     8.99s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.00s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.58s     Wait for nyc.plee.bbgo to idle
+    t =    11.25s Checking existence of `StaticText (First Match)`
+    t =    11.30s Press Target Application 'nyc.plee.bbgo'[0.50, 0.72] for 0.1 seconds, then drag to Target Application 'nyc.plee.bbgo'[0.50, 0.56] with velocity of 500.00 pixels per second, and then hold for 0.0 seconds 
+    t =    11.30s     Wait for nyc.plee.bbgo to idle
+    t =    11.31s     Find the Target Application 'nyc.plee.bbgo'
+    t =    11.32s     Check for interrupting elements affecting "BB Studio" Application
+    t =    11.34s     Synthesize event
+    t =    11.34s         Find the Target Application 'nyc.plee.bbgo'
+    t =    11.36s         Find the Target Application 'nyc.plee.bbgo'
+    t =    11.37s         Find the Target Application 'nyc.plee.bbgo'
+    t =    11.39s         Find the Target Application 'nyc.plee.bbgo'
+    t =    11.40s         Find the Target Application 'nyc.plee.bbgo'
+    t =    11.98s     Wait for nyc.plee.bbgo to idle
+    t =    13.63s Checking existence of `StaticText (First Match)`
+    t =    13.69s Find the StaticText (First Match)
+    t =    13.74s Checking existence of `"Configured limit, Automatic" StaticText`
+    t =    13.78s Find the "Configured limit, Automatic" StaticText
+    t =    13.83s Find the Target Application 'nyc.plee.bbgo'
+    t =    13.91s Added attachment named 'settings-xxxl-portrait-first-reachable'
+    t =    13.91s Requesting snapshot of accessibility hierarchy for app with pid 76348
+    t =    14.02s Requesting snapshot of accessibility hierarchy for app with pid 76348
+    t =    14.05s Added attachment named 'settings-xxxl-portrait-first-reachable-tree'
+    t =    14.05s Find the "Configured limit, Automatic" StaticText
+    t =    14.09s Find the "Configured limit, Automatic" StaticText
+    t =    14.14s Find the "Configured limit, Automatic" StaticText
+    t =    14.18s Find the "Configured limit, Automatic" StaticText
+    t =    14.23s Find the "Configured limit, Automatic" StaticText
+    t =    14.27s Find the "Configured limit, Automatic" StaticText
+    t =    14.31s Find the Window (First Match)
+    t =    14.31s Find the Window (First Match)
+    t =    14.32s Find the TabBar (First Match)
+    t =    14.33s Find the TabBar (First Match)
+    t =    14.33s Added attachment named 'settings-xxxl-portrait-first-reachable-bounds'
+VISIBILITY settings-xxxl-portrait-first-reachable {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":2,"row":[16,644.33333333333326,370,222.66666666666663],"tabBar":[791,874],"visibleBottom":783,"visibleTop":197,"window":[402,874]}
+    t =    14.34s Find the "Configured limit, Automatic" StaticText
+    t =    14.38s Find the "Configured limit, Automatic" StaticText
+    t =    14.42s Find the "Configured limit, Automatic" StaticText
+    t =    14.47s Press Target Application 'nyc.plee.bbgo'[0.50, 0.62] for 0.1 seconds, then drag to Target Application 'nyc.plee.bbgo'[0.50, 0.50] with velocity of 500.00 pixels per second, and then hold for 0.0 seconds 
+    t =    14.47s     Wait for nyc.plee.bbgo to idle
+    t =    14.47s     Find the Target Application 'nyc.plee.bbgo'
+    t =    14.48s     Check for interrupting elements affecting "BB Studio" Application
+    t =    14.50s     Synthesize event
+    t =    14.50s         Find the Target Application 'nyc.plee.bbgo'
+    t =    14.51s         Find the Target Application 'nyc.plee.bbgo'
+    t =    14.53s         Find the Target Application 'nyc.plee.bbgo'
+    t =    14.54s         Find the Target Application 'nyc.plee.bbgo'
+    t =    14.55s         Find the Target Application 'nyc.plee.bbgo'
+    t =    15.07s     Wait for nyc.plee.bbgo to idle
+    t =    16.75s Find the "Configured limit, Automatic" StaticText
+    t =    16.82s Find the "Configured limit, Automatic" StaticText
+    t =    16.86s Find the Target Application 'nyc.plee.bbgo'
+    t =    16.94s Added attachment named 'settings-xxxl-portrait-fully-visible'
+    t =    16.94s Requesting snapshot of accessibility hierarchy for app with pid 76348
+    t =    17.05s Requesting snapshot of accessibility hierarchy for app with pid 76348
+    t =    17.07s Added attachment named 'settings-xxxl-portrait-fully-visible-tree'
+    t =    17.08s Find the "Configured limit, Automatic" StaticText
+    t =    17.12s Find the "Configured limit, Automatic" StaticText
+    t =    17.16s Find the "Configured limit, Automatic" StaticText
+    t =    17.21s Find the "Configured limit, Automatic" StaticText
+    t =    17.25s Find the "Configured limit, Automatic" StaticText
+    t =    17.29s Find the "Configured limit, Automatic" StaticText
+    t =    17.33s Find the Window (First Match)
+    t =    17.33s Find the Window (First Match)
+    t =    17.34s Find the TabBar (First Match)
+    t =    17.35s Find the TabBar (First Match)
+    t =    17.35s Added attachment named 'settings-xxxl-portrait-fully-visible-bounds'
+VISIBILITY settings-xxxl-portrait-fully-visible {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":3,"row":[16,342.66666666666669,370,222.66666666666657],"tabBar":[791,874],"visibleBottom":783,"visibleTop":197,"window":[402,874]}
+    t =    17.36s Find the "Configured limit, Automatic" StaticText
+    t =    17.40s Find the "Configured limit, Automatic" StaticText
+    t =    17.44s Find the "Configured limit, Automatic" StaticText
+    t =    17.49s Find the "Configured limit, Automatic" StaticText
+    t =    17.53s Find the "Configured limit, Automatic" StaticText
+    t =    17.57s Find the "Configured limit, Automatic" StaticText
+    t =    17.62s Find the "Configured limit, Automatic" StaticText
+    t =    17.66s Terminate nyc.plee.bbgo:76348
+    t =    18.67s Setting device orientation to Portrait
+    t =    18.68s     Wait for com.apple.springboard to idle
+    t =    18.69s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLPortrait]' passed (18.718 seconds).
+Test Suite 'SettingsVisibilityUITests' passed at 2026-10-03 02:35:38.905.
+	 Executed 4 tests, with 2 tests skipped and 0 failures (0 unexpected) in 52.018 (52.031) seconds
+Test Suite 'BBStudioUITests.xctest' passed at 2026-10-03 02:35:38.905.
+	 Executed 4 tests, with 2 tests skipped and 0 failures (0 unexpected) in 52.018 (52.031) seconds
+Test Suite 'Selected tests' passed at 2026-10-03 02:35:38.905.
+	 Executed 4 tests, with 2 tests skipped and 0 failures (0 unexpected) in 52.018 (52.032) seconds
+2026-10-03 02:35:39.218 xcodebuild[73094:89544983] [MT] IDETestOperationsObserverDebug: 57.686 elapsed -- Testing started completed.
+2026-10-03 02:35:39.218 xcodebuild[73094:89544983] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 02:35:39.218 xcodebuild[73094:89544983] [MT] IDETestOperationsObserverDebug: 57.686 sec, +57.686 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-settings-visibility-iphone2.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

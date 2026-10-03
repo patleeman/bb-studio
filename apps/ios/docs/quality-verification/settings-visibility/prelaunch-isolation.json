@@ -1,0 +1,38 @@
+[
+  {
+    "simulator": "2FF2A8F1-3BFF-49CC-A459-AD20EE8733D6",
+    "container": "/Users/patrick/Library/Developer/CoreSimulator/Devices/2FF2A8F1-3BFF-49CC-A459-AD20EE8733D6/data/Containers/Data/Application/EEEE26DA-366E-447E-B2BC-1840AED6DA0E",
+    "preLaunchPrefs": {
+      "serverURL": "http://127.0.0.1:49486",
+      "skipPushPrompt": true
+    },
+    "domain": "nyc.plee.bbgo"
+  },
+  {
+    "simulator": "2FF2A8F1-3BFF-49CC-A459-AD20EE8733D6",
+    "container": "/Users/patrick/Library/Developer/CoreSimulator/Devices/2FF2A8F1-3BFF-49CC-A459-AD20EE8733D6/data/Containers/Shared/AppGroup/602081E2-376E-4DF2-8ECB-885944BBB422",
+    "preLaunchPrefs": {
+      "serverURL": "http://127.0.0.1:49486",
+      "skipPushPrompt": true
+    },
+    "domain": "group.nyc.plee.bbgo"
+  },
+  {
+    "simulator": "901FF4CB-B83C-4E8C-A889-6449C134ED45",
+    "container": "/Users/patrick/Library/Developer/CoreSimulator/Devices/901FF4CB-B83C-4E8C-A889-6449C134ED45/data/Containers/Data/Application/DAA88038-2179-4C07-9087-684DCF9512F0",
+    "preLaunchPrefs": {
+      "serverURL": "http://127.0.0.1:49486",
+      "skipPushPrompt": true
+    },
+    "domain": "nyc.plee.bbgo"
+  },
+  {
+    "simulator": "901FF4CB-B83C-4E8C-A889-6449C134ED45",
+    "container": "/Users/patrick/Library/Developer/CoreSimulator/Devices/901FF4CB-B83C-4E8C-A889-6449C134ED45/data/Containers/Shared/AppGroup/D1162FD9-7B1A-44B7-AFB7-50B6F120FE2D",
+    "preLaunchPrefs": {
+      "serverURL": "http://127.0.0.1:49486",
+      "skipPushPrompt": true
+    },
+    "domain": "group.nyc.plee.bbgo"
+  }
+]

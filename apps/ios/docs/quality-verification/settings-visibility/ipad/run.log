@@ -1,0 +1,372 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-share-derived/Build/Products/SettingsVisibility.xctestrun -destination "platform=iOS Simulator,id=901FF4CB-B83C-4E8C-A889-6449C134ED45" -parallel-testing-enabled NO -resultBundlePath /tmp/bb-settings-visibility-ipad3.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-settings-visibility-ipad3.xcresult
+
+2026-10-03 02:38:16.746741-0400 BBStudioUITests-Runner[86971:89588338] [Default] Running tests...
+2026-10-03 02:38:16.788838-0400 BBStudioUITests-Runner[86971:89588338] [UIKit App Config] Update the Info.plist: Launch screens will soon be required.
+    t =      nans Interface orientation changed to Landscape Right
+Test Suite 'Selected tests' started at 2026-10-03 02:38:19.532.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 02:38:19.532.
+Test Suite 'SettingsVisibilityUITests' started at 2026-10-03 02:38:19.533.
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultLandscape]' started.
+    t =     0.00s Start Test at 2026-10-03 02:38:19.534
+    t =     0.02s Set Up
+    t =     0.02s Setting device orientation to Landscape Left
+    t =     0.03s     Wait for com.apple.springboard to idle
+    t =     0.03s Open nyc.plee.bbgo
+    t =     0.03s     Launch nyc.plee.bbgo
+2026-10-03 02:38:19.611 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:38:19.611 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.69s         Setting up automation session
+objc[86971]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x1056e0398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x105eb4310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     2.98s         Wait for nyc.plee.bbgo to idle
+    t =     4.98s Waiting 20.0s for Any (First Match) to exist
+    t =     6.05s     Checking `Expect predicate `existsNoRetry == 1` for object Any (First Match)`
+    t =     6.05s         Checking existence of `Any (First Match)`
+    t =     6.10s Find the Any (First Match)
+    t =     6.13s Tap "gear" Cell
+    t =     6.13s     Wait for nyc.plee.bbgo to idle
+    t =     6.13s     Find the "gear" Cell
+    t =     6.16s     Check for interrupting elements affecting "gear" Cell
+    t =     6.24s         Wait for com.apple.springboard to idle
+    t =     6.28s     Synthesize event
+    t =     6.69s     Wait for nyc.plee.bbgo to idle
+    t =     6.80s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     7.88s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     7.88s         Checking existence of `"settingsServerURL" Any`
+    t =     7.96s Find the "settingsServerURL" Any
+    t =     8.00s Find the Window (First Match)
+    t =     8.00s Checking existence of `TabBar (First Match)`
+    t =     8.09s Find the "Settings" NavigationBar
+    t =     8.12s Checking existence of `StaticText (First Match)`
+    t =     8.20s Find the StaticText (First Match)
+    t =     8.28s Checking existence of `"Configured limit, Automatic" StaticText`
+    t =     8.36s Find the "Configured limit, Automatic" StaticText
+    t =     8.45s Find the Target Application 'nyc.plee.bbgo'
+    t =     8.57s Added attachment named 'settings-default-landscape-first-reachable'
+    t =     8.57s Requesting snapshot of accessibility hierarchy for app with pid 88078
+    t =     8.81s Requesting snapshot of accessibility hierarchy for app with pid 88078
+    t =     8.85s Added attachment named 'settings-default-landscape-first-reachable-tree'
+    t =     8.86s Find the "Configured limit, Automatic" StaticText
+    t =     8.96s Find the "Configured limit, Automatic" StaticText
+    t =     9.06s Find the "Configured limit, Automatic" StaticText
+    t =     9.15s Find the "Configured limit, Automatic" StaticText
+    t =     9.24s Find the "Configured limit, Automatic" StaticText
+    t =     9.36s Find the "Configured limit, Automatic" StaticText
+    t =     9.46s Find the Window (First Match)
+    t =     9.47s Find the Window (First Match)
+    t =     9.47s Checking existence of `TabBar (First Match)`
+    t =     9.58s Added attachment named 'settings-default-landscape-first-reachable-bounds'
+VISIBILITY settings-default-landscape-first-reachable {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[300,457,890,52],"tabBar":[],"visibleBottom":792,"visibleTop":146,"window":[1210,834]}
+    t =     9.58s Find the "Configured limit, Automatic" StaticText
+    t =     9.68s Find the "Configured limit, Automatic" StaticText
+    t =     9.77s Find the Target Application 'nyc.plee.bbgo'
+    t =     9.87s Added attachment named 'settings-default-landscape-fully-visible'
+    t =     9.87s Requesting snapshot of accessibility hierarchy for app with pid 88078
+    t =    10.26s Requesting snapshot of accessibility hierarchy for app with pid 88078
+    t =    10.31s Added attachment named 'settings-default-landscape-fully-visible-tree'
+    t =    10.31s Find the "Configured limit, Automatic" StaticText
+    t =    10.42s Find the "Configured limit, Automatic" StaticText
+    t =    10.53s Find the "Configured limit, Automatic" StaticText
+    t =    10.64s Find the "Configured limit, Automatic" StaticText
+    t =    10.76s Find the "Configured limit, Automatic" StaticText
+    t =    10.89s Find the "Configured limit, Automatic" StaticText
+    t =    11.02s Find the Window (First Match)
+    t =    11.02s Find the Window (First Match)
+    t =    11.03s Checking existence of `TabBar (First Match)`
+    t =    11.17s Added attachment named 'settings-default-landscape-fully-visible-bounds'
+VISIBILITY settings-default-landscape-fully-visible {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[300,457,890,52],"tabBar":[],"visibleBottom":792,"visibleTop":146,"window":[1210,834]}
+    t =    11.17s Find the "Configured limit, Automatic" StaticText
+    t =    11.28s Find the "Configured limit, Automatic" StaticText
+    t =    11.50s Find the "Configured limit, Automatic" StaticText
+    t =    11.65s Find the "Configured limit, Automatic" StaticText
+    t =    11.78s Find the "Configured limit, Automatic" StaticText
+    t =    11.91s Find the "Configured limit, Automatic" StaticText
+    t =    12.02s Find the "Configured limit, Automatic" StaticText
+    t =    12.13s Terminate nyc.plee.bbgo:88078
+    t =    13.23s Setting device orientation to Portrait
+    t =    13.23s     Device orientation changed to Portrait
+    t =    13.24s     Interface orientation changed to Portrait
+    t =    13.28s     Wait for com.apple.springboard to idle
+    t =    13.72s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultLandscape]' passed (13.919 seconds).
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultPortrait]' started.
+    t =     0.00s Start Test at 2026-10-03 02:38:33.455
+    t =     0.02s Set Up
+    t =     0.02s Setting device orientation to Portrait
+    t =     0.03s     Wait for com.apple.springboard to idle
+    t =     0.03s Open nyc.plee.bbgo
+    t =     0.03s     Launch nyc.plee.bbgo
+2026-10-03 02:38:33.490 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:38:33.490 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.25s         Setting up automation session
+    t =     3.47s         Wait for nyc.plee.bbgo to idle
+    t =     5.80s Waiting 20.0s for Any (First Match) to exist
+    t =     6.87s     Checking `Expect predicate `existsNoRetry == 1` for object Any (First Match)`
+    t =     6.87s         Checking existence of `Any (First Match)`
+    t =     6.91s Find the Any (First Match)
+    t =     6.96s Tap "gear" Button
+    t =     6.96s     Wait for nyc.plee.bbgo to idle
+    t =     6.96s     Find the "gear" Button
+    t =     6.98s     Check for interrupting elements affecting "gear" Button
+    t =     7.05s         Wait for com.apple.springboard to idle
+    t =     7.07s     Synthesize event
+    t =     7.37s     Wait for nyc.plee.bbgo to idle
+    t =     8.84s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.91s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.91s         Checking existence of `"settingsServerURL" Any`
+    t =    10.00s Find the "settingsServerURL" Any
+    t =    10.04s Find the Window (First Match)
+    t =    10.05s Checking existence of `TabBar (First Match)`
+    t =    10.16s Find the "Settings" NavigationBar
+    t =    10.20s Checking existence of `StaticText (First Match)`
+    t =    10.29s Find the StaticText (First Match)
+    t =    10.38s Checking existence of `"Configured limit, Automatic" StaticText`
+    t =    10.47s Find the "Configured limit, Automatic" StaticText
+    t =    10.56s Find the Target Application 'nyc.plee.bbgo'
+    t =    10.67s Added attachment named 'settings-default-portrait-first-reachable'
+    t =    10.67s Requesting snapshot of accessibility hierarchy for app with pid 89832
+    t =    10.91s Requesting snapshot of accessibility hierarchy for app with pid 89832
+    t =    10.96s Added attachment named 'settings-default-portrait-first-reachable-tree'
+    t =    10.96s Find the "Configured limit, Automatic" StaticText
+    t =    11.05s Find the "Configured limit, Automatic" StaticText
+    t =    11.16s Find the "Configured limit, Automatic" StaticText
+    t =    11.25s Find the "Configured limit, Automatic" StaticText
+    t =    11.34s Find the "Configured limit, Automatic" StaticText
+    t =    11.43s Find the "Configured limit, Automatic" StaticText
+    t =    11.51s Find the Window (First Match)
+    t =    11.52s Find the Window (First Match)
+    t =    11.52s Checking existence of `TabBar (First Match)`
+    t =    11.63s Added attachment named 'settings-default-portrait-first-reachable-bounds'
+VISIBILITY settings-default-portrait-first-reachable {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[20,457,794,52],"tabBar":[],"visibleBottom":1168,"visibleTop":146,"window":[834,1210]}
+    t =    11.63s Find the "Configured limit, Automatic" StaticText
+    t =    11.72s Find the "Configured limit, Automatic" StaticText
+    t =    11.80s Find the Target Application 'nyc.plee.bbgo'
+    t =    11.91s Added attachment named 'settings-default-portrait-fully-visible'
+    t =    11.91s Requesting snapshot of accessibility hierarchy for app with pid 89832
+    t =    12.14s Requesting snapshot of accessibility hierarchy for app with pid 89832
+    t =    12.19s Added attachment named 'settings-default-portrait-fully-visible-tree'
+    t =    12.19s Find the "Configured limit, Automatic" StaticText
+    t =    12.29s Find the "Configured limit, Automatic" StaticText
+    t =    12.39s Find the "Configured limit, Automatic" StaticText
+    t =    12.49s Find the "Configured limit, Automatic" StaticText
+    t =    12.59s Find the "Configured limit, Automatic" StaticText
+    t =    12.69s Find the "Configured limit, Automatic" StaticText
+    t =    12.78s Find the Window (First Match)
+    t =    12.79s Find the Window (First Match)
+    t =    12.79s Checking existence of `TabBar (First Match)`
+    t =    12.90s Added attachment named 'settings-default-portrait-fully-visible-bounds'
+VISIBILITY settings-default-portrait-fully-visible {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[20,457,794,52],"tabBar":[],"visibleBottom":1168,"visibleTop":146,"window":[834,1210]}
+    t =    12.91s Find the "Configured limit, Automatic" StaticText
+    t =    13.00s Find the "Configured limit, Automatic" StaticText
+    t =    13.10s Find the "Configured limit, Automatic" StaticText
+    t =    13.20s Find the "Configured limit, Automatic" StaticText
+    t =    13.30s Find the "Configured limit, Automatic" StaticText
+    t =    13.41s Find the "Configured limit, Automatic" StaticText
+    t =    13.51s Find the "Configured limit, Automatic" StaticText
+    t =    13.61s Terminate nyc.plee.bbgo:89832
+    t =    14.70s Setting device orientation to Portrait
+    t =    14.70s     Wait for com.apple.springboard to idle
+    t =    14.71s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testDefaultPortrait]' passed (14.728 seconds).
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLLandscape]' started.
+    t =     0.00s Start Test at 2026-10-03 02:38:48.183
+    t =     0.01s Set Up
+    t =     0.01s Setting device orientation to Landscape Left
+    t =     0.02s     Device orientation changed to Landscape Left
+    t =     0.02s     Interface orientation changed to Landscape Right
+    t =     0.05s     Wait for com.apple.springboard to idle
+    t =     0.05s Open nyc.plee.bbgo
+    t =     0.06s     Launch nyc.plee.bbgo
+2026-10-03 02:38:48.239 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:38:48.239 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.27s         Setting up automation session
+    t =     2.30s         Wait for nyc.plee.bbgo to idle
+    t =     4.15s Waiting 20.0s for Any (First Match) to exist
+    t =     5.23s     Checking `Expect predicate `existsNoRetry == 1` for object Any (First Match)`
+    t =     5.23s         Checking existence of `Any (First Match)`
+    t =     5.27s Find the Any (First Match)
+    t =     5.30s Tap "gear" Cell
+    t =     5.30s     Wait for nyc.plee.bbgo to idle
+    t =     5.30s     Find the "gear" Cell
+    t =     5.32s     Check for interrupting elements affecting "gear" Cell
+    t =     5.39s         Wait for com.apple.springboard to idle
+    t =     5.41s Ignoring failure to get hierarchy for remote element in process 90943 (Error getting main window kAXErrorServerNotFound)
+    t =     5.41s Ignoring failure to get hierarchy for remote element in process 90943 (Error getting main window kAXErrorServerNotFound)
+    t =     5.42s     Synthesize event
+    t =     5.72s     Wait for nyc.plee.bbgo to idle
+    t =     5.76s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     6.83s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     6.83s         Checking existence of `"settingsServerURL" Any`
+    t =     6.94s Find the "settingsServerURL" Any
+    t =     6.98s Find the Window (First Match)
+    t =     7.00s Checking existence of `TabBar (First Match)`
+    t =     7.22s Find the "Settings" NavigationBar
+    t =     7.26s Checking existence of `StaticText (First Match)`
+    t =     7.38s Find the StaticText (First Match)
+    t =     7.49s Checking existence of `"Configured limit, Automatic" StaticText`
+    t =     7.59s Find the "Configured limit, Automatic" StaticText
+    t =     7.69s Find the Target Application 'nyc.plee.bbgo'
+    t =     7.80s Added attachment named 'settings-xxxl-landscape-first-reachable'
+    t =     7.80s Requesting snapshot of accessibility hierarchy for app with pid 91524
+    t =     8.07s Requesting snapshot of accessibility hierarchy for app with pid 91524
+    t =     8.12s Added attachment named 'settings-xxxl-landscape-first-reachable-tree'
+    t =     8.13s Find the "Configured limit, Automatic" StaticText
+    t =     8.32s Find the "Configured limit, Automatic" StaticText
+    t =     8.46s Find the "Configured limit, Automatic" StaticText
+    t =     8.54s Find the "Configured limit, Automatic" StaticText
+    t =     8.60s Find the "Configured limit, Automatic" StaticText
+    t =     8.67s Find the "Configured limit, Automatic" StaticText
+    t =     8.73s Find the Window (First Match)
+    t =     8.74s Find the Window (First Match)
+    t =     8.74s Checking existence of `TabBar (First Match)`
+    t =     8.80s Added attachment named 'settings-xxxl-landscape-first-reachable-bounds'
+VISIBILITY settings-xxxl-landscape-first-reachable {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[300,817.5,890,93.5],"tabBar":[],"visibleBottom":792,"visibleTop":167,"window":[1210,834]}
+    t =     8.81s Find the "Configured limit, Automatic" StaticText
+    t =     8.87s Find the "Configured limit, Automatic" StaticText
+    t =     8.94s Find the "Configured limit, Automatic" StaticText
+    t =     9.00s Press Target Application 'nyc.plee.bbgo'[0.50, 0.62] for 0.1 seconds, then drag to Target Application 'nyc.plee.bbgo'[0.50, 0.50] with velocity of 500.00 pixels per second, and then hold for 0.0 seconds 
+    t =     9.00s     Wait for nyc.plee.bbgo to idle
+    t =     9.00s     Find the Target Application 'nyc.plee.bbgo'
+    t =     9.02s     Check for interrupting elements affecting "BB Studio" Application
+    t =     9.04s         Wait for com.apple.springboard to idle
+    t =     9.05s Ignoring failure to get hierarchy for remote element in process 90943 (Error getting main window kAXErrorServerNotFound)
+    t =     9.05s Ignoring failure to get hierarchy for remote element in process 90943 (Error getting main window kAXErrorServerNotFound)
+    t =     9.06s     Synthesize event
+    t =     9.06s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.07s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.09s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.11s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.13s         Find the Target Application 'nyc.plee.bbgo'
+    t =     9.64s     Wait for nyc.plee.bbgo to idle
+    t =    11.37s Find the "Configured limit, Automatic" StaticText
+    t =    11.44s Find the "Configured limit, Automatic" StaticText
+    t =    11.50s Find the Target Application 'nyc.plee.bbgo'
+    t =    11.59s Added attachment named 'settings-xxxl-landscape-fully-visible'
+    t =    11.59s Requesting snapshot of accessibility hierarchy for app with pid 91524
+    t =    11.73s Requesting snapshot of accessibility hierarchy for app with pid 91524
+    t =    11.77s Added attachment named 'settings-xxxl-landscape-fully-visible-tree'
+    t =    11.77s Find the "Configured limit, Automatic" StaticText
+    t =    11.83s Find the "Configured limit, Automatic" StaticText
+    t =    11.89s Find the "Configured limit, Automatic" StaticText
+    t =    11.96s Find the "Configured limit, Automatic" StaticText
+    t =    12.02s Find the "Configured limit, Automatic" StaticText
+    t =    12.08s Find the "Configured limit, Automatic" StaticText
+    t =    12.13s Find the Window (First Match)
+    t =    12.14s Find the Window (First Match)
+    t =    12.14s Checking existence of `TabBar (First Match)`
+    t =    12.20s Added attachment named 'settings-xxxl-landscape-fully-visible-bounds'
+VISIBILITY settings-xxxl-landscape-fully-visible {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":1,"row":[300,514,890,93.5],"tabBar":[],"visibleBottom":792,"visibleTop":167,"window":[1210,834]}
+    t =    12.20s Find the "Configured limit, Automatic" StaticText
+    t =    12.27s Find the "Configured limit, Automatic" StaticText
+    t =    12.33s Find the "Configured limit, Automatic" StaticText
+    t =    12.40s Find the "Configured limit, Automatic" StaticText
+    t =    12.46s Find the "Configured limit, Automatic" StaticText
+    t =    12.53s Find the "Configured limit, Automatic" StaticText
+    t =    12.60s Find the "Configured limit, Automatic" StaticText
+    t =    12.67s Terminate nyc.plee.bbgo:91524
+    t =    13.80s Setting device orientation to Portrait
+    t =    13.81s     Device orientation changed to Portrait
+    t =    13.81s     Interface orientation changed to Portrait
+    t =    13.84s     Wait for com.apple.springboard to idle
+    t =    14.26s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLLandscape]' passed (14.297 seconds).
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLPortrait]' started.
+    t =     0.00s Start Test at 2026-10-03 02:39:02.480
+    t =     0.01s Set Up
+    t =     0.01s Setting device orientation to Portrait
+    t =     0.02s     Wait for com.apple.springboard to idle
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 02:39:02.499 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 02:39:02.499 xcodebuild[86454:89587584] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.24s         Setting up automation session
+    t =     2.12s         Wait for nyc.plee.bbgo to idle
+    t =     4.08s Waiting 20.0s for Any (First Match) to exist
+    t =     5.14s     Checking `Expect predicate `existsNoRetry == 1` for object Any (First Match)`
+    t =     5.14s         Checking existence of `Any (First Match)`
+    t =     5.19s Find the Any (First Match)
+    t =     5.22s Tap "gear" Button
+    t =     5.22s     Wait for nyc.plee.bbgo to idle
+    t =     5.23s     Find the "gear" Button
+    t =     5.24s     Check for interrupting elements affecting "gear" Button
+    t =     5.30s         Wait for com.apple.springboard to idle
+    t =     5.32s Ignoring failure to get hierarchy for remote element in process 90943 (Error getting main window kAXErrorServerNotFound)
+    t =     5.32s Ignoring failure to get hierarchy for remote element in process 90943 (Error getting main window kAXErrorServerNotFound)
+    t =     5.33s     Synthesize event
+    t =     5.61s     Wait for nyc.plee.bbgo to idle
+    t =     7.04s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     8.12s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     8.12s         Checking existence of `"settingsServerURL" Any`
+    t =     8.18s Find the "settingsServerURL" Any
+    t =     8.20s Find the Window (First Match)
+    t =     8.21s Checking existence of `TabBar (First Match)`
+    t =     8.26s Find the "Settings" NavigationBar
+    t =     8.29s Checking existence of `StaticText (First Match)`
+    t =     8.34s Find the StaticText (First Match)
+    t =     8.40s Checking existence of `"Configured limit, Automatic" StaticText`
+    t =     8.44s Find the "Configured limit, Automatic" StaticText
+    t =     8.49s Find the Target Application 'nyc.plee.bbgo'
+    t =     8.58s Added attachment named 'settings-xxxl-portrait-first-reachable'
+    t =     8.58s Requesting snapshot of accessibility hierarchy for app with pid 92285
+    t =     8.71s Requesting snapshot of accessibility hierarchy for app with pid 92285
+    t =     8.73s Added attachment named 'settings-xxxl-portrait-first-reachable-tree'
+    t =     8.74s Find the "Configured limit, Automatic" StaticText
+    t =     8.78s Find the "Configured limit, Automatic" StaticText
+    t =     8.83s Find the "Configured limit, Automatic" StaticText
+    t =     8.88s Find the "Configured limit, Automatic" StaticText
+    t =     8.93s Find the "Configured limit, Automatic" StaticText
+    t =     8.97s Find the "Configured limit, Automatic" StaticText
+    t =     9.02s Find the Window (First Match)
+    t =     9.03s Find the Window (First Match)
+    t =     9.03s Checking existence of `TabBar (First Match)`
+    t =     9.08s Added attachment named 'settings-xxxl-portrait-first-reachable-bounds'
+VISIBILITY settings-xxxl-portrait-first-reachable {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[20,867.5,794,93.5],"tabBar":[],"visibleBottom":1168,"visibleTop":167,"window":[834,1210]}
+    t =     9.08s Find the "Configured limit, Automatic" StaticText
+    t =     9.13s Find the "Configured limit, Automatic" StaticText
+    t =     9.18s Find the Target Application 'nyc.plee.bbgo'
+    t =     9.27s Added attachment named 'settings-xxxl-portrait-fully-visible'
+    t =     9.27s Requesting snapshot of accessibility hierarchy for app with pid 92285
+    t =     9.42s Requesting snapshot of accessibility hierarchy for app with pid 92285
+    t =     9.45s Added attachment named 'settings-xxxl-portrait-fully-visible-tree'
+    t =     9.45s Find the "Configured limit, Automatic" StaticText
+    t =     9.51s Find the "Configured limit, Automatic" StaticText
+    t =     9.57s Find the "Configured limit, Automatic" StaticText
+    t =     9.63s Find the "Configured limit, Automatic" StaticText
+    t =     9.68s Find the "Configured limit, Automatic" StaticText
+    t =     9.73s Find the "Configured limit, Automatic" StaticText
+    t =     9.78s Find the Window (First Match)
+    t =     9.79s Find the Window (First Match)
+    t =     9.79s Checking existence of `TabBar (First Match)`
+    t =     9.84s Added attachment named 'settings-xxxl-portrait-fully-visible-bounds'
+VISIBILITY settings-xxxl-portrait-fully-visible {"hittable":true,"label":"Configured limit, Automatic","ordinaryScrolls":0,"row":[20,867.5,794,93.5],"tabBar":[],"visibleBottom":1168,"visibleTop":167,"window":[834,1210]}
+    t =     9.84s Find the "Configured limit, Automatic" StaticText
+    t =     9.89s Find the "Configured limit, Automatic" StaticText
+    t =     9.93s Find the "Configured limit, Automatic" StaticText
+    t =     9.98s Find the "Configured limit, Automatic" StaticText
+    t =    10.02s Find the "Configured limit, Automatic" StaticText
+    t =    10.07s Find the "Configured limit, Automatic" StaticText
+    t =    10.11s Find the "Configured limit, Automatic" StaticText
+    t =    10.15s Terminate nyc.plee.bbgo:92285
+    t =    11.24s Setting device orientation to Portrait
+    t =    11.24s     Wait for com.apple.springboard to idle
+    t =    11.25s Tear Down
+Test Case '-[BBStudioUITests.SettingsVisibilityUITests testXXXLPortrait]' passed (11.273 seconds).
+Test Suite 'SettingsVisibilityUITests' passed at 2026-10-03 02:39:13.754.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 54.218 (54.221) seconds
+Test Suite 'BBStudioUITests.xctest' passed at 2026-10-03 02:39:13.754.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 54.218 (54.222) seconds
+Test Suite 'Selected tests' passed at 2026-10-03 02:39:13.754.
+	 Executed 4 tests, with 0 failures (0 unexpected) in 54.218 (54.222) seconds
+2026-10-03 02:39:14.049 xcodebuild[86454:89587584] [MT] IDETestOperationsObserverDebug: 58.771 elapsed -- Testing started completed.
+2026-10-03 02:39:14.049 xcodebuild[86454:89587584] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 02:39:14.049 xcodebuild[86454:89587584] [MT] IDETestOperationsObserverDebug: 58.771 sec, +58.771 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-settings-visibility-ipad3.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started
