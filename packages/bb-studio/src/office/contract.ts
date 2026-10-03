@@ -1,6 +1,6 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { inboxContract } from "./inbox-contract";
+import { inboxEventSchema, inboxContract } from "./inbox-contract";
 export { inboxEventSchema, type InboxEvent } from "./inbox-contract";
 
 const id = z.string().min(1).max(200);
@@ -34,6 +34,10 @@ const spaceInput = z.object({ name, icon: z.string().max(100).nullable().optiona
  * RPCs remain separate while the existing UI is replaced. */
 export const officeContract = defineRpcContract({
   ...inboxContract,
+  home: { input: z.object({ spaceId: id }), output: z.object({
+    needsYou: z.array(inboxEventSchema), reports: z.array(inboxEventSchema), recent: z.array(officeItemSchema),
+    working: z.array(z.object({ id, botId: id.nullable(), title: z.string(), status: z.enum(["working", "waiting", "review", "done"]), note: z.string().nullable(), recurring: z.string().nullable(), href: z.string(), updatedAt: z.number() })),
+  }) },
   spaces_list: { input: z.object({}), output: z.object({ spaces: z.array(officeSpaceSchema) }) },
   space_create: { input: spaceInput, output: z.object({ space: officeSpaceSchema }) },
   space_update: { input: spaceInput.partial().extend({ spaceId: id }), output: z.object({ space: officeSpaceSchema }) },

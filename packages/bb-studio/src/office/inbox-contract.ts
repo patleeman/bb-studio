@@ -8,7 +8,7 @@ export const inboxEventSchema = z.object({
   item: z.object({ ref: z.string(), title: z.string(), href: z.string() }).nullable(),
   title: z.string(), body: z.string(), href: z.string().nullable(),
   actions: z.array(z.object({ id: z.string(), label: z.string(), primary: z.boolean().optional() })).nullable(),
-  answerable: z.boolean().optional(), createdAt: z.number(), readAt: z.number().nullable(), doneAt: z.number().nullable(),
+  urgent: z.boolean().optional(), answerable: z.boolean().optional(), createdAt: z.number(), readAt: z.number().nullable(), doneAt: z.number().nullable(),
 });
 export type InboxEvent = z.infer<typeof inboxEventSchema>;
 export const inboxContract = defineRpcContract({

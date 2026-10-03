@@ -8,6 +8,9 @@ import type { StudioHub } from "../hub";
 import { StudioServices } from "../services";
 import { ProviderComments } from "../provider-comments";
 import { commentSource, pageRequestSource } from "./item-sources";
+import type { ModuleServices } from "../modules/services";
+import { moduleInboxSources } from "./module-sources";
+import { officeHome } from "./home";
 import { Inbox } from "./inbox";
 import { interactionSource } from "./interaction-source";
 import { officeContract } from "./contract";
@@ -15,7 +18,7 @@ import { FolderService } from "./folders";
 import { migrateOfficeSpaces } from "./migration";
 import { ProjectSpaceStore } from "./legacy-spaces";
 
-export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string } = {}) {
+export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; moduleServices?: ModuleServices } = {}) {
   const projects = await bb.sdk.projects.list({ includePersonal: true });
   const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE name='office_migrations'").get()
     && db.prepare("SELECT 1 FROM office_migrations WHERE id='space-root-v1'").get();
@@ -45,8 +48,9 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
-  const inbox = new Inbox(db, [interactionSource(bb.sdk), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub)], projectId => spaces.office.forProject(projectId).id);
-  bb.rpc.register(officeContract, {
+  const inbox = new Inbox(db, [interactionSource(bb.sdk), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
+  const { home: _homeContract, ...registeredContract } = officeContract;
+  bb.rpc.register(registeredContract, {
     inbox_list: input => inbox.list(input),
     inbox_counts: () => inbox.counts(spaces.office.list().map(s => s.id)),
     inbox_read: ({ keys }) => { inbox.mark(keys, "read"); changed(); return { ok: true }; },
@@ -95,5 +99,5 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
       }))) };
     },
   });
-  return { spaces, folders };
+  return { spaces, folders, home: (spaceId: string) => officeHome(spaceId, inbox, spaces.office, hub, options.moduleServices) };
 }
