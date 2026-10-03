@@ -1,0 +1,50 @@
+{
+  "origin": "http://127.0.0.1:49486",
+  "threadId": "thr_6qedhhkwm4",
+  "threadDeleteHTTP": 200,
+  "completedUTC": "2026-10-03T05:58:05Z",
+  "simulators": [
+    {
+      "args": [
+        "shutdown",
+        "20FC8510-346C-4775-9C2E-B1008E2EAF66"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "shutdown",
+        "DBEE99FC-4024-4FB4-A26B-7082D667FBD4"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "unpair",
+        "96A6A86F-C05B-43C0-8F7B-0638B43E9EF6"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "delete",
+        "20FC8510-346C-4775-9C2E-B1008E2EAF66"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "delete",
+        "DBEE99FC-4024-4FB4-A26B-7082D667FBD4"
+      ],
+      "exit": 0,
+      "output": ""
+    }
+  ],
+  "threadAfterDeleteHTTP": 404,
+  "ownedDevicesAbsent": true
+}
