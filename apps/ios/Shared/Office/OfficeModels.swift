@@ -5,6 +5,7 @@ public struct OfficeSpace: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
     public var icon: String?
+    public var color: String? = nil
     public var description: String
     public var isDefault: Bool
     public var defaultProjectId: String?

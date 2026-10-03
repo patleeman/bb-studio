@@ -69,6 +69,15 @@ public enum Studio {
     public static let inbox_act = "inbox_act"
     public static let inbox_done = "inbox_done"
     public static let inbox_read = "inbox_read"
+    public static let tabs_get = "tabs_get"
+    public static let tabs_seed = "tabs_seed"
+    public static let tabs_open = "tabs_open"
+    public static let tabs_move = "tabs_move"
+    public static let tabs_archived = "tabs_archived"
+    public static let tab_folder_create = "tab_folder_create"
+    public static let tab_folder_update = "tab_folder_update"
+    public static let tab_folder_delete = "tab_folder_delete"
+    public static let office_search = "office_search"
     public static let team_list = "team_list"
     public static let bot_desk = "bot_desk"
     public static let talk_dm = "talk_dm"
@@ -392,6 +401,26 @@ public enum Studio {
   public typealias InboxDone = InboxDoneOutput
 
   public typealias InboxRead = InboxReadOutput
+
+  public typealias TabsGet = TabsGetOutput
+
+  public typealias TabsSeed = TabsSeedOutput
+
+  public typealias TabsOpenInput = StudioJSONValue
+
+  public typealias TabsOpen = TabsOpenOutput
+
+  public typealias TabsMove = TabsMoveOutput
+
+  public typealias TabsArchived = TabsArchivedOutput
+
+  public typealias TabFolderCreate = TabFolderCreateOutput
+
+  public typealias TabFolderUpdate = TabFolderUpdateOutput
+
+  public typealias TabFolderDelete = TabFolderDeleteOutput
+
+  public typealias OfficeSearch = OfficeSearchOutput
 
   public typealias TeamList = TeamListOutput
 
@@ -5385,6 +5414,1040 @@ public enum Studio {
     }
   }
 
+  public struct TabsGetInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public enum TabsGetOutputEssentialsItemKind: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case bot
+    case conversation
+    case inbox
+    case home
+    case library
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      case "bot": self = .bot
+      case "conversation": self = .conversation
+      case "inbox": self = .inbox
+      case "home": self = .home
+      case "library": self = .library
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .bot: try container.encode("bot")
+      case .conversation: try container.encode("conversation")
+      case .inbox: try container.encode("inbox")
+      case .home: try container.encode("home")
+      case .library: try container.encode("library")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsGetOutputEssentialsItemZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsGetOutputEssentialsItemBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TabsGetOutputEssentialsItem: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var kind: TabsGetOutputEssentialsItemKind?
+    public var title: String?
+    public var icon: String?
+    public var href: String?
+    public var zone: TabsGetOutputEssentialsItemZone?
+    public var folderId: String?
+    public var openedAt: Double?
+    public var archivedAt: Double?
+    public var itemKind: String?
+    public var providerId: String?
+    public var botState: TabsGetOutputEssentialsItemBotState?
+    public var badge: Int?
+    public var needsYou: Bool?
+    public var unread: Bool?
+
+    public init(ref: String? = nil, kind: TabsGetOutputEssentialsItemKind? = nil, title: String? = nil, icon: String? = nil, href: String? = nil, zone: TabsGetOutputEssentialsItemZone? = nil, folderId: String? = nil, openedAt: Double? = nil, archivedAt: Double? = nil, itemKind: String? = nil, providerId: String? = nil, botState: TabsGetOutputEssentialsItemBotState? = nil, badge: Int? = nil, needsYou: Bool? = nil, unread: Bool? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.href = href
+      self.zone = zone
+      self.folderId = folderId
+      self.openedAt = openedAt
+      self.archivedAt = archivedAt
+      self.itemKind = itemKind
+      self.providerId = providerId
+      self.botState = botState
+      self.badge = badge
+      self.needsYou = needsYou
+      self.unread = unread
+    }
+  }
+
+  public enum TabsGetOutputPinnedItemKind: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case bot
+    case conversation
+    case inbox
+    case home
+    case library
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      case "bot": self = .bot
+      case "conversation": self = .conversation
+      case "inbox": self = .inbox
+      case "home": self = .home
+      case "library": self = .library
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .bot: try container.encode("bot")
+      case .conversation: try container.encode("conversation")
+      case .inbox: try container.encode("inbox")
+      case .home: try container.encode("home")
+      case .library: try container.encode("library")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsGetOutputPinnedItemZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsGetOutputPinnedItemBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TabsGetOutputPinnedItem: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var kind: TabsGetOutputPinnedItemKind?
+    public var title: String?
+    public var icon: String?
+    public var href: String?
+    public var zone: TabsGetOutputPinnedItemZone?
+    public var folderId: String?
+    public var openedAt: Double?
+    public var archivedAt: Double?
+    public var itemKind: String?
+    public var providerId: String?
+    public var botState: TabsGetOutputPinnedItemBotState?
+    public var badge: Int?
+    public var needsYou: Bool?
+    public var unread: Bool?
+
+    public init(ref: String? = nil, kind: TabsGetOutputPinnedItemKind? = nil, title: String? = nil, icon: String? = nil, href: String? = nil, zone: TabsGetOutputPinnedItemZone? = nil, folderId: String? = nil, openedAt: Double? = nil, archivedAt: Double? = nil, itemKind: String? = nil, providerId: String? = nil, botState: TabsGetOutputPinnedItemBotState? = nil, badge: Int? = nil, needsYou: Bool? = nil, unread: Bool? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.href = href
+      self.zone = zone
+      self.folderId = folderId
+      self.openedAt = openedAt
+      self.archivedAt = archivedAt
+      self.itemKind = itemKind
+      self.providerId = providerId
+      self.botState = botState
+      self.badge = badge
+      self.needsYou = needsYou
+      self.unread = unread
+    }
+  }
+
+  public struct TabsGetOutputFoldersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var `open`: Bool?
+    public var position: Int?
+
+    public init(id: String? = nil, name: String? = nil, `open`: Bool? = nil, position: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.`open` = `open`
+      self.position = position
+    }
+  }
+
+  public enum TabsGetOutputTodayItemKind: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case bot
+    case conversation
+    case inbox
+    case home
+    case library
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      case "bot": self = .bot
+      case "conversation": self = .conversation
+      case "inbox": self = .inbox
+      case "home": self = .home
+      case "library": self = .library
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .bot: try container.encode("bot")
+      case .conversation: try container.encode("conversation")
+      case .inbox: try container.encode("inbox")
+      case .home: try container.encode("home")
+      case .library: try container.encode("library")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsGetOutputTodayItemZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsGetOutputTodayItemBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TabsGetOutputTodayItem: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var kind: TabsGetOutputTodayItemKind?
+    public var title: String?
+    public var icon: String?
+    public var href: String?
+    public var zone: TabsGetOutputTodayItemZone?
+    public var folderId: String?
+    public var openedAt: Double?
+    public var archivedAt: Double?
+    public var itemKind: String?
+    public var providerId: String?
+    public var botState: TabsGetOutputTodayItemBotState?
+    public var badge: Int?
+    public var needsYou: Bool?
+    public var unread: Bool?
+
+    public init(ref: String? = nil, kind: TabsGetOutputTodayItemKind? = nil, title: String? = nil, icon: String? = nil, href: String? = nil, zone: TabsGetOutputTodayItemZone? = nil, folderId: String? = nil, openedAt: Double? = nil, archivedAt: Double? = nil, itemKind: String? = nil, providerId: String? = nil, botState: TabsGetOutputTodayItemBotState? = nil, badge: Int? = nil, needsYou: Bool? = nil, unread: Bool? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.href = href
+      self.zone = zone
+      self.folderId = folderId
+      self.openedAt = openedAt
+      self.archivedAt = archivedAt
+      self.itemKind = itemKind
+      self.providerId = providerId
+      self.botState = botState
+      self.badge = badge
+      self.needsYou = needsYou
+      self.unread = unread
+    }
+  }
+
+  public struct TabsGetOutput: Sendable, Hashable, Codable {
+    public var seeded: Bool?
+    public var essentials: [TabsGetOutputEssentialsItem]?
+    public var pinned: [TabsGetOutputPinnedItem]?
+    public var folders: [TabsGetOutputFoldersItem]?
+    public var today: [TabsGetOutputTodayItem]?
+
+    public init(seeded: Bool? = nil, essentials: [TabsGetOutputEssentialsItem]? = nil, pinned: [TabsGetOutputPinnedItem]? = nil, folders: [TabsGetOutputFoldersItem]? = nil, today: [TabsGetOutputTodayItem]? = nil) {
+      self.seeded = seeded
+      self.essentials = essentials
+      self.pinned = pinned
+      self.folders = folders
+      self.today = today
+    }
+  }
+
+  public struct TabsSeedInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var pinnedThreadIds: [String]?
+
+    public init(spaceId: String? = nil, pinnedThreadIds: [String]? = nil) {
+      self.spaceId = spaceId
+      self.pinnedThreadIds = pinnedThreadIds
+    }
+  }
+
+  public struct TabsSeedOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public enum TabsOpenOutputTabKind: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case bot
+    case conversation
+    case inbox
+    case home
+    case library
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      case "bot": self = .bot
+      case "conversation": self = .conversation
+      case "inbox": self = .inbox
+      case "home": self = .home
+      case "library": self = .library
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .bot: try container.encode("bot")
+      case .conversation: try container.encode("conversation")
+      case .inbox: try container.encode("inbox")
+      case .home: try container.encode("home")
+      case .library: try container.encode("library")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsOpenOutputTabZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsOpenOutputTabBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TabsOpenOutputTab: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var kind: TabsOpenOutputTabKind?
+    public var title: String?
+    public var icon: String?
+    public var href: String?
+    public var zone: TabsOpenOutputTabZone?
+    public var folderId: String?
+    public var openedAt: Double?
+    public var archivedAt: Double?
+    public var itemKind: String?
+    public var providerId: String?
+    public var botState: TabsOpenOutputTabBotState?
+    public var badge: Int?
+    public var needsYou: Bool?
+    public var unread: Bool?
+
+    public init(ref: String? = nil, kind: TabsOpenOutputTabKind? = nil, title: String? = nil, icon: String? = nil, href: String? = nil, zone: TabsOpenOutputTabZone? = nil, folderId: String? = nil, openedAt: Double? = nil, archivedAt: Double? = nil, itemKind: String? = nil, providerId: String? = nil, botState: TabsOpenOutputTabBotState? = nil, badge: Int? = nil, needsYou: Bool? = nil, unread: Bool? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.href = href
+      self.zone = zone
+      self.folderId = folderId
+      self.openedAt = openedAt
+      self.archivedAt = archivedAt
+      self.itemKind = itemKind
+      self.providerId = providerId
+      self.botState = botState
+      self.badge = badge
+      self.needsYou = needsYou
+      self.unread = unread
+    }
+  }
+
+  public struct TabsOpenOutput: Sendable, Hashable, Codable {
+    public var tab: TabsOpenOutputTab?
+
+    public init(tab: TabsOpenOutputTab? = nil) {
+      self.tab = tab
+    }
+  }
+
+  public enum TabsMoveInputZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TabsMoveInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var ref: String?
+    public var zone: TabsMoveInputZone?
+    public var folderId: String?
+    public var index: Int?
+
+    public init(spaceId: String? = nil, ref: String? = nil, zone: TabsMoveInputZone? = nil, folderId: String? = nil, index: Int? = nil) {
+      self.spaceId = spaceId
+      self.ref = ref
+      self.zone = zone
+      self.folderId = folderId
+      self.index = index
+    }
+  }
+
+  public struct TabsMoveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TabsArchivedInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var query: String?
+    public var limit: Int?
+
+    public init(spaceId: String? = nil, query: String? = nil, limit: Int? = nil) {
+      self.spaceId = spaceId
+      self.query = query
+      self.limit = limit
+    }
+  }
+
+  public enum TabsArchivedOutputTabsItemKind: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case bot
+    case conversation
+    case inbox
+    case home
+    case library
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      case "bot": self = .bot
+      case "conversation": self = .conversation
+      case "inbox": self = .inbox
+      case "home": self = .home
+      case "library": self = .library
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .bot: try container.encode("bot")
+      case .conversation: try container.encode("conversation")
+      case .inbox: try container.encode("inbox")
+      case .home: try container.encode("home")
+      case .library: try container.encode("library")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsArchivedOutputTabsItemZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TabsArchivedOutputTabsItemBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TabsArchivedOutputTabsItem: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var kind: TabsArchivedOutputTabsItemKind?
+    public var title: String?
+    public var icon: String?
+    public var href: String?
+    public var zone: TabsArchivedOutputTabsItemZone?
+    public var folderId: String?
+    public var openedAt: Double?
+    public var archivedAt: Double?
+    public var itemKind: String?
+    public var providerId: String?
+    public var botState: TabsArchivedOutputTabsItemBotState?
+    public var badge: Int?
+    public var needsYou: Bool?
+    public var unread: Bool?
+
+    public init(ref: String? = nil, kind: TabsArchivedOutputTabsItemKind? = nil, title: String? = nil, icon: String? = nil, href: String? = nil, zone: TabsArchivedOutputTabsItemZone? = nil, folderId: String? = nil, openedAt: Double? = nil, archivedAt: Double? = nil, itemKind: String? = nil, providerId: String? = nil, botState: TabsArchivedOutputTabsItemBotState? = nil, badge: Int? = nil, needsYou: Bool? = nil, unread: Bool? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.href = href
+      self.zone = zone
+      self.folderId = folderId
+      self.openedAt = openedAt
+      self.archivedAt = archivedAt
+      self.itemKind = itemKind
+      self.providerId = providerId
+      self.botState = botState
+      self.badge = badge
+      self.needsYou = needsYou
+      self.unread = unread
+    }
+  }
+
+  public struct TabsArchivedOutput: Sendable, Hashable, Codable {
+    public var tabs: [TabsArchivedOutputTabsItem]?
+
+    public init(tabs: [TabsArchivedOutputTabsItem]? = nil) {
+      self.tabs = tabs
+    }
+  }
+
+  public struct TabFolderCreateInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var name: String?
+
+    public init(spaceId: String? = nil, name: String? = nil) {
+      self.spaceId = spaceId
+      self.name = name
+    }
+  }
+
+  public struct TabFolderCreateOutputFolder: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var `open`: Bool?
+    public var position: Int?
+
+    public init(id: String? = nil, name: String? = nil, `open`: Bool? = nil, position: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.`open` = `open`
+      self.position = position
+    }
+  }
+
+  public struct TabFolderCreateOutput: Sendable, Hashable, Codable {
+    public var folder: TabFolderCreateOutputFolder?
+
+    public init(folder: TabFolderCreateOutputFolder? = nil) {
+      self.folder = folder
+    }
+  }
+
+  public struct TabFolderUpdateInput: Sendable, Hashable, Codable {
+    public var folderId: String?
+    public var name: String?
+    public var `open`: Bool?
+    public var position: Int?
+
+    public init(folderId: String? = nil, name: String? = nil, `open`: Bool? = nil, position: Int? = nil) {
+      self.folderId = folderId
+      self.name = name
+      self.`open` = `open`
+      self.position = position
+    }
+  }
+
+  public struct TabFolderUpdateOutputFolder: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var `open`: Bool?
+    public var position: Int?
+
+    public init(id: String? = nil, name: String? = nil, `open`: Bool? = nil, position: Int? = nil) {
+      self.id = id
+      self.name = name
+      self.`open` = `open`
+      self.position = position
+    }
+  }
+
+  public struct TabFolderUpdateOutput: Sendable, Hashable, Codable {
+    public var folder: TabFolderUpdateOutputFolder?
+
+    public init(folder: TabFolderUpdateOutputFolder? = nil) {
+      self.folder = folder
+    }
+  }
+
+  public struct TabFolderDeleteInput: Sendable, Hashable, Codable {
+    public var folderId: String?
+
+    public init(folderId: String? = nil) {
+      self.folderId = folderId
+    }
+  }
+
+  public struct TabFolderDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct OfficeSearchInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var query: String?
+    public var limit: Int?
+
+    public init(spaceId: String? = nil, query: String? = nil, limit: Int? = nil) {
+      self.spaceId = spaceId
+      self.query = query
+      self.limit = limit
+    }
+  }
+
+  public enum OfficeSearchOutputResultsItemKind: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case bot
+    case conversation
+    case inbox
+    case home
+    case library
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      case "bot": self = .bot
+      case "conversation": self = .conversation
+      case "inbox": self = .inbox
+      case "home": self = .home
+      case "library": self = .library
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .bot: try container.encode("bot")
+      case .conversation: try container.encode("conversation")
+      case .inbox: try container.encode("inbox")
+      case .home: try container.encode("home")
+      case .library: try container.encode("library")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeSearchOutputResultsItemZone: Sendable, Hashable, Codable {
+    case essential
+    case pinned
+    case today
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "essential": self = .essential
+      case "pinned": self = .pinned
+      case "today": self = .today
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .essential: try container.encode("essential")
+      case .pinned: try container.encode("pinned")
+      case .today: try container.encode("today")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum OfficeSearchOutputResultsItemBotState: Sendable, Hashable, Codable {
+    case idle
+    case working
+    case needs_you
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "idle": self = .idle
+      case "working": self = .working
+      case "needs_you": self = .needs_you
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .idle: try container.encode("idle")
+      case .working: try container.encode("working")
+      case .needs_you: try container.encode("needs_you")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct OfficeSearchOutputResultsItem: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var kind: OfficeSearchOutputResultsItemKind?
+    public var title: String?
+    public var icon: String?
+    public var href: String?
+    public var zone: OfficeSearchOutputResultsItemZone?
+    public var folderId: String?
+    public var openedAt: Double?
+    public var archivedAt: Double?
+    public var itemKind: String?
+    public var providerId: String?
+    public var botState: OfficeSearchOutputResultsItemBotState?
+    public var badge: Int?
+    public var needsYou: Bool?
+    public var unread: Bool?
+
+    public init(ref: String? = nil, kind: OfficeSearchOutputResultsItemKind? = nil, title: String? = nil, icon: String? = nil, href: String? = nil, zone: OfficeSearchOutputResultsItemZone? = nil, folderId: String? = nil, openedAt: Double? = nil, archivedAt: Double? = nil, itemKind: String? = nil, providerId: String? = nil, botState: OfficeSearchOutputResultsItemBotState? = nil, badge: Int? = nil, needsYou: Bool? = nil, unread: Bool? = nil) {
+      self.ref = ref
+      self.kind = kind
+      self.title = title
+      self.icon = icon
+      self.href = href
+      self.zone = zone
+      self.folderId = folderId
+      self.openedAt = openedAt
+      self.archivedAt = archivedAt
+      self.itemKind = itemKind
+      self.providerId = providerId
+      self.botState = botState
+      self.badge = badge
+      self.needsYou = needsYou
+      self.unread = unread
+    }
+  }
+
+  public struct OfficeSearchOutput: Sendable, Hashable, Codable {
+    public var results: [OfficeSearchOutputResultsItem]?
+
+    public init(results: [OfficeSearchOutputResultsItem]? = nil) {
+      self.results = results
+    }
+  }
+
   public struct TeamListInput: Sendable, Hashable, Codable {
     public var spaceId: String?
 
@@ -6080,6 +7143,7 @@ public enum Studio {
     public var id: String?
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
     public var isDefault: Bool?
     public var defaultProjectId: String?
@@ -6087,10 +7151,11 @@ public enum Studio {
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
       self.isDefault = isDefault
       self.defaultProjectId = defaultProjectId
@@ -6111,11 +7176,13 @@ public enum Studio {
   public struct SpaceCreateInput: Sendable, Hashable, Codable {
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
 
-    public init(name: String? = nil, icon: String? = nil, description: String? = nil) {
+    public init(name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil) {
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
     }
   }
@@ -6124,6 +7191,7 @@ public enum Studio {
     public var id: String?
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
     public var isDefault: Bool?
     public var defaultProjectId: String?
@@ -6131,10 +7199,11 @@ public enum Studio {
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
       self.isDefault = isDefault
       self.defaultProjectId = defaultProjectId
@@ -6155,12 +7224,14 @@ public enum Studio {
   public struct SpaceUpdateInput: Sendable, Hashable, Codable {
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
     public var spaceId: String?
 
-    public init(name: String? = nil, icon: String? = nil, description: String? = nil, spaceId: String? = nil) {
+    public init(name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil, spaceId: String? = nil) {
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
       self.spaceId = spaceId
     }
@@ -6170,6 +7241,7 @@ public enum Studio {
     public var id: String?
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
     public var isDefault: Bool?
     public var defaultProjectId: String?
@@ -6177,10 +7249,11 @@ public enum Studio {
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
       self.isDefault = isDefault
       self.defaultProjectId = defaultProjectId
@@ -6228,6 +7301,7 @@ public enum Studio {
     public var id: String?
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
     public var isDefault: Bool?
     public var defaultProjectId: String?
@@ -6235,10 +7309,11 @@ public enum Studio {
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
       self.isDefault = isDefault
       self.defaultProjectId = defaultProjectId
@@ -6261,6 +7336,39 @@ public enum Studio {
 
     public init(spaceId: String? = nil) {
       self.spaceId = spaceId
+    }
+  }
+
+  public enum SpaceSettingsGetOutputSettingsTodayArchiveAfter: Sendable, Hashable, Codable {
+    case _12h
+    case _1d
+    case _3d
+    case _7d
+    case never
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "12h": self = ._12h
+      case "1d": self = ._1d
+      case "3d": self = ._3d
+      case "7d": self = ._7d
+      case "never": self = .never
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case ._12h: try container.encode("12h")
+      case ._1d: try container.encode("1d")
+      case ._3d: try container.encode("3d")
+      case ._7d: try container.encode("7d")
+      case .never: try container.encode("never")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -6299,11 +7407,13 @@ public enum Studio {
   }
 
   public struct SpaceSettingsGetOutputSettings: Sendable, Hashable, Codable {
+    public var todayArchiveAfter: SpaceSettingsGetOutputSettingsTodayArchiveAfter?
     public var enabledItemKinds: [String]?
     public var defaultTrust: SpaceSettingsGetOutputSettingsDefaultTrust?
     public var defaultBotModel: SpaceSettingsGetOutputSettingsDefaultBotModel?
 
-    public init(enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsGetOutputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsGetOutputSettingsDefaultBotModel? = nil) {
+    public init(todayArchiveAfter: SpaceSettingsGetOutputSettingsTodayArchiveAfter? = nil, enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsGetOutputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsGetOutputSettingsDefaultBotModel? = nil) {
+      self.todayArchiveAfter = todayArchiveAfter
       self.enabledItemKinds = enabledItemKinds
       self.defaultTrust = defaultTrust
       self.defaultBotModel = defaultBotModel
@@ -6315,6 +7425,39 @@ public enum Studio {
 
     public init(settings: SpaceSettingsGetOutputSettings? = nil) {
       self.settings = settings
+    }
+  }
+
+  public enum SpaceSettingsSetInputSettingsTodayArchiveAfter: Sendable, Hashable, Codable {
+    case _12h
+    case _1d
+    case _3d
+    case _7d
+    case never
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "12h": self = ._12h
+      case "1d": self = ._1d
+      case "3d": self = ._3d
+      case "7d": self = ._7d
+      case "never": self = .never
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case ._12h: try container.encode("12h")
+      case ._1d: try container.encode("1d")
+      case ._3d: try container.encode("3d")
+      case ._7d: try container.encode("7d")
+      case .never: try container.encode("never")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -6353,11 +7496,13 @@ public enum Studio {
   }
 
   public struct SpaceSettingsSetInputSettings: Sendable, Hashable, Codable {
+    public var todayArchiveAfter: SpaceSettingsSetInputSettingsTodayArchiveAfter?
     public var enabledItemKinds: [String]?
     public var defaultTrust: SpaceSettingsSetInputSettingsDefaultTrust?
     public var defaultBotModel: SpaceSettingsSetInputSettingsDefaultBotModel?
 
-    public init(enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsSetInputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsSetInputSettingsDefaultBotModel? = nil) {
+    public init(todayArchiveAfter: SpaceSettingsSetInputSettingsTodayArchiveAfter? = nil, enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsSetInputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsSetInputSettingsDefaultBotModel? = nil) {
+      self.todayArchiveAfter = todayArchiveAfter
       self.enabledItemKinds = enabledItemKinds
       self.defaultTrust = defaultTrust
       self.defaultBotModel = defaultBotModel
@@ -6371,6 +7516,39 @@ public enum Studio {
     public init(spaceId: String? = nil, settings: SpaceSettingsSetInputSettings? = nil) {
       self.spaceId = spaceId
       self.settings = settings
+    }
+  }
+
+  public enum SpaceSettingsSetOutputSettingsTodayArchiveAfter: Sendable, Hashable, Codable {
+    case _12h
+    case _1d
+    case _3d
+    case _7d
+    case never
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "12h": self = ._12h
+      case "1d": self = ._1d
+      case "3d": self = ._3d
+      case "7d": self = ._7d
+      case "never": self = .never
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case ._12h: try container.encode("12h")
+      case ._1d: try container.encode("1d")
+      case ._3d: try container.encode("3d")
+      case ._7d: try container.encode("7d")
+      case .never: try container.encode("never")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -6409,11 +7587,13 @@ public enum Studio {
   }
 
   public struct SpaceSettingsSetOutputSettings: Sendable, Hashable, Codable {
+    public var todayArchiveAfter: SpaceSettingsSetOutputSettingsTodayArchiveAfter?
     public var enabledItemKinds: [String]?
     public var defaultTrust: SpaceSettingsSetOutputSettingsDefaultTrust?
     public var defaultBotModel: SpaceSettingsSetOutputSettingsDefaultBotModel?
 
-    public init(enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsSetOutputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsSetOutputSettingsDefaultBotModel? = nil) {
+    public init(todayArchiveAfter: SpaceSettingsSetOutputSettingsTodayArchiveAfter? = nil, enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsSetOutputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsSetOutputSettingsDefaultBotModel? = nil) {
+      self.todayArchiveAfter = todayArchiveAfter
       self.enabledItemKinds = enabledItemKinds
       self.defaultTrust = defaultTrust
       self.defaultBotModel = defaultBotModel
@@ -6492,6 +7672,7 @@ public enum Studio {
     public var id: String?
     public var name: String?
     public var icon: String?
+    public var color: String?
     public var description: String?
     public var isDefault: Bool?
     public var defaultProjectId: String?
@@ -6499,10 +7680,11 @@ public enum Studio {
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
+      self.color = color
       self.description = description
       self.isDefault = isDefault
       self.defaultProjectId = defaultProjectId

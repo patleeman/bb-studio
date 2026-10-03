@@ -536,6 +536,48 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_open",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_archived",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tab_folder_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tab_folder_update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "office_search",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "tree",

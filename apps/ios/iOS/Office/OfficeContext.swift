@@ -11,9 +11,11 @@ final class OfficeContext {
     private(set) var home: HomeStore?
     private(set) var team: TeamStore?
     private(set) var work: WorkStore?
+    private(set) var tabs: TabsStore?
     /// Requests waiting on you in every Space; the Inbox tab's badge.
     var inboxBadge: Int { inbox.counts.bySpace.values.reduce(0) { $0 + $1.requests } }
     @ObservationIgnored private let client: BBClient
+    @ObservationIgnored private var realtime: BBRealtime?
 
     init(client: BBClient) {
         self.client = client
@@ -21,8 +23,16 @@ final class OfficeContext {
         inbox = InboxStore(client: client)
     }
 
-    func observe(_ realtime: BBRealtime) { inbox.startObserving(realtime) }
-    func stopObserving() { inbox.stopObserving() }
+    func observe(_ realtime: BBRealtime) {
+        self.realtime = realtime
+        inbox.startObserving(realtime)
+        tabs?.startObserving(realtime)
+    }
+    func stopObserving() {
+        inbox.stopObserving()
+        tabs?.stopObserving()
+        realtime = nil
+    }
 
     var currentSpace: OfficeSpace? { spaces.currentSpace }
 
@@ -44,7 +54,8 @@ final class OfficeContext {
         async let home: Void = self.home?.refresh() ?? ()
         async let team: Void = self.team?.refresh() ?? ()
         async let work: Void = self.work?.refresh() ?? ()
-        _ = await (home, team, work)
+        async let tabs: Void = self.tabs?.refresh() ?? ()
+        _ = await (home, team, work, tabs)
     }
 
     private func rebuild() {
@@ -53,6 +64,9 @@ final class OfficeContext {
         home = HomeStore(spaceId: id, client: client)
         team = TeamStore(spaceId: id, client: client)
         work = WorkStore(spaceId: id, client: client)
+        tabs?.stopObserving()
+        tabs = TabsStore(spaceId: id, client: client)
+        if let realtime { tabs?.startObserving(realtime) }
     }
 
     func bot(_ id: String?) -> OfficeTeamBot? {

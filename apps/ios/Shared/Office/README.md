@@ -52,3 +52,20 @@ unsupported forms open the app. The coordinator owns their Inbox navigation.
 Legacy notifications without an Inbox key retain their existing action path.
 
 Trust uses the backend’s two supported levels, `ask` and `act`.
+
+`TabsStore(spaceId:client:)` owns `essentials`, `pinned`, `today`, and `folders`.
+`refresh()` seeds an unseeded Space from pinned sidebar threads, then resolves
+thread titles. `title(for:)` uses that cache with an `Untitled` fallback.
+`open(ref:)`, `open(href:)`, `move(_:to:folderId:)`, `archive(_:)`, and
+`clearToday()` refresh after mutation and expose failures through `error`.
+Folder methods are `createFolder(name:)`, `renameFolder(_:to:)`,
+`setFolderOpen(_:_:)`, and `deleteFolder(_:)`.
+`archived(query:)` and `search(_:)` throw on failure. Search returns matching
+open tabs, other matching BB threads, then server search results, deduplicated
+by ref. Future tab kinds are skipped when decoding server result envelopes.
+
+OfficeContext rebuilds TabsStore per Space and manages its realtime listener.
+The iOS-only `OfficeTab+Route.swift` reuses OfficeItem routing; channels open
+`.savedView`, bots open `.botDesk`, and Home/Inbox return nil for tab selection.
+Call `await tabs.noteOpened(route)` after pushing a native route. Item routes
+use canonical server hrefs; routes without a target ID cannot identify an item.
