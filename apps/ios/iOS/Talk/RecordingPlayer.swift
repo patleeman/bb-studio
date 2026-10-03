@@ -280,8 +280,9 @@ final class RecordingPlayer: ObservableObject {
         if mimeType.contains("webm") {
             pcm = try WebMOpus(data).decode()
         } else {
-            // The phone records MP4/AAC, which Core Audio reads from a file.
-            let url = FileManager.default.temporaryDirectory.appendingPathComponent("talk-play-\(UUID().uuidString).m4a")
+            // Core Audio reads both older AAC captures and journal-recovered WAV.
+            let extensionName = mimeType.contains("wav") ? "wav" : "m4a"
+            let url = FileManager.default.temporaryDirectory.appendingPathComponent("talk-play-\(UUID().uuidString).\(extensionName)")
             try data.write(to: url)
             defer { try? FileManager.default.removeItem(at: url) }
             let file = try AVAudioFile(forReading: url)

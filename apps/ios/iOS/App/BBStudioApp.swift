@@ -27,6 +27,7 @@ struct BBStudioApp: App {
                     }
                 }
                 .task {
+                    TalkOutbox.shared.kick()
                     // `-openURL bbstudio://…` drives headless simulator runs.
                     if let url = UserDefaults.standard.string(forKey: "openURL").flatMap(URL.init(string:)) {
                         model.handle(url)

@@ -12,6 +12,8 @@ struct SettingsView: View {
     @ObservedObject private var audioOutbox = TalkOutbox.shared
     @State private var confirmingLegacyUpload = false
     @State private var confirmingLegacyDrafts = false
+    @State private var discardingAudio: URL?
+    @State private var audioRecoveryError: String?
 
     var body: some View {
         Form {
@@ -32,6 +34,24 @@ struct SettingsView: View {
                 Section("Older drafts") {
                     Text("Older drafts are preserved, but their original server is unknown.").font(.footnote)
                     Button("Recover older drafts…") { confirmingLegacyDrafts = true }
+                }
+            }
+            if audioOutbox.recoveryError != nil || !audioOutbox.recoveryFiles.isEmpty {
+                Section("Audio recovery") {
+                    if let error = audioOutbox.recoveryError { Text(error).font(.footnote) }
+                    Button("Retry recovering audio") { audioOutbox.recoverCaptures() }
+                    if let audioRecoveryError { Text(audioRecoveryError).font(.footnote).foregroundStyle(.red) }
+                    ForEach(audioOutbox.recoveryFiles, id: \.self) { file in
+                        VStack(alignment: .leading, spacing: 8) {
+                            if FileManager.default.fileExists(atPath: file.path) {
+                                ShareLink(item: file) { Label("Export \(file.lastPathComponent)", systemImage: "square.and.arrow.up") }
+                            } else {
+                                Text("Missing audio: \(file.lastPathComponent)").font(.footnote)
+                            }
+                            Button("Discard local copy…", role: .destructive) { discardingAudio = file }
+                        }
+                    }
+                    Text("Unidentified audio is never uploaded automatically. PCM exports are 16 kHz, mono, 16-bit little-endian audio.").font(.footnote)
                 }
             }
             if audioOutbox.legacyPending > 0 {
@@ -94,6 +114,16 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .onAppear { serverURL = app.serverURL.absoluteString }
+        .confirmationDialog("Discard this local audio copy?", isPresented: .init(get: { discardingAudio != nil }, set: { if !$0 { discardingAudio = nil } }), titleVisibility: .visible, presenting: discardingAudio) { file in
+            Button("Discard local copy", role: .destructive) {
+                do { try audioOutbox.discardLocalCopy(file); audioRecoveryError = nil }
+                catch { audioRecoveryError = error.localizedDescription }
+                discardingAudio = nil
+            }
+            Button("Cancel", role: .cancel) { discardingAudio = nil }
+        } message: { file in
+            Text("This permanently deletes only \(file.lastPathComponent) and its recovery metadata from this phone. It may allow the recording to finish without this audio. Export it first if you want to keep it. Other local files and server audio are unchanged.")
+        }
         .confirmationDialog("Recover drafts onto \(app.serverURL.host() ?? app.serverURL.absoluteString)?", isPresented: $confirmingLegacyDrafts, titleVisibility: .visible) {
             Button("Recover onto this server") { Drafts.recoverLegacy(to: app.serverURL) }
         } message: {

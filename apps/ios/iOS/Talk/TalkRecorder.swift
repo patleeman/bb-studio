@@ -7,7 +7,7 @@ private let log = Logger(subsystem: "nyc.plee.bbgo", category: "talk")
 /// Native capture for the Talk plugin, following its web client's lifecycle:
 /// `recording_create` → `segment_put` per cut → heartbeat every 20s →
 /// `recording_state: finishing` → poll `recording_get` until the transcript is done.
-/// Segments are 16 kHz mono AAC, cut at a pause once they pass the target length
+/// Segments are 16 kHz mono PCM, cut at a pause once they pass the target length
 /// (Talk's segmenter policy), and pass through an on-disk outbox so a dropped
 /// connection loses nothing.
 @MainActor
@@ -32,6 +32,7 @@ final class TalkRecorder: ObservableObject {
     private var handoff: TalkHandoff?
     private var stoppedSegments: Int?
     private var completing = false
+    private var captureSession: TalkCaptureJournal.Session?
 
     init(client: BBClient) {
         self.client = client
@@ -41,6 +42,8 @@ final class TalkRecorder: ObservableObject {
     func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil) async {
         guard !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
         transcript = ""
+        captureSession = nil
+        stoppedSegments = nil
         do {
             guard await AVAudioApplication.requestRecordPermission() else {
                 phase = .failed("Microphone access is off. Enable it in Settings.")
@@ -54,12 +57,20 @@ final class TalkRecorder: ObservableObject {
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
             recordingId = recording.id
             let sessionId = Self.clientId()
+            let captureSession = try outbox.beginCapture(recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
+            self.captureSession = captureSession
             let handoff = TalkHandoff { [outbox, client] segment in
                 try outbox.add(segment, recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
             }
             self.handoff = handoff
             stoppedSegments = nil
-            try capture.start(
+            try capture.start(journal: outbox.captureJournal, session: captureSession,
+                onError: { [weak self] error in Task { @MainActor in
+                    guard let self else { return }
+                    self.needsRecovery = true
+                    _ = self.stopCapture()
+                    self.phase = .failed("Audio could not be written. Free some storage and retry saving. Interrupted audio is preserved for recovery in Settings.")
+                } },
                 onLevel: { [weak self] level in Task { @MainActor in self?.level = level } },
                 onSegment: { [weak self] segment in
                     Task { @MainActor in
@@ -83,7 +94,8 @@ final class TalkRecorder: ObservableObject {
             watchInput()
         } catch {
             log.error("start failed: \(error.localizedDescription, privacy: .public)")
-            _ = capture.stop()
+            _ = stopCapture()
+            needsRecovery = captureSession != nil
             try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
             phase = .failed(error.localizedDescription)
         }
@@ -242,7 +254,10 @@ final class SegmentCapture: @unchecked Sendable {
     private let queue = DispatchQueue(label: "talk.capture")
     private let format = AVAudioFormat(commonFormat: .pcmFormatFloat32, sampleRate: 16_000, channels: 1, interleaved: false)!
     private var converter: AVAudioConverter?
-    private var file: AVAudioFile?
+    private var file: FileHandle?
+    private var journal: TalkCaptureJournal?
+    private var session: TalkCaptureJournal.Session?
+    private var onError: ((Error) -> Void)?
     private var fileURL: URL?
     private var index = 0
     private var segmentStarted = Date()
@@ -260,7 +275,10 @@ final class SegmentCapture: @unchecked Sendable {
     private let maxMs = 40_000.0
     private let pauseMs = 350.0
 
-    func start(onLevel: @escaping (Float) -> Void, onSegment: @escaping (CapturedSegment) -> Void) throws {
+    func start(journal: TalkCaptureJournal, session: TalkCaptureJournal.Session, onError: @escaping (Error) -> Void, onLevel: @escaping (Float) -> Void, onSegment: @escaping (CapturedSegment) -> Void) throws {
+        self.journal = journal
+        self.session = session
+        self.onError = onError
         self.onSegment = onSegment
         self.onLevel = onLevel
         try queue.sync {
@@ -378,8 +396,16 @@ final class SegmentCapture: @unchecked Sendable {
 
     private func write(_ buffer: AVAudioPCMBuffer) {
         guard let file else { return }
-        try? file.write(from: buffer)
-        segmentFrames += AVAudioFramePosition(buffer.frameLength)
+        guard let samples = buffer.floatChannelData?[0] else { return }
+        let pcm = (0..<Int(buffer.frameLength)).map { i -> Int16 in
+            let value = samples[i].isFinite ? min(1, max(-1, samples[i])) : 0
+            return Int16(value * 32767).littleEndian
+        }
+        do {
+            try pcm.withUnsafeBytes { try file.write(contentsOf: Data($0)) }
+            if segmentFrames / 16_000 != (segmentFrames + AVAudioFramePosition(buffer.frameLength)) / 16_000 { try file.synchronize() }
+            segmentFrames += AVAudioFramePosition(buffer.frameLength)
+        } catch { onError?(error); return }
 
         let dtMs = Double(buffer.frameLength) / format.sampleRate * 1000
         let rms = Self.rms(buffer)
@@ -391,34 +417,30 @@ final class SegmentCapture: @unchecked Sendable {
         let elapsedMs = Double(segmentFrames) / format.sampleRate * 1000
         if elapsedMs >= maxMs || (elapsedMs >= targetMs && quietMs >= pauseMs) {
             closeSegment()
-            try? openSegment()
+            do { try openSegment() } catch { onError?(error) }
         }
     }
 
     private func openSegment() throws {
-        let url = FileManager.default.temporaryDirectory.appendingPathComponent("talk-\(UUID().uuidString).m4a")
-        let settings: [String: Any] = [
-            AVFormatIDKey: kAudioFormatMPEG4AAC,
-            AVSampleRateKey: 16_000,
-            AVNumberOfChannelsKey: 1,
-            AVEncoderBitRateKey: 32_000,
-        ]
-        file = try AVAudioFile(forWriting: url, settings: settings, commonFormat: .pcmFormatFloat32, interleaved: false)
-        fileURL = url
+        guard let journal, let session else { throw CocoaError(.fileWriteUnknown) }
         segmentStarted = Date()
+        let url = try journal.open(session, index: index, startedAt: Int(segmentStarted.timeIntervalSince1970 * 1000))
+        fileURL = url
+        file = try FileHandle(forWritingTo: url)
         segmentFrames = 0
         tracker.resetQuiet()
     }
 
     private func closeSegment() {
         guard let file, let fileURL else { return }
-        file.close()
+        try? file.synchronize()
+        try? file.close()
         self.file = nil
         self.fileURL = nil
-        let durationMs = Int(Double(segmentFrames) / format.sampleRate * 1000)
+        let durationMs = (try? TalkCaptureJournal.duration(of: fileURL)) ?? Int(Double(segmentFrames) / format.sampleRate * 1000)
         log.info("segment \(self.index) closed: \(durationMs)ms peak level \(self.tracker.level)")
-        guard durationMs > 300 else {
-            try? FileManager.default.removeItem(at: fileURL)
+        guard durationMs > 0 else {
+            journal?.discardEmpty(fileURL)
             return
         }
         onSegment?(
