@@ -2,7 +2,9 @@ import { readFile } from "node:fs/promises";
 import Ajv from "ajv/dist/2020.js";
 import addFormats from "ajv-formats";
 const root = new URL("../", import.meta.url);
-const fixtures = JSON.parse(await readFile(new URL("apps/ios/Tests/Fixtures/native-payloads.json", root), "utf8"));
+const fixtures = (await Promise.all(["native-payloads", "office-payloads"].map(async name =>
+  JSON.parse(await readFile(new URL(`apps/ios/Tests/Fixtures/${name}.json`, root), "utf8"))
+))).flat();
 const ajv = new Ajv({ strict: false, allErrors: true });
 addFormats(ajv);
 for (const fixture of fixtures) {

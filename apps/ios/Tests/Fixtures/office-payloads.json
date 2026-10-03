@@ -1,0 +1,95 @@
+[
+  {
+    "id": "office-inbox_list",
+    "plugin": "studio",
+    "method": "inbox_list",
+    "input": {
+      "spaceId": "all"
+    },
+    "output": {
+      "events": [
+        {
+          "key": "interaction:office",
+          "spaceId": "sp_office",
+          "type": "request",
+          "source": "bb-interaction",
+          "botId": null,
+          "threadId": "thr_office",
+          "item": null,
+          "title": "Review",
+          "body": "May I proceed?",
+          "href": "/threads/thr_office",
+          "actions": [
+            {
+              "id": "approve",
+              "label": "Approve",
+              "primary": true
+            },
+            {
+              "id": "deny",
+              "label": "Deny"
+            }
+          ],
+          "answerable": false,
+          "createdAt": 1700000000000,
+          "readAt": null,
+          "doneAt": null
+        }
+      ],
+      "cursor": "next"
+    }
+  },
+  {
+    "id": "office-inbox_counts",
+    "plugin": "studio",
+    "method": "inbox_counts",
+    "input": {},
+    "output": {
+      "bySpace": {
+        "sp_office": {
+          "requests": 1,
+          "unreadReports": 2
+        }
+      }
+    }
+  },
+  {
+    "id": "office-inbox_act",
+    "plugin": "studio",
+    "method": "inbox_act",
+    "input": {
+      "key": "interaction:office",
+      "actionId": "answer",
+      "text": "Proceed"
+    },
+    "output": {
+      "ok": true
+    }
+  },
+  {
+    "id": "office-inbox_done",
+    "plugin": "studio",
+    "method": "inbox_done",
+    "input": {
+      "keys": [
+        "interaction:office"
+      ]
+    },
+    "output": {
+      "ok": true
+    }
+  },
+  {
+    "id": "office-inbox_read",
+    "plugin": "studio",
+    "method": "inbox_read",
+    "input": {
+      "keys": [
+        "interaction:office"
+      ]
+    },
+    "output": {
+      "ok": true
+    }
+  }
+]

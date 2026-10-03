@@ -8,7 +8,7 @@ extension BBClient {
         try await rpc("studio", method, input)
     }
     public func officeHome(_ spaceId: String) async throws -> OfficeHome {
-        try await pendingOfficeRPC("home", ["spaceId": .string(spaceId)])
+        try await pendingOfficeRPC("office_home", ["spaceId": .string(spaceId)])
     }
     public func officeTeam(_ spaceId: String) async throws -> [OfficeTeamBot] {
         struct Result: Decodable { var bots: [OfficeTeamBot] }
@@ -20,7 +20,30 @@ extension BBClient {
         let result: Result = try await pendingOfficeRPC("talk_list", ["spaceId": .string(spaceId)])
         return result.conversations
     }
+    public func officeStart(spaceId: String, request: String) async throws -> OfficeStartResult {
+        try await pendingOfficeRPC("office_start", ["spaceId": .string(spaceId), "request": .string(request)])
+    }
+    public func officeDelegate(botId: String, brief: String, context: [String]? = nil,
+                               folderId: String? = nil, schedule: String? = nil) async throws -> OfficeDelegationResult {
+        try await pendingOfficeRPC("delegate", .object(omittingNil: [
+            "botId": .string(botId), "brief": .string(brief),
+            "context": context.map { .array($0.map(JSONValue.string)) },
+            "folderId": folderId.map(JSONValue.string), "schedule": schedule.map(JSONValue.string),
+        ]))
+    }
     public func officeBotDesk(_ botId: String) async throws -> OfficeBotDesk {
         try await pendingOfficeRPC("bot_desk", ["botId": .string(botId)])
     }
+}
+
+/// Provisional office_start result from the web OfficeHome composer.
+public struct OfficeStartResult: Codable, Sendable {
+    public var threadId: String?
+    public var taskId: String?
+    public var botId: String?
+}
+
+/// Provisional delegate result from the web DelegateDialog.
+public struct OfficeDelegationResult: Codable, Sendable {
+    public var taskId: String
 }
