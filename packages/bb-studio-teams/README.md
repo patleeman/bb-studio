@@ -68,24 +68,32 @@ Captured on stable BB 0.45.0 with the full suite installed from pushed commit ad
 A segmented switcher above the channel picks Merged, Grid, Active, or Focus.
 Grid shows every member's native transcript. Threads that need input or are
 failing come first, then working threads, then the rest by most recent update.
-Bots that have no thread yet share one quiet row instead of empty panes. To
+Bots that have no thread yet share one row with a dashed outline, the same
+outline they get in Focus and Active. To
 [rearrange the grid](assets/channel-grid-arrange.png), drag a pane by its
 header and drop it where the blue line shows. You can also focus the pane's
 grip and use the arrow keys. Each channel remembers its order. New threads
-follow in attention order, and Reset order returns to it. The
-[Active view](assets/channel-active.png) lists every member in a status strip
-and shows only working transcripts below it. When nobody is working, it names
-the last thread to reply. The [Focus view](assets/channel-focus.png) pairs a
-one-line member list with a frameless transcript aligned to the composer.
-On a phone, [Grid](assets/channel-grid-mobile.png) stacks the transcripts and
-[Focus](assets/channel-focus-mobile.png) turns the member list into a row
-above the transcript.
+follow in attention order, and Reset order returns to it.
+
+The [Focus view](assets/channel-focus.png) looks like a thread page. The
+transcript scrolls edge to edge at the composer's width, and a floating box in
+the left margin lists the members. Click a name to swap threads. The current
+row has Reply in channel and Open thread. When the margin is too narrow for
+names, the box [shows avatars only](assets/channel-focus-compact.png).
+The [Active view](assets/channel-active.png) uses the same page and box, but
+follows the work: it shows whichever thread starts working and keeps it on
+screen after it finishes. Picking a member in the box holds that thread until
+another thread starts. On a phone, [Grid](assets/channel-grid-mobile.png)
+stacks the transcripts and [Focus](assets/channel-focus-mobile.png) turns the
+box into a row above the transcript.
 
 These captures run in the full stable BB 0.45.0 application with Studio Teams
-installed from pushed commit 501a9eb. Live assertions check concise owner input
+installed from pushed commit 51b5c3a. Live assertions check concise owner input
 without transport envelopes in Grid and phone Focus, native reaction rendering and reply routing,
 retention of the exact composer and its draft across all four views, and promotion
-and removal of a running thread in Active, including the idle note that names the last reply.
+that Active follows a thread when it starts working, keeps it after it stops,
+and swaps on a pick, and that the member box stays in the margin at full and
+compact widths.
 The arrange check drags a pane over another in the live grid, then confirms
 the drop, the order after a reload, and Reset order.
 
