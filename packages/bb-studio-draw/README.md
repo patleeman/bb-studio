@@ -95,6 +95,9 @@ versa) via tombstones; edits to the *same* element resolve by Excalidraw's
   changes are serialized (keeping deleted elements as tombstones so
   deletions propagate in multi-writer merges) and autosaved with a 1.2s
   debounce plus an ordered save chain, so rapid edits never race.
+  Failed saves keep the newest pending scene and retry up to three times.
+  If a save still fails, the editor shows **Retry save** and warns before
+  you close the browser with unsaved changes.
 - Every successful write (editor autosave, agent tool, CLI) publishes a
   realtime `excalidraw` signal and tells Studio the collection changed; open
   editors fetch the latest scene on every signal, fill in element defaults
