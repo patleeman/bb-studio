@@ -11,6 +11,29 @@ import { officeTalk } from "./talk";
 import { matches, type TabCatalog } from "./tab-service";
 import type { TabTarget } from "./tabs-contract";
 
+/**
+ * Reads shared across requests for a moment. Clients load the tab list in
+ * bursts (each Studio change, each page open), and every load resolved every
+ * tab again: a BB thread lookup per thread tab, the team, the channels and
+ * the Inbox count. Bursts now share one answer; thread existence, which
+ * rarely changes, is kept a little longer.
+ */
+const shared = new Map<string, { at: number; value: Promise<unknown> }>();
+let sharing = true;
+/** Tests that change data between reads turn sharing off. */
+export function shareTabReads(on: boolean): void { sharing = on; shared.clear(); }
+export function cached<T>(key: string, ttlMs: number, load: () => Promise<T>): Promise<T> {
+  if (!sharing) return load();
+  const hit = shared.get(key);
+  if (hit && Date.now() - hit.at < ttlMs) return hit.value as Promise<T>;
+  const value = load();
+  shared.set(key, { at: Date.now(), value });
+  value.catch(() => { if (shared.get(key)?.value === value) shared.delete(key); });
+  return value;
+}
+const BURST_MS = 3_000;
+const THREAD_MS = 30_000;
+
 export function tabCatalog(spaceId: string, deps: {
   bb: BbPluginApi; hub: StudioHub; spaces: OfficeSpaceStore;
   inbox: Inbox; search: SearchIndex; modules?: ModuleServices;
@@ -19,18 +42,31 @@ export function tabCatalog(spaceId: string, deps: {
   const space = spaces.get(spaceId);
   const belongs = (projectId: string | null) => spaces.forProject(projectId).id === spaceId;
   const once = <T>(fn: () => Promise<T>) => { let promise: Promise<T> | undefined; return () => promise ??= fn(); };
-  const bots = once(() => officeTeam("all", spaces, inbox, modules).then(r => r.bots));
-  const conversations = once(async () => modules ? (await officeTalk("all", modules, spaces)).conversations : []);
-  const overview = once(() => hub.overview());
+  const bots = once(() => cached("team:all", BURST_MS, () => officeTeam("all", spaces, inbox, modules).then(r => r.bots)));
+  const conversations = once(() => cached("talk:all", BURST_MS, async () => modules ? (await officeTalk("all", modules, spaces)).conversations : []));
+  const overview = once(() => cached("overview", BURST_MS, () => hub.overview()));
   const threads = new Map<string, Promise<Awaited<ReturnType<typeof bb.sdk.threads.get>> | null>>();
   const thread = (id: string) => {
-    if (!threads.has(id)) threads.set(id, bb.sdk.threads.get({ threadId: id }).catch(error => {
+    if (!threads.has(id)) threads.set(id, cached(`thread:${id}`, THREAD_MS, () => bb.sdk.threads.get({ threadId: id }).catch(error => {
       if (rpcErrorStatus(error) === 404) return null;
       throw error;
-    }));
+    })));
     return threads.get(id)!;
   };
   const itemReads = new Map<string, ReturnType<StudioHub["itemsResult"]>>();
+  // Items asked for in the same tick go to their provider in one read.
+  const batches = new Map<string, { ids: Set<string>; run: ReturnType<StudioHub["itemsResult"]> }>();
+  const readItem = (pluginId: string, id: string) => {
+    let batch = batches.get(pluginId);
+    if (!batch) {
+      const ids = new Set<string>();
+      const run = Promise.resolve().then(() => { batches.delete(pluginId); return hub.itemsResult(pluginId, [...ids]); });
+      batch = { ids, run };
+      batches.set(pluginId, batch);
+    }
+    batch.ids.add(id);
+    return batch.run;
+  };
   const resolve = async (ref: string): Promise<TabTarget | null> => {
     const base = { ref, title: null, icon: null, href: null };
     if (ref.startsWith("thread:")) {
@@ -38,7 +74,7 @@ export function tabCatalog(spaceId: string, deps: {
       return value && !value.deletedAt ? { ...base, kind: "thread" } : null;
     }
     if (ref === "office:home") return { ...base, kind: "home", title: "Home", icon: "studio/home", href: "/plugins/studio/office" };
-    if (ref === "office:inbox") return { ...base, kind: "inbox", title: "Inbox", icon: "studio/inbox", href: "/plugins/studio/office-inbox", badge: (await inbox.counts([spaceId])).bySpace[spaceId]?.requests ?? 0 };
+    if (ref === "office:inbox") return { ...base, kind: "inbox", title: "Inbox", icon: "studio/inbox", href: "/plugins/studio/office-inbox", badge: (await cached(`counts:${spaceId}`, BURST_MS, () => inbox.counts([spaceId]))).bySpace[spaceId]?.requests ?? 0 };
     if (ref === "library") return { ...base, kind: "library", title: "Library", icon: "studio/studio", href: "/plugins/studio/studio" };
     if (ref.startsWith("library:")) {
       const kind = ref.slice(8);
@@ -60,7 +96,7 @@ export function tabCatalog(spaceId: string, deps: {
       const [, pluginId, ...parts] = ref.split(":");
       const id = parts.join(":");
       const key = `${pluginId}:${id}`;
-      if (!itemReads.has(key)) itemReads.set(key, hub.itemsResult(pluginId!, [id]));
+      if (!itemReads.has(key)) itemReads.set(key, readItem(pluginId!, id));
       const result = await itemReads.get(key)!;
       if (result.status === "unavailable") throw new Error(result.error);
       const item = result.status === "ready" ? result.items.find(i => i.id === id) : undefined;

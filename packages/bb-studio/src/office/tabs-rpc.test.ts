@@ -7,6 +7,9 @@ import { initializeOffice } from "./server";
 import { ModuleServices } from "../modules/services";
 import { officeTabsContract } from "./tabs-contract";
 import type { OfficeInput, OfficeOutput } from "./contract";
+import { cached, shareTabReads } from "./tab-catalog";
+// These tests change data between reads; the short-lived read sharing would hide that.
+shareTabReads(false);
 
 const cleanups: (() => Promise<void>)[]=[];
 afterEach(async()=>{ for (const close of cleanups.splice(0)) await close(); });
@@ -53,7 +56,8 @@ it("serves every tab RPC through schema validation, resolves routes and metadata
   const count=signalCount();await call("tabs_seed",{spaceId,pinnedThreadIds:["again"]});expect(signalCount()).toBe(count);
   for (const [href,ref] of [["/plugins/studio/office","office:home"],["/plugins/studio/office-inbox","office:inbox"],["/plugins/studio/office-team/ada/tasks","bot:ada"],["/plugins/studio/studio","library"],["/plugins/studio/studio/artifact","library:artifact"],["/plugins/studio/artifacts/a/details?x=1","item:studio:a"],["/plugins/studio/channels/channel","conversation:channel"]]) {
     const before=signalCount(); const opened=await call("tabs_open",{spaceId,href:href!});
-    expect(opened.tab?.ref).toBe(ref); expect(signalCount()).toBeGreaterThan(before);
+    // Only a new tab is news; reopening an Essential just moves its opened time.
+    expect(opened.tab?.ref).toBe(ref); expect(signalCount() > before).toBe(!["office:inbox","bot:ada"].includes(ref!));
   }
   expect((await call("tabs_open",{spaceId,ref:"bot:ada"})).tab).toMatchObject({title:"Launch Ada",providerId:"hermes",botState:"idle",href:"/plugins/studio/office-team/ada"});
   expect((await call("tabs_open",{spaceId,ref:"office:inbox"})).tab).toMatchObject({badge:0,href:"/plugins/studio/office-inbox"});
@@ -275,4 +279,16 @@ it("collapses overlapping pane arrangements to one plain tab and removes a split
   await call("tabs_split_remove", { spaceId, ref: split.ref });
   expect(harness.realtimeSignals.length).toBe(before + 1);
   expect((await call("tabs_get", { spaceId })).today.map(t => t.ref)).toEqual(["thread:one", "library"]);
+});
+
+
+it("shares one read across a burst of tab loads", async () => {
+  shareTabReads(true);
+  try {
+    let loads = 0;
+    const load = async () => ++loads;
+    await Promise.all([cached("burst", 1_000, load), cached("burst", 1_000, load), cached("burst", 1_000, load)]);
+    expect(loads).toBe(1);
+    expect(await cached("burst", 0, load)).toBe(2);
+  } finally { shareTabReads(false); }
 });

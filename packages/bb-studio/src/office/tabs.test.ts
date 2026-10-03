@@ -34,7 +34,8 @@ describe("office tab storage", () => {
     store.open(spaceId, "thread:a");
     expect(refs(store, spaceId, "today")).toEqual(["thread:a", "thread:b"]);
     expect(store.rows(spaceId)[0]!.archived_at).toBeNull();
-    expect(changed).toHaveBeenCalledTimes(5);
+    // The touch of an existing tab publishes nothing; the rest do.
+    expect(changed).toHaveBeenCalledTimes(4);
   });
   it("adds to the end of Essentials and Pinned, and to the top of Today", () => {
     const { store, spaceId } = setup();

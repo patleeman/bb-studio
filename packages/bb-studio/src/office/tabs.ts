@@ -128,15 +128,21 @@ export class OfficeTabs {
     this.order(spaceId, refs);
   }
   open(spaceId: string, ref: string): void {
-    this.db.transaction(() => {
+    const added = this.db.transaction(() => {
       const old = this.rows(spaceId).find(t => t.ref === ref);
       if (!old || old.zone === "archived") {
         this.db.prepare("INSERT INTO office_tabs VALUES (?,?,'today',NULL,0,?,NULL) ON CONFLICT(space_id,ref) DO UPDATE SET zone='today',folder_id=NULL,opened_at=excluded.opened_at,archived_at=NULL")
           .run(spaceId, ref, this.now());
         this.place(spaceId, ref, "today", null);
-      } else this.db.prepare("UPDATE office_tabs SET opened_at=? WHERE space_id=? AND ref=?").run(this.now(), spaceId, ref);
+        return true;
+      }
+      this.db.prepare("UPDATE office_tabs SET opened_at=? WHERE space_id=? AND ref=?").run(this.now(), spaceId, ref);
+      return false;
     })();
-    this.notify();
+    // Reopening a tab you have only moves its opened time, which no sidebar
+    // shows: telling every client to refetch on each page open made opening
+    // pages slow.
+    if (added) this.notify();
   }
   move(spaceId: string, ref: string, zone: TabZone, folderId?: string | null, index?: number): void {
     this.db.transaction(() => {
