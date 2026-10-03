@@ -157,11 +157,11 @@ export function ProfileForm({
   }, [bot, changedProfile]);
   useEffect(() => {
     if (!dirty && !submitting.current) {
-      setDraft(bot);
+      setDraft(resolved && !bot.model ? { ...bot, ...resolved } : bot);
       setBaseline(bot);
       setVersion(bot.updatedAt);
     }
-  }, [bot, dirty]);
+  }, [bot, dirty, resolved]);
   useEffect(() => {
     try {
       writeConfigDraft(
@@ -289,12 +289,13 @@ export function ProfileForm({
                 reasoningLevel: draft.reasoningLevel,
               }}
               onChange={(v) => {
+                if (v.providerId === draft.providerId && v.model === draft.model && v.reasoningLevel === draft.reasoningLevel) return;
                 // A bot without a model gets the catalog's default filled in
                 // on load. That isn't an edit, so it moves the baseline too.
                 if (!draft.model && !baseline.model && v.providerId === draft.providerId) {
                   setResolved({ model: v.model, reasoningLevel: v.reasoningLevel });
                 } else setSaved(false);
-                setDraft((d) => ({ ...d, ...v }));
+                setDraft((d) => ({ ...d, providerId: v.providerId, model: v.model, reasoningLevel: v.reasoningLevel }));
               }}
               routing={{ kind: "host", hostId: bot.hostId }}
             />
@@ -311,6 +312,7 @@ export function ProfileForm({
                   reasoningLevel: draft.fallbackReasoningLevel,
                 }}
                 onChange={(v) => {
+                  if (v.providerId === draft.fallbackProviderId && v.model === draft.fallbackModel && v.reasoningLevel === draft.fallbackReasoningLevel) return;
                   setDraft((d) => ({
                     ...d,
                     fallbackProviderId: v.providerId,

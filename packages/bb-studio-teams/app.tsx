@@ -31,7 +31,7 @@ const STATUS_TONES = {
   error: "danger",
 } as const;
 
-function BotDetail({ id, tab }: { id: string; tab: string }) {
+function BotDetail({ id, tab, href }: { id: string; tab: string; href: string }) {
   const rpc = useRpc<typeof rpcContract>(),
     studio = useStudioPresent();
   const [archiveOpen, setArchiveOpen] = useState(false);
@@ -104,7 +104,7 @@ function BotDetail({ id, tab }: { id: string; tab: string }) {
   return (
     <div className="relative h-full min-h-0">
       <ItemHeader
-        item={{ href: botHref(id), title: bot.name }}
+        item={{ href, title: bot.name }}
         chatAction={bot.retired ? null : <BotChat key={id} id={id} disabled={pending} onError={setError} />}
         backLabel={studio ? "Studio" : "Bots"}
         onBack={() =>
@@ -289,6 +289,7 @@ function BotsPage({ subPath }: PluginNavPanelProps) {
       <BotDetail
           key={id}
           id={id}
+          href={`${botHref(id)}${section ? `/${section}` : ""}`}
           tab={
             tabs.includes(section as (typeof tabs)[number])
               ? section
