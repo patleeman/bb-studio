@@ -1,0 +1,164 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-artifact-edge.LWSdl5/build/Build/Products/BBStudio_iphonesimulator27.0-arm64.xctestrun -destination "platform=iOS Simulator,id=3F721505-CCAA-45AB-A647-E1E15C41FD4E" "-only-testing:BBStudioUITests/ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction" "-only-testing:BBStudioUITests/ArtifactRuntimeUITests/testLockedPDFOffersShare" -parallel-testing-enabled NO -resultBundlePath /tmp/bb-artifact-edge.LWSdl5/results.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-artifact-edge.LWSdl5/results.xcresult
+
+2026-10-03 04:16:49.576108-0400 BBStudioUITests-Runner[95650:90523109] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 04:16:52.840.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 04:16:52.840.
+Test Suite 'ArtifactRuntimeUITests' started at 2026-10-03 04:16:52.840.
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testCorruptHeaderPDFShowsRecoveryAction]' started.
+    t =     0.02s Start Test at 2026-10-03 04:16:52.859
+    t =     0.12s Set Up
+    t =     0.13s Open nyc.plee.bbgo
+    t =     0.13s     Launch nyc.plee.bbgo
+2026-10-03 04:16:53.011 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:16:53.011 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: no debugger version
+objc[95650]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x1088c0398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x108a18310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     0.78s         Setting up automation session
+    t =     3.40s         Wait for nyc.plee.bbgo to idle
+    t =     5.17s Waiting 20.0s for "Settings" Button to exist
+    t =     6.21s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     6.21s         Checking existence of `"Settings" Button`
+    t =     6.29s Tap "Settings" Button
+    t =     6.29s     Wait for nyc.plee.bbgo to idle
+    t =     6.30s     Find the "Settings" Button
+    t =     6.33s     Check for interrupting elements affecting "Settings" Button
+    t =     6.36s     Synthesize event
+    t =     6.76s     Wait for nyc.plee.bbgo to idle
+    t =     8.65s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.69s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.69s         Checking existence of `"settingsServerURL" Any`
+    t =     9.75s Find the "settingsServerURL" Any
+    t =     9.78s Open nyc.plee.bbgo with URL bbstudio://artifact/art_511e8384044656fa
+    t =     9.79s     Launch nyc.plee.bbgo
+2026-10-03 04:17:02.626 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:17:02.626 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     9.99s         Setting up automation session
+    t =    12.86s         Wait for nyc.plee.bbgo to idle
+    t =    14.98s Waiting 15.0s for "Edge header corrupt" NavigationBar to exist
+    t =    16.01s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge header corrupt" NavigationBar`
+    t =    16.01s         Checking existence of `"Edge header corrupt" NavigationBar`
+    t =    16.09s Find the Target Application 'nyc.plee.bbgo'
+    t =    16.18s Added attachment named 'header-pdf-opened'
+    t =    16.18s Requesting snapshot of accessibility hierarchy for app with pid 95755
+    t =    16.30s Requesting snapshot of accessibility hierarchy for app with pid 95755
+    t =    16.34s Added attachment named 'header-pdf-opened-tree'
+    t =    16.34s Waiting 15.0s for "Couldn't load the preview" StaticText to exist
+    t =    17.37s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    17.37s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    17.42s Find the "Retry" Button
+    t =    17.45s Find the "Share File" Button
+    t =    17.48s Find the Target Application 'nyc.plee.bbgo'
+    t =    17.56s Added attachment named 'header-pdf-error'
+    t =    17.56s Requesting snapshot of accessibility hierarchy for app with pid 95755
+    t =    17.65s Requesting snapshot of accessibility hierarchy for app with pid 95755
+    t =    17.69s Added attachment named 'header-pdf-error-tree'
+    t =    17.69s Tap "Retry" Button
+    t =    17.69s     Wait for nyc.plee.bbgo to idle
+    t =    17.69s     Find the "Retry" Button
+    t =    17.71s     Check for interrupting elements affecting "Retry" Button
+    t =    17.73s     Synthesize event
+    t =    18.02s     Wait for nyc.plee.bbgo to idle
+    t =    18.03s Waiting 15.0s for "Couldn't load the preview" StaticText to exist
+    t =    19.06s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    19.06s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    19.10s Tap "Share File" Button
+    t =    19.10s     Wait for nyc.plee.bbgo to idle
+    t =    19.10s     Find the "Share File" Button
+    t =    19.13s     Check for interrupting elements affecting "Share File" Button
+    t =    19.16s     Synthesize event
+    t =    19.46s     Wait for nyc.plee.bbgo to idle
+    t =    19.51s Waiting 15.0s for "ActivityListView" Other to exist
+    t =    20.54s     Checking `Expect predicate `existsNoRetry == 1` for object "ActivityListView" Other`
+    t =    20.54s         Checking existence of `"ActivityListView" Other`
+    t =    20.58s Waiting 15.0s for "Close" Button to exist
+    t =    21.61s     Checking `Expect predicate `existsNoRetry == 1` for object "Close" Button`
+    t =    21.61s         Checking existence of `"Close" Button`
+    t =    21.78s Find the Target Application 'nyc.plee.bbgo'
+    t =    21.90s Added attachment named 'header-pdf-share'
+    t =    21.90s Requesting snapshot of accessibility hierarchy for app with pid 95755
+    t =    22.13s Requesting snapshot of accessibility hierarchy for app with pid 95755
+    t =    22.19s Added attachment named 'header-pdf-share-tree'
+    t =    22.19s Terminate nyc.plee.bbgo:95755
+    t =    23.26s Tear Down
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testCorruptHeaderPDFShowsRecoveryAction]' passed (23.462 seconds).
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testLockedPDFOffersShare]' started.
+    t =     0.00s Start Test at 2026-10-03 04:17:16.321
+    t =     0.02s Set Up
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 04:17:16.340 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:17:16.340 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.22s         Setting up automation session
+    t =     2.49s         Wait for nyc.plee.bbgo to idle
+    t =     4.18s Waiting 20.0s for "Settings" Button to exist
+    t =     5.22s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.22s         Checking existence of `"Settings" Button`
+    t =     5.29s Tap "Settings" Button
+    t =     5.29s     Wait for nyc.plee.bbgo to idle
+    t =     5.29s     Find the "Settings" Button
+    t =     5.31s     Check for interrupting elements affecting "Settings" Button
+    t =     5.33s     Synthesize event
+    t =     5.62s     Wait for nyc.plee.bbgo to idle
+    t =     7.46s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     8.49s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     8.49s         Checking existence of `"settingsServerURL" Any`
+    t =     8.57s Find the "settingsServerURL" Any
+    t =     8.60s Open nyc.plee.bbgo with URL bbstudio://artifact/art_529bd12e2dadf95d
+    t =     8.60s     Launch nyc.plee.bbgo
+2026-10-03 04:17:24.918 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:17:24.918 xcodebuild[95636:90522946] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     8.80s         Setting up automation session
+    t =    11.04s         Wait for nyc.plee.bbgo to idle
+    t =    13.12s Waiting 15.0s for "Edge locked" NavigationBar to exist
+    t =    14.15s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge locked" NavigationBar`
+    t =    14.15s         Checking existence of `"Edge locked" NavigationBar`
+    t =    14.22s Waiting 15.0s for "Couldn't load the preview" StaticText to exist
+    t =    15.26s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    15.26s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    15.29s Checking existence of `"This PDF needs a password. Share the file to open it in an app that can unlock it." StaticText`
+    t =    15.31s Find the "Share File" Button
+    t =    15.34s Find the Target Application 'nyc.plee.bbgo'
+    t =    15.42s Added attachment named 'locked-pdf-error'
+    t =    15.42s Requesting snapshot of accessibility hierarchy for app with pid 95822
+    t =    15.51s Requesting snapshot of accessibility hierarchy for app with pid 95822
+    t =    15.55s Added attachment named 'locked-pdf-error-tree'
+    t =    15.55s Tap "Share File" Button
+    t =    15.55s     Wait for nyc.plee.bbgo to idle
+    t =    15.55s     Find the "Share File" Button
+    t =    15.57s     Check for interrupting elements affecting "Share File" Button
+    t =    15.60s     Synthesize event
+    t =    15.89s     Wait for nyc.plee.bbgo to idle
+    t =    15.93s Waiting 15.0s for "ActivityListView" Other to exist
+    t =    16.96s     Checking `Expect predicate `existsNoRetry == 1` for object "ActivityListView" Other`
+    t =    16.96s         Checking existence of `"ActivityListView" Other`
+    t =    17.03s Waiting 15.0s for "Close" Button to exist
+    t =    18.06s     Checking `Expect predicate `existsNoRetry == 1` for object "Close" Button`
+    t =    18.06s         Checking existence of `"Close" Button`
+    t =    18.11s Find the Target Application 'nyc.plee.bbgo'
+    t =    18.22s Added attachment named 'locked-pdf-share'
+    t =    18.22s Requesting snapshot of accessibility hierarchy for app with pid 95822
+    t =    18.44s Requesting snapshot of accessibility hierarchy for app with pid 95822
+    t =    18.51s Added attachment named 'locked-pdf-share-tree'
+    t =    18.51s Terminate nyc.plee.bbgo:95822
+    t =    19.57s Tear Down
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testLockedPDFOffersShare]' passed (19.811 seconds).
+Test Suite 'ArtifactRuntimeUITests' passed at 2026-10-03 04:17:36.133.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 43.273 (43.292) seconds
+Test Suite 'BBStudioUITests.xctest' passed at 2026-10-03 04:17:36.133.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 43.273 (43.293) seconds
+Test Suite 'Selected tests' passed at 2026-10-03 04:17:36.133.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 43.273 (43.293) seconds
+2026-10-03 04:17:36.432 xcodebuild[95636:90522946] [MT] IDETestOperationsObserverDebug: 48.892 elapsed -- Testing started completed.
+2026-10-03 04:17:36.432 xcodebuild[95636:90522946] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 04:17:36.432 xcodebuild[95636:90522946] [MT] IDETestOperationsObserverDebug: 48.892 sec, +48.892 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-artifact-edge.LWSdl5/results.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

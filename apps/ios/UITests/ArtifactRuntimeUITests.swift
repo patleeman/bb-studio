@@ -3,7 +3,10 @@ import UIKit
 
 /// Opt-in native previews against the isolated staged BB; never launch on a default origin.
 final class ArtifactRuntimeUITests: XCTestCase {
-    private let origin = "http://127.0.0.1:49486"
+    private var origin: String {
+        ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_EDGE"] == "YES"
+            ? "http://127.0.0.1:49626" : "http://127.0.0.1:49486"
+    }
     private var fixtures: [String: [String: Any]] = [:]
     private var baseline: Bool { ProcessInfo.processInfo.environment["BB_ARTIFACT_QA_BASELINE"] == "YES" }
 
@@ -128,6 +131,121 @@ final class ArtifactRuntimeUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["Couldn't load the image"].waitForExistence(timeout: 15))
         XCTAssertEqual(app.buttons["Retry"].exists, !baseline)
         capture(app, baseline ? "baseline-corrupt-image" : "corrupt-image")
+    }
+
+    func testReadablePDFRendersPages() throws {
+        let app = try launch()
+        defer { app.terminate() }
+        try open("pdf", in: app)
+        let pdf = app.descendants(matching: .any)["artifactPDFDocument"]
+        XCTAssertTrue(pdf.waitForExistence(timeout: 15))
+        XCTAssertFalse(app.staticTexts["Couldn't load the preview"].exists)
+        capture(app, "readable-pdf-pages")
+        pdf.pinch(withScale: 2, velocity: 1)
+        capture(app, "readable-pdf-zoomed")
+    }
+
+    func testCorruptHeaderPDFShowsRecoveryAction() throws {
+        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        let app = try launch()
+        defer { app.terminate() }
+        try open("headerPDF", in: app)
+        capture(app, "header-pdf-opened")
+        XCTAssertTrue(app.staticTexts["Couldn't load the preview"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Retry"].isHittable)
+        XCTAssertTrue(app.buttons["Share File"].isHittable)
+        capture(app, "header-pdf-error")
+        app.buttons["Retry"].tap()
+        XCTAssertTrue(app.staticTexts["Couldn't load the preview"].waitForExistence(timeout: 15))
+        app.buttons["Share File"].tap()
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 15), "Corrupt bytes remain available in the system share sheet")
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15), "Wait for the native share sheet to finish presenting")
+        capture(app, "header-pdf-share")
+    }
+
+    func testInitialLookupCanRetry() throws {
+        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        let app = try launch()
+        defer { app.terminate() }
+        try control("arm-lookup")
+        let id = try XCTUnwrap(fixtures["lookup"]?["id"] as? String)
+        app.open(URL(string: "bbstudio://artifact/\(id)")!)
+        XCTAssertTrue(app.staticTexts["Couldn't open the artifact"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Retry"].isHittable)
+        capture(app, "lookup-error")
+        app.buttons["Retry"].tap()
+        XCTAssertTrue(app.staticTexts["Edge lookup recovered"].waitForExistence(timeout: 15))
+        XCTAssertTrue(try control("status")["lookupFailed", default: false])
+        XCTAssertTrue(try control("status")["lookupRecovered", default: false])
+        capture(app, "lookup-recovered")
+    }
+
+    func testDelayedVersionCannotReplaceSelection() throws {
+        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        let app = try launch()
+        defer { app.terminate() }
+        try control("arm-delay")
+        try open("race", in: app)
+        XCTAssertTrue(app.staticTexts["Edge newest selected version"].waitForExistence(timeout: 15))
+        try selectVersion(1, in: app)
+        let deadline = Date().addingTimeInterval(10)
+        while Date() < deadline, try !control("status")["delayed", default: false] { Thread.sleep(forTimeInterval: 0.1) }
+        XCTAssertTrue(try control("status")["delayed", default: false], "Old-version response must be held by the proxy")
+        try selectVersion(2, in: app)
+        XCTAssertTrue(app.staticTexts["Edge newest selected version"].waitForExistence(timeout: 15))
+        try control("release")
+        Thread.sleep(forTimeInterval: 2)
+        XCTAssertTrue(try control("status")["completed", default: false], "The old response must complete after the version switch")
+        XCTAssertTrue(app.staticTexts["Edge newest selected version"].exists)
+        XCTAssertFalse(app.staticTexts["Edge old delayed version"].exists)
+        app.buttons["More"].tap()
+        XCTAssertTrue(app.buttons["Copy Text"].exists)
+        app.buttons["Copy Text"].tap()
+        XCTAssertTrue(try control("check-copy")["copiedNewest", default: false], "Copy Text must put the selected version in the private simulator clipboard")
+        capture(app, "delayed-old-response-keeps-newest")
+        app.buttons["Share"].tap()
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.otherElements["LP.CaptionBar.BottomCaption"].label.contains("28 bytes"))
+        XCTAssertTrue(try control("status")["sharedNewest", default: false])
+        capture(app, "selected-version-share")
+    }
+
+    func testLockedPDFOffersShare() throws {
+        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        let app = try launch()
+        defer { app.terminate() }
+        try open("lockedPDF", in: app)
+        XCTAssertTrue(app.staticTexts["Couldn't load the preview"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["This PDF needs a password. Share the file to open it in an app that can unlock it."].exists)
+        XCTAssertTrue(app.buttons["Share File"].isHittable)
+        capture(app, "locked-pdf-error")
+        app.buttons["Share File"].tap()
+        XCTAssertTrue(app.otherElements["ActivityListView"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.buttons["Close"].waitForExistence(timeout: 15))
+        capture(app, "locked-pdf-share")
+    }
+
+    private func selectVersion(_ number: Int, in app: XCUIApplication) throws {
+        app.buttons["More"].tap()
+        app.buttons["Versions"].tap()
+        let option = app.buttons.containing(NSPredicate(format: "label BEGINSWITH %@", "v\(number) ·")).firstMatch
+        XCTAssertTrue(option.waitForExistence(timeout: 5))
+        option.tap()
+    }
+
+    @discardableResult
+    private func control(_ action: String) throws -> [String: Bool] {
+        guard origin == "http://127.0.0.1:49626" else { throw XCTSkip("Requires isolated edge-case proxy") }
+        let done = expectation(description: "Controlled edge response")
+        var result: [String: Bool] = [:]
+        URLSession.shared.dataTask(with: URL(string: origin + "/__edge/" + action)!) { data, response, error in
+            XCTAssertNil(error)
+            XCTAssertEqual((response as? HTTPURLResponse)?.statusCode, 200)
+            if let data { result = (try? JSONSerialization.jsonObject(with: data) as? [String: Bool]) ?? [:] }
+            done.fulfill()
+        }.resume()
+        wait(for: [done], timeout: 10)
+        return result
     }
 
     private func launch() throws -> XCUIApplication {

@@ -1,0 +1,60 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "EAF96018-5709-4D4C-B1F5-D3F40237764C",
+        "deviceName" : "BBArtifactEdgePrivate",
+        "modelName" : "iPhone 18 Pro",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 2,
+      "passedTests" : 4,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "BBStudio · Built with macOS 26.6.2",
+  "expectedFailures" : 0,
+  "failedTests" : 2,
+  "finishTime" : 1791014743.461,
+  "passedTests" : 4,
+  "result" : "Failed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1791014562.917,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "XCTAssertTrue failed",
+      "targetName" : "BBStudioUITests",
+      "testIdentifier" : 1,
+      "testIdentifierString" : "ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction()",
+      "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction",
+      "testName" : "testCorruptHeaderPDFShowsRecoveryAction()"
+    },
+    {
+      "failureText" : "XCTAssertEqual failed: (\"nil\") is not equal to (\"Optional(\"Edge newest selected version\")\")",
+      "targetName" : "BBStudioUITests",
+      "testIdentifier" : 2,
+      "testIdentifierString" : "ArtifactRuntimeUITests/testDelayedVersionCannotReplaceSelection()",
+      "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ArtifactRuntimeUITests/testDelayedVersionCannotReplaceSelection",
+      "testName" : "testDelayedVersionCannotReplaceSelection()"
+    }
+  ],
+  "title" : "Test - BBStudio",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 6
+}

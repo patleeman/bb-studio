@@ -1,0 +1,3 @@
+Verified origin before launch: nyc.plee.bbgo http://127.0.0.1:49626
+Verified origin before launch: group.nyc.plee.bbgo http://127.0.0.1:49626
+/tmp/bb-artifact-edge.XdKXhG/build/Build/Products/BBStudio_iphonesimulator27.0-arm64.xctestrun

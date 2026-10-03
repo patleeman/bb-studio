@@ -1,0 +1,336 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-artifact-edge.lTiVwJ/build/Build/Products/BBStudio_iphonesimulator27.0-arm64.xctestrun -destination "platform=iOS Simulator,id=0025F620-2473-48AA-BCD7-AC9BBF53E7E6" "-only-testing:BBStudioUITests/ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction" "-only-testing:BBStudioUITests/ArtifactRuntimeUITests/testDelayedVersionCannotReplaceSelection" "-only-testing:BBStudioUITests/ArtifactRuntimeUITests/testInitialLookupCanRetry" -parallel-testing-enabled NO -resultBundlePath /tmp/bb-artifact-edge.lTiVwJ/results.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-artifact-edge.lTiVwJ/results.xcresult
+
+2026-10-03 03:52:24.244041-0400 BBStudioUITests-Runner[84777:90216111] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 03:52:27.857.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 03:52:27.858.
+Test Suite 'ArtifactRuntimeUITests' started at 2026-10-03 03:52:27.858.
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testCorruptHeaderPDFShowsRecoveryAction]' started.
+    t =     0.00s Start Test at 2026-10-03 03:52:27.860
+    t =     0.10s Set Up
+    t =     0.10s Open nyc.plee.bbgo
+    t =     0.11s     Launch nyc.plee.bbgo
+2026-10-03 03:52:28.013 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 03:52:28.013 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.77s         Setting up automation session
+objc[84777]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x105638398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x108e8c310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     3.76s         Wait for nyc.plee.bbgo to idle
+    t =     5.69s Waiting 20.0s for "Settings" Button to exist
+    t =     6.76s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     6.76s         Checking existence of `"Settings" Button`
+    t =     6.88s Tap "Settings" Button
+    t =     6.88s     Wait for nyc.plee.bbgo to idle
+    t =     6.89s     Find the "Settings" Button
+    t =     6.92s     Check for interrupting elements affecting "Settings" Button
+    t =     6.95s     Synthesize event
+    t =     7.34s     Wait for nyc.plee.bbgo to idle
+    t =     9.22s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =    10.29s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =    10.29s         Checking existence of `"settingsServerURL" Any`
+    t =    10.36s Find the "settingsServerURL" Any
+    t =    10.39s Open nyc.plee.bbgo with URL bbstudio://artifact/art_d4dcca719721a2d4
+    t =    10.39s     Launch nyc.plee.bbgo
+2026-10-03 03:52:38.253 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 03:52:38.253 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    10.61s         Setting up automation session
+    t =    14.00s         Wait for nyc.plee.bbgo to idle
+    t =    17.12s Waiting 15.0s for "Edge header corrupt" NavigationBar to exist
+    t =    18.19s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge header corrupt" NavigationBar`
+    t =    18.19s         Checking existence of `"Edge header corrupt" NavigationBar`
+    t =    18.31s Find the Target Application 'nyc.plee.bbgo'
+    t =    18.45s Added attachment named 'header-pdf-opened'
+    t =    18.45s Requesting snapshot of accessibility hierarchy for app with pid 85498
+    t =    18.64s Requesting snapshot of accessibility hierarchy for app with pid 85498
+    t =    18.69s Added attachment named 'header-pdf-opened-tree'
+    t =    18.69s Waiting 15.0s for "Couldn't load the preview" StaticText to exist
+    t =    19.76s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    19.76s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    19.80s         Capturing element debug description
+    t =    20.77s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    20.77s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    20.80s         Capturing element debug description
+    t =    21.76s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    21.76s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    21.83s         Capturing element debug description
+    t =    22.70s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    22.70s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    22.75s         Capturing element debug description
+    t =    23.72s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    23.72s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    23.76s         Capturing element debug description
+    t =    24.73s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    24.73s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    24.77s         Capturing element debug description
+    t =    25.74s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    25.74s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    25.79s         Capturing element debug description
+    t =    26.74s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    26.74s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    26.78s         Capturing element debug description
+    t =    27.75s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    27.75s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    27.80s         Capturing element debug description
+    t =    28.76s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    28.76s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    28.81s         Capturing element debug description
+    t =    29.78s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    29.78s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    29.83s         Capturing element debug description
+    t =    30.77s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    30.77s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    30.82s         Capturing element debug description
+    t =    31.78s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    31.78s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    31.83s         Capturing element debug description
+    t =    32.78s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    32.78s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    32.83s         Capturing element debug description
+    t =    33.70s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't load the preview" StaticText`
+    t =    33.70s         Checking existence of `"Couldn't load the preview" StaticText`
+    t =    33.79s         Capturing element debug description
+    t =    33.79s     Checking existence of `"Couldn't load the preview" StaticText`
+    t =    34.02s Collecting debug information to assist test failure triage
+    t =    34.02s     Requesting snapshot of accessibility hierarchy for app with pid 85498
+/tmp/bb-artifact-edge.lTiVwJ/project/UITests/ArtifactRuntimeUITests.swift:141: error: -[BBStudioUITests.ArtifactRuntimeUITests testCorruptHeaderPDFShowsRecoveryAction] : XCTAssertTrue failed
+    t =    34.40s Tear Down
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testCorruptHeaderPDFShowsRecoveryAction]' failed (34.731 seconds).
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testDelayedVersionCannotReplaceSelection]' started.
+    t =     0.00s Start Test at 2026-10-03 03:53:02.591
+    t =     0.02s Set Up
+    t =     0.03s Open nyc.plee.bbgo
+    t =     0.03s     Launch nyc.plee.bbgo
+    t =     0.03s         Terminate nyc.plee.bbgo:85498
+2026-10-03 03:53:08.643 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 03:53:08.643 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     6.26s         Setting up automation session
+    t =    10.36s         Wait for nyc.plee.bbgo to idle
+    t =    12.63s Waiting 20.0s for "Settings" Button to exist
+    t =    13.71s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =    13.71s         Checking existence of `"Settings" Button`
+    t =    13.90s Tap "Settings" Button
+    t =    13.90s     Wait for nyc.plee.bbgo to idle
+    t =    13.91s     Find the "Settings" Button
+    t =    13.97s     Check for interrupting elements affecting "gear" Button
+    t =    14.03s     Synthesize event
+    t =    14.34s     Wait for nyc.plee.bbgo to idle
+    t =    16.37s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =    17.43s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =    17.43s         Checking existence of `"settingsServerURL" Any`
+    t =    17.52s Find the "settingsServerURL" Any
+    t =    17.64s Open nyc.plee.bbgo with URL bbstudio://artifact/art_d96116a5dc62fc8d
+    t =    17.65s     Launch nyc.plee.bbgo
+2026-10-03 03:53:20.238 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 03:53:20.238 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    18.07s         Setting up automation session
+    t =    21.75s         Wait for nyc.plee.bbgo to idle
+    t =    24.13s Waiting 15.0s for "Edge race" NavigationBar to exist
+    t =    25.19s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge race" NavigationBar`
+    t =    25.19s         Checking existence of `"Edge race" NavigationBar`
+    t =    25.30s Waiting 15.0s for "Edge newest selected version" StaticText to exist
+    t =    26.35s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge newest selected version" StaticText`
+    t =    26.35s         Checking existence of `"Edge newest selected version" StaticText`
+    t =    26.39s Tap "More" Button
+    t =    26.39s     Wait for nyc.plee.bbgo to idle
+    t =    26.39s     Find the "More" Button
+    t =    26.43s     Check for interrupting elements affecting "More" Button
+    t =    26.47s     Synthesize event
+    t =    26.79s     Wait for nyc.plee.bbgo to idle
+    t =    27.80s Tap "Versions" Button
+    t =    27.80s     Wait for nyc.plee.bbgo to idle
+    t =    27.80s     Find the "Versions" Button
+    t =    27.84s     Check for interrupting elements affecting "clock.arrow.circlepath" Button
+    t =    27.87s     Synthesize event
+    t =    28.17s     Wait for nyc.plee.bbgo to idle
+    t =    29.32s Waiting 5.0s for Button (First Match) to exist
+    t =    30.37s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+    t =    30.37s         Checking existence of `Button (First Match)`
+    t =    30.52s Tap Button (First Match)
+    t =    30.52s     Wait for nyc.plee.bbgo to idle
+    t =    30.52s     Find the Button (First Match)
+    t =    30.67s     Check for interrupting elements affecting "v1 · 2 minutes ago" Button
+    t =    30.74s     Synthesize event
+    t =    31.10s     Wait for nyc.plee.bbgo to idle
+    t =    32.19s Tap "More" Button
+    t =    32.19s     Wait for nyc.plee.bbgo to idle
+    t =    32.20s     Find the "More" Button
+    t =    32.28s     Check for interrupting elements affecting "More" Button
+    t =    32.33s     Synthesize event
+    t =    32.65s     Wait for nyc.plee.bbgo to idle
+    t =    33.51s Tap "Versions" Button
+    t =    33.51s     Wait for nyc.plee.bbgo to idle
+    t =    33.52s     Find the "Versions" Button
+    t =    33.57s     Check for interrupting elements affecting "clock.arrow.circlepath" Button
+    t =    33.62s     Synthesize event
+    t =    33.93s     Wait for nyc.plee.bbgo to idle
+    t =    35.07s Waiting 5.0s for Button (First Match) to exist
+    t =    36.13s     Checking `Expect predicate `existsNoRetry == 1` for object Button (First Match)`
+    t =    36.13s         Checking existence of `Button (First Match)`
+    t =    36.22s Tap Button (First Match)
+    t =    36.22s     Wait for nyc.plee.bbgo to idle
+    t =    36.22s     Find the Button (First Match)
+    t =    36.28s     Check for interrupting elements affecting "v2 · 2 minutes ago" Button
+    t =    36.31s     Synthesize event
+    t =    36.61s     Wait for nyc.plee.bbgo to idle
+    t =    37.68s Waiting 15.0s for "Edge newest selected version" StaticText to exist
+    t =    38.76s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge newest selected version" StaticText`
+    t =    38.76s         Checking existence of `"Edge newest selected version" StaticText`
+    t =    40.82s Checking existence of `"Edge newest selected version" StaticText`
+    t =    40.86s Checking existence of `"Edge old delayed version" StaticText`
+    t =    40.96s Tap "More" Button
+    t =    40.96s     Wait for nyc.plee.bbgo to idle
+    t =    40.96s     Find the "More" Button
+    t =    41.03s     Check for interrupting elements affecting "More" Button
+    t =    41.07s     Synthesize event
+    t =    41.41s     Wait for nyc.plee.bbgo to idle
+    t =    42.25s Checking existence of `"Copy Text" Button`
+    t =    42.40s Tap "Copy Text" Button
+    t =    42.40s     Wait for nyc.plee.bbgo to idle
+    t =    42.40s     Find the "Copy Text" Button
+    t =    42.44s     Check for interrupting elements affecting "doc.on.doc" Button
+    t =    42.49s     Synthesize event
+    t =    42.79s     Wait for nyc.plee.bbgo to idle
+    t =    43.87s Find the Target Application 'nyc.plee.bbgo'
+    t =    44.01s Added attachment named 'delayed-old-response-keeps-newest'
+    t =    44.01s Requesting snapshot of accessibility hierarchy for app with pid 88596
+    t =    44.19s Requesting snapshot of accessibility hierarchy for app with pid 88596
+    t =    44.25s Added attachment named 'delayed-old-response-keeps-newest-tree'
+    t =    44.25s Tap "Share" Button
+    t =    44.25s     Wait for nyc.plee.bbgo to idle
+    t =    44.26s     Find the "Share" Button
+    t =    44.39s     Check for interrupting elements affecting "square.and.arrow.up" Button
+    t =    44.44s     Synthesize event
+    t =    44.77s     Wait for nyc.plee.bbgo to idle
+    t =    45.20s Waiting 15.0s for "Copy" Button to exist
+    t =    46.28s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    46.28s         Checking existence of `"Copy" Button`
+    t =    46.35s         Capturing element debug description
+    t =    47.21s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    47.21s         Checking existence of `"Copy" Button`
+    t =    47.25s         Capturing element debug description
+    t =    48.20s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    48.20s         Checking existence of `"Copy" Button`
+    t =    48.79s         Capturing element debug description
+    t =    49.20s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    49.20s         Checking existence of `"Copy" Button`
+    t =    49.27s         Capturing element debug description
+    t =    50.24s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    50.24s         Checking existence of `"Copy" Button`
+    t =    50.31s         Capturing element debug description
+    t =    51.27s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    51.28s         Checking existence of `"Copy" Button`
+    t =    51.34s         Capturing element debug description
+    t =    52.29s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    52.29s         Checking existence of `"Copy" Button`
+    t =    52.35s         Capturing element debug description
+    t =    53.21s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    53.21s         Checking existence of `"Copy" Button`
+    t =    53.28s         Capturing element debug description
+    t =    54.24s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    54.24s         Checking existence of `"Copy" Button`
+    t =    54.31s         Capturing element debug description
+    t =    55.27s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    55.28s         Checking existence of `"Copy" Button`
+    t =    55.35s         Capturing element debug description
+    t =    56.21s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    56.21s         Checking existence of `"Copy" Button`
+    t =    56.27s         Capturing element debug description
+    t =    57.21s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    57.21s         Checking existence of `"Copy" Button`
+    t =    57.28s         Capturing element debug description
+    t =    58.23s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    58.23s         Checking existence of `"Copy" Button`
+    t =    58.29s         Capturing element debug description
+    t =    59.23s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    59.23s         Checking existence of `"Copy" Button`
+    t =    59.30s         Capturing element debug description
+    t =    60.21s     Checking `Expect predicate `existsNoRetry == 1` for object "Copy" Button`
+    t =    60.21s         Checking existence of `"Copy" Button`
+    t =    60.31s         Capturing element debug description
+    t =    60.31s     Checking existence of `"Copy" Button`
+    t =    60.37s Collecting debug information to assist test failure triage
+    t =    60.37s     Requesting snapshot of accessibility hierarchy for app with pid 88596
+/tmp/bb-artifact-edge.lTiVwJ/project/UITests/ArtifactRuntimeUITests.swift:188: error: -[BBStudioUITests.ArtifactRuntimeUITests testDelayedVersionCannotReplaceSelection] : XCTAssertTrue failed
+    t =    60.47s Tear Down
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testDelayedVersionCannotReplaceSelection]' failed (60.779 seconds).
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testInitialLookupCanRetry]' started.
+    t =     0.00s Start Test at 2026-10-03 03:54:03.370
+    t =     0.02s Set Up
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+    t =     0.02s         Terminate nyc.plee.bbgo:88596
+2026-10-03 03:54:04.402 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 03:54:04.402 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     1.24s         Setting up automation session
+    t =     5.90s         Wait for nyc.plee.bbgo to idle
+    t =     8.28s Waiting 20.0s for "Settings" Button to exist
+    t =     9.32s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     9.32s         Checking existence of `"Settings" Button`
+    t =     9.50s Tap "Settings" Button
+    t =     9.50s     Wait for nyc.plee.bbgo to idle
+    t =     9.51s     Find the "Settings" Button
+    t =     9.56s     Check for interrupting elements affecting "gear" Button
+    t =     9.62s     Synthesize event
+    t =     9.93s     Wait for nyc.plee.bbgo to idle
+    t =    11.95s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =    12.98s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =    12.98s         Checking existence of `"settingsServerURL" Any`
+    t =    13.06s Find the "settingsServerURL" Any
+    t =    13.10s Open nyc.plee.bbgo with URL bbstudio://artifact/art_70a902529a544024
+    t =    13.11s     Launch nyc.plee.bbgo
+2026-10-03 03:54:16.476 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 03:54:16.476 xcodebuild[84762:90215898] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =    13.32s         Setting up automation session
+    t =    17.49s         Wait for nyc.plee.bbgo to idle
+    t =    20.43s Waiting 15.0s for "Couldn't open the artifact" StaticText to exist
+    t =    21.46s     Checking `Expect predicate `existsNoRetry == 1` for object "Couldn't open the artifact" StaticText`
+    t =    21.46s         Checking existence of `"Couldn't open the artifact" StaticText`
+    t =    21.53s Find the "Retry" Button
+    t =    21.57s Find the Target Application 'nyc.plee.bbgo'
+    t =    21.66s Added attachment named 'lookup-error'
+    t =    21.66s Requesting snapshot of accessibility hierarchy for app with pid 92359
+    t =    21.80s Requesting snapshot of accessibility hierarchy for app with pid 92359
+    t =    21.84s Added attachment named 'lookup-error-tree'
+    t =    21.84s Tap "Retry" Button
+    t =    21.84s     Wait for nyc.plee.bbgo to idle
+    t =    21.84s     Find the "Retry" Button
+    t =    21.87s     Check for interrupting elements affecting "Retry" Button
+    t =    21.90s     Synthesize event
+    t =    22.21s     Wait for nyc.plee.bbgo to idle
+    t =    22.22s Waiting 15.0s for "Edge lookup recovered" StaticText to exist
+    t =    23.25s     Checking `Expect predicate `existsNoRetry == 1` for object "Edge lookup recovered" StaticText`
+    t =    23.25s         Checking existence of `"Edge lookup recovered" StaticText`
+    t =    23.30s Find the Target Application 'nyc.plee.bbgo'
+    t =    23.43s Added attachment named 'lookup-recovered'
+    t =    23.43s Requesting snapshot of accessibility hierarchy for app with pid 92359
+    t =    23.66s Requesting snapshot of accessibility hierarchy for app with pid 92359
+    t =    23.73s Added attachment named 'lookup-recovered-tree'
+    t =    23.73s Terminate nyc.plee.bbgo:92359
+    t =    24.80s Tear Down
+Test Case '-[BBStudioUITests.ArtifactRuntimeUITests testInitialLookupCanRetry]' passed (25.017 seconds).
+Test Suite 'ArtifactRuntimeUITests' failed at 2026-10-03 03:54:28.387.
+	 Executed 3 tests, with 2 failures (0 unexpected) in 120.526 (120.529) seconds
+Test Suite 'BBStudioUITests.xctest' failed at 2026-10-03 03:54:28.387.
+	 Executed 3 tests, with 2 failures (0 unexpected) in 120.526 (120.529) seconds
+Test Suite 'Selected tests' failed at 2026-10-03 03:54:28.387.
+	 Executed 3 tests, with 2 failures (0 unexpected) in 120.526 (120.530) seconds
+2026-10-03 03:54:28.850 xcodebuild[84762:90220709]  IDETestOperationsObserverDebug: Failure collecting diagnostics from simulator: Process exited with error 72:
+ xcrun: error: unable to find utility "simctl", not a developer tool or in PATH
+
+2026-10-03 03:54:28.859 xcodebuild[84762:90215898] [MT] IDETestOperationsObserverDebug: 126.974 elapsed -- Testing started completed.
+2026-10-03 03:54:28.859 xcodebuild[84762:90215898] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 03:54:28.859 xcodebuild[84762:90215898] [MT] IDETestOperationsObserverDebug: 126.974 sec, +126.974 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-artifact-edge.lTiVwJ/results.xcresult
+
+Failing tests:
+	ArtifactRuntimeUITests.testCorruptHeaderPDFShowsRecoveryAction()
+	ArtifactRuntimeUITests.testDelayedVersionCannotReplaceSelection()
+
+** TEST EXECUTE FAILED **
+
+Testing started

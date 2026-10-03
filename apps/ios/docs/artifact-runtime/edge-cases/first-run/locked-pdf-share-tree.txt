@@ -1,0 +1,172 @@
+Attributes: Application, 0x1110dbd40, pid: 43424, label: 'BB Studio'
+Element subtree:
+ →Application, 0x1110dbd40, pid: 43424, label: 'BB Studio'
+    Window (Main), 0x1110dbe80, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1110a9a40, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1110a8500, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x1110a8640, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x1110a8780, {{-402.0, -874.0}, {1206.0, 2622.0}}
+          Other, 0x1110a8c80, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x1110a8dc0, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x1110a88c0, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x1110a8a00, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x1110a8b40, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x1110a83c0, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x1110a8280, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x1110a8000, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x1110a8140, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x105c59e00, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Edge locked'
+                              Button, 0x105c59180, {{16.0, 62.0}, {44.0, 44.0}}, identifier: 'BackButton', label: 'Studio'
+                              StaticText, 0x105c5ad00, {{72.0, 73.7}, {97.0, 20.7}}, label: 'Edge locked'
+                              Button, 0x105c59f40, {{229.3, 66.0}, {41.7, 36.0}}, label: 'Related'
+                              Other, 0x105c59900, {{287.0, 66.0}, {39.0, 36.0}}
+                                Other, 0x105c58c80, {{287.0, 66.0}, {39.0, 36.0}}
+                                  Button, 0x105c5b0c0, {{287.0, 66.0}, {39.0, 36.0}}, identifier: 'square.and.arrow.up', label: 'Share'
+                              Other, 0x105c5af80, {{342.0, 66.0}, {40.0, 36.0}}
+                                Other, 0x105c5a800, {{342.0, 66.0}, {40.0, 36.0}}
+                                  Button, 0x105c58f00, {{342.0, 66.0}, {40.0, 36.0}}, label: 'More'
+                                    Button, 0x105c59400, {{342.0, 66.0}, {40.0, 36.0}}
+                                      Image, 0x105c5a940, {{351.0, 73.0}, {22.0, 22.0}}, identifier: 'ellipsis.circle', label: 'More'
+                            Other, 0x105c59040, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x11016ef80, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x11016da40, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x11016dcc0, {{0.0, 0.0}, {402.0, 874.0}}
+                                    StaticText, 0x11016de00, {{81.2, 321.7}, {239.7, 89.2}}, label: 'Couldn't load the preview'
+                                    Image, 0x11016c500, {{184.7, 321.7}, {33.0, 42.0}}, identifier: 'doc.text.image', label: 'Text Document With An Image'
+                                    StaticText, 0x11016fd40, {{32.0, 413.8}, {338.0, 74.0}}, label: 'This PDF needs a password. Share the file to open it in an app that can unlock it.'
+                                    Button, 0x11016ea80, {{172.7, 517.7}, {56.7, 28.0}}, label: 'Retry'
+                                    Button, 0x11016f700, {{157.3, 560.7}, {87.3, 28.0}}, label: 'Share File'
+                            Toolbar, 0x11016c640, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x11016f5c0, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x11016f840, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x11016e1c0, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x11016e080, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x11016fe80, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x11016ca00, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x11016f0c0, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x11016ed00, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x11016c3c0, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home'
+                              Image, 0x11016f480, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x11016cb40, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio', Selected
+                              Image, 0x11016d680, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x11016d180, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x11016e940, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x11016e440, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x11016fc00, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x11016cf00, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x11016ee40, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x11016e800, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x11016c000, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x11016e6c0, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x11016c140, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x11016ebc0, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x11016f980, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x11016f200, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x11016d2c0, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x11016d040, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x11016e300, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x11016e580, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x11016c8c0, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x11016c280, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x11016fac0, {{0.0, 791.0}, {402.0, 83.0}}
+      Other, 0x11016d900, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x11016df40, {{-402.0, -874.0}, {1206.0, 2622.0}}
+        Other, 0x11016c780, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x11016db80, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x11129c000, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x11129c140, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x11129c280, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'ActivityListView'
+                  Other, 0x11129c3c0, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'ShareSheet.RemoteContainerView'
+                    Other, 0x11129c500, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x11129c640, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x11129c780, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x11129c8c0, {{0.0, 0.0}, {402.0, 874.0}}
+                            Other, 0x11129ca00, {{0.0, 62.0}, {402.0, 812.0}}
+                              Image, 0x11129cb40, {{-150.0, -88.0}, {702.0, 1112.0}}
+                              Other, 0x11129cc80, {{0.0, 62.0}, {402.0, 812.0}}
+                                Other, 0x11129cdc0, {{0.0, 62.0}, {402.0, 812.0}}
+                                  NavigationBar, 0x11129cf00, {{0.0, 78.0}, {402.0, 95.3}}, identifier: 'UIActivityContentView'
+                                    Image, 0x11129d040, {{31.3, 93.3}, {48.0, 64.0}}
+                                    Button, 0x11129d180, {{346.0, 82.0}, {36.0, 36.0}}, identifier: 'header.closeButton', label: 'Close'
+                                    Other, 0x11129d2c0, {{94.3, 106.3}, {232.7, 18.0}}, identifier: 'LP.CaptionBar.TopCaption', label: 'edge-locked'
+                                    Other, 0x11129d400, {{94.3, 124.3}, {232.7, 20.0}}, identifier: 'LP.CaptionBar.BottomCaption', label: 'PDF Document · 8 KB'
+                                  Other, 0x11129d540, {{0.0, 62.0}, {402.0, 812.0}}
+                                    Other, 0x11129d680, {{0.0, 62.0}, {402.0, 812.0}}
+                                      Other, 0x11129d7c0, {{0.0, 62.0}, {402.0, 812.0}}, identifier: 'shareSheet.activity.contentView'
+                                        CollectionView, 0x11129d900, {{0.0, 62.0}, {402.0, 812.0}}, identifier: 'activityCollectionView'
+                                          Other, 0x11129da40, {{0.0, 62.0}, {402.0, 812.0}}
+                                            Other, 0x11129db80, {{0.0, 62.0}, {402.0, 151.3}}
+                                          Other, 0x11129dcc0, {{0.0, 62.0}, {402.0, 812.0}}
+                                          ScrollView, 0x11129de00, {{23.3, 173.3}, {355.3, 121.0}}
+                                            Cell, 0x11129df40, {{23.3, 173.3}, {82.0, 120.3}}, identifier: 'shareCell', label: 'BB Studio'
+                                              Other, 0x11129e080, {{23.3, 173.3}, {82.0, 120.3}}
+                                                Other, 0x11129e1c0, {{23.3, 263.3}, {82.0, 14.3}}
+                                                  StaticText, 0x11129e300, {{23.3, 263.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'BB Studio'
+                                                  StaticText, 0x11129e440, {{23.3, 263.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x11129e580, {{23.3, 263.3}, {82.0, 14.3}}
+                                                Image, 0x11129e6c0, {{31.3, 189.3}, {66.0, 66.0}}, identifier: 'activityImageView'
+                                            Cell, 0x11129e800, {{114.7, 173.3}, {82.0, 120.3}}, identifier: 'shareCell', label: 'Preview'
+                                              Other, 0x11129e940, {{114.7, 173.3}, {82.0, 120.3}}
+                                                Other, 0x11129ea80, {{114.7, 263.3}, {82.0, 14.3}}
+                                                  StaticText, 0x11129ebc0, {{114.7, 263.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'Preview'
+                                                  StaticText, 0x11129ed00, {{114.7, 263.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x11129ee40, {{114.7, 263.3}, {82.0, 14.3}}
+                                                Image, 0x11129ef80, {{122.7, 189.3}, {66.0, 66.0}}, identifier: 'activityImageView'
+                                            Cell, 0x11129f0c0, {{206.0, 173.3}, {82.0, 120.3}}, identifier: 'shareCell', label: 'More'
+                                              Other, 0x11129f200, {{206.0, 173.3}, {82.0, 120.3}}
+                                                Other, 0x11129f340, {{206.0, 263.3}, {82.0, 14.3}}
+                                                  StaticText, 0x11129f480, {{206.0, 263.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'More'
+                                                  StaticText, 0x11129f5c0, {{206.0, 263.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x11129f700, {{206.0, 263.3}, {82.0, 14.3}}
+                                                Image, 0x11129f840, {{214.0, 189.3}, {66.0, 66.0}}, identifier: 'activityImageView', label: 'edge-header-corrupt.pdf, Apple
+Inc, Apple
+Inc, Apple
+Inc, Apple
+Inc, Apple
+Inc, Apple
+Inc, Apple
+Inc'
+                                          ScrollView, 0x11129f980, {{23.3, 295.3}, {355.3, 134.3}}
+                                            Cell, 0x11129fac0, {{23.3, 295.3}, {82.0, 134.3}}, identifier: 'actionGroupCell', label: 'Copy'
+                                              Other, 0x11129fc00, {{23.3, 295.3}, {82.0, 134.3}}
+                                                Other, 0x11129fd40, {{23.3, 383.3}, {82.0, 14.3}}
+                                                  StaticText, 0x11129fe80, {{23.3, 383.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'Copy'
+                                                  StaticText, 0x1112f4000, {{23.3, 383.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x1112f4140, {{23.3, 383.3}, {82.0, 14.3}}
+                                                Other, 0x1112f4280, {{31.3, 311.3}, {66.0, 66.0}}
+                                                Image, 0x1112f43c0, {{48.3, 325.3}, {32.0, 38.0}}, identifier: 'activityImageView', label: 'copy'
+                                            Cell, 0x1112f4500, {{114.7, 295.3}, {82.0, 134.3}}, identifier: 'actionGroupCell', label: 'Markup'
+                                              Other, 0x1112f4640, {{114.7, 295.3}, {82.0, 134.3}}
+                                                Other, 0x1112f4780, {{114.7, 383.3}, {82.0, 14.3}}
+                                                  StaticText, 0x1112f48c0, {{114.7, 383.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'Markup'
+                                                  StaticText, 0x1112f4a00, {{114.7, 383.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x1112f4b40, {{114.7, 383.3}, {82.0, 14.3}}
+                                                Other, 0x1112f4c80, {{122.7, 311.3}, {66.0, 66.0}}
+                                                Image, 0x1112f4dc0, {{139.7, 328.3}, {32.0, 32.0}}, identifier: 'activityImageView', label: 'Markup'
+                                            Cell, 0x1112f4f00, {{206.0, 295.3}, {82.0, 134.3}}, identifier: 'actionGroupCell', label: 'Print'
+                                              Other, 0x1112f5040, {{206.0, 295.3}, {82.0, 134.3}}
+                                                Other, 0x1112f5180, {{206.0, 383.3}, {82.0, 14.3}}
+                                                  StaticText, 0x1112f52c0, {{206.0, 383.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'Print'
+                                                  StaticText, 0x1112f5400, {{206.0, 383.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x1112f5540, {{206.0, 383.3}, {82.0, 14.3}}
+                                                Other, 0x1112f5680, {{214.0, 311.3}, {66.0, 66.0}}
+                                                Image, 0x1112f57c0, {{231.0, 328.0}, {32.0, 33.3}}, identifier: 'activityImageView', label: 'print'
+                                            Cell, 0x1112f5900, {{297.3, 295.3}, {82.0, 134.3}}, identifier: 'actionGroupCell', label: 'Save to Files'
+                                              Other, 0x1112f5a40, {{297.3, 295.3}, {82.0, 134.3}}
+                                                Other, 0x1112f5b80, {{297.3, 383.3}, {82.0, 14.3}}
+                                                  StaticText, 0x1112f5cc0, {{297.3, 383.3}, {82.0, 14.3}}, identifier: 'cellTitleLabel', label: 'Save to Files'
+                                                  StaticText, 0x1112f5e00, {{297.3, 383.3}, {32.7, 30.3}}, identifier: 'cellTitleLabel', label: 'Apple Inc'
+                                                  Other, 0x1112f5f40, {{297.3, 383.3}, {82.0, 14.3}}
+                                                Other, 0x1112f6080, {{305.3, 311.3}, {66.0, 66.0}}
+                                                Image, 0x1112f61c0, {{316.7, 322.7}, {43.3, 43.3}}, identifier: 'activityImageView'
+                                          Other, 0x1112f6300, {{31.3, 294.3}, {339.3, 1.0}}, identifier: 'collectionView.footerView'
+                                        Other, 0x1112f6440, {{31.3, 173.3}, {339.3, 1.0}}
+                                  Toolbar, 0x1112f6580, {{0.0, 62.0}, {402.0, 812.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                                    Other, 0x1112f66c0, {{0.0, 62.0}, {402.0, 812.0}}
+Path to element:
+ →Application, 0x1110dbd40, pid: 43424, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x1112f6800, pid: 43424, label: 'BB Studio'
+  }
