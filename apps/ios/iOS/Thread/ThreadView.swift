@@ -54,7 +54,7 @@ struct ThreadView: View {
     /// Permissions chosen in Model & permissions, waiting for the next message.
     @AppStorage private var pendingPermission: String?
 
-    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("artifacts") }
+    private var canSaveFiles: Bool { runningPlugins.split(separator: ",").contains("studio") }
 
     init(threadId: String) {
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))

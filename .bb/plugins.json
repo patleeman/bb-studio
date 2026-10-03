@@ -28,10 +28,6 @@
       "source": "./packages/bb-studio-draw"
     },
     {
-      "name": "artifacts",
-      "source": "./packages/bb-studio-artifacts"
-    },
-    {
       "name": "thread-list-plus",
       "source": "./packages/bb-studio-sidebar"
     },

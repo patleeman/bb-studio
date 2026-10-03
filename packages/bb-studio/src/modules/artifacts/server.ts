@@ -5,7 +5,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 // Studio Artifacts (plugin id `artifacts`): keep the files agents make.
 //
 // Backend entry. Saving is explicit: an agent calls `artifacts_save` (or
-// `bb artifacts save`), or the user picks files from a reply with "Save to
+// `bb studio artifacts save`), or the user picks files from a reply with "Save to
 // Studio". Either way the bytes are copied at save time, since workspace and
 // thread-storage files change and vanish. Saving the same file from the same
 // thread again adds a version. With BB Studio installed, artifacts list in
@@ -521,15 +521,15 @@ export default async function plugin(bb: BbPluginApi) {
 
   bb.agents.registerTool({
     name: "artifacts_read",
-    description: "Read a Studio artifact: its details and, for text types (Markdown, HTML, code, text), its contents. For images and other files, use `bb artifacts export <id>` to copy it into the workspace.",
+    description: "Read a Studio artifact: its details and, for text types (Markdown, HTML, code, text), its contents. For images and other files, use `bb studio artifacts export <id>` to copy it into the workspace.",
     parameters: z.object({ artifactId: z.string().min(1).max(100) }),
     execute({ artifactId }) {
       const artifact = store.get(artifactId);
       if (!artifact) return { content: [{ type: "text", text: `Artifact ${artifactId} not found.` }], isError: true };
       const text = artifactText(store, artifact);
       const head = savedLine({ artifact, outcome: "unchanged" }).replace(/ is already saved with these contents/, "");
-      if (text === null) return `${head}\n\nNot text. Copy it into the workspace with: bb artifacts export ${artifact.id}`;
-      const shown = text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…(truncated; full text: bb artifacts show ${artifact.id})` : text;
+      if (text === null) return `${head}\n\nNot text. Copy it into the workspace with: bb studio artifacts export ${artifact.id}`;
+      const shown = text.length > MAX_TOOL_TEXT ? `${text.slice(0, MAX_TOOL_TEXT)}\n…(truncated; full text: bb studio artifacts show ${artifact.id})` : text;
       return `${head}\n\n${artifact.description ? `Description: ${artifact.description}\n\n` : ""}${shown}`;
     },
   });
@@ -570,16 +570,16 @@ export default async function plugin(bb: BbPluginApi) {
     },
   }));
 
-  // CLI: `bb artifacts …`
+  // CLI: `bb studio artifacts …`
   bb.cli.register({
     name: "artifacts",
     summary: "Save and read Studio artifacts",
     commands: [
-      { name: "save", summary: "Save a file from this thread's workspace or thread storage", usage: "bb artifacts save <path> [--title <title>] [--description <text>]" },
-      { name: "list", summary: "List artifacts", usage: "bb artifacts list [--thread]" },
-      { name: "show", summary: "Print a text artifact's contents", usage: "bb artifacts show <id>" },
-      { name: "export", summary: "Copy an artifact into this thread's workspace (or a path you give)", usage: "bb artifacts export <id> [path] [--force]" },
-      { name: "delete", summary: "Delete an artifact and all its versions", usage: "bb artifacts delete <id>" },
+      { name: "save", summary: "Save a file from this thread's workspace or thread storage", usage: "bb studio artifacts save <path> [--title <title>] [--description <text>]" },
+      { name: "list", summary: "List artifacts", usage: "bb studio artifacts list [--thread]" },
+      { name: "show", summary: "Print a text artifact's contents", usage: "bb studio artifacts show <id>" },
+      { name: "export", summary: "Copy an artifact into this thread's workspace (or a path you give)", usage: "bb studio artifacts export <id> [path] [--force]" },
+      { name: "delete", summary: "Delete an artifact and all its versions", usage: "bb studio artifacts delete <id>" },
     ],
     async run(argv, ctx) {
       const [cmd, ...rest] = argv;
@@ -587,7 +587,7 @@ export default async function plugin(bb: BbPluginApi) {
       switch (cmd) {
         case "save": {
           const [path] = flags.positional;
-          if (!path) return { exitCode: 1, stderr: "usage: bb artifacts save <path> [--title <title>] [--description <text>]\n" };
+          if (!path) return { exitCode: 1, stderr: "usage: bb studio artifacts save <path> [--title <title>] [--description <text>]\n" };
           if (!ctx.threadId) return { exitCode: 1, stderr: "Run this from a BB thread, so the path can be found.\n" };
           try {
             const result = await saveFromThread({
@@ -614,15 +614,15 @@ export default async function plugin(bb: BbPluginApi) {
         }
         case "show": {
           const artifact = store.get(flags.positional[0] ?? "");
-          if (!artifact) return { exitCode: 1, stderr: "usage: bb artifacts show <id>\n" };
+          if (!artifact) return { exitCode: 1, stderr: "usage: bb studio artifacts show <id>\n" };
           const text = artifactText(store, artifact) ?? (isTextType(versionType(artifact.version)) ? store.bytes(artifact.version.sha256)?.toString("utf8") : null);
-          if (text == null) return { exitCode: 1, stderr: `${artifact.id} isn't text. Copy it out with: bb artifacts export ${artifact.id}\n` };
+          if (text == null) return { exitCode: 1, stderr: `${artifact.id} isn't text. Copy it out with: bb studio artifacts export ${artifact.id}\n` };
           return { exitCode: 0, stdout: text.length > 900_000 ? `${text.slice(0, 900_000)}\n…(truncated)\n` : `${text}\n` };
         }
         case "export": {
           const [id, target] = flags.positional;
           const artifact = store.get(id ?? "");
-          if (!artifact) return { exitCode: 1, stderr: "usage: bb artifacts export <id> [path] [--force]\n" };
+          if (!artifact) return { exitCode: 1, stderr: "usage: bb studio artifacts export <id> [path] [--force]\n" };
           if (!ctx.threadId) return { exitCode: 1, stderr: "Run this from a BB thread, so there's a workspace to write to.\n" };
           const bytes = store.bytes(artifact.version.sha256);
           if (!bytes) return { exitCode: 1, stderr: "This artifact's contents are missing.\n" };
@@ -648,7 +648,7 @@ export default async function plugin(bb: BbPluginApi) {
         }
         case "delete": {
           const id = flags.positional[0];
-          if (!id) return { exitCode: 1, stderr: "usage: bb artifacts delete <id>\n" };
+          if (!id) return { exitCode: 1, stderr: "usage: bb studio artifacts delete <id>\n" };
           if (!store.delete(id)) return { exitCode: 1, stderr: `Artifact ${id} not found\n` };
           changed(id);
           return { exitCode: 0, stdout: `deleted ${id}\n` };
@@ -668,3 +668,5 @@ export default async function plugin(bb: BbPluginApi) {
 
 
 export { MAX_ARTIFACT_BYTES };
+
+export async function registerServer(ctx: import("../runtime").ModuleContext) { await plugin(ctx.bb); }

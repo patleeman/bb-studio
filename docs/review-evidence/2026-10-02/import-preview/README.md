@@ -8,7 +8,7 @@ the real `/content` HTTP route backed by SQLite. Inputs are temporary test
 data; no artifacts or tables were created in a user's installation.
 
 - [Tables handler tests](../../../../packages/bb-studio/src/modules/tables/src/import-export.test.ts)
-- [Artifacts route tests](../../../../packages/bb-studio-artifacts/src/server/preview-routes.test.ts)
+- [Artifacts route tests](../../../../packages/bb-studio/src/modules/artifacts/src/server/preview-routes.test.ts)
 
 ## Reproduced and fixed
 

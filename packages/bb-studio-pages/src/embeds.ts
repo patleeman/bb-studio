@@ -184,13 +184,13 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       };
     },
     async artifactView(id: string) {
-      const { artifact } = await sdk.plugins.callRpc({ pluginId: "artifacts", method: "get", input: { id } as never, outputSchema: artifactSchema });
+      const { artifact } = await sdk.plugins.callRpc({ pluginId: "studio", method: "artifacts_get", input: { id } as never, outputSchema: artifactSchema });
       if (!artifact) return null;
       const { version } = artifact;
       let text: string | null = null;
       if (version.type === "markdown" || version.type === "code" || version.type === "text") {
         const result = await sdk.plugins.callRpc({
-          pluginId: "artifacts",
+          pluginId: "studio",
           method: "studio_read",
           input: { id, format: "markdown" } as never,
           outputSchema: studio.provider.studio_read.output,
@@ -198,7 +198,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
         text = result.content === null ? null : result.content.slice(0, MAX_TEXT) + (result.content.length > MAX_TEXT ? "\n…" : "");
       }
       const query = `artifact=${encodeURIComponent(artifact.id)}&version=${encodeURIComponent(version.id)}`;
-      return { type: version.type, name: version.name, url: `/api/v1/plugins/artifacts/http/content?${query}`, text };
+      return { type: version.type, name: version.name, url: `/api/v1/plugins/studio/http/content?${query}`, text };
     },
   };
 }

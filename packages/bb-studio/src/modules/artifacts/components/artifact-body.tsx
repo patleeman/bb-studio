@@ -1,3 +1,4 @@
+import { useModuleRpc } from "../../app";
 // An artifact version's contents, shown by type. HTML runs in a sandboxed
 // frame with an opaque origin (the content route also sends a sandbox CSP);
 // images, PDFs and text use the browser's and BB's own viewers. Dragging over
@@ -5,7 +6,7 @@
 import { useEffect, useState } from "react";
 import { EmptyState, Icon, OUTLINE_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { Markdown, experimental_SourceCode as SourceCode, useRpc } from "@get-bb/plugin-sdk/app";
+import { Markdown, experimental_SourceCode as SourceCode } from "@get-bb/plugin-sdk/app";
 import type { rpcContract } from "../server";
 import { contentUrl, formatBytes, isTextType, type ArtifactType } from "../src/shared";
 import { AreaBox, useImageArea, type Picked } from "./artifact-quote";
@@ -26,7 +27,7 @@ const SPIN = "animate-spin motion-reduce:animate-none";
 type Text = { text: string | null; truncated: boolean } | { error: string } | null;
 
 function useVersionText(artifactId: string, version: ArtifactVersion, wanted: boolean, retry: number): Text {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("artifacts");
   const [text, setText] = useState<Text>(null);
   useEffect(() => {
     if (!wanted) return;

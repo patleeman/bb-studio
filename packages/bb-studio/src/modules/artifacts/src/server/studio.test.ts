@@ -29,7 +29,7 @@ describe("the Artifacts Studio provider", () => {
   it("describes artifacts, which Studio can't create", async () => {
     const { call } = setup();
     const info = await call("studio_describe", null);
-    expect(info).toMatchObject({ pluginId: "artifacts", panel: "artifacts", kinds: [{ id: "artifact", create: null, canArchive: true }] });
+    expect(info).toMatchObject({ pluginId: "studio", panel: "artifacts", kinds: [{ id: "artifact", create: null, canArchive: true }] });
     expect(studioSchemas(z).info.parse(info)).toBeTruthy();
     await expect(call("studio_create", { kind: "artifact", projectId: null, title: "x" })).rejects.toThrow(/saved from threads/);
   });
@@ -53,13 +53,13 @@ describe("the Artifacts Studio provider", () => {
         { id: "versions", value: "1", sort: 1 },
       ],
       thumbnailUrl: null,
-      href: `/plugins/artifacts/artifacts/${doc.id}`,
+      href: `/plugins/studio/artifacts/${doc.id}`,
       archived: false,
     });
     expect(byId[image.id]).toMatchObject({
       title: "chart.png",
       facts: expect.arrayContaining([{ id: "type", value: "Image", sort: null }]),
-      thumbnailUrl: `/api/v1/plugins/artifacts/http/content?artifact=${image.id}&version=${image.version.id}`,
+      thumbnailUrl: `/api/v1/plugins/studio/http/content?artifact=${image.id}&version=${image.version.id}`,
     });
   });
 

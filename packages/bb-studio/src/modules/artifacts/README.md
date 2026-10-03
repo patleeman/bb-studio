@@ -1,6 +1,6 @@
 # Studio Artifacts
 
-> **Studio Artifacts** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), Studio Artifacts, [Studio Tasks](../bb-studio/src/modules/tasks), [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio/src/modules/teams).
+> **Studio Artifacts** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../../../../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio-talk), [Studio Draw](../../../../bb-studio-draw), Studio Artifacts, [Studio Tasks](../../../../bb-studio/src/modules/tasks), [Studio Chat](../../../../bb-studio/src/modules/chat), and [Studio Teams](../../../../bb-studio/src/modules/teams).
 
 Keep the images, reports, pages and files your agents make. Save a file from
 a thread and it becomes an artifact in Studio's collection. You can view it,
@@ -33,14 +33,14 @@ Studio Chat's New in Float and Open in Float.
 
 ## What you get
 
-- **Artifacts in Studio.** With the [Studio](../bb-studio) plugin
+- **Artifacts in Studio.** With the [Studio](../../../../bb-studio) plugin
   installed, artifacts join Studio's collection next to pages, recordings
   and drawings. They get type, size and version columns, image thumbnails,
   projects, search over titles and text, archive, move and delete. Saving
   to an archived artifact again brings it back. Studio
   can't create an artifact, because artifacts come from threads. Without
   Studio, the **Artifacts** panel shows the same collection on its own.
-- **The viewer** (`/plugins/artifacts/artifacts/<id>`) shows each type in
+- **The viewer** (`/plugins/studio/artifacts/<id>`) shows each type in
   the way that suits it:
   - Images fit the window, and a click switches to actual size.
   - HTML runs in a sandboxed frame.
@@ -50,7 +50,7 @@ Studio Chat's New in Float and Open in Float.
   - Other files offer a download.
 
   The header has an editable title, the artifact's thread (with
-  [Studio Chat](../bb-studio/src/modules/chat); otherwise **New thread**, which starts a
+  [Studio Chat](../../../../bb-studio/src/modules/chat); otherwise **New thread**, which starts a
   thread that mentions the artifact), Copy (text, or the image), Download,
   and a menu.
   The menu has Open source thread, Save as page (for Markdown, text and code),
@@ -77,7 +77,7 @@ Studio Chat's New in Float and Open in Float.
   when you explicitly request that export.
 - **`@artifact` mentions.** The agent receives the artifact's details and,
   for text types, its contents.
-- **`bb artifacts` CLI**: `save <path> [--title] [--description]`,
+- **`bb studio artifacts` CLI**: `save <path> [--title] [--description]`,
   `list [--thread]`, `show <id>`, `export <id> [path] [--force]` (copies an
   artifact into the thread's workspace, so an agent can edit it and save it
   back; it won't replace an existing file without `--force`), and
@@ -100,7 +100,7 @@ Studio Chat's New in Float and Open in Float.
   script before `</body>`. It posts the selected text and its position to
   the viewer, which accepts messages only from its own frame. The page stays
   sandboxed. A page whose own CSP blocks inline scripts just can't be quoted.
-- Contents are served from `GET /api/v1/plugins/artifacts/http/content`.
+- Contents are served from `GET /api/v1/plugins/studio/http/content`.
   Every response except a real PDF carries a `sandbox allow-scripts` CSP.
   This gives HTML an opaque origin, so it can't call BB's API with your
   session, even if it's opened directly. Chrome's PDF viewer won't load in a

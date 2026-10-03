@@ -11,6 +11,7 @@ describe("studio embeds", () => {
     expect(studioRef("drawing", "")).toBeNull();
     expect(studioRef("table", "tbl_1/view/view_2")).toEqual({ pluginId: "studio", id: "tbl_1" });
     expect(studioRef("page", "pg_1")).toBeNull();
+    expect(studioEmbedFor("studio", "art_1")).toEqual({ kind: "artifact", target: "art_1" });
     expect(studioEmbedFor("artifacts", "art_1")).toEqual({ kind: "artifact", target: "art_1" });
     expect(studioEmbedFor("studio-tables", "tbl_1")).toEqual({ kind: "table", target: "tbl_1" });
     expect(studioEmbedFor("notes", "nt_1")).toEqual({ kind: "item", target: "notes:nt_1" });

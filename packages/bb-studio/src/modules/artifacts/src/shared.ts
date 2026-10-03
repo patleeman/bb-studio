@@ -1,11 +1,11 @@
 // Names, paths and file types the server and the app share.
 
-export const PLUGIN_ID = "artifacts";
-/** The nav panel: /plugins/artifacts/artifacts, and artifacts/<id> for one artifact. */
+export const PLUGIN_ID = "studio";
+/** The nav panel: /plugins/studio/artifacts, and artifacts/<id> for one artifact. */
 export const PANEL_PATH = "artifacts";
-export const ARTIFACT_ICON = "artifacts/artifact";
+export const ARTIFACT_ICON = "studio/artifact";
 /** "Save to Studio" on messages, the side panel and the picker. */
-export const SAVE_ICON = "artifacts/save";
+export const SAVE_ICON = "studio/save";
 /** Realtime channel: the server says when an artifact changed. */
 export const REALTIME_CHANNEL = "artifacts";
 export const ARTIFACT_UPDATE_TYPE = "artifact:updated";
@@ -46,7 +46,7 @@ export const TYPE_LABELS: Record<ArtifactType, string> = {
 };
 
 export const TYPE_ICONS: Record<ArtifactType, string> = {
-  image: "artifacts/image",
+  image: "studio/image",
   html: "Globe",
   markdown: "FileText",
   code: "Code",

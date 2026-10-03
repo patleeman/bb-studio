@@ -1,3 +1,4 @@
+import { moduleApp } from "../app";
 // Studio Artifacts — frontend entry.
 //
 // Surfaces:
@@ -18,7 +19,8 @@ import { ARTIFACT_ICON, PANEL_PATH, SAVE_ICON } from "./src/shared";
 
 const PICKER = "save-to-studio";
 
-export default definePluginApp((app) => {
+export function registerApp(host: import("@get-bb/plugin-sdk/app").PluginAppBuilder) {
+  const app = moduleApp(host, "artifacts");
   app.slots.navPanel({
     id: "artifacts",
     title: "Artifacts",
@@ -28,7 +30,7 @@ export default definePluginApp((app) => {
   });
 
   // Shows the panel in Float windows open on its paths.
-  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <ArtifactsPanel subPath={subPath} />} /> });
+  app.slots.experimental_appOverlay({ id: "artifacts-float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <ArtifactsPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
     id: PICKER,
     title: "Artifacts",
@@ -48,4 +50,6 @@ export default definePluginApp((app) => {
   });
 
   app.slots.messageDirective({ id: "artifact", component: ArtifactCard });
-});
+}
+
+export default definePluginApp(registerApp);

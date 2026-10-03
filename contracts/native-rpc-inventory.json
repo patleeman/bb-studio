@@ -3,56 +3,56 @@
   "calls": [
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "get",
+      "plugin": "studio",
+      "method": "artifacts_get",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "text",
+      "plugin": "studio",
+      "method": "artifacts_text",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "update",
+      "plugin": "studio",
+      "method": "artifacts_update",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "move",
+      "plugin": "studio",
+      "method": "artifacts_move",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "delete",
+      "plugin": "studio",
+      "method": "artifacts_delete",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "saveAsPage",
+      "plugin": "studio",
+      "method": "artifacts_saveAsPage",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "threadArtifacts",
+      "plugin": "studio",
+      "method": "artifacts_threadArtifacts",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "candidates",
+      "plugin": "studio",
+      "method": "artifacts_candidates",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Artifacts.swift",
-      "plugin": "artifacts",
-      "method": "saveFiles",
+      "plugin": "studio",
+      "method": "artifacts_saveFiles",
       "coverage": "literal method checked against contract"
     },
     {
@@ -981,8 +981,8 @@
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
-      "plugin": "artifacts",
-      "method": "importFile",
+      "plugin": "studio",
+      "method": "artifacts_importFile",
       "coverage": "generated method"
     },
     {

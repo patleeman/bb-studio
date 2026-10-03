@@ -255,7 +255,7 @@ struct CaptureSheet: View {
                 guard file.data.count <= 25 * 1024 * 1024 else {
                     throw BBError(status: 413, message: "\(file.name) is over 25 MB.")
                 }
-                let result: Artifacts.ImportFileOutput = try await client.rpc("artifacts", Artifacts.Method.importFile, [
+                let result: Studio.ArtifactsImportFileOutput = try await client.rpc("studio", Studio.Method.artifacts_importFile, [
                     "name": .string(file.name),
                     "mime": .string(file.mimeType),
                     "bytes": .string(file.data.base64EncodedString()),

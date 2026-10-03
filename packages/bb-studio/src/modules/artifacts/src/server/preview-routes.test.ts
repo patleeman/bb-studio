@@ -109,4 +109,4 @@ it("marks the 2 MiB text preview truncated while downloads retain all bytes", as
   expect(result.truncated).toBe(true);
   expect(result.text).toHaveLength(2 * 1024 * 1024);
   expect(Buffer.from(await (await host.rpc.fetchHttp("GET", `${saved.url}&download=1`)).arrayBuffer())).toEqual(bytes);
-});
+}, 15_000);

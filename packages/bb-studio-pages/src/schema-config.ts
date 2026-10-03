@@ -62,7 +62,7 @@ export type EmbedKind = (typeof EMBED_KINDS)[number];
  */
 export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
-  artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
+  artifact: { idPrefix: "art_", pluginId: "studio", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
   task: { pluginId: "studio", panel: "tasks", label: "Task", idPrefix: "tsk_" },
   board: { pluginId: "studio", panel: "tasks", label: "Board", idPrefix: "brd_" },

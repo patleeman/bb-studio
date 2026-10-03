@@ -27,7 +27,10 @@
         "mark-read": "./src/modules/feed/icons/mark-read.svg",
         "task": "./src/modules/tasks/assets/icon.svg",
         "board": "./src/modules/tasks/assets/icon-board.svg",
-        "flag": "./src/modules/tasks/assets/icon-flag.svg"
+        "flag": "./src/modules/tasks/assets/icon-flag.svg",
+        "artifact": "./src/modules/artifacts/assets/icon.svg",
+        "image": "./src/modules/artifacts/assets/icon-image.svg",
+        "save": "./src/modules/artifacts/assets/icon-save.svg"
       }
     },
     "server": "./server.ts",

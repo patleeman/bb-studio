@@ -1,12 +1,12 @@
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
   {
     id: "artifacts",
-    packageDir: "bb-studio-artifacts",
+    packageDir: "bb-studio/src/modules/artifacts",
     privateSidebar: true,
     setup: async (client) => {
       const { artifactId, cleanup } = await seedArtifact();
       try {
-        await client.navigate(`/plugins/artifacts/artifacts/${artifactId}`);
+        await client.navigate(`/plugins/studio/artifacts/${artifactId}`);
         await client.waitForInputValue("Artifact title", "Q3 usage report");
         await client.waitForText("HTML ·");
         await client.waitForText("· v2");

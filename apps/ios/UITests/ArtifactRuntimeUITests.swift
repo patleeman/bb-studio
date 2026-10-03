@@ -272,7 +272,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
 
     private func restore(_ kind: String) throws {
         let payload = try XCTUnwrap(fixtures[kind]?["payload"] as? [String: Any])
-        var request = URLRequest(url: URL(string: origin + "/api/v1/plugins/artifacts/rpc/importFile")!)
+        var request = URLRequest(url: URL(string: origin + "/api/v1/plugins/studio/rpc/artifacts_importFile")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try JSONSerialization.data(withJSONObject: payload)
@@ -287,7 +287,7 @@ final class ArtifactRuntimeUITests: XCTestCase {
         }.resume()
         wait(for: [done], timeout: 15)
         let id = try XCTUnwrap(createdID)
-        request.url = URL(string: origin + "/api/v1/plugins/artifacts/rpc/delete")!
+        request.url = URL(string: origin + "/api/v1/plugins/studio/rpc/artifacts_delete")!
         request.httpBody = try JSONSerialization.data(withJSONObject: ["id": id])
         let deleted = expectation(description: "Delete owned restore artifact")
         URLSession.shared.dataTask(with: request) { _, _, error in XCTAssertNil(error); deleted.fulfill() }.resume()

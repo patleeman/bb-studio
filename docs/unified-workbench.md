@@ -183,7 +183,7 @@ The compact-layout implementation and capture definitions are pushed in
 Live captures on stable BB 0.45.0, with all 17 plugins installed from 786fd2f,
 pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Draw](../packages/bb-studio-draw/assets/compact-header.png),
-[Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
+[Artifacts](../packages/bb-studio/src/modules/artifacts/assets/compact-header.png),
 [Talk](../packages/bb-studio-talk/assets/compact-header.png),
 [Tables](../packages/bb-studio/src/modules/tables/assets/compact-header.png),
 [Tasks](../packages/bb-studio/src/modules/tasks/assets/compact-header.png), and

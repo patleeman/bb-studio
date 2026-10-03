@@ -26,7 +26,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         await pluginRpc("studio", "chat_unlink", drawingRef).catch(() => {});
         await cleanupDrawing();
         await cleanupPages();
-        if (artifactId) await pluginRpc("artifacts", "delete", { id: artifactId });
+        if (artifactId) await pluginRpc("studio", "artifacts_delete", { id: artifactId });
         if (quoteId) await client.evaluate(`new Promise((resolve, reject) => {
           const request = indexedDB.open('bb-studio-chat:drafts', 1);
           request.onerror = () => reject(request.error);
@@ -151,9 +151,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
           ctx.font = '16px sans-serif'; ctx.fillText('Review the retry arrow before release.',32,260);
           return canvas.toDataURL('image/png').split(',')[1];
         })()`);
-        ({ id: artifactId } = await pluginRpc("artifacts", "importFile", { name: "release-diagram.png", mime: "image/png", bytes, projectId }));
-        await pluginRpc("artifacts", "update", { id: artifactId, title: "Release diagram", description: "A deterministic diagram for cropped-image chat context." });
-        await client.navigate(`/plugins/artifacts/artifacts/${artifactId}`);
+        ({ id: artifactId } = await pluginRpc("studio", "artifacts_importFile", { name: "release-diagram.png", mime: "image/png", bytes, projectId }));
+        await pluginRpc("studio", "artifacts_update", { id: artifactId, title: "Release diagram", description: "A deterministic diagram for cropped-image chat context." });
+        await client.navigate(`/plugins/studio/artifacts/${artifactId}`);
         await client.waitForSelector('img[alt="release-diagram.png"]');
         const deadline = Date.now() + 15000;
         while (!(await client.evaluate(`document.querySelector('img[alt="release-diagram.png"]')?.naturalWidth === 640`))) {

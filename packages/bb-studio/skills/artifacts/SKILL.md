@@ -43,12 +43,12 @@ own line in your reply and the user sees a card that opens the artifact.
 ## CLI (works in every agent session)
 
 ```sh
-bb artifacts save <path> [--title <title>] [--description <text>]
-bb artifacts list [--thread]
-bb artifacts show <id>          # print a text artifact
-bb artifacts export <id> [path] [--force] # copy it into the workspace (default: its file name;
+bb studio artifacts save <path> [--title <title>] [--description <text>]
+bb studio artifacts list [--thread]
+bb studio artifacts show <id>          # print a text artifact
+bb studio artifacts export <id> [path] [--force] # copy it into the workspace (default: its file name;
                                           # --force replaces a file already there)
-bb artifacts delete <id>
+bb studio artifacts delete <id>
 ```
 
 ## Types

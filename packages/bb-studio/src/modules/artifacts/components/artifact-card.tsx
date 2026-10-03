@@ -1,8 +1,9 @@
+import { useModuleRpc } from "../../app";
 // `::artifact{id="art_…"}` in a reply: a card for a saved artifact that opens
 // its viewer. Images show a preview.
 import { useCallback, useEffect, useState } from "react";
 import { ItemDirectiveCard } from "@bb-studio/kit/app";
-import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../server";
 import { ARTIFACT_UPDATE_TYPE, PANEL_PATH, REALTIME_CHANNEL, TYPE_ICONS, TYPE_LABELS, contentUrl, formatBytes, isArtifactId } from "../src/shared";
@@ -12,7 +13,7 @@ type Artifact = NonNullable<z.infer<(typeof rpcContract)["get"]["output"]>["arti
 export function ArtifactCard({ attributes }: PluginMessageDirectiveProps) {
   const id = attributes.id ?? "";
   const valid = isArtifactId(id);
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("artifacts");
   const navigate = useBbNavigate();
   const [artifact, setArtifact] = useState<Artifact | null | undefined>(undefined);
 

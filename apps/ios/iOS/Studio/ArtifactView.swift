@@ -77,14 +77,14 @@ struct ArtifactView: View {
         .navigationBarTitleDisplayMode(.inline)
         .toolbar { toolbar }
         .toolbar { Button { showingRelated = true } label: { Label("Related", systemImage: "link") } }
-        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "artifacts", itemId: id) }
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "studio", itemId: id) }
         .studioChat(
-            isPresented: $chatting, pluginId: "artifacts", itemId: id, title: artifact?.displayTitle ?? "Artifact",
+            isPresented: $chatting, pluginId: "studio", itemId: id, title: artifact?.displayTitle ?? "Artifact",
             projectId: artifact?.projectId)
         .task(id: "\(version?.id ?? ""):\(textAttempt)") { await loadText() }
         .task {
             listener = app.realtime.listen { event in
-                guard case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "artifacts" else { return }
+                guard case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "studio" else { return }
                 if let changed = payload["id"]?.stringValue, changed != id { return }
                 Task { await load() }
             }
@@ -421,7 +421,7 @@ struct ArtifactView: View {
         do {
             try await client.deleteArtifact(id)
             guard client.baseURL == app.serverURL else { return }
-            StudioStore.shared.removed(pluginId: "artifacts", id: id)
+            StudioStore.shared.removed(pluginId: "studio", id: id)
             operation.complete(on: app) { dismiss() }
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))

@@ -160,6 +160,9 @@ public enum Studio {
     public static let tasks_sendBack = "tasks_sendBack"
     public static let tasks_archiveThreads = "tasks_archiveThreads"
     public static let tasks_settings = "tasks_settings"
+    public static let teams_office_dm = "teams_office_dm"
+    public static let teams_office_direct = "teams_office_direct"
+    public static let teams_office_talk = "teams_office_talk"
     public static let teams_viewThreads = "teams_viewThreads"
     public static let teams_views = "teams_views"
     public static let teams_viewCreate = "teams_viewCreate"
@@ -193,6 +196,17 @@ public enum Studio {
     public static let teams_handoffSource = "teams_handoffSource"
     public static let teams_usage = "teams_usage"
     public static let teams_saveLimits = "teams_saveLimits"
+    public static let artifacts_get = "artifacts_get"
+    public static let artifacts_versionBytes = "artifacts_versionBytes"
+    public static let artifacts_text = "artifacts_text"
+    public static let artifacts_update = "artifacts_update"
+    public static let artifacts_delete = "artifacts_delete"
+    public static let artifacts_move = "artifacts_move"
+    public static let artifacts_threadArtifacts = "artifacts_threadArtifacts"
+    public static let artifacts_candidates = "artifacts_candidates"
+    public static let artifacts_saveFiles = "artifacts_saveFiles"
+    public static let artifacts_importFile = "artifacts_importFile"
+    public static let artifacts_saveAsPage = "artifacts_saveAsPage"
   }
 
   public typealias Home = HomeOutput
@@ -543,6 +557,12 @@ public enum Studio {
 
   public typealias TasksSettings = TasksSettingsOutput
 
+  public typealias TeamsOfficeDm = TeamsOfficeDmOutput
+
+  public typealias TeamsOfficeDirect = TeamsOfficeDirectOutput
+
+  public typealias TeamsOfficeTalk = TeamsOfficeTalkOutput
+
   public typealias TeamsViewThreadsOutput = [TeamsViewThreadsOutputItem]
 
   public typealias TeamsViewThreads = TeamsViewThreadsOutput
@@ -624,6 +644,28 @@ public enum Studio {
   public typealias TeamsUsage = TeamsUsageOutput
 
   public typealias TeamsSaveLimits = TeamsSaveLimitsOutput
+
+  public typealias ArtifactsGet = ArtifactsGetOutput
+
+  public typealias ArtifactsVersionBytes = ArtifactsVersionBytesOutput
+
+  public typealias ArtifactsText = ArtifactsTextOutput
+
+  public typealias ArtifactsUpdate = ArtifactsUpdateOutput
+
+  public typealias ArtifactsDelete = ArtifactsDeleteOutput
+
+  public typealias ArtifactsMove = ArtifactsMoveOutput
+
+  public typealias ArtifactsThreadArtifacts = ArtifactsThreadArtifactsOutput
+
+  public typealias ArtifactsCandidates = ArtifactsCandidatesOutput
+
+  public typealias ArtifactsSaveFiles = ArtifactsSaveFilesOutput
+
+  public typealias ArtifactsImportFile = ArtifactsImportFileOutput
+
+  public typealias ArtifactsSaveAsPage = ArtifactsSaveAsPageOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -13453,6 +13495,78 @@ public enum Studio {
     }
   }
 
+  public struct TeamsOfficeDmInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsOfficeDmOutput: Sendable, Hashable, Codable {
+    public var conversationId: String?
+    public var threadId: String?
+
+    public init(conversationId: String? = nil, threadId: String? = nil) {
+      self.conversationId = conversationId
+      self.threadId = threadId
+    }
+  }
+
+  public struct TeamsOfficeDirectInput: Sendable, Hashable, Codable {
+    public var botId: String?
+
+    public init(botId: String? = nil) {
+      self.botId = botId
+    }
+  }
+
+  public struct TeamsOfficeDirectOutput: Sendable, Hashable, Codable {
+    public var conversationId: String?
+    public var threadId: String?
+
+    public init(conversationId: String? = nil, threadId: String? = nil) {
+      self.conversationId = conversationId
+      self.threadId = threadId
+    }
+  }
+
+  public struct TeamsOfficeTalkInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct TeamsOfficeTalkOutputConversationsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var memberBotIds: [String]?
+    public var isDirect: Bool?
+    public var needsYou: Bool?
+    public var unread: Bool?
+    public var href: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, title: String? = nil, memberBotIds: [String]? = nil, isDirect: Bool? = nil, needsYou: Bool? = nil, unread: Bool? = nil, href: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.memberBotIds = memberBotIds
+      self.isDirect = isDirect
+      self.needsYou = needsYou
+      self.unread = unread
+      self.href = href
+      self.projectId = projectId
+    }
+  }
+
+  public struct TeamsOfficeTalkOutput: Sendable, Hashable, Codable {
+    public var conversations: [TeamsOfficeTalkOutputConversationsItem]?
+
+    public init(conversations: [TeamsOfficeTalkOutputConversationsItem]? = nil) {
+      self.conversations = conversations
+    }
+  }
+
   public struct TeamsViewThreadsInput: Sendable, Hashable, Codable {
     public var id: String?
 
@@ -13492,14 +13606,16 @@ public enum Studio {
   public struct TeamsViewsOutputItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
+    public var projectId: String?
     public var members: [StudioJSONValue]?
     public var archived: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
+      self.projectId = projectId
       self.members = members
       self.archived = archived
       self.createdAt = createdAt
@@ -13522,14 +13638,16 @@ public enum Studio {
   public struct TeamsViewCreateOutput: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
+    public var projectId: String?
     public var members: [StudioJSONValue]?
     public var archived: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
+      self.projectId = projectId
       self.members = members
       self.archived = archived
       self.createdAt = createdAt
@@ -13556,14 +13674,16 @@ public enum Studio {
   public struct TeamsViewUpdateOutput: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
+    public var projectId: String?
     public var members: [StudioJSONValue]?
     public var archived: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
+      self.projectId = projectId
       self.members = members
       self.archived = archived
       self.createdAt = createdAt
@@ -13604,14 +13724,16 @@ public enum Studio {
   public struct TeamsViewOutputView: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
+    public var projectId: String?
     public var members: [StudioJSONValue]?
     public var archived: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
+      self.projectId = projectId
       self.members = members
       self.archived = archived
       self.createdAt = createdAt
@@ -13866,6 +13988,30 @@ public enum Studio {
     }
   }
 
+  public enum TeamsListOutputBotsItemTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct TeamsListOutputBotsItemLimits: Sendable, Hashable, Codable {
     public var turnsPerHour: Int?
     public var turnsPerDay: Int?
@@ -13992,6 +14138,7 @@ public enum Studio {
   }
 
   public struct TeamsListOutputBotsItem: Sendable, Hashable, Codable {
+    public var trust: TeamsListOutputBotsItemTrust?
     public var limits: TeamsListOutputBotsItemLimits?
     public var name: String?
     public var description: String?
@@ -14017,7 +14164,8 @@ public enum Studio {
     public var working: Bool?
     public var lastActivityAt: Double?
 
-    public init(limits: TeamsListOutputBotsItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsListOutputBotsItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsListOutputBotsItemReasoningLevel? = nil, permissionMode: TeamsListOutputBotsItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil, working: Bool? = nil, lastActivityAt: Double? = nil) {
+    public init(trust: TeamsListOutputBotsItemTrust? = nil, limits: TeamsListOutputBotsItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsListOutputBotsItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsListOutputBotsItemReasoningLevel? = nil, permissionMode: TeamsListOutputBotsItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil, working: Bool? = nil, lastActivityAt: Double? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -14269,14 +14417,16 @@ public enum Studio {
   public struct TeamsListOutputViewsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
+    public var projectId: String?
     public var members: [StudioJSONValue]?
     public var archived: Bool?
     public var createdAt: Double?
     public var updatedAt: Double?
 
-    public init(id: String? = nil, name: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, projectId: String? = nil, members: [StudioJSONValue]? = nil, archived: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.name = name
+      self.projectId = projectId
       self.members = members
       self.archived = archived
       self.createdAt = createdAt
@@ -14583,6 +14733,30 @@ public enum Studio {
     }
   }
 
+  public enum TeamsCreateInputTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct TeamsCreateInputLimits: Sendable, Hashable, Codable {
     public var turnsPerHour: Int?
     public var turnsPerDay: Int?
@@ -14709,6 +14883,7 @@ public enum Studio {
   }
 
   public struct TeamsCreateInput: Sendable, Hashable, Codable {
+    public var trust: TeamsCreateInputTrust?
     public var limits: TeamsCreateInputLimits?
     public var name: String?
     public var description: String?
@@ -14723,7 +14898,8 @@ public enum Studio {
     public var intervalMinutes: Int?
     public var mission: String?
 
-    public init(limits: TeamsCreateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateInputReasoningLevel? = nil, permissionMode: TeamsCreateInputPermissionMode? = nil, intervalMinutes: Int? = nil, mission: String? = nil) {
+    public init(trust: TeamsCreateInputTrust? = nil, limits: TeamsCreateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateInputReasoningLevel? = nil, permissionMode: TeamsCreateInputPermissionMode? = nil, intervalMinutes: Int? = nil, mission: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -14737,6 +14913,30 @@ public enum Studio {
       self.permissionMode = permissionMode
       self.intervalMinutes = intervalMinutes
       self.mission = mission
+    }
+  }
+
+  public enum TeamsCreateOutputTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -14866,6 +15066,7 @@ public enum Studio {
   }
 
   public struct TeamsCreateOutput: Sendable, Hashable, Codable {
+    public var trust: TeamsCreateOutputTrust?
     public var limits: TeamsCreateOutputLimits?
     public var name: String?
     public var description: String?
@@ -14889,7 +15090,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(limits: TeamsCreateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateOutputReasoningLevel? = nil, permissionMode: TeamsCreateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(trust: TeamsCreateOutputTrust? = nil, limits: TeamsCreateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsCreateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsCreateOutputReasoningLevel? = nil, permissionMode: TeamsCreateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -14930,6 +15132,30 @@ public enum Studio {
 
     public init(ok: Bool? = nil) {
       self.ok = ok
+    }
+  }
+
+  public enum TeamsUpdateInputTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -15059,6 +15285,7 @@ public enum Studio {
   }
 
   public struct TeamsUpdateInput: Sendable, Hashable, Codable {
+    public var trust: TeamsUpdateInputTrust?
     public var limits: TeamsUpdateInputLimits?
     public var name: String?
     public var description: String?
@@ -15074,7 +15301,8 @@ public enum Studio {
     public var id: String?
     public var expectedUpdatedAt: Double?
 
-    public init(limits: TeamsUpdateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateInputReasoningLevel? = nil, permissionMode: TeamsUpdateInputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, expectedUpdatedAt: Double? = nil) {
+    public init(trust: TeamsUpdateInputTrust? = nil, limits: TeamsUpdateInputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateInputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateInputReasoningLevel? = nil, permissionMode: TeamsUpdateInputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, expectedUpdatedAt: Double? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -15089,6 +15317,30 @@ public enum Studio {
       self.intervalMinutes = intervalMinutes
       self.id = id
       self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public enum TeamsUpdateOutputTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -15218,6 +15470,7 @@ public enum Studio {
   }
 
   public struct TeamsUpdateOutput: Sendable, Hashable, Codable {
+    public var trust: TeamsUpdateOutputTrust?
     public var limits: TeamsUpdateOutputLimits?
     public var name: String?
     public var description: String?
@@ -15241,7 +15494,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(limits: TeamsUpdateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateOutputReasoningLevel? = nil, permissionMode: TeamsUpdateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(trust: TeamsUpdateOutputTrust? = nil, limits: TeamsUpdateOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsUpdateOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsUpdateOutputReasoningLevel? = nil, permissionMode: TeamsUpdateOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -15274,6 +15528,30 @@ public enum Studio {
     public init(id: String? = nil, expectedUpdatedAt: Double? = nil) {
       self.id = id
       self.expectedUpdatedAt = expectedUpdatedAt
+    }
+  }
+
+  public enum TeamsSwapModelOutputTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -15403,6 +15681,7 @@ public enum Studio {
   }
 
   public struct TeamsSwapModelOutput: Sendable, Hashable, Codable {
+    public var trust: TeamsSwapModelOutputTrust?
     public var limits: TeamsSwapModelOutputLimits?
     public var name: String?
     public var description: String?
@@ -15426,7 +15705,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(limits: TeamsSwapModelOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsSwapModelOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsSwapModelOutputReasoningLevel? = nil, permissionMode: TeamsSwapModelOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(trust: TeamsSwapModelOutputTrust? = nil, limits: TeamsSwapModelOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsSwapModelOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsSwapModelOutputReasoningLevel? = nil, permissionMode: TeamsSwapModelOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -15459,6 +15739,30 @@ public enum Studio {
     public init(id: String? = nil, retired: Bool? = nil) {
       self.id = id
       self.retired = retired
+    }
+  }
+
+  public enum TeamsRetireOutputTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
     }
   }
 
@@ -15588,6 +15892,7 @@ public enum Studio {
   }
 
   public struct TeamsRetireOutput: Sendable, Hashable, Codable {
+    public var trust: TeamsRetireOutputTrust?
     public var limits: TeamsRetireOutputLimits?
     public var name: String?
     public var description: String?
@@ -15611,7 +15916,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(limits: TeamsRetireOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsRetireOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsRetireOutputReasoningLevel? = nil, permissionMode: TeamsRetireOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(trust: TeamsRetireOutputTrust? = nil, limits: TeamsRetireOutputLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsRetireOutputFallbackReasoningLevel? = nil, reasoningLevel: TeamsRetireOutputReasoningLevel? = nil, permissionMode: TeamsRetireOutputPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -15930,6 +16236,30 @@ public enum Studio {
     public init() {}
   }
 
+  public enum TeamsProfilesOutputItemTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct TeamsProfilesOutputItemLimits: Sendable, Hashable, Codable {
     public var turnsPerHour: Int?
     public var turnsPerDay: Int?
@@ -16056,6 +16386,7 @@ public enum Studio {
   }
 
   public struct TeamsProfilesOutputItem: Sendable, Hashable, Codable {
+    public var trust: TeamsProfilesOutputItemTrust?
     public var limits: TeamsProfilesOutputItemLimits?
     public var name: String?
     public var description: String?
@@ -16079,7 +16410,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(limits: TeamsProfilesOutputItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsProfilesOutputItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsProfilesOutputItemReasoningLevel? = nil, permissionMode: TeamsProfilesOutputItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(trust: TeamsProfilesOutputItemTrust? = nil, limits: TeamsProfilesOutputItemLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsProfilesOutputItemFallbackReasoningLevel? = nil, reasoningLevel: TeamsProfilesOutputItemReasoningLevel? = nil, permissionMode: TeamsProfilesOutputItemPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -16253,6 +16585,30 @@ public enum Studio {
     }
   }
 
+  public enum TeamsGetOutputBotTrust: Sendable, Hashable, Codable {
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct TeamsGetOutputBotLimits: Sendable, Hashable, Codable {
     public var turnsPerHour: Int?
     public var turnsPerDay: Int?
@@ -16379,6 +16735,7 @@ public enum Studio {
   }
 
   public struct TeamsGetOutputBot: Sendable, Hashable, Codable {
+    public var trust: TeamsGetOutputBotTrust?
     public var limits: TeamsGetOutputBotLimits?
     public var name: String?
     public var description: String?
@@ -16402,7 +16759,8 @@ public enum Studio {
     public var lastWakeAt: Double?
     public var error: String?
 
-    public init(limits: TeamsGetOutputBotLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsGetOutputBotFallbackReasoningLevel? = nil, reasoningLevel: TeamsGetOutputBotReasoningLevel? = nil, permissionMode: TeamsGetOutputBotPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+    public init(trust: TeamsGetOutputBotTrust? = nil, limits: TeamsGetOutputBotLimits? = nil, name: String? = nil, description: String? = nil, avatar: String? = nil, providerId: String? = nil, model: String? = nil, fallbackProviderId: String? = nil, fallbackModel: String? = nil, fallbackReasoningLevel: TeamsGetOutputBotFallbackReasoningLevel? = nil, reasoningLevel: TeamsGetOutputBotReasoningLevel? = nil, permissionMode: TeamsGetOutputBotPermissionMode? = nil, intervalMinutes: Int? = nil, id: String? = nil, handle: String? = nil, home: String? = nil, projectId: String? = nil, hostId: String? = nil, retired: Bool? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, lastWakeAt: Double? = nil, error: String? = nil) {
+      self.trust = trust
       self.limits = limits
       self.name = name
       self.description = description
@@ -17117,6 +17475,586 @@ public enum Studio {
       self.routingMilliseconds = routingMilliseconds
       self.since = since
       self.limits = limits
+    }
+  }
+
+  public struct ArtifactsGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum ArtifactsGetOutputArtifactVersionType: Sendable, Hashable, Codable {
+    case image
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsGetOutputArtifactVersion: Sendable, Hashable, Codable {
+    public var id: String?
+    public var number: Double?
+    public var name: String?
+    public var mime: String?
+    public var size: Double?
+    public var type: ArtifactsGetOutputArtifactVersionType?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, number: Double? = nil, name: String? = nil, mime: String? = nil, size: Double? = nil, type: ArtifactsGetOutputArtifactVersionType? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.number = number
+      self.name = name
+      self.mime = mime
+      self.size = size
+      self.type = type
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ArtifactsGetOutputArtifact: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var projectId: String?
+    public var sourceThreadId: String?
+    public var sourcePath: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var version: ArtifactsGetOutputArtifactVersion?
+    public var versions: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, sourceThreadId: String? = nil, sourcePath: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, version: ArtifactsGetOutputArtifactVersion? = nil, versions: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.projectId = projectId
+      self.sourceThreadId = sourceThreadId
+      self.sourcePath = sourcePath
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.version = version
+      self.versions = versions
+    }
+  }
+
+  public enum ArtifactsGetOutputVersionsItemType: Sendable, Hashable, Codable {
+    case image
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsGetOutputVersionsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var number: Double?
+    public var name: String?
+    public var mime: String?
+    public var size: Double?
+    public var type: ArtifactsGetOutputVersionsItemType?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, number: Double? = nil, name: String? = nil, mime: String? = nil, size: Double? = nil, type: ArtifactsGetOutputVersionsItemType? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.number = number
+      self.name = name
+      self.mime = mime
+      self.size = size
+      self.type = type
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ArtifactsGetOutput: Sendable, Hashable, Codable {
+    public var artifact: ArtifactsGetOutputArtifact?
+    public var versions: [ArtifactsGetOutputVersionsItem]?
+
+    public init(artifact: ArtifactsGetOutputArtifact? = nil, versions: [ArtifactsGetOutputVersionsItem]? = nil) {
+      self.artifact = artifact
+      self.versions = versions
+    }
+  }
+
+  public struct ArtifactsVersionBytesInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: String?
+
+    public init(id: String? = nil, versionId: String? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public struct ArtifactsVersionBytesOutput: Sendable, Hashable, Codable {
+    public var bytes: String?
+    public var sha256: String?
+
+    public init(bytes: String? = nil, sha256: String? = nil) {
+      self.bytes = bytes
+      self.sha256 = sha256
+    }
+  }
+
+  public struct ArtifactsTextInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var versionId: String?
+
+    public init(id: String? = nil, versionId: String? = nil) {
+      self.id = id
+      self.versionId = versionId
+    }
+  }
+
+  public struct ArtifactsTextOutput: Sendable, Hashable, Codable {
+    public var text: String?
+    public var truncated: Bool?
+
+    public init(text: String? = nil, truncated: Bool? = nil) {
+      self.text = text
+      self.truncated = truncated
+    }
+  }
+
+  public struct ArtifactsUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+    }
+  }
+
+  public struct ArtifactsUpdateOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ArtifactsDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ArtifactsDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ArtifactsMoveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.projectId = projectId
+    }
+  }
+
+  public struct ArtifactsMoveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public enum ArtifactsThreadArtifactsOutputArtifactsItemVersionType: Sendable, Hashable, Codable {
+    case image
+    case html
+    case markdown
+    case code
+    case text
+    case pdf
+    case other
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "html": self = .html
+      case "markdown": self = .markdown
+      case "code": self = .code
+      case "text": self = .text
+      case "pdf": self = .pdf
+      case "other": self = .other
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .html: try container.encode("html")
+      case .markdown: try container.encode("markdown")
+      case .code: try container.encode("code")
+      case .text: try container.encode("text")
+      case .pdf: try container.encode("pdf")
+      case .other: try container.encode("other")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsOutputArtifactsItemVersion: Sendable, Hashable, Codable {
+    public var id: String?
+    public var number: Double?
+    public var name: String?
+    public var mime: String?
+    public var size: Double?
+    public var type: ArtifactsThreadArtifactsOutputArtifactsItemVersionType?
+    public var createdAt: Double?
+
+    public init(id: String? = nil, number: Double? = nil, name: String? = nil, mime: String? = nil, size: Double? = nil, type: ArtifactsThreadArtifactsOutputArtifactsItemVersionType? = nil, createdAt: Double? = nil) {
+      self.id = id
+      self.number = number
+      self.name = name
+      self.mime = mime
+      self.size = size
+      self.type = type
+      self.createdAt = createdAt
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsOutputArtifactsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var projectId: String?
+    public var sourceThreadId: String?
+    public var sourcePath: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var version: ArtifactsThreadArtifactsOutputArtifactsItemVersion?
+    public var versions: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, projectId: String? = nil, sourceThreadId: String? = nil, sourcePath: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, version: ArtifactsThreadArtifactsOutputArtifactsItemVersion? = nil, versions: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.projectId = projectId
+      self.sourceThreadId = sourceThreadId
+      self.sourcePath = sourcePath
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.version = version
+      self.versions = versions
+    }
+  }
+
+  public struct ArtifactsThreadArtifactsOutput: Sendable, Hashable, Codable {
+    public var artifacts: [ArtifactsThreadArtifactsOutputArtifactsItem]?
+
+    public init(artifacts: [ArtifactsThreadArtifactsOutputArtifactsItem]? = nil) {
+      self.artifacts = artifacts
+    }
+  }
+
+  public struct ArtifactsCandidatesInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var seq: Int?
+
+    public init(threadId: String? = nil, seq: Int? = nil) {
+      self.threadId = threadId
+      self.seq = seq
+    }
+  }
+
+  public enum ArtifactsCandidatesOutputReplyItemKind: Sendable, Hashable, Codable {
+    case image
+    case created
+    case changed
+    case storage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "created": self = .created
+      case "changed": self = .changed
+      case "storage": self = .storage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .created: try container.encode("created")
+      case .changed: try container.encode("changed")
+      case .storage: try container.encode("storage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsCandidatesOutputReplyItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var display: String?
+    public var kind: ArtifactsCandidatesOutputReplyItemKind?
+    public var artifactId: String?
+
+    public init(path: String? = nil, display: String? = nil, kind: ArtifactsCandidatesOutputReplyItemKind? = nil, artifactId: String? = nil) {
+      self.path = path
+      self.display = display
+      self.kind = kind
+      self.artifactId = artifactId
+    }
+  }
+
+  public enum ArtifactsCandidatesOutputStorageItemKind: Sendable, Hashable, Codable {
+    case image
+    case created
+    case changed
+    case storage
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "image": self = .image
+      case "created": self = .created
+      case "changed": self = .changed
+      case "storage": self = .storage
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .image: try container.encode("image")
+      case .created: try container.encode("created")
+      case .changed: try container.encode("changed")
+      case .storage: try container.encode("storage")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsCandidatesOutputStorageItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var display: String?
+    public var kind: ArtifactsCandidatesOutputStorageItemKind?
+    public var artifactId: String?
+
+    public init(path: String? = nil, display: String? = nil, kind: ArtifactsCandidatesOutputStorageItemKind? = nil, artifactId: String? = nil) {
+      self.path = path
+      self.display = display
+      self.kind = kind
+      self.artifactId = artifactId
+    }
+  }
+
+  public struct ArtifactsCandidatesOutput: Sendable, Hashable, Codable {
+    public var reply: [ArtifactsCandidatesOutputReplyItem]?
+    public var storage: [ArtifactsCandidatesOutputStorageItem]?
+    public var storageError: String?
+
+    public init(reply: [ArtifactsCandidatesOutputReplyItem]? = nil, storage: [ArtifactsCandidatesOutputStorageItem]? = nil, storageError: String? = nil) {
+      self.reply = reply
+      self.storage = storage
+      self.storageError = storageError
+    }
+  }
+
+  public struct ArtifactsSaveFilesInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var paths: [String]?
+
+    public init(threadId: String? = nil, paths: [String]? = nil) {
+      self.threadId = threadId
+      self.paths = paths
+    }
+  }
+
+  public enum ArtifactsSaveFilesOutputSavedItemOutcome: Sendable, Hashable, Codable {
+    case created
+    case versioned
+    case unchanged
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "created": self = .created
+      case "versioned": self = .versioned
+      case "unchanged": self = .unchanged
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .created: try container.encode("created")
+      case .versioned: try container.encode("versioned")
+      case .unchanged: try container.encode("unchanged")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ArtifactsSaveFilesOutputSavedItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var artifactId: String?
+    public var outcome: ArtifactsSaveFilesOutputSavedItemOutcome?
+    public var restored: Bool?
+
+    public init(path: String? = nil, artifactId: String? = nil, outcome: ArtifactsSaveFilesOutputSavedItemOutcome? = nil, restored: Bool? = nil) {
+      self.path = path
+      self.artifactId = artifactId
+      self.outcome = outcome
+      self.restored = restored
+    }
+  }
+
+  public struct ArtifactsSaveFilesOutputFailedItem: Sendable, Hashable, Codable {
+    public var path: String?
+    public var error: String?
+
+    public init(path: String? = nil, error: String? = nil) {
+      self.path = path
+      self.error = error
+    }
+  }
+
+  public struct ArtifactsSaveFilesOutput: Sendable, Hashable, Codable {
+    public var saved: [ArtifactsSaveFilesOutputSavedItem]?
+    public var failed: [ArtifactsSaveFilesOutputFailedItem]?
+
+    public init(saved: [ArtifactsSaveFilesOutputSavedItem]? = nil, failed: [ArtifactsSaveFilesOutputFailedItem]? = nil) {
+      self.saved = saved
+      self.failed = failed
+    }
+  }
+
+  public struct ArtifactsImportFileInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var mime: String?
+    public var bytes: String?
+    public var projectId: String?
+
+    public init(name: String? = nil, mime: String? = nil, bytes: String? = nil, projectId: String? = nil) {
+      self.name = name
+      self.mime = mime
+      self.bytes = bytes
+      self.projectId = projectId
+    }
+  }
+
+  public struct ArtifactsImportFileOutput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ArtifactsSaveAsPageInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ArtifactsSaveAsPageOutput: Sendable, Hashable, Codable {
+    public var href: String?
+
+    public init(href: String? = nil) {
+      self.href = href
     }
   }
 

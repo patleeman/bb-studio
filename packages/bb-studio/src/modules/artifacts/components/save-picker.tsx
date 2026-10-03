@@ -1,3 +1,4 @@
+import { useModuleRpc } from "../../app";
 // "Artifacts" in a thread's side panel: the files a reply made and the
 // thread's storage files, to tick and save, and what this thread has saved.
 // Opened from a message's action bar (params `{ seq }`) or the panel launcher
@@ -6,7 +7,7 @@ import { useCallback, useEffect, useMemo, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage, plural, relativeTime } from "@bb-studio/kit/format";
-import { useRealtime, useRpc, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
+import { useRealtime, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../server";
 import { REALTIME_CHANNEL, SAVE_ICON, TYPE_ICONS, TYPE_LABELS, artifactType, baseName, mimeFor, prunePicked } from "../src/shared";
@@ -35,7 +36,7 @@ export function SavePicker({ threadId, params }: PluginThreadPanelProps) {
 }
 
 function PickerList({ threadId, seq, onOpen }: { threadId: string; seq: number | null; onOpen(id: string): void }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("artifacts");
   const [candidates, setCandidates] = useState<Candidates | null>(null);
   const [saved, setSaved] = useState<Saved>([]);
   const [error, setError] = useState<string | null>(null);

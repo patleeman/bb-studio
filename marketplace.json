@@ -157,30 +157,6 @@
       }
     },
     {
-      "id": "artifacts",
-      "displayName": "Studio Artifacts",
-      "description": "Part of BB Studio. Keep the images, pages, reports and files your agents make, in Studio's collection.",
-      "icon": {
-        "url": "./packages/bb-studio-artifacts/assets/icon.svg"
-      },
-      "tags": [
-        "files",
-        "artifacts",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-artifacts",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "thread-list-plus",
       "displayName": "Studio Sidebar",
       "description": "BB's thread list with a section for each Studio app above your threads, and New project in its menu.",

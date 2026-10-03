@@ -1,3 +1,4 @@
+import { useModuleRpc } from "../../app";
 // One artifact: its contents by type under Studio's item header, with its
 // versions, the thread it came from, and Save as page for text. Selected text
 // or an image area can go to the artifact's thread (artifact-quote.tsx).
@@ -24,7 +25,7 @@ import {
 } from "@bb-studio/kit/app";
 
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
-import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
+import { useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
 import type { z } from "zod";
 import type { rpcContract } from "../server";
 import { ARTIFACT_UPDATE_TYPE, PLUGIN_ID, REALTIME_CHANNEL, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../src/shared";
@@ -45,7 +46,7 @@ export function ArtifactViewer({
   /** `replace` when leaving because the artifact is gone. */
   onBack: (replace?: boolean) => void;
 }) {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("artifacts");
   const navigate = useBbNavigate();
   // Studio Chat's New in Float bar starts threads; the menu only offers it without one.
   const studioChat = useStudioChatPresent();

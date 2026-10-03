@@ -7,8 +7,8 @@ import { PagesService } from "../../bb-studio-pages/src/service";
 import { readMarkdown } from "../../bb-studio-pages/src/doc";
 import { registerStudio as registerTalk } from "../../bb-studio-talk/src/server/studio";
 import { memoryStore as talkStore, addSegment } from "../../bb-studio-talk/src/test/db";
-import { registerStudio as registerArtifacts } from "../../bb-studio-artifacts/src/server/studio";
-import { memoryStore as artifactStore, bytes } from "../../bb-studio-artifacts/src/test/db";
+import { registerStudio as registerArtifacts } from "../../bb-studio/src/modules/artifacts/src/server/studio";
+import { memoryStore as artifactStore, bytes } from "../../bb-studio/src/modules/artifacts/src/test/db";
 import { registerStudio as registerBots } from "./modules/teams/studio-provider";
 import { createTestStore } from "./modules/teams/test/test-store";
 import { botSchema } from "./modules/teams/contract";
@@ -81,7 +81,7 @@ providerConformance("Artifacts", () => {
   const changed: string[] = [];
   registerArtifacts(bb as never, schemas, { store, changed: (id) => { changed.push(id); } });
   return {
-    pluginId: "artifacts", kind: "artifact", handlers, expectedContent: "Conformance artifact body",
+    pluginId: "studio", kind: "artifact", handlers, expectedContent: "Conformance artifact body",
     seed: (projectId) => store.save({ name: "conformance.md", mime: "text/markdown", bytes: bytes("Conformance artifact body"), projectId, by: "agent" }).artifact.id,
     notificationCount: () => changed.length,
     editTitle: (id, title) => { store.update(id, { title }, "app"); },
