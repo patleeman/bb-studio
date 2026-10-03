@@ -7,9 +7,12 @@ import { OfficeNavigation } from "./OfficeNavigation";
 import { OfficePanel } from "./OfficePanel";
 import { OfficeSidebar } from "./OfficeSidebar";
 import { OFFICE_PANEL_PATH } from "./routes";
+import { TrustRequest } from "./TrustRequest";
 
 export function registerOfficeApp(app: PluginAppBuilder, options: { sidebar: boolean }): void {
   app.slots.navPanel({ id: "office", title: "Home", icon: "Home", path: OFFICE_PANEL_PATH, component: retainPanel("office", OfficePanel) });
+  // Approvals for bots set to "Ask first" (office/trust.ts, origin rendererId office-trust).
+  app.slots.pendingInteraction({ id: "office-trust", component: TrustRequest });
   if (!options.sidebar) return;
   app.slots.experimental_sidebarNavigation({ id: "office-navigation", title: "Office", description: "Space switcher, Home, Inbox, Search and New thread.", component: OfficeNavigation });
   app.slots.experimental_threadList({ id: "office-sidebar", title: "Office", description: "Your team, favorites and folders for the current space.", component: OfficeSidebar });
