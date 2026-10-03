@@ -132,7 +132,7 @@ that did not forward plugin sync sockets. Host release remains required.
 Pages' standalone header now uses Chat and New conversation. Its former chat
 card is removed; legacy page chat routes and activity entries open the shared
 companion destination, with ordinary thread navigation when Float is absent.
-Existing page chats and the `pages:<id>` draft key remain in use. Pages' 80
+Existing page chats and the `pages:<id>` draft key remain in use. Pages' 84
 tests pass, including continuation, project/context forwarding, error retries,
 and stale submissions. The stable BB 0.44.0 standalone captures at pushed
 commit b070150 pass with Studio Chat temporarily disabled: the actual legacy
@@ -140,8 +140,17 @@ page chat continues without duplication, a draft survives closing and
 reopening, and the phone drawer keeps all composer buttons in the viewport.
 The scheduled fixture never runs an agent. Studio Chat is restored and the
 fixture thread/pages are deleted after capture.
-The updated stable BB 0.45.0 standalone captures also verify the compact
-primary Chat action and access to Version history through Page actions.
+The updated stable BB 0.45.0 standalone captures install Pages `1992412`,
+save a draft and file in its old dialog, then install `258d801` and restore
+them in the canonical companion composer. They verify exact composer DOM
+retention through folding, tab reuse, and real sidebar navigation, plus draft
+and file recovery after reload. A second page's native scheduled send retains
+the page pointer, edited prompt, and attachment, replaces its originating tab,
+and updates the main page's Chat action to reuse the created conversation.
+The phone companion keeps all composer controls inside a 390 by 844 viewport.
+The [desktop](../packages/bb-studio-pages/assets/standalone-chat.png) and
+[phone](../packages/bb-studio-pages/assets/standalone-chat-mobile.png) screenshots
+are visually checked. All scheduled threads and seeded pages are deleted.
 
 Teams now registers companion renderers for bot profiles, saved views, and
 legacy channel routes. Bot Chat resumes its direct conversation; New
@@ -245,8 +254,8 @@ uses real mouse input to verify Escape cancellation, a successful drop into
 exactly one page tab, and removal of the drop zone in both cases.
 
 Remaining delivery includes publishing the native host changes, the SDK/CLI
-placement controller, embedded composer targeting, migrating standalone
-Pages composers, quote-draft recovery and compact composer checks, and the remaining suite
+placement controller, embedded composer targeting,
+quote-draft recovery and compact composer checks, and the remaining suite
 entry points: task handoff verification, Talk
 return navigation, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the

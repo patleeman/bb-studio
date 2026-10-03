@@ -45,17 +45,27 @@ buttons. **Dictate** appears because Talk is installed in the staged app.
 
 The standalone Chat check temporarily disables Studio Chat in the isolated
 staged app. It resumes a legacy page conversation without creating another
-thread, then opens **New conversation**, writes a draft, and verifies it
-survives closing and reopening. The same checks pass in the
-[phone drawer](assets/standalone-chat-mobile.png), with every composer control
-inside the viewport. The seeded thread is scheduled 30 days ahead, so no
-agent runs. The capture restores Studio Chat and removes its fixtures.
+thread, then opens **New conversation** as a companion tab. Its draft and
+file survive tab reuse, folding, navigation to another page, and a browser
+reload. The desktop check also schedules a second page's conversation and
+verifies its page context, edited prompt, attachment, and updated Chat action.
+The [phone companion](assets/standalone-chat-mobile.png) keeps every composer
+control inside the viewport. All fixture sends are scheduled and their threads
+are deleted before any agent runs. The capture restores Studio Chat and
+removes its pages and files.
 
 ```sh
 BB_CAPTURE_STANDALONE_CHAT=1 \
   BB_CAPTURE_ONLY=pages-standalone-chat,pages-standalone-chat-mobile \
   node scripts/capture-plugin-screenshots.mjs --plugin pages
 ```
+
+To verify migration from the previous dialog, also set
+`BB_CAPTURE_PAGES_LEGACY_REF=19924123c7b66a787ff9a4eafc6761fa2b3cd212` and
+`BB_CAPTURE_PAGES_REF=258d801d4000c27538d62de817e1fb8b5a7d3d59`. The desktop
+capture saves a draft and file in the old dialog, installs the new Pages
+plugin, and verifies that the companion restores them using the same draft
+key. Both versions run inside the isolated staged BB.
 
 ![The Pages Comments panel with a microphone in the reply box](assets/comments.png)
 
