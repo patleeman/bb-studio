@@ -31,6 +31,7 @@ final class ShareModel: ObservableObject {
     @Published var destination: Destination?
     @Published var sending = false
     @Published var error: String?
+    @Published private(set) var attachmentErrors: [String] = []
 
     private let context: NSExtensionContext?
     private let client = BBClient()
@@ -60,7 +61,7 @@ final class ShareModel: ObservableObject {
     }
 
     func send() async {
-        guard checkServer(), let destination else { return }
+        guard checkServer(), canSend, let destination else { return }
         sending = true
         defer { sending = false }
         do {
@@ -105,66 +106,18 @@ final class ShareModel: ObservableObject {
     }
 
     var canSend: Bool {
-        destination != nil && !sending && !(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && files.isEmpty)
+        destination != nil && !sending && attachmentErrors.isEmpty && !(text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty && files.isEmpty)
     }
 
     /// Text and URLs join into the message, one per paragraph; images and files become attachments.
     private func loadShared() async {
-        var parts: [String] = []
         let providers = (context?.inputItems as? [NSExtensionItem] ?? []).flatMap { $0.attachments ?? [] }
-        for provider in providers {
-            if provider.hasItemConformingToTypeIdentifier(UTType.image.identifier) {
-                if let file = await SharedFile.image(from: provider) { files.append(file) }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.url.identifier),
-                let url = try? await provider.loadItem(forTypeIdentifier: UTType.url.identifier) as? URL
-            {
-                if url.isFileURL, let file = SharedFile.file(url) { files.append(file) } else { parts.append(url.absoluteString) }
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.plainText.identifier),
-                let text = try? await provider.loadItem(forTypeIdentifier: UTType.plainText.identifier) as? String
-            {
-                parts.append(text)
-            } else if provider.hasItemConformingToTypeIdentifier(UTType.data.identifier),
-                let url = try? await provider.loadItem(forTypeIdentifier: UTType.data.identifier) as? URL,
-                let file = SharedFile.file(url)
-            {
-                files.append(file)
-            }
-        }
-        text = parts.joined(separator: "\n\n")
-    }
-}
-
-/// A shared photo or file. Photos are re-encoded as JPEG (BB rejects HEIC) at most 2048px.
-struct SharedFile: Identifiable {
-    let id = UUID()
-    var data: Data
-    var name: String
-    var mimeType: String
-    var thumbnail: UIImage?
-
-    static func image(from provider: NSItemProvider) async -> SharedFile? {
-        let item = try? await provider.loadItem(forTypeIdentifier: UTType.image.identifier)
-        let image: UIImage?
-        switch item {
-        case let url as URL: image = UIImage(contentsOfFile: url.path)
-        case let data as Data: image = UIImage(data: data)
-        case let value as UIImage: image = value
-        default: image = nil
-        }
-        guard let image else { return nil }
-        let scale = min(1, 2048 / max(image.size.width, image.size.height))
-        let size = CGSize(width: image.size.width * scale, height: image.size.height * scale)
-        let resized = UIGraphicsImageRenderer(size: size).image { _ in image.draw(in: CGRect(origin: .zero, size: size)) }
-        guard let data = resized.jpegData(compressionQuality: 0.85) else { return nil }
-        let base = (provider.suggestedName ?? "photo") as NSString
-        return SharedFile(data: data, name: "\(base.deletingPathExtension).jpg", mimeType: "image/jpeg", thumbnail: resized)
+        let content = await SharedContent.load(providers)
+        text = content.text
+        files = content.files
+        attachmentErrors = content.errors
     }
 
-    static func file(_ url: URL) -> SharedFile? {
-        guard let data = try? Data(contentsOf: url), data.count <= 35 * 1024 * 1024 else { return nil }
-        let mimeType = UTType(filenameExtension: url.pathExtension)?.preferredMIMEType ?? "application/octet-stream"
-        return SharedFile(data: data, name: url.lastPathComponent, mimeType: mimeType)
-    }
 }
 
 struct ShareView: View {
@@ -209,6 +162,14 @@ struct ShareView: View {
                 }
                 if let error = model.error {
                     Text(error).font(.footnote).foregroundStyle(.red)
+                }
+                if !model.attachmentErrors.isEmpty {
+                    Section("Some shared items couldn't be loaded") {
+                        ForEach(Array(model.attachmentErrors.enumerated()), id: \.offset) { _, error in
+                            Text(error).font(.footnote).foregroundStyle(.red)
+                        }
+                        Text("Close Share and try again. Nothing has been sent.").font(.footnote)
+                    }
                 }
             }
             .navigationTitle("Send to BB")

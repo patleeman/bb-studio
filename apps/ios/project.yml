@@ -125,6 +125,7 @@ targets:
     platform: iOS
     sources:
       - path: Tests
+      - path: Share/SharedFile.swift
     dependencies:
       - target: BBStudio
     settings:
