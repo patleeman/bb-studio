@@ -29,11 +29,11 @@ export function useNewItemThread(item: ItemThread | undefined) {
 }
 
 /**
- * Moves the item on screen: Float takes it out of the main view, which goes
- * back as the header's back pill would; a split opens it beside. Not shown
+ * Moves the view on screen: Float adopts it, optionally returning through
+ * the header's back action; a split opens it beside. Not shown
  * inside a floating tab, whose own menu moves it.
  */
-function MoveMenu({ item, onBack }: { item: ItemThread; onBack(): void }) {
+export function ViewMoveMenu({ item, onBack }: { item: ItemThread; onBack?(): void }) {
   const target = { kind: "path" as const, path: item.href, title: item.title };
   const canFloat = useCanFloat(target);
   const inFloat = useInFloat();
@@ -52,7 +52,7 @@ function MoveMenu({ item, onBack }: { item: ItemThread; onBack(): void }) {
           {canFloat ? (
             <DropdownMenuItem
               onSelect={() => {
-                if (openFloat(target)) onBack();
+                if (openFloat(target)) onBack?.();
               }}
             >
               <Icon name="AppWindow" className="size-4" /> Float this
@@ -171,7 +171,7 @@ export function ItemHeader({
         {(relatedRef && studio) || (moved && !inFloat) || trailing ? <ItemActions compact={compact}>
           {relatedRef && studio ? <SpacePicker item={relatedRef} /> : null}
           {relatedRef && studio ? <RelatedPanel ref={relatedRef} compact={inFloat} /> : null}
-          {moved && !inFloat ? <MoveMenu item={moved} onBack={onBack} /> : null}
+          {moved && !inFloat ? <ViewMoveMenu item={moved} onBack={onBack} /> : null}
           {trailing}
         </ItemActions> : null}
       </div> : null}

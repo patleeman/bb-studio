@@ -3,6 +3,7 @@ import { useState, type ComponentProps } from "react";
 import { errorMessage, quoteMessage, type ItemQuote } from "../format";
 import { Icon } from "../ui/icon";
 import { cn } from "../ui/utils";
+import { ViewMoveMenu, type ItemThread } from "./item-header";
 
 export type ConversationSubmit = NonNullable<ComponentProps<typeof NewThreadComposer>["onSubmit"]>;
 
@@ -20,14 +21,16 @@ export interface NewConversationProps {
   composerClassName?: string;
   onSubmit: ConversationSubmit;
   onClose?: () => void;
+  moveTarget?: ItemThread;
 }
 
-export function NewConversationComposer({ title, icon = "MessageSquare", ariaLabel, placeholder = "What would you like to work on?", initialPrompt, quote, draftKey, focusRequest, defaultProjectId, className, composerClassName, onSubmit, onClose }: NewConversationProps) {
+export function NewConversationComposer({ title, icon = "MessageSquare", ariaLabel, placeholder = "What would you like to work on?", initialPrompt, quote, draftKey, focusRequest, defaultProjectId, className, composerClassName, onSubmit, onClose, moveTarget }: NewConversationProps) {
   const [error, setError] = useState<string | null>(null);
   return <section data-studio-conversation="" aria-label={ariaLabel ?? title} className={cn("flex h-full min-h-0 flex-col bg-background text-foreground", className)}>
     <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
       <Icon name={icon} className="size-3.5 shrink-0" />
       <span className="min-w-0 flex-1 truncate">{title}</span>
+      {moveTarget ? <ViewMoveMenu item={moveTarget} /> : null}
       {onClose ? <button type="button" aria-label="Close composer" onClick={onClose} className="rounded p-1 hover:bg-state-hover"><Icon name="X" className="size-4" /></button> : null}
     </header>
     <p className="shrink-0 px-3 pt-2 text-xs text-muted-foreground">@mention a bot to hand it off.</p>

@@ -2,9 +2,9 @@
 import React, { act, useEffect, useRef, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { ItemHeader } from "./item-header";
+import { ItemHeader, ViewMoveMenu } from "./item-header";
 
-const state = vi.hoisted(() => ({ launch: null as ((mode: string) => void) | null }));
+const state = vi.hoisted(() => ({ launch: null as ((mode: string) => void) | null, inFloat: true, float: vi.fn(() => true), split: vi.fn() }));
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useBbNavigate: () => ({ toCompose: () => {} }) }));
 vi.mock("./item-chat", () => ({
   useHomeThread: () => null,
@@ -15,8 +15,8 @@ vi.mock("./item-chat", () => ({
   }),
 }));
 vi.mock("./presence", () => ({ useStudioChatPresent: () => true, useStudioPresent: () => true }));
-vi.mock("./float", () => ({ useInFloat: () => true, useCanFloat: () => true }));
-vi.mock("./move", () => ({ useOpenTarget: () => ({ open: () => {}, anchor: null }) }));
+vi.mock("./float", () => ({ useInFloat: () => state.inFloat, useCanFloat: () => true, openFloat: state.float }));
+vi.mock("./move", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
 vi.mock("./related-panel", () => ({ RelatedPanel: () => null }));
 vi.mock("./space-picker", () => ({ SpacePicker: () => null }));
 vi.mock("../ui/icon", () => ({ Icon: () => null }));
@@ -47,6 +47,7 @@ const menu = async () => {
 };
 
 beforeEach(async () => {
+  state.inFloat = true; state.float.mockClear(); state.split.mockClear();
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   container = document.createElement("div");
   document.body.append(container);
@@ -54,6 +55,41 @@ beforeEach(async () => {
   await act(async () => root.render(<Harness />));
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); state.launch = null; });
+
+describe("View placement menu", () => {
+  const target = { href: "/plugins/feed/feed/post/discussion", title: "Discussion draft" };
+  const choose = async (label: string) => {
+    await act(async () => {
+      container.querySelector('[aria-label="Move"]')!.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true, button: 0, pointerType: "mouse" }));
+      await settle();
+    });
+    const entry = [...document.querySelectorAll('[role="menuitem"]')].find(element => element.textContent?.trim() === label) as HTMLElement;
+    expect(entry).toBeDefined();
+    await act(async () => { entry.click(); await settle(); });
+  };
+  it("moves a draft's exact route without requiring a back action", async () => {
+    state.inFloat = false;
+    await act(async () => root.render(<ViewMoveMenu item={target} />));
+    await choose("Float this");
+    expect(state.float).toHaveBeenCalledWith({ kind: "path", path: target.href, title: target.title });
+    await choose("Open in split");
+    expect(state.split).toHaveBeenCalledWith({ kind: "path", path: target.href, title: target.title }, "split");
+  });
+  it("uses the header's back action only after Float accepts the transfer", async () => {
+    state.inFloat = false;
+    const back = vi.fn();
+    await act(async () => root.render(<ViewMoveMenu item={target} onBack={back} />));
+    state.float.mockReturnValueOnce(false);
+    await choose("Float this");
+    expect(back).not.toHaveBeenCalled();
+    await choose("Float this");
+    expect(back).toHaveBeenCalledOnce();
+  });
+  it("uses the companion chrome when already moved", async () => {
+    await act(async () => root.render(<ViewMoveMenu item={target} />));
+    expect(container.querySelector('[aria-label="Move"]')).toBeNull();
+  });
+});
 
 describe("Chat menu focus", () => {
   it("keeps Chat visible and accessory state mounted while a narrow header opens, closes, and widens", async () => {

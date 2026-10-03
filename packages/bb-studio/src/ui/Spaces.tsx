@@ -16,6 +16,7 @@ import {
   ItemTile,
   OUTLINE_BUTTON,
   PageColumn,
+  ViewMoveMenu,
   openAppPath,
   projectName,
   studioItemProps,
@@ -340,6 +341,7 @@ export function SpaceHome({
           {space.name}
         </h1>
         <SpaceMenu reference={{ href: spaceHref(space.id), title: space.name, ...(space.icon ? { icon: space.icon } : {}) }} onEdit={onEdit} onDelete={onDelete} />
+        <ViewMoveMenu item={{ href: spaceHref(space.id), title: space.name }} />
       </div>
       {space.description ? (
         <p className="mt-2 whitespace-pre-wrap text-muted-foreground"><ItemLinkText text={space.description} /></p>

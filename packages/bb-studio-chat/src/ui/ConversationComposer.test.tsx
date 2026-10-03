@@ -17,6 +17,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   experimental_Icon: () => null,
   useRpc: () => state.rpc,
   useBbNavigate: () => state.navigate,
+  experimental_useSidebarThreadActions: () => ({ open: vi.fn() }),
   experimental_NewThreadComposer: (props: any) => {
     state.props.set(props.draftKey, props);
     state.submit.set(props.draftKey, props.onSubmit);

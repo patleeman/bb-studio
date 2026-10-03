@@ -6,13 +6,14 @@ import type { rpcContract, Viewed } from "../contract";
 import { itemKey } from "../context";
 import { CHAT_ICON, CONVERSATION_STARTED, draftRoute, quoteDrafts } from "./conversation-drafts";
 
-export function ConversationComposer({ item, quote, draftKey, focusRequest, onSubmit, onClose }: {
+export function ConversationComposer({ item, quote, draftKey, focusRequest, onSubmit, onClose, href }: {
   item: Viewed | null;
   quote?: ItemQuote;
   draftKey: string;
   focusRequest?: number;
   onSubmit: ConversationSubmit;
   onClose?: () => void;
+  href?: string;
 }) {
   const kind = item?.kindLabel.toLowerCase() ?? "conversation";
   return <NewConversationComposer
@@ -23,6 +24,7 @@ export function ConversationComposer({ item, quote, draftKey, focusRequest, onSu
     className="studio-chat"
     composerClassName="studio-chat-composer"
     draftKey={draftKey}
+    {...(href ? { moveTarget: { href, title: item ? `Chat about "${untitled(item.title)}"` : "New conversation" } } : {})}
     {...(quote ? { quote } : {})}
     {...(focusRequest !== undefined ? { focusRequest } : {})}
     {...(item?.projectId ? { defaultProjectId: item.projectId } : {})}
@@ -61,7 +63,7 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
   }, [load, attempt]);
   if (error) return <div role="alert" className="flex h-full flex-col items-center justify-center gap-3 p-4 text-center text-sm"><p>{error}</p><button type="button" onClick={() => setAttempt(value => value + 1)} className="rounded border border-border px-3 py-1.5 hover:bg-state-hover">Retry</button></div>;
   if (!loaded) return <p className="p-4 text-sm text-muted-foreground">Loading conversation…</p>;
-  return <ConversationComposer key={loaded.draftKey} {...loaded} focusRequest={1} onSubmit={async request => {
+  return <ConversationComposer key={loaded.draftKey} {...loaded} href={`/plugins/studio-chat/chats${subPath ? `/${subPath.split("/").map(encodeURIComponent).join("/")}` : ""}`} focusRequest={1} onSubmit={async request => {
     const { threadId } = await rpc.call("start", { item: loaded.item ? { pluginId: loaded.item.pluginId, id: loaded.item.id } : null, request });
     if (loaded.item) window.dispatchEvent(new CustomEvent(CONVERSATION_STARTED, { detail: { pluginId: loaded.item.pluginId, id: loaded.item.id } }));
     const target = { kind: "thread" as const, threadId };

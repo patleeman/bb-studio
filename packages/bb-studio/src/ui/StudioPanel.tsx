@@ -7,6 +7,7 @@
 // filtering on it.
 import {
   CollectionPage,
+  ViewMoveMenu,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -457,6 +458,8 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
 
   const headerActions = (
+    <>
+    <ViewMoveMenu item={{ href: `/plugins/studio/studio${subPath ? `/${subPath.split("/").map(encodeURIComponent).join("/")}` : ""}`, title: "Studio" }} />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button
@@ -497,6 +500,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         ))}
       </DropdownMenuContent>
     </DropdownMenu>
+    </>
   );
 
   if (data && !providers.length) {

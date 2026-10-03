@@ -5,7 +5,7 @@
 // or starts a new thread. A rail lists what needs you and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
+import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -270,6 +270,7 @@ function FeedReader() {
     <div ref={readerRoot} onClickCapture={() => capturePosition.current()} className="min-w-0">
       <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
         <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">Feed</h1>
+        <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: "Feed" }} />
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
         <button type="button" className={OUTLINE_BUTTON} disabled={posts === null} onClick={markAllRead}>
           <Icon name="feed/mark-read" /> Mark entire feed read
@@ -769,9 +770,12 @@ function PostPage({ postId }: { postId: string }) {
 
   return (
     <PageColumn className="max-w-3xl">
-      <button type="button" className={cn(GHOST_BUTTON, "-ml-3 mb-6")} onClick={back}>
+      <div className="mb-6 flex items-center justify-between gap-3">
+      <button type="button" className={cn(GHOST_BUTTON, "-ml-3")} onClick={back}>
         <Icon name="ArrowLeft" /> Feed
       </button>
+      {post ? <ViewMoveMenu item={{ href: postHref(post.id), title: post.title }} onBack={back} /> : null}
+      </div>
       {post === undefined ? (
         <div className="h-24 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" />
       ) : post === null ? (
