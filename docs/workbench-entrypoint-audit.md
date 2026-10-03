@@ -196,6 +196,32 @@ contract, native-payload and packed-Kit gates. These checks establish the
 listed routes and workflows, rather than every possible dialog/provider or
 browser combination.
 
+## Interrupted drag recovery
+
+The refreshed `float-drag-cleanup` capture passes in stable BB 0.45.0 and
+the isolated patched core `318990df9`, with Pages and Float `a36295c`.
+Real browser pointer input starts a sidebar item drag. Escape clears its
+overlay without opening a tab. A second drag removes its synthetic source
+link; a document listener verifies that no `dragend` arrives. Releasing and
+resuming ordinary pointer input still clears the overlay. The same link is
+restored before successful and repeated drops, which both retain the exact
+original main Pages editor in exactly one tab. Every case requires the drop
+zone to disappear.
+
+The [stable](../packages/bb-studio-float/assets/drag-preview.png) and
+[native-host](../packages/bb-studio-float/assets/drag-preview-native.png)
+captures show the final floated page. This establishes the cleanup paths,
+including a deliberately missing event, rather than assigning a specific
+cause to the user's earlier freeze. No new production source was needed.
+
+```sh
+BB_CAPTURE_FLOAT_DRAG=1 BB_CAPTURE_ONLY=float-drag-cleanup \
+node scripts/capture-plugin-screenshots.mjs --plugin float
+```
+
+Source the matching isolated env first; add `BB_CAPTURE_SUITE_HOST=native`
+for the patched host. The synthetic page is deleted after unloading its view.
+
 ## Remaining release and QA boundaries
 
 - Stable BB has no native retained companion API. The authoritative core

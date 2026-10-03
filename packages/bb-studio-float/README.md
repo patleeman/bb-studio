@@ -33,11 +33,23 @@ BB_CAPTURE_MAIN_RETENTION=1 BB_CAPTURE_ONLY=float-main-mobile \
 
 ![A page opened in Float by a real browser drag](assets/drag-preview.png)
 
-The drag capture cancels a sidebar drag with Escape, then drops the page into
-Float and checks that exactly one tab opens and the drop zone disappears.
+The drag capture cancels a sidebar drag with Escape, removes the source during
+a second real browser drag, then drops the page into Float twice. It verifies
+that the removed source delivers no document `dragend`, resumed pointer input
+clears the overlay, and both successful drops keep one tab and the original
+main Pages editor. The drop zone disappears after every case.
 Drop cleanup runs after the drop handler, even when a child consumes the
 event. Escape, window blur, and resumed pointer input also clear interrupted
 drags whose source disappeared before it could send `dragend`.
+
+![The same drag recovery checks in the isolated native-host runtime](assets/drag-preview-native.png)
+
+These refreshed captures use stable BB 0.45.0 and the isolated patched core
+`318990df9`, both with Pages and Float installed from `a36295c`. They drive
+browser mouse and Escape input against the real sidebar and Float panel.
+The source-removal case temporarily detaches only the synthetic page's
+sidebar link, restores the same link, and checks missing-event recovery;
+it does not claim a particular cause for the originally reported freeze.
 
 ```sh
 BB_CAPTURE_FLOAT_DRAG=1 BB_CAPTURE_ONLY=float-drag-cleanup \
