@@ -376,7 +376,9 @@ export function DrawingEditor({
       role="status"
       aria-live="polite"
       title={
-        realtimeState === "connected"
+        saveError ? "Changes are not saved. Retry saving before closing this drawing."
+          : saving ? "Saving your changes…"
+          : realtimeState === "connected"
           ? "Live — agent edits appear here automatically"
           : "Reconnecting to live sync…"
       }
@@ -386,7 +388,8 @@ export function DrawingEditor({
         aria-hidden="true"
         className={cn(
           "size-1.5 rounded-full",
-          realtimeState === "connected" ? "bg-success" : "animate-pulse bg-warning motion-reduce:animate-none",
+          saveError ? "bg-destructive" : saving || realtimeState !== "connected"
+            ? "animate-pulse bg-warning motion-reduce:animate-none" : "bg-success",
         )}
       />
       {saveError ? "Not saved" : saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
