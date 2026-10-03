@@ -1,7 +1,7 @@
 import Foundation
 
 public enum OfficeTabZone: String, Codable, Sendable { case essential, pinned, today, archived }
-public enum OfficeTabKind: String, Codable, Sendable { case thread, item, bot, conversation, inbox, home, library }
+public enum OfficeTabKind: String, Codable, Sendable { case thread, item, bot, conversation, inbox, home, library, split }
 
 public struct OfficeTab: Codable, Identifiable, Hashable, Sendable {
     public var ref: String
@@ -19,6 +19,8 @@ public struct OfficeTab: Codable, Identifiable, Hashable, Sendable {
     public var badge: Int? = nil
     public var needsYou: Bool? = nil
     public var unread: Bool? = nil
+    public var members: [OfficeTab]? = nil
+    enum CodingKeys: String, CodingKey { case ref, kind, title, icon, href, zone, folderId, openedAt, archivedAt, itemKind, providerId, botState, badge, needsYou, unread, members }
     public var id: String { ref }
     public var threadId: String? { targetId(prefix: "thread:") }
     public var itemRef: (pluginId: String, itemId: String)? {
@@ -31,6 +33,48 @@ public struct OfficeTab: Codable, Identifiable, Hashable, Sendable {
         guard ref.hasPrefix(prefix) else { return nil }
         let id = String(ref.dropFirst(prefix.count))
         return id.isEmpty || id.contains(":") ? nil : id
+    }
+}
+
+extension OfficeTab {
+    public init(from decoder: Decoder) throws { try self.init(from: decoder, parent: nil) }
+
+    // Server split members are TabTargets, without their own tab storage fields.
+    // Only members inherit these fields; malformed top-level tabs still fail.
+    private init(from decoder: Decoder, parent: OfficeTab?) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        ref = try c.decode(String.self, forKey: .ref)
+        kind = try c.decode(OfficeTabKind.self, forKey: .kind)
+        title = try c.decodeIfPresent(String.self, forKey: .title)
+        icon = try c.decodeIfPresent(String.self, forKey: .icon)
+        href = try c.decodeIfPresent(String.self, forKey: .href)
+        zone = try c.decodeIfPresent(OfficeTabZone.self, forKey: .zone) ?? parent?.zone ?? c.decode(OfficeTabZone.self, forKey: .zone)
+        folderId = try c.decodeIfPresent(String.self, forKey: .folderId) ?? parent?.folderId
+        openedAt = try c.decodeIfPresent(Double.self, forKey: .openedAt) ?? parent?.openedAt ?? c.decode(Double.self, forKey: .openedAt)
+        archivedAt = try c.decodeIfPresent(Double.self, forKey: .archivedAt) ?? parent?.archivedAt
+        itemKind = try c.decodeIfPresent(String.self, forKey: .itemKind)
+        providerId = try c.decodeIfPresent(String.self, forKey: .providerId)
+        botState = try c.decodeIfPresent(OfficeBotState.self, forKey: .botState)
+        badge = try c.decodeIfPresent(Int.self, forKey: .badge)
+        needsYou = try c.decodeIfPresent(Bool.self, forKey: .needsYou)
+        unread = try c.decodeIfPresent(Bool.self, forKey: .unread)
+        if c.contains(.members), try !c.decodeNil(forKey: .members) {
+            var panes = try c.nestedUnkeyedContainer(forKey: .members)
+            var decoded: [OfficeTab] = []
+            while !panes.isAtEnd { decoded.append(try OfficeTab(from: panes.superDecoder(), parent: self)) }
+            members = decoded
+        }
+    }
+}
+
+public struct OfficeTabOpenResult: Decodable, Sendable {
+    public var tab: OfficeTab?
+    public var spaceId: String
+    enum CodingKeys: String, CodingKey { case tab, spaceId }
+    public init(from decoder: Decoder) throws {
+        let c = try decoder.container(keyedBy: CodingKeys.self)
+        tab = try c.decodeIfPresent(CompatibleTab.self, forKey: .tab)?.tab
+        spaceId = try c.decode(String.self, forKey: .spaceId)
     }
 }
 
@@ -80,6 +124,39 @@ extension BBClient {
     }
     public func officeTabOpen(_ spaceId: String, href: String) async throws -> OfficeTab? {
         try await openTab(["spaceId": .string(spaceId), "href": .string(href)])
+    }
+    public func officeTabOpen(_ spaceId: String, ref: String, follow: Bool) async throws -> OfficeTabOpenResult {
+        try await rpc("studio", Studio.Method.tabs_open, ["spaceId": .string(spaceId), "ref": .string(ref), "follow": .bool(follow)])
+    }
+    public func officeTabOpen(_ spaceId: String, href: String, follow: Bool) async throws -> OfficeTabOpenResult {
+        try await rpc("studio", Studio.Method.tabs_open, ["spaceId": .string(spaceId), "href": .string(href), "follow": .bool(follow)])
+    }
+    public func officeTabSplitCreate(_ spaceId: String, refs: [String], zone: OfficeTabZone? = nil, folderId: String? = nil) async throws -> OfficeTab {
+        struct Result: Decodable { var tab: OfficeTab }
+        let result: Result = try await rpc("studio", Studio.Method.tabs_split_create, .object(omittingNil: [
+            "spaceId": .string(spaceId), "refs": .array(refs.map(JSONValue.string)),
+            "zone": zone.map { .string($0.rawValue) }, "folderId": folderId.map(JSONValue.string),
+        ]))
+        return result.tab
+    }
+    public func officeTabSplitRemove(_ spaceId: String, ref: String) async throws {
+        try await tabsAction(Studio.Method.tabs_split_remove, ["spaceId": .string(spaceId), "ref": .string(ref)])
+    }
+    public func officeTabMoveSpace(_ spaceId: String, ref: String, toSpaceId: String) async throws -> OfficeTab {
+        struct Result: Decodable { var tab: OfficeTab }
+        let result: Result = try await rpc("studio", Studio.Method.tabs_move_space, ["spaceId": .string(spaceId), "ref": .string(ref), "toSpaceId": .string(toSpaceId)])
+        return result.tab
+    }
+    public func officeTabsReopen(_ spaceId: String) async throws -> OfficeTab? {
+        struct Result: Decodable { var tab: CompatibleTab? }
+        let result: Result = try await rpc("studio", Studio.Method.tabs_reopen, ["spaceId": .string(spaceId)])
+        return result.tab?.tab
+    }
+    public func officeTabsCloseMany(_ spaceId: String, refs: [String]) async throws {
+        try await tabsAction(Studio.Method.tabs_close_many, ["spaceId": .string(spaceId), "refs": .array(refs.map(JSONValue.string))])
+    }
+    public func officeSpaceReorder(_ spaceIds: [String]) async throws {
+        try await tabsAction(Studio.Method.space_reorder, ["spaceIds": .array(spaceIds.map(JSONValue.string))])
     }
     private func openTab(_ input: JSONValue) async throws -> OfficeTab? {
         struct Result: Decodable { var tab: CompatibleTab? }

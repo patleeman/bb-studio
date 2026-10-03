@@ -36,7 +36,7 @@ public final class TabsStore {
                 result = try await client.officeTabs(spaceId)
             }
             var titles = Dictionary(entries.map { ($0.id, $0) }, uniquingKeysWith: { first, _ in first })
-            for id in Set((result.essentials + result.pinned + result.today).compactMap(\.threadId)) where titles[id] == nil {
+            for id in Set((result.essentials + result.pinned + result.today).flatMap { [$0] + ($0.members ?? []) }.compactMap(\.threadId)) where titles[id] == nil {
                 // A tab can refer to an archived thread absent from the sidebar.
                 titles[id] = try? await client.thread(id)
             }
@@ -55,6 +55,7 @@ public final class TabsStore {
     }
 
     public func title(for tab: OfficeTab) -> String {
+        if let members = tab.members, tab.kind == .split { return members.map { title(for: $0) }.joined(separator: " | ") }
         if let id = tab.threadId, let thread = threads[id] {
             return [thread.title, thread.titleFallback].compactMap { $0 }.first { !$0.isEmpty } ?? "Untitled"
         }
@@ -72,11 +73,23 @@ public final class TabsStore {
         await perform { try await self.client.officeTabMove(self.spaceId, ref: ref, zone: zone, folderId: folderId, index: index) }
     }
     public func archive(_ ref: String) async { await move(ref, to: .archived) }
-    public func clearToday() async {
-        let refs = today.map(\.ref)
-        await perform {
-            for ref in refs { try await self.client.officeTabMove(self.spaceId, ref: ref, zone: .archived) }
-        }
+    public func clearToday() async { await closeMany(today.map(\.ref)) }
+    public func closeMany(_ refs: [String]) async {
+        await perform { try await self.client.officeTabsCloseMany(self.spaceId, refs: refs) }
+    }
+    public func separate(_ ref: String) async {
+        await perform { try await self.client.officeTabSplitRemove(self.spaceId, ref: ref) }
+    }
+    public func keepSplit(_ refs: [String]) async {
+        await perform { _ = try await self.client.officeTabSplitCreate(self.spaceId, refs: refs) }
+    }
+    public func moveToSpace(_ ref: String, to spaceId: String) async {
+        await perform { _ = try await self.client.officeTabMoveSpace(self.spaceId, ref: ref, toSpaceId: spaceId) }
+    }
+    public func reopen() async -> OfficeTab? {
+        var tab: OfficeTab?
+        await perform { tab = try await self.client.officeTabsReopen(self.spaceId) }
+        return tab
     }
     public func createFolder(name: String) async {
         await perform { _ = try await self.client.officeTabFolderCreate(self.spaceId, name: name) }

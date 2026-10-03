@@ -170,3 +170,11 @@ space_reorder({ spaceIds }) → { ok: true }
   in their current relative order. `spaces_list` returns `position` and sorts by it.
 - Every mutation emits the Studio realtime change after commit. Split creation,
   removal, movement and bulk close each publish once, never intermediate rows.
+
+Native Swift data API: `OfficeTabKind.split` and `OfficeTab.members` decode the
+storage-free member targets using the parent tab’s zone, folder and timestamps.
+The existing `officeTabOpen` overloads still return an optional tab; overloads
+with an explicit `follow` argument return `OfficeTabOpenResult` with `tab` and
+`spaceId`. `TabsStore` provides `keepSplit`, `separate`, `moveToSpace`, `reopen`
+and `closeMany`; `clearToday` uses one bulk-close request. Split titles resolve
+member thread titles from the native thread cache.

@@ -550,6 +550,36 @@
     {
       "file": "apps/ios/Shared/Office/OfficeTabs.swift",
       "plugin": "studio",
+      "method": "tabs_open",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_split_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_move_space",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_reopen",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
+      "method": "tabs_open",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeTabs.swift",
+      "plugin": "studio",
       "method": "tabs_archived",
       "coverage": "generated method"
     },

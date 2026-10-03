@@ -61,7 +61,7 @@ final class OfficeTabsTests: XCTestCase {
         XCTAssertTrue(requests.contains { $0.0 == "tabs_open" && $0.1["ref"] == .string("conversation:channel") })
         XCTAssertTrue(requests.contains { $0.0 == "tabs_open" && $0.1["href"] == .string("/plugins/pages/pages/p") && $0.1["ref"] == nil })
         XCTAssertTrue(requests.contains { $0.0 == "tabs_move" && $0.1["folderId"] == .string("f") })
-        XCTAssertTrue(requests.contains { $0.0 == "tabs_move" && $0.1["zone"] == .string("archived") })
+        XCTAssertTrue(requests.contains { $0.0 == "tabs_close_many" && $0.1["refs"] == .array([.string("thread:t")]) })
         XCTAssertTrue(requests.contains { $0.0 == "tab_folder_update" && $0.1["open"] == .bool(false) && $0.1["spaceId"] == nil })
         let before = await stub.getCount
         await store.receiveRealtime(.connected)
