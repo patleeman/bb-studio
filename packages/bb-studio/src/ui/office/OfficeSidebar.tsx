@@ -28,7 +28,7 @@ export const KIND_ICONS: Record<string, string> = {
   page: "FileText",
   board: "GridView",
   task: "CircleCheck",
-  table: "Rows3",
+  table: "ListView",
   drawing: "Palette",
   recording: "Mic",
   dictation: "Mic",

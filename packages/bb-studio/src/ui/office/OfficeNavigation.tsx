@@ -63,9 +63,9 @@ export function OfficeNavigation(_props: ExperimentalSidebarNavigationProps) {
     <nav aria-label="Office" className="relative shrink-0 space-y-0.5 px-2 pt-1 pb-2">
       <SpaceSwitcher extras={extras} />
       <div className="h-1" />
-      <NavRow icon={<Icon name="studio/home" />} label="Home" active={sub === ""} onClick={() => openOffice("")} />
+      <NavRow icon={<Icon name="studio/home" className="size-4" />} label="Home" active={sub === ""} onClick={() => openOffice("")} />
       <NavRow
-        icon={<Icon name="studio/inbox" />}
+        icon={<Icon name="studio/inbox" className="size-4" />}
         label="Inbox"
         active={sub === "inbox"}
         onClick={() => openOffice("inbox")}
