@@ -236,6 +236,14 @@ margin clipping the left edge of a resized companion. Float now bounds that
 margin to the available viewport width. All seeded fixtures are deleted
 without running agents.
 
+Float's drag overlay now clears after consumed drops, cancelled drags, window
+blur, and a removed source that loses `dragend`. Cleanup waits until the drop
+event finishes so React can open the companion before its target disappears.
+All 45 Float tests pass, including a regression that fails with immediate
+capture-phase cleanup. The stable BB 0.45.0 [drag capture](../packages/bb-studio-float/assets/drag-preview.png)
+uses real mouse input to verify Escape cancellation, a successful drop into
+exactly one page tab, and removal of the drop zone in both cases.
+
 Remaining delivery includes publishing the native host changes, the SDK/CLI
 placement controller, embedded composer targeting, migrating standalone
 Pages composers, quote-draft recovery and compact composer checks, and the remaining suite

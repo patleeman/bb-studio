@@ -18,6 +18,19 @@ then the pinned page was selected over the Studio list. The capture also
 checks the real Pages editor and an unsent thread draft through tab switches,
 folding, hiding, and moving Float, and verifies the pin in saved state.
 
+![A page opened in Float by a real browser drag](assets/drag-preview.png)
+
+The drag capture cancels a sidebar drag with Escape, then drops the page into
+Float and checks that exactly one tab opens and the drop zone disappears.
+Drop cleanup runs after the drop handler, even when a child consumes the
+event. Escape, window blur, and resumed pointer input also clear interrupted
+drags whose source disappeared before it could send `dragend`.
+
+```sh
+BB_CAPTURE_FLOAT_DRAG=1 BB_CAPTURE_ONLY=float-drag-cleanup \
+  node scripts/capture-plugin-screenshots.mjs --plugin float
+```
+
 ![Live integration capture of a page beside its workbench conversation](assets/native-workbench-preview.png)
 
 The native-host integration capture runs the local BB frontend against an

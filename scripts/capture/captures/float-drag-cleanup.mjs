@@ -10,6 +10,7 @@ export default ({ seedPages, sleep }) => ({
     };
     const point = () => client.evaluate(`(() => { const r = document.querySelector(${JSON.stringify(source)}).getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()`);
     const start = async () => {
+      await client.waitForSelector(source);
       const at = await point();
       await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", ...at, buttons: 0 });
       await client.command("Input.dispatchMouseEvent", { type: "mousePressed", ...at, button: "left", buttons: 1, clickCount: 1 });
@@ -40,6 +41,7 @@ export default ({ seedPages, sleep }) => ({
       await start();
       const destination = await client.evaluate("(() => { const r = document.querySelector('[data-float-drop]').getBoundingClientRect(); return {x:r.left+r.width/2,y:r.top+r.height/2}; })()");
       await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", ...destination, button: "left", buttons: 1 });
+      await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: destination.x + 1, y: destination.y + 1, button: "left", buttons: 1 });
       await sleep(200);
       await client.command("Input.dispatchMouseEvent", { type: "mouseReleased", ...destination, button: "left", buttons: 0, clickCount: 1 });
       await client.waitForSelector(`[data-float-window="${key}"] .pages-editor .ProseMirror`);
