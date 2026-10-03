@@ -1,0 +1,51 @@
+{
+  "checkpoint": "6c5e012",
+  "noStudioChangedCalls": true,
+  "focusSequence": [
+    {
+      "shift": false,
+      "focus": "Close search"
+    },
+    {
+      "shift": false,
+      "focus": "Search Studio"
+    },
+    {
+      "shift": true,
+      "focus": "Close search"
+    },
+    {
+      "shift": true,
+      "focus": "Search Studio"
+    }
+  ],
+  "restoredPrompt": true,
+  "disabled": {
+    "dialog": true,
+    "inside": true,
+    "focus": "Search Studio",
+    "text": "Search StudioNo matches.↑↓ to move↵ to open⌘↵ in a split⇧↵ to floatesc to close",
+    "active": null,
+    "options": []
+  },
+  "disabledRpc": [],
+  "reenabled": {
+    "dialog": true,
+    "inside": true,
+    "focus": "Search Studio",
+    "text": "Search StudioPagesQuick QA BetaPage · OrbitBody-only marker quartzquickqaQuick QA AlphaPage · OrbitBody-only marker quartzquickqa↑↓ to move↵ to open⌘↵ in a split⇧↵ to floatesc to close",
+    "active": "studio-quick-open-0",
+    "options": [
+      {
+        "id": "studio-quick-open-0",
+        "selected": "true"
+      },
+      {
+        "id": "studio-quick-open-1",
+        "selected": "false"
+      }
+    ]
+  },
+  "explicitRefocusAfterProviderEnable": false,
+  "passed": true
+}

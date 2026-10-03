@@ -1,0 +1,99 @@
+{
+  "checkpoint": "3979fe1",
+  "pages": [
+    "pg_3a26de67c4b1dd78",
+    "pg_f5f8944a8fb94e15"
+  ],
+  "readFailure": {
+    "state": "stale",
+    "pendingProviders": [
+      "pages"
+    ],
+    "unavailableProviders": [],
+    "discoveryIncomplete": false,
+    "revision": 2
+  },
+  "cachedDuringFailure": "PagesQuick QA BetaPage · OrbitBody-only marker quartzquickqaQuick QA AlphaPage · OrbitBody-only marker quartzquickqa",
+  "recovered": {
+    "state": "current",
+    "pendingProviders": [],
+    "unavailableProviders": [],
+    "discoveryIncomplete": false,
+    "revision": 3
+  },
+  "disabledBeforeRebuild": {
+    "status": {
+      "state": "current",
+      "pendingProviders": [],
+      "unavailableProviders": [],
+      "discoveryIncomplete": false,
+      "revision": 3
+    },
+    "hits": [
+      {
+        "ref": {
+          "pluginId": "pages",
+          "id": "pg_f5f8944a8fb94e15"
+        },
+        "kind": "page",
+        "title": "Quick QA Beta",
+        "snippet": {
+          "text": "Body-only marker quartzquickqa",
+          "ranges": [
+            {
+              "start": 17,
+              "end": 30
+            }
+          ]
+        },
+        "href": "/plugins/pages/pages/pg_f5f8944a8fb94e15",
+        "projectId": "proj_su3dznrbpw",
+        "updatedAt": 1790999909861,
+        "score": 1.000001139896373
+      },
+      {
+        "ref": {
+          "pluginId": "pages",
+          "id": "pg_3a26de67c4b1dd78"
+        },
+        "kind": "page",
+        "title": "Quick QA Alpha",
+        "snippet": {
+          "text": "Body-only marker quartzquickqa",
+          "ranges": [
+            {
+              "start": 17,
+              "end": 30
+            }
+          ]
+        },
+        "href": "/plugins/pages/pages/pg_3a26de67c4b1dd78",
+        "projectId": "proj_su3dznrbpw",
+        "updatedAt": 1790999909855,
+        "score": 1.000001139896373
+      }
+    ]
+  },
+  "disabledConfirmed": {
+    "status": {
+      "state": "current",
+      "pendingProviders": [],
+      "unavailableProviders": [],
+      "discoveryIncomplete": false,
+      "revision": 4
+    },
+    "hits": []
+  },
+  "discovery": {
+    "state": "stale",
+    "pendingProviders": [],
+    "unavailableProviders": [],
+    "discoveryIncomplete": true,
+    "revision": 1
+  },
+  "statusRpc": {
+    "cachedHits": "PagesQuick QA BetaPage · OrbitBody-only marker quartzquickqaQuick QA AlphaPage · OrbitBody-only marker quartzquickqa",
+    "failure": "Injected search status RPC failure"
+  },
+  "statusRecovered": true
+}

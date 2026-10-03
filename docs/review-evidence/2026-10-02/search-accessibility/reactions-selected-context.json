@@ -1,0 +1,11 @@
+{
+  "selection": "SQLite is simpler to set up and suits a personal to",
+  "events": [
+    {
+      "defaultPrevented": false,
+      "target": "P"
+    }
+  ],
+  "menus": [],
+  "tail": "se for the todo app\n\nI'm building a small todo app just for me. Should it store its data in SQLite or Postgres? Give me two short sentences on the trade-off, then ask me which one I want.\n\n👍\n👎\n✅\n❓\nProvisioned thread\n\nSQLite is simpler to set up and suits a personal todo app well. Postgres takes more setup but offers more flexibility if you later add multiple users or devices.\n\nWhich one do you want?\n\n📁\nSQLite\n🐘\nPostgres\n👍\n👎\n✅\n❓\nWorking...\n\n\n\n\n6.1-Sol\nLow\nProject:\nOrbit\nEnvironment:\nProject checkout\nmain\nApprove for me\nToggle Sidebar\nAdd to chat\nSave to Studio\n👍\n👎\n✅\n❓\nReply in side chat"
+}

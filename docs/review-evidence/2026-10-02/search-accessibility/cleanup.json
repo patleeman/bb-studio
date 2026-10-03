@@ -1,0 +1,20 @@
+{
+  "checkpoint": "6c5e012",
+  "deleted": [
+    {
+      "deleted": [
+        "pg_3a26de67c4b1dd78"
+      ]
+    },
+    {
+      "deleted": [
+        "pg_f5f8944a8fb94e15"
+      ]
+    }
+  ],
+  "pagesEnabled": true,
+  "studioSource": "git:https://github.com/patleeman/bb-studio.git@6c5e012",
+  "pagesBundleRestored": true,
+  "privateBrowserClosed": true,
+  "privateProfileRemoved": true
+}
