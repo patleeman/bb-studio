@@ -55,7 +55,7 @@ export function OfficeNavigation(_props: ExperimentalSidebarNavigationProps) {
   const search = findHostItem(items, "search");
   const extras: SwitcherExtra[] = items
     .filter((item) => item.pluginId === null && MENU_ROWS.test(item.id) && !item.isDisabled)
-    .map((item) => ({ id: item.id, label: item.label, icon: "Settings2", run: () => actions.activate(item.id, { openInSplit: false }) }));
+    .map((item) => ({ id: item.id, label: item.label, icon: "SlidersHorizontal", run: () => actions.activate(item.id, { openInSplit: false }) }));
 
   const shortcut = (item: ExperimentalSidebarNavigationItem | null) => (isShortcutModifierHeld ? item?.shortcut?.label ?? null : null);
 
@@ -63,9 +63,9 @@ export function OfficeNavigation(_props: ExperimentalSidebarNavigationProps) {
     <nav aria-label="Office" className="relative shrink-0 space-y-0.5 px-2 pt-1 pb-2">
       <SpaceSwitcher extras={extras} />
       <div className="h-1" />
-      <NavRow icon={<Icon name="Home" />} label="Home" active={sub === ""} onClick={() => openOffice("")} />
+      <NavRow icon={<Icon name="studio/home" />} label="Home" active={sub === ""} onClick={() => openOffice("")} />
       <NavRow
-        icon={<Icon name="Inbox" />}
+        icon={<Icon name="studio/inbox" />}
         label="Inbox"
         active={sub === "inbox"}
         onClick={() => openOffice("inbox")}

@@ -20,7 +20,7 @@ function useThreadItems(thread: PluginSidebarThread, onRename: () => void): Item
       { id: "split", label: "Open in split", icon: "Columns2", run: () => actions.open(thread.id, { split: true }) },
       { id: "pin", label: thread.isPinned ? "Remove from favorites" : "Add to favorites", icon: "Star", run: () => void actions.setPinned(thread.id, !thread.isPinned) },
       { id: "read", label: thread.isUnread ? "Mark as read" : "Mark as unread", icon: thread.isUnread ? "MailOpen" : "Mail", run: () => void actions.setRead(thread.id, thread.isUnread) },
-      { id: "rename", label: "Rename", icon: "Pencil", run: onRename },
+      { id: "rename", label: "Rename", icon: "Edit", run: onRename },
     ],
     [
       { id: "archive", label: "Archive", icon: "Archive", run: () => actions.archive(thread.id) },

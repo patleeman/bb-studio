@@ -7,7 +7,7 @@ import { SpaceMark } from "./SpaceSwitcher";
 import { useCall, type InboxEvent, type Space, type TeamBot } from "./model";
 import { cn } from "./styles";
 
-const SOURCE_ICONS: Record<string, string> = { comment: "MessageSquarePlus", review: "Eye", report: "Newspaper", request: "CircleQuestion" };
+const SOURCE_ICONS: Record<string, string> = { comment: "MessageSquarePlus", review: "Eye", report: "FileText", request: "CircleQuestion" };
 
 function when(at: number): string {
   const date = new Date(at);
@@ -42,7 +42,7 @@ export function InboxRow({ event, bot, space, onChanged }: {
       <div className="pt-0.5">
         {bot
           ? <Face name={bot.name} avatar={bot.avatar} state={bot.state} />
-          : <span className="flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name={SOURCE_ICONS[event.type] ?? "Bell"} className="size-4" aria-hidden /></span>}
+          : <span className="flex size-8 items-center justify-center rounded-full bg-muted text-muted-foreground"><Icon name={SOURCE_ICONS[event.type] ?? "Info"} className="size-4" aria-hidden /></span>}
       </div>
       <div className="min-w-0 flex-1">
         <div className="flex items-baseline gap-2">

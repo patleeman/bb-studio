@@ -26,13 +26,13 @@ const BACKGROUND_ORIGINS = new Set(["bot-teams", "automations", "studio"]);
 export const KIND_ICONS: Record<string, string> = {
   thread: "MessageSquare",
   page: "FileText",
-  board: "LayoutGrid",
+  board: "GridView",
   task: "CircleCheck",
-  table: "Table",
-  drawing: "PenTool",
+  table: "Rows3",
+  drawing: "Palette",
   recording: "Mic",
   dictation: "Mic",
-  artifact: "Package",
+  artifact: "PackageReceive",
 };
 
 /** True for threads you started yourself, at the top level. */

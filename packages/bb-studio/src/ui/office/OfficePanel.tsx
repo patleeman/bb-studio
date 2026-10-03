@@ -41,7 +41,7 @@ function InboxPage({ scope, space, spaces }: { scope: "space" | "all"; space: Sp
 
   return (
     <PageColumn className="max-w-3xl">
-      <h1 className="text-2xl font-semibold">{scope === "all" ? "Inbox · All spaces" : "Inbox"}</h1>
+      <h1 className="text-2xl font-semibold">{scope === "all" ? "Inbox · All spaces" : "studio/inbox"}</h1>
       {scope === "all"
         ? <div role="group" aria-label="Filter by space" className="mt-4 flex flex-wrap gap-1">
             <button type="button" aria-pressed={filter === "all"} onClick={() => setFilter("all")} className={PILL}>All</button>

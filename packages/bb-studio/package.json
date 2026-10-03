@@ -19,6 +19,8 @@
       "icon": "./icons/studio.svg",
       "experimental_icons": {
         "studio": "./icons/studio.svg",
+        "home": "./icons/home.svg",
+        "inbox": "./icons/inbox.svg",
         "tag": "./icons/tag.svg",
         "hash": "./icons/hash.svg",
         "link": "./icons/link.svg",

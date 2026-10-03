@@ -59,7 +59,7 @@ export function SpaceSwitcher({ extras }: { extras: SwitcherExtra[] }) {
       <Menu.Portal>
         <Menu.Content align="start" sideOffset={4} className={cn(MENU, "w-[var(--radix-dropdown-menu-trigger-width)] min-w-64")}>
           <Menu.Item className={MENU_ITEM} onSelect={() => openOffice("inbox/all")}>
-            <Icon name="Inbox" aria-hidden />
+            <Icon name="studio/inbox" aria-hidden />
             <span className="flex-1">Inbox · All spaces</span>
             {allRequests > 0 ? <span className={COUNT_HOT}>{allRequests}</span> : null}
           </Menu.Item>

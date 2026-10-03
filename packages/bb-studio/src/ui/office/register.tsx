@@ -15,7 +15,7 @@ import { TrustRequest } from "./TrustRequest";
  * enabled, it keeps its slot and the office's stays quiet.
  */
 export function registerOfficeApp(app: PluginAppBuilder, options: { sidebar: PluginAppBuilder | null; navigation: PluginAppBuilder | null }): void {
-  app.slots.navPanel({ id: "office", title: "Home", icon: "Home", path: OFFICE_PANEL_PATH, component: retainPanel("office", OfficePanel) });
+  app.slots.navPanel({ id: "office", title: "studio/home", icon: "studio/home", path: OFFICE_PANEL_PATH, component: retainPanel("office", OfficePanel) });
   // Approvals for bots set to "Ask first" (office/trust.ts, origin rendererId office-trust).
   app.slots.pendingInteraction({ id: "office-trust", component: TrustRequest });
   options.navigation?.slots.experimental_sidebarNavigation({ id: "office-navigation", title: "Office", description: "Space switcher, Home, Inbox, Search and New thread.", component: OfficeNavigation });

@@ -50,7 +50,7 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
             <h1 className="truncate text-2xl font-semibold">{bot.name}</h1>
             <p className="truncate text-sm text-muted-foreground">{bot.role ? `${bot.role} · ` : ""}<span className={state.tone}>{state.label}</span></p>
           </div>
-          <button type="button" onClick={() => setDelegating(true)} className={PRIMARY_BUTTON}><Icon name="Send" aria-hidden />Give a task</button>
+          <button type="button" onClick={() => setDelegating(true)} className={PRIMARY_BUTTON}><Icon name="Sent" aria-hidden />Give a task</button>
         </header>
         <div role="tablist" aria-label={`${bot.name}'s desk`} className="mt-5 flex gap-1 border-b border-border">
           {TABS.map((entry) => (
@@ -100,7 +100,7 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
                     <section><h2 className="mb-2 text-sm font-medium text-muted-foreground">Memory</h2><pre className="whitespace-pre-wrap rounded-md border border-border p-3 font-sans text-sm">{desk.data.memory.memory || "Nothing remembered yet."}</pre></section>
                   </div>
                 : null}
-              <button type="button" onClick={() => openAppPath(desk.data!.profileHref)} className={cn(OUTLINE_BUTTON, "mt-6")}><Icon name="Pencil" aria-hidden />Edit profile</button>
+              <button type="button" onClick={() => openAppPath(desk.data!.profileHref)} className={cn(OUTLINE_BUTTON, "mt-6")}><Icon name="Edit" aria-hidden />Edit profile</button>
             </div>
           : null}
       </div>
