@@ -18,6 +18,12 @@ struct ArtifactView: View {
     @State private var text: String?
     @State private var truncated = false
     @State private var textVersion: String?
+    @State private var textError: String?
+    @State private var textAttempt = 0
+    @State private var imageAttempt = 0
+    @State private var webAttempt = 0
+    @State private var webError: String?
+    @State private var webErrorVersion: String?
     @State private var error: String?
     @State private var source = false
     @State private var renaming = false
@@ -65,7 +71,7 @@ struct ArtifactView: View {
         .studioChat(
             isPresented: $chatting, pluginId: "artifacts", itemId: id, title: artifact?.displayTitle ?? "Artifact",
             projectId: artifact?.projectId)
-        .task(id: version?.id) { await loadText() }
+        .task(id: "\(version?.id ?? ""):\(textAttempt)") { await loadText() }
         .task {
             listener = app.realtime.listen { event in
                 guard case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "artifacts" else { return }
@@ -99,27 +105,56 @@ struct ArtifactView: View {
         let url = client.artifactContentURL(artifact.id, versionId: version.id)
         switch version.type {
         case "image":
-            ScrollView([.horizontal, .vertical]) {
-                AsyncImage(url: url) { phase in
-                    if let image = phase.image {
+            AsyncImage(url: url) { phase in
+                if let image = phase.image {
+                    ScrollView([.horizontal, .vertical]) {
                         image.resizable().scaledToFit().frame(maxWidth: 900)
-                    } else if phase.error != nil {
-                        Label("Couldn't load the image", systemImage: "photo").foregroundStyle(.secondary)
-                    } else {
-                        ProgressView()
+                            .accessibilityElement(children: .ignore)
+                            .accessibilityAddTraits(.isImage)
+                            .accessibilityLabel(version.name)
+                            .accessibilityIdentifier("artifactPreviewImage")
+                            .padding()
                     }
+                    .accessibilityElement(children: .ignore)
+                    .accessibilityAddTraits(.isImage)
+                    .accessibilityLabel(version.name)
+                    .accessibilityIdentifier("artifactPreviewImage")
+                } else if phase.error != nil {
+                    previewFailure("Couldn't load the image", symbol: "photo", message: "Try again, or share the file to open it in another app.") {
+                        imageAttempt += 1
+                    }
+                } else {
+                    ProgressView()
                 }
-                .padding()
             }
+            .id("\(version.id):\(imageAttempt)")
             .safeAreaInset(edge: .top) { header(artifact, version) }
         case "html", "pdf":
             // Served with a sandboxing CSP, so the page can't reach BB.
-            WebView(url: url)
+            if webErrorVersion == version.id, let webError {
+                previewFailure("Couldn't load the preview", symbol: version.symbol, message: webError) {
+                    self.webError = nil
+                    webErrorVersion = nil
+                    webAttempt += 1
+                }
+            } else {
+                ArtifactWebPreview(url: url) { message in
+                    guard self.version?.id == version.id else { return }
+                    webError = message
+                    webErrorVersion = version.id
+                }
                 .ignoresSafeArea(edges: .bottom)
-                .id(url)
+                .id("\(url.absoluteString):\(webAttempt)")
+            }
         case "markdown", "code", "text":
             if textVersion != version.id {
                 ProgressView()
+            } else if let textError {
+                previewFailure("Couldn't load the text", symbol: "doc.text", message: textError) {
+                    textVersion = nil
+                    self.textError = nil
+                    textAttempt += 1
+                }
             } else if let text {
                 let shown = String(text.prefix(Self.maxCharacters))
                 let more = truncated || text.count > shown.count
@@ -170,6 +205,17 @@ struct ArtifactView: View {
             .foregroundStyle(.secondary)
     }
 
+    private func previewFailure(_ title: String, symbol: String, message: String, retry: @escaping () -> Void) -> some View {
+        ContentUnavailableView {
+            Label(title, systemImage: symbol)
+        } description: {
+            Text(message)
+        } actions: {
+            Button("Retry", action: retry).buttonStyle(.borderedProminent)
+            Button("Share File") { Task { await share() } }.buttonStyle(.bordered)
+        }
+    }
+
     private func binary(_ version: ArtifactVersion) -> some View {
         ContentUnavailableView {
             Label(version.name, systemImage: version.symbol)
@@ -192,7 +238,7 @@ struct ArtifactView: View {
     @ToolbarContentBuilder
     private var toolbar: some ToolbarContent {
         ToolbarItemGroup(placement: .topBarTrailing) {
-            if version?.type == "markdown", text != nil {
+            if version?.type == "markdown", textVersion == version?.id, text != nil {
                 Button { source.toggle() } label: {
                     Image(systemName: source ? "doc.richtext" : "chevron.left.forwardslash.chevron.right")
                 }
@@ -214,7 +260,7 @@ struct ArtifactView: View {
                 operation.complete(on: app) { app.newThread(text: "[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ") }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
             StudioChatMenuButton(isPresented: $chatting)
-            if let text, version?.isText == true {
+            if let text, version?.isText == true, textVersion == version?.id {
                 Button {
                     UIPasteboard.general.string = text
                     flash("Copied")
@@ -283,14 +329,22 @@ struct ArtifactView: View {
 
     private func loadText() async {
         guard let artifact, let version, version.isText, textVersion != version.id else { return }
+        text = nil
+        textVersion = nil
+        truncated = false
+        textError = nil
         do {
             let result = try await client.artifactText(artifact.id, versionId: version.id)
+            guard !Task.isCancelled, self.version?.id == version.id else { return }
             text = result.text
             truncated = result.truncated
+            textError = result.text == nil ? "The preview content is unavailable. Try again, or share the file." : nil
             textVersion = version.id
         } catch where BBClient.isCancellation(error) {
         } catch {
+            guard !Task.isCancelled, self.version?.id == version.id else { return }
             text = nil
+            textError = BBClient.describe(error, server: client.baseURL)
             textVersion = version.id
         }
     }

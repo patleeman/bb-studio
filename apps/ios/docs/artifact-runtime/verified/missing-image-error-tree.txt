@@ -1,0 +1,80 @@
+Attributes: Application, 0x110d52d00, pid: 25912, label: 'BB Studio'
+Element subtree:
+ →Application, 0x110d52d00, pid: 25912, label: 'BB Studio'
+    Window (Main), 0x110d51400, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x110d51900, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x110d517c0, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x110d52940, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x110d52800, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x110d51b80, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x110d50b40, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x110d50a00, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x110d50000, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x110d52bc0, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x110d52a80, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x110d50500, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x110d512c0, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x110d535c0, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Artifact runtime missing image'
+                              Button, 0x110d50140, {{16.0, 62.0}, {44.0, 44.0}}, identifier: 'BackButton', label: 'Studio'
+                              StaticText, 0x110d53480, {{72.0, 73.7}, {141.3, 20.7}}, label: 'Artifact runtime missing image'
+                              Button, 0x110d50dc0, {{229.3, 66.0}, {41.7, 36.0}}, label: 'Related'
+                              Other, 0x110d53340, {{287.0, 66.0}, {39.0, 36.0}}
+                                Other, 0x110d52300, {{287.0, 66.0}, {39.0, 36.0}}
+                                  Button, 0x110d53ac0, {{287.0, 66.0}, {39.0, 36.0}}, identifier: 'square.and.arrow.up', label: 'Share'
+                              Other, 0x110d52440, {{342.0, 66.0}, {40.0, 36.0}}
+                                Other, 0x110d51cc0, {{342.0, 66.0}, {40.0, 36.0}}
+                                  Button, 0x110d51180, {{342.0, 66.0}, {40.0, 36.0}}, label: 'More'
+                                    Button, 0x110d53c00, {{342.0, 66.0}, {40.0, 36.0}}
+                                      Image, 0x110d50c80, {{351.0, 73.0}, {22.0, 22.0}}, identifier: 'ellipsis.circle', label: 'More'
+                            Other, 0x110d50640, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x110d51e00, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x110d52080, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x110d50280, {{0.0, 0.0}, {402.0, 874.0}}
+                                    StaticText, 0x110d51040, {{16.0, 124.0}, {351.7, 14.3}}, label: 'Image · artifact-runtime-missing-image.png · 251 bytes · Orbit'
+                                    StaticText, 0x110d51680, {{89.5, 356.3}, {223.0, 83.2}}, label: 'Couldn't load the image'
+                                    Image, 0x110d526c0, {{178.0, 356.3}, {46.3, 36.0}}, identifier: 'photo', label: 'Photo'
+                                    StaticText, 0x110d508c0, {{32.8, 442.5}, {336.3, 49.0}}, label: 'Try again, or share the file to open it in another app.'
+                                    Button, 0x110d51a40, {{172.7, 521.7}, {56.7, 28.0}}, label: 'Retry'
+                                    Button, 0x110d50f00, {{157.3, 564.7}, {87.3, 28.0}}, label: 'Share File'
+                            Toolbar, 0x110d51f40, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x110d51540, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x110d53980, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x110d53e80, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x110d53d40, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x110d503c0, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x110d53840, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x110d53700, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x110d52e40, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x110d52580, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home'
+                              Image, 0x10686ee40, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x10686c500, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio', Selected
+                              Image, 0x10686ea80, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x10686f480, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x10686f340, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x10686ebc0, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x10686d900, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x10686fac0, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x10686d040, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x10686ca00, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x10686fd40, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x10686f700, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x10686f980, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x10686f200, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x10686da40, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x10686fe80, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x10686e800, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x10686d2c0, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x10686de00, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x10686e940, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x10686e300, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x10686cf00, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x10686fc00, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x10686f0c0, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x10686ed00, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x110d52d00, pid: 25912, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x10686e080, pid: 25912, label: 'BB Studio'
+  }
