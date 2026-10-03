@@ -49,10 +49,9 @@ final class ThreadUITests: XCTestCase {
     }
 
     func testThread() throws {
-        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
-        guard app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10) else {
-            throw XCTSkip("the thread's last reply has no reactions")
-        }
+        let fixture = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_REACTIONS_THREAD"], "Seed reactions with BB_QA_DATA_DIR")
+        app.open(URL(string: "bbstudio://thread/\(fixture)")!)
+        XCTAssertTrue(app.buttons["reaction"].firstMatch.waitForExistence(timeout: 10), "seeded reactions")
         let chip = app.buttons.matching(identifier: "reaction").allElementsBoundByIndex.last!
         let chipText = chip.label
         sleep(2)
@@ -181,8 +180,8 @@ final class ThreadUITests: XCTestCase {
 
         // Model sheet, cancelled.
         app.buttons["More"].tap()
-        app.buttons["Model & reasoning"].tap()
-        XCTAssertTrue(app.navigationBars["Model"].waitForExistence(timeout: 5), "model sheet")
+        app.buttons["Model & permissions"].tap()
+        XCTAssertTrue(app.navigationBars["Model & Permissions"].waitForExistence(timeout: 5), "model sheet")
         sleep(2)
         shot("model")
         app.buttons["Cancel"].tap()

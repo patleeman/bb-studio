@@ -6,6 +6,7 @@ import { mkdir, mkdtemp, readFile, realpath, writeFile, rm } from 'node:fs/promi
 import { dirname, join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { randomUUID } from 'node:crypto';
+import { seedThreadFixtures } from './seed-thread-fixtures.mjs';
 const require = createRequire(new URL('../../../packages/bb-studio/package.json', import.meta.url));
 const Database = require('better-sqlite3');
 const origin = process.env.BB_QA_SERVER_URL;
@@ -119,8 +120,10 @@ if (!fixtures.performancePages) {
   }
   await writeFile(marker, JSON.stringify(fixtures,null,2)+'\n');
 }
+await seedThreadFixtures({db,api,rpc,fixtures,dataDir,projectId});
+await writeFile(marker, JSON.stringify(fixtures,null,2)+'\n');
 db.close();
-const env = Object.fromEntries(Object.entries(fixtures).filter(([key])=>key.startsWith('BBGO_QA_')));
+const env = Object.fromEntries(Object.entries(fixtures).filter(([key])=>key.startsWith('BBGO_QA_') || key.startsWith('BBGO_PROBE_')));
 env.BBGO_QA_PERFORMANCE_READY = fixtures.performancePages.length === 24 ? 'YES' : 'NO';
 await writeFile(process.argv[2],JSON.stringify(env,null,2)+'\n');
 console.log('Seeded assistant timeline and two 90-second segmented audio fixtures.');

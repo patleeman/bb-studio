@@ -91,10 +91,11 @@ extension BBClient {
     /// Any file on the thread's host, like a screenshot in `/tmp`, which the
     /// workspace endpoint can't reach. Read the way BB web opens such links.
     public func hostFile(threadId: String, path: String) async throws -> WorkspaceFile {
-        var components = URLComponents()
-        components.queryItems = [URLQueryItem(name: "path", value: path)]
+        let encoded = path.split(separator: "/").map {
+            String($0).addingPercentEncoding(withAllowedCharacters: .alphanumerics) ?? String($0)
+        }.joined(separator: "/")
         let (status, data) = try await raw(
-            method: "GET", path: "/api/v1/threads/\(threadId)/host-files/content?\(components.percentEncodedQuery ?? "")", body: nil)
+            method: "GET", path: "/api/v1/threads/\(threadId)/host-files/\(encoded)", body: nil)
         guard (200..<300).contains(status) else {
             throw BBError(status: status, message: Self.errorMessage(data) ?? "HTTP \(status) for \(path)")
         }

@@ -275,3 +275,32 @@ cycles including warm-up. Five measured iterations averaged 35.420 seconds per
 two-cycle iteration; peak physical memory averaged 124,223 kB. These are observed
 measurements, not a regression-baseline claim. Node/shell syntax checks and
 `git diff --check` passed. The fixture-enabled full runner will include this test.
+
+## Read-only thread fixtures and file/timeline repairs
+
+The isolated seed now creates idle, inert timelines for reactions and scrolling,
+find/mentions/drafts/model selection, completed file edits, file links, Markdown
+images, inline HTML/Markdown, and saved artifact cards. It creates only local
+fixture files and events, cancels the scheduled placeholder, and validates every
+timeline through the real API before passing generated IDs to XCTest.
+
+Enabling this coverage exposed three product incompatibilities with stable BB:
+
+- Host files were requested at `host-files/content?path=…`, which the server
+  interpreted as `/content`. File links and images now use the path-shaped route.
+- Inline HTML used the removed thread `worktree/files` route. Previews now use
+  the URL returned by `inline-vis.preparePreview`, including its environment.
+- Completed tool steps were hidden inside server turn containers that iOS
+  discarded. Timeline requests now include nested rows and the existing activity
+  group renders the children, restoring completed file-edit and diff navigation.
+
+`testFeatures` also targets the current Model & Permissions sheet title.
+`testThread` requires its seeded reactions instead of skipping an arbitrary
+thread without them. The runner retains all existing assertions.
+
+`/tmp/office-thread-fixtures-3/results.xcresult`: 7 passed, 0 failed, 0 skipped:
+`testArtifact`, `testFeatures`, `testFileLink`, `testInlineVis`,
+`testMarkdownImage`, `testProbe`, and `testThread`. This run includes all three
+product repairs and the idle fixture timelines. Build, Node syntax checks,
+`git diff --check`, and stable compatibility (all seven plugins) passed.
+The fresh full-suite run and Review/Artifact/Share harness skip work remain.

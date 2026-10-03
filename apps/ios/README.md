@@ -245,6 +245,9 @@ assistant message, completed meeting notes, 24 performance pages, and two 90-sec
 recordings (WebM/Opus and MP4/AAC) using `ffmpeg`. It accepts only temporary staged
 data directories. No model or transcription is run. The runner passes the
 generated IDs to the sent-time, meeting-notes and playback tests, and enables
-the repeated Studio page-navigation performance test. The seed is reused
+the repeated Studio page-navigation performance test. It also seeds read-only
+thread coverage for reactions, find, mentions, drafts, completed file-edit diffs,
+file links, images, inline HTML/Markdown and artifact cards. Every seeded timeline
+is parsed through the server API before the tests start. The seed is reused
 on later runs against that staged project. Share-sheet and accessibility tests
 still require their own fixtures; a skip is not a pass for those workflows.

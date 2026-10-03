@@ -204,7 +204,7 @@ extension BBClient {
     public func timeline(_ threadId: String, before cursor: TimelineCursor? = nil, after: Int? = nil, segments: Int = 8)
         async throws -> TimelinePage
     {
-        var path = "/api/v1/threads/\(threadId)/timeline?segmentLimit=\(segments)"
+        var path = "/api/v1/threads/\(threadId)/timeline?includeNestedRows=true&segmentLimit=\(segments)"
         if let after { path += "&afterSequence=\(after)" }
         if let cursor {
             let anchor = cursor.anchorId.addingPercentEncoding(withAllowedCharacters: .urlQueryAllowed) ?? cursor.anchorId

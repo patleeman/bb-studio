@@ -56,6 +56,8 @@ public struct ThreadEntry: Codable, Identifiable, Hashable, Sendable {
 }
 
 public struct TimelineRow: Codable, Identifiable, Hashable, Sendable {
+    /// Completed turn containers returned by the timeline API.
+    public var children: [TimelineRow]?
     public var id: String
     public var kind: String
     public var role: String?
