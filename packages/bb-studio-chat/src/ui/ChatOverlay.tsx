@@ -20,7 +20,8 @@ import {
 import { errorMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import { ref as itemRefSchema, type rpcContract, type Viewed } from "../contract";
+import type { rpcContract, Viewed } from "../contract";
+import { ref as itemRefSchema } from "../schemas";
 import { MENTION_PROVIDER_ID } from "../ids";
 import { itemKey } from "../context";
 import { ThreadPicker } from "./ThreadPicker";

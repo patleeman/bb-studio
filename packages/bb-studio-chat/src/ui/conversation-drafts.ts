@@ -1,6 +1,6 @@
 import { z } from "zod";
 import type { ItemQuote } from "@bb-studio/kit/format";
-import { quote, ref, type ItemRef } from "../contract";
+import { quote, ref, type ItemRef } from "../schemas";
 
 export const CHATS_PATH = "chats";
 export const CONVERSATION_STARTED = "bb-studio-chat:started";
