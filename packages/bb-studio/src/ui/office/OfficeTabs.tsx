@@ -354,15 +354,31 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
   const [renaming, setRenaming] = useState<string | null>(null);
   // A split you separate stays separated while those panes are still open.
   const [separated, setSeparated] = useState<string | null>(null);
+  // Closing the tab you're on closes it in the window too, as in Arc: the
+  // tab below it opens (or the one above, at the end), else Home.
+  const leaveIfShowing = useCallback((closing: readonly string[]) => {
+    const gone = new Set(closing);
+    const lists = [tabs.today, ...[null, ...tabs.folders.map((folder) => folder.id)].map((folderId) => tabs.pinned.filter((tab) => tab.folderId === folderId))];
+    for (const list of lists) {
+      const at = list.findIndex((tab) => gone.has(tab.ref) && isTabActive(tab, activeThreadId, locationHref));
+      if (at < 0) continue;
+      const next = [...list.slice(at + 1), ...list.slice(0, at).reverse()].find((tab) => !gone.has(tab.ref));
+      if (next) openTab(next, threadActions);
+      else openOffice("");
+      return;
+    }
+  }, [tabs.today, tabs.pinned, tabs.folders, activeThreadId, locationHref, threadActions]);
   const moves: TabMoves = useMemo(() => ({
     ...actions,
+    archive: (ref: string) => { leaveIfShowing([ref]); actions.archive(ref); },
+    closeMany: (refs: readonly string[]) => { leaveIfShowing(refs); actions.closeMany(refs); },
     newFolder: (withRef: string) => setNaming({ withRef }),
     separate: (ref: string) => {
       const split = [...tabs.essentials, ...tabs.pinned, ...tabs.today].find((tab) => tab.ref === ref);
       if (split?.members) setSeparated(split.members.map((member) => member.ref).join(","));
       actions.separate(ref);
     },
-  }), [actions, tabs.essentials, tabs.pinned, tabs.today]);
+  }), [actions, leaveIfShowing, tabs.essentials, tabs.pinned, tabs.today]);
   const open = (tab: ShownTab, options: { split: boolean }) => { openTab(tab, threadActions, options); onNavigate(); };
   // Threads open side by side become one split tab, as in Arc; it stays after
   // the split closes, so you can come back to the pair.
@@ -456,7 +472,7 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
       <SectionEdge
         zone="today"
         action={tabs.today.length
-          ? <button type="button" onClick={() => actions.closeMany(tabs.today.map((tab) => tab.ref))} className="rounded px-1 text-xs text-foreground/45 opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/divider:opacity-100">Clear</button>
+          ? <button type="button" onClick={() => moves.closeMany(tabs.today.map((tab) => tab.ref))} className="rounded px-1 text-xs text-foreground/45 opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/divider:opacity-100">Clear</button>
           : null}
       />
       <div className="space-y-px">
