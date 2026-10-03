@@ -31,7 +31,7 @@ test("BB's mention menu offers both channel broadcasts and resolves picked items
   } finally { await x.close(); }
 });
 
-test.each(["all", "channel", "everyone", "CHANNEL"])("@%s delivers once to every channel member", async handle => {
+test.each(["all", "channel", "everyone", "CHANNEL", "all."])("@%s delivers once to every channel member", async handle => {
   const x = fixture();
   try {
     const members = [{ kind: "bot" as const, id: x.a.id }, { kind: "bot" as const, id: x.b.id }, { kind: "thread" as const, id: "thr_member" }];

@@ -230,7 +230,7 @@ export class ThreadViews {
   async recipients(view: ThreadView, input: ViewSend) {
     const threads = await this.threads(view);
     const targets = [...input.targets];
-    const tags = [...input.text.matchAll(/(?:^|[^a-zA-Z0-9_.-])@(?:thread:)?([a-zA-Z0-9][a-zA-Z0-9_.-]*)(\+new)?/g)];
+    const tags = [...input.text.matchAll(/(?:^|[^a-zA-Z0-9_.-])@(?:thread:)?([a-zA-Z0-9_-]+)(\+new)?(?![a-zA-Z0-9_-]|\.[a-zA-Z0-9_])/g)];
     for (const [, handle] of tags) {
       if (isBroadcastHandle(handle!)) { targets.push(...view.members); continue; }
       const bot = this.store.all().find(b => b.handle === handle);
