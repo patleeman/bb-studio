@@ -14,6 +14,7 @@ import type { rpcContract } from "../contract";
 import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
 import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
 import { PostDiscussion } from "./discussion";
+import { loadFeedWindow } from "../window";
 
 const PAGE = 40;
 
@@ -67,20 +68,26 @@ function FeedReader() {
   const [error, setError] = useState<string | null>(null);
   const loaded = useRef(PAGE);
   const loadingMore = useRef(false);
+  const loadVersion = useRef(0);
   const end = useRef<HTMLDivElement>(null);
 
   const load = useCallback(() => {
-    rpc.call("list", { topic, limit: loaded.current }).then(
+    const version = ++loadVersion.current;
+    loadFeedWindow((input) => rpc.call("list", { ...input, topic }), loaded.current).then(
       (result) => {
+        if (version !== loadVersion.current) return;
         setPosts(result.posts);
         setNextCursor(result.nextCursor);
         setError(null);
       },
-      (cause: unknown) => setError(errorMessage(cause)),
+      (cause: unknown) => { if (version === loadVersion.current) setError(errorMessage(cause)); },
     );
     rpc.call("topics", {}).then((result) => setTopics(result.topics), () => undefined);
   }, [rpc, topic]);
-  useEffect(load, [load]);
+  useEffect(() => {
+    load();
+    return () => { loadVersion.current++; };
+  }, [load]);
   // New posts and edits reload; reading ("seen") is already in the list.
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = feedEvent(payload);
@@ -91,15 +98,17 @@ function FeedReader() {
   const more = useCallback(() => {
     if (!nextCursor || loadingMore.current) return;
     loadingMore.current = true;
+    const version = loadVersion.current;
     rpc
       .call("list", { topic, cursor: nextCursor, limit: PAGE })
       .then(
         (result) => {
+          if (version !== loadVersion.current) return;
           loaded.current += result.posts.length;
           setPosts((current) => [...(current ?? []), ...result.posts]);
           setNextCursor(result.nextCursor);
         },
-        (cause: unknown) => setError(errorMessage(cause)),
+        (cause: unknown) => { if (version === loadVersion.current) setError(errorMessage(cause)); },
       )
       .finally(() => (loadingMore.current = false));
   }, [rpc, topic, nextCursor]);
