@@ -46,6 +46,7 @@ import {
   useIsDark,
 } from "../lib/scene";
 import { useDrawingSync } from "../lib/sync";
+import { DrawingSaveQueue } from "../lib/save-queue";
 import { DRAWING_UPDATE_TYPE, REALTIME_CHANNEL, drawingHref } from "../src/shared";
 
 const SPIN = "animate-spin motion-reduce:animate-none";
@@ -74,6 +75,7 @@ export function DrawingEditor({
   const [initialData, setInitialData] = useState<ExcalidrawInitialDataState | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState<string | null>(null);
   const [attaching, setAttaching] = useState(false);
 
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
@@ -82,9 +84,9 @@ export function DrawingEditor({
   // resizes (the sidebar or a side panel opening or closing).
   const touchedRef = useRef(false);
   const loadedRef = useRef(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const saveChainRef = useRef<Promise<void>>(Promise.resolve());
-  const pendingRef = useRef<string | null>(null);
+  const saveQueueRef = useRef<DrawingSaveQueue | null>(null);
+  if (!saveQueueRef.current) saveQueueRef.current = new DrawingSaveQueue((data) => rpc.call("saveDrawing", { id: drawingId, data }));
+  const saveQueue = saveQueueRef.current;
   // The scene as last saved or loaded, serialized. Excalidraw calls onChange
   // for pointer moves, selection and scrolling too; comparing against this
   // saves only real changes, so the editor doesn't keep rewriting the scene
@@ -220,55 +222,25 @@ export function DrawingEditor({
     };
   }, [loading]);
 
-  const flushSave = useCallback(() => {
-    if (saveTimerRef.current) {
-      clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = null;
-    }
-    const pending = pendingRef.current;
-    if (!pending) return;
-    pendingRef.current = null;
-    setSaving(true);
-    const payload = { id: drawingId, data: pending };
-    saveChainRef.current = saveChainRef.current
-      .then(() => rpc.call("saveDrawing", payload))
-      // The server's merged revision is left for the sync hook to fetch: it
-      // can hold an agent's elements that landed while this save was in
-      // flight, and those must still reach the canvas.
-      .then(() => setSaving(false))
-      .catch((error) => {
-        setSaving(false);
-        toast.error(
-          error instanceof Error ? `Save failed: ${error.message}` : "Save failed",
-        );
-      });
-  }, [drawingId, rpc]);
-
-  const scheduleSave = useCallback(
-    (data: string) => {
-      pendingRef.current = data;
-      setSaving(true);
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      saveTimerRef.current = setTimeout(() => flushSave(), 1200);
-    },
-    [flushSave],
-  );
-
-  // Save any pending changes when leaving the editor.
+  // Leaving the editor flushes the newest scene; bounded retries continue after
+  // unmount. Warn before closing the browser while a scene remains unacknowledged.
   useEffect(() => {
-    return () => {
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
-      const pending = pendingRef.current;
-      if (pending) {
-        saveChainRef.current = saveChainRef.current.then(() =>
-          rpc
-            .call("saveDrawing", { id: drawingId, data: pending })
-            .then(() => undefined),
-        );
-      }
+    const unsubscribe = saveQueue.subscribe(({ pending, error }) => {
+      setSaving(pending);
+      setSaveError(error ? errorMessage(error) : null);
+    });
+    const beforeUnload = (event: BeforeUnloadEvent) => {
+      if (!saveQueue.hasPending) return;
+      event.preventDefault();
+      event.returnValue = "";
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [drawingId]);
+    window.addEventListener("beforeunload", beforeUnload);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("beforeunload", beforeUnload);
+      void saveQueue.flush();
+    };
+  }, [saveQueue]);
 
   const handleChange = useCallback(
     (elements: readonly unknown[], appState: unknown, files: unknown) => {
@@ -294,12 +266,12 @@ export function DrawingEditor({
         }
         if (serialized === savedSceneRef.current) return;
         savedSceneRef.current = serialized;
-        scheduleSave(serialized);
+        saveQueue.enqueue(serialized);
       } catch (error) {
         console.error("serialize failed", error);
       }
     },
-    [scheduleSave],
+    [saveQueue],
   );
 
   async function renderPng(): Promise<Blob> {
@@ -354,7 +326,7 @@ export function DrawingEditor({
     if (event?.type !== DRAWING_UPDATE_TYPE || event.drawingId !== drawingId) return;
     void rpc.call("getDrawingUpdatedAt", { id: drawingId }).then(({ updatedAt }) => {
       if (updatedAt !== 0) return;
-      pendingRef.current = null;
+      saveQueue.cancel();
       toast.info("This drawing was deleted.");
       onBack(true);
     });
@@ -390,8 +362,8 @@ export function DrawingEditor({
 
   async function deleteDrawing() {
     try {
-      pendingRef.current = null;
       await rpc.call("deleteDrawing", { id: drawingId });
+      saveQueue.cancel();
       toast.success("Drawing deleted");
       onBack(true);
     } catch (error) {
@@ -417,7 +389,7 @@ export function DrawingEditor({
           realtimeState === "connected" ? "bg-success" : "animate-pulse bg-warning motion-reduce:animate-none",
         )}
       />
-      {saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
+      {saveError ? "Not saved" : saving ? "Saving…" : syncedAt ? "Synced" : "Saved"}
     </span>
   );
 
@@ -479,6 +451,12 @@ export function DrawingEditor({
         }
         trailing={trailing}
       />
+      {saveError ? (
+        <div role="alert" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-sm text-destructive">
+          <span className="min-w-0 flex-1">Changes are not saved: {saveError}</span>
+          <button type="button" className={FLOATING_BUTTON} onClick={() => saveQueue.retry()}>Retry save</button>
+        </div>
+      ) : null}
       <div
         ref={canvasRef}
         className="relative min-h-0 flex-1 overflow-hidden bg-background"
