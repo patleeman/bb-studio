@@ -1,0 +1,24 @@
+{
+  "source": "apps/ios/iOS/Capture/CaptureSheet.swift",
+  "sha256": "bbf9ffcde57eaa736db0d82b49a879131603520ec84b892c587a1a829b627921",
+  "origin": "http://127.0.0.1:49486",
+  "fallbackURLsVerified": 2,
+  "actualAppAndGroupPreferencesVerifiedBeforeLaunch": true,
+  "noteLines": 12,
+  "exactEditorValueAsserted": true,
+  "saveFrame": {
+    "x": 16,
+    "y": 448,
+    "width": 370,
+    "height": 93.33333333333326
+  },
+  "keyboardTop": 590,
+  "navigationBottom": 132,
+  "saveEnabled": true,
+  "saveHittable": true,
+  "saveActivated": false,
+  "serverFixtureWrites": false,
+  "sourceModified": false,
+  "initialProbePassed": true,
+  "exactContentFollowupPassed": true
+}
