@@ -1,3 +1,4 @@
+import { ModuleAgents } from "./agents";
 import { moduleSettings } from "./settings";
 import { moduleStatusContract } from "./status";
 import { migrateModuleRefs } from "./refs";
@@ -14,6 +15,7 @@ export interface ModuleContext {
 export interface ServerModule {
   name: string;
   legacyPluginId: string;
+  skills?: string[];
   registerServer(context: ModuleContext): void | Promise<void>;
 }
 
@@ -33,7 +35,8 @@ export class ModuleRuntime {
   private readonly coreContract: Record<string, PluginRpcContract[string]> = {};
   private readonly coreHandlers: PluginRpcHandlers<PluginRpcContract> = {};
 
-  constructor(private readonly host: BbPluginApi) {}
+  private readonly agents: ModuleAgents;
+  constructor(private readonly host: BbPluginApi) { this.agents = new ModuleAgents(host.agents); }
 
   private sdk(): BbPluginApi["sdk"] {
     const sdk = this.host.sdk;
@@ -45,7 +48,7 @@ export class ModuleRuntime {
   }
 
   coreApi(): BbPluginApi {
-    return { ...this.host, sdk: this.sdk(), rpc: { register: (contract, handlers, options) => {
+    return { ...this.host, sdk: this.sdk(), agents: this.agents.scope(["studio"]), rpc: { register: (contract, handlers, options) => {
       Object.assign(this.coreContract, contract);
       Object.assign(this.coreHandlers, handlers);
       this.host.rpc.register(contract, handlers, options);
@@ -79,6 +82,7 @@ export class ModuleRuntime {
       this.host.rpc.register(moduleProviderContract, this.provider.handlers);
     }
     this.host.rpc.register(moduleStatusContract, { modules_status: () => ({ active: modules.filter(module => this.activeIds.includes(module.legacyPluginId)).map(module => module.name), legacyInstalled: this.legacyInstalled }) });
+    this.agents.register();
     const core = this.coreCommand;
     if (core) this.host.cli.register({ ...core, commands: [
       ...core.commands ?? [],
@@ -100,7 +104,7 @@ export class ModuleRuntime {
     this.host.onDispose(() => { if (db.open) db.close(); });
     const contract: Record<string, PluginRpcContract[string]> = {};
     const handlers: Record<string, PluginRpcHandlers<PluginRpcContract>[string]> = {};
-    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), settings: moduleSettings(this.host.settings, db, module.name), storage: {
+    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), agents: this.agents.scope(module.skills), settings: moduleSettings(this.host.settings, db, module.name), storage: {
       ...this.host.storage, database: () => db, kv: moduleKv(db),
     }, rpc: { register: (methods, implementations, options) => {
       const exposed: Record<string, PluginRpcContract[string]> = {};

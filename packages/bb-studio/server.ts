@@ -67,8 +67,8 @@ export default async function plugin(host: BbPluginApi) {
   await runtime.register([
     { name: "tasks", legacyPluginId: "studio-tasks", registerServer: registerTasks },
     { name: "feed", legacyPluginId: "feed", registerServer: registerFeed },
-    { name: "tables", legacyPluginId: "studio-tables", registerServer: registerTables },
-    { name: "chat", legacyPluginId: "studio-chat", registerServer: registerChat },
+    { name: "tables", legacyPluginId: "studio-tables", skills: ["studio-tables"], registerServer: registerTables },
+    { name: "chat", legacyPluginId: "studio-chat", skills: ["studio-chat"], registerServer: registerChat },
   ]);
 }
 
