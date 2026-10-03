@@ -9,6 +9,7 @@ import {
 import { useCallback, useEffect, useMemo, useRef } from "react";
 import { useLocationHref } from "./location";
 import { useCall, useLive } from "./model";
+import { officePath } from "./routes";
 
 export type TabZone = "essential" | "pinned" | "today" | "archived";
 export type TabKind = "thread" | "item" | "bot" | "conversation" | "inbox" | "home" | "library" | "folder";
@@ -120,7 +121,8 @@ export function useTabActions(spaceId: string | null, refresh: () => void) {
 /**
  * Keeps Today honest: whatever the route shows becomes a tab. Threads go by
  * id; any other page goes by its path, which the server resolves to a ref (or
- * ignores, for pages that aren't things you'd keep, like settings).
+ * ignores, for pages that aren't things you'd keep, like settings). Home is
+ * the new-tab page, so landing there adds nothing; you can still pin it.
  */
 export function useTrackOpen(spaceId: string | null, activeThreadId: string | null, knownHrefs: ReadonlySet<string>, knownRefs: ReadonlySet<string>, refresh: () => void) {
   const call = useCall();
@@ -131,6 +133,7 @@ export function useTrackOpen(spaceId: string | null, activeThreadId: string | nu
     const key = activeThreadId ? threadRef(activeThreadId) : href;
     if (!key || key === last.current) return;
     last.current = key;
+    if (!activeThreadId && href === officePath("") && !knownHrefs.has(href)) return;
     // Already a tab: only its opened time moves, so there's nothing to redraw.
     const known = activeThreadId ? knownRefs.has(key) : knownHrefs.has(href);
     void call("tabs_open", activeThreadId ? { spaceId, ref: key } : { spaceId, href: href })

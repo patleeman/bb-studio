@@ -25,7 +25,7 @@ export function importLegacyAttention(core: Database.Database, teams: Database.D
         type: attention.reason === "update" ? "report" : "request", title: conversation?.name ?? "Team request",
         body: message?.text ?? `Unresolved ${attention.reason} from a retired conversation.`,
         botId: message?.botId ?? null, threadId: message?.sourceThreadId ?? null,
-        item: null, href: `/plugins/studio/office/talk/${row.room_id}`, createdAt: attention.createdAt,
+        item: null, href: `/plugins/studio/channels/${row.room_id}`, createdAt: attention.createdAt,
         actions: [{ id: "resolve", label: "Resolve", primary: true }],
       };
       const raw = JSON.stringify(row);

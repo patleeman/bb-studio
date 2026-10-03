@@ -53,7 +53,7 @@ export function officeTeamHandlers(bb: BbPluginApi, store: Store, profiles: Thre
         const memberBotIds = conversation.members.filter(m => m.kind === "bot").map(m => m.id);
         rows.push({ id: conversation.id, title: conversation.name, projectId: conversation.projectId, memberBotIds,
           isDirect: memberBotIds.length === 1, needsYou: threads.some(t => t.hasPendingInteraction), unread,
-          href: `/plugins/studio/office/talk/${conversation.id}` });
+          href: `/plugins/studio/channels/${conversation.id}` });
       }
       return { conversations: rows };
     },
