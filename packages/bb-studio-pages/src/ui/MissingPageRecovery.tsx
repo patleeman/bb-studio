@@ -1,5 +1,6 @@
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { PageConnection } from "./connection";
+import { MissingTitleRecovery } from "./MissingTitleRecovery";
 
 const actionClass = "min-h-11 rounded-md border border-border px-3 py-2 text-sm hover:bg-state-hover focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-foreground";
 const noopSubscribe = () => () => {};
@@ -32,8 +33,9 @@ export function MissingPageRecovery({ pageId, onBack, onRetryPage, backLabel = "
               {failed ? <p>Local storage failed. Keep this view open until you download the recovery file or retry local recovery successfully.</p> : <p>The recovery copy is saved in this browser.</p>}
               <p className="text-muted-foreground">The .yjs recovery file preserves blocks and comments. It requires a Yjs recovery tool; Pages cannot import it through the normal editor.</p>
             </>
-          ) : failed ? <p>Could not read local recovery. Retry reading it to check for a retained draft.</p> : <p>No local recovery was found in this browser.</p>}
+          ) : failed ? <p>Could not read local content recovery. Retry reading it to check for a retained draft.</p> : <p>No local content recovery was found in this browser.</p>}
         </div>
+        <MissingTitleRecovery key={pageId} pageId={pageId} />
         <div className="flex flex-wrap justify-center gap-2">
           {recovered ? <button type="button" className={actionClass} onClick={() => connection?.exportRecovery()}>Download recovery file</button> : null}
           {!loading && failed ? <button type="button" className={actionClass} onClick={() => recovered ? connection?.retrySave() : connection?.retryRecovery()}>{recovered ? "Retry local recovery" : "Retry reading recovery"}</button> : null}

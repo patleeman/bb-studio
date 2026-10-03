@@ -3,6 +3,7 @@ import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { PagePanel } from "./PagePanel";
+import { TitleRecovery } from "./page-title";
 
 const state = vi.hoisted(() => ({ download: vi.fn(), retry: vi.fn(), read: vi.fn(), refetch: vi.fn(), options: [] as unknown[], failed: false, recovered: true }));
 vi.mock("./connection", () => ({ PageConnection: class {
@@ -36,9 +37,16 @@ beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
   state.failed = false; state.recovered = true; state.options = [];
   vi.clearAllMocks();
+  localStorage.clear();
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
-afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
+afterEach(async () => {
+  await act(async () => root.unmount()); container.remove();
+  vi.restoreAllMocks(); vi.unstubAllGlobals();
+  const recovery = new TitleRecovery(location.origin, "pg_deleted");
+  for (const draft of recovery.memory()) recovery.remove(draft);
+  localStorage.clear();
+});
 async function render() { await act(async () => { root.render(<PagePanel {...({ threadId: "thr_one", params: { pageId: "pg_deleted" } } as any)} />); }); }
 async function click(text: string) {
   await act(async () => {
@@ -74,4 +82,15 @@ it("retries a failed recovery read rather than writing an empty document", async
   expect(state.read).toHaveBeenCalledOnce();
   expect(state.retry).not.toHaveBeenCalled();
   expect(container.textContent).not.toContain("Download recovery file");
+});
+
+it("exposes a title-only recovery when deleted metadata and body recovery are absent", async () => {
+  state.recovered = false;
+  const recovery = new TitleRecovery(location.origin, "pg_deleted");
+  recovery.save({ id: "draft-title-only", title: "Retained title", base: "Old title", at: 1 });
+  await render();
+  expect(container.textContent).toContain("Retained title");
+  expect(container.textContent).toContain("Download title recovery");
+  expect(container.querySelector('[contenteditable="true"]')).toBeNull();
+  expect(state.options).toEqual([{ recoveryOnly: true }]);
 });
