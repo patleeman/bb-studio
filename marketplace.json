@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "Studio for BB: pages, voice recordings, drawings, artifacts, tasks, bot teams and a sidebar, in one collection your agents can use.",
+  "description": "Your office in BB: organize work in Spaces, delegate to bots, and follow requests and reports in one Inbox.",
   "plugins": [
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio. One collection for your pages, recordings, drawings, tasks and bots: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
+      "description": "Your office in BB: Spaces for your work, a team of bots, DMs and channels, delegation, and one Inbox for requests and reports.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
