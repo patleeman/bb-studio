@@ -1,0 +1,10 @@
+[
+  {
+    "test": "ThreadUITests/testIPad()",
+    "reason": "iPad only"
+  },
+  {
+    "test": "ThreadUITests/testVoiceChat()",
+    "reason": "This Simulator cannot initialize Apple's speech recognizer; failed-session pause/end verified. Listening requires a speech-capable device."
+  }
+]

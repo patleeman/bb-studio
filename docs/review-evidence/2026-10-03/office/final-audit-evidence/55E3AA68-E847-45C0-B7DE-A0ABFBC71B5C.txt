@@ -1,0 +1,1 @@
+studio-default: policy 3: resolved element id= label=Artifact · Orbit · Image · 21 B · 1 version sRGB foreground=[15, 15, 15], background=[229, 229, 229], contrast=15.216943231791376:1; element frame=(96.0, 821.0, 220.33333333333331, 14.333333333333371)

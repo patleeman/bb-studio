@@ -1,0 +1,1 @@
+studio-default: policy 3: resolved element id= label=25 min. ago sRGB foreground=[64, 64, 64], background=[239, 239, 239], contrast=9.01710375581664:1; element frame=(281.33333333333337, 780.6666666666666, 66.66666666666663, 14.333333333333371)

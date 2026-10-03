@@ -1,0 +1,1 @@
+inbox-default-material-0-reaudit: decorative emoji: glyph=🧭, labeled Face image=Atlas, needs you, image frame=(32.0, 234.0, 34.0, 34.0); element frame=(36.5, 242.33333333333337, 23.0, 19.333333333333314)

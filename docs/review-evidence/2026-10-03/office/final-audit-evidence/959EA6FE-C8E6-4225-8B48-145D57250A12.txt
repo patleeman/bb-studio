@@ -1,0 +1,1 @@
+expected=Threads at once; control=(16.0, 450.3333333333333, 370.0, 52.0); passed=true; observations=["Threads at once confidence=1.0 bounds=(31.999999920575256, 470.7580645071439, 122.66304347826086, 13.11827956989246)"]

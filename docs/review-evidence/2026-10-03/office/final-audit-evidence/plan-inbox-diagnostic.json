@@ -1,0 +1,105 @@
+{
+  "ok": true,
+  "result": {
+    "events": [
+      {
+        "key": "interaction:stage9-1866e153-6af6-47ae-abef-9bea0025d9d7",
+        "spaceId": "spc_personal",
+        "type": "request",
+        "source": "bb-interaction",
+        "botId": null,
+        "threadId": "thr_x2uump2i9w",
+        "item": null,
+        "title": "Atlas wants to edit the release checklist",
+        "body": "Native UI workspace fixture",
+        "href": "/threads/thr_x2uump2i9w",
+        "actions": [
+          {
+            "id": "approve",
+            "label": "Approve",
+            "primary": true
+          },
+          {
+            "id": "deny",
+            "label": "Deny"
+          }
+        ],
+        "answerable": false,
+        "createdAt": 1791058366031,
+        "readAt": null,
+        "doneAt": null
+      },
+      {
+        "key": "feed:story:stage9-orbit",
+        "spaceId": "spc_personal",
+        "type": "report",
+        "source": "feed",
+        "botId": null,
+        "threadId": "",
+        "item": null,
+        "title": "ORBIT-42 checks are ready",
+        "body": "The release checklist and inventory are ready. Please confirm the Friday release window.",
+        "href": "/plugins/studio/feed/post_b4bcd3e9b8f82f1f",
+        "actions": null,
+        "urgent": false,
+        "createdAt": 1791058366029,
+        "readAt": null,
+        "doneAt": null
+      },
+      {
+        "key": "task-review:tsk_4602f944b0a7474b",
+        "spaceId": "spc_personal",
+        "type": "request",
+        "source": "task-review",
+        "botId": "bot_0d0e08261dc39c08",
+        "threadId": null,
+        "item": {
+          "ref": "studio:tsk_4602f944b0a7474b",
+          "title": "Review the ORBIT-42 release checklist",
+          "href": "/plugins/studio/tasks/tsk_4602f944b0a7474b"
+        },
+        "title": "Review the ORBIT-42 release checklist",
+        "body": "The checklist is ready for your review.",
+        "href": "/plugins/studio/tasks/tsk_4602f944b0a7474b",
+        "actions": [
+          {
+            "id": "accept",
+            "label": "Accept",
+            "primary": true
+          }
+        ],
+        "createdAt": 1791058366021,
+        "readAt": null,
+        "doneAt": null
+      },
+      {
+        "key": "interaction:pint_45b695e684",
+        "spaceId": "spc_personal",
+        "type": "request",
+        "source": "bb-interaction",
+        "botId": null,
+        "threadId": "thr_55rwuwh3sw",
+        "item": null,
+        "title": "Approval needed",
+        "body": "Native approval card QA",
+        "href": "/threads/thr_55rwuwh3sw",
+        "actions": [
+          {
+            "id": "approve",
+            "label": "Approve",
+            "primary": true
+          },
+          {
+            "id": "deny",
+            "label": "Deny"
+          }
+        ],
+        "answerable": false,
+        "createdAt": 1791058365878,
+        "readAt": null,
+        "doneAt": null
+      }
+    ],
+    "cursor": null
+  }
+}

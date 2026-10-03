@@ -1,0 +1,143 @@
+Attributes: Application, 0x1129e3700, pid: 46992, label: 'BB Studio'
+Element subtree:
+ →Application, 0x1129e3700, pid: 46992, label: 'BB Studio'
+    Window (Main), 0x1129e3840, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1129e3980, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1129e3ac0, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x1129e3c00, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x1129e3d40, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x1129e3e80, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x1129e2a80, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x1129e2bc0, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x1129e2d00, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x1129e2e40, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x1129e2f80, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x1129e30c0, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x114fa0140, {{0.0, 0.0}, {402.0, 874.0}}, value: 3
+                            NavigationBar, 0x115035e00, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Inbox'
+                              StaticText, 0x1129d2940, {{179.0, 73.7}, {43.7, 20.7}}, label: 'Inbox'
+                            Other, 0x1129e6300, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x113e19cc0, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x113e197c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x113e1b340, {{0.0, 0.0}, {402.0, 874.0}}
+                                    CollectionView, 0x113e192c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x113e1a300, {{-16.0, -1737.3}, {434.0, 2324.0}}
+                                      Other, 0x113e1bc00, {{0.0, -0.0}, {402.0, 874.0}}
+                                        Other, 0x113e1a1c0, {{0.0, -0.0}, {402.0, 156.0}}
+                                        Other, 0x113e19900, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Other, 0x113e1b200, {{0.0, -0.0}, {402.0, 874.0}}
+                                        Other, 0x113910280, {{0.0, -0.0}, {402.0, 156.0}}
+                                        Other, 0x113913480, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Cell, 0x113910c80, {{16.0, 10.7}, {370.0, 40.3}}
+                                        Other, 0x113912080, {{16.0, 10.7}, {370.0, 40.3}}
+                                        Other, 0x107f72f80, {{16.0, 10.7}, {370.0, 40.3}}
+                                          Other, 0x107f730c0, {{16.0, 10.7}, {370.0, 40.3}}
+                                            Other, 0x107f73200, {{16.0, 10.7}, {370.0, 40.3}}
+                                              StaticText, 0x107f73340, {{16.0, 10.7}, {370.0, 40.3}}, label: 'Needs You'
+                                      Cell, 0x107f72e40, {{16.0, 51.0}, {370.0, 166.0}}
+                                        Other, 0x107f72080, {{16.0, 51.0}, {370.0, 166.0}}
+                                          Other, 0x107f73480, {{16.0, 51.0}, {370.0, 166.0}}
+                                        Other, 0x107f735c0, {{16.0, 51.0}, {370.0, 166.0}}
+                                          Other, 0x107f73c00, {{16.0, 51.0}, {370.0, 166.0}}
+                                            Other, 0x107f73840, {{16.0, 51.0}, {370.0, 166.0}}
+                                              Image, 0x107f73980, {{38.0, 76.0}, {20.0, 20.0}}, identifier: 'questionmark.circle', label: 'Question Mark In A Circle'
+                                              Button, 0x107f73ac0, {{76.0, 70.0}, {294.0, 66.0}}, identifier: 'officeRequestOpen', label: 'Atlas wants to edit the release checklist, 26 min. ago, Native UI workspace fixture'
+                                                StaticText, 0x107f70500, {{76.0, 70.8}, {181.0, 42.3}}, label: 'Atlas wants to edit the release checklist'
+                                                StaticText, 0x107f70000, {{298.3, 74.8}, {71.7, 15.7}}, label: '26 min. ago'
+                                                StaticText, 0x107f70140, {{76.0, 118.0}, {187.7, 18.0}}, label: 'Native UI workspace fixture'
+                                              Button, 0x107f70280, {{76.0, 140.0}, {88.0, 58.0}}, label: 'Approve'
+                                              Button, 0x107f703c0, {{172.0, 140.0}, {63.3, 58.0}}, label: 'Deny'
+                                      Cell, 0x107f72440, {{16.0, 217.0}, {370.0, 186.0}}
+                                        Other, 0x107f72580, {{16.0, 217.0}, {370.0, 186.0}}
+                                          Other, 0x107f726c0, {{16.0, 217.0}, {370.0, 186.0}}
+                                        Other, 0x107f72800, {{16.0, 217.0}, {370.0, 186.0}}
+                                          Other, 0x107f72940, {{16.0, 217.0}, {370.0, 186.0}}
+                                            Other, 0x107f72a80, {{16.0, 217.0}, {370.0, 186.0}}
+                                              Image, 0x107f72bc0, {{32.0, 234.0}, {34.0, 34.0}}, identifier: 'officeFace', label: 'Atlas, needs you'
+                                                StaticText, 0x107f72d00, {{36.5, 242.3}, {23.0, 19.3}}, label: '🧭'
+                                              Button, 0x112930000, {{76.0, 236.0}, {294.0, 86.0}}, identifier: 'officeRequestOpen', label: 'Review the ORBIT-42 release checklist, 26 min. ago, Atlas · The checklist is ready for your review.'
+                                                StaticText, 0x112930140, {{76.0, 236.8}, {173.3, 42.3}}, label: 'Review the ORBIT-42 release checklist'
+                                                StaticText, 0x112930280, {{298.3, 240.8}, {71.7, 15.7}}, label: '26 min. ago'
+                                                StaticText, 0x1129303c0, {{76.0, 284.0}, {222.0, 38.0}}, label: 'Atlas · The checklist is ready for your review.'
+                                              Button, 0x112930500, {{76.0, 326.0}, {77.7, 58.0}}, label: 'Accept'
+                                      Other, 0x112930640, {{76.0, 216.0}, {294.0, 1.0}}
+                                      Cell, 0x112930780, {{16.0, 403.0}, {370.0, 166.0}}
+                                        Other, 0x1129308c0, {{16.0, 403.0}, {370.0, 166.0}}
+                                          Other, 0x112930a00, {{16.0, 403.0}, {370.0, 166.0}}
+                                        Other, 0x112930b40, {{16.0, 403.0}, {370.0, 166.0}}
+                                          Other, 0x112930c80, {{16.0, 403.0}, {370.0, 166.0}}
+                                            Other, 0x112930dc0, {{16.0, 403.0}, {370.0, 166.0}}
+                                              Image, 0x112930f00, {{38.0, 428.0}, {20.0, 20.0}}, identifier: 'questionmark.circle', label: 'Question Mark In A Circle'
+                                              Button, 0x112931040, {{76.0, 422.0}, {294.0, 66.0}}, identifier: 'officeRequestOpen', label: 'Approval needed, 26 min. ago, Native approval card QA'
+                                                StaticText, 0x112931180, {{76.0, 433.8}, {134.7, 20.3}}, label: 'Approval needed'
+                                                StaticText, 0x1129312c0, {{298.3, 437.8}, {71.7, 15.7}}, label: '26 min. ago'
+                                                StaticText, 0x112931400, {{76.0, 470.0}, {165.7, 18.0}}, label: 'Native approval card QA'
+                                              Button, 0x112931540, {{76.0, 492.0}, {88.0, 58.0}}, label: 'Approve'
+                                              Button, 0x112931680, {{172.0, 492.0}, {63.3, 58.0}}, label: 'Deny'
+                                      Other, 0x1129317c0, {{76.0, 402.0}, {294.0, 1.0}}
+                                      Other, 0x112931900, {{-16.0, 586.7}, {434.0, 1952.3}}
+                                      Cell, 0x112931a40, {{16.0, 586.7}, {370.0, 40.3}}
+                                        Other, 0x112931b80, {{16.0, 586.7}, {370.0, 40.3}}
+                                        Other, 0x112931cc0, {{16.0, 586.7}, {370.0, 40.3}}
+                                          Other, 0x112931e00, {{16.0, 586.7}, {370.0, 40.3}}
+                                            Other, 0x112931f40, {{16.0, 586.7}, {370.0, 40.3}}
+                                              StaticText, 0x112932080, {{16.0, 586.7}, {370.0, 40.3}}, label: 'Reports and Comments'
+                                      Cell, 0x1129321c0, {{16.0, 627.0}, {370.0, 144.0}}
+                                        Other, 0x112932300, {{16.0, 627.0}, {370.0, 144.0}}
+                                          Other, 0x112932440, {{16.0, 627.0}, {370.0, 144.0}}
+                                        Other, 0x112932580, {{16.0, 627.0}, {370.0, 144.0}}
+                                          Other, 0x1129326c0, {{16.0, 627.0}, {370.0, 144.0}}
+                                            Other, 0x112932800, {{16.0, 627.0}, {370.0, 144.0}}
+                                              Image, 0x112932940, {{37.0, 651.7}, {22.3, 21.0}}, identifier: 'newspaper', label: 'Newspaper'
+                                              Button, 0x112932a80, {{76.0, 646.0}, {294.0, 106.0}}, identifier: 'officeRequestOpen', label: 'ORBIT-42 checks are ready, 26 min. ago, The release checklist and inventory are ready. Please confirm the Friday release window.'
+                                                StaticText, 0x112932bc0, {{76.0, 646.8}, {143.0, 42.3}}, label: 'ORBIT-42 checks are ready'
+                                                StaticText, 0x112932d00, {{298.3, 650.8}, {71.7, 15.7}}, label: '26 min. ago'
+                                                StaticText, 0x112932e40, {{76.0, 694.0}, {277.0, 58.0}}, label: 'The release checklist and inventory are ready. Please confirm the Friday release window.'
+                                      Other, 0x112932f80, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 2 pages', value: 100%
+                                        Other, 0x1129330c0, {{396.0, 191.0}, {3.0, 597.0}}
+                                      Other, 0x112933200, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 2 pages', value: 100%
+                                        Other, 0x112933340, {{396.0, 191.0}, {3.0, 597.0}}
+                            Toolbar, 0x112933480, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x1129335c0, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x112933700, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x112933840, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x112933980, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x112933ac0, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x112933c00, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x112933d40, {{21.0, 791.0}, {77.0, 54.0}}
+                          Other, 0x112933e80, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x115554000, {{25.0, 795.0}, {77.0, 54.0}}, label: 'Inbox', value: 3 items, Selected
+                              Image, 0x115554140, {{47.0, 803.0}, {33.0, 23.7}}, identifier: 'tray.fill', label: 'inbox'
+                            Button, 0x115554280, {{93.8, 795.0}, {77.0, 54.0}}, label: 'Home'
+                              Image, 0x1155543c0, {{115.8, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x115554500, {{162.5, 795.0}, {77.0, 54.0}}, label: 'Work'
+                              Image, 0x115554640, {{185.2, 802.3}, {32.0, 25.0}}, identifier: 'folder.fill', label: 'move'
+                            Button, 0x115554780, {{231.2, 795.0}, {77.0, 54.0}}, label: 'Team'
+                              Image, 0x1155548c0, {{251.2, 802.7}, {37.0, 26.0}}, identifier: 'person.2.fill', label: 'Two people, filled'
+                            Button, 0x115554a00, {{300.0, 795.0}, {77.0, 54.0}}, label: 'Settings'
+                              Image, 0x115554b40, {{323.3, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x115554c80, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x115554dc0, {{25.0, 795.0}, {77.0, 54.0}}
+                            Other, 0x115554f00, {{25.0, 795.0}, {77.0, 54.0}}
+                              Other, 0x115555040, {{25.0, 795.0}, {77.0, 54.0}}
+                              Other, 0x115555180, {{25.0, 795.0}, {77.0, 54.0}}
+                                Other, 0x1155552c0, {{25.0, 795.0}, {77.0, 54.0}}
+                                  Other, 0x115555400, {{25.0, 795.0}, {77.0, 54.0}}
+                                    Other, 0x115555540, {{25.0, 795.0}, {77.0, 54.0}}
+                                  Other, 0x115555680, {{25.0, 795.0}, {77.0, 54.0}}
+                                Other, 0x1155557c0, {{25.0, 795.0}, {77.0, 54.0}}
+                    Other, 0x115555900, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x115555a40, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x115555b80, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x115555cc0, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x115555e00, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x115555f40, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x115556080, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x1155561c0, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x1129e3700, pid: 46992, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x115556300, pid: 46992, label: 'BB Studio'
+  }

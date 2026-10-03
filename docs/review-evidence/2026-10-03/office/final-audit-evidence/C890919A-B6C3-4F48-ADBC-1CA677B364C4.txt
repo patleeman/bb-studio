@@ -1,0 +1,1 @@
+home-default-material-0-reaudit: decorative emoji: glyph=🧭, labeled Face image=Atlas, needs you, image frame=(32.0, 122.33333587646484, 34.0, 34.00000762939453); element frame=(36.5, 130.66666666666666, 23.0, 19.333333333333343)

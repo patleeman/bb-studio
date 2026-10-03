@@ -1,0 +1,2350 @@
+{
+  "ReviewQualityUITests/testCaptureClippingAtAccessibilityText()": [
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-file-results_0_4C9A6646-FB64-43D9-9A0A-F8617C8288E6.txt",
+      "path": "16364EC5-2C2A-4A71-BD5D-5C2B87CD91A6.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-file_0_38975A62-AB4D-46F8-A0B7-BE42004223A4.png",
+      "path": "A54537DF-EB89-490B-AA12-24EDF8D232AA.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-file-control_0_9E7C6296-C3E3-4273-9442-AED6855BD04B.png",
+      "path": "C6E292AC-206D-46CF-A9B5-46148A964E19.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-before-capture-file-accessibility-tree_0_E1BA5182-841F-44EE-8B43-44BD94DEF248.txt",
+      "path": "A29ABEB4-64C4-462F-9955-FA7BCBC5A3D4.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-before-capture-file_0_186CF2E2-50B9-4B48-9B7D-F76965AE772F.png",
+      "path": "D4E90701-A147-4B5C-A2D3-036F8D8D8C9E.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-voice-results_0_5B97361D-64B6-47AF-853E-0FA4AB39F33F.txt",
+      "path": "99FF7F48-3880-4270-95A4-100BA421E480.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-voice_0_C64F14E1-A93D-4122-943B-E009A64A7F01.png",
+      "path": "0806B217-17B9-4374-AB1D-BB917E556B31.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-voice-control_0_99DE3A96-30FB-4AF9-9AF4-D7A1C9C09C73.png",
+      "path": "289CA1E9-D640-4F99-A9DD-19A260FEE732.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-before-capture-voice-accessibility-tree_0_4E39968E-A6B5-48DC-ABAA-F67D4094C852.txt",
+      "path": "A76EB303-F9E5-4BE5-90D9-E36A095F904A.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-before-capture-voice_0_3F7EF613-4207-4B13-8C78-BA88D796D251.png",
+      "path": "D5DF69A3-4BBD-401C-842C-5E4847835DAD.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-dictate-results_0_CC6B3B0B-C7FE-49BA-A2E8-859F378FD457.txt",
+      "path": "FED1A48D-BDE8-4D29-BD13-A8AD2A8FE6EE.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-dictate_0_3941AFC6-E732-4728-80B6-08D91003822C.png",
+      "path": "45E4905A-9508-48B6-BA7E-0111B3DAB667.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-proof-capture-dictate-control_0_4799CB81-5B11-48C0-8BBD-EB3352764255.png",
+      "path": "CF0075C2-D079-4560-9436-49C8C39EDD01.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-before-capture-dictate-accessibility-tree_0_8D6E1914-5A31-4B24-A786-A2852E5AAA27.txt",
+      "path": "A475522E-1CE4-4F25-B559-5511CA563915.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-clipping-before-capture-dictate_0_7073FCB7-26CB-49D0-8800-663813186946.png",
+      "path": "718143F4-4641-4B48-8A38-7235C9F5C1B2.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-accessibility-tree_0_25FFC311-D84E-4404-B418-2E1D2D775F2F.txt",
+      "path": "3D575CE6-0EA4-4E26-A310-47100498FF87.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl_0_D94981D7-6AB5-47C1-83CD-CE7297FDEFE4.png",
+      "path": "90DF5A55-5C1D-4413-A3DE-2BD14549C438.png"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl-accessibility-tree_0_362D3C2C-BCEC-4ECD-ABA0-FCA2E582864F.txt",
+      "path": "EADE9E5C-1BC5-4005-B309-20770A38885C.txt"
+    },
+    {
+      "name": "capture-clipping-accessibility-xxxl_0_92386D37-753A-404E-8A70-F03F4D2645C6.png",
+      "path": "A89888C9-C5AE-44A0-A4BB-080C3E5352E8.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-results_0_098A20F0-F645-417E-8054-09C3B4A089C5.txt",
+      "path": "F14A7069-FFE3-46B6-9978-4DFBC807DE2B.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl_0_C125453E-B922-4436-9D51-E5AA0F6FC895.png",
+      "path": "706A4FD1-B394-4558-8FB4-26D55E64951E.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-control_0_3DC993C9-3E40-457F-9871-F52C229EA7A4.png",
+      "path": "E780D1F5-455A-496D-8C89-DC531CE60B10.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-results_0_9B2EFA0C-C3C4-4D77-A2DD-A0BB02EB1DCC.txt",
+      "path": "682E15E9-5D02-4B8C-A899-3800DFC1E2BF.txt"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl_0_2DF11439-90C6-4CDD-B28E-7639568CEF7D.png",
+      "path": "8F6C3FC5-D497-48BF-8BA6-2EA565872A8B.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-control_0_29F9B013-F142-4AF3-A488-381032CBABFB.png",
+      "path": "3E43BB88-D1E7-4820-8E89-74F669104807.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-results_0_1C4B01C8-C357-4B42-83C2-933DCEE1E5CB.txt",
+      "path": "D5D9CBD3-6B48-4DB6-B299-E1550D08859F.txt"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl_0_79E85E12-3E61-4D27-9DB7-D9F754250939.png",
+      "path": "B152F376-3AE0-4C59-BC3B-5529DF25EB74.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-control_0_9BA2D6B1-2F16-4891-B88C-EE0C94FCF66E.png",
+      "path": "5C020712-9F19-4356-8191-040FDA6DB3DF.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-results_0_78817F20-58EB-4BBB-A66F-9B5357E2B18D.txt",
+      "path": "8A167A4F-87F7-4FC6-89C7-584026CBA16B.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl_0_83B92024-878A-4B13-B004-CEB89A76FDED.png",
+      "path": "FED20997-8CAF-4907-80E6-8B9FE0C00266.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-control_0_8D1CF157-9FC2-4A59-BB2E-5971CFAA7C04.png",
+      "path": "172633C7-9AAA-47BA-8EC6-2AA44ED758BA.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-results_0_00B6433F-B712-405A-B0A0-FEB23CA1A08C.txt",
+      "path": "0B0F5169-F6A1-4B82-8D58-0E9C7F696DE7.txt"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl_0_6299DA37-06C4-47B7-9FEE-3A53C932BF0F.png",
+      "path": "0FAE3ED7-FCA4-4A25-9C50-6C66EC4E4094.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-control_0_6B7BB616-D615-49B6-9BC5-FE70AEEDC251.png",
+      "path": "8BE3BA7E-FACE-4EC0-8335-8D5229CA6268.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-results_0_BCD07C82-EB88-4B37-8311-1A5C549A00BD.txt",
+      "path": "D96D603A-59FB-4230-BEEA-7EDCB7F40DB3.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-default_0_4D2A8820-1D25-4CAC-982E-7BD1FF548954.png",
+      "path": "81566FB8-C631-4733-8A43-F972612D7D1E.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-control_0_68D3BD67-E3CF-485E-9887-AF877B8FBE98.png",
+      "path": "B0AAD029-5B2A-42CB-82C7-CD7DFC009D02.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-results_0_3C093091-9DD1-4DE6-A120-3AA1B5408661.txt",
+      "path": "0A8C92E5-E053-4F01-8BBB-7E847B89A499.txt"
+    },
+    {
+      "name": "ocr-capture-thread-default_0_F1F735F9-7C36-4D16-832E-3E752B9404A9.png",
+      "path": "ABF2425B-A791-4598-9173-4AF0B3E68561.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-control_0_6A54249D-A089-4AA0-A789-C1ABCD2CAADF.png",
+      "path": "3F6B776C-C79A-40ED-81E1-10C8FAF5783B.png"
+    },
+    {
+      "name": "ocr-capture-file-default-results_0_1AEAB339-1A4B-4471-BF83-74C055B833BC.txt",
+      "path": "1114708F-0E8B-4094-8F16-A6F0CDFD8F7E.txt"
+    },
+    {
+      "name": "ocr-capture-file-default_0_A56B5AC0-F7B8-4C9B-A505-9961363C4896.png",
+      "path": "B5E7041D-B017-4763-9AB2-E04DB5E5A88A.png"
+    },
+    {
+      "name": "ocr-capture-file-default-control_0_DBE8270C-11AC-4D22-BF13-81BD82071D61.png",
+      "path": "A8E94583-3E00-459D-9272-FD7A4CD28922.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-results_0_211C0682-F18D-4701-A827-AD3D2AA3BFE4.txt",
+      "path": "3A5AD89A-0336-4F76-B2B9-951FE2FC8004.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-default_0_21F179E3-1F7D-4738-8C5E-513C1A88D612.png",
+      "path": "FBCC9B9A-A5EA-4E9F-8ECE-7757F5EA0017.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-control_0_9B1360E0-DBCF-4696-8D91-366B0DFAE686.png",
+      "path": "7B4C07C1-9ECB-452E-AE4C-938AEFD9A60C.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-results_0_47E00E85-C46E-42C5-B184-93640E9C7787.txt",
+      "path": "90426D2C-0E73-4660-9854-2DF16959B407.txt"
+    },
+    {
+      "name": "ocr-capture-voice-default_0_9332B382-9EA0-44BE-BB74-4996CC63C37C.png",
+      "path": "55F911F8-08F1-406D-B706-81E82B565829.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-control_0_7376AB23-E547-46D9-A6CD-9952224D9848.png",
+      "path": "684409AC-718A-45C5-B273-8D2F2E480C06.png"
+    }
+  ],
+  "ReviewQualityUITests/testCaptureLargeContentViewer()": [
+    {
+      "name": "lcv-officeSpaceSwitcher-results_0_D6194083-096E-4FE1-AD46-7F5DA4AA1AED.txt",
+      "path": "29E4D32D-3A99-40BA-98F2-1B7707627D2E.txt"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-held_0_0EE06E56-A8E9-4853-973C-AB885B840125.png",
+      "path": "9E0E55E3-11A6-4CAD-8E6F-4299F16359C0.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-before_0_132A4A79-386D-4F0F-AF68-972C38607635.png",
+      "path": "0BAFB042-3BDA-4D66-9482-B1FD7647A07A.png"
+    },
+    {
+      "name": "lcv-studioSelect-results_0_6376A482-5641-416B-B650-B83B1D1D6BA2.txt",
+      "path": "88345BDD-7A9E-49D8-A98D-971B0B9441A1.txt"
+    },
+    {
+      "name": "lcv-studioSelect-held_0_D4477579-F3A7-4527-941A-C1BBE4C2B156.png",
+      "path": "B12D634D-68D0-4BEA-9F92-374C78DA27E0.png"
+    },
+    {
+      "name": "lcv-studioSelect-before_0_2D026E90-59CF-45B4-8775-452462AA8F94.png",
+      "path": "1D715C6C-AE69-4EC6-9D25-5736B0E620DE.png"
+    },
+    {
+      "name": "lcv-captureClose-results_0_6C8AF1E6-39E3-4572-8686-674EFE266CB5.txt",
+      "path": "0DD2E2DC-A0E9-48DE-A7BD-1C953F03D54B.txt"
+    },
+    {
+      "name": "lcv-captureClose-held_0_8C4871A2-714F-4913-ADA5-396ECF1B9F1A.png",
+      "path": "B76109FD-4709-43C8-BA2B-2E0D8770BDCF.png"
+    },
+    {
+      "name": "lcv-captureClose-before_0_F1E0F952-C8A6-4941-A213-3E7DC8D4DC3F.png",
+      "path": "853D7E93-6871-48B6-96BC-A3EFDEAA0E7A.png"
+    },
+    {
+      "name": "lcv-captureBack-results_0_23748E96-B859-43CB-AA43-CFFB93B67368.txt",
+      "path": "2C3A4AD6-738E-4FFA-BD55-5FDB6CEF6F86.txt"
+    },
+    {
+      "name": "lcv-captureBack-held_0_D85CF1F9-3106-4A95-9017-DCA355AB322C.png",
+      "path": "2D0EEE56-CC70-424B-BB1B-E98D904B83F8.png"
+    },
+    {
+      "name": "lcv-captureBack-before_0_37039FD4-610B-41EB-85E2-414F5EE3B7BD.png",
+      "path": "832554CF-0C8F-4C58-9C2E-4805B935B26E.png"
+    }
+  ],
+  "ReviewQualityUITests/testCaptureTextPixelEvidenceAtBothSizes()": [
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-results_0_4F2B9E7A-5096-46F4-BA3E-54D42EEAE2E9.txt",
+      "path": "B76D6A67-EE6D-413A-95D2-A37A620C8ACC.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl_0_5CAE3A46-DDAA-487A-B567-4C8050246567.png",
+      "path": "6C73E6AB-53C7-4BFB-93C6-012193D0CFA9.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-control_0_0C37D9EB-4EA2-476D-B97D-B222A1837E2F.png",
+      "path": "76B1BFCA-0E83-4470-94B9-F98B5A452C33.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-results_0_C77CB1DB-5E80-4A42-BD4F-243769E7E4C5.txt",
+      "path": "C0B86B3F-B49C-449A-9A23-5CEC54FA0602.txt"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl_0_8CFE39D2-28CB-415C-BEF8-B0731CF88632.png",
+      "path": "52F28E69-90FC-4CB3-A82F-96375469FE81.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-control_0_F5667A34-DB74-4B13-8194-6A1FD3E0CCDF.png",
+      "path": "95A70A4B-63F7-4F79-997F-16B0F2A39A4A.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-results_0_B9A7EF3D-62F1-4228-B611-F5165B15C2CA.txt",
+      "path": "889FB5AB-5A2C-44E3-BF13-A274083655D5.txt"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl_0_F7EF562A-493C-4C65-AF93-3927739B10C4.png",
+      "path": "B185076B-4B8D-4F02-ADCE-26BE5865CC71.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-control_0_C20FCDE8-1B6A-4BF0-8101-6A404D728076.png",
+      "path": "C75EFA43-BB6A-44A3-8A99-DA387DA4C68F.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-results_0_D5AF0DED-FB60-4D00-BDA9-82F195AD1E1C.txt",
+      "path": "6776C7BD-D99E-4B0C-AD51-777C3A45FCFF.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl_0_227D54E5-DA49-440B-8694-C833E5815B4F.png",
+      "path": "D3F10846-28CC-40CB-B76A-9E7DC61F9D29.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-control_0_CD650D66-3053-48A5-A6FC-D9FA66761490.png",
+      "path": "CF4B9654-5D5C-4986-9302-1D4C6D32BBA1.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-results_0_66A0192F-B000-4C68-AB7B-C39165FAD252.txt",
+      "path": "42A474E4-495A-46E1-8C8D-B184DEB12482.txt"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl_0_03250F77-0923-46A2-B16D-EFBBB1A75391.png",
+      "path": "4FFA3CDE-FAC1-4467-8285-C901862F243E.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-control_0_EB61DDAE-A7BD-4FB0-BD12-6B06300E965C.png",
+      "path": "9B78824C-CDF6-4BA6-BFCD-36C69691ED09.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-results_0_5A48B93E-DF8E-4C33-961A-34200707F207.txt",
+      "path": "4D24AA0B-D924-4C0A-BC1F-0BB5BC5693E2.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-default_0_907B0086-0403-4110-94B9-D59D1C3462BE.png",
+      "path": "8DE76AE7-4DA5-4410-BF54-18633EC2E163.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-control_0_EFFC984D-7C62-431C-9E8E-6C604B30ACDD.png",
+      "path": "8102E13C-4D2C-4C8E-BC3A-C581253D0FDD.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-results_0_AC4A4605-AFBF-45B5-AB97-4CE2D0115A9E.txt",
+      "path": "F12A889E-010E-4DEC-AEF6-84CF905B508F.txt"
+    },
+    {
+      "name": "ocr-capture-thread-default_0_85EE469A-9B85-41B1-AE19-8DE540F3D6AA.png",
+      "path": "F1239290-25DA-43AF-B171-455C79962F41.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-control_0_CF0E4A9A-DEE1-46A7-8BB6-213B6CD0E268.png",
+      "path": "2F9C9154-A8F1-4BA2-A5BE-154657609CD9.png"
+    },
+    {
+      "name": "ocr-capture-file-default-results_0_26A237C2-2581-4C02-98D0-FB46A03147E6.txt",
+      "path": "31E76E3B-CB20-4567-81D2-6C7BF9FD4A43.txt"
+    },
+    {
+      "name": "ocr-capture-file-default_0_0F434175-80E8-427E-BD88-7319AE7B9025.png",
+      "path": "3177B979-A081-4C94-9E9B-FFCBF9E78C9C.png"
+    },
+    {
+      "name": "ocr-capture-file-default-control_0_D7F9B706-C7F8-46D3-A1BA-4BCD15549937.png",
+      "path": "A8CA58A5-C0A3-4A3E-8CB1-6D28B3EEC613.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-results_0_CB0F956E-5239-455A-9735-B2B61BDCD58F.txt",
+      "path": "E43A29D0-204C-4999-A34C-6C550C381592.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-default_0_153B7F1B-5A9A-490E-AAB6-48188CF01A65.png",
+      "path": "2FD4B457-86CD-4AD9-97E1-C6C1C587C0CF.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-control_0_CE44512C-3031-4BA1-8CA6-A3A467A20DDF.png",
+      "path": "DC380AA8-8347-4F6B-B4AF-5D0408BEB2BB.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-results_0_4A5BA1BC-6BC5-440A-AB89-ECCB0AA8FA9E.txt",
+      "path": "C6D56CE5-A7BD-4C31-9609-34744326A118.txt"
+    },
+    {
+      "name": "ocr-capture-voice-default_0_E85FA1BF-71A1-4284-883A-86D272272F85.png",
+      "path": "E5C3D1F9-952A-438D-AEF8-FA577D6CBA94.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-control_0_679BC30F-D7D6-40A7-9560-2E223F35E844.png",
+      "path": "992BEB40-B4DC-41CD-B8BD-071616963BE3.png"
+    }
+  ],
+  "ReviewQualityUITests/testHomeClippingAtDefaultText()": [
+    {
+      "name": "home-clipping-native-default-accessibility-tree_0_EAD15CF1-1E7F-4B48-9272-01F2966F7B74.txt",
+      "path": "EE40DF22-5AD3-42D2-AF83-4E2A42B2C9A8.txt"
+    },
+    {
+      "name": "home-clipping-native-default_0_AF77466D-F502-47F0-BAB2-5A992C0D6F90.png",
+      "path": "4C354FAA-8CD2-40E8-8CC5-7269119D278F.png"
+    }
+  ],
+  "ReviewQualityUITests/testHomeClippingNativeDiagnosticAtAccessibilityText()": [
+    {
+      "name": "home-clipping-native-accessibility-xxxl-accessibility-tree_0_D85D3D79-62A6-461F-9890-C182F5F74470.txt",
+      "path": "EECFB0DA-3D6C-4525-A5B0-BAF2B01D817A.txt"
+    },
+    {
+      "name": "home-clipping-native-accessibility-xxxl_0_CAD7DEF3-564D-4138-B55C-2155E2E07FB1.png",
+      "path": "510C9AA7-B33D-49A8-B6BC-3E70116F4DA2.png"
+    }
+  ],
+  "ReviewQualityUITests/testHomeContrastNativeDiagnosticAtAccessibilityText()": [
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-results_0_215AA41B-C9DB-40BC-9E2F-642D441FE92A.txt",
+      "path": "0D9353B1-7F64-453C-80B2-C27943ADC45F.txt"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_FEF087C9-4868-4939-BDDE-BC339DCEFB38.txt",
+      "path": "FCBE4FE9-5A66-4F04-BCA9-4CC275976DBB.txt"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen_0_71AA7EB9-7351-4C6A-A7C4-0B0C9AD90542.png",
+      "path": "9FB72EA3-5C0E-4BDC-B536-E7F15805A62D.png"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion_0_A30052CD-3F04-4AAA-995E-91C8E44D9491.txt",
+      "path": "92FE9280-5D6F-482E-AA7E-DEC88C4A50A2.txt"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-reaudit-verified-element-contrast_0_46646959-D88C-427E-BEAA-FD3DC2FEEA42.png",
+      "path": "02E979AF-3B15-433E-961E-9197B2FD0BC3.png"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-after-accessibility-tree_0_E73CD2AA-957A-4E97-A10F-5E2289AB6E5C.txt",
+      "path": "4B1675C6-9A11-494F-87B7-D138E2D07E9F.txt"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-after_0_EFDA9908-ABB6-4C1A-B5C2-C3BD9A3C3229.png",
+      "path": "A2856E0E-2E4F-4065-84E7-00FC92290794.png"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-before-accessibility-tree_0_DDA03573-5DF2-4D22-A095-260C8C978B84.txt",
+      "path": "A48126E1-BD52-46DD-BEAD-B879B3FD0660.txt"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-material-0-before_0_F251B238-618F-49BE-9F98-BB79D27933F7.png",
+      "path": "4B5F06BF-4DBE-401E-BB14-03B56B234BA2.png"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl-accessibility-tree_0_1090C645-6AFD-42E1-9A4E-B1032FE97CED.txt",
+      "path": "57A27EA8-D3DD-4798-9ACF-20FDED3EB834.txt"
+    },
+    {
+      "name": "home-contrast-native-accessibility-xxxl_0_5186EBE2-1505-4939-8966-1982D61FED12.png",
+      "path": "00436E0F-6B6E-4930-BA2A-6033569D5EA3.png"
+    }
+  ],
+  "ReviewQualityUITests/testInboxApprovalActionsAtAccessibilityText()": [
+    {
+      "name": "App UI hierarchy for nyc.plee_0_F5448108-9F3F-4E11-89A9-D0DD70B65812.bbgo",
+      "path": "263E0454-A462-4A8A-9273-7542BE30C365.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_9FF0C6F7-3D08-4D63-B0FB-BF32D41E1092.txt",
+      "path": "52407E64-A07A-4DF8-A53C-D69A1CC4B4E2.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_2135F6F2-D5B2-4F5F-B4D2-DA332C544B2A.txt",
+      "path": "41366E31-48CA-4FFE-973B-8FCB5E082B85.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_6E530157-7F6B-482B-A4A2-8AEB6C5C14EB.txt",
+      "path": "EEA699C5-FA81-4E07-8796-26A90BEA8FA9.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_4E4105B6-233A-4F20-8DE5-EBE609DE8108.txt",
+      "path": "B2BF0FE4-1F23-4F0D-82C9-7260896F6E40.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_F5CA943E-358D-46BD-ACB9-CB05DAEE31F4.txt",
+      "path": "B77E04FC-62E2-456C-8F36-ABF33327B622.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_E168E1EE-76BB-4576-BB65-FF017C7CCFFF.txt",
+      "path": "9366A063-455C-4D5E-84AB-73783C745AEA.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_EDB9CF48-4185-413D-9C8F-4F4D9C24B76E.txt",
+      "path": "B6395F45-C2D0-4F20-8917-6B759CF71ADB.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_79FCA9CE-6FA8-4225-9297-6E7C77A9DF4A.txt",
+      "path": "7D8E30F8-BAB0-48E7-92D3-BA9BBFB133C6.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_F394CC11-C12F-423B-82C5-61028FF60EB6.txt",
+      "path": "54BAB182-72B4-47E2-B513-1C4C0A786A33.txt"
+    },
+    {
+      "name": "Debug description for `\"Approve\" Button`_0_11753977-66F8-4126-8667-8650146259BE.txt",
+      "path": "A1386160-483F-4F5C-AB12-9F794A5F6B34.txt"
+    }
+  ],
+  "ReviewQualityUITests/testInboxApprovalActionsAtDefaultText()": [
+    {
+      "name": "inbox-approval-default-open-thread-accessibility-tree_0_27DB1096-19A9-4210-8A6E-09B27294AF1B.txt",
+      "path": "3948FC70-FCEB-4F86-8C2D-F2EB0D0AA0B3.txt"
+    },
+    {
+      "name": "inbox-approval-default-open-thread_0_CB4DD017-D05B-47EA-A83D-996508526F71.png",
+      "path": "7496DC0A-A7C8-4A40-B020-2477EB7233FF.png"
+    },
+    {
+      "name": "inbox-approval-default-action-deny-accessibility-tree_0_39354617-3095-49B6-8C2A-E8C6C19D961E.txt",
+      "path": "7B1C20C5-AE07-4E02-BD10-B0B327E79F09.txt"
+    },
+    {
+      "name": "inbox-approval-default-action-deny_0_EA4015AB-1311-483E-B2C4-7BFF3E98A8BC.png",
+      "path": "34D6FAFE-339A-4DBC-96BB-23EC58E61681.png"
+    },
+    {
+      "name": "inbox-approval-default-action-approve-accessibility-tree_0_CF15F476-0AB0-46C7-AD71-BFA9B3660F79.txt",
+      "path": "9FE44387-2759-42AE-88A7-1D7863910F94.txt"
+    },
+    {
+      "name": "inbox-approval-default-action-approve_0_16CCB1EF-01C0-471C-9F3E-CF2B02066CE5.png",
+      "path": "FCFE33F4-6542-451A-A32A-F1AE285AC41A.png"
+    }
+  ],
+  "ReviewQualityUITests/testNavigationAtAccessibilityText()": [
+    {
+      "name": "note-accessibility-xxxl-clipping-proof-captureNoteSave-results_0_FB964050-0528-4FDA-875F-38CBC20F21B0.txt",
+      "path": "49DF28AD-34F0-45EC-B25A-9FBFF6D2CE55.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl-clipping-proof-captureNoteSave_0_1A82E2CE-47DF-403E-88FA-01E6A03BE9A8.png",
+      "path": "5B4C0D77-452D-4282-875E-B634EF23BD1F.png"
+    },
+    {
+      "name": "note-accessibility-xxxl-clipping-proof-captureNoteSave-control_0_B5B735DE-4C0D-4CFA-BBE8-100C552376B2.png",
+      "path": "36F51B65-5B57-466C-9D30-1401F57F15EA.png"
+    },
+    {
+      "name": "note-accessibility-xxxl-clipping-before-captureNoteSave-accessibility-tree_0_A2E90D41-00F1-47B7-B542-0F8369831D03.txt",
+      "path": "A9A24F7B-9F0F-4554-8F72-1D7DEB5B9025.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl-clipping-before-captureNoteSave_0_408B842B-12CD-4A39-AFBA-B73FD36D8FDF.png",
+      "path": "1FB906AC-63AE-4772-A03C-6B51BC3BBEE6.png"
+    },
+    {
+      "name": "note-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_64F22327-4B3C-43D3-8CD3-0B2FCF650FC6.txt",
+      "path": "F3609C1A-4E8D-4711-AE4F-E82096B0AFFA.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl-contrast-exclusion-screen_0_F6564C8E-E789-41B4-9B7E-4673C5EB110B.png",
+      "path": "5F91A44A-3A06-4902-B8A7-5E7EC20E1A89.png"
+    },
+    {
+      "name": "note-accessibility-xxxl-contrast-exclusion_0_8CDC52A8-E58A-4491-97BF-47693F160FE0.txt",
+      "path": "E36292D5-2487-40CB-A438-E7FE35761EBC.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_DE252F46-40AD-4DBF-A1FD-F6281A4139B5.txt",
+      "path": "1264A062-6F4C-411F-9C61-516C8C573CB4.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl-contrast-exclusion-screen_0_983CA061-9EDB-4D1E-885E-15D0969B1D52.png",
+      "path": "266E61EE-A1AB-438B-81ED-DF9910A3F4F9.png"
+    },
+    {
+      "name": "note-accessibility-xxxl-contrast-exclusion_0_21214F7A-D4ED-4FB7-B1E3-997A4E5196DB.txt",
+      "path": "D0FDBD13-1748-4EE2-9FDD-615095513B2A.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl-verified-element-contrast_0_05A37A83-243D-4079-9382-08826D9EE88D.png",
+      "path": "4E23BAD1-9D78-4895-8B34-A0E42BB4E22E.png"
+    },
+    {
+      "name": "note-accessibility-xxxl-accessibility-tree_0_C91736B0-9B49-4682-9566-A7C0100A44B8.txt",
+      "path": "1C8CD74D-FF4A-4B2B-8148-005DBFF31EEE.txt"
+    },
+    {
+      "name": "note-accessibility-xxxl_0_AAAA323C-B67C-420C-8E3E-AC1E6D7BF546.png",
+      "path": "27F18AE7-6A79-4821-8A4C-CDD662923851.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-voice-results_0_43693777-4774-41B6-A4D0-FD2EDF308286.txt",
+      "path": "C4904303-6EAE-4FF5-8450-C18328DB58D4.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-voice_0_E91DDEDE-B31A-4925-812C-08420576FC06.png",
+      "path": "574E0A70-C075-42B0-9ACB-ABFDAB9323A3.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-voice-control_0_34DA5070-A79B-498D-BCE6-E645D6279CFD.png",
+      "path": "2E8571F1-8F24-4B13-A35E-E5B03DEA200E.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-before-capture-voice-accessibility-tree_0_30EB7733-8502-4AEC-AA51-82C8CF55BDEC.txt",
+      "path": "390DC538-8434-4E50-B540-EB46CBFB8A41.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-before-capture-voice_0_05C639DC-BA18-414D-B551-352546F47F42.png",
+      "path": "AFEAB3BC-52EB-48CF-A57B-DC91A3A6C107.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-file-results_0_6DF74773-18E4-41ED-A71F-FEB9A2B25AF2.txt",
+      "path": "218B1D4D-0C6F-4A7D-9004-EC3F1220D7AE.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-file_0_FD4DAAD2-0B2D-4C2F-9B77-D7691D7F9A74.png",
+      "path": "4DDACEAC-3776-4F14-A728-260818A63F8E.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-file-control_0_BBEE0D82-B0B6-4A38-871A-314328FCB128.png",
+      "path": "A6762A8D-B222-4E7E-8186-C49C69224C88.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-before-capture-file-accessibility-tree_0_75629BFB-DA2A-4D37-A5A5-217DD97FD86E.txt",
+      "path": "B43C5B92-D14E-4C66-BF47-AD3359EB88D5.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-before-capture-file_0_79254425-E619-40E7-BDFD-7A2171F51F33.png",
+      "path": "6B5D453B-A5CD-47AD-AAA2-00D6D794053B.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-dictate-results_0_F9955349-2260-46F5-94B2-F219AAEE6913.txt",
+      "path": "51880B92-593D-4D2C-A0DE-2D2693F6EE16.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-dictate_0_8E695F06-1AAE-46C1-B14B-31711E23229C.png",
+      "path": "AC0E33DC-7D69-4E34-9519-834C7DE36783.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-proof-capture-dictate-control_0_0BA3E749-794A-4651-B96A-88BA0C19E18F.png",
+      "path": "720C4265-1B47-495A-B73C-AF77742C5492.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-before-capture-dictate-accessibility-tree_0_1A2C2BED-B12F-493D-B6BC-A4E50597B5F6.txt",
+      "path": "BFF7CB9C-3DAB-4A7E-8824-6761C499B143.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-clipping-before-capture-dictate_0_C1B41B97-75BA-4D2D-93A0-0381D159073D.png",
+      "path": "FB688154-654B-4D35-8E35-FE5EC90E3803.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_99676798-7F62-4A8D-8C41-2C0CC5240FE7.txt",
+      "path": "AA52312D-D088-4E82-BB00-B1FA352D259C.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-contrast-exclusion-screen_0_A5A78562-09E5-454F-85B5-FC0614268CD6.png",
+      "path": "0C8FD853-6C57-488F-B17D-683262DAEC5D.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-contrast-exclusion_0_406D4B93-279A-4473-ABF7-E598C4442A19.txt",
+      "path": "A022A3AC-D4B0-4B2C-AE0F-6123375D5C93.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl-verified-element-contrast_0_E8E4A39A-D8E5-4AE2-95D7-12D812982E45.png",
+      "path": "17916BCD-FAD4-431B-92B1-EC51E6E2FCF3.png"
+    },
+    {
+      "name": "capture-accessibility-xxxl-accessibility-tree_0_CF3EDA2F-8EFC-4264-BC80-C1090962AC00.txt",
+      "path": "03A2FBA5-F592-4276-8E7A-068BBA18C99F.txt"
+    },
+    {
+      "name": "capture-accessibility-xxxl_0_A04D0E8D-23DF-497A-936C-9D0F823E7883.png",
+      "path": "0C118AD4-FA07-4E6C-91C6-A18FCFAAFDED.png"
+    },
+    {
+      "name": "inbox-accessibility-xxxl-accessibility-tree_0_856137F3-D943-477D-8440-E4CC4373AE93.txt",
+      "path": "A1AA86DA-5820-4510-907E-A7F0149CF3FC.txt"
+    },
+    {
+      "name": "inbox-accessibility-xxxl_0_5C5F19BB-B7D5-4C56-B595-B7A341183ECA.png",
+      "path": "30BD2109-DC37-41FE-BEC3-BDCB9850DD86.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-results_0_A588DCCA-CD9D-4C47-98BD-8E4715D23954.txt",
+      "path": "E8F5D65A-E604-4480-919F-C12C3FD8491C.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_9D7C2755-197C-474C-811A-BCEF7A70AEEB.txt",
+      "path": "E656233D-55C5-4A98-9557-D3365C7BA7BF.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen_0_1E20B10E-DEE4-478B-8519-8E64A5C04721.png",
+      "path": "E9D60487-3FC1-4633-B48B-C4FA15BB8107.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-contrast-exclusion_0_006C9FAE-F79D-410B-B9C8-1DF0792ED33A.txt",
+      "path": "C597E8B8-4DD4-4109-ACF6-2114EE7B7EA3.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-verified-element-contrast_0_7C582AE9-859D-4FC9-8801-0041BB2F8D27.png",
+      "path": "61A25024-9568-4009-809E-7E091EC7270A.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_0544BF73-0D6D-4F47-9DFE-B521D69A3AA6.txt",
+      "path": "303E9993-0D67-4055-AA5D-4EB19FD542FF.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen_0_65AD5069-D7BA-4201-9584-0264D7D58B9B.png",
+      "path": "71138985-0E70-4B5F-A0A2-BDE167DF9562.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-contrast-exclusion_0_6114473B-BB0A-4A0C-8180-3CAE2CB8F5F4.txt",
+      "path": "01C343DD-24B5-4118-9BE9-3A0503F6B870.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-reaudit-verified-element-contrast_0_AEC508AF-9C73-4EC7-ABA1-26D42CE9036E.png",
+      "path": "DB13ECA4-048D-4F2E-84BC-2E50E896A182.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-after-accessibility-tree_0_3EEA59E3-4414-4E08-8FFC-7036FB32F610.txt",
+      "path": "203D3B98-10A0-498F-9725-61FA3EEFA6CE.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-after_0_94F30ACB-FF55-428F-82FD-E1B3E61352F9.png",
+      "path": "DE1AF023-4594-4394-A9D4-6F01F45446B5.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-before-accessibility-tree_0_A87BF8BF-24AC-4159-935F-D15392E17052.txt",
+      "path": "98978806-EB27-4A8E-AB4D-BBD7402741C7.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl-material-0-before_0_0A59BFC3-C2CA-4E48-9E79-81A179F7B7F1.png",
+      "path": "53026FCD-5F00-4AE3-8A58-CDA861FFD61B.png"
+    },
+    {
+      "name": "home-accessibility-xxxl-accessibility-tree_0_59AE1C7B-0A9F-44A9-A27F-BC4B19C7134D.txt",
+      "path": "5FFFDC59-F2B1-4C26-B274-01986E2D6798.txt"
+    },
+    {
+      "name": "home-accessibility-xxxl_0_E2AE6A7E-1353-41A0-9190-908BA14A3E52.png",
+      "path": "3E2C20FC-45E7-443F-8232-817112182D4D.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-results_0_7267F3F7-DC7B-42AB-91D1-DF6D514EA363.txt",
+      "path": "DF0D3B87-83D0-4D1D-AA1A-F7AB59C867DE.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_A985F156-D383-49D2-9B26-6A44C5114564.txt",
+      "path": "47FDB3A5-B77A-480A-B725-291AB6984764.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen_0_806DBFC4-F3FF-492E-9B6A-28392B814116.png",
+      "path": "0588F0A5-B8B2-4293-8E79-4311CD31DA0C.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-reaudit-contrast-exclusion_0_A8B4D344-2898-4C6D-862B-00A1E85F7951.txt",
+      "path": "6245C9A8-D490-4E7B-AFE5-AC123A807F11.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-reaudit-verified-element-contrast_0_44DD57D5-A65F-40D7-B5AB-FB8315E90EBB.png",
+      "path": "3B63D774-AB0A-4293-B11E-783FEB9ED184.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-after-accessibility-tree_0_8A1168C1-995B-4200-AE3F-9846B9FD795E.txt",
+      "path": "576834DE-0795-4AFA-BBE1-BEAB1A9FA3F7.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-after_0_B48C89DB-C166-4C07-AF12-4F3F9D3E26FE.png",
+      "path": "480262E3-E893-4D07-882D-5CA67F17FB2E.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-before-accessibility-tree_0_8B06804B-58C7-4BD4-8E60-9089C7BDB096.txt",
+      "path": "CA67E465-9621-486A-8A15-FAA63AD74245.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-material-0-before_0_BC185D83-FAB5-4039-B045-7E20C8FF4957.png",
+      "path": "58BF9A22-16BC-4B87-BD28-C601519F283A.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_079BE45D-FAD1-468D-9A25-B6B099246D76.txt",
+      "path": "D69BDC0F-6529-468D-B57C-BC73B08B3612.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-contrast-exclusion-screen_0_5A8D24AC-EF08-467F-A4FD-4CE49E8E519B.png",
+      "path": "BF29082F-4EF6-4E2C-8C37-899E98E93EFB.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-contrast-exclusion_0_955B9647-5629-4E73-A2DA-3C7209637A08.txt",
+      "path": "E19CE112-3F02-4F91-94F8-82B1ACCC5618.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-verified-element-contrast_0_463B52D6-574C-4B2D-9454-EB9C13191568.png",
+      "path": "DB9447B5-E2A0-4B3E-BFC5-EF0AF36D967D.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_571F0AE5-0FAF-4C14-A6AA-7ED2745EC150.txt",
+      "path": "186E61F3-D95E-4433-B047-E8DB8789F821.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-contrast-exclusion-screen_0_03E65D3B-8DF2-4E2D-81AF-95688372E055.png",
+      "path": "23F756D2-B301-4D3D-A612-453074B0BD18.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-contrast-exclusion_0_80D5BF22-B3E5-4805-9D1D-5A3C40674E49.txt",
+      "path": "6150BD61-549B-4D70-B952-A970D23AADAC.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl-verified-element-contrast_0_D314D870-831B-46F9-9267-2F95D4E9974C.png",
+      "path": "EE2C9F54-1A02-4700-8452-485EA4012949.png"
+    },
+    {
+      "name": "studio-accessibility-xxxl-accessibility-tree_0_5EDE591B-4000-4E6A-B417-69DA56B55E6F.txt",
+      "path": "8CB2D93C-F742-4BE3-8298-FC6873B3D373.txt"
+    },
+    {
+      "name": "studio-accessibility-xxxl_0_2107A4A0-17CE-475F-B64E-1B751407E7D5.png",
+      "path": "CEC19501-E8FF-4EF1-AF1B-B2024DA5E4B8.png"
+    },
+    {
+      "name": "settings-accessibility-xxxl-accessibility-tree_0_8EE0EF7A-31E5-428C-AF10-7D55A4568235.txt",
+      "path": "6A6D1B95-0B2A-463A-A264-843F7E5A114D.txt"
+    },
+    {
+      "name": "settings-accessibility-xxxl_0_94E46D3D-4D21-4204-B39E-039B2B63DC97.png",
+      "path": "81AD1370-4F8B-4763-8E4C-19D45D0AC953.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-results_0_4ED5EFBA-8C67-4A62-A984-D559D1B8FA07.txt",
+      "path": "E30DFB8C-9524-4369-B8EB-BA4DB9847F60.txt"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-held_0_726FAF9E-A2F1-4887-9453-0B51388C6DD4.png",
+      "path": "B3A78C65-1099-4C32-9B02-F12834FA8C1E.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-before_0_7C5E91BA-9342-419A-AA7B-DFB0F17CB721.png",
+      "path": "BF23FAA1-CF5C-4EB9-AF87-243FCEEA510B.png"
+    },
+    {
+      "name": "lcv-studioSelect-results_0_E0772071-39AC-469A-AD29-DE624F9F7F84.txt",
+      "path": "5C1947F3-4608-436C-93B4-F0114224571F.txt"
+    },
+    {
+      "name": "lcv-studioSelect-held_0_067CC3C9-D9BC-43F2-B548-91B9EC85F41C.png",
+      "path": "B2173C37-3987-4977-A3F2-FC91076CBFF6.png"
+    },
+    {
+      "name": "lcv-studioSelect-before_0_6C2AAE05-499B-42EE-985A-A590256CAF3B.png",
+      "path": "709885C4-52E9-4F04-B826-5E65B58AFC0E.png"
+    },
+    {
+      "name": "lcv-captureClose-results_0_F82AB6EB-52FA-4021-8D49-60B6DAF2A555.txt",
+      "path": "081171DE-7904-448C-9637-E8BEEA7A71CB.txt"
+    },
+    {
+      "name": "lcv-captureClose-held_0_E5333DEB-E68A-42A8-AA04-FDF7F11733A9.png",
+      "path": "4AE1F700-B8A7-40BB-8AD9-7BC4D751CC28.png"
+    },
+    {
+      "name": "lcv-captureClose-before_0_54D86A9B-4673-47F3-8A4F-86652C396886.png",
+      "path": "57EAEC08-DA44-427F-A341-E7CECE7FAE3B.png"
+    },
+    {
+      "name": "lcv-captureBack-results_0_C931A4AA-76A0-48BC-A657-CB7D27734FBA.txt",
+      "path": "9776445F-E4F7-4544-8CA0-19CC407372C6.txt"
+    },
+    {
+      "name": "lcv-captureBack-held_0_A2A6E365-3332-4438-BCB0-2C4E98953766.png",
+      "path": "8EBB570D-CFE4-4F8A-B5F6-AEB8AB9EC73D.png"
+    },
+    {
+      "name": "lcv-captureBack-before_0_D03AD1A9-4CC6-4A59-96C1-60211652AB17.png",
+      "path": "F0794011-0471-43B4-9633-23C9275B5E4D.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-results_0_85BBFE8A-EB67-4605-83EA-1A6A81CC89B9.txt",
+      "path": "2289330C-34CF-45EC-A947-042EF4FC7F90.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl_0_438BC950-8637-467E-BF23-E4367E879A36.png",
+      "path": "B8B32CB9-7947-465D-BA33-A6C647DDC42F.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-control_0_36A07C5D-B296-4304-B542-6FD4C4AB452A.png",
+      "path": "935CBD8B-71AD-437B-9533-6A954DB95B00.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-results_0_2DE2538E-888A-40B9-93D1-0B8138F4105C.txt",
+      "path": "0ADB76B0-6CC9-44D9-9568-2DAE5EC18737.txt"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl_0_37CE0E7D-AE8B-4FC0-97DB-8190EB2D0CEB.png",
+      "path": "143136A5-C752-46D0-850A-3F31D0CC3B16.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-control_0_38769A64-7952-412B-9092-98D8F107F43A.png",
+      "path": "D7694DC4-ABCE-403A-BEB5-0C0AAD9AF04F.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-results_0_EBCC643A-78DE-4603-9DA0-FA4E6713FE00.txt",
+      "path": "92514281-B86A-430E-AE5B-FBBA86338E89.txt"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl_0_E9B916D3-1829-46C1-85D0-50F5EC4E3E9C.png",
+      "path": "4BA7305C-3A30-41AC-A403-0DDD1BED2D38.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-control_0_8921D09D-3FB9-4A2F-AE60-54A0556FE782.png",
+      "path": "43ACB437-2A97-4EC7-8F7F-24EB50564F83.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-results_0_81F558A7-88DD-4C31-A992-94034080CCD4.txt",
+      "path": "A8CE9ECE-6D0C-477A-9443-9032EA034ABB.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl_0_E21BABEE-2F17-43C5-927D-7ED74C962876.png",
+      "path": "21F61911-16E1-43F5-94D2-550C7ABA10C4.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-control_0_8F5795CF-9888-4EE4-BEF2-6A2A49547E00.png",
+      "path": "6872C1FA-9FD7-4309-B66D-62FFB93E91D7.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-results_0_42ABFD45-22CA-4E12-90EA-07BBD15068DF.txt",
+      "path": "0941BC5E-55BE-4458-A739-9FB2364FC0C5.txt"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl_0_FC0AABF8-BE1D-4B17-8861-01787F140F2D.png",
+      "path": "27BD4905-90F8-4F9C-8ACC-18E13E49F156.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-control_0_0F331022-8E59-4FB0-801E-6D44D87CDFF4.png",
+      "path": "391E1E3D-EB07-47A6-B9B3-CD1481A0A0C9.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-results_0_C7B43BED-8A08-46F4-BCB3-3DF9B9065963.txt",
+      "path": "5D197750-72D4-405B-8221-B9F198D2BC37.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-default_0_CC736466-10FB-439B-B50B-8CAF5C355840.png",
+      "path": "DAB6AEB3-33F4-4F73-8E58-2CC528A1C4D1.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-control_0_A3D0A7BA-CB80-48B5-ABF0-8ACB3518867D.png",
+      "path": "24600ED8-28A8-4FEA-AC77-1B0DC2A94CB9.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-results_0_B5E52B8E-E15D-40F1-BEC2-4C58BE0FA356.txt",
+      "path": "DB1FE3E1-B1CC-4247-9D2F-D45713AB633C.txt"
+    },
+    {
+      "name": "ocr-capture-thread-default_0_45A02B51-2530-4C19-8D73-E617424989F9.png",
+      "path": "E11666BF-6E10-46F7-99D3-9C218D23CB38.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-control_0_A240BA40-93F1-43D4-AF21-7C1F634799A5.png",
+      "path": "1A1A27E1-92D2-474D-902A-141CC6188F2C.png"
+    },
+    {
+      "name": "ocr-capture-file-default-results_0_EA1C14FC-2A8E-4CF6-8878-588EAC530589.txt",
+      "path": "1390D616-AB27-4663-B2EF-6830472D8DE8.txt"
+    },
+    {
+      "name": "ocr-capture-file-default_0_FBD0EAC9-B572-4732-ADE0-E74204083450.png",
+      "path": "FFAF48B5-EABE-4C26-90E4-071286282A28.png"
+    },
+    {
+      "name": "ocr-capture-file-default-control_0_D52945AA-208F-4235-9AB5-E2C7D8ACE8E0.png",
+      "path": "1B10E8AB-F31F-4CBA-9643-14DF95BF5137.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-results_0_527A4852-4FEC-4DFB-8BF2-1B4C96FAE401.txt",
+      "path": "7C58A15F-9EE5-4135-AFDC-D35490516064.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-default_0_EE82F47A-660F-48D9-ADBD-03FC8C2E8A29.png",
+      "path": "8BB90EB2-C131-4CE7-BFA8-28D276C6C842.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-control_0_685A3E57-BFEA-482C-A424-C50ECF1D4114.png",
+      "path": "A5EEE79E-2793-41F5-A65E-34D23638E332.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-results_0_B2032DB3-5A5A-46A2-99EC-DD14C51A4821.txt",
+      "path": "3E3A0B9F-D255-4479-A2AA-4B5AD575CB4F.txt"
+    },
+    {
+      "name": "ocr-capture-voice-default_0_8D14EC87-84CC-4E62-8764-ABFF10B3DD8B.png",
+      "path": "C508F83C-BF50-4036-A81D-5910D019F629.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-control_0_62E99F34-0FEE-48C0-983F-E342DA0CCD78.png",
+      "path": "3232E378-D558-42B6-9868-2B2D5E0EFC99.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl-results_0_4B13BCA3-2FFA-4AD1-B532-41F3B7C68B3B.txt",
+      "path": "2C1E5806-1EC4-4220-BAEE-52FA8FB7ACBA.txt"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl_0_5505186C-CA6F-4D0B-BA24-40E1A565ED51.png",
+      "path": "694F8519-F02E-4E7D-A3CE-8C775C6C8CD5.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl-control_0_48694FC2-4296-4F43-834C-821FB2CD9439.png",
+      "path": "17BFDD8A-6104-412A-827E-DE1294A99678.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl-results_0_62083217-DBCE-42F0-9BC8-C82140ECF1A0.txt",
+      "path": "2FAE0639-D6EF-4B78-80CE-717A8D410477.txt"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl_0_CD3B8DE2-97B2-45CA-AEB6-979A1811157B.png",
+      "path": "67027BCA-416E-4444-B1C7-39F58B95B444.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl-control_0_B756DCB7-C252-42F0-8330-473BA207593E.png",
+      "path": "13032B62-F029-4DD1-A8CC-BD3212F37B08.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl-results_0_309E48CF-3159-447B-AD27-D00707139C6F.txt",
+      "path": "6705F7A0-F2AA-45CF-A128-FC97DA3A5E79.txt"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl_0_39716DB7-BB59-4746-8D58-625924D6F754.png",
+      "path": "9F660580-230A-4B7A-BAC8-354E5008CD8A.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl-control_0_A3C02480-5676-4EFD-90D7-BCC75C71A105.png",
+      "path": "1A0D56A9-DCCE-4CBF-B8EF-A1B786C1DEAF.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl-results_0_93DE9A9A-6D65-4279-A726-92B5CECED51B.txt",
+      "path": "37BB9B58-9AFB-495D-97BA-B3EEF57C3622.txt"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl_0_6DAC2C52-742A-48CB-A53C-CD08662E3B28.png",
+      "path": "FD3DF333-F568-4705-B21D-25B2F0AAB130.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl-control_0_1E22FA2F-1102-4747-BE16-AF7789D404AF.png",
+      "path": "FA75292A-393D-4C80-8217-DE731CEBDF5D.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default-results_0_0F1B8226-6C67-48B2-8B96-9A838538F1F4.txt",
+      "path": "4C8D021F-1FAD-4DA6-9CFA-EB5A2C5710BC.txt"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default_0_1E01525D-D698-45A3-94F5-E24606E48FB5.png",
+      "path": "D85A5490-AEA8-429A-8A11-CAA59B20AA6E.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default-control_0_C1A66C10-DF3C-4493-8C9A-750A4E1A4648.png",
+      "path": "DE7211F8-1C8F-4A94-9568-6324F8515D67.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-default-results_0_0B3CE5B7-1F0D-43A5-A645-2BC9DC0618D9.txt",
+      "path": "01F3270E-6801-4FA0-A793-4E4C0E7B785C.txt"
+    },
+    {
+      "name": "settings-scale-Configured limit-default_0_9F1CA6DC-0588-45B0-8D4F-6B6E2C0F1C47.png",
+      "path": "FC78149D-26E8-43CE-8EAF-3D1889247DA9.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-default-control_0_D04B7F12-A7D2-41E7-97C4-2E8CD7D9AFAD.png",
+      "path": "980DF9CB-D859-4699-9490-73C9C7AC4D44.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-default-results_0_004D3600-1739-47A3-90D1-FDD2CB4F756C.txt",
+      "path": "6E2889E3-32ED-418D-A8DE-EAF922A93F6D.txt"
+    },
+    {
+      "name": "settings-scale-Threads at once-default_0_422CD236-3A44-4F21-BF6E-F1A1260A61E7.png",
+      "path": "726B3E7D-A758-43E0-A913-795CA8F57695.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-default-control_0_EF1169A8-B294-4BF2-8356-446E559EA154.png",
+      "path": "D72DA528-FBA2-459B-80BD-AB55C1B6B493.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default-results_0_B7708A4A-0E81-4B66-BF8E-84008320B965.txt",
+      "path": "DB515180-F767-421C-B2C5-38C513857982.txt"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default_0_EF9F4CA1-9048-4080-84A2-A0B6C64D1575.png",
+      "path": "10C72C0F-788E-4FFF-B440-F78E5A31CC1F.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default-control_0_E9A483DB-F788-4F48-AC1F-014205E39E89.png",
+      "path": "6295A175-B3A6-4DC5-9278-9FF52FC8F94A.png"
+    },
+    {
+      "name": "Complete Issue Description.txt",
+      "path": "626CFFEC-3CE6-4EB9-9462-46842C85333A.txt"
+    }
+  ],
+  "ReviewQualityUITests/testNavigationAtDefaultText()": [
+    {
+      "name": "note-default-clipping-proof-captureNoteSave-results_0_7AAABE6C-7949-4630-B2AE-AAE9160BB68D.txt",
+      "path": "7DB38FE7-27C3-4562-B5D4-A1A33AAA10EE.txt"
+    },
+    {
+      "name": "note-default-clipping-proof-captureNoteSave_0_32699E60-13F8-42E9-95F2-2129D4DF72D9.png",
+      "path": "38751FD7-D9C8-421B-B99C-0BE248B200C7.png"
+    },
+    {
+      "name": "note-default-clipping-proof-captureNoteSave-control_0_2A3A7128-D179-4E64-8C34-AA94C5C17FB9.png",
+      "path": "676E5093-AA58-47F7-BBED-823BD29560A3.png"
+    },
+    {
+      "name": "note-default-clipping-before-captureNoteSave-accessibility-tree_0_58327308-5C9F-4DC3-A062-CEFA0E99E716.txt",
+      "path": "75BE2AF0-491A-4B73-A6AE-280A36F6834B.txt"
+    },
+    {
+      "name": "note-default-clipping-before-captureNoteSave_0_DEC800DB-436A-4B5E-B506-648909322214.png",
+      "path": "8C582C36-4219-4DC6-9E5B-AA39D32454D9.png"
+    },
+    {
+      "name": "note-default-contrast-exclusion-screen-accessibility-tree_0_6923EF0D-1B33-457E-9DA4-ABE018575035.txt",
+      "path": "91F087D2-584E-48B4-9E4E-14A79CAB3293.txt"
+    },
+    {
+      "name": "note-default-contrast-exclusion-screen_0_89AEC66B-0034-4ED2-B9D5-E9C65BF64A53.png",
+      "path": "4E0F5F21-4FCF-49CF-ABAE-FE2577EB8007.png"
+    },
+    {
+      "name": "note-default-contrast-exclusion_0_03A0F4A3-5ECC-4154-9229-C1C7111EAA93.txt",
+      "path": "CA56DC3A-8C64-42A3-939D-C08C3D9ABBDD.txt"
+    },
+    {
+      "name": "note-default-contrast-exclusion-screen-accessibility-tree_0_1DA826BC-C9AE-431A-9E69-66E21A761867.txt",
+      "path": "C296BF9E-1B07-4AB7-8FE8-E780B318023E.txt"
+    },
+    {
+      "name": "note-default-contrast-exclusion-screen_0_DA1A2C2F-29B1-4D8F-8EB6-C5311D0C8219.png",
+      "path": "74293442-D1EE-4D35-B021-8A1C495823DE.png"
+    },
+    {
+      "name": "note-default-contrast-exclusion_0_C139DB5E-4B51-4966-B7BD-E5B033F28334.txt",
+      "path": "BA29CD0B-BA4D-4606-9138-707B514FEB07.txt"
+    },
+    {
+      "name": "note-default-verified-element-contrast_0_62375C20-061B-4F35-A3EE-7443BCF9E912.png",
+      "path": "97B1B2B2-4E03-480C-9C12-54334D26779F.png"
+    },
+    {
+      "name": "note-default-accessibility-tree_0_3DF3C1D7-16C3-4ADD-B682-59273A5EC658.txt",
+      "path": "85D1F31B-E67B-43FB-9CEA-218543DE9E56.txt"
+    },
+    {
+      "name": "note-default_0_DA3059CC-D1FF-43A6-B08D-081610FE632A.png",
+      "path": "FD6431A2-53AD-4479-A7F3-2BBA28D90996.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-file-results_0_E0894455-85EE-4FE3-B1A8-30A1D24926B8.txt",
+      "path": "59AE894E-1B46-4C72-892F-DA5569E2547F.txt"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-file_0_7C2D7561-D64B-43A9-865F-BA7E3331F662.png",
+      "path": "A9969A56-02E5-4048-9ACF-61E7F74D6D38.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-file-control_0_BC75B4DE-E26F-4F73-AC9E-EFA7E0D72C6B.png",
+      "path": "AA66D3BB-E0E8-497B-9999-37D85D7ACDB8.png"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-file-accessibility-tree_0_F25A7AE2-04B8-41B7-B017-F5FC7D2B65BC.txt",
+      "path": "24C67010-4C68-495C-95D7-FE903B64273C.txt"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-file_0_1FE6F8DC-4AB8-4F47-9A04-C285E95AD35C.png",
+      "path": "A8CE54CC-EE5B-4EDD-B5D4-3D6DF4CAE172.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-voice-results_0_2BBAB21D-9B7E-48B0-ADF4-38DBC5D6211F.txt",
+      "path": "D294884E-542D-414A-AD12-40ABD289BBFF.txt"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-voice_0_BBE31087-6A58-4F7F-9D3B-998BDE2F1707.png",
+      "path": "823B7BB3-5A26-449D-A654-91283D7AF6A9.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-voice-control_0_F67D8F44-EE69-4212-B692-B58D2B1AFE88.png",
+      "path": "8C87190A-B8B9-4B8F-8810-7B7AA3F39EDD.png"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-voice-accessibility-tree_0_6EA479C4-5B0E-44D2-8434-33B0A32EAAD4.txt",
+      "path": "74998802-F4CD-4A3E-9A1D-E64A27CDE48D.txt"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-voice_0_BA824284-7419-4A64-82DD-78A8C54E1FCE.png",
+      "path": "69FBC480-DED3-4231-84E8-456138BDFD0D.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-thread-results_0_B66F68BF-BFC5-495C-8E46-2398389E322D.txt",
+      "path": "FC8C6E9F-F6BB-4E44-B12F-0C66005BB855.txt"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-thread_0_BC19ABF4-0FD5-473D-B2BC-BA2F500E345D.png",
+      "path": "D40651C3-A353-492F-BC6A-F55C78A721CE.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-thread-control_0_CCD1DD51-1E4F-4649-95E0-BE16BE982793.png",
+      "path": "E4B83E4B-9639-4904-A96C-F2CAA8FE7200.png"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-thread-accessibility-tree_0_D4215A99-9486-403B-8AD4-55650DB75D91.txt",
+      "path": "B6E1A1ED-DDC9-4DF2-BCA4-424277FE728A.txt"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-thread_0_E6941D1E-D675-49EA-8F02-D411CA0E1B6D.png",
+      "path": "F6435C8C-961E-4B5A-AC9D-D634A8A7820D.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-dictate-results_0_D01B4E3A-6BD3-435E-9291-8B9A9E84F655.txt",
+      "path": "C9A9FCBC-42D1-4453-8B42-FA9DAE096C29.txt"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-dictate_0_1B27481C-63BD-484F-84ED-28D03D679EA6.png",
+      "path": "E5B9806F-5090-41DB-8C71-FA2FE959439C.png"
+    },
+    {
+      "name": "capture-default-clipping-proof-capture-dictate-control_0_817B9082-0B4F-49CA-BC9E-ED0A9E5A189A.png",
+      "path": "EE2D2917-1DA1-419D-8E64-1F56E8E0D79D.png"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-dictate-accessibility-tree_0_7E839108-F59B-4A5C-95E0-D207A9DE42C4.txt",
+      "path": "2689D612-5E10-4401-A5CA-87B9E8B0B92C.txt"
+    },
+    {
+      "name": "capture-default-clipping-before-capture-dictate_0_154555E0-614E-47E0-9DB5-26B0A47398D9.png",
+      "path": "648DB0F9-687D-44C3-A72B-6AEE2D1CA24B.png"
+    },
+    {
+      "name": "capture-default-contrast-exclusion-screen-accessibility-tree_0_DCF87BEE-6E53-4604-96C6-47890AD07C4A.txt",
+      "path": "315E4AB8-401E-4CA4-9B9D-0CD61B2D396D.txt"
+    },
+    {
+      "name": "capture-default-contrast-exclusion-screen_0_213BD57E-4377-4B77-B546-B2EEA4DAC3C1.png",
+      "path": "C3E9B33E-CC1B-4939-83FA-3F13BBC7830F.png"
+    },
+    {
+      "name": "capture-default-contrast-exclusion_0_283DDBF0-C17F-4692-9298-EA8D8307063F.txt",
+      "path": "E39FAF74-FFB0-474F-9FD1-898F9ED52B4B.txt"
+    },
+    {
+      "name": "capture-default-verified-element-contrast_0_3EFC44B4-B5D7-4759-9890-2D26554861A0.png",
+      "path": "AA96630E-009E-4BBB-91E1-92D74733C517.png"
+    },
+    {
+      "name": "capture-default-accessibility-tree_0_52EDB8F5-9220-481E-915B-B45B50DB9005.txt",
+      "path": "02896825-36B0-4FA1-A6A3-575E18594344.txt"
+    },
+    {
+      "name": "capture-default_0_B505E2F1-D765-4105-8128-706F5E586D6B.png",
+      "path": "68F606E3-080B-4DD8-A1A1-82306E005CB6.png"
+    },
+    {
+      "name": "inbox-default-material-0-results_0_A6704F59-AEB5-43E8-BB3E-95B2C800C78D.txt",
+      "path": "0F199F50-4697-4551-B086-E8D04BD63F47.txt"
+    },
+    {
+      "name": "inbox-default-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_FD3BB8BB-E521-4D5D-A6B0-EE8027080061.txt",
+      "path": "BC51A79D-65FA-45FB-8C98-9FCD3A29E64B.txt"
+    },
+    {
+      "name": "inbox-default-material-0-reaudit-contrast-exclusion-screen_0_0B52F586-FD82-431D-AB40-50933F55688C.png",
+      "path": "7E2CC1CF-F02A-4766-95EA-741DDD0CDA1D.png"
+    },
+    {
+      "name": "inbox-default-material-0-reaudit-contrast-exclusion_0_FEE48D87-934D-400F-BDD3-913AB5C88BC4.txt",
+      "path": "3D48D6C4-768E-44B7-9906-6DD093994732.txt"
+    },
+    {
+      "name": "inbox-default-material-0-reaudit-decorative-face_0_9F4451CF-27A0-448A-9D42-E80D3EC750DC.png",
+      "path": "5717A3B3-55A9-400B-AFDD-BC50CB6DE1F2.png"
+    },
+    {
+      "name": "inbox-default-material-0-after-accessibility-tree_0_970515C3-6566-4317-82EA-62D50C562905.txt",
+      "path": "AEE01C89-7D2D-4BCC-8E5F-EC54EC90F47B.txt"
+    },
+    {
+      "name": "inbox-default-material-0-after_0_EA8E8AF3-B414-4D6F-B5C6-0E3F3721B1D7.png",
+      "path": "E2AF532B-8DEC-4191-9765-A9A62F8C54AE.png"
+    },
+    {
+      "name": "inbox-default-material-0-before-accessibility-tree_0_1C68C137-2705-4504-AFC7-F5B1F4E05D66.txt",
+      "path": "89DE894E-7FB6-4BFE-91AA-57532B9DCE03.txt"
+    },
+    {
+      "name": "inbox-default-material-0-before_0_C5D2ECCA-3169-42AD-ADA0-91361DF3D994.png",
+      "path": "90F2930C-0E8E-4D10-A642-C5A3B522C457.png"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion-screen-accessibility-tree_0_C569BF29-05A9-4095-84F6-33EBC1D4691A.txt",
+      "path": "4E82A6A4-5F0D-4F6C-A4E8-AD6954FDA0E6.txt"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion-screen_0_AA690D50-9FE3-475A-A8DD-2367A16005D5.png",
+      "path": "69C398F4-C91D-4493-AD9A-3075E511DD0C.png"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion_0_05BFB320-09B3-433B-B68B-47B3C3A6B3A6.txt",
+      "path": "D5092538-B3D2-4E6D-87EB-99782F8C6208.txt"
+    },
+    {
+      "name": "inbox-default-verified-element-contrast_0_0438A92B-17AA-425A-9BDD-9E00EF542F6D.png",
+      "path": "A5E7E4A2-1A83-43C9-ACBD-1F93A83A9946.png"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion-screen-accessibility-tree_0_D13B77D1-B330-4893-B6FF-B26C7AC3189A.txt",
+      "path": "972A5747-9FBA-47D8-9373-B4C83A1AE7F0.txt"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion-screen_0_69F79761-BCF6-4930-9DF6-418DA725A1C7.png",
+      "path": "035C9FF5-90C2-426F-9523-6B7CBBB77EFC.png"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion_0_45942F49-59AE-4D53-A857-F09042F8AE16.txt",
+      "path": "51334EED-828E-4B5B-989A-C2235AD194A8.txt"
+    },
+    {
+      "name": "inbox-default-verified-element-contrast_0_8DA80101-39C0-4CE9-BFE5-9015EF5CC1B6.png",
+      "path": "D674ED5D-460E-4868-9366-12E24ACC7771.png"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion-screen-accessibility-tree_0_F77F0F4D-7C47-4271-9F10-92CC5644D73D.txt",
+      "path": "89415934-7D5B-431D-A7D4-AE64FF50E203.txt"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion-screen_0_B04503E7-DCB0-4738-B085-BC1A9E4B8FE0.png",
+      "path": "A821F17C-1A75-4586-BC4F-655BA7711E29.png"
+    },
+    {
+      "name": "inbox-default-contrast-exclusion_0_7F0EBC25-FB8E-4496-9820-A7817DBFD0B9.txt",
+      "path": "1209C20B-7B88-42C8-8731-A9C0DB4EED7B.txt"
+    },
+    {
+      "name": "inbox-default-decorative-face_0_A6B54765-DAD3-476E-AFEA-DD12C62453A0.png",
+      "path": "2EA70A07-3337-4577-9E3A-85E3C930FAD4.png"
+    },
+    {
+      "name": "inbox-default-accessibility-tree_0_D8729A98-D082-4D36-BB59-C79E6539C2A9.txt",
+      "path": "8065703A-3F2A-4BB9-9DD6-957B1DB96C62.txt"
+    },
+    {
+      "name": "inbox-default_0_FEF808B3-4207-4EDC-BD1F-EE7D2A95D1E5.png",
+      "path": "D2704FA7-85CE-4F4A-BBF4-54AF55C14780.png"
+    },
+    {
+      "name": "home-default-material-0-results_0_3D51B0D7-7EA4-4383-B491-14D4810225BA.txt",
+      "path": "39BC3EC7-EA3D-4566-AEE3-F76BFA5B8406.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_E9C74642-AD1D-40BC-BE98-B301E0C8369C.txt",
+      "path": "269C9EBB-F9B1-48C4-A4E1-D5B24F0405C5.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion-screen_0_C05DAB6B-A18E-476A-85B4-1856AB5EC3E7.png",
+      "path": "6A78966B-45DA-4414-9875-D140DE685F76.png"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion_0_8B9D65C3-2BE0-43DC-ADA2-A2D095DE1ADA.txt",
+      "path": "FE0CB6DF-76A1-4370-B28E-ABD0C8ADFC98.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-decorative-face_0_B5AC59E3-FA89-4DD4-BC9A-7F46EC92F582.png",
+      "path": "325C7B9D-837E-4726-96BE-BE085D7D5916.png"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_721F5732-7F9A-48B1-9AF4-C27FC6A300C6.txt",
+      "path": "E7492616-ED7F-4859-8F1B-B071B193C9C6.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion-screen_0_53CF7F5D-AAC1-4126-B41B-CD96A6E7EF24.png",
+      "path": "00F19416-9AB8-4715-915A-A30B6BE92D61.png"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion_0_42913F09-2597-4D92-ADA0-34716C0F7934.txt",
+      "path": "C890919A-B6C3-4F48-ADBC-1CA677B364C4.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-decorative-face_0_DF18E2A8-85CC-457B-BB0B-3A17A2AF2188.png",
+      "path": "24A4C05C-2143-4B95-B96A-56A034A3AB81.png"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_A12C7A5F-E1BC-467A-9E02-53A0C94CC09C.txt",
+      "path": "2F52A718-A0C6-4B2A-919B-B063D11B4E89.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion-screen_0_0CFBF994-09D8-4016-86E4-FB17592427EC.png",
+      "path": "09312CA6-3EC6-4A29-9C18-AB1F6363205D.png"
+    },
+    {
+      "name": "home-default-material-0-reaudit-contrast-exclusion_0_08781B71-5BF1-4BF3-A997-2780507B56CA.txt",
+      "path": "E8136A9A-03BF-4F0A-92DC-9F1985FDC785.txt"
+    },
+    {
+      "name": "home-default-material-0-reaudit-verified-element-contrast_0_386BDADF-7870-4239-B596-416EB660AC18.png",
+      "path": "9A68B65B-2D62-4C57-BAB5-54FD835A6A21.png"
+    },
+    {
+      "name": "home-default-material-0-after-accessibility-tree_0_A7A48E95-088F-43D7-91FD-ABE683E5E6FD.txt",
+      "path": "D0F83C52-B7CF-4ECD-B2F7-2BE1BBC2B6B1.txt"
+    },
+    {
+      "name": "home-default-material-0-after_0_59D76763-2306-4E04-8ADE-6C1998A52EE3.png",
+      "path": "915D10B8-842C-40E8-9BB0-30E5A20F0BB2.png"
+    },
+    {
+      "name": "home-default-material-0-before-accessibility-tree_0_FA721889-9C2B-497E-AF58-1FE11EB40C9B.txt",
+      "path": "10B703BB-DF56-4E17-B839-D1082D7D49F8.txt"
+    },
+    {
+      "name": "home-default-material-0-before_0_B5E2E25B-E80E-4965-BFFD-A81E2BA7A001.png",
+      "path": "EEB70E18-A62D-43F7-8A1E-E7E1EB6BD2B5.png"
+    },
+    {
+      "name": "home-default-contrast-exclusion-screen-accessibility-tree_0_6A46C855-24B5-420F-A925-61E79B51F28D.txt",
+      "path": "136FA210-2E19-4499-94A4-B15D2917022C.txt"
+    },
+    {
+      "name": "home-default-contrast-exclusion-screen_0_9899DB6C-03F6-45DB-82DD-66C2621C9443.png",
+      "path": "EAB50592-8180-4E7F-9948-BB42374F7F5A.png"
+    },
+    {
+      "name": "home-default-contrast-exclusion_0_32A50671-5097-48E7-B436-EFA7F3256A8A.txt",
+      "path": "D63DBFE2-12F0-4EA8-8D40-9AF554832BEB.txt"
+    },
+    {
+      "name": "home-default-decorative-face_0_87305767-4C5A-4ECE-A91F-A4FDE7B838A8.png",
+      "path": "4142F454-FAF6-4AC8-8C21-A95B537A1544.png"
+    },
+    {
+      "name": "home-default-accessibility-tree_0_F5FF1C3F-F5ED-48A2-9C9D-316148241D71.txt",
+      "path": "00F033B5-C0AB-4C47-BDB8-14B1EC213AC9.txt"
+    },
+    {
+      "name": "home-default_0_DFEB7FB4-D547-4E2C-8F9C-D08E808ECE03.png",
+      "path": "78C3DDE4-86AE-41FB-A2A6-F7D54F41DA6D.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen-accessibility-tree_0_577848FD-E8A3-4ACD-9B63-CAD54E6474E8.txt",
+      "path": "41531E37-3E95-4ECD-84DE-3C1201ACAD08.txt"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen_0_43106561-EDAE-438E-B3A0-1813DCB57CBC.png",
+      "path": "978B4895-9E55-42B3-B73D-77E2FF8C1DF9.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion_0_48098616-A6EE-4855-86AE-62AE49724D37.txt",
+      "path": "55E3AA68-E847-45C0-B7DE-A0ABFBC71B5C.txt"
+    },
+    {
+      "name": "studio-default-verified-element-contrast_0_18D36E13-4A64-4A90-BCF5-6060ABC9CBF6.png",
+      "path": "C0420A87-DC09-4F2D-8941-4DC30496FF98.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen-accessibility-tree_0_2B4BC81A-361F-4F37-82AE-D1118149004D.txt",
+      "path": "C55B066B-81C7-4549-937A-6C97ED2286B5.txt"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen_0_DFD317E1-3CFC-4B8C-A3C2-00E314365C60.png",
+      "path": "E913AB7F-F97A-43E4-BAC2-3D9C743B5EC6.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion_0_C0E6C33D-317E-4598-A924-014177B3CFF8.txt",
+      "path": "49134332-236C-45F2-9349-FD0737012BAA.txt"
+    },
+    {
+      "name": "studio-default-verified-element-contrast_0_86F62272-FEDF-4FE6-91EC-F182387DD3CE.png",
+      "path": "E6A8DA84-5CBE-48C6-811E-2EBA9B907372.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen-accessibility-tree_0_0C3144B0-A239-4EA2-8714-964BC20034AD.txt",
+      "path": "55C24413-72BD-4EA2-9CD1-FC337559373B.txt"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen_0_6B7E795E-5965-4969-AB9E-E8AC3EA86833.png",
+      "path": "36AB175A-2FD0-47CD-A460-148E7ABB2321.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion_0_F97E61FD-0083-43C1-BA12-A0B2E837364E.txt",
+      "path": "3084674C-B358-4B4E-8DAE-33332A215DBB.txt"
+    },
+    {
+      "name": "studio-default-verified-element-contrast_0_E1746794-3E9F-4052-9CA9-6144C0347D7F.png",
+      "path": "5F9993E4-371A-4F6F-9A74-143FA736A151.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen-accessibility-tree_0_06E964DC-80CE-4D6B-8161-3BBAFB8B14E6.txt",
+      "path": "17069B9C-CB7E-47D2-AC80-B81C1DDE7D4D.txt"
+    },
+    {
+      "name": "studio-default-contrast-exclusion-screen_0_7E40B337-777D-43EC-8120-80BFCAB56A13.png",
+      "path": "FC68B962-9EA7-4BFC-979C-143D54A6E129.png"
+    },
+    {
+      "name": "studio-default-contrast-exclusion_0_D5099DD4-736C-4131-93F7-A3A474E6322E.txt",
+      "path": "99EC0F45-E801-4B6B-83D5-9E2AAC95A251.txt"
+    },
+    {
+      "name": "studio-default-verified-element-contrast_0_8D91ABD2-3BDE-447F-94CB-E0A713FD35C6.png",
+      "path": "D80C54BC-A844-477F-AA90-AAF7BFA44E70.png"
+    },
+    {
+      "name": "studio-default-accessibility-tree_0_8008F894-9A1D-499E-8E51-32D5E931F8FC.txt",
+      "path": "AB6920B6-DCE3-4A7C-BB92-E2E9EB9B7C5E.txt"
+    },
+    {
+      "name": "studio-default_0_36D40960-A2D7-480E-87CB-D7C0F3AD4CD5.png",
+      "path": "5AA5DC3B-2D90-4312-AE09-9B5DFD9E1D24.png"
+    },
+    {
+      "name": "settings-default-material-0-results_0_5F5A2A88-81CF-441F-A508-E13B0BA065E2.txt",
+      "path": "17A72F0C-6A63-4F8B-ABAA-9800F9B193AB.txt"
+    },
+    {
+      "name": "settings-default-material-0-after-accessibility-tree_0_8886BE87-4DF9-4362-8883-4A96F7E45EF9.txt",
+      "path": "E8B3B6A3-7F73-45E3-A63F-122FE1003BAD.txt"
+    },
+    {
+      "name": "settings-default-material-0-after_0_D12E2F38-3943-42A5-854C-33D055D516EC.png",
+      "path": "E82512B9-A162-401A-9712-B6EE4B71E9B0.png"
+    },
+    {
+      "name": "settings-default-material-0-before-accessibility-tree_0_4EC2F635-1ED7-4FE3-8D87-91897F7BC01A.txt",
+      "path": "7AABC2A7-2A36-4792-AFC8-AB52D3572817.txt"
+    },
+    {
+      "name": "settings-default-material-0-before_0_1FDB3E8D-88A3-4A34-920E-5E66AFDB4507.png",
+      "path": "D34FB335-35FE-4C98-AD5E-090E0999CA2C.png"
+    },
+    {
+      "name": "settings-default-contrast-exclusion-screen-accessibility-tree_0_AAD54FF9-9129-4BE0-8E0B-2EF86C80A3DF.txt",
+      "path": "C699CB1D-A83A-49E8-9765-AADCAA6367A8.txt"
+    },
+    {
+      "name": "settings-default-contrast-exclusion-screen_0_87C885A0-15AF-487E-8F71-A9E06C830CF8.png",
+      "path": "71F4446C-298E-4891-83C9-33585B0D3157.png"
+    },
+    {
+      "name": "settings-default-contrast-exclusion_0_B6F1F933-EF02-4008-A676-AD4435A8FD07.txt",
+      "path": "6E4D56AA-52F4-49AC-955A-3989A10DA635.txt"
+    },
+    {
+      "name": "settings-default-verified-element-contrast_0_9FAB42CE-E45F-437C-AD51-CA1714FD66E6.png",
+      "path": "EF6BD84A-86B0-40D2-A972-C198211156B3.png"
+    },
+    {
+      "name": "settings-default-accessibility-tree_0_6781CB9B-3BEA-4C96-8763-139CAD547E6C.txt",
+      "path": "F0EF3687-E295-4EC3-B820-0C4719AECDB8.txt"
+    },
+    {
+      "name": "settings-default_0_E0504ECD-8567-4B8F-A36B-B8A14340DDED.png",
+      "path": "424E9637-ADC8-4E30-B3FC-6492AA760392.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-results_0_294ACEB9-32B2-4EAD-A829-C766D2F2919B.txt",
+      "path": "21F31D0A-547C-44F0-872D-9781A42576E4.txt"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-held_0_2E813C39-E10B-42AB-9952-FAD43F717615.png",
+      "path": "F8E9C175-58C3-4572-92A1-EA1D9A82F924.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-before_0_F8990D92-2574-444F-8B96-202D671E68CA.png",
+      "path": "D2B59974-3707-423C-A765-8725FDD8CAA6.png"
+    },
+    {
+      "name": "lcv-studioSelect-results_0_943BED2E-3152-4A5F-8C96-45045F2EBA56.txt",
+      "path": "32D1C6F6-6A96-47D8-9A11-34CDD43DF53A.txt"
+    },
+    {
+      "name": "lcv-studioSelect-held_0_31E12367-5D17-41E3-8BE1-73B7E925BD7E.png",
+      "path": "05F051A0-B4DE-4076-8EB3-78AA2A041186.png"
+    },
+    {
+      "name": "lcv-studioSelect-before_0_9A9F35AC-54C8-4E51-88A3-AEA6ADEB52E3.png",
+      "path": "661D3CCB-A416-498E-BECA-54A4E1B22AD7.png"
+    },
+    {
+      "name": "lcv-captureClose-results_0_51EACA4C-EBA5-40A7-A1C0-3E059DFFC6DA.txt",
+      "path": "FA812269-901F-48BE-AE2E-A23E6EB67352.txt"
+    },
+    {
+      "name": "lcv-captureClose-held_0_842927E3-B921-40DB-B418-80DA92D7A999.png",
+      "path": "4C2632BF-4D71-44CA-BC3E-25282F6C59B6.png"
+    },
+    {
+      "name": "lcv-captureClose-before_0_760D93A6-0E80-45DA-B0F6-884EFFD95A87.png",
+      "path": "B43FEC99-A7F4-41E2-9ACD-D90B6D0F92E7.png"
+    },
+    {
+      "name": "lcv-captureBack-results_0_22B376BA-35DF-4B3D-A51C-797778853C36.txt",
+      "path": "15C91585-C6BF-40E5-9132-CBC00F78995F.txt"
+    },
+    {
+      "name": "lcv-captureBack-held_0_F7662EA4-982E-4E24-BA04-39945F04B697.png",
+      "path": "570506F7-A795-4EAE-8B3E-0B9208A71D80.png"
+    },
+    {
+      "name": "lcv-captureBack-before_0_576A02B3-9B6A-4FD5-8357-59D28BF2C247.png",
+      "path": "62A1BB4C-2E84-4AA9-8DCC-70B2E875F441.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-results_0_1EB20D2B-308A-407D-93A5-3B7355A15E27.txt",
+      "path": "6051E30D-D19F-419F-8485-61344EAD064A.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl_0_5252D4ED-808A-4C84-B6C0-E1B7CC79B47D.png",
+      "path": "16CF97FD-21D7-4E99-8531-D0A003BE0E7A.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-accessibility-xxxl-control_0_ECBA99BC-028F-43D4-977E-FF541345F294.png",
+      "path": "DBF50685-CA6C-4EF1-9D13-8D4BF9FEF14D.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-results_0_C41BBFDB-CE23-4C53-A7AB-1021FCD059D8.txt",
+      "path": "5444FD5E-B25F-46E4-932C-2C1E150416D1.txt"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl_0_ABEA0EE6-74BB-4C58-89DE-F441C5639CC6.png",
+      "path": "45D8B50A-375D-4F39-9F7A-751239DB1FF3.png"
+    },
+    {
+      "name": "ocr-capture-thread-accessibility-xxxl-control_0_63E2B153-988C-4C4E-A04B-CF07F0EF47FE.png",
+      "path": "FD409847-2543-4CDC-8511-6D8501F71B98.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-results_0_FF7CA7C1-2510-461B-A669-3F9D51B28040.txt",
+      "path": "81E159CD-0E9D-4BD0-90A7-B9CC6BB0FDD3.txt"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl_0_D2AA69D5-C4DC-42FF-A9EF-45C6E5016265.png",
+      "path": "1AD03A5A-FEAF-45BB-A046-25569BD161C7.png"
+    },
+    {
+      "name": "ocr-capture-file-accessibility-xxxl-control_0_C532EE34-7E98-4506-9F81-FF6A60D58C0A.png",
+      "path": "C5EBD72A-6277-407A-A3CA-B7E619B9AC6F.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-results_0_68AEDC6D-B2ED-48DE-854D-0EABEE3640F5.txt",
+      "path": "264EA812-3EC3-4BBC-B040-FD91AF3CAA01.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl_0_00A84800-E7B6-4F2E-BC4A-5534CFFFEDCA.png",
+      "path": "1887BEA9-3D7C-4BA2-A11E-0A1D898FE90A.png"
+    },
+    {
+      "name": "ocr-capture-dictate-accessibility-xxxl-control_0_5F407157-5B00-415D-9CDD-D00CEB2C8AB3.png",
+      "path": "D4F3213D-0784-4CAC-9442-2485200F78C1.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-results_0_734F2EED-11D9-4D2F-9B2F-8FCDA15C07B6.txt",
+      "path": "7A5507D3-7463-492E-A802-BBEA0BA68DA9.txt"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl_0_F56C0FD2-9F36-40FE-AF19-AD632174EA56.png",
+      "path": "584C2015-521E-427E-AF57-027DFCC8E228.png"
+    },
+    {
+      "name": "ocr-capture-voice-accessibility-xxxl-control_0_627FA617-D238-47D5-A202-C54793B193C6.png",
+      "path": "D8CC341E-F00D-4C10-9416-CE4C973D65E4.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-results_0_B9E3B95D-9629-4623-96FE-0CE032B27DA3.txt",
+      "path": "150C87EC-1D87-495A-B7E6-6B0FA6D29D69.txt"
+    },
+    {
+      "name": "ocr-captureNoteSave-default_0_06FB6BC8-50A9-47AF-8D2D-E8CFDD219F54.png",
+      "path": "48EC85ED-BEDE-40C1-A825-81FCFF3DF51C.png"
+    },
+    {
+      "name": "ocr-captureNoteSave-default-control_0_86E98E79-5AF0-4069-A4EE-E0B860454C2A.png",
+      "path": "0C69F948-7641-4D72-B27F-36FF600F1AF7.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-results_0_4C8B3544-5044-49C0-9248-2A656E672F75.txt",
+      "path": "086F66F4-50A8-4C20-AE3D-6838C8C46582.txt"
+    },
+    {
+      "name": "ocr-capture-thread-default_0_251CB441-BB41-48A4-BACE-0730C94EB980.png",
+      "path": "B7AF23AA-BA74-4B93-9F85-FC1FFE482AEB.png"
+    },
+    {
+      "name": "ocr-capture-thread-default-control_0_D041BBE2-9D11-4992-B9B0-7C3C48212CA6.png",
+      "path": "7D7BFA8C-B8AC-4B79-8EC8-E53EF1176FD1.png"
+    },
+    {
+      "name": "ocr-capture-file-default-results_0_646B5BA8-E73F-4AFE-8CD2-6A036A41EED2.txt",
+      "path": "B4B6C0F1-1CD9-44A2-960C-EE11D45BD15B.txt"
+    },
+    {
+      "name": "ocr-capture-file-default_0_57B1AE58-C0FF-4D9A-9248-FB33D4A0AC3E.png",
+      "path": "EEFF3814-4EA5-464F-B6BE-EBA5E695035D.png"
+    },
+    {
+      "name": "ocr-capture-file-default-control_0_43686C40-33D0-4F0E-B23D-3364AC575EF2.png",
+      "path": "2630A1B0-69C5-4D55-BB66-9E4A1C262A6D.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-results_0_5669A311-8E5E-4817-8835-55D8C7C9253A.txt",
+      "path": "323FACC4-8D83-4F13-ABEC-B7902DA5F706.txt"
+    },
+    {
+      "name": "ocr-capture-dictate-default_0_9FDCD7AA-59A1-40D2-BA8C-FD7253ACFCCB.png",
+      "path": "FCA7413F-D48D-43B4-9780-92283BCE5DEB.png"
+    },
+    {
+      "name": "ocr-capture-dictate-default-control_0_4713873B-6CB9-482A-9865-6EC35DC4A17C.png",
+      "path": "85329BB7-F61C-4D96-9E46-E5EB9509D1CD.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-results_0_D17D17DB-1622-4256-BAEA-28FEED7CAF46.txt",
+      "path": "45BB4428-7438-464E-8946-1A19BC8530A9.txt"
+    },
+    {
+      "name": "ocr-capture-voice-default_0_AB509525-8AFE-4CFE-94D4-44642CAC4FF4.png",
+      "path": "DB747C0C-B1F1-48A6-BFC1-7C16F3CCF4A9.png"
+    },
+    {
+      "name": "ocr-capture-voice-default-control_0_C1859B26-ACD7-431D-AD21-5DBFD83A6945.png",
+      "path": "946B64EA-EFB9-4429-A74C-FF6501BF7D60.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl-results_0_A5EF6A5C-46BB-4945-8C6E-2BD9B9E8EC8D.txt",
+      "path": "7DF9CF51-B1A3-4BC6-ADC3-27BDF3C9B434.txt"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl_0_F5473295-7432-4341-AD65-8AF38B346955.png",
+      "path": "12DC6D84-385F-46E6-A35C-582EA9A1233E.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl-control_0_432DA31E-86E5-427B-A71D-A8FD25E27E79.png",
+      "path": "841F5BBC-793E-43B8-8C2B-091A3541384B.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl-results_0_4546C55E-92AB-40C5-9616-45C8E4B4D236.txt",
+      "path": "6D088BFD-DD62-44A7-94D6-6B95C127A301.txt"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl_0_468CF247-AEE2-4B78-8694-7EBAC879B8AC.png",
+      "path": "89F6E948-B1B8-43B5-81C5-CC61DAEA0E4D.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl-control_0_B320972D-EB98-4584-B5AD-BB2072BAF4A6.png",
+      "path": "917AFD36-2B56-43DC-AD9F-234023C6A0F0.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl-results_0_0053205D-7F67-4A9E-8FB3-DDB51E6628F3.txt",
+      "path": "F36A039A-978A-4B9C-916C-976EA4F818FE.txt"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl_0_31E020AB-EE43-45ED-9AF4-C0801363241C.png",
+      "path": "6E4A9F2F-67DE-4AC4-9B39-AB5A8A266D8D.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl-control_0_D0FCEC6A-07DA-41DF-9BF9-D95F69041631.png",
+      "path": "21F1611B-0B54-4B4D-A103-DD92CE722B23.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl-results_0_E85D88CC-A12D-49C5-AD7B-E8D874282228.txt",
+      "path": "E4B33B39-B6FD-48E6-8EEF-4C0DF02E4912.txt"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl_0_9B5A3B1D-EFB0-4742-933D-543A825A4957.png",
+      "path": "7261E9E0-FF00-45AE-AB9A-0126415BF79A.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl-control_0_0D6CB5E3-4336-45B1-A0E1-05D5215600AC.png",
+      "path": "6D705E9C-799B-40B2-8941-6D037D80194C.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default-results_0_83FEF9BE-FFA6-4EA6-AC48-6DCEAB6EF53E.txt",
+      "path": "CC5776C5-8196-4759-9308-67A29B68A01D.txt"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default_0_E872288F-732C-456A-946C-613B39D4985A.png",
+      "path": "6C2F0D5C-787C-4F45-B05D-5CD2FD8FBDA1.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default-control_0_B22D578D-7790-4E7E-9C6B-4AF15A19353F.png",
+      "path": "7C04A70E-B97B-4D4C-88C8-DE13ADCD23E3.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-default-results_0_056BB948-B045-47C2-81C9-B8D01074E15D.txt",
+      "path": "202C6A36-01A0-4285-9F85-0D90B9E4F56E.txt"
+    },
+    {
+      "name": "settings-scale-Configured limit-default_0_23C80CF5-80B1-4806-B9A5-3AA1BDBACAD8.png",
+      "path": "29C730B4-C45D-4C1D-AFE2-56D8AC3923C1.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-default-control_0_A17CE439-DF68-4E77-9BF6-4FB63EBD0E55.png",
+      "path": "06120BAF-2685-4CE2-8C60-3239F78D0D64.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-default-results_0_A356F483-74F0-4765-83FB-720FA41D8C1E.txt",
+      "path": "959EA6FE-C8E6-4225-8B48-145D57250A12.txt"
+    },
+    {
+      "name": "settings-scale-Threads at once-default_0_A6571C34-6993-494C-B855-E8CA698E9290.png",
+      "path": "46666EF2-A30A-4E33-84CA-D0312CD9FB28.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-default-control_0_EFF13EDF-6C57-46E2-A31C-ED7920DF27B8.png",
+      "path": "274899CC-EC33-4744-829A-3AC525B49D57.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default-results_0_C4EB94A5-508D-41EF-9247-C6ABCDB03775.txt",
+      "path": "70785104-D10B-4A72-8436-7AD9E190BC84.txt"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default_0_B7A45EE7-9394-4D7C-8EF3-9AAF6A479764.png",
+      "path": "1556C28F-AA52-4128-A6BB-BA7094FB04F1.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default-control_0_BBC533C3-57CF-4D3A-A3E5-25BFA2486822.png",
+      "path": "C61067C9-72A0-468A-92F1-B3A0D97CF9D4.png"
+    },
+    {
+      "name": "Complete Issue Description.txt",
+      "path": "A69CA65B-9DC1-45E7-8FC7-7C38CE6CCA70.txt"
+    }
+  ],
+  "ReviewQualityUITests/testPlanApprovalActionsAtAccessibilityText()": [
+    {
+      "name": "App UI hierarchy for nyc.plee_0_035DF6DF-CB71-48E5-BEDC-EDFFA64BC537.bbgo",
+      "path": "D08E8A68-0AD9-4E21-A829-4614A9AF9AD2.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_9FA5D127-D67D-42DA-8210-E3E26DED21D6.txt",
+      "path": "E4426E95-E03D-43BE-83B9-134ABEC83A91.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_DBB19FAB-BA3D-4C9A-B935-EAE792E9909A.txt",
+      "path": "1EDF146B-C449-467D-BEC9-E7B561F256A7.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_546DCFAF-98B6-4A67-9F15-21E22D2C4C41.txt",
+      "path": "5C852198-18B2-4576-A8F5-2EC3E1FCD688.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_B6E0F31F-C40B-4CD1-BFCE-F73B676F3D52.txt",
+      "path": "2F42C1C1-DDAC-4AB9-BC75-B80120E9DD2F.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_5262FDF3-2F54-4256-9C6A-7E18A0DD4A83.txt",
+      "path": "D110C93C-4079-40E2-A3BA-415B55783A02.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_7DEA29A5-5593-44EB-8F09-52650DFBA8F1.txt",
+      "path": "6A8FFFA2-ACCE-4C2B-B253-893BE78D8140.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_D38DEBCE-8138-4B8E-BDBC-857DC061C32D.txt",
+      "path": "31C12824-A782-46ED-A7FB-145EB648B669.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_46F94670-36BC-49D0-9004-048342DFCD39.txt",
+      "path": "C8DFE4FE-1FF1-468D-A340-277B84618A2D.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_64BB947D-06C3-4F05-BA2D-9F0EA4F1489A.txt",
+      "path": "CDBFD3A8-F613-405B-9B23-E0F175DF6BFD.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_BF7D405D-40A1-442F-9FAE-B41CDF66601A.txt",
+      "path": "EAD1E9F9-564B-4A9C-B5EE-8F52AE021798.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_64D920D7-4562-415B-95F4-30CF35B319FA.txt",
+      "path": "A208B984-F1DA-475A-BE75-E8C732BC898A.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_B9466EBF-9FB5-4D37-B179-1ADD237D59B1.txt",
+      "path": "EE72D08F-2F65-4D70-819E-8EB2786DFE8C.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_F28A54E5-F9E6-46C1-B71C-A2F9C54FEE6A.txt",
+      "path": "C6DD2F7F-FC41-4630-BDE1-8B9BDA094200.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_1FA9BFBA-3E5E-40B8-9133-75F502B3B474.txt",
+      "path": "002EEC15-B368-45B5-9E8C-E871490C28AF.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_0EF82196-0935-44DF-9FC1-4C85CF2323A3.txt",
+      "path": "A7EE8A4B-3A95-49A0-9289-50A4311F9E93.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_9DD45A86-7E33-4FE1-BE21-70564A91D0B9.txt",
+      "path": "B22730D1-AEE4-4826-994C-EFD4ABA79B51.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_1255E892-5D30-473E-B611-B77FB2163AAA.txt",
+      "path": "31CFA5A8-4710-41F1-A422-5220D00D3981.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_4C578712-C5C6-4208-8E98-31327D498FE7.txt",
+      "path": "171A6791-DC88-482B-89CC-2167151FDDDB.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_6C734BD1-E68E-4EC5-984F-4FEDE674A30E.txt",
+      "path": "9FC04B4F-156F-4743-82DB-A48EE24C9167.txt"
+    },
+    {
+      "name": "Debug description for `\"officeRequestOpen\" Button`_0_9120560F-9072-4159-B1B1-3A953C62F4D8.txt",
+      "path": "CB4FF4AD-47EC-4C8E-851A-6A9A7E291F81.txt"
+    }
+  ],
+  "ReviewQualityUITests/testPlanApprovalActionsAtDefaultText()": [
+    {
+      "name": "plan-approval-default-keep-planning-accessibility-tree_0_EE7D1CBC-38BF-43C3-8521-C1F5EB8D06D1.txt",
+      "path": "A1908D7B-6B32-4AE4-B81E-6928A1F45E87.txt"
+    },
+    {
+      "name": "plan-approval-default-keep-planning_0_60C0EBCD-F115-4A47-BCEF-BCCA55B608B6.png",
+      "path": "A2971752-B98E-4E3B-A011-FFD497965D8A.png"
+    },
+    {
+      "name": "plan-approval-default-approve-plan-accessibility-tree_0_1E7F8D75-7F79-46A5-80D5-4FAFE0FC4F34.txt",
+      "path": "E62FC849-638F-4268-851C-EA5ED6754DF3.txt"
+    },
+    {
+      "name": "plan-approval-default-approve-plan_0_45D171D1-1128-40A5-BD3D-2EBB589923E5.png",
+      "path": "BF648D82-3955-4507-8595-3ADCB6B703BD.png"
+    }
+  ],
+  "ReviewQualityUITests/testSettingsContrastNativeDiagnostic()": [
+    {
+      "name": "settings-contrast-native-default-material-0-results_0_471371A0-6B23-4751-AD4F-D12C66253F2B.txt",
+      "path": "7A5209C0-250F-4B98-B324-75EC423400A1.txt"
+    },
+    {
+      "name": "settings-contrast-native-default-material-0-after-accessibility-tree_0_C106EE5D-5ECF-45A0-BB63-16E0464ED8A0.txt",
+      "path": "94F6D272-94E4-439D-9A13-438DF1952E2D.txt"
+    },
+    {
+      "name": "settings-contrast-native-default-material-0-after_0_468153C7-5766-4F12-BEBA-8ED94089208E.png",
+      "path": "536FF9A2-FF41-48FE-B8F0-76D026C28E2F.png"
+    },
+    {
+      "name": "settings-contrast-native-default-material-0-before-accessibility-tree_0_3F2DC3CD-EC0D-4EFF-9183-3E170F33A4D5.txt",
+      "path": "31589ECC-E935-496C-8F22-1553F3D430A0.txt"
+    },
+    {
+      "name": "settings-contrast-native-default-material-0-before_0_37DFDDF7-9E58-45FF-B6B6-7DCAB83CA1E8.png",
+      "path": "3439315B-BDC0-4BCE-B128-38C8AC0C87F1.png"
+    },
+    {
+      "name": "settings-contrast-native-default-contrast-exclusion-screen-accessibility-tree_0_D5FF3DC2-BD17-4A1F-9714-72F0A798C999.txt",
+      "path": "D7FD1A00-463C-44A0-A253-62C85F33FEA6.txt"
+    },
+    {
+      "name": "settings-contrast-native-default-contrast-exclusion-screen_0_A509BBAD-FC1A-472B-9AEC-B3D5514C581A.png",
+      "path": "386C7D7A-488A-4142-A727-D5A50A8AD403.png"
+    },
+    {
+      "name": "settings-contrast-native-default-contrast-exclusion_0_792E62AE-0AB5-43B7-860D-85C859CCF36B.txt",
+      "path": "60183EF4-0A3B-4EC3-B96D-41DC6E3D14E8.txt"
+    },
+    {
+      "name": "settings-contrast-native-default-verified-element-contrast_0_5C35C9FB-247C-43C4-B8E1-5F3F7104C44C.png",
+      "path": "D53B44B1-A115-43A2-9B56-C65B7BE16A4F.png"
+    },
+    {
+      "name": "settings-contrast-native-default-accessibility-tree_0_0882ABC1-EFB0-4B92-BC4F-EB93B273FBC5.txt",
+      "path": "C4F039C3-FE23-4F4F-A260-A483D19AF45D.txt"
+    },
+    {
+      "name": "settings-contrast-native-default_0_0D783239-6EF4-4188-B8E9-A4AD6548FD05.png",
+      "path": "7958FBCE-5BDB-48F9-A090-A942D627DB75.png"
+    }
+  ],
+  "ReviewQualityUITests/testSettingsDetectionAtScrollPositions()": [
+    {
+      "name": "settings-detection-position-4-accessibility-tree_0_D2AAC9C7-0D11-426F-9756-D69B3F0EBDC1.txt",
+      "path": "2A2E3F67-1D63-4B0A-BF74-F400BE05B0C4.txt"
+    },
+    {
+      "name": "settings-detection-position-4_0_02F6E5AB-F43C-427A-96A6-08EFBF5E78F6.png",
+      "path": "21E2BFCD-4E9F-46EC-A6AF-05507968A973.png"
+    },
+    {
+      "name": "settings-detection-position-3-accessibility-tree_0_4EB614A5-8D03-4501-9578-74E1D8F9F683.txt",
+      "path": "B46AE82E-6A1C-44B6-B1E3-4D2B6CA7F479.txt"
+    },
+    {
+      "name": "settings-detection-position-3_0_6022C235-331C-4C45-9F19-4C14F4C342FB.png",
+      "path": "7FA45111-75C9-434D-911F-1B6359175498.png"
+    },
+    {
+      "name": "settings-detection-position-2-accessibility-tree_0_461BA1E2-B7E7-4A76-907A-28C875A0A210.txt",
+      "path": "8F4250D1-7EAB-4858-BC9E-93B782788337.txt"
+    },
+    {
+      "name": "settings-detection-position-2_0_58716630-F37E-4122-B340-BEA3D426D3C3.png",
+      "path": "8237D152-D914-4841-A70E-723F7D1F330B.png"
+    },
+    {
+      "name": "settings-detection-position-1-accessibility-tree_0_0DBBA161-CAF9-4D37-ADA5-85827C03C1E0.txt",
+      "path": "77980026-FA39-4A26-B0DA-C6C6F84AF7A5.txt"
+    },
+    {
+      "name": "settings-detection-position-1_0_9D119B4B-D202-4C87-AABA-1C7609620365.png",
+      "path": "C0402850-48DB-4233-B9CF-2820EB30823A.png"
+    },
+    {
+      "name": "settings-detection-position-0-accessibility-tree_0_C3D39E60-ECB4-4F7B-9785-6A1DCC331D05.txt",
+      "path": "17AD93F8-5EB0-4F02-A117-1854416BFE70.txt"
+    },
+    {
+      "name": "settings-detection-position-0_0_D8EA2B0E-A770-43EC-BCE5-BF1BAD46CD41.png",
+      "path": "7720BE0B-70B3-4098-883D-2CBC1A25CBCB.png"
+    }
+  ],
+  "ReviewQualityUITests/testSettingsElementDetectionAtDefaultText()": [
+    {
+      "name": "settings-detection-default-accessibility-tree_0_1E463227-53E3-46E1-9547-DC0A5C18B8FF.txt",
+      "path": "7FA98CEA-7B60-4539-A800-C273C9B0004F.txt"
+    },
+    {
+      "name": "settings-detection-default_0_89B05DCF-D8CD-474D-865E-30D3F93ABA6A.png",
+      "path": "48435C16-04F2-496C-BFD5-A1ADEEFE8FFA.png"
+    }
+  ],
+  "ReviewQualityUITests/testSettingsSecondContrastNativeDiagnostic()": [
+    {
+      "name": "settings-second-contrast-native-default-material-0-results_0_59806BE2-962C-4103-AC04-2E12B0EEC413.txt",
+      "path": "E50BCB34-91EF-4571-8595-1BC87552C4DD.txt"
+    },
+    {
+      "name": "settings-second-contrast-native-default-material-0-after-accessibility-tree_0_2D806891-8F7B-4292-93BB-5C8596559B40.txt",
+      "path": "83EE20AD-9429-4722-A326-27980D9837FB.txt"
+    },
+    {
+      "name": "settings-second-contrast-native-default-material-0-after_0_23B87355-C63B-43D5-BDC2-E2A806C0B0A7.png",
+      "path": "B1B5B626-405A-423D-ABA2-5CC30EC27ED8.png"
+    },
+    {
+      "name": "settings-second-contrast-native-default-material-0-before-accessibility-tree_0_12000CCB-0071-47A0-BB01-B3ADBE66AB37.txt",
+      "path": "29A392D3-FF33-4048-A0D8-FCC5AD851756.txt"
+    },
+    {
+      "name": "settings-second-contrast-native-default-material-0-before_0_D4794940-5D72-4949-A4EC-C66A69FA9A3B.png",
+      "path": "6943734F-BFBB-4D17-9E0F-270F6FB603ED.png"
+    },
+    {
+      "name": "settings-second-contrast-native-default-contrast-exclusion-screen-accessibility-tree_0_F87D2218-CC63-406C-8BCB-66B0BAC5A970.txt",
+      "path": "C0BEAF4D-1185-4893-8C77-80C73AD2496E.txt"
+    },
+    {
+      "name": "settings-second-contrast-native-default-contrast-exclusion-screen_0_281D2AFC-D48C-4D90-BB37-957AC3490968.png",
+      "path": "1DC1D623-CB02-4FE1-A812-790A4DF70CBB.png"
+    },
+    {
+      "name": "settings-second-contrast-native-default-contrast-exclusion_0_7F85113C-03CA-4E2F-8F6D-846E4F738616.txt",
+      "path": "5300A864-393E-4750-815E-2A85B7E720AD.txt"
+    },
+    {
+      "name": "settings-second-contrast-native-default-verified-element-contrast_0_2F724EAE-B32F-44F2-BED5-601836F62C72.png",
+      "path": "823DC512-5D33-459C-A01F-D38166274D68.png"
+    },
+    {
+      "name": "settings-second-contrast-native-default-accessibility-tree_0_E6EFD661-B2B0-4AC5-95DD-43C6F95DE607.txt",
+      "path": "3089FB97-90E6-4760-986E-C978750FADBC.txt"
+    },
+    {
+      "name": "settings-second-contrast-native-default_0_005B9E4A-0D39-4A46-AC2E-8F3EAE588B1B.png",
+      "path": "E21D3C6E-CD95-4EE2-A821-7012BFA75A2C.png"
+    }
+  ],
+  "ReviewQualityUITests/testSettingsTextActuallyScales()": [
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl-results_0_08476072-011F-428D-A9C2-F2CF124A8C62.txt",
+      "path": "0924E8D5-51FA-4CB3-94D7-A5A4B59D6E5E.txt"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl_0_E2CF179A-7518-4C44-A67B-06BA71BEBDA3.png",
+      "path": "A1F6A255-0B11-4779-9A27-1E8827348077.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-accessibility-xxxl-control_0_AF272F8B-22EC-4B18-BC5E-A808B5BC0A07.png",
+      "path": "46AB38CB-A2FD-495E-B210-E1ACA91092AD.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl-results_0_6A893B81-0348-402A-A25D-B1ED5EE31A95.txt",
+      "path": "D365DB34-F3EA-433B-8FF4-B41FCF3305D3.txt"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl_0_20A7BD80-0057-4585-8F14-B6C618930051.png",
+      "path": "0B1949D4-9435-4DA2-8B36-459DEB235D5B.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-accessibility-xxxl-control_0_DA31DEFE-1405-4C35-9DA4-C5DC4B49E7E2.png",
+      "path": "722AB823-C7A5-492C-A291-980BE5849E01.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl-results_0_14837D82-F526-44D7-9895-022F7DF0AB82.txt",
+      "path": "C8A61B16-8729-4F42-88A5-73A21418E28E.txt"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl_0_BC347F6E-01CD-470E-B12F-0C99D70C3A98.png",
+      "path": "48287EE7-1694-466F-9966-59AFFFFF14BD.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-accessibility-xxxl-control_0_D2F313CC-F07F-4B10-BBF6-A527BBA0B7A9.png",
+      "path": "D73DD796-2AEB-447D-AA0F-BA77C5DD9B34.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl-results_0_E5E1ADB3-73BD-4B9B-A4AD-710DF9C7FDC8.txt",
+      "path": "116AD869-41C2-477C-A0FB-EAD8EC835B01.txt"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl_0_CAB0CB3B-13AF-4A43-BD59-C8C5BF35BEBF.png",
+      "path": "4C2F1CA3-AB5B-4B33-9DD0-D434C2FB830E.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-accessibility-xxxl-control_0_1E5B1301-592D-4646-9057-51A6CAD2D023.png",
+      "path": "B2DEA3B3-F1B0-4ED6-A379-C47B105F56F6.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default-results_0_79CA48A2-EACB-458E-9FAC-D53090799CC8.txt",
+      "path": "480733FA-01FE-41F7-B6FB-F58FCF10D604.txt"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default_0_52E175F1-D8DC-4987-9BB4-CC4F25FADD32.png",
+      "path": "7109574F-A803-450B-BB65-A1736627C60E.png"
+    },
+    {
+      "name": "settings-scale-Patrick's MegaMac-default-control_0_8B51F12B-8B53-425E-96C0-AD942E86A312.png",
+      "path": "B5EE410E-411C-44CC-A47B-09901254A532.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-default-results_0_62EEBF18-3BFD-4ADD-8FF7-34231A2195D6.txt",
+      "path": "A00F0A97-6CD7-4804-AB7F-470D59A60112.txt"
+    },
+    {
+      "name": "settings-scale-Configured limit-default_0_2B23E563-CAB5-44C5-B787-69BE80DA678B.png",
+      "path": "E5E3063D-3573-40BA-90EF-C03B93BE1B2D.png"
+    },
+    {
+      "name": "settings-scale-Configured limit-default-control_0_AF37D8CB-F17C-41C0-9DAC-95DC19C7F9A5.png",
+      "path": "E761D8EC-C55A-4A22-82A5-5111489CE378.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-default-results_0_E64E1F8B-289F-4266-BDD5-B81EE534BA29.txt",
+      "path": "741E001A-375D-4BDF-A421-47C084003E3E.txt"
+    },
+    {
+      "name": "settings-scale-Threads at once-default_0_A545DAB1-F7B5-4A87-A781-551526C9A1A7.png",
+      "path": "E54C2CA2-D725-45E9-B6E3-437E2DA786D2.png"
+    },
+    {
+      "name": "settings-scale-Threads at once-default-control_0_4F51E06B-5B32-4BCD-9442-AF20899A4E2B.png",
+      "path": "91F55D61-799E-4FB8-81E2-9BCEA8153F9A.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default-results_0_CDEC6A9B-8845-46D8-8C7C-ECEF002C0443.txt",
+      "path": "ACAB5BD5-2FD9-4055-9C72-4CB09372F1D9.txt"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default_0_0BB9D46B-B94E-4BCE-9341-992730758B25.png",
+      "path": "A4C62677-62F1-4AFD-B716-5C424B916881.png"
+    },
+    {
+      "name": "settings-scale-Keep Mac awake-default-control_0_3D691901-3C80-44E6-BF4D-4569B8F4F988.png",
+      "path": "08C983AE-C5D0-4924-AB1F-A1EF74EE55AF.png"
+    }
+  ],
+  "ReviewQualityUITests/testStudioRowContrastNativeDiagnosticAtAccessibilityText()": [
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-results_0_A181DB4A-951E-4932-9A3F-EE71D5600553.txt",
+      "path": "284A62D6-07FC-42E7-8163-C750AA291F81.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_3B2EEFC5-8C69-40BE-99F1-9C0C30744090.txt",
+      "path": "3E2B3C30-2A4A-4ACE-AAA7-6AEE687E80BE.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen_0_012DCF53-C1ED-429A-ADCB-D76216040DA7.png",
+      "path": "C71717D4-7A1C-482D-A429-F1A8AFAD6F85.png"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion_0_49CF7D5B-6890-4479-ACA7-48E68E62E892.txt",
+      "path": "793F9A68-CB92-411C-875E-4C9515E1F94E.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-reaudit-verified-element-contrast_0_856CB0B8-5437-43F5-A88E-FC631439DE3D.png",
+      "path": "5D24B55D-D146-41E7-ADBC-5B80B000A39F.png"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-after-accessibility-tree_0_D0F532B4-1F56-405E-8F76-528CFF6B4AE2.txt",
+      "path": "F8B5F4E9-30E2-478C-ABE6-B538EBDAFE8D.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-after_0_EFA5C839-28D4-49A3-B14E-2672E993F469.png",
+      "path": "B62D1DBC-5CA6-4B84-96A9-DECD085A265D.png"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-before-accessibility-tree_0_288607F0-C1C6-447C-991A-009A57B10331.txt",
+      "path": "C3485421-065D-42EA-98AC-70776DF87F97.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-material-0-before_0_9B563DB0-4ADF-4FA7-B78C-0BFBDF6CA123.png",
+      "path": "A19A10AC-94C9-4922-A170-13713A1D1CFA.png"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_4FC33D3E-69C9-4627-A5E1-46B61E4714FE.txt",
+      "path": "1EACBDA0-D825-4D76-95CE-6A05EA73BE0A.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-contrast-exclusion-screen_0_F4DD0BF5-3998-405A-B51D-3A77DC99E895.png",
+      "path": "17469B14-3BDD-4D2D-B80D-575627AEF747.png"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-contrast-exclusion_0_E9834E00-8CAC-4508-A0BB-BCE9F9085975.txt",
+      "path": "6006932C-9624-47C8-ADE6-B22B3A6BD11B.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-verified-element-contrast_0_0A509D7C-B1FA-4CC0-9163-3E1822026247.png",
+      "path": "D06BE42D-A68D-47A8-9AFF-28C3DC0675AA.png"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl-accessibility-tree_0_AEBBC33D-51DC-4521-B191-B4CC98F5E921.txt",
+      "path": "BEEBE28D-E40F-425E-9C57-668890B2F92C.txt"
+    },
+    {
+      "name": "studio-row-contrast-native-accessibility-xxxl_0_8AD35EC6-3173-45F5-96CA-372C37DB9A47.png",
+      "path": "45E2E358-D550-4739-91E5-E9F58C0D094F.png"
+    }
+  ],
+  "ReviewQualityUITests/testStudioRowsAtAccessibilityText()": [
+    {
+      "name": "studio-rows-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_7BE04A2D-120A-49B4-9F07-56FFEDDB58D2.txt",
+      "path": "7420892D-50F4-41C0-96F7-7CB8CAD8C5A1.txt"
+    },
+    {
+      "name": "studio-rows-accessibility-xxxl-contrast-exclusion-screen_0_6E3298B2-1394-4DAF-BBD6-04CE19D9E532.png",
+      "path": "2A7E19FF-B316-4B76-BE84-80794DA9BE80.png"
+    },
+    {
+      "name": "studio-rows-accessibility-xxxl-contrast-exclusion_0_6ACC0363-9CC4-40DF-B18A-E833D991C28B.txt",
+      "path": "4706208F-ECD8-4D58-BE89-2D2FFB18D4A8.txt"
+    },
+    {
+      "name": "studio-rows-accessibility-xxxl-verified-element-contrast_0_3BD667CB-9130-4675-AB1F-C68F3507F76F.png",
+      "path": "7D8682D9-B77A-4530-B97C-EFE5231F8CAC.png"
+    },
+    {
+      "name": "studio-rows-accessibility-xxxl-accessibility-tree_0_22B8F22F-6599-4881-B3E1-B17F31BA5D2D.txt",
+      "path": "D5C8773D-AA7B-44EB-BA5A-9F063C9E2B54.txt"
+    },
+    {
+      "name": "studio-rows-accessibility-xxxl_0_11656FDD-9C3C-46A3-8A9C-FA7D9975698F.png",
+      "path": "C0E81FF8-AEB2-42B3-99BD-F273AC96DEBC.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-results_0_A4B52D2C-8ECD-4F9C-B4C6-0214F3CF4EA7.txt",
+      "path": "CD2BA0AC-0CDD-4FF3-A6A7-71C1E2267E12.txt"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-held_0_2B7FBF1D-93A8-469A-B6CB-3970250F4F52.png",
+      "path": "7516D717-59E3-439B-9634-0E36521601CD.png"
+    },
+    {
+      "name": "lcv-officeSpaceSwitcher-before_0_F35309C7-01CD-492E-9D31-CE7A0B7FE6A0.png",
+      "path": "14168D02-6314-43D9-B9D4-26C9C2451430.png"
+    },
+    {
+      "name": "lcv-studioSelect-results_0_A2CBF5DF-4A4E-4CD1-978A-913B3FD479D0.txt",
+      "path": "010B071A-13CB-4DCD-9E94-2163EDB10C89.txt"
+    },
+    {
+      "name": "lcv-studioSelect-held_0_678DA028-7949-4C4E-8928-E68CA044F08B.png",
+      "path": "A194DE0A-8EC3-40C8-B3DA-428D5B373EE3.png"
+    },
+    {
+      "name": "lcv-studioSelect-before_0_96EF82EA-091C-4727-AD96-B0714CCF4520.png",
+      "path": "2FEF0ECA-F44C-4CC4-9190-2409C5A84F72.png"
+    },
+    {
+      "name": "lcv-captureClose-results_0_D3A5B2B3-4D53-40BE-AD2E-A7F0EB96F97B.txt",
+      "path": "1565BC4E-8EDC-4308-A268-3F7EC78EF9DB.txt"
+    },
+    {
+      "name": "lcv-captureClose-held_0_86BE879C-582A-4B07-8B51-10B0894896E6.png",
+      "path": "0D912917-44A4-43C9-9526-3F0132609FFA.png"
+    },
+    {
+      "name": "lcv-captureClose-before_0_CB807D6D-5840-4CEE-A86B-E9E092A1B3BA.png",
+      "path": "4E271991-B475-4174-A6C2-A9D0AC9D7841.png"
+    },
+    {
+      "name": "lcv-captureBack-results_0_B6049BE3-088C-4030-B17F-781EED7C1315.txt",
+      "path": "B93D864C-F814-40EB-864A-DAD26054372A.txt"
+    },
+    {
+      "name": "lcv-captureBack-held_0_E23F08A8-B64B-42D2-93ED-D3DC2027C9B3.png",
+      "path": "2ACA845F-CF69-4949-AA55-EC230EE788FA.png"
+    },
+    {
+      "name": "lcv-captureBack-before_0_23F0BB73-7248-4CD7-B47C-21DDB85FBC5C.png",
+      "path": "5EE2485F-02F2-4FD6-98FD-DAA5B1E18B6F.png"
+    },
+    {
+      "name": "Complete Issue Description.txt",
+      "path": "5DC48B6C-54AF-435C-A9D3-8110348ADB7A.txt"
+    }
+  ],
+  "ReviewQualityUITests/testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText()": [
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-results_0_690513E9-0062-43DD-8F75-84FAB28B6BB8.txt",
+      "path": "A610D038-DC80-4BD6-8836-6D5D993596B2.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen-accessibility-tree_0_BBE72FF0-5150-4B5A-820B-01DAF6505BB6.txt",
+      "path": "F6E27A7B-9771-460E-9046-75FA1FA6326D.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion-screen_0_E4DAE5F4-DAEE-4B2A-90A0-7283BB0DFD52.png",
+      "path": "FCB3286A-E085-419B-813B-DDC1892F2833.png"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-reaudit-contrast-exclusion_0_C48CC5D8-11F7-432B-B068-23BFFFC6497B.txt",
+      "path": "1F072F35-7779-4453-9E70-D1D4362EB8FB.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-reaudit-verified-element-contrast_0_677414FF-1DD6-4FE4-8670-23C4F9A38118.png",
+      "path": "C01BC158-7B7B-45A7-841D-93C14BE7C476.png"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-after-accessibility-tree_0_57C5F5B6-2CB6-4FB7-B707-5D3152FFEB74.txt",
+      "path": "C284EF43-5CD1-45C6-91A4-FD6742CC1B8F.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-after_0_A3F01CE1-1A62-4810-B061-D1661AB81537.png",
+      "path": "8D0C7D24-C08F-4017-9FA0-B94BF793CD5E.png"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-before-accessibility-tree_0_7A276331-FD12-43EB-BF26-7440D85E248F.txt",
+      "path": "135B6498-B398-4C21-AAEF-69AEBCA868FA.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-material-0-before_0_F8CBAFE1-CDC6-43B7-90E3-5A4EA4C08FAA.png",
+      "path": "180F7BD8-33C8-4CC2-9210-10A44CE050E5.png"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-contrast-exclusion-screen-accessibility-tree_0_F617502A-EC83-4DC2-9690-D8A469F3EA62.txt",
+      "path": "6ABD7D6F-E065-464E-843D-E729FAF85839.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-contrast-exclusion-screen_0_6D655ACC-B17A-40DA-9672-04C2A7D6498E.png",
+      "path": "B0F68718-5911-4EB0-BCC4-DFF726ED74C3.png"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-contrast-exclusion_0_9ACECB91-1FFE-443C-A579-9FA0FF11FD5A.txt",
+      "path": "B1F13DD8-B16E-4B70-925B-4878992FB407.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-verified-element-contrast_0_FEDB5AC0-0937-4897-8946-02C36FCA5D23.png",
+      "path": "6F492297-24DC-4770-892F-3BDD970402DF.png"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl-accessibility-tree_0_01331D28-3ECE-4651-B180-A157A658DA72.txt",
+      "path": "35DB7219-4392-467F-A2C2-EDE432F32732.txt"
+    },
+    {
+      "name": "studio-row-second-contrast-native-accessibility-xxxl_0_189A4AD3-664C-4B7F-93C9-0FEED8D3EE82.png",
+      "path": "28E84C3C-DFD9-40A9-ABB9-CC489431AA25.png"
+    }
+  ]
+}

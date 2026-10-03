@@ -1,0 +1,1 @@
+note-accessibility-xxxl: policy 1: captureNoteSave is disabled (inactive control); element frame=(23.363184079601993, 642.5936981757877, 355.27363184079604, 89.6185737976781)

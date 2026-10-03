@@ -1,0 +1,277 @@
+[
+  {
+    "test": "ArtifactRuntimeUITests/testCorruptHeaderPDFShowsRecoveryAction()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testCorruptImageShowsRecoveryAction()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testCorruptPDFShowsRecoveryAction()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testDelayedVersionCannotReplaceSelection()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testEmptyTextRemainsValid()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testHealthyNativePreviews()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testInitialLookupCanRetry()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testLockedPDFOffersShare()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testReadablePDFRendersPages()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testUnavailableHTMLCanRecover()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testUnavailableImageCanRecover()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ArtifactRuntimeUITests/testUnavailableTextCanRecover()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "NewSurfacesUITests/testMeetingNotes()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "NewSurfacesUITests/testTableViews()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "OfficeCaptureUITests/testHome()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "OfficeCaptureUITests/testInbox()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "OfficeCaptureUITests/testTeamAndDesk()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "OfficeCaptureUITests/testWork()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewPerformanceUITests/testRepeatedStudioPageNavigation()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testHomeClippingNativeDiagnosticAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testHomeContrastNativeDiagnosticAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testInboxApprovalActionsAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Failed"
+  },
+  {
+    "test": "ReviewQualityUITests/testInboxApprovalActionsAtDefaultText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testIsolatedLaunchMeasurement()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testNavigationAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Failed"
+  },
+  {
+    "test": "ReviewQualityUITests/testNavigationAtDefaultText()",
+    "originalResult": "Skipped",
+    "finalResult": "Failed"
+  },
+  {
+    "test": "ReviewQualityUITests/testPlanApprovalActionsAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Failed"
+  },
+  {
+    "test": "ReviewQualityUITests/testPlanApprovalActionsAtDefaultText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testSettingsContrastNativeDiagnostic()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testSettingsDetectionAtScrollPositions()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testSettingsElementDetectionAtDefaultText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testSettingsSecondContrastNativeDiagnostic()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testStudioRowContrastNativeDiagnosticAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ReviewQualityUITests/testStudioRowsAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Failed"
+  },
+  {
+    "test": "ReviewQualityUITests/testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ShareRuntimeUITests/testFailedItemFromSystemShareSheet()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ShareRuntimeUITests/testFileFromSystemShareSheet()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ShareRuntimeUITests/testImageFromSystemShareSheet()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ShareRuntimeUITests/testSendFileToDedicatedStagedProject()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ShareRuntimeUITests/testURLAndTextFromSystemShareSheet()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testArtifact()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testFeatures()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testFileLink()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testInlineVis()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testIPad()",
+    "originalResult": "Skipped",
+    "finalResult": "Skipped"
+  },
+  {
+    "test": "ThreadUITests/testMarkdownImage()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testPageComments()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testPageTools()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testProbe()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testQueueEdit()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testQueueReorder()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testRenameThread()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testTerminal()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testThread()",
+    "originalResult": "Skipped",
+    "finalResult": "Passed"
+  },
+  {
+    "test": "ThreadUITests/testVoiceChat()",
+    "originalResult": "Skipped",
+    "finalResult": "Skipped"
+  }
+]

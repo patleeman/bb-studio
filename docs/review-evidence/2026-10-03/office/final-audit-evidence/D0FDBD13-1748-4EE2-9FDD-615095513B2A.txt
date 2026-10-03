@@ -1,0 +1,1 @@
+note-accessibility-xxxl: policy 3: resolved element id=captureBack label=Back sRGB foreground=[0, 0, 0], background=[236, 236, 239], contrast=17.811153478088894:1; element frame=(27.203980099502488, 257.23383084577114, 66.89386401326698, 34.56716417910451)

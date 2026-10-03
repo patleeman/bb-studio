@@ -1,0 +1,1 @@
+officeSpaceSwitcher: title=Personal; original=0.01917900664491745; held=0.05191503855038193; passed=true; observations=[BBStudioUITests.RenderedText.Line(text: "Personal", confidence: 1.0, bounds: (0.24091028587466706, 0.4713536840054192, 0.5305721352547159, 0.05191503855038193))]

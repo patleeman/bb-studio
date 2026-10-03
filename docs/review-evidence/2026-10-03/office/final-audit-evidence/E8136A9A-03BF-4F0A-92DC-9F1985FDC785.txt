@@ -1,0 +1,1 @@
+home-default-material-0-reaudit: policy 3: resolved element id= label=Recent Work sRGB foreground=[14, 13, 15], background=[222, 222, 227], contrast=14.461326715432568:1; element frame=(16.0, 801.0, 370.0, 40.33333333333337)

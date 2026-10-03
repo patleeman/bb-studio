@@ -1,0 +1,1 @@
+note-default: policy 1: captureNoteSave is disabled (inactive control); element frame=(23.363184079601993, 447.6733001658375, 355.27363184079604, 48.33001658374792)

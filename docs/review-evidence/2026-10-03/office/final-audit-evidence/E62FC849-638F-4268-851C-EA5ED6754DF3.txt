@@ -1,0 +1,68 @@
+Attributes: Application, 0x113e952c0, pid: 54284, label: 'BB Studio'
+Element subtree:
+ →Application, 0x113e952c0, pid: 54284, label: 'BB Studio'
+    Window (Main), 0x113e948c0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x113e94640, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x113e96a80, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x113e95540, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x113e95b80, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x11403f700, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x11403f980, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x114e692c0, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x114e6b840, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x114e6a940, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x114e6a440, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x114e6a6c0, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x114e6a580, {{0.0, 0.0}, {402.0, 874.0}}, value: 3
+                            NavigationBar, 0x114e6bc00, {{0.0, 62.0}, {402.0, 54.0}}, identifier: 'Native approval card QA'
+                              Button, 0x114e6bd40, {{16.0, 62.0}, {44.0, 44.0}}, identifier: 'BackButton', label: 'Inbox'
+                              StaticText, 0x114e6b5c0, {{105.3, 73.7}, {191.3, 20.7}}, label: 'Native approval card QA'
+                              Other, 0x114e6b480, {{346.0, 66.0}, {36.0, 36.0}}
+                                Other, 0x114e6a300, {{346.0, 66.0}, {36.0, 36.0}}
+                                  Button, 0x114e69f40, {{350.0, 66.0}, {28.0, 36.0}}, label: 'More'
+                                    Button, 0x114e68dc0, {{350.0, 66.0}, {28.0, 36.0}}
+                                      Image, 0x114e69b80, {{354.0, 82.0}, {20.0, 4.3}}, identifier: 'ellipsis', label: 'More'
+                            Other, 0x114e6a800, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x114e6b980, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x114e6ae40, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x114e6af80, {{0.0, 0.0}, {402.0, 874.0}}
+                                    ScrollView, 0x114e6b0c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x114e68f00, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x114e6b700, {{0.0, 0.0}, {402.0, 156.0}}
+                                      Other, 0x114e68780, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x112a5cdc0, {{0.0, 529.0}, {402.0, 243.0}}
+                                        Other, 0x112a5cf00, {{28.0, 549.7}, {326.0, 201.6}}
+                                          StaticText, 0x112a5d040, {{31.0, 549.7}, {179.0, 15.7}}, label: 'Waiting for your approval'
+                                          Image, 0x112a5d180, {{31.0, 550.0}, {10.7, 14.3}}, identifier: 'hand.raised.fill', label: 'Block'
+                                          StaticText, 0x112a5d2c0, {{28.0, 575.4}, {326.0, 58.0}}, label: 'After approval, return only QA_OK. Do not use tools, change files, execute commands, access the network, or send messages.'
+                                          Button, 0x112a5d400, {{28.0, 643.3}, {105.3, 44.0}}, label: 'Read the full plan'
+                                          Button, 0x112a5d540, {{28.0, 697.3}, {110.3, 54.0}}, label: 'Approve plan'
+                                          Button, 0x112a5d680, {{146.3, 697.3}, {117.3, 54.0}}, label: 'Keep planning'
+                                      Other, 0x112a5d7c0, {{369.0, 529.0}, {30.0, 243.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x112a5d900, {{396.0, 532.0}, {3.0, 237.0}}
+                                      Other, 0x112a5dcc0, {{369.0, 529.0}, {30.0, 243.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x112a5de00, {{396.0, 532.0}, {3.0, 237.0}}
+                                    Button, 0x112a5df40, {{16.0, 796.0}, {36.0, 36.0}}, label: 'Attachments'
+                                      Button, 0x112a5e080, {{16.0, 796.0}, {36.0, 36.0}}
+                                        Image, 0x112a5e1c0, {{24.0, 803.0}, {20.0, 22.3}}, identifier: 'paperclip', label: 'Attachments'
+                                    Button, 0x112a5f340, {{56.0, 796.0}, {36.0, 36.0}}, identifier: 'mic.fill', label: 'Dictate'
+                                    TextView, 0x112a5f480, {{96.0, 794.0}, {250.0, 38.0}}, label: 'Message'
+                                      StaticText, 0x112a5f700, {{108.0, 802.0}, {68.7, 20.3}}, label: 'Message'
+                                      Other, 0x112a5f840, {{313.0, 794.0}, {30.0, 32.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x112a5f980, {{340.0, 793.0}, {3.0, 36.0}}
+                                      Other, 0x112a5f0c0, {{96.0, 810.0}, {244.0, 19.0}}, label: 'Horizontal scroll bar, 1 page', value: 0%
+                                        Other, 0x112a5f200, {{99.0, 826.0}, {244.0, 3.0}}
+                                    Button, 0x112a5ee40, {{350.0, 796.0}, {36.0, 36.0}}, identifier: 'arrow.up.circle.fill', label: 'Send', Disabled
+                            Toolbar, 0x112a5c3c0, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x112a5c8c0, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x112a5ca00, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x112a5cb40, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x112a5ed00, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x112a5c500, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x113e952c0, pid: 54284, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x112a5c640, pid: 54284, label: 'BB Studio'
+  }

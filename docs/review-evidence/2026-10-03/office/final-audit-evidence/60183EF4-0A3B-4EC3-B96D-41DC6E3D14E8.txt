@@ -1,0 +1,1 @@
+settings-contrast-native-default: policy 3: resolved element id= label=Threads sRGB foreground=[13, 13, 15], background=[227, 226, 230], contrast=15.058846167606843:1; element frame=(16.0, 778.0, 370.0, 40.33333333333337)

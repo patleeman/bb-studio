@@ -1,0 +1,1 @@
+capture-accessibility-xxxl: policy 3: resolved element id=captureClose label=Close sRGB foreground=[0, 0, 0], background=[243, 243, 247], contrast=18.974254200706998:1; element frame=(27.203980099502488, 257.23383084577114, 72.97512437810946, 34.56716417910451)

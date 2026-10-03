@@ -1,0 +1,1 @@
+studio-accessibility-xxxl: policy 3: resolved element id= label=21 min. ago sRGB foreground=[87, 87, 87], background=[220, 220, 220], contrast=5.269471130833913:1; element frame=(80.0, 782.3333333333334, 206.33333333333331, 51.33333333333326)

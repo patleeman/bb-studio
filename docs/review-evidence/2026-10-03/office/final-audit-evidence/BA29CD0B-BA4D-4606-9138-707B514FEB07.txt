@@ -1,0 +1,1 @@
+note-default: policy 3: resolved element id=captureBack label=Back sRGB foreground=[3, 3, 3], background=[239, 237, 236], contrast=17.67318758896323:1; element frame=(27.203980099502488, 257.23383084577114, 59.21227197346599, 34.56716417910451)

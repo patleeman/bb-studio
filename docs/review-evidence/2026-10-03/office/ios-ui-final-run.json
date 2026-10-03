@@ -1,0 +1,40 @@
+{
+  "commit": "26d7a1e7b36cbd81fc492bfd789a5e911744f91b",
+  "stagedDirectory": "/tmp/bb-office-final-fresh",
+  "serverURL": "http://127.0.0.1:52886",
+  "projectId": "proj_9ysptyrrtk",
+  "workspaceThreadId": "thr_x2uump2i9w",
+  "simulatorId": "6DE2214C-A8C1-4F2F-BE59-70D176BCA8A1",
+  "stableBB": "0.45.0",
+  "trackedSourceCleanAtStart": true,
+  "pluginInstallLogLines": [
+    "Installing bb-app 0.45.0 in /tmp/bb-office-final-fresh",
+    "Installing studio from git:github.com/patleeman/bb-studio@26d7a1e",
+    "Installing float from git:github.com/patleeman/bb-studio@26d7a1e",
+    "Installing pages from git:github.com/patleeman/bb-studio@26d7a1e",
+    "Installing excalidraw from git:github.com/patleeman/bb-studio@26d7a1e",
+    "Installing mobile from git:github.com/patleeman/bb-studio@26d7a1e",
+    "Installing emoji-react from git:github.com/patleeman/bb-studio@26d7a1e"
+  ],
+  "fullTestTarget": "BBStudioUITests",
+  "runDirectory": "/tmp/office-ui-final-full",
+  "exitCode": 65,
+  "fixtureEnvironment": {
+    "BBGO_QA_MESSAGE_THREAD": "thr_d2zrnexnh8",
+    "BBGO_QA_MESSAGE_TEXT": "The native UI fixture is ready. This assistant message was seeded locally for the sent-time menu test.",
+    "BBGO_QA_RECORDING": "rec_5b7b36e4ded1ff2b",
+    "BBGO_QA_RECORDING_MP4": "rec_4900c468213ad51c",
+    "BBGO_QA_MEETING_RECORDING": "rec_929664a97584e85b",
+    "BBGO_QA_FILE_THREAD": "thr_ayq8z9cn24",
+    "BBGO_QA_VIS_THREAD": "thr_u3f36jf947",
+    "BBGO_QA_IMAGE_THREAD": "thr_pds83qz4wb",
+    "BBGO_QA_ARTIFACT": "art_ceb4cad15e769fbc",
+    "BBGO_QA_ARTIFACT_THREAD": "thr_xu22y7bycg",
+    "BBGO_QA_REACTIONS_THREAD": "thr_45dv6a2656",
+    "BBGO_PROBE_THREAD": "thr_29epuwqaye",
+    "BBGO_QA_PLAN_THREAD": "thr_55rwuwh3sw",
+    "BBGO_QA_PLAN_THREAD_TITLE": "Native approval card QA",
+    "BBGO_QA_PLAN_INTERACTION": "pint_45b695e684",
+    "BBGO_QA_PERFORMANCE_READY": "YES"
+  }
+}

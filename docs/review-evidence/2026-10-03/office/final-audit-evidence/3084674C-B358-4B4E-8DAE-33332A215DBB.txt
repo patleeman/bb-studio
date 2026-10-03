@@ -1,0 +1,1 @@
+studio-default: policy 3: resolved element id= label=Artifact runtime corrupt image sRGB foreground=[8, 8, 8], background=[220, 220, 220], contrast=14.604607229599095:1; element frame=(96.0, 775.6666666666666, 127.0, 42.33333333333337)
