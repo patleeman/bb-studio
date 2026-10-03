@@ -1,5 +1,11 @@
 # Native artifact preview runtime checks
 
+The later [edge-case follow-up](edge-cases/README.md) verifies header-valid corrupt
+PDFs, password-locked PDFs, native PDF rendering/zoom, initial lookup Retry, and
+a controlled delayed text-version response. PDF previews now use PDFKit; HTML
+keeps the artifact-specific WebKit viewer. The runs below describe the earlier
+WebKit-based checkpoint and retain its before/after evidence.
+
 Verified on 3 October 2026 against the isolated staged BB at `http://127.0.0.1:49486`, project Orbit (`proj_su3dznrbpw`). The app runs in a newly created, empty iPhone 18 Pro simulator on iOS 27.0, with a private copied project and derived data. Both app and app-group preferences were set and read back before launch. The copied `AppGroup.swift` and `BBClient.swift` also replace the production fallback URL with the staged URL. XCTest checks the visible Settings URL before opening any artifact.
 
 This is SwiftUI text/Markdown, AsyncImage, and WebKit coverage. It does not use or test QuickLook. No user server, existing simulator, phone, other agent's fixture, or legacy UI suite was used.
@@ -40,8 +46,8 @@ Raw private results: `/tmp/bb-artifact-runtime/verified.xcresult`; build log: `/
 A later source review added Retry to the initial artifact lookup error as well.
 It clears the error immediately and repeats the lookup through the view's
 captured server client. The seven UI tests above exercise content preview
-failures after lookup; they do not establish initial-lookup network recovery.
-That small follow-up is checked by the native build separately.
+failures after lookup. The [edge-case follow-up](edge-cases/README.md) now verifies
+initial-lookup recovery from a controlled HTTP 503 to a successful retry.
 
 The opt-in suite refuses to launch without the exact staged origin, a private-simulator marker, and owned fixture JSON. `run.sh` copies the project, includes only ArtifactRuntimeUITests, creates a new device, seeds its own artifact IDs, verifies preferences, and removes only its own device and artifact IDs on exit. `seed.py` removes bytes only after confirming the blob has exactly the owned fixture reference. It never alters another artifact.
 
@@ -55,4 +61,9 @@ The script prints its private results directory. The recorded runs used the same
 
 ## Limits
 
-These checks use one default-size iPhone simulator and simple deterministic files. They do not cover physical-device performance, other Dynamic Type sizes, every format or encoding, a corrupt PDF that still has a valid `%PDF-` header, or all linked-resource behavior. The stale-completion guards are reviewed code changes; this lane did not inject a controlled delayed version response or prove every version-switch race. WebKit process termination and network-disconnection callbacks are compiled but were not separately forced. PDF/image rendering is also inspected in screenshots; text and HTML recovery have live content assertions.
+This earlier checkpoint uses one default-size iPhone simulator and simple deterministic files. It does not cover physical-device performance, other Dynamic Type sizes, every format or encoding, a corrupt PDF that still has a valid `%PDF-` header, or all linked-resource behavior. The stale-completion guards are reviewed code changes; this lane did not inject a controlled delayed version response or prove every version-switch race. WebKit process termination and network-disconnection callbacks are compiled but were not separately forced. PDF/image rendering is also inspected in screenshots; text and HTML recovery have live content assertions.
+
+The [later follow-up](edge-cases/README.md) closes the header-valid corrupt PDF,
+locked PDF, initial lookup retry and one delayed text-version sequence gaps.
+Large-file performance, physical devices and metadata reload races remain
+unverified; the newer report records its precise source and coverage limits.
