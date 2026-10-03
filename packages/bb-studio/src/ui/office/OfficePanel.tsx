@@ -14,6 +14,7 @@ export function OfficePanel({ subPath }: { subPath: string }) {
   const { current, spaces, loading, error } = useSpaces();
   const route = parseOfficeRoute(subPath);
   if (route.view === "new-space") return <NewSpacePage />;
+  if (route.view === "new-bot" && current) return <NewBotPage space={current} />;
   if (route.view === "inbox" && route.scope === "all") return <InboxPage scope="all" space={current} spaces={spaces} />;
   if (!current) {
     return <PageColumn>{error ? <p role="alert" className="text-sm text-destructive">{error}</p> : loading ? null : <p className="text-sm text-muted-foreground">No spaces yet.</p>}</PageColumn>;
@@ -201,6 +202,79 @@ function SettingsPage({ space }: { space: Space }) {
             </button>
           </section>
         : null}
+    </PageColumn>
+  );
+}
+
+/** Hire a bot into this Space: who it is, what it's for, how much it may do. */
+function NewBotPage({ space }: { space: Space }) {
+  const call = useCall();
+  const ids = { name: useId(), avatar: useId(), role: useId(), mission: useId() };
+  const [name, setName] = useState("");
+  const [avatar, setAvatar] = useState("");
+  const [role, setRole] = useState("");
+  const [mission, setMission] = useState("");
+  const [trust, setTrust] = useState<"ask" | "act">("ask");
+  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const submit = async (event: FormEvent) => {
+    event.preventDefault();
+    if (!name.trim() || !mission.trim()) return;
+    setBusy(true); setError(null);
+    try {
+      const result = await call("teams_create", {
+        name: name.trim(),
+        mission: mission.trim(),
+        description: role.trim(),
+        trust,
+        ...(avatar.trim() ? { avatar: avatar.trim() } : {}),
+        ...(space.defaultProjectId ? { projectId: space.defaultProjectId } : {}),
+      }) as { id?: string; bot?: { id: string } };
+      const id = result.bot?.id ?? result.id;
+      openOffice(id ? `team/${encodeURIComponent(id)}` : "");
+    } catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const field = "h-9 w-full rounded-md border border-border bg-background px-2 text-sm";
+  return (
+    <PageColumn className="max-w-xl">
+      <h1 className="text-2xl font-semibold">Add a bot to {space.name}</h1>
+      <p className="mt-2 text-sm text-muted-foreground">A bot works on its own, on the tasks you give it and on its mission, and reports back to your Inbox.</p>
+      <form onSubmit={(event) => void submit(event)} className="mt-6 space-y-5">
+        <div className="flex gap-3">
+          <div className="w-16">
+            <label htmlFor={ids.avatar} className="mb-1.5 block text-xs font-medium text-muted-foreground">Face</label>
+            <input id={ids.avatar} value={avatar} maxLength={16} onChange={(change) => setAvatar(change.target.value)} placeholder="🤖" className={`${field} text-center`} />
+          </div>
+          <div className="flex-1">
+            <label htmlFor={ids.name} className="mb-1.5 block text-xs font-medium text-muted-foreground">Name</label>
+            <input id={ids.name} autoFocus required value={name} maxLength={80} onChange={(change) => setName(change.target.value)} placeholder="Researcher" className={field} />
+          </div>
+        </div>
+        <div>
+          <label htmlFor={ids.role} className="mb-1.5 block text-xs font-medium text-muted-foreground">Role</label>
+          <input id={ids.role} value={role} maxLength={500} onChange={(change) => setRole(change.target.value)} placeholder="Finds and checks facts for my projects" className={field} />
+        </div>
+        <div>
+          <label htmlFor={ids.mission} className="mb-1.5 block text-xs font-medium text-muted-foreground">Mission</label>
+          <textarea id={ids.mission} required value={mission} onChange={(change) => setMission(change.target.value)} placeholder="What this bot is responsible for, and how it should work." className="min-h-32 w-full resize-y rounded-md border border-border bg-background p-2 text-sm" />
+        </div>
+        <fieldset>
+          <legend className="mb-1.5 text-xs font-medium text-muted-foreground">Trust</legend>
+          {TRUST_OPTIONS.map((option) => (
+            <label key={option.id} className="flex cursor-pointer items-start gap-3 rounded-md px-2 py-2 hover:bg-state-hover">
+              <input type="radio" name="bot-trust" checked={trust === option.id} onChange={() => setTrust(option.id)} className="mt-1" />
+              <span><span className="block text-sm font-medium">{option.label}</span><span className="block text-sm text-muted-foreground">{option.detail}</span></span>
+            </label>
+          ))}
+        </fieldset>
+        <p className="text-xs text-muted-foreground">It uses {space.name}'s default model. You can change that on its profile.</p>
+        {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
+        <div className="flex gap-2">
+          <button type="submit" disabled={busy || !name.trim() || !mission.trim()} className={PRIMARY_BUTTON}>Add bot</button>
+          <button type="button" onClick={() => history.back()} className={GHOST_BUTTON}>Cancel</button>
+        </div>
+      </form>
     </PageColumn>
   );
 }
