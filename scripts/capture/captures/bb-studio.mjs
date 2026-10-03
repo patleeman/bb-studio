@@ -142,7 +142,9 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       const pages = await seedPages();
       const drawing = await seedDrawing();
       let recordingId = null;
+      let spaceId = null;
       const cleanup = async () => {
+        if (spaceId) await pluginRpc("studio", "deleteSpace", { id: spaceId }).catch(() => {});
         await pages.cleanup();
         await drawing.cleanup();
         if (recordingId) await talkRpc("recording_delete", { id: recordingId }).catch(() => {});
@@ -150,13 +152,16 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       try {
         // Studio only lists the recording, so it needn't be transcribed.
         recordingId = await seedTalkRecording(projectId, { transcribe: false });
+        const { space } = await pluginRpc("studio", "createSpace", { name: "Launch review", defaultProjectId: projectId });
+        spaceId = space.id;
+        await pluginRpc("studio", "spaceMembers", { id: spaceId, add: [{ pluginId: "pages", id: pages.page.id }] });
         await client.navigate("/plugins/studio/studio/collection");
         await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search and filter studio"]');
         await client.waitForSelector('nav[aria-label="Filters"]');
         const rail = await client.evaluate(`document.querySelector('nav[aria-label="Filters"]')?.innerText ?? ""`);
-        for (const label of ["Spaces", "Kind", "Pages", "Recordings", "Drawings", "Project", "Orbit"]) {
+        for (const label of ["Spaces", "Launch review", "Kind", "Pages", "Recordings", "Drawings", "Project", "Orbit"]) {
           if (!rail.includes(label)) throw new Error(`The filter rail didn't show ${label}: ${rail}`);
         }
         await client.waitForText("Pages");

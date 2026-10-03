@@ -120,12 +120,12 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       await client.waitForSelector('[role="menuitem"]');
       await client.clickElementWithTextAndPointer('[role="menuitem"]', "New project");
       await client.waitForSelector('[role="dialog"]');
-      const hasTitle = await client.evaluate(`document.querySelector('[role="dialog"]')?.textContent?.includes('New project')`);
+      const hasTitle = await client.evaluate(`Array.from(document.querySelectorAll('[role="dialog"]')).find(el => el.checkVisibility())?.textContent?.includes('New project')`);
       if (!hasTitle) throw new Error('The live New project dialog is missing its title');
       for (const text of ["Folder path", "Browse", "Create project"]) await client.waitForText(text);
     },
     clip: async (client) => client.evaluate(`(() => {
-      const dialog = document.querySelector('[role="dialog"]');
+      const dialog = Array.from(document.querySelectorAll('[role="dialog"]')).find(el => el.checkVisibility());
       if (!dialog) throw new Error('New project dialog not found for capture');
       const rect = dialog.getBoundingClientRect();
       return { x: rect.x, y: rect.y, width: rect.width, height: rect.height };
