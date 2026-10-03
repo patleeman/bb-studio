@@ -1,4 +1,4 @@
-import { useCallback, useEffect, useState, type DragEvent, type KeyboardEvent } from "react";
+import { useCallback, useEffect, useRef, useState, type DragEvent, type KeyboardEvent } from "react";
 import { ThreadChat, useRpc } from "@get-bb/plugin-sdk/app";
 import { Icon, ItemTile } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
@@ -53,7 +53,10 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
   const orderKey = `bot-teams:grid-order:${view.id}`;
   const [order, setOrder] = useState(() => readOrder(orderKey));
   useEffect(() => setOrder(readOrder(orderKey)), [orderKey]);
-  const [dragging, setDragging] = useState<string | null>(null);
+  const [dragging, setDraggingState] = useState<string | null>(null);
+  // Drag events can arrive before React re-renders, so handlers read the ref.
+  const draggingRef = useRef<string | null>(null);
+  const setDragging = (id: string | null) => { draggingRef.current = id; setDraggingState(id); };
   const [drop, setDrop] = useState<{ id: string; place: "before" | "after"; axis: "x" | "y" } | null>(null);
   const [announcement, setAnnouncement] = useState("");
   const roots = byAttention(threads.filter(thread => !thread.parentThreadId));
@@ -74,7 +77,7 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
     if (target) move(id, target, step < 0 ? "before" : "after");
   };
   const dragOver = (event: DragEvent<HTMLElement>, id: string) => {
-    if (!dragging || !event.dataTransfer.types.includes(PANE_DRAG)) return;
+    if (!draggingRef.current || !event.dataTransfer.types.includes(PANE_DRAG)) return;
     event.preventDefault();
     event.dataTransfer.dropEffect = "move";
     const rect = event.currentTarget.getBoundingClientRect(), stage = event.currentTarget.parentElement?.getBoundingClientRect();
@@ -99,7 +102,7 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
     return <section key={thread.id} className="channel-thread-pane" data-channel-thread={thread.id} data-activity={threadActivity(thread)} aria-label={`${label(thread)} transcript`}
       data-dragging={dragging === thread.id || undefined} data-drop={drop?.id === thread.id && dragging !== thread.id ? drop.place : undefined} data-drop-axis={drop?.id === thread.id ? drop.axis : undefined}
       onDragOver={arrangeable ? event => dragOver(event, thread.id) : undefined}
-      onDrop={arrangeable ? event => { event.preventDefault(); if (dragging && drop) move(dragging, drop.id, drop.place); endDrag(); } : undefined}>
+      onDrop={arrangeable ? event => { event.preventDefault(); if (draggingRef.current && drop) move(draggingRef.current, drop.id, drop.place); endDrag(); } : undefined}>
       <header draggable={arrangeable || undefined} data-arrangeable={arrangeable || undefined}
         onDragStart={arrangeable ? event => { event.dataTransfer.setData(PANE_DRAG, thread.id); event.dataTransfer.effectAllowed = "move"; event.dataTransfer.setDragImage(event.currentTarget.parentElement!, 24, 20); setDragging(thread.id); } : undefined}
         onDragEnd={arrangeable ? endDrag : undefined}>
