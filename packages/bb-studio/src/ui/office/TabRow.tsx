@@ -209,7 +209,8 @@ export function TabRow({ tab, active, folders, moves, indent, onOpen, trailing }
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content {...PORTAL_SCOPE} className={MENU}>
+        {/* Rename and New folder open a field; returning focus to the row would blur it shut. */}
+        <ContextMenu.Content {...PORTAL_SCOPE} className={MENU} onCloseAutoFocus={(event) => event.preventDefault()}>
           {groups.filter((group) => group.length).map((group, index) => (
             <div key={index}>
               {index > 0 ? <ContextMenu.Separator className={MENU_SEPARATOR} /> : null}

@@ -59,7 +59,13 @@ function DragGhost() {
 function FolderNameField({ initial, onDone }: { initial: string; onDone: (name: string | null) => void }) {
   const [value, setValue] = useState(initial);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { input.current?.select(); }, []);
+  // Focus after the opening menu has finished closing, and only treat a blur
+  // as "done" once the field has had focus.
+  const focused = useRef(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => { input.current?.focus(); input.current?.select(); });
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const finish = (save: boolean) => onDone(save && value.trim() ? value.trim() : null);
   return (
     <div className={cn(TAB, "bg-sidebar-accent")}>
@@ -71,7 +77,8 @@ function FolderNameField({ initial, onDone }: { initial: string; onDone: (name: 
         value={value}
         maxLength={100}
         onChange={(change) => setValue(change.target.value)}
-        onBlur={() => finish(true)}
+        onFocus={() => { focused.current = true; }}
+        onBlur={() => { if (focused.current) finish(true); }}
         onKeyDown={(key) => {
           if (key.key === "Enter") finish(true);
           if (key.key === "Escape") finish(false);
@@ -128,7 +135,7 @@ function FolderRow({ folder, renaming, onToggle, onRename, onStartRename, onDele
         </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
-        <ContextMenu.Content {...PORTAL_SCOPE} className={MENU}>
+        <ContextMenu.Content {...PORTAL_SCOPE} className={MENU} onCloseAutoFocus={(event) => event.preventDefault()}>
           <ContextMenu.Item onSelect={onStartRename} className={MENU_ITEM}><Icon name="Edit" aria-hidden />Rename</ContextMenu.Item>
           <ContextMenu.Separator className={MENU_SEPARATOR} />
           <ContextMenu.Item onSelect={onDelete} className={MENU_ITEM}><Icon name="FolderMinus" aria-hidden />Remove folder (keeps its tabs)</ContextMenu.Item>

@@ -87,7 +87,12 @@ export function RenameField({ thread, onDone, className = "pl-7" }: { thread: Pl
   const actions = useSidebarThreadActions();
   const [value, setValue] = useState(thread.title ?? thread.displayTitle);
   const input = useRef<HTMLInputElement>(null);
-  useEffect(() => { input.current?.select(); }, []);
+  // Focus after the menu that opened this has closed; a blur before then isn't "done".
+  const focused = useRef(false);
+  useEffect(() => {
+    const frame = requestAnimationFrame(() => { input.current?.focus(); input.current?.select(); });
+    return () => cancelAnimationFrame(frame);
+  }, []);
   const save = () => {
     const title = value.trim();
     if (title && title !== thread.displayTitle) void actions.rename(thread.id, title);
@@ -100,7 +105,8 @@ export function RenameField({ thread, onDone, className = "pl-7" }: { thread: Pl
         aria-label="Thread title"
         value={value}
         onChange={(change) => setValue(change.target.value)}
-        onBlur={save}
+        onFocus={() => { focused.current = true; }}
+        onBlur={() => { if (focused.current) save(); }}
         onKeyDown={(key) => {
           if (key.key === "Enter") save();
           if (key.key === "Escape") onDone();
