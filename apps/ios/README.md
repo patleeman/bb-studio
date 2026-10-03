@@ -218,3 +218,26 @@ notifications, including through the notification extension.
    install. To try a change on the phone meanwhile, use the Debug install above.
    Internal testers (you) get builds without App Review. TestFlight builds use
    production APNs, so the APNs key must be enabled for **Sandbox & Production**.
+
+
+### Office UI tests against a staged server
+
+Use a private simulator and the `capture.env` from `scripts/staged-bb.mjs`.
+The runner rejects the default BB port and verifies the staged project before
+launch. It supplies the same origin to the app and test RPC helpers.
+
+```sh
+BB_TEST_SIMULATOR_ID=<private-simulator-id> \
+BB_QA_SERVER_URL="$BB_SERVER_URL" \
+BB_QA_PROJECT_ID="$BB_CAPTURE_PROJECT_ID" \
+BBGO_QA_THREAD="$BB_CAPTURE_THREAD_ID" \
+apps/ios/scripts/ui-test.sh
+```
+
+For the deterministic Office screenshots, first run
+`node scripts/capture/seed-office.mjs` with the staged environment. Add
+`BB_OFFICE_CAPTURE_DIR=/tmp/office-captures` and
+`BB_UI_TEST_ONLY=BBStudioUITests/OfficeCaptureUITests` to select the capture tests.
+The result bundle and logs remain in the printed run directory (or the directory
+set by `BB_UI_TEST_RUN_DIR`). Specialized audio, share-sheet, and accessibility
+tests still require their own fixtures; a skip is not a pass for those workflows.

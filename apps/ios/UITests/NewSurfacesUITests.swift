@@ -1,7 +1,7 @@
 import XCTest
 
 final class NewSurfacesUITests: XCTestCase {
-    private let projectId = "proj_8ztiq6dkh5"
+    private let projectId = StagedFixture.projectId
 
     func testHomeAndCollection() throws {
         guard let spaces = rpc("studio", "spaces_list", [:])?["spaces"] as? [[String: Any]],
@@ -125,7 +125,7 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     private func rpcRaw(_ plugin: String, _ method: String, _ input: Any) -> Any? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)

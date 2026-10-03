@@ -47,7 +47,7 @@ final class ComposerUITests: XCTestCase {
 
     private func scratchThread() -> String? {
         let json = api("POST", "/threads", [
-            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": "QA iOS1 composer",
+            "projectId": StagedFixture.projectId, "origin": "app", "title": "QA iOS1 composer",
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
             "input": [["type": "text", "text": "Scratch composer thread. Do nothing.", "mentions": [String]()]],
         ])
@@ -55,7 +55,7 @@ final class ComposerUITests: XCTestCase {
     }
 
     private func api(_ method: String, _ path: String, _ body: [String: Any]) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
+        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1\(path)")!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: body)

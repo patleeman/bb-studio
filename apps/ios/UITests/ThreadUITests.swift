@@ -5,7 +5,7 @@ import XCTest
 /// assistant message ends with a `::reactions` directive. Nothing is sent.
 final class ThreadUITests: XCTestCase {
     private let app = XCUIApplication()
-    private var threadId: String { ProcessInfo.processInfo.environment["BBGO_QA_THREAD"] ?? "thr_64r2wmjrim" }
+    private var threadId: String { StagedFixture.threadId }
 
     override func setUp() {
         continueAfterFailure = true
@@ -903,7 +903,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     private func rpc(_ plugin: String, _ method: String, _ input: Any) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1/plugins/\(plugin)/rpc/\(method)")!)
+        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1/plugins/\(plugin)/rpc/\(method)")!)
         request.httpMethod = "POST"
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         request.httpBody = try? JSONSerialization.data(withJSONObject: input, options: .fragmentsAllowed)
@@ -951,7 +951,7 @@ final class ThreadUITests: XCTestCase {
 
     /// A message's menu ends with when it was sent. Read-only on a real thread.
     func testMessageSentTime() throws {
-        app.open(URL(string: "bbstudio://thread/thr_64r2wmjrim")!)
+        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
         XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
         sleep(2)
@@ -1116,7 +1116,7 @@ final class ThreadUITests: XCTestCase {
     /// Starts a real Studio Chat thread from a scratch task, then deletes both.
     func testStudioChat() throws {
         let title = "QA chat task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio", "tasks_create", ["title": title, "description": "Scratch task.", "projectId": "proj_8ztiq6dkh5"])
+        let created = rpc("studio", "tasks_create", ["title": title, "description": "Scratch task.", "projectId": StagedFixture.projectId])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         var threadId: String?
         addTeardownBlock {
@@ -1250,7 +1250,7 @@ final class ThreadUITests: XCTestCase {
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
         var ids: [String] = []
         for title in [titleA, titleB] {
-            let created = rpc("studio", "tasks_create", ["title": title, "description": "Has \(word) inside.", "projectId": "proj_8ztiq6dkh5"])
+            let created = rpc("studio", "tasks_create", ["title": title, "description": "Has \(word) inside.", "projectId": StagedFixture.projectId])
             ids.append(try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String))
         }
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
@@ -1322,7 +1322,7 @@ final class ThreadUITests: XCTestCase {
     /// sheet's agent pickers without starting anything; deletes the task.
     func testTaskLinksAndHandOff() throws {
         let title = "QA link task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio", "tasks_create", ["title": title, "description": "", "projectId": "proj_8ztiq6dkh5"])
+        let created = rpc("studio", "tasks_create", ["title": title, "description": "", "projectId": StagedFixture.projectId])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         addTeardownBlock { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
         app.open(URL(string: "bbstudio://task/\(id)")!)
@@ -1349,7 +1349,7 @@ final class ThreadUITests: XCTestCase {
 
     private func scratchThread(_ title: String) -> String? {
         let json = api("POST", "/threads", [
-            "projectId": "proj_8ztiq6dkh5", "origin": "app", "title": title,
+            "projectId": StagedFixture.projectId, "origin": "app", "title": title,
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
             "input": [["type": "text", "text": "Scratch thread for a UI test. Do nothing.", "mentions": [String]()]],
         ])
@@ -1357,7 +1357,7 @@ final class ThreadUITests: XCTestCase {
     }
 
     private func api(_ method: String, _ path: String, _ body: [String: Any]) -> [String: Any]? {
-        var request = URLRequest(url: URL(string: "http://127.0.0.1:38886/api/v1\(path)")!)
+        var request = URLRequest(url: URL(string: "\(StagedFixture.serverURL)/api/v1\(path)")!)
         request.httpMethod = method
         request.setValue("application/json", forHTTPHeaderField: "Content-Type")
         if method != "GET" { request.httpBody = try? JSONSerialization.data(withJSONObject: body) }
