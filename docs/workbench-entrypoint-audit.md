@@ -108,6 +108,51 @@ The integrated checkpoint passes 1,599 JavaScript tests across all 18 packages,
 including 99 Kit and 121 Teams tests, plus all type, stable compatibility,
 documentation, marketplace, contract, native-payload and packed-Kit gates.
 
+## Remaining content-plugin entry points
+
+Studio, Studio Chat, Feed and Explore installed from pushed `c83c4fd` pass
+the same placement matrix on both isolated hosts. These supplement the
+seven content types above, giving representative original-view transfer
+proof for all eleven retained content plugins. Every first move uses the
+visible **Move → Float this** action; every later move uses companion chrome.
+Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
+
+| View | Original state checked | Stable capture | Native capture |
+| --- | --- | --- | --- |
+| Studio collection | Search input, query and seeded release-note result | [Main](../packages/bb-studio/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/companion-transfers-native.png) |
+| Item-chat draft | Prompt, unsent wording, file input, selected attachment control and encoded item path | [Main](../packages/bb-studio-chat/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/companion-transfers-native.png) |
+| Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio-feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/companion-transfers-native.png) |
+| Feed post | Original post heading | [Main](../packages/bb-studio-feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-post-companion-transfers-native.png) |
+| Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-native.png) |
+| Explore explainer | Iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-explore/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/companion-transfers-native.png) |
+
+The chat check reproduced double encoding: the host passes an already-encoded
+item subpath, but main-view ownership encoded it again. Kit's shared
+`panelHref` now canonicalizes encoded host and decoded companion subpaths to
+the same target. Two regression cases prove original composer and attachment
+input adoption rather than a fresh composer at another route. The native
+file input clears its selected FileList after handing files to composer state;
+the live check follows the original input and rendered attachment control.
+
+Run the supplemental captures after sourcing the matching isolated env file:
+
+```sh
+BB_CAPTURE_PLUGIN= BB_CAPTURE_STAGE_ENV=/path/to/isolated/capture.env \
+BB_CAPTURE_SUITE_TRANSFERS=1 BB_CAPTURE_TRANSFER_FRAME=1 \
+BB_CAPTURE_SUITE_HOST=native \
+BB_CAPTURE_ONLY=suite-native-studio,suite-native-chat,suite-native-feed,suite-native-feed-post,suite-native-feed-discussion,suite-native-explore \
+node scripts/capture-plugin-screenshots.mjs
+```
+
+Use `stable` and `suite-stable-*` for the stable host. The matching env file
+guards the Explore database fixture; the saved HTML page and all other
+fixtures use normal plugin RPCs. No agent runs. The integrated checkpoint
+passes 1,631 JavaScript tests across 18 packages, including 106 Kit tests,
+plus all type, stable compatibility, documentation, marketplace, contract,
+native-payload and packed-Kit gates. These are representative routes; the
+space fallback, plain/quote composers and Explore list variants do not gain
+new placement-matrix coverage from these captures.
+
 ## Remaining release and QA boundaries
 
 - Stable BB has no native retained companion API. The authoritative core

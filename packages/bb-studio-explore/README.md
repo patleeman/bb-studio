@@ -43,6 +43,19 @@ BB_CAPTURE_EXPLORE_COMPANIONS=1 BB_CAPTURE_ONLY=explore-companions \
 
 ## What you get
 
+Explainer and list headers have the shared **Move** menu. The existing view
+can float, open in a split, return to main or move into a supported native
+right workbench through its companion controls.
+
+![The same saved HTML explainer in the right workbench](assets/companion-transfers-native.png)
+
+The isolated transfer check preserves the original iframe, embedded frame ID,
+document loader and an in-memory document value through Float, workbench,
+main, Float and workbench. The [stable capture](assets/companion-transfers-stable.png)
+passes two Float/main round trips. The seeded saved explainer starts ready;
+no investigation or agent runs.
+
+
 - **"Along the way" at the bottom of a reply.** When an answer involved
   reading code, the agent may end it with 1 to 4 findings, each an emoji and
   a label that says what you'd find: 🐛 suspicious, 🏗️ foundational, 🔗

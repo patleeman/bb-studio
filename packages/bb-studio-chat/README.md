@@ -29,6 +29,19 @@ Run `BB_CAPTURE_CHAT_COMPACT=1 BB_CAPTURE_ONLY=studio-chat node scripts/capture-
 
 ## What you get
 
+Main-view conversation drafts have the shared **Move** menu. Moving an item
+chat carries its existing composer and attachment into Float. Companion
+controls return it to the main view or the native right workbench when the
+host supports it.
+
+![The original item-chat draft and attachment in the workbench](assets/companion-transfers-native.png)
+
+The live check preserves the original prompt editor, file input, attachment
+control, unsent wording and encoded item route through every placement. The
+[stable capture](assets/companion-transfers-stable.png) verifies the same
+draft and attachment through two Float/main round trips. No message is sent.
+
+
 - **Chat.** Continue the item's linked conversation or start one in its
   project. New messages carry an item pill that tells the agent which tools
   read and edit it.

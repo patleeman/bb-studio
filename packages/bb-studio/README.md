@@ -51,6 +51,18 @@ the matching text with the match in bold.
 
 ## What you get
 
+The collection header's **Move** menu offers **Float this** and **Open in
+split**. Companion controls return it to the main view or, on a host with
+native companion support, move it to the right workbench.
+
+![The original Studio collection moved into the right workbench](assets/companion-transfers-native.png)
+
+The isolated transfer check keeps the same search input and its "Release
+notes" query through Float, workbench, main, Float and workbench. The
+[stable capture](assets/companion-transfers-stable.png) checks Float/main
+round trips with the same input and visible seeded release notes.
+
+
 - **Needs you** sits above the collection, only when something does: pending
   thread approvals and questions, Teams attention, review and due tasks, and
   unresolved comment replies or mentions. Rows open their source; simple

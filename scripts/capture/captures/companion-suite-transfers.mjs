@@ -1,4 +1,8 @@
 import { usageReportHtml } from "../seed.mjs";
+import entrypoints from "./companion-suite-entrypoints.mjs";
+import { mkdtemp, writeFile, rm } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
 
 export default context => {
   const { projectId, seedPages, seedDrawing, seedTalkRecording, talkRpc, pluginRpc, sleep } = context;
@@ -24,10 +28,11 @@ export default context => {
       const bot = existing ?? await pluginRpc("bot-teams", "create", { name: "Companion profile check", mission: "Wait for explicit owner input. No scheduled work.", intervalMinutes: 0 });
       return { path: `/plugins/bot-teams/bots/${bot.id}/profile`, ready: '[aria-label="Bot profile"] input[id$="-name"]', cleanup: async () => { if (!existing) await pluginRpc("bot-teams", "retire", { id: bot.id, retired: true }); } };
     } },
+    ...entrypoints(context),
   ];
   return fixtures.map(fixture => ({
     id: `suite-${native ? "native" : "stable"}-${fixture.id}`, packageDir: fixture.packageDir,
-    fileName: `companion-transfers-${native ? "native" : "stable"}.png`, privateSidebar: true,
+    fileName: `${fixture.id.startsWith("feed-") ? `${fixture.id}-` : ""}companion-transfers-${native ? "native" : "stable"}.png`, privateSidebar: true,
     setup: async client => {
       const seeded = await fixture.seed();
       const path = seeded.target ?? seeded.path;
@@ -36,6 +41,8 @@ export default context => {
       let originalFrame;
       let embeddedTarget;
       let frameSession;
+      let attachmentDir;
+      let originalFile;
       const frameCommand = (method, params = {}) => new Promise((resolve, reject) => {
         const id = client.nextId++;
         const timer = setTimeout(() => { client.pending.delete(id); reject(new Error(`Embedded CDP ${method} timed out`)); }, 15000);
@@ -52,6 +59,7 @@ export default context => {
         await client.command('Page.navigate', { url: 'about:blank' });
         await sleep(400);
         await seeded.cleanup();
+        if (attachmentDir) await rm(attachmentDir, { recursive: true, force: true });
       };
       const errors = [];
       const onMessage = event => {
@@ -93,6 +101,14 @@ export default context => {
           if (result.value !== true) throw new Error(`Embedded document state reset in ${placement}`);
         }
         if (fixture.id === 'teams' && await client.evaluate(`window.bbSuiteTransfer[0].value`) !== 'Companion profile draft') throw new Error(`Teams draft changed in ${placement}`);
+        if (seeded.draft) {
+          const draft = await client.evaluate(`window.bbSuiteTransfer[0].value ?? window.bbSuiteTransfer[0].textContent`);
+          if (draft !== seeded.draft) throw new Error(`${fixture.id} draft changed in ${placement}: ${JSON.stringify(draft)}`);
+        }
+        if (originalFile) {
+          const file = await client.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(`[data-float-window="${key}"]`)}); const input = window.bbSuiteFile; const attachment = root.querySelector('button[aria-label="Remove review-notes.txt"]'); return { same: input === root.querySelector('input[type="file"]'), connected: input.isConnected, sameAttachment: attachment === window.bbSuiteAttachment, attachmentConnected: window.bbSuiteAttachment.isConnected, visible: !!attachment?.checkVisibility() }; })()`);
+          if (!file.same || !file.connected || !file.sameAttachment || !file.attachmentConnected || !file.visible) throw new Error(`${fixture.id} attachment changed in ${placement}: ${JSON.stringify(file)}`);
+        }
       };
       const menu = async label => {
         await client.clickAriaButtonWithPointer("Floating tab actions");
@@ -104,6 +120,23 @@ export default context => {
         if (await client.evaluate(`typeof window.__bbPluginRuntime?.pluginSdkApp?.experimental_CompanionOutlet === 'function'`) !== native)
           throw new Error("The suite capture requires its specified host capability");
         await client.evaluate(`(() => { window.bbSuiteTransfer = [...document.querySelectorAll(${JSON.stringify(seeded.ready)})]; return true; })()`);
+        if (seeded.draft) {
+          await client.evaluate(`(() => { const node = window.bbSuiteTransfer[0]; node.focus(); if (node.select) node.select(); else { const range = document.createRange(); range.selectNodeContents(node); getSelection().removeAllRanges(); getSelection().addRange(range); } })()`);
+          await client.command('Input.insertText', { text: seeded.draft });
+        }
+        if (seeded.visibleText) await client.waitForText(seeded.visibleText);
+        if (seeded.attachment) {
+          attachmentDir = await mkdtemp(join(tmpdir(), 'bb-suite-attachment-'));
+          const file = join(attachmentDir, 'review-notes.txt');
+          await writeFile(file, 'Keep this original attachment through every move.');
+          const { root } = await client.command('DOM.getDocument');
+          const { nodeId } = await client.command('DOM.querySelector', { nodeId: root.nodeId, selector: `[data-studio-main-view=${JSON.stringify(seeded.path)}] input[type="file"]` });
+          if (!nodeId) throw new Error(`Missing original composer file input: ${JSON.stringify(await client.evaluate(`({ views: [...document.querySelectorAll('[data-studio-main-view]')].map(node => node.getAttribute('data-studio-main-view')), inputs: [...document.querySelectorAll('input[type="file"]')].map(node => node.closest('[data-studio-main-view]')?.getAttribute('data-studio-main-view')) })`))}`);
+          await client.command('DOM.setFileInputFiles', { nodeId, files: [file] });
+          await client.waitForSelector('button[aria-label="Remove review-notes.txt"]');
+          originalFile = await client.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(`[data-studio-main-view=${JSON.stringify(seeded.path)}]`)}); window.bbSuiteFile = root.querySelector('input[type="file"]'); window.bbSuiteAttachment = root.querySelector('button[aria-label="Remove review-notes.txt"]'); return !!window.bbSuiteFile && !!window.bbSuiteAttachment; })()`);
+          if (!originalFile) throw new Error('Original attachment was not staged');
+        }
         if (fixture.id === 'teams') {
           await client.evaluate(`window.bbSuiteTransfer[0].focus(); window.bbSuiteTransfer[0].select()`);
           await client.command('Input.insertText', { text: 'Companion profile draft' });
@@ -111,13 +144,14 @@ export default context => {
         if (process.env.BB_CAPTURE_TRANSFER_SELECTION === '1' && fixture.id === 'pages') {
           await client.evaluate(`(() => { const editor = window.bbSuiteTransfer[0]; editor.focus(); const walker = document.createTreeWalker(editor, NodeFilter.SHOW_TEXT); let node; while ((node = walker.nextNode())) { if (node.textContent.length >= 8) { window.bbSuiteSelectionNode = node; getSelection().setBaseAndExtent(node, 8, node, 2); return true; } } throw new Error('Missing staged text to select'); })()`);
         }
-        if (process.env.BB_CAPTURE_TRANSFER_FRAME === '1' && fixture.id === 'artifacts') {
+        if (process.env.BB_CAPTURE_TRANSFER_FRAME === '1' && (fixture.id === 'artifacts' || seeded.embedded)) {
           await sleep(1500);
           const { frameTree } = await client.command('Page.getFrameTree');
-          originalFrame = frameTree.childFrames?.find(tree => tree.frame.url.includes('/api/'))?.frame;
+          const matchesFrame = frame => seeded.embedded ? frame.url === 'about:srcdoc' : frame.url.includes('/api/');
+          originalFrame = frameTree.childFrames?.find(tree => matchesFrame(tree.frame))?.frame;
           if (!originalFrame) {
             const { targetInfos } = await client.command('Target.getTargets');
-            embeddedTarget = targetInfos.find(target => target.type === 'iframe' && target.url.includes('/api/'));
+            embeddedTarget = targetInfos.find(target => target.type === 'iframe' && matchesFrame(target));
             if (!embeddedTarget) throw new Error(`Missing embedded report frame: ${JSON.stringify({ frameTree, targetInfos })}`);
             ({ sessionId: frameSession } = await client.command('Target.attachToTarget', { targetId: embeddedTarget.targetId, flatten: true }));
             originalFrame = (await frameCommand('Page.getFrameTree')).frameTree.frame;
