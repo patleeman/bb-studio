@@ -25,7 +25,12 @@ import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE, cn } from "./styles";
 const BB_ROWS = /plugins|skills|automations/i;
 
 /** A section's label and rule; dropping a tab on it puts the tab first in that section. */
-function Divider({ label, zone, action }: { label: string; zone: TabZone; action?: ReactNode }) {
+/**
+ * Section edges, as in Arc: the Space's name heads the pinned tabs, and an
+ * unlabelled rule (with Clear) sets them off from today's. Dropping a tab on
+ * either puts it first in that section.
+ */
+function SectionEdge({ label, zone, action }: { label?: string; zone: TabZone; action?: ReactNode }) {
   const drag = useTabDragState();
   const target = drag?.target;
   const here = !!target && !target.beside && target.zoneKey === zone;
@@ -34,10 +39,10 @@ function Divider({ label, zone, action }: { label: string; zone: TabZone; action
       data-tab-drop-zone=""
       data-zone={zone}
       data-at="start"
-      className={cn("group/divider flex h-7 items-center gap-2 rounded-md px-2.5 pt-2 text-xs font-medium text-subtle-foreground", here && "text-foreground")}
+      className={cn("group/divider flex h-7 items-center gap-2 rounded-md px-2.5 text-xs font-medium text-subtle-foreground", label ? "pt-1" : "pt-2", here && "text-foreground")}
     >
-      <span>{label}</span>
-      <span aria-hidden className={cn("h-px flex-1 bg-border", here && "h-0.5 bg-ring")} />
+      {label ? <span className="min-w-0 flex-1 truncate">{label}</span> : <span aria-hidden className={cn("h-px flex-1 bg-border", here && "h-0.5 bg-ring")} />}
+      {label && here ? <span aria-hidden className="h-0.5 w-8 rounded-full bg-ring" /> : null}
       {action}
     </div>
   );
@@ -233,8 +238,8 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
 
   return (
     <div className="flex min-h-full flex-col px-2">
-      <Divider
-        label="Pinned"
+      <SectionEdge
+        label={current?.name ?? "Pinned"}
         zone="pinned"
         action={
           <button
@@ -268,24 +273,21 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
         {naming
           ? <FolderNameField initial="" onDone={(name) => { setNaming(null); if (name) actions.createFolder(name, naming.withRef); }} />
           : null}
-        {!loose.length && !folders.length && !naming
-          ? <p data-tab-drop-zone="" data-zone="pinned" data-at="end" className="px-2.5 py-1.5 text-xs text-subtle-foreground">Drag tabs here to keep them.</p>
-          : null}
       </div>
 
-      <Divider
-        label="Today"
+      <SectionEdge
         zone="today"
         action={tabs.today.length
           ? <button type="button" onClick={() => { for (const tab of tabs.today) actions.archive(tab.ref); }} className="rounded px-1 text-xs text-subtle-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/divider:opacity-100">Clear</button>
           : null}
       />
       <div className="space-y-px">
-        {tabs.today.map((tab) => row(tab))}
-        <button type="button" onClick={() => openCommandBar()} data-tab-drop-zone="" data-zone="today" data-at="end" className={cn(TAB, "text-muted-foreground")}>
+        {/* New tab heads today's tabs, which run newest first below it. */}
+        <button type="button" onClick={() => openCommandBar()} data-tab-drop-zone="" data-zone="today" data-at="start" className={cn(TAB, "text-muted-foreground")}>
           <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center [&_svg]:size-4"><Icon name="Plus" /></span>
           <span className="min-w-0 flex-1 truncate">New tab</span>
         </button>
+        {tabs.today.map((tab) => row(tab))}
       </div>
 
       <SpacesFooter />
