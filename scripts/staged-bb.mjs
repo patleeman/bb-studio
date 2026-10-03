@@ -78,6 +78,12 @@ async function pluginRpc(pluginId, method, input) {
   return payload.result;
 }
 
+// The migration fixture can start at an old 17-plugin commit as well as main.
+async function hasStudioModule(name) {
+  try { return (await pluginRpc("studio", "modules_status", null)).active.includes(name); }
+  catch { return false; }
+}
+
 async function until(what, check, timeoutMs = 300000) {
   const started = Date.now();
   while (!(await check())) {
@@ -172,25 +178,28 @@ async function seedExploreThread(project, machine, orbitDir) {
 }
 
 /**
- * Studio Teams' README fixture (packages/bb-studio-teams/docs/QA.md): four
+ * Studio Teams' README fixture (packages/bb-studio/src/modules/teams/docs/QA.md): four
  * bots, a Launch room where Atlas and Scribe give the fixed replies their
  * missions spell out, a Design review channel, a paused automation, and
  * Atlas's memory of the launch.
  */
 async function seedTeams(machine) {
   const teams = join(fixturesDir, "teams");
+  const consolidated = await hasStudioModule("teams");
+  const botsCli = (...args) => bb(...(consolidated ? ["studio", "bot-teams"] : ["bots"]), ...args);
+  const teamsRpc = (method, input) => pluginRpc(consolidated ? "studio" : "bot-teams", consolidated ? "teams_" + method : method, input);
   const profile = ["--provider", "codex", "--model", "gpt-6-luna", "--reasoning", "low", "--interval", "0", "--machine", machine.id];
-  await bb("bots", "create", "Atlas", "--description", "Research and verify the facts", "--avatar", "🧭", ...profile, "--mission-file", join(teams, "atlas-mission.md"));
-  await bb("bots", "create", "Scribe", "--description", "Record decisions and next steps", "--avatar", "📝", ...profile, "--mission-file", join(teams, "scribe-mission.md"));
-  await bb("bots", "create", "Quinn", "--description", "Review designs for clarity", "--avatar", "🎨", ...profile, "--mission", "Review designs for the owner.");
-  await bb("bots", "create", "Relay", "--description", "Hand work between threads", "--avatar", "📡", ...profile, "--mission", "Hand work between threads for the owner.");
-  await bb("bots", "memory", "atlas", "--text", "# Memory\n\n- ORBIT-42 ships in the Friday release window.\n- Scribe owns the release-check log.\n");
-  const { bots } = await pluginRpc("bot-teams", "list", null);
+  await botsCli("create", "Atlas", "--description", "Research and verify the facts", "--avatar", "🧭", ...profile, "--mission-file", join(teams, "atlas-mission.md"));
+  await botsCli("create", "Scribe", "--description", "Record decisions and next steps", "--avatar", "📝", ...profile, "--mission-file", join(teams, "scribe-mission.md"));
+  await botsCli("create", "Quinn", "--description", "Review designs for clarity", "--avatar", "🎨", ...profile, "--mission", "Review designs for the owner.");
+  await botsCli("create", "Relay", "--description", "Hand work between threads", "--avatar", "📡", ...profile, "--mission", "Hand work between threads for the owner.");
+  await botsCli("memory", "atlas", "--text", "# Memory\n\n- ORBIT-42 ships in the Friday release window.\n- Scribe owns the release-check log.\n");
+  const { bots } = await teamsRpc("list", null);
   const member = handle => ({kind:"bot",id:bots.find(b=>b.handle===handle).id});
-  const launch = await pluginRpc("bot-teams", "viewCreate", {name:"Launch work",members:[member("atlas"),member("scribe")],requestId:crypto.randomUUID()});
-  await pluginRpc("bot-teams", "viewCreate", {name:"Design review",members:[member("quinn")],requestId:crypto.randomUUID()});
-  const send = text => pluginRpc("bot-teams","viewSend",{id:launch.id,text,targets:[],requestId:crypto.randomUUID()});
-  const replied = start => async () => (await pluginRpc("bot-teams","view",{id:launch.id})).entries.some(e=>e.role==="assistant"&&e.text.startsWith(start));
+  const launch = await teamsRpc("viewCreate", {name:"Launch work",members:[member("atlas"),member("scribe")],requestId:crypto.randomUUID()});
+  await teamsRpc("viewCreate", {name:"Design review",members:[member("quinn")],requestId:crypto.randomUUID()});
+  const send = text => teamsRpc("viewSend",{id:launch.id,text,targets:[],requestId:crypto.randomUUID()});
+  const replied = start => async () => (await teamsRpc("view",{id:launch.id})).entries.some(e=>e.role==="assistant"&&e.text.startsWith(start));
   await send("@atlas @scribe Here's the ORBIT-42 launch brief. The owner is Atlas, Scribe keeps the release-check log, and release is Friday. Are you both ready?");
   await until("Atlas to read the brief",replied("Ready. I checked the brief"));
   await until("Scribe to read the brief",replied("Ready. I'll keep the decision log"));
@@ -259,7 +268,7 @@ async function start() {
   }
 
   // Talk's meeting notes and Studio Decisions fall back to this model.
-  await bb("smart-decisions", "fallback", "codex", "gpt-6-luna", "low");
+  await bb(...(await hasStudioModule("decisions") ? ["studio", "smart-decisions"] : ["smart-decisions"]), "fallback", "codex", "gpt-6-luna", "low");
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
     ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
