@@ -1,3 +1,7 @@
+import { OfficeTabs } from "./tabs";
+import { officeTabHandlers } from "./tab-service";
+import { tabCatalog } from "./tab-catalog";
+import { SearchIndex } from "../search-index";
 import { officeAuthors } from "./authors";
 import { officeTalk, officeBotDesk } from "./talk";
 import { officeTeamServiceContract } from "./team-service-contract";
@@ -25,7 +29,7 @@ import { FolderService } from "./folders";
 import { migrateOfficeSpaces } from "./migration";
 import { ProjectSpaceStore } from "./legacy-spaces";
 
-export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; moduleServices?: ModuleServices } = {}) {
+export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; moduleServices?: ModuleServices; searchIndex?: SearchIndex } = {}) {
   const projects = await bb.sdk.projects.list({ includePersonal: true });
   const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE name='office_migrations'").get()
     && db.prepare("SELECT 1 FROM office_migrations WHERE id='space-root-v1'").get();
@@ -56,8 +60,13 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
   const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
+  const search = options.searchIndex ?? new SearchIndex(db, hub, changed);
+  if (!options.searchIndex) bb.onDispose(() => search.dispose());
+  const tabStore = new OfficeTabs(db, spaces.office, changed);
+  const tabHandlers = officeTabHandlers(tabStore, spaceId => tabCatalog(spaceId, { bb, hub, spaces: spaces.office, inbox, search, modules: options.moduleServices }));
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
+    ...tabHandlers,
     office_start: async input => {
       const result = await startOffice(input, bb.sdk.threads, spaces.office, folders, hub, options.moduleServices);
       changed(); return result;

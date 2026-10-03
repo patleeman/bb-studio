@@ -91,10 +91,10 @@ async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServi
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
-  const { spaces, folders: officeFolders, home: officeHome } = await initializeOffice(bb, db, hub, { moduleServices });
+  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
+  const { spaces, folders: officeFolders, home: officeHome } = await initializeOffice(bb, db, hub, { moduleServices, searchIndex });
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
-  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
   bb.onDispose(() => searchIndex.dispose());
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();

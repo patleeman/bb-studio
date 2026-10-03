@@ -7072,6 +7072,1126 @@
         "additionalProperties": false
       }
     },
+    "tabs_get": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "seeded": {
+            "type": "boolean"
+          },
+          "essentials": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "item",
+                    "bot",
+                    "conversation",
+                    "inbox",
+                    "home",
+                    "library"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "zone": {
+                  "type": "string",
+                  "enum": [
+                    "essential",
+                    "pinned",
+                    "today",
+                    "archived"
+                  ]
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ref",
+                "kind",
+                "title",
+                "icon",
+                "href",
+                "zone",
+                "folderId",
+                "openedAt",
+                "archivedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "pinned": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "item",
+                    "bot",
+                    "conversation",
+                    "inbox",
+                    "home",
+                    "library"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "zone": {
+                  "type": "string",
+                  "enum": [
+                    "essential",
+                    "pinned",
+                    "today",
+                    "archived"
+                  ]
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ref",
+                "kind",
+                "title",
+                "icon",
+                "href",
+                "zone",
+                "folderId",
+                "openedAt",
+                "archivedAt"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "folders": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 200
+                },
+                "name": {
+                  "type": "string"
+                },
+                "open": {
+                  "type": "boolean"
+                },
+                "position": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                }
+              },
+              "required": [
+                "id",
+                "name",
+                "open",
+                "position"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "today": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "item",
+                    "bot",
+                    "conversation",
+                    "inbox",
+                    "home",
+                    "library"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "zone": {
+                  "type": "string",
+                  "enum": [
+                    "essential",
+                    "pinned",
+                    "today",
+                    "archived"
+                  ]
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ref",
+                "kind",
+                "title",
+                "icon",
+                "href",
+                "zone",
+                "folderId",
+                "openedAt",
+                "archivedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "seeded",
+          "essentials",
+          "pinned",
+          "folders",
+          "today"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_seed": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "pinnedThreadIds": {
+            "maxItems": 10000,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          }
+        },
+        "required": [
+          "spaceId",
+          "pinnedThreadIds"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_open": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "anyOf": [
+          {
+            "type": "object",
+            "properties": {
+              "spaceId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "ref": {
+                "type": "string",
+                "maxLength": 500,
+                "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+              },
+              "href": {
+                "not": {}
+              }
+            },
+            "required": [
+              "spaceId",
+              "ref"
+            ]
+          },
+          {
+            "type": "object",
+            "properties": {
+              "spaceId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "href": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 4000
+              },
+              "ref": {
+                "not": {}
+              }
+            },
+            "required": [
+              "spaceId",
+              "href"
+            ]
+          }
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tab": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "ref": {
+                    "type": "string",
+                    "maxLength": 500,
+                    "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                  },
+                  "kind": {
+                    "type": "string",
+                    "enum": [
+                      "thread",
+                      "item",
+                      "bot",
+                      "conversation",
+                      "inbox",
+                      "home",
+                      "library"
+                    ]
+                  },
+                  "title": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "icon": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "href": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "zone": {
+                    "type": "string",
+                    "enum": [
+                      "essential",
+                      "pinned",
+                      "today",
+                      "archived"
+                    ]
+                  },
+                  "folderId": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 200
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "openedAt": {
+                    "type": "number"
+                  },
+                  "archivedAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "itemKind": {
+                    "type": "string"
+                  },
+                  "providerId": {
+                    "type": "string"
+                  },
+                  "botState": {
+                    "type": "string",
+                    "enum": [
+                      "idle",
+                      "working",
+                      "needs_you"
+                    ]
+                  },
+                  "badge": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  },
+                  "needsYou": {
+                    "type": "boolean"
+                  },
+                  "unread": {
+                    "type": "boolean"
+                  }
+                },
+                "required": [
+                  "ref",
+                  "kind",
+                  "title",
+                  "icon",
+                  "href",
+                  "zone",
+                  "folderId",
+                  "openedAt",
+                  "archivedAt"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "tab"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_move": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "ref": {
+            "type": "string",
+            "maxLength": 500,
+            "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+          },
+          "zone": {
+            "type": "string",
+            "enum": [
+              "essential",
+              "pinned",
+              "today",
+              "archived"
+            ]
+          },
+          "folderId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "index": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "spaceId",
+          "ref",
+          "zone"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tabs_archived": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "spaceId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "tabs": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "item",
+                    "bot",
+                    "conversation",
+                    "inbox",
+                    "home",
+                    "library"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "zone": {
+                  "type": "string",
+                  "enum": [
+                    "essential",
+                    "pinned",
+                    "today",
+                    "archived"
+                  ]
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ref",
+                "kind",
+                "title",
+                "icon",
+                "href",
+                "zone",
+                "folderId",
+                "openedAt",
+                "archivedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "tabs"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tab_folder_create": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          }
+        },
+        "required": [
+          "spaceId",
+          "name"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "name": {
+                "type": "string"
+              },
+              "open": {
+                "type": "boolean"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "open",
+              "position"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tab_folder_update": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "open": {
+            "type": "boolean"
+          },
+          "position": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "folderId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "folder": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "name": {
+                "type": "string"
+              },
+              "open": {
+                "type": "boolean"
+              },
+              "position": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 9007199254740991
+              }
+            },
+            "required": [
+              "id",
+              "name",
+              "open",
+              "position"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "folder"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "tab_folder_delete": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "folderId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "folderId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "office_search": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "spaceId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "query": {
+            "type": "string",
+            "maxLength": 1000
+          },
+          "limit": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 100
+          }
+        },
+        "required": [
+          "spaceId",
+          "query"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "results": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "ref": {
+                  "type": "string",
+                  "maxLength": 500,
+                  "pattern": "^(thread:[^:]+|item:[^:]+:.+|bot:[^:]+|conversation:[^:]+|office:(inbox|home)|library(?::[^:]+)?)$"
+                },
+                "kind": {
+                  "type": "string",
+                  "enum": [
+                    "thread",
+                    "item",
+                    "bot",
+                    "conversation",
+                    "inbox",
+                    "home",
+                    "library"
+                  ]
+                },
+                "title": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "icon": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "href": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "zone": {
+                  "type": "string",
+                  "enum": [
+                    "essential",
+                    "pinned",
+                    "today",
+                    "archived"
+                  ]
+                },
+                "folderId": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 200
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
+                },
+                "openedAt": {
+                  "type": "number"
+                },
+                "archivedAt": {
+                  "type": [
+                    "number",
+                    "null"
+                  ]
+                },
+                "itemKind": {
+                  "type": "string"
+                },
+                "providerId": {
+                  "type": "string"
+                },
+                "botState": {
+                  "type": "string",
+                  "enum": [
+                    "idle",
+                    "working",
+                    "needs_you"
+                  ]
+                },
+                "badge": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 9007199254740991
+                },
+                "needsYou": {
+                  "type": "boolean"
+                },
+                "unread": {
+                  "type": "boolean"
+                }
+              },
+              "required": [
+                "ref",
+                "kind",
+                "title",
+                "icon",
+                "href",
+                "zone",
+                "folderId",
+                "openedAt",
+                "archivedAt"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "results"
+        ],
+        "additionalProperties": false
+      }
+    },
     "team_list": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -8345,6 +9465,17 @@
           "settings": {
             "type": "object",
             "properties": {
+              "todayArchiveAfter": {
+                "default": "3d",
+                "type": "string",
+                "enum": [
+                  "12h",
+                  "1d",
+                  "3d",
+                  "7d",
+                  "never"
+                ]
+              },
               "enabledItemKinds": {
                 "anyOf": [
                   {
@@ -8396,6 +9527,7 @@
               }
             },
             "required": [
+              "todayArchiveAfter",
               "enabledItemKinds",
               "defaultTrust",
               "defaultBotModel"
@@ -8422,6 +9554,16 @@
           "settings": {
             "type": "object",
             "properties": {
+              "todayArchiveAfter": {
+                "type": "string",
+                "enum": [
+                  "12h",
+                  "1d",
+                  "3d",
+                  "7d",
+                  "never"
+                ]
+              },
               "enabledItemKinds": {
                 "anyOf": [
                   {
@@ -8485,6 +9627,17 @@
           "settings": {
             "type": "object",
             "properties": {
+              "todayArchiveAfter": {
+                "default": "3d",
+                "type": "string",
+                "enum": [
+                  "12h",
+                  "1d",
+                  "3d",
+                  "7d",
+                  "never"
+                ]
+              },
               "enabledItemKinds": {
                 "anyOf": [
                   {
@@ -8536,6 +9689,7 @@
               }
             },
             "required": [
+              "todayArchiveAfter",
               "enabledItemKinds",
               "defaultTrust",
               "defaultBotModel"

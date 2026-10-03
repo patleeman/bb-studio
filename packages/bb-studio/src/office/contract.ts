@@ -4,6 +4,9 @@ import { conversationRequestSchema } from "@bb-studio/kit/contract";
 import { inboxEventSchema, inboxContract } from "./inbox-contract";
 export { inboxEventSchema, type InboxEvent } from "./inbox-contract";
 
+import { officeTabsContract, todayArchiveAfterSchema } from "./tabs-contract";
+export { officeTabsContract, officeTabSchema, tabFolderSchema, type Tab, type TabZone, type TabFolder } from "./tabs-contract";
+
 const id = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(100);
 export const trustSchema = z.enum(["ask", "act"]);
@@ -13,10 +16,12 @@ export const officeSpaceSchema = z.object({
   projectIds: z.array(id), createdAt: z.number(), updatedAt: z.number(),
 });
 export const spaceSettingsSchema = z.object({
+  todayArchiveAfter: todayArchiveAfterSchema.default("3d"),
   enabledItemKinds: z.array(id).nullable(),
   defaultTrust: trustSchema,
   defaultBotModel: z.object({ providerId: id, model: id }).nullable(),
 });
+export const spaceSettingsPatchSchema = spaceSettingsSchema.partial().extend({ todayArchiveAfter: todayArchiveAfterSchema.optional() });
 export const officeItemSchema = z.object({
   pluginId: id, id, kind: id, title: z.string(), href: z.string(),
   projectId: id.nullable(), authorBotId: id.nullable(), updatedAt: z.number(),
@@ -70,6 +75,7 @@ export const officeTeamContract = defineRpcContract({
  * RPCs remain separate while the existing UI is replaced. */
 export const officeContract = defineRpcContract({
   ...inboxContract,
+  ...officeTabsContract,
   ...officeTeamContract,
   office_start: {
     input: z.object({ spaceId: id, request: conversationRequestSchema(z) }),
@@ -85,7 +91,7 @@ export const officeContract = defineRpcContract({
   space_delete: { input: z.object({ spaceId: id }), output: z.object({ ok: z.boolean() }) },
   space_move_project: { input: z.object({ projectId: id, spaceId: id }), output: z.object({ space: officeSpaceSchema }) },
   space_settings_get: { input: z.object({ spaceId: id }), output: z.object({ settings: spaceSettingsSchema }) },
-  space_settings_set: { input: z.object({ spaceId: id, settings: spaceSettingsSchema.partial() }), output: z.object({ settings: spaceSettingsSchema }) },
+  space_settings_set: { input: z.object({ spaceId: id, settings: spaceSettingsPatchSchema }), output: z.object({ settings: spaceSettingsSchema }) },
   folder_create: { input: z.object({ spaceId: id, name }), output: z.object({ folder: folderSchema }) },
   folder_archive: { input: z.object({ folderId: id }), output: z.object({ ok: z.boolean() }) },
   space_tree: { input: z.object({ spaceId: id }), output: z.object({

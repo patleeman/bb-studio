@@ -39,7 +39,7 @@ describe("Office Space ownership", () => {
     expect(() => store.moveProject("catchall", store.defaultSpace().id)).toThrow("catch-all");
     store.setSettings(work.id, { defaultTrust: "act", enabledItemKinds: ["page"] });
     const reopened = new OfficeSpaceStore(db);
-    expect(reopened.settings(work.id)).toEqual({ defaultTrust: "act", enabledItemKinds: ["page"], defaultBotModel: null });
+    expect(reopened.settings(work.id)).toEqual({ defaultTrust: "act", enabledItemKinds: ["page"], defaultBotModel: null, todayArchiveAfter: "3d" });
     expect(reopened.settings(store.defaultSpace().id).defaultTrust).toBe("ask");
     expect(() => store.setSettings(work.id, { defaultTrust: "invalid" as never })).toThrow();
     expect(store.settings(work.id).defaultTrust).toBe("act");

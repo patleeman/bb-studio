@@ -1,10 +1,10 @@
 import type Database from "better-sqlite3";
 import { newId } from "@bb-studio/kit/ids";
-import { officeContract, spaceSettingsSchema, type OfficeInput, type OfficeSpace, type SpaceSettings } from "./contract";
+import { officeContract, spaceSettingsSchema, spaceSettingsPatchSchema, type OfficeInput, type OfficeSpace, type SpaceSettings } from "./contract";
 import { PERSONAL_PROJECT_ID } from "./migration";
 
 type Row = { id: string; name: string; icon: string | null; description: string; is_default: number; default_project_id: string | null; created_at: number; updated_at: number };
-const defaults: SpaceSettings = { enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null };
+const defaults: SpaceSettings = { todayArchiveAfter: "3d", enabledItemKinds: null, defaultTrust: "ask", defaultBotModel: null };
 
 /** Project ownership is authoritative. No membership is inferred from tags. */
 export class OfficeSpaceStore {
@@ -68,6 +68,8 @@ export class OfficeSpaceStore {
     if (space.projectIds.length) throw new Error("Move this Space's folders before deleting it.");
     this.db.transaction(() => {
       this.db.prepare("DELETE FROM space_settings WHERE space_id=?").run(id);
+      this.db.prepare("DELETE FROM office_tabs WHERE space_id=?").run(id);
+      this.db.prepare("DELETE FROM office_tab_folders WHERE space_id=?").run(id);
       this.db.prepare("DELETE FROM spaces WHERE id=?").run(id);
     })();
   }
@@ -125,7 +127,7 @@ export class OfficeSpaceStore {
   }
 
   setSettings(id: string, patch: Partial<SpaceSettings>): SpaceSettings {
-    const next = spaceSettingsSchema.parse({ ...this.settings(id), ...spaceSettingsSchema.partial().parse(patch) });
+    const next = spaceSettingsSchema.parse({ ...this.settings(id), ...spaceSettingsPatchSchema.parse(patch) });
     this.db.transaction(() => {
       const put = this.db.prepare("INSERT INTO space_settings(space_id,key,value) VALUES (?,?,?) ON CONFLICT(space_id,key) DO UPDATE SET value=excluded.value");
       for (const [key, value] of Object.entries(next)) put.run(id, key, JSON.stringify(value));

@@ -105,4 +105,20 @@ export const MIGRATIONS = [
      plugin_id TEXT NOT NULL, item_id TEXT NOT NULL, created_at INTEGER NOT NULL,
      PRIMARY KEY (plugin_id, item_id)
    );`,
+  // Office sidebar tabs and their Pinned groupings (independent of projects).
+  `CREATE TABLE office_tab_folders (
+     id TEXT PRIMARY KEY, space_id TEXT NOT NULL, name TEXT NOT NULL,
+     open INTEGER NOT NULL DEFAULT 1, position INTEGER NOT NULL
+   );
+   CREATE INDEX office_tab_folders_space ON office_tab_folders(space_id,position);
+   CREATE TABLE office_tabs (
+     space_id TEXT NOT NULL, ref TEXT NOT NULL,
+     zone TEXT NOT NULL CHECK(zone IN ('essential','pinned','today','archived')),
+     folder_id TEXT REFERENCES office_tab_folders(id), position INTEGER NOT NULL,
+     opened_at INTEGER NOT NULL, archived_at INTEGER,
+     PRIMARY KEY(space_id,ref),
+     CHECK(folder_id IS NULL OR zone='pinned'),
+     CHECK((zone='archived') = (archived_at IS NOT NULL))
+   );
+   CREATE INDEX office_tabs_space_zone ON office_tabs(space_id,zone,position);`,
 ];
