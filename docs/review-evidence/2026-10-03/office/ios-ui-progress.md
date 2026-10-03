@@ -166,3 +166,17 @@ scratch task and called `studio.remove` with pluginId `studio`; it returned
 then cleaned up through tasks_delete. The server remove handler still treats
 all consolidated Studio item IDs as spaces. This requires a separate server
 fix; the deletion assertion remains in place.
+
+## Consolidated bulk-delete routing fixed
+
+The server's collection remove handler now partitions Studio space IDs (`spc_`)
+from consolidated module item IDs. It sends tasks and other module items through
+the provider delete path, including existing tag/tab cleanup, and preserves
+per-item failures for missing spaces.
+
+The regression test initializes the real Studio plugin and calls its registered
+RPCs to create a task, remove it alongside a missing space, and verify the task
+is gone while the missing space reports an error. The focused removal, module
+runtime and provider-conformance tests pass: 17 tests, 0 failures. Studio
+typechecking and stable compatibility pass. Native bulk UI verification awaits
+a fresh staged install containing this pushed server fix.

@@ -519,9 +519,16 @@ async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServi
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
     remove: async ({ pluginId, ids }) => {
       if (pluginId === STUDIO_PLUGIN_ID) {
-        const done = ids.filter((id) => spaces.get(id));
+        // Consolidated modules share Studio's plugin ID with spaces.
+        const spaceIds = ids.filter((id) => id.startsWith("spc_"));
+        const itemIds = ids.filter((id) => !id.startsWith("spc_"));
+        const done = spaceIds.filter((id) => spaces.get(id));
         for (const id of done) deleteSpace(id);
-        return { done, failed: ids.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })) };
+        const items = itemIds.length ? await deleteItems(pluginId, itemIds) : { done: [], failed: [] };
+        return {
+          done: [...done, ...items.done],
+          failed: [...spaceIds.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })), ...items.failed],
+        };
       }
       return deleteItems(pluginId, ids);
     },
