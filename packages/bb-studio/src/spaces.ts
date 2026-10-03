@@ -18,6 +18,8 @@ const NEW_ITEM_MS = 2 * 60_000;
 
 export interface Space {
   id: string;
+  /** Present for project-owned office Spaces. */
+  isDefault?: boolean;
   name: string;
   color: string;
   /** An emoji, or null for the space icon. */
@@ -223,11 +225,13 @@ export class SpaceStore {
 
 /** Whether an item is in a space: added to it, or in one of its projects. */
 export function inSpace(space: Space, item: { pluginId: string; id: string; projectId: string | null }): boolean {
+  if (space.isDefault !== undefined) return item.projectId === null ? space.isDefault : space.projectIds.includes(item.projectId);
   return space.itemKeys.includes(`${item.pluginId}:${item.id}`) || (item.projectId !== null && space.projectIds.includes(item.projectId));
 }
 
 /** Whether a thread is in a space: added to it, or in one of its projects. */
 export function threadInSpace(space: Space, thread: { id: string; projectId: string | null }): boolean {
+  if (space.isDefault !== undefined) return thread.projectId === null ? space.isDefault : space.projectIds.includes(thread.projectId);
   return space.threadIds.includes(thread.id) || (thread.projectId !== null && space.projectIds.includes(thread.projectId));
 }
 

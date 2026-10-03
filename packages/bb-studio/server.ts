@@ -1,3 +1,4 @@
+import { initializeOffice } from "./src/office/server";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
 //
@@ -54,12 +55,12 @@ function queryArg(arg: string): string {
 
 export default async function plugin(bb: BbPluginApi) {
   // Spaces list as Studio's own items; `spaces` is set up below, before any call.
-  const hub = new StudioHub(bb.sdk, { kinds: [spaceKind], items: () => spaces.list().map(spaceItem) });
+  const hub = new StudioHub(bb.sdk);
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
-  const spaces = new SpaceStore(db);
+  const { spaces, folders: officeFolders } = await initializeOffice(bb, db, hub);
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
@@ -117,7 +118,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (refs === null) return;
       // A new thread that links a space joins it, as "New thread" in a space does.
       const joined = (firstThreadSpaceIds(events) ?? []).filter((id) => spaces.get(id));
-      for (const id of joined) spaces.add(id, [{ pluginId: THREAD_REF, id: thread.id }]);
+      // Space membership follows the thread project, not linked Space pages.
       if (joined.length) changes.append(null);
       for (const ref of refs) {
         services.linkThread({ threadId: thread.id, ref, role: "new-thread", state: thread.status, createdAt: thread.createdAt, updatedAt: Date.now(), metadata: {} });
@@ -161,7 +162,7 @@ export default async function plugin(bb: BbPluginApi) {
     pendingSpaces.delete(context.project.id);
     if (Date.now() - pending.at > PENDING_SPACES_MS) return { action: "proceed" };
     const joined = pending.ids.filter((id) => spaces.get(id));
-    for (const id of joined) spaces.add(id, [{ pluginId: THREAD_REF, id: context.thread.id }]);
+    // Space membership follows the thread project, not linked Space pages.
     if (joined.length) tagsChanged();
     return { action: "proceed" };
   });
@@ -261,7 +262,7 @@ export default async function plugin(bb: BbPluginApi) {
     if (!holding.length) return;
     const item = (await hub.get(ref.pluginId, [ref.id]).catch(() => []))[0];
     const joining = holding.filter((space) => !item || !inSpace(space, item));
-    for (const space of joining) spaces.add(space.id, [ref]);
+    // Item ownership follows its project; linking a thread does not refile it.
     if (joining.length) tagsChanged();
   };
   // A sub-item joins its parent's spaces once, when it's new; taking it out
@@ -344,7 +345,7 @@ export default async function plugin(bb: BbPluginApi) {
       const result = found[index];
       if (!result) return;
       if (!result.page) {
-        spaces.remove(space.id);
+        spaces.setPage(space.id, null);
         touched = true;
         return;
       }
@@ -513,7 +514,7 @@ export default async function plugin(bb: BbPluginApi) {
     createSpace: async (input) => {
       const made = spaces.create(input);
       tagsChanged();
-      await spacePage(made.id);
+      await officeFolders.ensureCatchAll(made.id);
       return { space: spaces.get(made.id) ?? made };
     },
     updateSpace: ({ id, ...input }) => {
@@ -602,7 +603,7 @@ export default async function plugin(bb: BbPluginApi) {
       const space = spaces.get(id);
       if (!space) throw new Error("That space no longer exists.");
       const { item } = await hub.call(pluginId, "studio_create", { kind, projectId: space.defaultProjectId });
-      spaces.add(id, [{ pluginId, id: item.id }]);
+      // Created directly in the Space catch-all project.
       tagsChanged();
       return { href: item.href };
     },

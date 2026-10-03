@@ -72,6 +72,22 @@ export class OfficeSpaceStore {
     })();
   }
 
+  /** The caller has verified that the sole catch-all contains no items or threads. */
+  removeEmptySpace(id: string): void {
+    const space = this.get(id);
+    if (space.isDefault) throw new Error("The default Space cannot be deleted.");
+    if (space.projectIds.some(p => p !== space.defaultProjectId)) throw new Error("Move this Space's folders before deleting it.");
+    this.db.transaction(() => {
+      if (space.defaultProjectId) {
+        this.db.prepare("UPDATE spaces SET default_project_id=NULL WHERE id=?").run(id);
+        this.moveProject(space.defaultProjectId, this.defaultSpace().id);
+        this.db.prepare("INSERT OR IGNORE INTO office_folder_archives VALUES (?,?)").run(space.defaultProjectId, Date.now());
+      }
+      this.db.prepare("DELETE FROM office_folder_intents WHERE space_id=?").run(id);
+      this.remove(id);
+    })();
+  }
+
   moveProject(projectId: string, spaceId: string): OfficeSpace {
     this.get(spaceId);
     if (projectId === PERSONAL_PROJECT_ID && spaceId !== this.defaultSpace().id) throw new Error("Personal belongs to the default Space.");
