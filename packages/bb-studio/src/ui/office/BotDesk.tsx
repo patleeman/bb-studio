@@ -17,7 +17,7 @@ const TABS = [
 ] as const;
 
 const TRUST: Record<Desk["bot"]["trust"], string> = {
-  read_only: "Read only. Never changes anything.",
+  read_only: "Asks you before changing anything outside its own files.",
   ask: "Asks you before changing anything outside its own files.",
   act: "Acts on its own and reports what it did.",
 };

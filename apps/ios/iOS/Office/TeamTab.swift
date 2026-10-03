@@ -216,7 +216,6 @@ struct BotDeskView: View {
 
     private func trustLabel(_ trust: OfficeTrust?) -> String {
         switch trust {
-        case .readOnly: "Read only"
         case .act: "Acts and reports"
         default: "Asks first"
         }

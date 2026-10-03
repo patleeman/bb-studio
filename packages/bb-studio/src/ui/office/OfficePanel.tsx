@@ -113,7 +113,6 @@ function NewSpacePage() {
 }
 
 const TRUST_OPTIONS = [
-  { id: "read_only", label: "Read only", detail: "Bots look but never change anything." },
   { id: "ask", label: "Ask first", detail: "Bots ask in your Inbox before changing anything outside their own files." },
   { id: "act", label: "Act and report", detail: "Bots act on their own and tell you what they did." },
 ] as const;

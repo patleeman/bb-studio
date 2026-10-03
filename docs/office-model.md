@@ -174,10 +174,12 @@ The rules below apply with these exceptions.
 
 ### Team and delegation
 
-- Teams `bots`: add `trust` (`read_only` | `ask` | `act`), default `ask`.
-  `read_only` → permission mode that blocks writes; `ask` → every write-class
-  action outside the bot's home becomes an Inbox request; `act` → current
-  behavior. Map onto the existing `permissionMode` where possible.
+- Teams `bots`: add `trust` (`ask` | `act`), default `ask`. Stable SDK
+  permission modes can't enforce a read-only session, so there is no read-only
+  level until BB core can enforce one. `ask` → `accept-edits`: writes inside
+  the bot's workspace go through, anything else raises a BB approval that the
+  Inbox shows as a request. `act` → `auto`. Studio-owned mutation tools also
+  check trust.
 - A bot belongs to its project's Space. "Global" bots move to the default Space.
 - A task with a bot assignee is a delegation. Assigning starts the bot on it
   (existing `task_handoffs` path). The task records `threadId`, status
