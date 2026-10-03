@@ -20,8 +20,8 @@ export function useItemDrag(): boolean {
       if ((event.target === document.documentElement || event.target === document) && !event.relatedTarget) stop();
     };
     const onVisibility = () => { if (document.hidden) stop(); };
-    document.addEventListener("dragstart", onDragStart, true);
-    document.addEventListener("dragover", onDragOver, true);
+    document.addEventListener("dragstart", onDragStart);
+    document.addEventListener("dragover", onDragOver);
     document.addEventListener("dragleave", onDragLeave, true);
     document.addEventListener("visibilitychange", onVisibility);
     window.addEventListener("dragend", stop, true);
@@ -32,8 +32,8 @@ export function useItemDrag(): boolean {
     window.addEventListener("mousemove", onPointerMove, true);
     window.addEventListener("blur", stop);
     return () => {
-      document.removeEventListener("dragstart", onDragStart, true);
-      document.removeEventListener("dragover", onDragOver, true);
+      document.removeEventListener("dragstart", onDragStart);
+      document.removeEventListener("dragover", onDragOver);
       document.removeEventListener("dragleave", onDragLeave, true);
       document.removeEventListener("visibilitychange", onVisibility);
       window.removeEventListener("dragend", stop, true);
