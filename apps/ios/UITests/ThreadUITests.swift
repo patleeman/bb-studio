@@ -1267,7 +1267,7 @@ final class ThreadUITests: XCTestCase {
 
         // The tag chip: rename, then delete.
         let chips = app.scrollViews.containing(.button, identifier: "All").firstMatch
-        let chip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", tagName)).firstMatch
+        let chip = chips.buttons["studioTagChip-\(tag)"]
         for _ in 0..<6 where !chip.isHittable { chips.swipeLeft() }
         XCTAssertTrue(chip.waitForExistence(timeout: 10), "tag chip")
         chip.press(forDuration: 1.5)
@@ -1280,7 +1280,7 @@ final class ThreadUITests: XCTestCase {
         sleep(1)
         app.alerts.buttons["Rename"].tap()
         XCTAssertTrue(wait(10) { tagId(renamed) != nil && tagId(tagName) == nil }, "tag renamed")
-        let renamedChip = chips.buttons.matching(NSPredicate(format: "label CONTAINS %@", renamed)).firstMatch
+        let renamedChip = chips.buttons["studioTagChip-\(tag)"]
         XCTAssertTrue(renamedChip.waitForExistence(timeout: 10), "renamed chip")
         for _ in 0..<6 where !renamedChip.isHittable { chips.swipeLeft() }
         renamedChip.press(forDuration: 1)

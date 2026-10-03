@@ -644,26 +644,36 @@ struct StudioView: View {
                     }
                 }
                 ForEach(store.spaces) { space in
-                    chip(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
-                        selected: app.studioSpace == space.id, tint: Color(hex: space.color)) {
-                        app.studioSpace = app.studioSpace == space.id ? nil : space.id
-                    }
-                    .contextMenu {
+                    Menu {
                         Button { operation.complete(on: app) { app.studioPath.append(.space(id: space.id)) } } label: { Label("Open Space", systemImage: "arrow.up.right") }
                         Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
+                    } label: {
+                        chipLabel(space.emoji.map { "\($0) \(space.name)" } ?? space.name, space.emoji == nil ? "square.stack.3d.up" : nil,
+                                  selected: app.studioSpace == space.id, tint: Color(hex: space.color))
+                    } primaryAction: {
+                        app.studioSpace = app.studioSpace == space.id ? nil : space.id
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("studioSpaceChip-\(space.id)")
+                    .accessibilityAddTraits(app.studioSpace == space.id ? .isSelected : [])
+                    .sensoryFeedback(.selection, trigger: app.studioSpace == space.id)
                 }
                 ForEach(usedTags) { tag in
-                    chip(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color)) {
-                        tagFilter = tagFilter == tag.id ? nil : tag.id
-                    }
-                    .contextMenu {
+                    Menu {
                         Button {
                             newTag = tag.name
                             renamingTag = tag
                         } label: { Label("Rename Tag…", systemImage: "pencil") }
                         Button(role: .destructive) { deletingTag = tag } label: { Label("Delete Tag…", systemImage: "trash") }
+                    } label: {
+                        chipLabel(tag.name, "tag.fill", selected: tagFilter == tag.id, tint: Color(hex: tag.color))
+                    } primaryAction: {
+                        tagFilter = tagFilter == tag.id ? nil : tag.id
                     }
+                    .buttonStyle(.plain)
+                    .accessibilityIdentifier("studioTagChip-\(tag.id)")
+                    .accessibilityAddTraits(tagFilter == tag.id ? .isSelected : [])
+                    .sensoryFeedback(.selection, trigger: tagFilter == tag.id)
                 }
                 if hasArchived {
                     chip("Archived", "archivebox", selected: showArchived) { showArchived.toggle() }
@@ -676,18 +686,22 @@ struct StudioView: View {
 
     private func chip(_ title: String, _ symbol: String?, selected: Bool, tint: Color? = nil, action: @escaping () -> Void) -> some View {
         Button(action: action) {
-            HStack(spacing: 5) {
-                if let symbol { Image(systemName: symbol).font(.caption).foregroundStyle(selected ? .white : tint ?? .primary) }
-                Text(title).font(.subheadline.weight(.medium))
-            }
-            .padding(.horizontal, 12)
-            .padding(.vertical, 7)
-            .foregroundStyle(selected ? Color.white : .primary)
-            .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
+            chipLabel(title, symbol, selected: selected, tint: tint)
         }
         .buttonStyle(.plain)
         .accessibilityAddTraits(selected ? .isSelected : [])
         .sensoryFeedback(.selection, trigger: selected)
+    }
+
+    private func chipLabel(_ title: String, _ symbol: String?, selected: Bool, tint: Color? = nil) -> some View {
+        HStack(spacing: 5) {
+            if let symbol { Image(systemName: symbol).font(.caption).foregroundStyle(selected ? .white : tint ?? .primary) }
+            Text(title).font(.subheadline.weight(.medium))
+        }
+        .padding(.horizontal, 12)
+        .padding(.vertical, 7)
+        .foregroundStyle(selected ? Color.white : .primary)
+        .background(selected ? AnyShapeStyle(Color.accentColor) : AnyShapeStyle(.background.secondary), in: .capsule)
     }
 
     private var newMenu: some View {

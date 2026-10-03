@@ -150,3 +150,19 @@ and Keep Mac awake coverage, then scrolls Settings and opens Automations there.
 `/tmp/office-tools-2/results.xcresult`: 1 test passed, 0 failures. The seed was
 exercised against staged server 52586, and both staging scripts pass
 `node --check`. No product changes were needed for this failure.
+
+## Tag-chip menu fix; bulk-delete defect isolated
+
+The coordinator approved native Menu with primaryAction after contentShape
+failed to isolate each context menu. Space and tag chips now use that control,
+retain their label, styling and selected trait, and expose stable per-chip
+accessibility identifiers. The bulk test uses the tag identifier across rename.
+
+`/tmp/office-menu-fixed/results.xcresult` built successfully and passed tag
+rename, tag deletion, and task archive assertions. Its remaining failure is
+`deleted from select mode`. An independent staged RPC reproduction created a
+scratch task and called `studio.remove` with pluginId `studio`; it returned
+`That space no longer exists` and left the task intact. The diagnostic task was
+then cleaned up through tasks_delete. The server remove handler still treats
+all consolidated Studio item IDs as spaces. This requires a separate server
+fix; the deletion assertion remains in place.
