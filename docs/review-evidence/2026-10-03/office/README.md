@@ -4,7 +4,7 @@
 
 Stable BB 0.45.0. Web and native captures use the six-plugin Git install at
 `6089c1d` on isolated server 52386; the native app includes `1bf08d1`. A second
-clean six-plugin install at `1bf08d1` on 52486 passes the [fresh install checks](fresh-install.json).
+clean six-plugin install at `09bb66a8` on 52586 passes the [fresh install checks](fresh-install.json).
 The capture seed creates three bots (Atlas, Scribe, Quinn), a channel, an Atlas
 DM, a reviewed task, a report, and an inert plugin approval. No bot turn or
 approval is dispatched. `fresh-install.json` records the final install IDs; `capture-fixtures.json` records
@@ -80,7 +80,7 @@ Implementation and archive hardening: `1eb716f`, `4d23945`, `4befc7b`.
 
 Full `pnpm check` passes, including stable compatibility, contracts, 167 native
 RPC call sites, 32 payload fixtures, marketplace, docs, and the packed kit.
-Log: `/tmp/stage9-release-check.log`. A timing-dependent table fixture failure
+Log: `/tmp/stage9-handoff-check.log`. A timing-dependent table fixture failure
 was fixed in `2553c55` by stubbing its debounced notification RPC.
-The last fresh staged install uses final implementation commit `1bf08d1`;
+The last fresh staged install uses final implementation and capture commit `09bb66a8`;
 later changes only affect tests and evidence.

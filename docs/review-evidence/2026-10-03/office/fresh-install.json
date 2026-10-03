@@ -1,41 +1,41 @@
 {
-  "commit": "1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+  "commit": "09bb66a8",
   "bbVersion": "0.45.0",
-  "server": "http://127.0.0.1:52486",
+  "server": "http://127.0.0.1:52586",
   "installed": [
     {
       "id": "emoji-react",
-      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "source": "git:github.com/patleeman/bb-studio@09bb66a8b25fd3e8f004cb693e4a6fbab0aaeddb",
       "status": "running",
       "enabled": true
     },
     {
       "id": "excalidraw",
-      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "source": "git:github.com/patleeman/bb-studio@09bb66a8b25fd3e8f004cb693e4a6fbab0aaeddb",
       "status": "running",
       "enabled": true
     },
     {
       "id": "float",
-      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "source": "git:github.com/patleeman/bb-studio@09bb66a8b25fd3e8f004cb693e4a6fbab0aaeddb",
       "status": "running",
       "enabled": true
     },
     {
       "id": "mobile",
-      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "source": "git:github.com/patleeman/bb-studio@09bb66a8b25fd3e8f004cb693e4a6fbab0aaeddb",
       "status": "running",
       "enabled": true
     },
     {
       "id": "pages",
-      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "source": "git:github.com/patleeman/bb-studio@09bb66a8b25fd3e8f004cb693e4a6fbab0aaeddb",
       "status": "running",
       "enabled": true
     },
     {
       "id": "studio",
-      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "source": "git:github.com/patleeman/bb-studio@09bb66a8b25fd3e8f004cb693e4a6fbab0aaeddb",
       "status": "running",
       "enabled": true
     }
@@ -73,28 +73,28 @@
     "entries": []
   },
   "fixture": {
-    "projectId": "proj_p2na8gyi4c",
-    "threadId": "thr_s3iujkw47y",
+    "projectId": "proj_76wzbzwrth",
+    "threadId": "thr_pkzy5g43vb",
     "spaceId": "spc_personal",
-    "botId": "bot_bbf780c34abeefee",
+    "botId": "bot_e890c40baa24ceca",
     "bots": [
       {
-        "id": "bot_bbf780c34abeefee",
+        "id": "bot_e890c40baa24ceca",
         "name": "Atlas"
       },
       {
-        "id": "bot_b995e955f56823ca",
+        "id": "bot_9cf67226d176c2e5",
         "name": "Scribe"
       },
       {
-        "id": "bot_6460afabc183d22c",
+        "id": "bot_1709d60401385ad2",
         "name": "Quinn"
       }
     ],
-    "channelId": "3b053e47-d228-4b8b-9faf-27020e1db663",
-    "dmThreadId": "thr_9vtvdd9e68",
-    "taskId": "tsk_82244cb5e93e1c74",
-    "postId": "post_8877cab3444f679c",
-    "approvalId": "stage9-f1f687c4-8ed8-4f39-9298-c8accf3157f7"
+    "channelId": "8f856bd0-b35d-44d8-8f0c-858918a02823",
+    "dmThreadId": "thr_tv9n4dt4jp",
+    "taskId": "tsk_45edc0c79bae6e30",
+    "postId": "post_5bbb9ce751e2d6fa",
+    "approvalId": "stage9-6f36e143-8412-4088-944c-472364741f1d"
   }
 }
