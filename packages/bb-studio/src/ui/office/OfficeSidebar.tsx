@@ -12,6 +12,7 @@ import {
 import { Icon, openAppPath } from "@bb-studio/kit/app";
 import { useMemo, useState, type ReactNode } from "react";
 import { Face, FaceStack } from "./Face";
+import { ThreadMenu } from "./ThreadMenu";
 import { usePathname } from "./location";
 import { itemRef, useLive, useSpaces, useSpaceTree, useTeam, type Conversation, type TeamBot, type TreeFolder, type TreeItem } from "./model";
 import { currentOfficeSubPath, openOffice } from "./routes";
@@ -68,7 +69,15 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   );
 }
 
-function ThreadRow({ thread, active, indent, onOpen }: { thread: PluginSidebarThread; active: boolean; indent?: boolean; onOpen: (id: string) => void }) {
+function ThreadRow(props: { thread: PluginSidebarThread; active: boolean; indent?: boolean; onOpen: (id: string) => void }) {
+  return (
+    <ThreadMenu thread={props.thread}>
+      {(editor) => editor ?? <ThreadButton {...props} />}
+    </ThreadMenu>
+  );
+}
+
+function ThreadButton({ thread, active, indent, onOpen }: { thread: PluginSidebarThread; active: boolean; indent?: boolean; onOpen: (id: string) => void }) {
   const running = RUNNING.has(thread.runtimeStatus);
   return (
     <button type="button" onClick={() => onOpen(thread.id)} aria-current={active ? "page" : undefined} className={cn(ROW, indent && "pl-7", active && ROW_ACTIVE)}>

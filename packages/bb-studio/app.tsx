@@ -1,5 +1,4 @@
-import { registerApp as registerSidebar } from "./src/modules/sidebar/app";
-import { registerApp as registerNavigation } from "./src/modules/navigation/app";
+import { moduleApp } from "./src/modules/app";
 import { registerApp as registerTalk } from "./src/modules/talk/app";
 import { registerApp as registerDecisions } from "./src/modules/decisions/app";
 import { registerApp as registerArtifacts } from "./src/modules/artifacts/app";
@@ -33,8 +32,6 @@ function StudioRoot({ subPath }: { subPath: string }) {
 
 export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "module-import-notice", component: ModuleNotice });
-  registerSidebar(app);
-  registerNavigation(app);
   registerTalk(app);
   registerDecisions(app);
   registerArtifacts(app);
@@ -43,9 +40,9 @@ export default definePluginApp((app) => {
   registerFeed(app);
   registerTables(app);
   registerChat(app);
-  // The office (docs/office-model.md). The sidebar slots switch on once the
-  // Sidebar and Navigation modules are folded into core.
-  registerOfficeApp(app, { sidebar: false });
+  // The office (docs/office-model.md). Its sidebar replaces the folded
+  // Sidebar and Navigation modules, gated the same way they were.
+  registerOfficeApp(app, { sidebar: moduleApp(app, "sidebar"), navigation: moduleApp(app, "navigation") });
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot) });
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
