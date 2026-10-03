@@ -42,3 +42,16 @@ export async function seedStudioItems(pluginRpc, projectId) {
   }
   return { projectId, items: expected, providers: providers.map(({ pluginId, state }) => ({ pluginId, state })) };
 }
+
+/** A paused schedule for native automation detail checks; it never dispatches. */
+export async function seedUITestAutomation(pluginRpc, projectId) {
+  return pluginRpc("automations", "automations_create", {
+    projectId, name: "Daily native UI fixture", enabled: false, origin: "app",
+    trigger: { triggerType: "schedule", cron: "0 9 * * *", timezone: "UTC" },
+    execution: {
+      mode: "agent", prompt: "UI fixture only. Do not enable or run.",
+      providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low",
+      permissionMode: "accept-edits", environment: { type: "project-default" },
+    },
+  });
+}

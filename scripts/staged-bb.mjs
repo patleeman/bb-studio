@@ -21,7 +21,7 @@ import { cp, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
-import { seedStudioItems } from "./staged-items.mjs";
+import { seedStudioItems, seedUITestAutomation } from "./staged-items.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoSource = "git:github.com/patleeman/bb-studio";
@@ -278,6 +278,7 @@ async function start() {
       "--title", "Native UI workspace fixture",
       "--prompt", "Reply with exactly: Native UI workspace fixture is ready. Do not call tools or change files.");
     await bb("thread", "wait", uiTestThread.id, "--timeout", "5m");
+    await seedUITestAutomation(pluginRpc, project.id);
     const environments = await bb("environment", "list", "--project", project.id);
     if (!environments.some(e => e.status === "ready" && e.environmentProviderId === "project-checkout" && e.isGitRepo)) {
       throw new Error("Native UI fixture requires a ready Git project checkout");

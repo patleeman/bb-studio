@@ -202,14 +202,16 @@ final class ThreadUITests: XCTestCase {
         shot("diff")
     }
 
-    /// Every Pages block kind, from a built-in page rather than a real one.
     /// Automations, usage and host settings. Read-only: nothing is run, paused or sent.
     func testTools() {
+        continueAfterFailure = false
         app.open(URL(string: "bbstudio://automations")!)
         XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10))
         sleep(2)
         shot("tools-automations")
-        app.staticTexts.matching(NSPredicate(format: "label CONTAINS 'Daily'")).firstMatch.tap()
+        let daily = app.staticTexts["Daily native UI fixture"].firstMatch
+        XCTAssertTrue(daily.waitForExistence(timeout: 10), "paused staged automation")
+        daily.tap()
         XCTAssertTrue(app.switches["Enabled"].waitForExistence(timeout: 10), "automation detail")
         sleep(2)
         shot("tools-automation")
@@ -220,9 +222,12 @@ final class ThreadUITests: XCTestCase {
         app.open(URL(string: "bbstudio://settings")!)
         XCTAssertTrue(app.switches["Keep Mac awake"].waitForExistence(timeout: 10), "keep awake")
         shot("tools-settings")
-        app.open(URL(string: "bbstudio://home")!)
-        XCTAssertTrue(app.buttons["Automations"].waitForExistence(timeout: 10))
-        shot("tools-home")
+        let automations = app.buttons["Automations"]
+        for _ in 0..<5 where !automations.exists || !automations.isHittable { app.swipeUp() }
+        XCTAssertTrue(automations.waitForExistence(timeout: 5), "Automations entry in Settings")
+        automations.tap()
+        XCTAssertTrue(app.navigationBars["Automations"].waitForExistence(timeout: 10), "Automations is in Settings")
+        shot("tools-settings-automations")
     }
 
     /// Read-only: opens sheets and screens, never sends, forks or compacts.

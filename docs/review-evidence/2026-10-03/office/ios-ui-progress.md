@@ -138,3 +138,15 @@ the coordinator was notified. `/tmp/office-tables-fixed/results.xcresult` report
 Bulk-tag investigation remains open. Scrolling its chip fully into view still
 opened the neighboring Space menu in `/tmp/office-collection-tests/results.xcresult`.
 The experimental scrolling change was removed; the test was not weakened.
+
+## Tools fixture and Settings route
+
+`testTools` expected an unseeded automation whose name contained Daily, then
+looked for the removed Home automation entry. Staging with `--ui-tests` now
+creates a deterministic disabled schedule, `Daily native UI fixture`; it does
+not dispatch. The test opens that schedule and checks its detail, retains Usage
+and Keep Mac awake coverage, then scrolls Settings and opens Automations there.
+
+`/tmp/office-tools-2/results.xcresult`: 1 test passed, 0 failures. The seed was
+exercised against staged server 52586, and both staging scripts pass
+`node --check`. No product changes were needed for this failure.
