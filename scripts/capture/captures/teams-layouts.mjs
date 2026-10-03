@@ -116,6 +116,15 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await wait(client, `${rows}===3&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Release checklist')`);
    await margin(client);
   }) },
+  { id: "bots-focus-compact", packageDir: "bb-studio-teams", fileName: "channel-focus-compact.png", setup: guard(async client => {
+   // A narrower window keeps the member box in the margin as avatars only.
+   await client.command("Emulation.setDeviceMetricsOverride", { width: 1040, height: 800, deviceScaleFactor: 1, mobile: false });
+   const data = await open(client, "focus");
+   await client.clickAriaButtonWithPointer("Release checklist, Idle");
+   await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&${rows}===3&&getComputedStyle(document.querySelector('.channel-switcher .channel-rail-name')).display==='none'`);
+   await margin(client);
+   return () => client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+  }) },
   { id: "bots-active", packageDir: "bb-studio-teams", fileName: "channel-active.png", setup: guard(async client => {
    const data = await open(client, "active");
    await bbCli(["thread", "tell", data.threadId, "For a staged UI activity check, use the terminal to run sleep 45, then reply only Check finished. Change no files."]);
@@ -129,7 +138,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
     await bbCli(["thread", "stop", data.threadId]);
     // It keeps the finished thread on screen, and a pick swaps threads without leaving Active.
     await wait(client, `!!document.querySelector('[data-channel-thread="${data.threadId}"]')&&!document.querySelector('.channel-switcher-row[data-activity="Working"]')`);
-    await client.clickElementWithTextAndPointer('.channel-switcher-row > button .channel-rail-name', "Scribe");
+    await client.clickAriaButtonWithPointer("Scribe, Idle");
     await wait(client, `!!document.querySelector('[data-channel-layout="active"]')&&document.querySelector('.channel-switcher-row[data-current] button')?.textContent.includes('Scribe')`);
    };
   }) },

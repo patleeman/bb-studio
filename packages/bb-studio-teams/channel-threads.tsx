@@ -133,7 +133,7 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
       {forks.length > 0 && <footer aria-label="Forks">{forks.map(child => <button type="button" key={child.id} onClick={() => onSelect(child.id)} title={child.title}><Icon name="GitBranch" className="size-3 shrink-0" aria-hidden /><span className="truncate">{child.title}</span><Status thread={child} /></button>)}</footer>}
     </section>;
   };
-  const unstartedRow = (bot: { id: string; name: string; avatar: string | null }) => <span key={bot.id} className="channel-member-unstarted" title={`${bot.name} hasn’t started. Mention it in the composer to start its thread.`}><ItemTile icon={bot.avatar || null} kindIcon="Bot" size="sm" /><span className="channel-rail-name">{bot.name}</span></span>;
+  const unstartedRow = (bot: { id: string; name: string; avatar: string | null }) => <span key={bot.id} className="channel-member-unstarted" role="note" aria-label={`${bot.name}, not started`} title={`${bot.name} hasn’t started. Mention it in the composer to start its thread.`}><ItemTile icon={bot.avatar || null} kindIcon="Bot" size="sm" /><span className="channel-rail-name">{bot.name}</span></span>;
   const customOrder = order.some(id => roots.some(thread => thread.id === id));
   const gridFooter = (unstarted.length > 0 || customOrder) && <div className="channel-unstarted">
     {unstarted.length > 0 && <><span className="text-xs text-subtle-foreground">Not started</span>
@@ -145,10 +145,10 @@ export function ChannelThreads({ view, initialThreads, bots, layout, selected, o
     {switcherThreads.map(thread => {
       const current = single?.id === thread.id;
       return <div key={thread.id} className="channel-switcher-row" data-current={current || undefined} data-fork={thread.parentThreadId ? "" : undefined} data-activity={threadActivity(thread)}>
-        <button type="button" aria-current={current || undefined} onClick={() => pick(thread.id)} title={`${label(thread)} · ${threadActivity(thread)}`}>
+        <button type="button" aria-current={current || undefined} onClick={() => pick(thread.id)} aria-label={`${label(thread)}, ${threadActivity(thread)}`} title={`${label(thread)} · ${threadActivity(thread)}`}>
           {thread.parentThreadId ? <Icon name="GitBranch" className="size-3.5 shrink-0 text-subtle-foreground" aria-hidden /> : avatar(thread)}
           <span className="channel-rail-name">{label(thread)}</span>
-          <span className="channel-status-dot" aria-hidden /><span className="sr-only">{threadActivity(thread)}</span>
+          <span className="channel-status-dot" aria-hidden />
         </button>
         {current && <span className="channel-switcher-actions">
           <button type="button" aria-label={`Reply to ${label(thread)}`} title="Reply in channel" onClick={() => choose(thread.id)} className="channel-pane-action"><Icon name="ArrowTurnBackward" className="size-3.5" /></button>
