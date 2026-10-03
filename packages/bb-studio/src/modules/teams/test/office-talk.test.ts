@@ -5,6 +5,7 @@ import { setup } from "./bots-fixture";
 
 it("creates one durable DM and normal profile thread across concurrent calls", async () => {
   const x = setup();
+  x.harness.inspection.sdk.stub("projects.get", async () => ({ id: x.a.projectId, sources: [{ isDefault: true, path: "/safe/Spaces/Work/General", hostId: "folder-host" }] }) as never);
   x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) => makeThreadResponse({ id: threadId, projectId: x.a.projectId, status: "idle" }));
   await plugin(x.bb);
   try {
@@ -18,7 +19,7 @@ it("creates one durable DM and normal profile thread across concurrent calls", a
     expect(await x.harness.behavior.callRpc("office_talk", {})).toMatchObject({ conversations: [{ id: first!.conversationId, projectId: x.a.projectId, memberBotIds: [x.a.id], isDirect: true }] });
     const spawns = x.harness.inspection.sdk.callsTo("threads.spawn");
     expect(spawns).toHaveLength(1);
-    expect(spawns[0]![0]).toMatchObject({ visibility: "visible", permissionMode: "accept-edits" });
+    expect(spawns[0]![0]).toMatchObject({ visibility: "visible", permissionMode: "accept-edits", environment: { workspace: { type: "unmanaged", path: "/safe/Spaces/Work/General" } } });
   } finally { await x.close(); }
 });
 

@@ -23,6 +23,7 @@ async function setup() {
         transcribeVoice: async () => ({ text: "Transcribed words" }),
       },
       projects: {
+        get: async ({ projectId }) => ({ id: projectId, sources: [] }) as never,
         list: async () => [{ id: "proj_personal", kind: "personal", name: "Personal", sources: [], gitRemoteUrl: null, createdAt: 1, updatedAt: 1 }],
         create: async () => ({ id: "proj_bots" }),
         attachments: {

@@ -55,7 +55,8 @@ async conversation(
       .find((c) => c.key === key);
     if (existing) return existing;
     const emptyDirectMessage = kind === "admin" && !prompt && !attachments.length;
-    const project = projectId ? await this.bb.sdk.projects.get({ projectId }) : null;
+    const targetProject = projectId ?? bot.projectId;
+    const project = targetProject !== "proj_personal" ? await this.bb.sdk.projects.get({ projectId: targetProject }) : null;
     const source = project?.sources.find(source => source.isDefault) ?? project?.sources[0];
     const thread = await this.bb.sdk.threads.spawn({
       projectId: projectId ?? bot.projectId,

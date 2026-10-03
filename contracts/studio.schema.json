@@ -20848,6 +20848,9 @@
             "items": {
               "type": "object",
               "properties": {
+                "projectId": {
+                  "type": "string"
+                },
                 "trust": {
                   "type": "string",
                   "enum": [
@@ -20979,9 +20982,6 @@
                 "home": {
                   "type": "string"
                 },
-                "projectId": {
-                  "type": "string"
-                },
                 "hostId": {
                   "type": "string"
                 },
@@ -21014,6 +21014,7 @@
                 }
               },
               "required": [
+                "projectId",
                 "name",
                 "description",
                 "avatar",
@@ -21028,7 +21029,6 @@
                 "id",
                 "handle",
                 "home",
-                "projectId",
                 "hostId",
                 "createdAt",
                 "updatedAt",
@@ -21624,6 +21624,11 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
           "trust": {
             "type": "string",
             "enum": [
@@ -21753,6 +21758,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "projectId": {
+            "type": "string"
+          },
           "trust": {
             "type": "string",
             "enum": [
@@ -21884,9 +21892,6 @@
           "home": {
             "type": "string"
           },
-          "projectId": {
-            "type": "string"
-          },
           "hostId": {
             "type": "string"
           },
@@ -21910,6 +21915,7 @@
           }
         },
         "required": [
+          "projectId",
           "name",
           "description",
           "avatar",
@@ -21924,7 +21930,6 @@
           "id",
           "handle",
           "home",
-          "projectId",
           "hostId",
           "createdAt",
           "updatedAt",
@@ -22093,6 +22098,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "projectId": {
+            "type": "string"
+          },
           "trust": {
             "type": "string",
             "enum": [
@@ -22224,9 +22232,6 @@
           "home": {
             "type": "string"
           },
-          "projectId": {
-            "type": "string"
-          },
           "hostId": {
             "type": "string"
           },
@@ -22250,6 +22255,7 @@
           }
         },
         "required": [
+          "projectId",
           "name",
           "description",
           "avatar",
@@ -22264,7 +22270,6 @@
           "id",
           "handle",
           "home",
-          "projectId",
           "hostId",
           "createdAt",
           "updatedAt",
@@ -22295,6 +22300,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "projectId": {
+            "type": "string"
+          },
           "trust": {
             "type": "string",
             "enum": [
@@ -22426,9 +22434,6 @@
           "home": {
             "type": "string"
           },
-          "projectId": {
-            "type": "string"
-          },
           "hostId": {
             "type": "string"
           },
@@ -22452,6 +22457,7 @@
           }
         },
         "required": [
+          "projectId",
           "name",
           "description",
           "avatar",
@@ -22466,7 +22472,6 @@
           "id",
           "handle",
           "home",
-          "projectId",
           "hostId",
           "createdAt",
           "updatedAt",
@@ -22498,6 +22503,9 @@
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
         "properties": {
+          "projectId": {
+            "type": "string"
+          },
           "trust": {
             "type": "string",
             "enum": [
@@ -22629,9 +22637,6 @@
           "home": {
             "type": "string"
           },
-          "projectId": {
-            "type": "string"
-          },
           "hostId": {
             "type": "string"
           },
@@ -22655,6 +22660,7 @@
           }
         },
         "required": [
+          "projectId",
           "name",
           "description",
           "avatar",
@@ -22669,7 +22675,6 @@
           "id",
           "handle",
           "home",
-          "projectId",
           "hostId",
           "createdAt",
           "updatedAt",
@@ -23055,6 +23060,9 @@
         "items": {
           "type": "object",
           "properties": {
+            "projectId": {
+              "type": "string"
+            },
             "trust": {
               "type": "string",
               "enum": [
@@ -23186,9 +23194,6 @@
             "home": {
               "type": "string"
             },
-            "projectId": {
-              "type": "string"
-            },
             "hostId": {
               "type": "string"
             },
@@ -23212,6 +23217,7 @@
             }
           },
           "required": [
+            "projectId",
             "name",
             "description",
             "avatar",
@@ -23226,7 +23232,6 @@
             "id",
             "handle",
             "home",
-            "projectId",
             "hostId",
             "createdAt",
             "updatedAt",
@@ -23515,6 +23520,9 @@
           "bot": {
             "type": "object",
             "properties": {
+              "projectId": {
+                "type": "string"
+              },
               "trust": {
                 "type": "string",
                 "enum": [
@@ -23646,9 +23654,6 @@
               "home": {
                 "type": "string"
               },
-              "projectId": {
-                "type": "string"
-              },
               "hostId": {
                 "type": "string"
               },
@@ -23672,6 +23677,7 @@
               }
             },
             "required": [
+              "projectId",
               "name",
               "description",
               "avatar",
@@ -23686,7 +23692,6 @@
               "id",
               "handle",
               "home",
-              "projectId",
               "hostId",
               "createdAt",
               "updatedAt",

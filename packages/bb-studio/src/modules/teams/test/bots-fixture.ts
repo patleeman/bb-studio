@@ -41,6 +41,7 @@ export const setup = () => {
     sdk: {
       plugins: { callRpc: async (args) => args.outputSchema.parse([]) },
       projects: {
+        get: async ({ projectId }) => ({ id: projectId, sources: [] }) as never,
         list: async () => [{ id: "proj_personal", kind: "personal", name: "Personal", sources: [], gitRemoteUrl: null, createdAt: 1, updatedAt: 1 }],
         attachments: {
           upload: async (args) => ({

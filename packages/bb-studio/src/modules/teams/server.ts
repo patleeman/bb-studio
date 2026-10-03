@@ -1,3 +1,4 @@
+import { botDefaults } from "../../office/bot-defaults";
 import { automationTasks } from "../../office/automation-tasks";
 import { missionTasks } from "../../office/missions";
 import { officeTeamHandlers } from "../../office/team-runtime";
@@ -72,6 +73,9 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
       const now = Date.now(),
         id = newId();
       const { mission, ...profile } = input;
+      const projectId = input.projectId ?? await project();
+      if (input.projectId) await bb.sdk.projects.get({ projectId });
+      const defaults = botDefaults(profile, projectId, coreDatabase);
       const slug =
         input.name
           .toLowerCase()
@@ -86,8 +90,7 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
       const handle = reserved.has(slug) ? `${slug}-${id.slice(-6)}` : slug;
       const bot: Bot = {
         ...profile,
-        trust: profile.trust ?? "ask",
-        permissionMode: permissionForTrust(profile.trust ?? "ask"),
+        ...defaults,
         id,
         handle,
         home: join(store.root, id),
@@ -99,7 +102,7 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
         error: null,
       };
       await store.initialize(bot, mission);
-      bot.projectId = await project();
+      bot.projectId = projectId;
       store.db.transaction(() => {
         store.put(bot);
         if (requestId) {

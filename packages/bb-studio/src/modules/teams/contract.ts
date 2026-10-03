@@ -9,6 +9,7 @@ export const idSchema = z.string().regex(/^bot_[a-f0-9]{16}$/);
 export const permissionModeSchema = z.enum(["accept-edits", "auto", "full"]);
 export type PermissionMode = z.infer<typeof permissionModeSchema>;
 export const profileInput = z.object({
+  projectId: z.string().min(1).max(200).optional(),
   trust: z.enum(["ask", "act"]).optional(),
   limits: usageLimits.optional(),
   name: z.string().trim().min(1).max(80),
