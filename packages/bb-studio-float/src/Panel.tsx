@@ -39,6 +39,7 @@ import {
   navigateTab,
   HEADER_HEIGHT,
   ICON_TAB_WIDTH,
+  MARGIN,
   moveTab,
   moveCompanion,
   panelSize,
@@ -495,7 +496,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
   const size = panelSize(state.size, screen);
   const width = resizing?.width ?? size.width;
   const height = state.collapsed ? HEADER_HEIGHT : (resizing?.height ?? size.height);
-  const dockRight = `calc(var(--studio-float-right, 1.5rem) + ${dockOffset}px)`;
+  const dockRight = `clamp(${MARGIN}px, calc(var(--studio-float-right, 1.5rem) + ${dockOffset}px), ${Math.max(MARGIN, screen.width - width - MARGIN)}px)`;
   const resized = resizing && state.place.kind === "free" ? { left: resizing.left, bottom: screen.height - resizing.top - resizing.height } : null;
   const free =
     dragAt ?? resized ?? (state.place.kind === "free" ? clampFree(state.place.left, state.place.bottom, { width, height }, screen) : null);
