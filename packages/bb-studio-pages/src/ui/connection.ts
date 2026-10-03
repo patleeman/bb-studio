@@ -52,6 +52,7 @@ export class PageConnection {
   status: ConnectionStatus = "connecting";
   synced = false;
   ready = false;
+  hasRecovery = false;
   localSave: LocalSaveStatus = "loading";
   serverSave: ServerSaveStatus = "pending";
   localError: string | null = null;
@@ -72,9 +73,10 @@ export class PageConnection {
   private readonly recovery: PageRecoveryStore;
   private readonly recoveryKey: string;
 
-  constructor(readonly pageId: string, options: { recovery?: PageRecoveryStore; origin?: string } = {}) {
+  constructor(readonly pageId: string, options: { recovery?: PageRecoveryStore; origin?: string; recoveryOnly?: boolean } = {}) {
     this.recovery = options.recovery ?? pageRecovery;
     this.recoveryKey = JSON.stringify([options.origin ?? location.origin, pageId]);
+    if (options.recoveryOnly) this.status = "missing";
     this.doc.on("update", this.onDocUpdate);
     this.awareness.on("update", this.onAwarenessUpdate);
     window.addEventListener("online", this.reconnectNow);
@@ -82,7 +84,7 @@ export class PageConnection {
   }
 
   get snapshot(): string {
-    return JSON.stringify([this.status, this.synced, this.ready, this.localSave, this.serverSave, this.localError, this.serverError]);
+    return JSON.stringify([this.status, this.synced, this.ready, this.hasRecovery, this.localSave, this.serverSave, this.localError, this.serverError]);
   }
 
   subscribe(listener: () => void): () => void {
@@ -98,6 +100,15 @@ export class PageConnection {
       this.reconnectNow();
       this.requestBarrier();
     }
+  }
+
+  /** Re-read recovery without replacing an unread draft with an empty document. */
+  retryRecovery(): void {
+    if (this.destroyed || this.localSave === "loading") return;
+    this.localSave = "loading";
+    this.localError = null;
+    this.emit();
+    void this.restore();
   }
 
   exportRecovery(): void {
@@ -129,8 +140,13 @@ export class PageConnection {
     try {
       const state = await this.recovery.load(this.recoveryKey);
       if (this.destroyed) return;
-      if (state) { Y.applyUpdate(this.doc, state, RESTORE); this.ready = true; }
+      if (state) {
+        Y.applyUpdate(this.doc, state, RESTORE);
+        this.hasRecovery = true;
+        this.ready = this.status !== "missing";
+      }
       this.localSave = "saved";
+      this.localError = null;
     } catch (error) {
       if (this.destroyed) return;
       this.localSave = "failed";
@@ -139,7 +155,8 @@ export class PageConnection {
     const memory = memoryRecovery.get(this.recoveryKey);
     if (memory) {
       Y.applyUpdate(this.doc, memory, RESTORE);
-      this.ready = true;
+      this.hasRecovery = true;
+      this.ready = this.status !== "missing";
       // It is only in memory until another transaction succeeds.
       this.saveRecovery();
     }
@@ -241,6 +258,7 @@ export class PageConnection {
 
   private readonly onDocUpdate = (update: Uint8Array, origin: unknown) => {
     if (origin === RESTORE) return;
+    this.hasRecovery = true;
     this.revision++;
     this.serverSave = this.serverError ? "failed" : "pending";
     this.saveRecovery();

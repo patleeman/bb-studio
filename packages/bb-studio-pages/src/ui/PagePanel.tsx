@@ -5,7 +5,8 @@ import { ThreadItemsPanel } from "@bb-studio/kit/app";
 import { Icon } from "@bb-studio/kit/ui";
 import { PLUGIN_ID, REALTIME_CHANNEL } from "../constants";
 import type { rpcContract } from "../contract";
-import { OpenInPages, PanelMessage, PanelShell, usePanelPage } from "./PanelShell";
+import { OpenInPages, PanelShell, usePanelPage } from "./PanelShell";
+import { MissingPageRecovery } from "./MissingPageRecovery";
 import { relativeTime } from "./shared";
 
 /** What the `page` thread panel tab is opened with: a page. */
@@ -56,9 +57,9 @@ function ThreadPages({ threadId }: { threadId: string }) {
 
 function PageTab({ pageId, backLabel, onBack }: { pageId: string; backLabel?: string; onBack?(): void }) {
   const navigate = useBbNavigate();
-  const page = usePanelPage(pageId);
+  const { page, refetch } = usePanelPage(pageId);
 
-  if (page === null) return <PanelMessage title="Page not found" detail="It may have been deleted." />;
+  if (page === null) return <MissingPageRecovery key={pageId} pageId={pageId} onRetryPage={refetch} onBack={onBack} backLabel={backLabel ? `Back to ${backLabel}` : undefined} />;
   if (!page) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
 
   return (

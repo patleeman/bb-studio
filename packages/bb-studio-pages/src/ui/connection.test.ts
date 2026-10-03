@@ -270,4 +270,49 @@ describe("PageConnection recovery", () => {
     await settle();
     expect(reopened.doc.getText("body").toString()).toBe(`A${"B".repeat(30)}`);
   });
+
+  it("loads a missing page's recovery without a socket or server retry", async () => {
+    const store = recovery();
+    const original = new PageConnection("pg_recovery_only", { recovery: store });
+    connections.push(original);
+    await settle();
+    original.doc.getText("body").insert(0, "Deleted unsynced work");
+    await settle();
+    original.destroy();
+    const connection = new PageConnection("pg_recovery_only", { recovery: store, recoveryOnly: true });
+    connections.push(connection);
+    await settle();
+    expect(connection.doc.getText("body").toString()).toBe("Deleted unsynced work");
+    expect(connection.hasRecovery).toBe(true);
+    expect(connection.status).toBe("missing");
+    expect(connection.ready).toBe(false);
+    connection.retrySave();
+    window.dispatchEvent(new Event("online"));
+    expect(OfflineSocket.instances).toHaveLength(1);
+    expect(store.states.size).toBe(1);
+  });
+
+  it("retries an unread missing-page draft without writing or opening a socket", async () => {
+    const store = recovery();
+    const draft = new Y.Doc();
+    draft.getText("body").insert(0, "Unread retained work");
+    await store.save(JSON.stringify([location.origin, "pg_unread"]), Y.encodeStateAsUpdate(draft));
+    draft.destroy();
+    const originalLoad = store.load;
+    store.load = vi.fn().mockRejectedValueOnce(new Error("Storage unavailable")).mockImplementation(originalLoad);
+    store.save = vi.fn(store.save);
+    const connection = new PageConnection("pg_unread", { recovery: store, recoveryOnly: true });
+    connections.push(connection);
+    await settle();
+    expect(connection.localSave).toBe("failed");
+    expect(connection.hasRecovery).toBe(false);
+    connection.retryRecovery();
+    await settle();
+    expect(connection.doc.getText("body").toString()).toBe("Unread retained work");
+    expect(connection.hasRecovery).toBe(true);
+    expect(connection.localSave).toBe("saved");
+    expect(connection.localError).toBeNull();
+    expect(store.save).not.toHaveBeenCalled();
+    expect(OfflineSocket.instances).toHaveLength(0);
+  });
 });
