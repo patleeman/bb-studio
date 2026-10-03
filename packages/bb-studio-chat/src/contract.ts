@@ -6,13 +6,13 @@ export const schemas = studioSchemas(z);
 
 export { MENTION_PROVIDER_ID } from "./ids";
 
-const ref = z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) });
+export const ref = z.object({ pluginId: z.string().min(1).max(100), id: z.string().min(1).max(200) });
 export type ItemRef = z.infer<typeof ref>;
 
 const homeThread = z.object({ threadId: z.string(), title: z.string(), origin: z.enum(["chosen", "created"]) });
 
 /** A passage or an image area sent to the item's thread (ItemQuote in the kit). */
-const quote = z.object({
+export const quote = z.object({
   text: z.string().max(20_000).nullable(),
   note: z.string().max(10_000),
   where: z.string().max(300).nullable(),

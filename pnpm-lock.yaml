@@ -149,6 +149,9 @@ importers:
       clsx:
         specifier: ^2.1.1
         version: 2.1.1
+      fake-indexeddb:
+        specifier: 6.2.4
+        version: 6.2.4
       jsdom:
         specifier: 29.0.1
         version: 29.0.1
@@ -3465,6 +3468,10 @@ packages:
   expect-type@1.4.0:
     resolution: {integrity: sha512-KfYbmpRm0VbLjEvVa9yGwCi9GI34xvi7A/HXYWQO65CSD2u3MczUJSuwXKFIxlGsgBQizV9q5J9NHj4VG0n+pA==}
     engines: {node: '>=12.0.0'}
+
+  fake-indexeddb@6.2.4:
+    resolution: {integrity: sha512-INKeIKEtSViN4yVtEWEUqbsqmaIy7Ls+MfU0yxQVXg67pOJ/sH1ZxcVrP8XrKULUFohcPD9gnmym+qBfEybACw==}
+    engines: {node: '>=18'}
 
   fast-deep-equal@3.1.3:
     resolution: {integrity: sha512-f3qQ9oQy9j2AhBe/H9VC91wLmKBCCU/gDOnKNAYG5hswO7BLKj09Hc5HYNz9cGI++xlpDCIgDaitVs03ATR84Q==}
@@ -7046,6 +7053,8 @@ snapshots:
   expand-template@2.0.3: {}
 
   expect-type@1.4.0: {}
+
+  fake-indexeddb@6.2.4: {}
 
   fast-deep-equal@3.1.3: {}
 

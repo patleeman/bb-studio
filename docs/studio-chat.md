@@ -45,8 +45,18 @@ it only after successful submission.
 When revisiting an item, its linked thread can return as an unopened Float
 tab behind the active one. Pinned or previously opened tabs stay protected.
 Explicit Chat focuses the existing thread tab. Without Float, it opens BB's
-main thread view. The composer and picker use Float's corner portal while
-open, or the bottom-right overlay without Float.
+main thread view. New-conversation composers use the same retained companion
+tabs as conversations and item views. Each item has a canonical draft route
+and keeps its existing `studio-chat:<plugin>:<id>` native draft key. Separate
+quotes have independent draft IDs; their context, including cropped images,
+is stored in IndexedDB before opening a companion. A successful submission
+replaces its originating tab with the new thread and refreshes the item's
+home link. Failed submissions retain the native draft and quote.
+
+The Chat navigation panel offers a plain new-conversation composer. The
+conversation picker still uses Float's corner portal. Without Float, item
+composers use the compact overlay. If local quote storage is unavailable,
+Chat reports that failure and keeps the quote in the overlay for submission.
 
 ## Stable SDK integration
 
@@ -54,9 +64,9 @@ open, or the bottom-right overlay without Float.
 | --- | --- |
 | Chat button and options | Shared kit `ItemHeader` and item-chat host |
 | Shared controller | `experimental_appOverlay` |
-| Conversation creation | `experimental_NewThreadComposer` |
+| Conversation creation | `experimental_NewThreadComposer` in retained `FloatPanels` |
 | Conversation picker | `threads.list`, `threads.search`, `threads.get` |
-| Thread presentation | Kit `openFloat`, then `navigate.toThread` fallback |
+| Thread presentation | Kit `openCompanion`, then `navigate.toThread` fallback |
 | Sent context | Registered item mention provider |
 | Main-pane discovery | Kit `usePathname` and Studio `itemAt` |
 

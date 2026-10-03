@@ -31,6 +31,11 @@ navigation, conversation selection, and focusing an existing thread.
   composer opens with the quote.
 - **Correct context across panes.** A composer or picker stays bound to its
   item when you navigate. It uses that item's title, project, and link.
+- **Retained new chats.** New-conversation composers use the shared companion
+  tabs. Reopening an item's draft focuses that tab; switching, folding, and
+  changing placement keeps its native composer. Quote drafts save their
+  passage and image locally for restoration. Without Float, the composer
+  remains available in a compact overlay.
 - **Existing conversations.** Page chats still go through Pages and remain
   in its Chats menu. Threads that created other items can serve as their
   linked conversation until you choose one.

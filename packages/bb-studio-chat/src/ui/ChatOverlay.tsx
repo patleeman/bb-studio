@@ -1,5 +1,4 @@
 import {
-  experimental_NewThreadComposer as NewThreadComposer,
   useBbNavigate,
   useComposer,
   useRpc,
@@ -18,15 +17,16 @@ import {
   type ItemChatHost,
   type ItemChatRef,
 } from "@bb-studio/kit/app";
-import { errorMessage, quoteMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
+import { errorMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { toast } from "sonner";
-import type { rpcContract, Viewed } from "../contract";
+import { ref as itemRefSchema, type rpcContract, type Viewed } from "../contract";
 import { MENTION_PROVIDER_ID } from "../ids";
 import { itemKey } from "../context";
-import { HEADER_BUTTON } from "./styles";
 import { ThreadPicker } from "./ThreadPicker";
 import { useChatDialog } from "./use-chat-dialog";
+import { ConversationComposer } from "./ConversationComposer";
+import { CONVERSATION_STARTED, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -86,6 +86,15 @@ function useHomeThreads(
     },
     [rpc, put],
   );
+
+  useEffect(() => {
+    const started = (event: Event) => {
+      const item = itemRefSchema.safeParse((event as CustomEvent).detail);
+      if (item.success) load(item.data);
+    };
+    window.addEventListener(CONVERSATION_STARTED, started);
+    return () => window.removeEventListener(CONVERSATION_STARTED, started);
+  }, [load]);
 
   useEffect(() => itemChatChanged(), [cache]);
 
@@ -184,7 +193,8 @@ export function ChatOverlay() {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const viewed = useViewing(rpc, usePathname());
-  const [error, setError] = useState<string | null>(null);
+  const floatAvailable = useFloatAvailable();
+  const [fallbackRequest, setFallbackRequest] = useState<number | null>(null);
   const resolve = useCallback(async (ref: ItemChatRef) => (await rpc.call("subject", { pluginId: ref.pluginId, id: ref.id })).item, [rpc]);
   const reportError = useCallback((cause: unknown) => toast.error(errorMessage(cause)), []);
   const { dialog, open, close, isCurrent } = useChatDialog(resolve, reportError);
@@ -195,9 +205,29 @@ export function ChatOverlay() {
   };
   const homes = useHomeThreads(rpc, viewed, {
     show,
-    choose: (ref) => { setError(null); void open(ref, "choose"); },
-    compose: (ref, quote) => { setError(null); void open(ref, "compose", quote); },
+    choose: (ref) => { void open(ref, "choose"); },
+    compose: (ref, quote) => { void open(ref, "compose", quote); },
   });
+  useEffect(() => {
+    if (!dialog || dialog.mode !== "compose" || !floatAvailable || fallbackRequest === dialog.request) return;
+    const current = dialog;
+    let live = true;
+    void (async () => {
+      try {
+        const saved = current.quote ? await quoteDrafts.save({ pluginId: current.item.pluginId, id: current.item.id }, current.quote) : null;
+        if (!live || !isCurrent(current.request)) {
+          if (saved) await quoteDrafts.remove(saved.id);
+          return;
+        }
+        const path = saved ? quoteDraftPath(saved.id) : itemDraftPath(current.item);
+        if (openCompanion({ kind: "path", path, title: `Chat: ${untitled(current.item.title)}`, icon: "MessageCircle" })) close(current.request);
+        else setFallbackRequest(current.request);
+      } catch (cause) {
+        if (live && isCurrent(current.request)) { reportError(cause); setFallbackRequest(current.request); }
+      }
+    })();
+    return () => { live = false; };
+  }, [dialog, floatAvailable, fallbackRequest, close, isCurrent, reportError]);
   const chip = <FloatThreadLeading render={(threadId) => (viewed ? <ViewingChip threadId={threadId} viewed={viewed} /> : null)} />;
   if (!dialog) return chip;
 
@@ -205,44 +235,27 @@ export function ChatOverlay() {
   const key = itemKey(item);
   const home = homes.cache.get(key) ?? null;
   const kindLabel = item.kindLabel.toLowerCase();
+  if (mode === "compose" && floatAvailable && fallbackRequest !== focus) return chip;
   return (
     <>
       {chip}
       <Corner>
         {mode === "compose" ? (
-          <section aria-label={`Work with this ${kindLabel}`} className={cn(CARD, "w-[min(460px,calc(100vw-1rem))] mb-2")}>
-            <header className="flex items-center gap-2 border-b border-border py-1.5 pr-2 pl-4 text-xs text-muted-foreground">
-              <Icon name={item.kindIcon} className="size-3.5 shrink-0" />
-              <span className="min-w-0 flex-1 truncate">
-                Chat about "{untitled(item.title)}". @mention a bot to hand it off.
-              </span>
-              <button type="button" aria-label="Close composer" className={HEADER_BUTTON} onClick={() => close()}>
-                <Icon name="X" className="size-4" />
-              </button>
-            </header>
-            {error ? <p className="px-4 pt-1 text-xs text-red-500">{error}</p> : null}
-            <NewThreadComposer
+          <div className={cn(CARD, "w-[min(460px,calc(100vw-1rem))] h-[min(520px,calc(100dvh-6rem))] mb-2")}>
+            <ConversationComposer
               key={quote ? `${key}:quote:${focus}` : key}
-              className="studio-chat-composer max-h-[60vh] min-h-0"
-              layout="document"
-              placeholder={`Work with this ${kindLabel}…`}
+              item={item}
+              {...(quote ? { quote } : {})}
               draftKey={quote ? `studio-chat:${key}:quote:${focus}` : `studio-chat:${key}`}
-              {...(quote ? { initialPrompt: quoteMessage(quote) } : {})}
               focusRequest={focus}
-              {...(item.projectId ? { defaultProjectId: item.projectId } : {})}
+              onClose={() => close()}
               onSubmit={async (request) => {
-                setError(null);
-                try {
-                  const { threadId } = await rpc.call("start", { item: { pluginId: item.pluginId, id: item.id }, request });
-                  homes.load(item);
-                  show(threadId, ITEM_CHAT_TAG, focus);
-                } catch (cause) {
-                  if (isCurrent(focus)) setError(errorMessage(cause));
-                  throw cause;
-                }
+                const { threadId } = await rpc.call("start", { item: { pluginId: item.pluginId, id: item.id }, request });
+                homes.load(item);
+                show(threadId, ITEM_CHAT_TAG, focus);
               }}
             />
-          </section>
+          </div>
         ) : (
           <section aria-label={`Choose this ${kindLabel}'s conversation`} className={cn(CARD, "studio-chat-picker w-[min(380px,calc(100vw-1rem))] mb-2")}>
             <p className="border-b border-border px-3 py-2 text-xs text-muted-foreground">

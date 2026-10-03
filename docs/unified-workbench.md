@@ -202,9 +202,18 @@ linked threads now use the shared companion policy in pushed commit 6854481.
 Tasks' 49 tests and typecheck pass. Live handoff entry-point verification
 remains part of the suite completion audit.
 
+Studio Chat's new-conversation composers now have shared companion routes.
+Ordinary item drafts retain their native draft keys; independent quote drafts
+store their passage and image in IndexedDB before opening. The originating
+tab becomes the new thread after submission. Studio Chat's tests verify
+draft and attachment DOM retention through placement changes, independent
+quote restoration, image forwarding, failed submissions, storage failures,
+and background submissions that leave another draft intact. The live
+new-composer capture is being updated and remains required before handoff.
+
 Remaining delivery includes publishing the native host changes, the SDK/CLI
-placement controller, embedded composer targeting, moving new-conversation
-composers into the retained companion stack, and the remaining suite
+placement controller, embedded composer targeting, migrating standalone
+Pages composers, and the remaining suite
 entry points: Feed discussions and links, task handoff verification, Talk
 return navigation, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
