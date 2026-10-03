@@ -65,9 +65,12 @@ than 60 characters, and drops items without both an emoji and a label.
 
 ![Live BB screenshot of Studio Reactions settings](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`), which turns
-smart reactions on. The settings page shows the default reaction list, the
-location toggles, and the **Smart reactions** toggle turned on.
+Captured from isolated stable BB at checkpoint `38f64b5`. The native settings
+form is the only reaction editor. It shows the default reaction list, all
+three location toggles enabled, and Smart reactions off. The saved preview
+below confirms these menu settings are applied in this window. Live checks
+also verified the pending reload notice, each location toggle independently,
+emoji-only selection entries, and cleanup when the plugin is disabled.
 
 ![Smart reactions under a live assistant reply](assets/smart-reactions.png)
 
@@ -150,7 +153,8 @@ Smart-reaction instructions use saved settings when a thread starts or resumes.
 - The small `src/action-decoration.ts` host adapter identifies actions only by
   this plugin's icon plus a configured reaction title. It swaps the icon for
   an emoji in message bars and removes the redundant icon in selection menus.
-  Role-specific visibility uses explicit role attributes; unknown roles stay
+  Role-specific visibility uses explicit role attributes and stable BB’s
+  message container classes; unknown roles stay
   visible unless both message-bar locations are off. It restores every owned
   icon and visibility change when the plugin generation ends, and never targets
   unrelated buttons just because they share an emoji label.

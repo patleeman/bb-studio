@@ -1,0 +1,89 @@
+{
+  "checkpoint": "38f64b5",
+  "states": [
+    {
+      "user": false,
+      "assistant": true,
+      "selection": true,
+      "counts": {
+        "user": 0,
+        "assistant": 4
+      },
+      "menu": {
+        "selected": "SQLite is simpler to set up and suits a personal to",
+        "buttons": [
+          {
+            "text": "👍",
+            "icons": 0
+          },
+          {
+            "text": "👎",
+            "icons": 0
+          },
+          {
+            "text": "✅",
+            "icons": 0
+          },
+          {
+            "text": "❓",
+            "icons": 0
+          }
+        ]
+      }
+    },
+    {
+      "user": true,
+      "assistant": false,
+      "selection": true,
+      "counts": {
+        "user": 4,
+        "assistant": 0
+      },
+      "menu": {
+        "selected": "SQLite is simpler to set up and suits a personal to",
+        "buttons": [
+          {
+            "text": "👍",
+            "icons": 0
+          },
+          {
+            "text": "👎",
+            "icons": 0
+          },
+          {
+            "text": "✅",
+            "icons": 0
+          },
+          {
+            "text": "❓",
+            "icons": 0
+          }
+        ]
+      }
+    },
+    {
+      "user": true,
+      "assistant": true,
+      "selection": false,
+      "counts": {
+        "user": 4,
+        "assistant": 4
+      },
+      "menu": {
+        "selected": "SQLite is simpler to set up and suits a personal to",
+        "buttons": []
+      }
+    }
+  ],
+  "cleanup": {
+    "glyphs": 0,
+    "pluginIcons": 0
+  },
+  "settings": {
+    "nativeEditors": 1,
+    "duplicateEditors": 0,
+    "applied": true,
+    "pendingReloadNotice": true,
+    "reloadApplied": true
+  }
+}
