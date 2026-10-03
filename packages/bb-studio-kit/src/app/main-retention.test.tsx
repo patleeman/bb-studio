@@ -28,6 +28,27 @@ afterEach(() => {
   vi.unstubAllGlobals();
 });
 const target = { kind: "path" as const, path: "/plugins/pages/pages/one" };
+it.each([false, true])("adopts the original composer from an encoded route (encoded host input: %s)", encoded => {
+  const ref = JSON.stringify({ pluginId: "pages", id: "release" });
+  const path = `/plugins/pages/chats/item/${encodeURIComponent(ref)}`;
+  const Main = retainPanel("chats", () => <><textarea /><input type="file" /></>);
+  mount(<FloatPanels path="chats" render={() => <><textarea /><input type="file" /></>} />);
+  const main = mount(<Main subPath={`item/${encoded ? encodeURIComponent(ref) : ref}`} />);
+  const editor = main.host.querySelector("textarea")!;
+  const file = main.host.querySelector("input")!;
+  editor.value = "Original draft";
+  const attached = new File(["Notes"], "notes.txt");
+  Object.defineProperty(file, "files", { value: [attached] });
+  const body = document.createElement("div");
+  elements.push(body); document.body.append(body);
+  act(() => publishFloatBody({ windowKey: "one", target: { kind: "path", path }, element: body, placement: "floating" }));
+  expect(main.host.querySelector('[data-studio-main-view]')?.getAttribute('data-studio-main-view')).toBe(path);
+  expect(body.querySelector("textarea")).toBe(editor);
+  expect(body.querySelector("input")).toBe(file);
+  expect(editor.value).toBe("Original draft");
+  expect(file.files![0]).toBe(attached);
+  expect(document.querySelectorAll("textarea")).toHaveLength(1);
+});
 function floatBody() {
   const host = document.createElement("div");
   elements.push(host);

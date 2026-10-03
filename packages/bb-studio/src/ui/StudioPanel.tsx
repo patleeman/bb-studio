@@ -20,6 +20,7 @@ import {
   itemKey,
   PageColumn,
   openAppPath,
+  panelHref,
   useProjects,
   type ActionResults,
   type CollectionHandlers,
@@ -459,7 +460,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   const headerActions = (
     <>
-    <ViewMoveMenu item={{ href: `/plugins/studio/studio${subPath ? `/${subPath.split("/").map(encodeURIComponent).join("/")}` : ""}`, title: "Studio" }} />
+    <ViewMoveMenu item={{ href: panelHref("studio", "studio", subPath), title: "Studio" }} />
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
         <button

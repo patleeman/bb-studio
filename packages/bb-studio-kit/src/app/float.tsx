@@ -7,6 +7,7 @@
 import { experimental_usePluginId } from "@get-bb/plugin-sdk/app";
 import { createContext, useContext, useLayoutEffect, useRef, useState, useSyncExternalStore, type ComponentType, type ReactNode, type RefObject } from "react";
 import { createPortal } from "react-dom";
+import { panelHref } from "./nav";
 import {
   floatBodies,
   mainBodies,
@@ -86,7 +87,7 @@ function MainPanel({ path, subPath, children }: { path: string; subPath: string;
   const [moved, setMoved] = useState(false);
   const element = useRef<HTMLDivElement>(null);
   const root = `/plugins/${pluginId}/${path}`;
-  const href = subPath ? `${root}/${subPath.split("/").map(encodeURIComponent).join("/")}` : root;
+  const href = panelHref(pluginId, path, subPath);
   useFloatRevision();
   const ready = floatPanelFor(root)?.path === path;
   useLayoutEffect(() => {

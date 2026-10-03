@@ -11,6 +11,16 @@ interface RouterState {
   idx?: number;
 }
 
+/** Canonical panel path for encoded host subpaths and decoded companion subpaths. */
+export function panelHref(pluginId: string, path: string, subPath = ""): string {
+  const root = `/plugins/${pluginId}/${path}`;
+  if (!subPath) return root;
+  return `${root}/${subPath.split("/").map(segment => {
+    try { return encodeURIComponent(decodeURIComponent(segment)); }
+    catch { return encodeURIComponent(segment); }
+  }).join("/")}`;
+}
+
 /**
  * Opens an in-app path such as /plugins/pages/pages/pg_x. Clicked from inside
  * a floating tab, the tab goes there instead, as a browser tab would; `main`

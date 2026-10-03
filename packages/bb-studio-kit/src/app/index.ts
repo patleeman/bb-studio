@@ -23,7 +23,7 @@ export { CopyReferenceMenuItem, copyReferenceWithToast, ItemDeleteConfirm, ItemM
 export { ITEM_LINK_PILLS, ITEM_PILL, ItemLinkText, ItemLinkTextarea, ItemPill, itemLinkIcon, mentionQuery, splitItemLinks } from "./item-links";
 export { copyItemReference, ITEM_REFERENCE_TYPE, itemReferenceFrom, itemReferenceText, parseItemReference } from "./item-reference";
 export { ItemDirectiveCard } from "./directive-card";
-export { openAppPath, studioPath } from "./nav";
+export { openAppPath, studioPath, panelHref } from "./nav";
 export {
   Badge,
   Checkbox,
