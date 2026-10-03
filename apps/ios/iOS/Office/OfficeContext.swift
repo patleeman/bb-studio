@@ -183,7 +183,7 @@ struct SpaceSwitcher: View {
     @State private var deleting = false
     @State private var draftName = ""
     @State private var draftIcon = ""
-    @AppStorage(OfficeRouting.key) private var routing = OfficeRouting.own.rawValue
+    @AppStorage(OfficeRouting.key) private var routing = OfficeRouting.current.rawValue
 
     /// Arc's Space colors, by name, for the color menu.
     private static let colors: [(name: String, hex: String)] = [
