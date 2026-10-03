@@ -8,10 +8,6 @@
       "source": "./packages/bb-studio"
     },
     {
-      "name": "studio-chat",
-      "source": "./packages/bb-studio-chat"
-    },
-    {
       "name": "float",
       "source": "./packages/bb-studio-float"
     },
@@ -66,10 +62,6 @@
     {
       "name": "smart-decisions",
       "source": "./packages/bb-studio-decisions"
-    },
-    {
-      "name": "studio-tables",
-      "source": "./packages/bb-studio-tables"
     }
   ]
 }

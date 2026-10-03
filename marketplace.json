@@ -31,31 +31,6 @@
       }
     },
     {
-      "id": "studio-chat",
-      "displayName": "Studio Chat",
-      "description": "Part of BB Studio. One Chat action on Studio items opens their linked conversation or a new composer. Choose or start another conversation from its menu; item quotes keep their own context across main and Float views.",
-      "icon": {
-        "url": "./packages/bb-studio-chat/assets/icon.svg"
-      },
-      "tags": [
-        "productivity",
-        "collaboration",
-        "agents",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-chat",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "float",
       "displayName": "Float",
       "description": "Part of BB Studio. Float any thread, channel, Studio item or view as a tab in one panel, docked at the bottom or dragged anywhere, and keep several open while you work.",
@@ -391,31 +366,6 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-decisions",
-          "ref": "main"
-        }
-      }
-    },
-    {
-      "id": "studio-tables",
-      "displayName": "Studio Tables",
-      "description": "Part of BB Studio. Structured tables with typed columns, rows, views, CSV import and export, and agent tools.",
-      "icon": {
-        "url": "./packages/bb-studio-tables/assets/icon.svg"
-      },
-      "tags": [
-        "productivity",
-        "data",
-        "agents",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-tables",
           "ref": "main"
         }
       }

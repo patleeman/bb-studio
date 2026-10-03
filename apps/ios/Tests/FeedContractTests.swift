@@ -33,8 +33,8 @@ final class FeedContractTests: XCTestCase {
     func testStudioChatUsesHomeContractAndHandlesUnlinkedItem() async throws {
         let client = BBClient(baseURL: URL(string: "https://contracts.invalid")!)
         client.transport = { _, path, body in
-            XCTAssertEqual(path, "/api/v1/plugins/studio-chat/rpc/\(Chat.Method.home)")
-            let input = try JSONDecoder().decode(Chat.HomeInput.self, from: XCTUnwrap(body))
+            XCTAssertEqual(path, "/api/v1/plugins/studio/rpc/\(Studio.Method.chat_home)")
+            let input = try JSONDecoder().decode(Studio.ChatHomeInput.self, from: XCTUnwrap(body))
             XCTAssertEqual(input.pluginId, "pages")
             XCTAssertEqual(input.id, "pg_contract")
             return (200, Data(#"{"ok":true,"result":{"thread":{"threadId":"thr_home","title":"Home","origin":"chosen"}}}"#.utf8))

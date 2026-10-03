@@ -1,11 +1,13 @@
 # Studio Chat
 
-> **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), Studio Chat, and [Studio Teams](../bb-studio-teams).
+Built into the `studio` plugin.
+
+> **Studio Chat** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../../../../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio-talk), [Studio Draw](../../../../bb-studio-draw), [Studio Artifacts](../../../../bb-studio-artifacts), [Studio Tasks](../../../../bb-studio-tasks), Studio Chat, and [Studio Teams](../../../../bb-studio-teams).
 
 One **Chat** action in a Studio item's header opens its linked conversation
 or a new composer. Its menu lets you start another conversation, choose an
 existing one, or unlink it. Chat and quotes target the chosen item, including
-items inside [Float](../bb-studio-float) tabs while the main pane shows
+items inside [Float](../../../../bb-studio-float) tabs while the main pane shows
 something else.
 
 ## Staged preview
@@ -79,7 +81,7 @@ its saved route. See [plain/main](assets/chat-plain-companion-transfers-stable.p
 
 The shared companion controller prefers BB's native right workbench when
 the host supports retained companion views. BB's host implementation and its
-live release verification remain in the [full-suite delivery work](../../docs/unified-workbench.md).
+live release verification remain in the [full-suite delivery work](../../../../../docs/unified-workbench.md).
 Stable BB currently opens threads in Float, or in the main view without Float.
 Without Studio Chat, Pages uses the same companion tabs with its own native
 new-conversation composer.
@@ -89,7 +91,7 @@ its thread. The Viewing chip only offers **Add to message** when the scope
 matches. Type `@` in the thread to mention an item. Main-pane discovery
 follows BB navigation and polls every 400ms as a fallback.
 
-More in [docs/studio-chat.md](../../docs/studio-chat.md).
+More in [docs/studio-chat.md](../../../../../docs/studio-chat.md).
 
 ## Develop
 
@@ -97,9 +99,9 @@ More in [docs/studio-chat.md](../../docs/studio-chat.md).
 pnpm install
 pnpm --filter @bb-studio/studio-chat test
 pnpm --filter @bb-studio/studio-chat typecheck
-bb plugin build packages/bb-studio-chat
+bb plugin build packages/bb-studio
 node scripts/staged-bb.mjs start --plugin studio-chat
 ```
 
-Requires [Studio](../bb-studio) to resolve item context. The item header and
-shared host live in [the kit](../bb-studio-kit/src/app/item-chat.ts).
+Requires [Studio](../../../../bb-studio) to resolve item context. The item header and
+shared host live in [the kit](../../../../bb-studio-kit/src/app/item-chat.ts).

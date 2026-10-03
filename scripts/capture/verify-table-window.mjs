@@ -29,7 +29,7 @@ try {
     });
     id = table.id;
     const started = performance.now();
-    await client.navigate(`/plugins/studio-tables/tables/${id}`);
+    await client.navigate(`/plugins/studio/tables/${id}`);
     await client.waitForSelector('[data-cell="0:0"]');
     const stats = await client.evaluate(`({ nodes: document.querySelectorAll('*').length, mountedRows: document.querySelectorAll('tbody tr[data-row]').length, total: document.querySelector('[role=grid]').getAttribute('aria-rowcount') })`);
     assert.ok(stats.mountedRows < 80, `Unbounded initial row count: ${stats.mountedRows}`);

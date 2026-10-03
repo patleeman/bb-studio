@@ -1,6 +1,6 @@
 # Studio Pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio-teams).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
@@ -150,7 +150,7 @@ afterwards.
   Conversations use the shared companion system: workbench on a capable BB
   host, Float on stable hosts without that capability, or ordinary thread
   navigation without Float. Existing page chats and links still work.
-  [Studio Chat](../bb-studio-chat) provides the suite-wide item links and
+  [Studio Chat](../bb-studio/src/modules/chat) provides the suite-wide item links and
   conversation picker when installed. Standalone Pages uses the same
   retained companion tabs and preserves its existing composer draft keys.
   New conversation focuses `/plugins/pages/pages/<id>/compose`; it keeps

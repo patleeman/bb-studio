@@ -50,7 +50,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, sleep }) 
       await client.command("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [attachment] });
       await client.waitForText("release-review.txt");
       await retained(true);
-      const ownChat = await pluginRpc("studio-chat", "viewing", { path: `/plugins/bot-teams/channels/${id}` });
+      const ownChat = await pluginRpc("studio", "chat_viewing", { path: `/plugins/bot-teams/channels/${id}` });
       if (ownChat.item) throw new Error("Saved view still triggers automatic Studio Chat");
 
       await client.dragBy(`[data-studio-tab="bot-teams:${bot.id}"] a`, 0, 0);

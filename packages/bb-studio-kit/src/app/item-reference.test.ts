@@ -52,3 +52,9 @@ it("picks an item's icon from its link", () => {
   expect(itemLinkIcon("/plugins/studio/studio/space/spc_1")).toBe("Layers");
   expect(itemLinkIcon("/plugins/unknown/things/x_1")).toBe("GridView");
 });
+
+
+it("accepts the absorbed table prefix and old route", () => {
+  expect(parseItemReference("studio-tables:tbl_1", "")).toEqual({ href: "/plugins/studio/tables/tbl_1" });
+  expect(parseItemReference("[Table](/plugins/studio-tables/tables/tbl_1)", "")).toEqual({ href: "/plugins/studio/tables/tbl_1", title: "Table" });
+});

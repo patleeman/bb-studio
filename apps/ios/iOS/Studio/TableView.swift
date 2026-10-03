@@ -3,7 +3,7 @@ import SwiftUI
 struct StudioTableView: View {
     @EnvironmentObject private var app: AppModel
     let id: String
-    @State private var table: Tables.GetOutputTable?
+    @State private var table: Studio.TablesGetOutputTable?
     @State private var error: String?
     @State private var grid = false
     @State private var showingRelated = false
@@ -34,7 +34,7 @@ struct StudioTableView: View {
         .task(id: id) { await load() }
     }
 
-    private func listView(_ table: Tables.GetOutputTable) -> some View {
+    private func listView(_ table: Studio.TablesGetOutputTable) -> some View {
         List {
             ForEach(Array((table.rows ?? []).enumerated()), id: \.offset) { _, row in
                 VStack(alignment: .leading, spacing: 4) {
@@ -48,7 +48,7 @@ struct StudioTableView: View {
         }
     }
 
-    private func gridView(_ table: Tables.GetOutputTable) -> some View {
+    private func gridView(_ table: Studio.TablesGetOutputTable) -> some View {
         ScrollView([.horizontal, .vertical]) {
             Grid(alignment: .leading, horizontalSpacing: 0, verticalSpacing: 0) {
                 GridRow {

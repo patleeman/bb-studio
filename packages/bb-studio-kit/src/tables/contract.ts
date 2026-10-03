@@ -9,7 +9,7 @@ import { columnSchema, filterSchema, sortSchema, valuesSchema, viewSchema } from
 const defineRpcContract = <const Contract extends PluginRpcContract>(contract: Contract): Contract =>
   contract;
 
-export const TABLES_PLUGIN_ID = "studio-tables";
+export const TABLES_PLUGIN_ID = "studio";
 export const TABLES_PANEL = "tables";
 /** Tables' realtime channel; payload `{ tableId }`. */
 export const TABLES_CHANNEL = "studio-tables-changed";

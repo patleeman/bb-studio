@@ -50,7 +50,7 @@ describe("Chat item resolution and submission", () => {
     expect(await handlers.start({ item: ref, request })).toEqual({ threadId: "thread_new" });
     expect(spawn.mock.calls[0]![0].input[0]).toMatchObject({
       text: "@Companion flow Fix the arrow",
-      mentions: [{ resource: { pluginId: "studio-chat", itemId: "item:excalidraw:drawing_1" } }],
+      mentions: [{ resource: { pluginId: "studio", itemId: "item:excalidraw:drawing_1" } }],
     });
     expect(set).toHaveBeenCalledWith("link:excalidraw:drawing_1", expect.objectContaining({ threadId: "thread_new" }));
   });

@@ -1,3 +1,9 @@
+import type { ModuleServices } from "./src/modules/services";
+import { ModuleRuntime } from "./src/modules/runtime";
+import type { LocalProvider } from "./src/hub";
+import { registerServer as registerTables } from "./src/modules/tables/server";
+import { registerServer as registerChat } from "./src/modules/chat/server";
+import { officeContract } from "./src/office/contract";
 import { initializeOffice } from "./src/office/server";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // bb-studio server: the hub every Studio add-on plugs into.
@@ -15,7 +21,7 @@ import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 //   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { rewriteLegacyText, STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
 import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
@@ -53,14 +59,23 @@ function queryArg(arg: string): string {
   return filter ? `${filter[1]}"${filter[2]}"` : `"${arg}"`;
 }
 
-export default async function plugin(bb: BbPluginApi) {
+export default async function plugin(host: BbPluginApi) {
+  const runtime = new ModuleRuntime(host);
+  await registerCore(runtime.coreApi(), runtime.provider, runtime.services);
+  await runtime.register([
+    { name: "tables", legacyPluginId: "studio-tables", registerServer: registerTables },
+    { name: "chat", legacyPluginId: "studio-chat", registerServer: registerChat },
+  ]);
+}
+
+async function registerCore(bb: BbPluginApi, modules: LocalProvider, moduleServices: ModuleServices) {
   // Spaces list as Studio's own items; `spaces` is set up below, before any call.
-  const hub = new StudioHub(bb.sdk);
+  const hub = new StudioHub(bb.sdk, modules);
   const changes = new ChangeLog();
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
-  const { spaces, folders: officeFolders } = await initializeOffice(bb, db, hub);
+  const { spaces, folders: officeFolders, home: officeHome } = await initializeOffice(bb, db, hub, { moduleServices });
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
@@ -402,10 +417,11 @@ export default async function plugin(bb: BbPluginApi) {
   };
 
   const itemForPath = async (path: string) => {
+    path = rewriteLegacyText(path);
     const parts = path.split(/[?#]/)[0]!.split("/");
     const pluginId = parts[2];
     // A space opens at /plugins/studio/studio/space/<id>.
-    const id = pluginId === STUDIO_PLUGIN_ID ? parts[5] : parts[4];
+    const id = pluginId === STUDIO_PLUGIN_ID && parts[3] === "studio" && parts[4] === "space" ? parts[5] : parts[4];
     if (!pluginId || !id) return null;
     // A space's page opens as the space.
     const home = pluginId === PAGES_PLUGIN_ID ? spaces.list().find((space) => space.pageId === decodeURIComponent(id)) : undefined;
@@ -426,8 +442,12 @@ export default async function plugin(bb: BbPluginApi) {
     return { panels: panels.map((panel) => ({ ...panel, visible: isPanelVisible(order, visible, panel.id) })) };
   };
 
-  bb.rpc.register(rpcContract, {
-    home: ({ projectId, periodDays }) => homeData(bb.sdk, hub, services, providerComments, projectId, periodDays),
+  const transitionalContract = { ...rpcContract, home: {
+    input: z.union([officeContract.home.input, rpcContract.home.input]),
+    output: z.union([officeContract.home.output, rpcContract.home.output]),
+  } };
+  bb.rpc.register(transitionalContract, {
+    home: input => "spaceId" in input ? officeHome(input.spaceId) : homeData(bb.sdk, hub, services, providerComments, input.projectId, input.periodDays),
     homeRespond: async (input) => {
       await respondToNeed(bb.sdk, input);
       changes.append(null);

@@ -352,37 +352,37 @@ export default function plugin(bb: BbPluginApi) {
     name: "tables",
     summary: "Create and query Studio Tables",
     commands: [
-      { name: "list", summary: "List tables", usage: "bb tables list" },
+      { name: "list", summary: "List tables", usage: "bb studio studio-tables list" },
       {
         name: "create",
         summary: "Create a table",
-        usage: "bb tables create <title>",
+        usage: "bb studio studio-tables create <title>",
       },
       {
         name: "schema",
         summary: "Show columns and views",
-        usage: "bb tables schema <id>",
+        usage: "bb studio studio-tables schema <id>",
       },
       {
         name: "query",
         summary: "Query rows",
-        usage: "bb tables query <id> [--view <id>] [--limit 100] [--offset 0] [--revision <revision>]",
+        usage: "bb studio studio-tables query <id> [--view <id>] [--limit 100] [--offset 0] [--revision <revision>]",
       },
       {
         name: "insert",
         summary: "Insert JSON values",
-        usage: "bb tables insert <id> <json>",
+        usage: "bb studio studio-tables insert <id> <json>",
       },
       {
         name: "update",
         summary: "Update JSON values",
-        usage: "bb tables update <id> <row-id> <json>",
+        usage: "bb studio studio-tables update <id> <row-id> <json>",
       },
-      { name: "export", summary: "Export CSV", usage: "bb tables export <id>" },
+      { name: "export", summary: "Export CSV", usage: "bb studio studio-tables export <id>" },
       {
         name: "import",
         summary: "Import CSV from stdin",
-        usage: "bb tables import <id> --csv <text>",
+        usage: "bb studio studio-tables import <id> --csv <text>",
       },
     ],
     run: (argv, ctx) => {
@@ -456,7 +456,7 @@ export default function plugin(bb: BbPluginApi) {
             return {
               exitCode: 1,
               stderr:
-                "usage: bb tables <list|create|schema|query|insert|update|export|import>\n",
+                "usage: bb studio studio-tables <list|create|schema|query|insert|update|export|import>\n",
             };
         }
         return {

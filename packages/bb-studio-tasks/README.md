@@ -1,6 +1,6 @@
 # Studio Tasks
 
-> **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
+> **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio-teams).
 
 Boards of tasks you can do yourself or hand to an agent. Each board is a
 Studio item like a page: it has its own columns, shows as a board, list or
@@ -79,7 +79,7 @@ Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node script
   pages, artifacts, drawings and recordings; and the agent section. The
   header has **Hand off**, **Mark done** / **Reopen**, and a menu with Mark
   done and archive threads, New thread about this (without
-  [Studio Chat](../bb-studio-chat), whose Chat menu starts conversations),
+  [Studio Chat](../bb-studio/src/modules/chat), whose Chat menu starts conversations),
   Archive threads, Move to project, Archive task and Delete.
 - **In a thread's side panel** the **Tasks** tab lists the tasks made in that
   thread, then the project's recent ones. **New** makes a task in the

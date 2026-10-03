@@ -14,7 +14,7 @@ import { createTestStore } from "../../bb-studio-teams/test/test-store";
 import { botSchema } from "../../bb-studio-teams/contract";
 import { Runtime } from "../../bb-studio-teams/mission-runtime";
 import { ThreadViews } from "../../bb-studio-teams/thread-views";
-import tablesPlugin from "../../bb-studio-tables/server";
+import tablesPlugin from "./modules/tables/server";
 import { schemas } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
 import { SearchIndex } from "./search-index";
@@ -132,7 +132,7 @@ function tablesFixture() {
     ui: { registerMentionProvider: () => {} }, agents: { registerTool: () => {}, configure: () => {} }, cli: { register: () => {} },
   } as never);
   return {
-    pluginId: "studio-tables", kind: "table", handlers, optionalStudio, expectedContent: "Name",
+    pluginId: "studio", kind: "table", handlers, optionalStudio, expectedContent: "Name",
     notificationCount: () => events.length,
     editTitle: async (id: string, title: string) => { await handlers.update!({ id, title } as never); },
     close: () => { cleanup(); db.close(); },
@@ -161,14 +161,14 @@ it("Tables supplies searchable text beyond the 200-row preview", async () => {
     const db = new Database(":memory:");
     for (const sql of MIGRATIONS) db.exec(sql);
     const sdk: HubSdk = { plugins: {
-      list: async () => ({ plugins: [{ id: "studio-tables", name: "Tables", enabled: true, status: "running", statusDetail: null, version: "1" }] }),
-      experimental_discoverRpc: async () => [{ pluginId: "studio-tables" }],
+      list: async () => ({ plugins: [{ id: "studio", name: "Tables", enabled: true, status: "running", statusDetail: null, version: "1" }] }),
+      experimental_discoverRpc: async () => [{ pluginId: "studio" }],
       callRpc: async ({ method, input, outputSchema }) => outputSchema.parse(await fixture.handlers[method]!(input as never)),
     } };
     const index = new SearchIndex(db, new StudioHub(sdk));
     try {
       await index.ensure();
-      expect(index.search("afterpreviewuniqueword").map((hit) => hit.ref)).toEqual([{ pluginId: "studio-tables", id: created.table.id }]);
+      expect(index.search("afterpreviewuniqueword").map((hit) => hit.ref)).toEqual([{ pluginId: "studio", id: created.table.id }]);
       expect(index.status().state).toBe("current");
     } finally { await index.dispose(); db.close(); }
   } finally { fixture.close(); }

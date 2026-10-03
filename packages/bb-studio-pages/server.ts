@@ -1,3 +1,4 @@
+import { migratePageModuleRefs } from "./src/module-refs";
 import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes, studioServices } from "@bb-studio/kit/server";
 import { readFile } from "node:fs/promises";
@@ -39,6 +40,8 @@ export default async function plugin(bb: BbPluginApi) {
   settings.onChange((next) => { config = next; });
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
+  const rewritten = migratePageModuleRefs(db);
+  if (rewritten) bb.log.info(`Studio module references: rewrote ${rewritten} document nodes`);
   const store = new PageStore(db, () => config.snapshotsPerPage);
   const bots = new BotDirectory(bb);
   const service = new PagesService(bb, store, bots);

@@ -124,18 +124,20 @@ describe("StudioHub", () => {
     expect(overview.items.map((entry) => entry.id)).toEqual(["pg_1"]);
   });
 
-  it("lists suite plugins first, then discovered ones, skipping disabled plugins and itself", async () => {
+  it("lists suite plugins first, then discovered providers including Studio modules", async () => {
     const sdk = fakeSdk({
       plugins: [plugin("zeta"), plugin("pages"), plugin("talk", { enabled: false }), plugin("studio")],
       discovered: ["zeta", "studio", "pages"],
       rpc: {
         "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: "pages", kinds: [kind] }),
         "zeta.studio_describe": () => ({ pluginId: "zeta", version: 1, panel: null, kinds: [] }),
+        "studio.studio_describe": () => ({ pluginId: "studio", version: 1, panel: "studio", kinds: [kind] }),
       },
     });
     const providers = await new StudioHub(sdk).providers();
     expect(providers.map((provider) => [provider.pluginId, provider.state])).toEqual([
       ["pages", "ready"],
+      ["studio", "ready"],
       ["zeta", "ready"],
     ]);
   });
@@ -229,8 +231,8 @@ describe("StudioHub", () => {
     expect((await new StudioHub(sdk).providers())[0]).toMatchObject({ state: "offline", detail: expect.stringContaining("missing capabilities") });
   });
 
-  it("refuses to call itself", async () => {
-    const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }));
+  it("refuses to call a local kind without service handlers", async () => {
+    const hub = new StudioHub(fakeSdk({ plugins: [], rpc: {} }), { kinds: [], items: () => [] });
     await expect(hub.call("studio", "studio_list", null)).rejects.toThrow("Studio isn't a provider.");
   });
 

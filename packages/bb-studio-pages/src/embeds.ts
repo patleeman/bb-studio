@@ -73,7 +73,7 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
   type Tables = typeof tablesContract;
   /** Calls Studio Tables with its own contract's schemas. */
   const table = <M extends keyof Tables>(method: M, input: z.input<Tables[M]["input"]>) =>
-    call(TABLES_PLUGIN_ID, method, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
+    call(TABLES_PLUGIN_ID, `tables_${method}`, input, tablesContract[method].output) as Promise<z.infer<Tables[M]["output"]>>;
 
   const spacesSchema = z.object({ spaces: z.array(z.object({ id: z.string(), name: z.string(), icon: z.string().nullable(), description: z.string() })) });
   /** Studio's spaces, as items to mention; the index leaves Studio's own out. */

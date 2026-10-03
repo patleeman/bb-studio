@@ -1,3 +1,4 @@
+import { rewriteLegacyText } from "../legacy-refs";
 // Copy a reference to a Studio item, then paste it into another Studio item,
 // where it shows as a pill. The clipboard carries a Markdown link to the
 // item's view, which reads as a link in a thread or any other app, an HTML
@@ -27,7 +28,9 @@ function localPath(href: string, origin: string): string {
 
 /** The item a reference names, from its plain text: a Markdown link or a bare link to an item's view. */
 export function parseItemReference(text: string, origin = typeof window === "undefined" ? "" : window.location.origin): StudioItemLink | null {
-  const trimmed = text.trim();
+  const legacyTable = /^(?:item:)?studio-tables:([a-zA-Z0-9_-]+)$/.exec(text.trim());
+  if (legacyTable) return { href: `/plugins/studio/tables/${legacyTable[1]}` };
+  const trimmed = rewriteLegacyText(text.trim());
   if (!trimmed || trimmed.length > 2_000) return null;
   const link = MARKDOWN_LINK.exec(trimmed);
   const href = pluginViewPath(localPath(link ? link[2]! : trimmed, origin));
@@ -55,7 +58,7 @@ export function itemReferenceFrom(data: DataTransfer | null | undefined, options
     // Not one of ours; read the text instead.
   }
   const text = data.getData("text/plain");
-  if (!options.bare && !MARKDOWN_LINK.test(text.trim())) return null;
+  if (!options.bare && !MARKDOWN_LINK.test(rewriteLegacyText(text.trim()))) return null;
   return parseItemReference(text);
 }
 

@@ -1,3 +1,6 @@
+import { ModuleNotice } from "./src/modules/Notice";
+import { registerApp as registerTables } from "./src/modules/tables/app";
+import { registerApp as registerChat } from "./src/modules/chat/app";
 // bb-studio frontend: the Studio collection, one nav panel whose
 // sub-path filters it to a kind or opens a space, the sidebar's Studio tabs
 // (spaces among them), each thread's spaces under its composer, and Studio
@@ -21,6 +24,9 @@ function StudioRoot({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp((app) => {
+  app.slots.experimental_appOverlay({ id: "module-import-notice", component: ModuleNotice });
+  registerTables(app);
+  registerChat(app);
   // The office (docs/office-model.md). The sidebar slots switch on once the
   // Sidebar and Navigation modules are folded into core.
   registerOfficeApp(app, { sidebar: false });

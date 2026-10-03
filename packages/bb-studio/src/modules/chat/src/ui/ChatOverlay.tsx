@@ -1,7 +1,7 @@
+import { useModuleRpc } from "../../../app";
 import {
   useBbNavigate,
   useComposer,
-  useRpc,
 } from "@get-bb/plugin-sdk/app";
 import {
   cn,
@@ -29,7 +29,7 @@ import { useChatDialog } from "./use-chat-dialog";
 import { ConversationComposer } from "./ConversationComposer";
 import { CHAT_ICON, CONVERSATION_STARTED, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
-type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
+type Rpc = ReturnType<typeof useModuleRpc<typeof rpcContract>>;
 
 const CARD = "pointer-events-auto flex flex-col overflow-hidden rounded-lg border border-border bg-background shadow-xl";
 /** Float tabs opened for "the item's chat" replace each other while you're not looking at them. */
@@ -199,7 +199,7 @@ function Corner({ children }: { children: ReactNode }) {
 }
 
 export function ChatOverlay() {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("chat");
   const navigate = useBbNavigate();
   const viewed = useViewing(rpc, usePathname());
   const floatAvailable = useFloatAvailable();

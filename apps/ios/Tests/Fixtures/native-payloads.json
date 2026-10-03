@@ -222,8 +222,8 @@
   },
   {
     "id": "table-read",
-    "plugin": "studio-tables",
-    "method": "get",
+    "plugin": "studio",
+    "method": "tables_get",
     "input": {
       "id": "tbl_contract"
     },
@@ -315,8 +315,8 @@
   },
   {
     "id": "chat-start",
-    "plugin": "studio-chat",
-    "method": "start",
+    "plugin": "studio",
+    "method": "chat_start",
     "input": {
       "item": {
         "pluginId": "pages",

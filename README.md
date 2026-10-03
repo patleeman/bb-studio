@@ -17,9 +17,7 @@ agent.
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
 | [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | Boards of tasks you can hand to agents and embed in pages; each task follows its thread from working to review. |
-| [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bot profiles and saved views of ordinary threads, with shared memory and missions. |
-| [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | One Chat action opens an item's linked conversation or a new composer. Choose or start another from its menu. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
 | [Studio Navigation](packages/bb-studio-navigation/) | `studio-navigation` | Replaces BB's sidebar navigation with one that leaves out the Studio rows Studio and Studio Sidebar already open. Rows from BB and other plugins stay. |
@@ -27,7 +25,7 @@ agent.
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and chooses recipients in Studio Teams views. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
-Every add-on works on its own. With Studio installed, their items also appear in
+Tables and Chat are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
 all. Studio Teams needs Studio Decisions to choose recipients in views, and Studio
 Explore needs Studio Pages.
@@ -62,9 +60,7 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
    - studio-tasks: a task board you hand to agents
-   - studio-tables: structured tables with views and CSV import and export
    - bot-teams: bot profiles and saved thread views
-   - studio-chat: Chat on Studio items, with New conversation and Choose conversation in its menu
    - float: a panel of tabs for threads, views and Studio items, docked
      or dragged anywhere
    - thread-list-plus: Studio Sidebar; it replaces BB's thread list
@@ -125,7 +121,7 @@ bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
 scripts/refresh-locks.sh bb-studio-tasks  # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
-node scripts/staged-bb.mjs start --plugin studio-chat # all plugins, only this capture's fixtures
+node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
 ```
 
 The iOS app builds with Xcode and [XcodeGen](https://github.com/yonaskolb/XcodeGen)

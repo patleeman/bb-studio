@@ -36,7 +36,7 @@ const report={source,expectRetry,profiles:[],recovery:{},limits:[
 ]};
 client.socket.addEventListener('message',event=>{
   const message=JSON.parse(event.data),p=message.params;
-  if(message.method==='Network.requestWillBeSent'&&p.request.url===`${serverUrl}/api/v1/plugins/studio-tables/rpc/get`&&p.request.postData?.includes(id)) requests.set(p.requestId,{phase,requestId:p.requestId,started:p.timestamp,method:p.request.method});
+  if(message.method==='Network.requestWillBeSent'&&p.request.url===`${serverUrl}/api/v1/plugins/studio/rpc/get`&&p.request.postData?.includes(id)) requests.set(p.requestId,{phase,requestId:p.requestId,started:p.timestamp,method:p.request.method});
   const request=requests.get(p?.requestId);
   if(!request) return;
   if(message.method==='Network.responseReceived') {request.status=p.response.status;request.responseAt=p.timestamp;request.mimeType=p.response.mimeType;}
@@ -62,17 +62,17 @@ try {
   report.browser=await client.command('Browser.getVersion');
   const {table}=await pluginRpc('studio-tables','create',{title:'Latency QA 5000',projectId,columns:[{id:'name',name:'Name',type:'text'},{id:'qty',name:'Quantity',type:'number'}],rows:Array.from({length:5000},(_,i)=>({name:`Latency fixture ${i+1}`,qty:i}))});
   id=table.id;
-  await client.navigate(`/plugins/studio-tables/tables/${id}`);
+  await client.navigate(`/plugins/studio/tables/${id}`);
   await settled(`document.querySelector('[data-cell="0:0"]')`);
   report.document=await client.evaluate(`({timeOrigin:performance.timeOrigin,token:(window.__latencyToken=crypto.randomUUID())})`);
-  const close=async()=>{await route('/plugins/studio-tables/tables');await settled(`!document.querySelector('input[aria-label="Table title"]')&&document.body.innerText.includes('Tables')`);};
+  const close=async()=>{await route('/plugins/studio/tables');await settled(`!document.querySelector('input[aria-label="Table title"]')&&document.body.innerText.includes('Tables')`);};
   for(const profile of [
     {name:'local-control',latency:0,downloadThroughput:-1,uploadThroughput:-1},
     {name:'150ms-1.5Mbps',latency:150,downloadThroughput:187500,uploadThroughput:46875},
     {name:'400ms-512Kbps',latency:400,downloadThroughput:64000,uploadThroughput:16000},
   ]) {
     await network({});await close();phase=profile.name;await network(profile);
-    const started=await route(`/plugins/studio-tables/tables/${id}`);
+    const started=await route(`/plugins/studio/tables/${id}`);
     const load=await observeLoad('ready');
     load.routeToReadyMs=Math.round((await client.evaluate('performance.now()')-started)*10)/10;
     assert.equal(load.error,null);
@@ -89,8 +89,8 @@ try {
     process.stdout.write(`Verified ${profile.name}: ${load.routeToReadyMs}ms\n`);
   }
   await network({});await close();phase='blocked-initial-get';
-  await client.command('Network.setBlockedURLs',{urls:[`${serverUrl}/api/v1/plugins/studio-tables/rpc/get`]});
-  await route(`/plugins/studio-tables/tables/${id}`);
+  await client.command('Network.setBlockedURLs',{urls:[`${serverUrl}/api/v1/plugins/studio/rpc/get`]});
+  await route(`/plugins/studio/tables/${id}`);
   report.recovery.failure=await observeLoad('error');
   await client.capture(`${output}/failed-load.png`);
   report.recovery.errorControls=await client.evaluate(`Array.from(document.querySelectorAll('.studio-root button')).map(button=>({text:button.innerText,label:button.getAttribute('aria-label')}))`);
@@ -122,7 +122,7 @@ try {
     await client.capture(`${output}/retry-recovered.png`);
     await network({});
   }
-  phase='reopen-recovery';await close();const reopenStarted=await route(`/plugins/studio-tables/tables/${id}`);
+  phase='reopen-recovery';await close();const reopenStarted=await route(`/plugins/studio/tables/${id}`);
   report.recovery.reopen=await observeLoad('ready');
   report.recovery.reopen.routeToReadyMs=Math.round((await client.evaluate('performance.now()')-reopenStarted)*10)/10;
   report.recovery.reopen.finalRow=await finalRow();

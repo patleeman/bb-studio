@@ -22,9 +22,9 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
       const { cleanup } = await seedPages();
       return { path: "/plugins/studio/studio", ready: 'input[aria-label="Search and filter studio"]', draft: "Release notes", visibleText: "Release notes: October", cleanup };
     } },
-    { id: "chat", packageDir: "bb-studio-chat", seed: async () => {
+    { id: "chat", packageDir: "bb-studio/src/modules/chat", seed: async () => {
       const { page, cleanup } = await seedPages();
-      return { path: `/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: "pages", id: page.id }))}`, ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent item conversation", attachment: true, cleanup };
+      return { path: `/plugins/studio/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: "pages", id: page.id }))}`, ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent item conversation", attachment: true, cleanup };
     } },
     { id: "feed", packageDir: "bb-studio-feed", seed: async () => {
       const { post, cleanup } = await seedPost();
@@ -84,8 +84,8 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         return { path: `/plugins/studio/studio/space/${space.id}`, ready: 'button[aria-label="Space options"]', visibleText: space.name, cleanup };
       } catch (error) { await cleanup(); throw error; }
     } },
-    { id: "chat-plain", packageDir: "bb-studio-chat", seed: async () => ({ path: "/plugins/studio-chat/chats", ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent general conversation", attachment: true, cleanup: async () => {} }) },
-    { id: "chat-quote", packageDir: "bb-studio-chat", seed: async client => {
+    { id: "chat-plain", packageDir: "bb-studio/src/modules/chat", seed: async () => ({ path: "/plugins/studio/chats", ready: '.studio-chat-composer [contenteditable="true"]', draft: "Keep this unsent general conversation", attachment: true, cleanup: async () => {} }) },
+    { id: "chat-quote", packageDir: "bb-studio/src/modules/chat", seed: async client => {
       const { page, cleanup } = await seedPages();
       let path;
       try {
@@ -94,7 +94,7 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         const quote = { text: "Ship offline sync to beta teams", note: "Clarify the rollout timing", where: "Launch checklist", image: null };
         await client.evaluate(`window.__bbStudioItemChat_v1.host.send(${JSON.stringify({ pluginId: "pages", id: page.id })}, ${JSON.stringify(quote)})`, true);
         await client.waitForSelector('.studio-chat-composer [contenteditable="true"]');
-        path = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.target.kind === 'path' && tab.target.path.startsWith('/plugins/studio-chat/chats/quote/'))?.target.path`);
+        path = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.target.kind === 'path' && tab.target.path.startsWith('/plugins/studio/chats/quote/'))?.target.path`);
         if (!path) throw new Error("The real quote action did not create a saved quote composer");
         await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
         await client.command('Page.navigate', { url: 'about:blank' });

@@ -185,7 +185,7 @@ pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Draw](../packages/bb-studio-draw/assets/compact-header.png),
 [Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
 [Talk](../packages/bb-studio-talk/assets/compact-header.png),
-[Tables](../packages/bb-studio-tables/assets/compact-header.png),
+[Tables](../packages/bb-studio/src/modules/tables/assets/compact-header.png),
 [Tasks](../packages/bb-studio-tasks/assets/compact-header.png), and
 [Teams](../packages/bb-studio-teams/assets/compact-header.png).
 Each checks the primary Chat action, every visible header button's bounds
@@ -245,7 +245,7 @@ Artifacts from 902d642.
 It verifies conversation linking/reuse, exact native composer and attachment
 retention through real sidebar navigation, a second item draft and folding,
 and a cropped image quote whose image, edited prompt, and file attachment
-return after a browser reload. The [screenshot](../packages/bb-studio-chat/assets/staged-preview.png)
+return after a browser reload. The [screenshot](../packages/bb-studio/src/modules/chat/assets/staged-preview.png)
 is visually checked. The workflow caught and fixed a server-only SDK import
 in the frontend and a quote card whose controls were behind Float. Artifacts'
 53 tests, typecheck, and build pass; the capture verifies the quote controls'
@@ -255,7 +255,7 @@ also checks the recovered image quote at 390 by 844 pixels. Its crop, edited
 prompt and attachment remain intact, resizing retains the exact native
 composer, and every visible composer button and image stays in the viewport
 with an unobstructed hit target. The
-[phone screenshot](../packages/bb-studio-chat/assets/quote-mobile.png) is
+[phone screenshot](../packages/bb-studio/src/modules/chat/assets/quote-mobile.png) is
 visually checked. The capture now waits for the new document after reload,
 preventing an old composer from satisfying the recovery assertion.
 

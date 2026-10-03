@@ -24,13 +24,13 @@ another desktop chat panel.
 | Plugin | Source integration | Recorded live evidence |
 | --- | --- | --- |
 | Studio | Item/sidebar menus, shared item headers, Quick Open placement and retained collection/space routes | [Compact headers and New menu](../packages/bb-studio/README.md) |
-| Studio Chat | One Chat action, linked conversation, creation/picking, item-specific quotes and retained composer routes | [Draft/file/image quote and phone recovery](../packages/bb-studio-chat/README.md) |
+| Studio Chat | One Chat action, linked conversation, creation/picking, item-specific quotes and retained composer routes | [Draft/file/image quote and phone recovery](../packages/bb-studio/src/modules/chat/README.md) |
 | Float | Canonical stack, pins/history, explicit Float/main/split/swap; optional native workbench | [Stable and native transfers](../packages/bb-studio-float/README.md) |
 | Pages | Shared Chat; standalone fallback and legacy chat-route migration; original editor ownership | [Standalone migration and compact controls](../packages/bb-studio-pages/README.md) |
 | Talk | Retained recording/player routes; dictation and Go back target the originating composer | [Exact draft/file return and playback continuity](../packages/bb-studio-talk/README.md) |
 | Draw | Retained canvas, shared item Chat and companion-aware related references | [Original first-move canvas and compact header](../packages/bb-studio-draw/README.md) |
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio-artifacts/README.md) |
-| Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio-tables/README.md) |
+| Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio/src/modules/tables/README.md) |
 | Tasks | Shared task/board header; current/earlier handoffs, discussions and dispatch use companions | [Retained handoff composer and real bot dispatch](../packages/bb-studio-tasks/README.md) |
 | Teams | Bot Chat, channels and member-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Channel composer/file retention and conversation reuse](../packages/bb-studio-teams/README.md) |
 | Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio-feed/README.md) |
@@ -73,7 +73,7 @@ requested placement and one saved tab for its target.
 | Draw | Both original Excalidraw canvas layers | [Main](../packages/bb-studio-draw/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-draw/assets/companion-transfers-native.png) |
 | Artifacts | HTML iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-artifacts/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-artifacts/assets/companion-transfers-native.png) |
 | Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio-talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-talk/assets/companion-transfers-native.png) |
-| Tables | Title input and seeded table row | [Main](../packages/bb-studio-tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tables/assets/companion-transfers-native.png) |
+| Tables | Title input and seeded table row | [Main](../packages/bb-studio/src/modules/tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/tables/assets/companion-transfers-native.png) |
 | Tasks | Board title input and seeded task | [Main](../packages/bb-studio-tasks/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tasks/assets/companion-transfers-native.png) |
 | Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](../packages/bb-studio-teams/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-teams/assets/companion-transfers-native.png) |
 
@@ -120,7 +120,7 @@ Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
 | View | Original state checked | Stable capture | Native capture |
 | --- | --- | --- | --- |
 | Studio collection | Search input, query and seeded release-note result | [Main](../packages/bb-studio/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/companion-transfers-native.png) |
-| Item-chat draft | Prompt, unsent wording, file input, selected attachment control and encoded item path | [Main](../packages/bb-studio-chat/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/companion-transfers-native.png) |
+| Item-chat draft | Prompt, unsent wording, file input, selected attachment control and encoded item path | [Main](../packages/bb-studio/src/modules/chat/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/chat/assets/companion-transfers-native.png) |
 | Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio-feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/companion-transfers-native.png) |
 | Feed post | Original post heading | [Main](../packages/bb-studio-feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-post-companion-transfers-native.png) |
 | Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-native.png) |
@@ -163,8 +163,8 @@ placement assertions. All initial moves use the displayed Move menu.
 | Studio's legacy collection address | Search input/query, seeded release notes and actual `/collection` target | [Main](../packages/bb-studio/assets/studio-collection-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-collection-companion-transfers-native.png) |
 | Studio Activity | Original period selector, selected 30 days and the nonexecuting staged thread | [Main](../packages/bb-studio/assets/studio-activity-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-activity-companion-transfers-native.png) |
 | Studio space without Pages | Original space-options control and synthetic fallback space | [Main](../packages/bb-studio/assets/studio-space-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-space-companion-transfers-native.png) |
-| Plain chat draft | Original prompt/file input, unsent wording and one selected attachment control | [Main](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-native.png) |
-| Saved quote draft | Original prompt/file input, source quote, location, note, appended wording and one attachment control | [Main](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-native.png) |
+| Plain chat draft | Original prompt/file input, unsent wording and one selected attachment control | [Main](../packages/bb-studio/src/modules/chat/assets/chat-plain-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/chat/assets/chat-plain-companion-transfers-native.png) |
+| Saved quote draft | Original prompt/file input, source quote, location, note, appended wording and one attachment control | [Main](../packages/bb-studio/src/modules/chat/assets/chat-quote-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/chat/assets/chat-quote-companion-transfers-native.png) |
 | Explore collection | Original seeded explainer-row button and collection route | [Main](../packages/bb-studio-explore/assets/explore-list-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-list-companion-transfers-native.png) |
 | Explore thread list | Original seeded explainer-row button and thread-specific route | [Main](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-native.png) |
 

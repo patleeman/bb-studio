@@ -1,3 +1,8 @@
+import { moduleStatusContract } from "../packages/bb-studio/src/modules/status.ts";
+import { moduleProviderContract } from "../packages/bb-studio/src/modules/provider.ts";
+const prefixed = (prefix, contract) => Object.fromEntries(Object.entries(contract).map(([name, schema]) => [prefix + name, schema]));
+import { tablesContract } from "../packages/bb-studio-kit/src/tables/contract.ts";
+import { rpcContract as chatContract } from "../packages/bb-studio/src/modules/chat/src/contract.ts";
 import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
@@ -20,10 +25,8 @@ const plugins = [
   ["studio-tasks", "Tasks", "../packages/bb-studio-tasks/server.ts", "rpcContract"],
   ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "rpcContract"],
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
-  ["studio-chat", "Chat", "../packages/bb-studio-chat/src/contract.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
-  ["studio-tables", "Tables", "../packages/bb-studio-kit/src/tables/contract.ts", "tablesContract"],
   ["feed", "Feed", "../packages/bb-studio-feed/src/contract.ts", "rpcContract"],
 ];
 
@@ -143,7 +146,7 @@ const item = schemaOf(studioSchemas(z).item, "output");
 const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
-  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract } : mod[exportName];
+  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract) } : mod[exportName];
   if (!contract) throw new Error(`Missing ${exportName} in ${path}`);
   const methods = Object.fromEntries(Object.entries(contract).map(([name, value]) => [name, {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),

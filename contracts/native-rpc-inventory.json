@@ -171,8 +171,8 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tables",
-      "method": "get",
+      "plugin": "studio",
+      "method": "tables_get",
       "coverage": "generated method"
     },
     {
@@ -424,6 +424,12 @@
     {
       "file": "apps/ios/Shared/Office/BBClient+Office.swift",
       "plugin": "studio",
+      "method": "home",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
       "method": "spaces_list",
       "coverage": "generated method"
     },
@@ -479,6 +485,36 @@
       "file": "apps/ios/Shared/Office/BBClient+Office.swift",
       "plugin": "studio",
       "method": "space_tree",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeInboxAPI.swift",
+      "plugin": "studio",
+      "method": "inbox_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeInboxAPI.swift",
+      "plugin": "studio",
+      "method": "inbox_counts",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeInboxAPI.swift",
+      "plugin": "studio",
+      "method": "inbox_act",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeInboxAPI.swift",
+      "plugin": "studio",
+      "method": "inbox_done",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeInboxAPI.swift",
+      "plugin": "studio",
+      "method": "inbox_read",
       "coverage": "generated method"
     },
     {
@@ -825,14 +861,14 @@
     },
     {
       "file": "apps/ios/Shared/StudioChat.swift",
-      "plugin": "studio-chat",
-      "method": "start",
+      "plugin": "studio",
+      "method": "chat_start",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/StudioChat.swift",
-      "plugin": "studio-chat",
-      "method": "home",
+      "plugin": "studio",
+      "method": "chat_home",
       "coverage": "generated method"
     },
     {
@@ -930,6 +966,12 @@
       "plugin": "artifacts",
       "method": "importFile",
       "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Office/HomeTab.swift",
+      "plugin": "plugin",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
     },
     {
       "file": "apps/ios/iOS/Thread/InlineVis.swift",

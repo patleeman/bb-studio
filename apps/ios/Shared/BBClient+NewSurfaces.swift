@@ -76,8 +76,8 @@ extension BBClient {
         return result.taskId ?? ""
     }
 
-    public func studioTable(_ id: String) async throws -> Tables.GetOutputTable? {
-        let result: Tables.GetOutput = try await rpc("studio-tables", Tables.Method.get, ["id": .string(id)])
+    public func studioTable(_ id: String) async throws -> Studio.TablesGetOutputTable? {
+        let result: Studio.TablesGetOutput = try await rpc("studio", Studio.Method.tables_get, ["id": .string(id)])
         return result.table
     }
 

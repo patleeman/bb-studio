@@ -16,7 +16,7 @@ import { STUDIO_ITEM_AT_METHOD, STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract
 import { MENTION_PROVIDER_ID, pagesSchemas, rpcContract, schemas, type ItemRef } from "./src/contract";
 import { itemKey, missingNote, parseItemKey, pointerNote, toViewed, withItemPill } from "./src/context";
 
-const PLUGIN_ID = "studio-chat";
+const PLUGIN_ID = "studio";
 const PAGES_PLUGIN_ID = "pages";
 const CALL_TIMEOUT_MS = 10_000;
 /** Starting a page chat creates a thread, which can take a while; don't wait forever. */

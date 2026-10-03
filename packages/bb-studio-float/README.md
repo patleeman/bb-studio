@@ -215,7 +215,7 @@ main route. The shared kit's `FloatPanels` does this
 Talk, Artifacts and Studio render it, so their items and views can float.
 Other plugins open tabs with the kit's `openFloat`.
 
-[Studio Chat](../bb-studio-chat) provides the shared item-header Chat action
+[Studio Chat](../bb-studio/src/modules/chat) provides the shared item-header Chat action
 and adds a "Viewing" chip to conversation tabs. Chat prefers the native
 workbench when available and otherwise opens Float.
 
