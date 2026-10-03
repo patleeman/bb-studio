@@ -70,7 +70,7 @@ await client.command("Emulation.setDeviceMetricsOverride", {
 
 try {
   for (const capture of captures) {
-    if ((captureOnly && !captureOnly.has(capture.id)) || (packageOnly && capture.packageDir !== packageOnly)) continue;
+    if ((captureOnly && !captureOnly.has(capture.id)) || (packageOnly && capture.packageDir !== packageOnly && !capture.packageDir.startsWith(`${packageOnly}/src/modules/`))) continue;
     process.stdout.write(`Capturing ${capture.id}...\n`);
     const cleanup = await capture.setup(client);
     try {

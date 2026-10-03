@@ -40,7 +40,7 @@ export const STUDIO_REALTIME_CHANNEL = "studio-changed";
 export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
 /** Studio Chat: "Work with this…" on Studio items. */
-export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
+export const STUDIO_CHAT_PLUGIN_ID = "studio";
 /** Float, the windows along the bottom of the screen. */
 export const FLOAT_PLUGIN_ID = "float";
 /**
