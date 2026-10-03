@@ -138,8 +138,9 @@ The rules below apply with these exceptions.
 - Each Space has a catch-all folder: the default Space uses `proj_personal`;
   a new Space creates a plain-folder project at creation.
 - **Folders** are core projects. A plain folder (no repo) is a standard project
-  rooted at `~/Spaces/<space-slug>/<folder-slug>` (create the directory), with
-  threads using the personal-workspace environment provider. Creating a folder
+  rooted at `~/Spaces/<space-slug>/<folder-slug>` (create the directory).
+  Its threads run in that directory, like a project checkout: the folder is
+  the shared workspace. No environment provider override is needed. Creating a folder
   = `bb project create` + `space_projects` row in one RPC. Deleting archives.
 - Space settings (new `space_settings(space_id, key, value)`): enabled item
   kinds, default trust level, default bot model. Model/provider defaults for
