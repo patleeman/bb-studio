@@ -96,6 +96,16 @@ describe("Studio Navigation", () => {
     ]);
   });
 
+  it("filters consolidated panel IDs while retaining Teams and outside plugins", () => {
+    const moved = ITEMS.map(entry => {
+      const [plugin, panel] = entry.id.split("/");
+      return ["artifacts", "talk", "studio-tasks", "studio-tables", "bot-teams"].includes(plugin!)
+        ? item("studio/" + panel, entry.label) : entry;
+    });
+    renderNavigation([...moved, item("studio/channels", "Channels"), item("studio/former-views", "Channels")]);
+    expect(rowOrder()).toEqual(["__bb__/new-thread", "studio/studio", "studio/bots", "weather/forecast", "__bb__/skills"]);
+  });
+
   it("reaches channels through Studio, with a standalone fallback", () => {
     const channels = item("bot-teams/channels", "Channels");
     const formerViews = item("bot-teams/former-views", "Channels");

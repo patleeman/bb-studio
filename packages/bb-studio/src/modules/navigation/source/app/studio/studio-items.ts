@@ -14,6 +14,11 @@ export const HUB_PANELS = [
   "studio-tasks/tasks",
   "studio-tables/tables",
   "bot-teams/channels",
+  "studio/artifacts",
+  "studio/recordings",
+  "studio/tasks",
+  "studio/tables",
+  "studio/channels",
 ];
 
 export function studioNavigationItems(
@@ -25,6 +30,7 @@ export function studioNavigationItems(
     (item) =>
       // Old /views links redirect to channels; the row would only repeat Channels.
       item.id !== "bot-teams/former-views" &&
+      item.id !== "studio/former-views" &&
       !(hubReachable && HUB_PANELS.includes(item.id)),
   );
 }

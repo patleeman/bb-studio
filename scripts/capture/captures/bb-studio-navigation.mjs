@@ -1,10 +1,11 @@
 // The Studio panels Studio Navigation leaves out, by the label bb gives their rows.
 const LEFT_OUT = ["Pages", "Drawings", "Artifacts", "Recordings", "Tasks", "Tables", "New channel"];
-const STUDIO_PLUGINS = ["studio", "pages", "excalidraw", "artifacts", "talk", "studio-tasks", "studio-tables", "bot-teams", "thread-list-plus", "studio-navigation"];
+const STUDIO_PLUGINS = ["studio", "pages", "excalidraw", "thread-list-plus"];
+const STUDIO_MODULES = ["artifacts", "talk", "tasks", "tables", "teams", "navigation"];
 // Staged by scripts/staged-bb.mjs: a plugin outside BB Studio whose row stays.
 const OUTSIDE_PLUGIN = "staged-forecast";
 
-export default ({ projectId, threadId, bbCli, sleep }) => [
+export default ({ projectId, threadId, bbCli, pluginRpc, sleep }) => [
   {
     id: "studio-navigation",
     packageDir: "bb-studio/src/modules/navigation",
@@ -16,6 +17,8 @@ export default ({ projectId, threadId, bbCli, sleep }) => [
       for (const id of [...STUDIO_PLUGINS, OUTSIDE_PLUGIN]) {
         if (!new RegExp(`^${id}@\\S+\\s+running`, "m").test(plugins)) throw new Error(`Install and enable ${id} before capturing`);
       }
+      const status = await pluginRpc("studio", "modules_status", null);
+      for (const name of STUDIO_MODULES) if (!status.active.includes(name)) throw new Error(`Activate Studio module ${name} before capturing`);
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
       await client.waitForSelector('[data-bb-plugin="studio"] [data-testid="plugin-nav-sidebar-items"]');
       await client.waitForSelector('[data-sidebar-navigation-item="studio/studio"]');
