@@ -8,14 +8,15 @@ import {
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreadSplit as useSidebarThreadSplit,
 } from "@get-bb/plugin-sdk/app";
-import { Icon, copyReferenceWithToast, openAppPath } from "@bb-studio/kit/app";
+import { Icon, copyReferenceWithToast, openAppPath, projectName, useProjects } from "@bb-studio/kit/app";
+import { relativeTime } from "@bb-studio/kit/format";
 import { useCallback, useState, type ReactNode } from "react";
 import { RUNNING } from "./activeWork";
 import { useTabDrag, useTabDragState, type DropTarget } from "./tabDrag";
 import { Face } from "./Face";
 import { externalAgentName } from "./external";
 import { useCall } from "./model";
-import { ProviderBadge } from "./ProviderBadge";
+import { Hint, ProviderBadge } from "./ProviderBadge";
 import type { ShownTab, TabFolder, TabZone } from "./tabs";
 import { RenameField } from "./ThreadMenu";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE, cn } from "./styles";
@@ -61,6 +62,45 @@ export function TabGlyph({ tab, size = "sm" }: { tab: ShownTab; size?: "sm" | "m
   if (tab.icon && tab.kind === "item") return <span aria-hidden className={cn("inline-flex shrink-0 items-center justify-center leading-none", box)}>{tab.icon}</span>;
   const name = KIND_ICONS[tab.kind === "item" ? tab.itemKind ?? "" : tab.kind] ?? "File";
   return <span aria-hidden className={cn("inline-flex shrink-0 items-center justify-center text-foreground/45", box)}><Icon name={name} /></span>;
+}
+
+const KIND_LABELS: Record<string, string> = {
+  thread: "Thread", bot: "Bot", conversation: "Channel", inbox: "Inbox", home: "Home", library: "Library", split: "Split",
+  page: "Page", board: "Board", task: "Task", table: "Table", drawing: "Drawing", recording: "Recording", dictation: "Dictation", artifact: "Artifact",
+};
+
+function threadState(thread: NonNullable<ShownTab["thread"]>): string | null {
+  if (thread.hasPendingInteraction) return "Needs you";
+  if (RUNNING.has(thread.runtimeStatus)) return "Working";
+  if (thread.runtimeStatus === "pending") return "Scheduled";
+  if (thread.runtimeStatus === "error") return "Stopped with an error";
+  if (thread.isUnread) return "Unread";
+  return null;
+}
+
+/**
+ * What a tab is, on hover: its full title, its kind and where it lives, its
+ * state, and when it last moved. A split lists its tabs.
+ */
+function TabDetails({ tab }: { tab: ShownTab }) {
+  const projects = useProjects();
+  const kind = KIND_LABELS[tab.kind === "item" ? tab.itemKind ?? "item" : tab.kind] ?? "Item";
+  const where = tab.thread ? projectName(projects, tab.thread.projectId) : tab.kind === "bot" && externalAgentName(tab.providerId) ? `runs on ${externalAgentName(tab.providerId)}` : null;
+  const state = tab.thread
+    ? threadState(tab.thread)
+    : tab.kind === "bot"
+      ? tab.botState === "needs_you" ? "Needs you" : tab.botState === "working" ? "Working" : null
+      : tab.badge ? `${tab.badge} waiting on you` : tab.needsYou ? "Needs you" : tab.unread ? "Unread" : null;
+  const when = tab.thread ? `Active ${relativeTime(tab.thread.updatedAt)}` : tab.openedAt ? `Opened ${relativeTime(tab.openedAt)}` : null;
+  return (
+    <span className="block max-w-64 space-y-0.5 py-0.5">
+      <span className="block font-medium">{tab.title}</span>
+      {tab.members
+        ? tab.members.map((member) => <span key={member.ref} className="block opacity-80">{KIND_LABELS[member.kind === "item" ? member.itemKind ?? "item" : member.kind] ?? "Item"} · {member.title}</span>)
+        : <span className="block opacity-80">{[kind, where].filter(Boolean).join(" · ")}</span>}
+      {state || when ? <span className="block opacity-80">{[state, when].filter(Boolean).join(" · ")}</span> : null}
+    </span>
+  );
 }
 
 /** What needs saying at the tab's right edge, most urgent first. */
@@ -282,6 +322,7 @@ export function TabRow({ tab, active, folders, moves, context, indent, onOpen, t
           data-axis="y"
         >
           {beside ? <DropLine after={beside.after} /> : null}
+          <Hint label={<TabDetails tab={tab} />} side="right" delay={600}>
           <button
             type="button"
             onPointerDown={startDrag}
@@ -297,10 +338,11 @@ export function TabRow({ tab, active, folders, moves, context, indent, onOpen, t
                 </>}
             <span className="flex shrink-0 items-center group-hover/tab:hidden">{trailing ?? <TabState tab={tab} />}</span>
           </button>
+          </Hint>
           <button
             type="button"
-            aria-label={`Archive ${tab.title}`}
-            title="Archive tab"
+            aria-label={`Close ${tab.title}`}
+            title="Close tab"
             onClick={() => moves.archive(tab.ref)}
             className="absolute top-1/2 right-1.5 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md text-foreground/45 hover:bg-foreground/[0.1] hover:text-foreground focus-visible:flex group-hover/tab:flex [&_svg]:size-3.5"
           >

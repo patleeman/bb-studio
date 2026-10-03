@@ -29,9 +29,9 @@ export function ProviderBadge({ providerId, label, className }: { providerId: st
 }
 
 /** A short tooltip in BB's style, for faces and icon-only controls. */
-export function Hint({ label, children, side = "bottom" }: { label: ReactNode; children: ReactNode; side?: "top" | "bottom" | "left" | "right" }) {
+export function Hint({ label, children, side = "bottom", delay = 250 }: { label: ReactNode; children: ReactNode; side?: "top" | "bottom" | "left" | "right"; delay?: number }) {
   return (
-    <Tooltip.Provider delayDuration={250}>
+    <Tooltip.Provider delayDuration={delay}>
       <Tooltip.Root>
         <Tooltip.Trigger asChild>{children}</Tooltip.Trigger>
         <Tooltip.Portal>
