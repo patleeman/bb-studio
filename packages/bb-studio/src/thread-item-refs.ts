@@ -11,6 +11,26 @@ interface InputEvent {
   data: unknown;
 }
 
+/** Known mention namespaces; unknown add-ons may have colons in their item IDs. */
+const ITEM_MENTION_PROVIDERS: Record<string, readonly string[]> = {
+  pages: ["page"],
+  excalidraw: ["drawing"],
+  artifacts: ["artifact"],
+  talk: ["recordings"],
+  "studio-tasks": ["task"],
+  "studio-tables": ["table"],
+  "bot-teams": ["bot", "views"],
+};
+
+function mentionRef(pluginId: string, wireId: string): Ref | null {
+  if (pluginId === "studio-chat") {
+    const match = /^item:([a-z0-9-]+):(.+)$/.exec(wireId);
+    return match ? { pluginId: match[1]!, id: match[2]! } : null;
+  }
+  const prefix = ITEM_MENTION_PROVIDERS[pluginId]?.find((provider) => wireId.startsWith(`${provider}:`));
+  return { pluginId, id: prefix ? wireId.slice(prefix.length + 1) : wireId };
+}
+
 /** The first composer input of a new thread, or null before it's saved. */
 function firstInput(events: readonly InputEvent[]): InputPart[] | null {
   return events.map((event) => {
@@ -49,7 +69,10 @@ export function firstThreadItemRefs(events: readonly InputEvent[]): Ref[] | null
     }
     if (Array.isArray(part.mentions)) for (const mention of part.mentions) {
       const resource = (mention as { resource?: { kind?: string; pluginId?: string; itemId?: string } })?.resource;
-      if (resource?.kind === "plugin" && resource.pluginId && resource.itemId) add(resource.pluginId, resource.itemId);
+      if (resource?.kind === "plugin" && typeof resource.pluginId === "string" && typeof resource.itemId === "string") {
+        const ref = mentionRef(resource.pluginId, resource.itemId);
+        if (ref) add(ref.pluginId, ref.id);
+      }
     }
   }
   return [...found.values()];
