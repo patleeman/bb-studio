@@ -19,8 +19,8 @@ const savePick = (projectId: string, botId: string | null) =>
  * the bot's model and permissions, which can still be changed before sending,
  * and attaches when the first message is sent.
  *
- * A new thread's pick, and the bot a thread works as, show beside the model
- * picker; otherwise the control waits in the composer's ⋯ menu.
+ * A new thread's pick, and the bot a thread works as, show in the composer's
+ * action row; otherwise the control waits in the ⋯ menu under it.
  */
 export function ProfilePicker() {
   const [triggerRef, side] = useComposerMoreSide();
