@@ -520,15 +520,15 @@
   div:has(> p):has(> [data-icon-root]) {
   display: none;
 }
-/* BB marks its macOS header actions as no-drag. Channels fill that action area,
+/* BB marks its macOS header actions as no-drag. A channel header fills that area,
    so restore window dragging there and carve out the controls. */
 [data-testid="app-page-header-content-row"]
-  > div[class~="[app-region:no-drag]"]:has(.channel-header) {
+  > div[class~="[app-region:no-drag]"]:has([data-view-header]) {
   app-region: drag;
   -webkit-app-region: drag;
 }
 [data-testid="app-page-header-content-row"]
-  > div[class~="[app-region:no-drag]"]:has(.channel-header)
+  > div[class~="[app-region:no-drag]"]:has([data-view-header])
   :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"]) {
   app-region: no-drag;
   -webkit-app-region: no-drag;
