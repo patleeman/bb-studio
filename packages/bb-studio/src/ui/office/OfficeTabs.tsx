@@ -10,14 +10,14 @@ import {
   type PluginThreadListProps,
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@bb-studio/kit/app";
-import { useMemo, type ReactNode } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { openCommandBar } from "./CommandBar";
-import { useTabDragState, zoneKey } from "./tabDrag";
+import { folderTargetAt, useTabDrag, useTabDragState, zoneKey, type DropTarget } from "./tabDrag";
 import { useLocationHref } from "./location";
 import { requestCount, setCurrentSpaceId, useInboxCounts, useSpaces } from "./model";
 import { openOffice } from "./routes";
-import { TAB, TabRow, openTab, type TabMoves } from "./TabRow";
+import { DropLine, TAB, TabRow, openTab, type TabMoves } from "./TabRow";
 import { isTabActive, useTabActions, useTabs, useTrackOpen, type ShownTab, type TabFolder, type TabZone } from "./tabs";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE, cn } from "./styles";
 
@@ -55,32 +55,81 @@ function DragGhost() {
   );
 }
 
-function FolderRow({ folder, onToggle, onRename, onDelete }: { folder: TabFolder; onToggle: () => void; onRename: () => void; onDelete: () => void }) {
+/** Names a folder in place, like renaming a tab: Enter saves, Escape or an empty name cancels. */
+function FolderNameField({ initial, onDone }: { initial: string; onDone: (name: string | null) => void }) {
+  const [value, setValue] = useState(initial);
+  const input = useRef<HTMLInputElement>(null);
+  useEffect(() => { input.current?.select(); }, []);
+  const finish = (save: boolean) => onDone(save && value.trim() ? value.trim() : null);
+  return (
+    <div className={cn(TAB, "bg-sidebar-accent")}>
+      <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center text-subtle-foreground [&_svg]:size-4"><Icon name="Folder" /></span>
+      <input
+        ref={input}
+        aria-label="Folder name"
+        placeholder="Folder name"
+        value={value}
+        maxLength={100}
+        onChange={(change) => setValue(change.target.value)}
+        onBlur={() => finish(true)}
+        onKeyDown={(key) => {
+          if (key.key === "Enter") finish(true);
+          if (key.key === "Escape") finish(false);
+        }}
+        className="h-6 min-w-0 flex-1 rounded-sm bg-background px-1 text-sm font-medium outline-none ring-1 ring-ring"
+      />
+    </div>
+  );
+}
+
+/**
+ * A Pinned folder, as in Arc: click to open or close, drop tabs on it to file
+ * them, drag it to reorder, right-click to rename or remove.
+ */
+function FolderRow({ folder, renaming, onToggle, onRename, onStartRename, onDelete, onMove }: {
+  folder: TabFolder;
+  renaming: boolean;
+  onToggle: () => void;
+  onRename: (name: string | null) => void;
+  onStartRename: () => void;
+  onDelete: () => void;
+  onMove: (index: number) => void;
+}) {
   const drag = useTabDragState();
+  const ref = `folder:${folder.id}`;
   const here = !!drag?.target && !drag.target.beside && drag.target.zoneKey === zoneKey("pinned", folder.id);
+  const beside = drag?.target?.beside?.ref === ref ? drag.target.beside : null;
+  const drop = useCallback((target: DropTarget) => onMove(target.index), [onMove]);
+  const startDrag = useTabDrag({ ref, title: folder.name }, drop, undefined, folderTargetAt);
+  if (renaming) return <FolderNameField initial={folder.name} onDone={onRename} />;
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <button
-          type="button"
-          onClick={onToggle}
-          aria-expanded={folder.open}
-          data-tab-drop-zone=""
-          data-zone="pinned"
-          data-folder={folder.id}
-          data-at="end"
-          className={cn(TAB, here && "bg-sidebar-accent ring-1 ring-ring")}
-        >
-          <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center text-subtle-foreground [&_svg]:size-4">
-            <Icon name={folder.open ? "FolderOpen" : "Folder"} />
-          </span>
-          <span className="min-w-0 flex-1 truncate font-medium">{folder.name}</span>
-          <Icon name={folder.open ? "ChevronDown" : "ChevronRight"} aria-hidden className="size-3.5 shrink-0 text-subtle-foreground" />
-        </button>
+        <div className={cn("relative", drag?.ref === ref && "opacity-40")} data-tab-folder-row="" data-folder={folder.id}>
+          {beside ? <DropLine after={beside.after} /> : null}
+          <button
+            type="button"
+            onPointerDown={startDrag}
+            onClick={onToggle}
+            onDoubleClick={onStartRename}
+            aria-expanded={folder.open}
+            data-tab-drop-zone=""
+            data-zone="pinned"
+            data-folder={folder.id}
+            data-at="end"
+            className={cn(TAB, here && "bg-sidebar-accent ring-1 ring-ring")}
+          >
+            <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center text-subtle-foreground [&_svg]:size-4">
+              <Icon name={folder.open ? "FolderOpen" : "Folder"} />
+            </span>
+            <span className="min-w-0 flex-1 truncate font-medium">{folder.name}</span>
+            <Icon name={folder.open ? "ChevronDown" : "ChevronRight"} aria-hidden className="size-3.5 shrink-0 text-subtle-foreground" />
+          </button>
+        </div>
       </ContextMenu.Trigger>
       <ContextMenu.Portal>
         <ContextMenu.Content {...PORTAL_SCOPE} className={MENU}>
-          <ContextMenu.Item onSelect={onRename} className={MENU_ITEM}><Icon name="Edit" aria-hidden />Rename</ContextMenu.Item>
+          <ContextMenu.Item onSelect={onStartRename} className={MENU_ITEM}><Icon name="Edit" aria-hidden />Rename</ContextMenu.Item>
           <ContextMenu.Separator className={MENU_SEPARATOR} />
           <ContextMenu.Item onSelect={onDelete} className={MENU_ITEM}><Icon name="FolderMinus" aria-hidden />Remove folder (keeps its tabs)</ContextMenu.Item>
         </ContextMenu.Content>
@@ -163,7 +212,10 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
   const knownHrefs = useMemo(() => new Set(all.flatMap((tab) => (tab.href ? [tab.href] : []))), [all]);
   useTrackOpen(spaceId, activeThreadId, knownHrefs, knownRefs, tabs.refresh);
 
-  const moves: TabMoves = actions;
+  // A folder being named in place: a new one (filing `withRef` when set), or a rename.
+  const [naming, setNaming] = useState<{ withRef?: string } | null>(null);
+  const [renaming, setRenaming] = useState<string | null>(null);
+  const moves: TabMoves = useMemo(() => ({ ...actions, newFolder: (withRef: string) => setNaming({ withRef }) }), [actions]);
   const open = (tab: ShownTab, options: { split: boolean }) => { openTab(tab, threadActions, options); onNavigate(); };
   const row = (tab: ShownTab, indent = false) => (
     <TabRow key={tab.ref} tab={tab} indent={indent} active={isTabActive(tab, activeThreadId, locationHref)} folders={tabs.folders} moves={moves} onOpen={open} />
@@ -171,12 +223,24 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
 
   const loose = tabs.pinned.filter((tab) => !tab.folderId);
   const folders = [...tabs.folders].sort((a, b) => a.position - b.position);
-  // While a tab is dragged, Pinned shows even when empty, so there's somewhere to pin it.
-  const dragging = useTabDragState() !== null;
 
   return (
     <div className="flex min-h-full flex-col px-2">
-      {loose.length || folders.length || dragging ? <Divider label="Pinned" zone="pinned" /> : null}
+      <Divider
+        label="Pinned"
+        zone="pinned"
+        action={
+          <button
+            type="button"
+            aria-label="New folder"
+            title="New folder"
+            onClick={() => setNaming({})}
+            className="inline-flex size-5 items-center justify-center rounded text-subtle-foreground opacity-0 hover:bg-sidebar-accent hover:text-foreground focus-visible:opacity-100 group-hover/divider:opacity-100 [&_svg]:size-3.5"
+          >
+            <Icon name="FolderPlus" />
+          </button>
+        }
+      />
       <div className="space-y-px">
         {/* Loose tabs first, so dropping on "Pinned" lands right under it. */}
         {loose.map((tab) => row(tab))}
@@ -184,13 +248,22 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
           <div key={folder.id} className="space-y-px">
             <FolderRow
               folder={folder}
+              renaming={renaming === folder.id}
               onToggle={() => actions.updateFolder(folder.id, { open: !folder.open })}
-              onRename={() => { const name = prompt("Folder name", folder.name)?.trim(); if (name && name !== folder.name) actions.updateFolder(folder.id, { name }); }}
+              onStartRename={() => setRenaming(folder.id)}
+              onRename={(name) => { setRenaming(null); if (name && name !== folder.name) actions.updateFolder(folder.id, { name }); }}
               onDelete={() => actions.deleteFolder(folder.id)}
+              onMove={(position) => actions.updateFolder(folder.id, { position })}
             />
             {folder.open ? tabs.pinned.filter((tab) => tab.folderId === folder.id).map((tab) => row(tab, true)) : null}
           </div>
         ))}
+        {naming
+          ? <FolderNameField initial="" onDone={(name) => { setNaming(null); if (name) actions.createFolder(name, naming.withRef); }} />
+          : null}
+        {!loose.length && !folders.length && !naming
+          ? <p data-tab-drop-zone="" data-zone="pinned" data-at="end" className="px-2.5 py-1.5 text-xs text-subtle-foreground">Drag tabs here to keep them.</p>
+          : null}
       </div>
 
       <Divider

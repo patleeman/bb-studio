@@ -10,6 +10,8 @@ struct TabsTab: View {
     @Environment(OfficeContext.self) private var office
     @State private var query = ""
     @State private var addingBot = false
+    @State private var namingFolder = false
+    @State private var folderName = ""
 
     var body: some View {
         NavigationStack(path: $app.path) {
@@ -29,6 +31,7 @@ struct TabsTab: View {
                         Button { app.push(.officeHome) } label: { Label("Home", systemImage: "house") }
                         Button { app.push(.officeTeam) } label: { Label("Team", systemImage: "person.2") }
                         Button { app.push(.studioCollection) } label: { Label("Library", systemImage: "square.stack") }
+                        Button { folderName = ""; namingFolder = true } label: { Label("New Folder", systemImage: "folder.badge.plus") }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -39,6 +42,14 @@ struct TabsTab: View {
             .navigationBarTitleDisplayMode(.inline)
             .searchable(text: $query, prompt: "Search or open")
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
+            .alert("New Folder", isPresented: $namingFolder) {
+                TextField("Name", text: $folderName)
+                Button("Cancel", role: .cancel) {}
+                Button("Create") {
+                    let name = folderName.trimmingCharacters(in: .whitespaces)
+                    if !name.isEmpty { Task { await office.tabs?.createFolder(name: name) } }
+                }
+            } message: { Text("A folder in Pinned. Drag tabs onto it.") }
             .sheet(isPresented: $addingBot) {
                 if let space = office.currentSpace { AddBotSheet(space: space) }
             }
@@ -133,6 +144,14 @@ private struct TabsList: View {
 }
 
 extension TabsStore {
+    /// Makes a Pinned folder and files a tab in it, like "New Folder…" on the web.
+    func createFolder(name: String, filing ref: String) async {
+        await createFolder(name: name)
+        if let folder = folders.filter({ $0.name == name }).max(by: { $0.position < $1.position }) {
+            await move(ref, to: .pinned, folderId: folder.id)
+        }
+    }
+
     /// Drops a dragged tab just before `target`, or first in its list (last
     /// for Essentials and folders, which grow at the end).
     func drop(_ ref: String, zone: OfficeTabZone, folderId: String? = nil, before target: String? = nil) async {
@@ -282,6 +301,8 @@ private struct TabRow: View {
     @EnvironmentObject private var app: AppModel
     let store: TabsStore
     let tab: OfficeTab
+    @State private var namingFolder = false
+    @State private var folderName = ""
 
     var body: some View {
         let title = store.title(for: tab)
@@ -323,20 +344,27 @@ private struct TabRow: View {
                 Label(tab.zone == .pinned ? "Unpin" : "Pin", systemImage: tab.zone == .pinned ? "pin.slash" : "pin")
             }
             Button { Task { await store.move(tab.ref, to: .essential) } } label: { Label("Add to Essentials", systemImage: "star") }
-            if !store.folders.isEmpty || tab.folderId != nil {
-                Menu {
-                    ForEach(store.folders.filter { $0.id != tab.folderId }) { folder in
-                        Button(folder.name) { Task { await store.move(tab.ref, to: .pinned, folderId: folder.id) } }
-                    }
-                    if tab.folderId != nil {
-                        Button { Task { await store.move(tab.ref, to: .pinned) } } label: { Label("Out of Folder", systemImage: "arrow.up") }
-                    }
-                } label: { Label("Move to Folder", systemImage: "folder") }
-            }
+            Menu {
+                ForEach(store.folders.filter { $0.id != tab.folderId }) { folder in
+                    Button(folder.name) { Task { await store.move(tab.ref, to: .pinned, folderId: folder.id) } }
+                }
+                if tab.folderId != nil {
+                    Button { Task { await store.move(tab.ref, to: .pinned) } } label: { Label("Out of Folder", systemImage: "arrow.up") }
+                }
+                Button { folderName = ""; namingFolder = true } label: { Label("New Folder…", systemImage: "folder.badge.plus") }
+            } label: { Label("Move to Folder", systemImage: "folder") }
             CopyLinkButton(tab: tab, title: title)
             Divider()
             Button { Task { await store.archive(tab.ref) } } label: { Label("Archive Tab", systemImage: "archivebox") }
         }
+        .alert("New Folder", isPresented: $namingFolder) {
+            TextField("Name", text: $folderName)
+            Button("Cancel", role: .cancel) {}
+            Button("Create") {
+                let name = folderName.trimmingCharacters(in: .whitespaces)
+                if !name.isEmpty { Task { await store.createFolder(name: name, filing: tab.ref) } }
+            }
+        } message: { Text("“\(title)” goes in it.") }
     }
 }
 

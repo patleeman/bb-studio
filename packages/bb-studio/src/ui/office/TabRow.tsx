@@ -84,7 +84,8 @@ export function openTab(tab: ShownTab, threadActions: ReturnType<typeof useSideb
 export interface TabMoves {
   move: (ref: string, zone: TabZone, options?: { folderId?: string | null; index?: number }) => void;
   archive: (ref: string) => void;
-  newFolder: (name: string) => void;
+  /** Starts naming a new Pinned folder in place; the tab goes in it. */
+  newFolder: (withRef: string) => void;
 }
 
 interface Action { id: string; label: string; icon: string; danger?: boolean; run: () => void }
@@ -137,7 +138,7 @@ function useTabMenu(tab: ShownTab, folders: readonly TabFolder[], moves: TabMove
   const folderMoves: Action[] = [
     ...folders.filter((folder) => folder.id !== tab.folderId).map((folder) => ({ id: folder.id, label: folder.name, icon: "Folder", run: () => moves.move(tab.ref, "pinned", { folderId: folder.id }) })),
     ...(tab.folderId ? [{ id: "out", label: "Out of folder", icon: "ArrowUp", run: () => moves.move(tab.ref, "pinned", { folderId: null }) }] : []),
-    { id: "new", label: "New folder…", icon: "Plus", run: () => { const name = prompt("Folder name")?.trim(); if (name) moves.newFolder(name); } },
+    { id: "new", label: "New folder…", icon: "Plus", run: () => moves.newFolder(tab.ref) },
   ];
   return { groups, folderMoves };
 }

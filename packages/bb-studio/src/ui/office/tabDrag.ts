@@ -80,7 +80,13 @@ function targetAt(x: number, y: number, dragged: string): DropTarget | null {
  * that never moves past a few pixels stays a click. `onPointerDown` from BB's
  * split support runs first, so dragging a thread out to the page still splits.
  */
-export function useTabDrag(tab: { ref: string; title: string }, onDrop: (target: DropTarget) => void, hostPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void) {
+export function useTabDrag(
+  tab: { ref: string; title: string },
+  onDrop: (target: DropTarget) => void,
+  hostPointerDown?: (event: ReactPointerEvent<HTMLElement>) => void,
+  /** Finds the drop target instead of the tab rules; folders use their own. */
+  resolve: (x: number, y: number, dragged: string) => DropTarget | null = targetAt,
+) {
   return useCallback((event: ReactPointerEvent<HTMLElement>) => {
     hostPointerDown?.(event);
     if (event.button !== 0 || event.pointerType === "touch") return;
@@ -97,7 +103,7 @@ export function useTabDrag(tab: { ref: string; title: string }, onDrop: (target:
       }
       const box = sidebar?.getBoundingClientRect();
       const outside = !!box && (moved.clientX > box.right || moved.clientX < box.left);
-      state = { ref: tab.ref, title: tab.title, x: moved.clientX, y: moved.clientY, outside, target: outside ? null : targetAt(moved.clientX, moved.clientY, tab.ref) };
+      state = { ref: tab.ref, title: tab.title, x: moved.clientX, y: moved.clientY, outside, target: outside ? null : resolve(moved.clientX, moved.clientY, tab.ref) };
       emit();
     };
     const finish = (commit: boolean) => {
@@ -126,5 +132,22 @@ export function useTabDrag(tab: { ref: string; title: string }, onDrop: (target:
     window.addEventListener("pointerup", up);
     window.addEventListener("pointercancel", cancel);
     window.addEventListener("keydown", key);
-  }, [tab.ref, tab.title, onDrop, hostPointerDown]);
+  }, [tab.ref, tab.title, onDrop, hostPointerDown, resolve]);
+}
+
+/**
+ * Where a dragged folder would go: before or after the folder under the
+ * pointer. `index` is its position among the other folders; `folderId` is the
+ * folder it lands beside. Folders are marked [data-tab-folder-row][data-folder].
+ */
+export function folderTargetAt(x: number, y: number, dragged: string): DropTarget | null {
+  const row = document.elementFromPoint(x, y)?.closest<HTMLElement>("[data-tab-folder-row]");
+  const id = row?.dataset.folder;
+  if (!row || !id || `folder:${id}` === dragged) return null;
+  const others = [...document.querySelectorAll<HTMLElement>("[data-tab-folder-row]")]
+    .map((folder) => folder.dataset.folder!)
+    .filter((folder) => `folder:${folder}` !== dragged);
+  const box = row.getBoundingClientRect();
+  const after = y > box.top + box.height / 2;
+  return { zone: "pinned", folderId: id, index: others.indexOf(id) + (after ? 1 : 0), beside: { ref: `folder:${id}`, after }, zoneKey: "folders" };
 }

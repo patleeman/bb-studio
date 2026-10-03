@@ -112,10 +112,18 @@ export function useTabActions(spaceId: string | null, refresh: () => void) {
     move: (ref: string, zone: TabZone, options: { folderId?: string | null; index?: number } = {}) => run("tabs_move", { spaceId, ref, zone, ...options }),
     archive: (ref: string) => run("tabs_move", { spaceId, ref, zone: "archived" }),
     open: (ref: string) => run("tabs_open", { spaceId, ref }),
-    newFolder: (name: string) => run("tab_folder_create", { spaceId, name }),
-    updateFolder: (folderId: string, patch: { name?: string; open?: boolean }) => run("tab_folder_update", { folderId, ...patch }),
+    /** Makes a Pinned folder, then files `withRef` in it when given. */
+    createFolder: (name: string, withRef?: string) => {
+      void call("tab_folder_create", { spaceId, name })
+        .then(async (result) => {
+          const { folder } = result as { folder: TabFolder };
+          if (withRef) await call("tabs_move", { spaceId, ref: withRef, zone: "pinned", folderId: folder.id });
+        })
+        .then(refresh, refresh);
+    },
+    updateFolder: (folderId: string, patch: { name?: string; open?: boolean; position?: number }) => run("tab_folder_update", { folderId, ...patch }),
     deleteFolder: (folderId: string) => run("tab_folder_delete", { folderId }),
-  }), [run, spaceId]);
+  }), [run, spaceId, call, refresh]);
 }
 
 /**
