@@ -161,8 +161,11 @@ survive a reload.
 
 The native companion host is being implemented in BB as part of the
 [full-suite delivery](../../docs/unified-workbench.md). Until that host ships,
-stable BB retains the same live view through Float, main placement, split,
-and swap. Its companion outlet lives in the main area; the native right
+stable BB retains the same live view through Float, main placement and swap.
+It can split a companion beside an ordinary main view. Stable BB currently
+reuses an existing Companions pane when opening another; Move to split is
+disabled in that case to preserve the two views. The saved core patch fixes
+that routing limitation. Its companion outlet lives in the main area; the native right
 workbench still requires the host capability. Plugin SDK pins remain
 compatible with stable; the suite detects native hosting when it is present.
 

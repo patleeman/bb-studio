@@ -75,3 +75,5 @@ export function LegacyCompanionOutlet({ id }: { id: string }) {
     {!owns ? <button className="m-auto rounded-md border border-border px-3 py-2 text-sm" onClick={focus}>Show companion here</button> : null}
   </div>;
 }
+
+export const useLegacyMainOutletPresent = () => useSyncExternalStore(subscribe, () => outlets.size > 0, () => false);

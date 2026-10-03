@@ -27,7 +27,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject, type ComponentProps } from "react";
 import { update } from "./store";
 import { RetainedView } from "./RetainedView";
-import { LegacyCompanionView } from "./LegacyCompanion";
+import { LegacyCompanionView, useLegacyMainOutletPresent } from "./LegacyCompanion";
 import { focusCompanion } from "./focus";
 import { mainCompanionPath, mainTarget, swapCompanions } from "./placements";
 import {
@@ -297,6 +297,8 @@ function TabStrip({ state }: { state: FloatState }) {
 }
 
 function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
+  const legacyMainPresent = useLegacyMainOutletPresent();
+  const splitBlocked = !companionWorkbenchAvailable() && legacyMainPresent;
   const { open, anchor } = useOpenTarget();
   const navigate = useBbNavigate();
   const move = (place: "main" | "split") => {
@@ -331,7 +333,7 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
           <DropdownMenuItem onSelect={() => move("main")}>
             <Icon name="Maximize2" className="size-4" /> Move to main view
           </DropdownMenuItem>
-          <DropdownMenuItem onSelect={() => move("split")}>
+          <DropdownMenuItem disabled={splitBlocked} title={splitBlocked ? "This BB version reuses an existing Companions pane. Split beside an ordinary main view instead." : undefined} onSelect={() => move("split")}>
             <Icon name="Columns2" className="size-4" /> Move to split
           </DropdownMenuItem>
           {main && floatWindowKey(main) !== active.key ? (
