@@ -22,16 +22,18 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
       db.prepare("DELETE FROM explore_jobs WHERE id = ?").run(jobId);
       db.prepare("DELETE FROM explore_explainers WHERE id = ?").run(id);
       db.close();
-      if (page) await pluginRpc("pages", "delete", { id: page.id });
+      if (page) await pluginRpc("pages", "remove", { id: page.id });
       await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1'); delete window.bbExploreFrame; delete window.bbExploreScroll`).catch(() => {});
     };
     try {
       const html = '<!doctype html><html><head><style>body{font:16px system-ui;margin:28px;color:#19383d;background:#f6faf9}h1{font-size:28px}section{margin:24px 0;padding:18px;border:1px solid #b9cdca;border-radius:10px}code{font-size:14px}</style></head><body><h1>How the upload queue retries</h1><p>A saved explainer from the Orbit demo repository.</p><section><h2>1. Queue an upload</h2><p>The oldest pending upload runs first.</p></section><section><h2>2. Retry after a failure</h2><p>The worker waits before its next attempt.</p><code>delay = min(base × 2 ** attempt, cap)</code></section><section><h2>3. Keep the delay in milliseconds</h2><p>The timeout and its cap use the same unit.</p></section></body></html>';
-      ({ page } = await pluginRpc("pages", "create", { title: label, projectId, markdown: `\`\`\`html\n${html}\n\`\`\`` }));
+      ({ page } = await pluginRpc("pages", "create", { title: label, projectId, parentId: null, markdown: `\`\`\`html\n${html}\n\`\`\`` }));
       db.prepare("INSERT INTO explore_explainers (id,key,thread_id,message_id,emoji,label,project_id,status,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?)")
         .run(id, id, threadId, `msg_capture_${id}`, "🏗️", label, projectId, "generating", now, now);
       db.prepare("INSERT INTO explore_jobs (id,explainer_id,kind,status,label,detail,progress,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?)")
         .run(jobId, id, "generate", "writing", "Writing", "Investigating the upload queue", 45, now, now);
+      const seeded = await pluginRpc("explore", "explainers", {});
+      if (!seeded.explainers.some(explainer => explainer.id === id)) throw new Error("Explore's live RPC cannot read its seeded fixture");
       await client.navigate("/plugins/explore/explainers");
       await client.waitForText(label);
       await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);

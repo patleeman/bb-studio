@@ -56,10 +56,11 @@ function ThreadExplainers({ threadId }: { threadId?: string }) {
   const navigate = useBbNavigate();
   useMinuteTick();
   const [explainers, setExplainers] = useState<ExplainerView[] | null>(null);
+  const [error, setError] = useState<string | null>(null);
   const load = useCallback(() => {
-    rpc.call("explainers", { threadId, limit: 100 }).then(
-      (result) => setExplainers(result.explainers),
-      () => setExplainers((current) => current ?? []),
+    rpc.call("explainers", { ...(threadId ? { threadId } : {}), limit: 100 }).then(
+      (result) => { setExplainers(result.explainers); setError(null); },
+      (failure: unknown) => setError(errorMessage(failure)),
     );
   }, [rpc, threadId]);
   useEffect(load, [load]);
@@ -67,6 +68,7 @@ function ThreadExplainers({ threadId }: { threadId?: string }) {
     const event = explainerEvent(payload);
     if (event && (!threadId || event.threadId === threadId)) load();
   });
+  if (error) return <PanelMessage title="Couldn't load explainers" detail={error}><button type="button" className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-state-hover" onClick={load}>Retry</button></PanelMessage>;
   if (explainers === null) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
   if (!explainers.length) {
     return <PanelMessage title={threadId ? "Nothing explored in this thread yet" : "Nothing explored yet"} detail="Click a finding under an answer to write a page explaining it." />;
