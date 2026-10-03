@@ -225,10 +225,10 @@ export function PersistenceBadge({ connection }: { connection: PageConnection | 
         {text}{detail ? ` · ${detail}` : ""}
       </span>
       {(failed || connection.status === "offline") ? (
-        <button type="button" className="underline" onClick={() => connection.retrySave()}>{missing ? "Retry local recovery" : "Retry save"}</button>
+        <button type="button" className="min-h-11 rounded-md px-2 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" onClick={() => connection.retrySave()}>{missing ? "Retry local recovery" : "Retry save"}</button>
       ) : null}
       {failed || missing || connection.serverSave !== "confirmed" ? (
-        <button type="button" className="underline" title="Downloads a .yjs recovery file preserving blocks and comments. This is not a Markdown document." onClick={() => connection.exportRecovery()}>Download recovery file (.yjs)</button>
+        <button type="button" className="min-h-11 rounded-md px-2 underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring" title="Downloads a .yjs recovery file preserving blocks and comments. This is not a Markdown document." onClick={() => connection.exportRecovery()}>Download recovery file (.yjs)</button>
       ) : null}
     </span>
   );
