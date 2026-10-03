@@ -160,7 +160,7 @@ export const rpcContract = defineRpcContract({
   create: {
     input: z.object({
       title: z.string().trim().max(300),
-      description: z.string().max(20_000).optional(),
+      description: z.string().max(64_000).optional(),
       status: statusSchema.optional(),
       /** Without one, the project's main board. */
       boardId: idSchema.optional(),
@@ -175,7 +175,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({
       id: idSchema,
       title: z.string().trim().max(300).optional(),
-      description: z.string().max(20_000).optional(),
+      description: z.string().max(64_000).optional(),
       /** Puts the task, and its subtasks, on another board. */
       boardId: idSchema.optional(),
       projectId: projectIdSchema.nullable().optional(),
@@ -1026,7 +1026,7 @@ export default async function plugin(bb: BbPluginApi) {
     parameters: z.object({
       title: z.string().trim().min(1).max(300),
       boardId: boardIdSchema.optional(),
-      description: z.string().max(20_000).optional(),
+      description: z.string().max(64_000).optional(),
       status: statusSchema.optional(),
       due: z.string().optional().describe("A day, like 2026-10-01."),
       assignee: assigneeSchema.optional().describe('"me", "agent", or "bot:<id>".'),
@@ -1059,7 +1059,7 @@ export default async function plugin(bb: BbPluginApi) {
       status: statusSchema.optional(),
       note: z.string().max(2000).optional(),
       title: z.string().trim().min(1).max(300).optional(),
-      description: z.string().max(20_000).optional(),
+      description: z.string().max(64_000).optional(),
       due: z.string().nullable().optional(),
       priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.nullable().optional(),
       recurrence: recurrenceSchema.optional(), reminderAt: z.number().int().nonnegative().nullable().optional(),

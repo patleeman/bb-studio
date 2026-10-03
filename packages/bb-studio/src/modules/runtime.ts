@@ -1,3 +1,4 @@
+import { officeTrustAgents } from "../office/trust-agents";
 import { ModuleAgents } from "./agents";
 import { moduleSettings } from "./settings";
 import { moduleStatusContract } from "./status";
@@ -36,7 +37,7 @@ export class ModuleRuntime {
   private readonly coreHandlers: PluginRpcHandlers<PluginRpcContract> = {};
 
   private readonly agents: ModuleAgents;
-  constructor(private readonly host: BbPluginApi) { this.agents = new ModuleAgents(host.agents); }
+  constructor(private readonly host: BbPluginApi) { this.agents = new ModuleAgents(officeTrustAgents(host, this.services)); }
 
   private sdk(): BbPluginApi["sdk"] {
     const sdk = this.host.sdk;
