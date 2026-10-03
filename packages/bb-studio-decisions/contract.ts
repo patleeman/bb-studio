@@ -1,18 +1,9 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
-import { publicContract } from "@bb-studio/kit/decisions-contract";
+import { publicContract, modelSelectionSchema } from "@bb-studio/kit/decisions-contract";
 export { publicContract } from "@bb-studio/kit/decisions-contract";
 
-const reasoningLevel = z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]);
-
-const chosenModelSchema = z
-  .object({
-    mode: z.literal("model"),
-    providerId: z.string().trim().min(1).max(100),
-    model: z.string().trim().min(1).max(200),
-    reasoningLevel: reasoningLevel.nullable(),
-  })
-  .strict();
+const chosenModelSchema = modelSelectionSchema.extend({ mode: z.literal("model") });
 /**
  * Which model decides when no Jev provider answers. `thread` uses the
  * caller's provider (the busy thread's, or the bot's) and its default model,

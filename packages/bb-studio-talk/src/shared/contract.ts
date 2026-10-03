@@ -2,6 +2,16 @@
 // the RPC boundary; the frontend imports only the types.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
+import { modelSelectionSchema } from "@bb-studio/kit/decisions-contract";
+
+export const modelPurposeSchema = z.enum(["cleanup", "title", "summary"]);
+export type ModelPurpose = z.infer<typeof modelPurposeSchema>;
+export const modelPreferencesSchema = z.object({
+  cleanup: modelSelectionSchema.nullable(),
+  title: modelSelectionSchema.nullable(),
+  summary: modelSelectionSchema.nullable(),
+});
+export type ModelPreferences = z.infer<typeof modelPreferencesSchema>;
 
 export const recordingStatusSchema = z.enum([
   // A client is capturing audio into this recording.
@@ -80,6 +90,12 @@ const clientId = z.string().regex(/^[a-z0-9]{6,32}$/);
 export const MAX_SEGMENT_BASE64 = 16 * 1024 * 1024;
 
 export const rpcContract = defineRpcContract({
+  "models.get": { input: z.null(), output: modelPreferencesSchema },
+  "models.set": {
+    input: z.object({ purpose: modelPurposeSchema, selection: modelSelectionSchema.nullable() }).strict(),
+    output: modelPreferencesSchema,
+  },
+  "models.suggest": { input: z.null(), output: modelSelectionSchema.nullable() },
   recordings_list: {
     input: z.object({
       query: z.string().max(200).optional(),

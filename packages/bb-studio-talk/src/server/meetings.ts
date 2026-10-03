@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askModel } from "@bb-studio/kit/decisions";
 import { primaryHostId } from "@bb-studio/kit/server";
+import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
 import { meetingNotesSchema, type MeetingNotes } from "../shared/contract";
 
 /** Keep the existing storage/RPC shape so saved recordings and older clients still work. */
@@ -19,7 +20,7 @@ ${transcript}
 """`;
 }
 
-export async function generateRecordingSummary(bb: BbPluginApi, id: string, transcript: string, signal: AbortSignal): Promise<MeetingNotes> {
+export async function generateRecordingSummary(bb: BbPluginApi, id: string, transcript: string, signal: AbortSignal, modelSelection?: ModelSelection | null): Promise<MeetingNotes> {
   const hostId = await primaryHostId(bb);
   if (!hostId) throw new Error("No BB host is available to summarize this recording.");
   const excerpt = transcript.length > 40_000
@@ -28,6 +29,7 @@ export async function generateRecordingSummary(bb: BbPluginApi, id: string, tran
   const result = await askModel(bb, {
     caller: "talk", requestId: `summary:${id}`, hostId, providerId: null,
     prompt: recordingSummaryPrompt(excerpt),
+    ...(modelSelection ? { modelSelection } : {}),
   }, signal);
   if (!result.text) throw new Error("The model returned no recording summary.");
   return parseRecordingSummary(result.text);

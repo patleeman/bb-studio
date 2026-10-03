@@ -1,6 +1,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askTitle, DecisionsUnavailableError } from "@bb-studio/kit/decisions";
 import { primaryHostId } from "@bb-studio/kit/server";
+import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
 import { cleanTitle, titleExcerpt } from "../shared/format";
 
 /** A stable label when Studio Decisions is missing or has no fallback model. */
@@ -22,7 +23,7 @@ ${titleExcerpt(transcript)}
 
 export async function generateTitle(
   bb: BbPluginApi,
-  options: { transcript: string; recordingId: string; createdAt: number },
+  options: { transcript: string; recordingId: string; createdAt: number; modelSelection?: ModelSelection | null },
   signal: AbortSignal,
 ): Promise<string> {
   try {
@@ -34,6 +35,7 @@ export async function generateTitle(
     const result = await askTitle(bb, {
       caller: "talk", requestId: options.recordingId, hostId, providerId,
       prompt: titlePrompt(options.transcript),
+      ...(options.modelSelection ? { modelSelection: options.modelSelection } : {}),
     }, signal);
     return cleanTitle(result) ?? fallbackTitle(options.transcript, options.createdAt);
   } catch (error) {

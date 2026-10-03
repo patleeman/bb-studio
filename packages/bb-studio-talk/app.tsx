@@ -17,8 +17,10 @@ import { TalkOverlay } from "./src/client/overlay";
 import { RecordingsPanel } from "./src/client/recordings-panel";
 import { ComposerBridge } from "./src/client/ComposerBridge";
 import { linkRecordingMentions } from "./src/client/recording-mentions";
+import { ModelSettings } from "./src/client/model-settings";
 
 export default definePluginApp((app) => {
+  app.slots.settingsSection({ id: "models", title: "Models", component: ModelSettings });
   app.contentScripts.register({
     id: "recording-links",
     mount({ signal }) { linkRecordingMentions(openAppPath, signal); },

@@ -193,6 +193,7 @@ export async function runModel(
       input: [{ type: "text", text: prompt, mentions: [] }],
       providerId,
       model,
+      ...(fallback.mode === "model" && fallback.serviceTier ? { serviceTier: fallback.serviceTier } : {}),
       // A classifier needs no deliberation: use the lowest level unless the user chose one.
       reasoningLevel:
         (fallback.mode === "model" && fallback.reasoningLevel) ||

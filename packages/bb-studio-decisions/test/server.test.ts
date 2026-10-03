@@ -1,4 +1,4 @@
-import { test } from "vitest";
+import { test, vi } from "vitest";
 import assert from "node:assert/strict";
 import plugin from "../server";
 import { rpcContract } from "../contract";
@@ -56,3 +56,32 @@ test("dispatch hook passes a message through when Smart Queue is off", async () 
     thread: { id: "thr_1", status: "idle", visibility: "visible", originPluginId: null },
   }), { action: "proceed" });
 });
+
+test("an explicit model overrides an off fallback and retains the chosen execution settings", async () => {
+  const { bb, handlers } = setup();
+  const spawn = vi.fn(async () => ({ id: "temporary" }));
+  const stop = vi.fn(async () => {});
+  const remove = vi.fn(async () => {});
+  Object.assign(bb.sdk, {
+    providers: { list: async () => [{ id: "chosen", available: true, reasoningLevels: [{ id: "low" }], capabilities: { permissionModes: ["accept-edits"] } }] },
+    threads: { spawn, wait: async () => {}, output: async () => ({ output: "Cleaned text" }), stop, delete: remove },
+  });
+  await plugin(bb as never);
+  await handlers["fallback.set"]!({ mode: "off" });
+  const request = {
+    caller: "talk", requestId: "cleanup:one", hostId: "host", prompt: "Clean up", providerId: null,
+    modelSelection: { providerId: "chosen", model: "small", reasoningLevel: "low", serviceTier: "fast" },
+  };
+  const result = await handlers["model.ask"]!(rpcContract["model.ask"].input.parse(request));
+  assert.equal(result.text, "Cleaned text");
+  assert.equal(result.via, "chosen/small");
+  assert.deepEqual(expectSelection(spawn.mock.calls[0]), request.modelSelection);
+  assert.equal(stop.mock.calls.length, 1);
+  assert.equal(remove.mock.calls.length, 1);
+  assert.equal(rpcContract["model.ask"].input.safeParse({ ...request, modelSelection: { ...request.modelSelection, model: " " } }).success, false);
+});
+
+function expectSelection(call: unknown) {
+  const { providerId, model, reasoningLevel, serviceTier } = (call as any[])[0];
+  return { providerId, model, reasoningLevel, serviceTier };
+}

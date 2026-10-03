@@ -233,6 +233,54 @@
                 "type": "null"
               }
             ]
+          },
+          "modelSelection": {
+            "type": "object",
+            "properties": {
+              "providerId": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              "model": {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 200
+              },
+              "reasoningLevel": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "xhigh",
+                      "max",
+                      "ultra",
+                      "ultracode"
+                    ]
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              }
+            },
+            "required": [
+              "providerId",
+              "model",
+              "reasoningLevel"
+            ],
+            "additionalProperties": false
           }
         },
         "required": [
@@ -336,10 +384,6 @@
           {
             "type": "object",
             "properties": {
-              "mode": {
-                "type": "string",
-                "const": "model"
-              },
               "providerId": {
                 "type": "string",
                 "minLength": 1,
@@ -369,13 +413,24 @@
                     "type": "null"
                   }
                 ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "const": "model"
               }
             },
             "required": [
-              "mode",
               "providerId",
               "model",
-              "reasoningLevel"
+              "reasoningLevel",
+              "mode"
             ],
             "additionalProperties": false
           }
@@ -415,10 +470,6 @@
           {
             "type": "object",
             "properties": {
-              "mode": {
-                "type": "string",
-                "const": "model"
-              },
               "providerId": {
                 "type": "string",
                 "minLength": 1,
@@ -448,13 +499,24 @@
                     "type": "null"
                   }
                 ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "const": "model"
               }
             },
             "required": [
-              "mode",
               "providerId",
               "model",
-              "reasoningLevel"
+              "reasoningLevel",
+              "mode"
             ],
             "additionalProperties": false
           }
@@ -492,10 +554,6 @@
           {
             "type": "object",
             "properties": {
-              "mode": {
-                "type": "string",
-                "const": "model"
-              },
               "providerId": {
                 "type": "string",
                 "minLength": 1,
@@ -525,13 +583,24 @@
                     "type": "null"
                   }
                 ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "const": "model"
               }
             },
             "required": [
-              "mode",
               "providerId",
               "model",
-              "reasoningLevel"
+              "reasoningLevel",
+              "mode"
             ],
             "additionalProperties": false
           }
@@ -549,10 +618,6 @@
           {
             "type": "object",
             "properties": {
-              "mode": {
-                "type": "string",
-                "const": "model"
-              },
               "providerId": {
                 "type": "string",
                 "minLength": 1,
@@ -582,13 +647,24 @@
                     "type": "null"
                   }
                 ]
+              },
+              "serviceTier": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "fast"
+                ]
+              },
+              "mode": {
+                "type": "string",
+                "const": "model"
               }
             },
             "required": [
-              "mode",
               "providerId",
               "model",
-              "reasoningLevel"
+              "reasoningLevel",
+              "mode"
             ],
             "additionalProperties": false
           },

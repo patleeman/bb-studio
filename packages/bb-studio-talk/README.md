@@ -209,10 +209,18 @@ The same message at a 390-pixel viewport, with the source pill in view.
 | Segment length (seconds) | 25 | Target piece length, 8–60. Shorter pieces show text sooner. |
 | Auto-title recordings | on | Titles recordings from their transcripts. |
 | Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
-| Title provider | automatic | Provider for titling, such as `codex` or `claude-code`. |
-| Title model | provider default | Model for titling. |
+| Cleanup model | Studio Decisions | Provider, model, reasoning, and supported service tier for dictation and saved-transcript cleanup. |
+| Titles model | Studio Decisions | Model for automatic recording titles. |
+| Summaries model | Studio Decisions | Model for automatic and on-demand summaries. |
 | Hold-to-talk key | Right Option (Alt) | Key to hold for dictation: Right Option, Right Command, Right Control, or Off. |
 | Keep dictation audio (days) | 1 | Deletes a finished dictation's audio after this many days. 0 keeps it. |
+
+Open **Settings → Studio Talk → Models**. Each job can follow Studio Decisions
+or use **A specific model**, selected with BB's provider and model picker.
+Choices apply to the next request and persist across devices and restarts.
+Studio Decisions must be enabled to run either choice. Existing cleaned text,
+titles, and summaries stay as saved. Voice transcription is configured in
+**Settings → AI services**.
 
 ## Commands
 

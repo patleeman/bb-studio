@@ -1,5 +1,5 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { publicContract, type Answers, type Questions } from "./decisions-contract";
+import { publicContract, type Answers, type Questions, type ModelSelection } from "./decisions-contract";
 
 export { publicContract } from "./decisions-contract";
 export type { Answer, Answers, Question, Questions } from "./decisions-contract";
@@ -50,7 +50,7 @@ export function askSystemOne(bb: BbPluginApi, request: { caller: string; state: 
 
 export function askModel(
   bb: BbPluginApi,
-  request: { caller: string; requestId: string; hostId: string; providerId: string | null; prompt: string },
+  request: { caller: string; requestId: string; hostId: string; providerId: string | null; prompt: string; modelSelection?: ModelSelection },
   signal: AbortSignal,
 ) {
   return callRpc<{ ok: true; text: string | null; via: string; ms: number }>(bb, "model.ask", request, publicContract["model.ask"].output, signal);
@@ -59,7 +59,7 @@ export function askModel(
 /** Title prompts use Decisions' configured fallback and the same cleanup as every model request. */
 export async function askTitle(
   bb: BbPluginApi,
-  request: { caller: string; requestId: string; hostId: string; providerId: string | null; prompt: string },
+  request: { caller: string; requestId: string; hostId: string; providerId: string | null; prompt: string; modelSelection?: ModelSelection },
   signal: AbortSignal,
 ): Promise<string | null> {
   return (await askModel(bb, request, signal)).text;

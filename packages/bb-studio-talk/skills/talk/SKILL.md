@@ -105,7 +105,14 @@ or failed. Say so instead of guessing at the missing part.
 | Segment length (seconds) | 25 | Target piece length, 8–60. Shorter shows text sooner. |
 | Automatically summarize recordings | off | Summarizes on completion; the recording menu can summarize on demand. |
 | Auto-title recordings | on | Titles a recording from its transcript through a hidden, short-lived agent thread. |
-| Title provider | automatic | Provider id for titling (for example `codex` or `claude-code`). |
-| Title model | provider default | Model for titling. |
+| Cleanup model | Studio Decisions | Provider and model picker for dictation and saved-transcript cleanup. |
+| Titles model | Studio Decisions | Provider and model picker for automatic titles. |
+| Summaries model | Studio Decisions | Provider and model picker for automatic and on-demand summaries. |
+
+The **Models** section also saves reasoning and the provider's supported service
+tier. Choices apply to future requests across devices. Studio Decisions must be
+enabled; following it uses its fallback model. Voice transcription remains in
+**Settings → AI services**. Segment length accepts 8 to 60 seconds; dictation
+audio retention accepts 0 to 3650 days, with 0 keeping audio forever.
 
 A title the user edited is never replaced.

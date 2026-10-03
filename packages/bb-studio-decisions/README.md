@@ -159,9 +159,12 @@ logs.
   thread in the Personal project and deletes it afterwards. It takes
   `requestId`, `hostId`, `prompt`, and `providerId`, the caller's provider for
   when the fallback follows it.
+  An optional `modelSelection` object (`providerId`, `model`, `reasoningLevel`,
+  optional `serviceTier`) runs the caller's chosen model instead of the fallback,
+  including when the fallback is off. It uses the same temporary-thread cleanup.
 
 Studio Teams uses these methods to choose view recipients. Studio Talk
-uses the fallback model for recording titles. Callers share the typed
+can choose models for transcript cleanup, recording titles, and summaries. Callers share the typed
 `@bb-studio/kit/decisions` client, including its `askTitle` helper.
 
 Both return `{ ok: true, … , via, ms }`, or `{ ok: false, unavailable, error }`.

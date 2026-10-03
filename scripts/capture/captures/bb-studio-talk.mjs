@@ -9,6 +9,48 @@ const scrollToTop = `(() => {
 
 export default ({ projectId, threadId, bbCli, seedTalkRecording, talkRpc, sleep }) => [
   {
+    id: "talk-settings",
+    packageDir: "bb-studio-talk",
+    fileName: "model-settings.png",
+    setup: async (client) => {
+      const original = await talkRpc("models.get", null);
+      const choice = { providerId: "codex", model: "gpt-6-luna", reasoningLevel: "low" };
+      const cleanup = async () => {
+        for (const [purpose, selection] of Object.entries(original)) await talkRpc("models.set", { purpose, selection });
+      };
+      try {
+        await talkRpc("models.set", { purpose: "cleanup", selection: null });
+        await client.navigate("/settings/plugins/talk");
+        await client.waitForSelector("[data-talk-model-settings]");
+        await client.waitForText("Studio Decisions");
+        await client.evaluate(`document.querySelector('[aria-label="Cleanup model source"]').click()`);
+        await client.waitForText("A specific model");
+        await client.evaluate(`[...document.querySelectorAll('[role="option"]')].find(el => el.textContent.includes('A specific model')).click()`);
+        await client.waitForSelector('[data-talk-model-purpose="cleanup"] button[data-state]');
+        // A real catalog choice must have been saved by the settings control.
+        let selected;
+        for (let attempt = 0; attempt < 40; attempt++) {
+          selected = (await talkRpc("models.get", null)).cleanup;
+          if (selected) break;
+          await sleep(250);
+        }
+        if (!selected?.providerId || !selected?.model) throw new Error("Talk's model source picker did not save a catalog choice.");
+        await talkRpc("models.set", { purpose: "cleanup", selection: choice });
+        await client.navigate("/settings/plugins/talk");
+        await client.waitForText("6-Luna");
+        await client.evaluate(`document.querySelector('[data-talk-model-settings]').scrollIntoView({ block: 'center' })`);
+        const text = await client.evaluate(`document.querySelector('[data-talk-model-settings]').innerText`);
+        for (const label of ["Cleanup", "Titles", "Summaries", "A specific model", "6-Luna"]) {
+          if (!text.includes(label)) throw new Error(`Missing Talk model setting: ${label}`);
+        }
+      } catch (error) {
+        await cleanup();
+        throw error;
+      }
+      return cleanup;
+    },
+  },
+  {
     id: "talk-inline",
     packageDir: "bb-studio-talk",
     fileName: "inline-dictation.png",

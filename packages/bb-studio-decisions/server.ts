@@ -212,11 +212,11 @@ export default async function plugin(bb: BbPluginApi) {
   bb.rpc.register(rpcContract, {
     "systemOne.ask": ({ caller, state, questions }) =>
       answer(caller, "Jev", async () => askSystemOne(await config(), { state, questions }, AbortSignal.timeout(60_000))),
-    "model.ask": ({ caller, requestId, hostId, prompt, providerId }) =>
+    "model.ask": ({ caller, requestId, hostId, prompt, providerId, modelSelection }) =>
       answer(caller, "Fallback model", async () =>
         runModel(
           bb,
-          await fallback(),
+          modelSelection ? { mode: "model", ...modelSelection } : await fallback(),
           { projectId: await personalProjectId(bb), hostId, requestId: `${caller} ${requestId}`, defaultProviderId: providerId },
           prompt,
           AbortSignal.timeout(60_000),

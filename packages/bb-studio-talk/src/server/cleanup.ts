@@ -2,6 +2,7 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { askModel } from "@bb-studio/kit/decisions";
 import { primaryHostId } from "@bb-studio/kit/server";
+import type { ModelSelection } from "@bb-studio/kit/decisions-contract";
 
 /** Longer dictations go in as spoken; a model rewrite of that much is slow and hard to check. */
 export const CLEANUP_MAX_CHARS = 12_000;
@@ -38,7 +39,7 @@ export function acceptCleanup(original: string, cleaned: string | null): string 
 /** The cleaned transcript, or null to insert it as spoken. Never throws. */
 export async function cleanTranscript(
   bb: BbPluginApi,
-  options: { recordingId: string; transcript: string; segmentId?: string },
+  options: { recordingId: string; transcript: string; segmentId?: string; modelSelection?: ModelSelection | null },
   signal: AbortSignal,
 ): Promise<string | null> {
   const transcript = options.transcript.trim();
@@ -49,6 +50,7 @@ export async function cleanTranscript(
     const result = await askModel(bb, {
       caller: "talk", requestId: `cleanup:${options.recordingId}${options.segmentId ? `:${options.segmentId}` : ""}`, hostId, providerId: null,
       prompt: cleanupPrompt(transcript),
+      ...(options.modelSelection ? { modelSelection: options.modelSelection } : {}),
     }, signal);
     return acceptCleanup(transcript, result.text);
   } catch (error) {

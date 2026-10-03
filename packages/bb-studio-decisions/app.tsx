@@ -164,6 +164,7 @@ function FallbackModel() {
               providerId: value.providerId,
               model: value.model,
               reasoningLevel: value.reasoningLevel ?? "low",
+              serviceTier: value.serviceTier,
             }}
             onChange={(next) =>
               void save({
@@ -171,6 +172,7 @@ function FallbackModel() {
                 providerId: next.providerId,
                 model: next.model,
                 reasoningLevel: next.reasoningLevel,
+                ...(next.serviceTier ? { serviceTier: next.serviceTier } : {}),
               })
             }
           />

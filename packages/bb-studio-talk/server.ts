@@ -26,6 +26,7 @@ import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
 import { generateRecordingSummary } from "./src/server/meetings";
 import { cleanTranscript } from "./src/server/cleanup";
+import { talkModels } from "./src/server/models";
 import { HOLD_KEY_OPTIONS } from "./src/shared/format";
 
 export type { TalkRpcContract } from "./src/shared/contract";
@@ -53,6 +54,7 @@ export default async function plugin(bb: BbPluginApi) {
       description:
         "Audio is uploaded and transcribed in pieces of about this length, cut at a pause. Shorter pieces stream text sooner; 15–40 works well.",
       default: 25,
+      experimental_schema: z.number().int().min(8).max(60),
     },
     autoTitle: {
       type: "boolean",
@@ -80,6 +82,7 @@ export default async function plugin(bb: BbPluginApi) {
       description:
         "Delete a finished dictation's audio after this many days and keep its transcript. Recordings keep their audio. 0 keeps it forever.",
       default: 1,
+      experimental_schema: z.number().int().min(0).max(3650),
     },
   });
   let config = await settings.get();
@@ -104,6 +107,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   const changed = (id: string) => changeBus.changed(id);
   const services = studioServices(bb.sdk);
+  const models = talkModels(bb);
 
   // Empty recordings are never kept: one that finishes without a word
   // (a mic tapped by accident, silence, noise) is deleted with its audio.
@@ -123,15 +127,16 @@ export default async function plugin(bb: BbPluginApi) {
     const due = store.titleDue(id, TITLE_MIN_CHARS);
     if (!due) return;
     titling.add(id);
-    void generateTitle(
+    void models.get("title").then((modelSelection) => generateTitle(
       bb,
       {
         transcript: store.transcript(id),
         recordingId: id,
         createdAt: store.recording(id)!.createdAt,
+        modelSelection,
       },
       lifetime.signal,
-    )
+    ))
       .then((title) => {
         if (store.rename(id, title, "auto", due.chars)) changed(id);
       })
@@ -153,7 +158,7 @@ export default async function plugin(bb: BbPluginApi) {
     summarizing.add(id);
     try {
       const transcript = store.transcript(id);
-      const notes = await generateRecordingSummary(bb, id, transcript, lifetime.signal);
+      const notes = await generateRecordingSummary(bb, id, transcript, lifetime.signal, await models.get("summary"));
       // A resumed recording may gain text while the model is working.
       if (store.transcript(id) === transcript && store.saveMeetingNotes(id, notes)) changed(id);
     } finally {
@@ -232,6 +237,7 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   bb.rpc.register(rpcContract, {
+    ...models.handlers,
     recordings_list: ({ query, limit }) => ({ recordings: store.list({ query, limit }) }),
     recording_get: ({ id }) => ({ recording: mustGet(id), segments: store.segments(id) }),
     recording_create: ({ kind, projectId, threadId }) => {
@@ -325,7 +331,7 @@ export default async function plugin(bb: BbPluginApi) {
       const recording = mustGet(id);
       if (recording.kind !== "dictation") return { text: null };
       const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)]);
-      return { text: await cleanTranscript(bb, { recordingId: id, transcript: store.transcript(id) }, signal) };
+      return { text: await cleanTranscript(bb, { recordingId: id, transcript: store.transcript(id), modelSelection: await models.get("cleanup") }, signal) };
     },
     recording_cleanup: async ({ id, segmentId }) => {
       const recording = mustGet(id);
@@ -334,8 +340,8 @@ export default async function plugin(bb: BbPluginApi) {
       if (!segment || segment.status !== "done" || !segment.text) throw new Error("This section has no finished transcript.");
       if (segment.cleanedText != null) return { text: segment.cleanedText };
       const signal = AbortSignal.any([lifetime.signal, AbortSignal.timeout(CLEANUP_TIMEOUT_MS)]);
-      const text = await cleanTranscript(bb, { recordingId: id, transcript: segment.text, segmentId }, signal);
-      if (text === null) throw new Error("Cleanup could not finish this section. Check Studio Decisions and try again; your original transcript is saved.");
+      const text = await cleanTranscript(bb, { recordingId: id, transcript: segment.text, segmentId, modelSelection: await models.get("cleanup") }, signal);
+      if (text === null) throw new Error("Cleanup could not finish this section. Check Talk's cleanup model and Studio Decisions, then try again; your original transcript is saved.");
       if (!store.saveCleanup(id, segmentId, segment.text, text)) throw new Error("The recording changed during cleanup. Try again after it finishes.");
       changed(id);
       return { text };

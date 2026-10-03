@@ -37,6 +37,14 @@ export type Answer = z.infer<typeof answerSchema>;
 export type Answers = Record<string, Answer>;
 
 const id = z.string().trim().min(1).max(200);
+/** A caller's explicit choice; omitted requests still use Decisions' fallback. */
+export const modelSelectionSchema = z.object({
+  providerId: z.string().trim().min(1).max(100),
+  model: id,
+  reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]).nullable(),
+  serviceTier: z.enum(["default", "fast"]).optional(),
+}).strict();
+export type ModelSelection = z.infer<typeof modelSelectionSchema>;
 const failure = z.object({ ok: z.literal(false), unavailable: z.boolean(), error: z.string() });
 
 /** Public RPCs owned by Studio Decisions. */
@@ -57,6 +65,7 @@ export const publicContract = defineRpcContract({
     experimental_description: "Ask the configured fallback model in a temporary thread.",
     input: z.object({
       caller: id, requestId: id, hostId: id, prompt: z.string().min(1).max(64_000), providerId: id.nullable(),
+      modelSelection: modelSelectionSchema.optional(),
     }).strict(),
     output: z.discriminatedUnion("ok", [
       z.object({ ok: z.literal(true), text: z.string().nullable(), via: z.string(), ms: z.number() }),
