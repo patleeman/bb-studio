@@ -313,19 +313,13 @@ struct DelegateSheet: View {
     private func submit() {
         guard let botId else { return }
         sending = true
-        var input: [String: JSONValue] = [
-            "botId": .string(botId),
-            "brief": .string(brief.trimmingCharacters(in: .whitespacesAndNewlines)),
-        ]
-        if schedule != "once" { input["schedule"] = .string(schedule) }
-        if let context {
-            input["context"] = .array([.string(context.ref)])
-            if let folderId = context.folderId { input["folderId"] = .string(folderId) }
-        }
+        let text = brief.trimmingCharacters(in: .whitespacesAndNewlines)
         Task {
             defer { sending = false }
             do {
-                _ = try await app.client.officePendingCall("delegate", .object(input))
+                _ = try await app.client.officeDelegate(
+                    botId: botId, brief: text, schedule: OfficeSchedule(rawValue: schedule),
+                    context: context.map { [$0.ref] }, folderId: context?.folderId)
                 dismiss()
             } catch {
                 self.error = BBClient.describe(error)
@@ -334,12 +328,3 @@ struct DelegateSheet: View {
     }
 }
 
-extension BBClient {
-    /// Office RPCs whose contracts land in later backend stages (delegate,
-    /// talk_dm). Dynamic on purpose, so the native inventory treats them as
-    /// runtime-validated until their generated methods exist.
-    func officePendingCall(_ method: String, _ input: JSONValue) async throws -> JSONValue {
-        let plugin = "studio"
-        return try await rpc(plugin, method, input)
-    }
-}
