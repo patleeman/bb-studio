@@ -30,13 +30,47 @@ export const folderSchema = z.object({
 });
 const spaceInput = z.object({ name, icon: z.string().max(100).nullable().optional(), description: z.string().max(500).optional() });
 
+export const workingTaskSchema = z.object({
+  id, botId: id.nullable(), title: z.string(),
+  status: z.enum(["working", "waiting", "review", "done"]),
+  note: z.string().nullable(), recurring: z.string().nullable(), href: z.string(), updatedAt: z.number(),
+});
+export const teamBotSchema = z.object({
+  id, name: z.string(), avatar: z.string().nullable(), role: z.string().nullable(),
+  spaceId: id, model: z.string().nullable(), trust: trustSchema,
+  state: z.enum(["idle", "working", "needs_you"]), activeTaskCount: z.number().int().nonnegative(),
+});
+export const talkConversationSchema = z.object({
+  id, title: z.string(), memberBotIds: z.array(id), isDirect: z.boolean(),
+  needsYou: z.boolean(), unread: z.boolean(), href: z.string(),
+});
+
+/** Published before module integration so web and native clients share one
+ * contract. Registered when the Teams and Tasks services are ready. */
+export const officeTeamContract = defineRpcContract({
+  team_list: { input: z.object({ spaceId: id }), output: z.object({ bots: z.array(teamBotSchema) }) },
+  bot_desk: { input: z.object({ botId: id }), output: z.object({
+    bot: teamBotSchema, tasks: z.array(workingTaskSchema),
+    directConversationId: id.nullable(), directThreadId: id.nullable(), profileHref: z.string(),
+    memory: z.object({ mission: z.string(), memory: z.string() }).nullable(),
+  }) },
+  talk_dm: { input: z.object({ botId: id }), output: z.object({ conversationId: id, threadId: id }) },
+  talk_list: { input: z.object({ spaceId: id }), output: z.object({ conversations: z.array(talkConversationSchema) }) },
+  delegate: { input: z.object({
+    botId: id, brief: z.string().trim().min(1).max(64000),
+    context: z.array(z.string().min(1).max(500)).max(100).optional(), folderId: id.nullable().optional(),
+    schedule: z.enum(["hourly", "daily", "weekdays", "weekly"]).optional(),
+  }), output: z.object({ taskId: id, task: workingTaskSchema }) },
+});
+
 /** Office RPCs use project ownership for Space membership. Legacy camelCase
  * RPCs remain separate while the existing UI is replaced. */
 export const officeContract = defineRpcContract({
   ...inboxContract,
+  ...officeTeamContract,
   home: { input: z.object({ spaceId: id }), output: z.object({
     needsYou: z.array(inboxEventSchema), reports: z.array(inboxEventSchema), recent: z.array(officeItemSchema),
-    working: z.array(z.object({ id, botId: id.nullable(), title: z.string(), status: z.enum(["working", "waiting", "review", "done"]), note: z.string().nullable(), recurring: z.string().nullable(), href: z.string(), updatedAt: z.number() })),
+    working: z.array(workingTaskSchema),
   }) },
   spaces_list: { input: z.object({}), output: z.object({ spaces: z.array(officeSpaceSchema) }) },
   space_create: { input: spaceInput, output: z.object({ space: officeSpaceSchema }) },
