@@ -50,7 +50,7 @@ and the Board, List and Calendar views.
   pages, artifacts, drawings and recordings; and the agent section. The
   header has **Hand off**, **Mark done** / **Reopen**, and a menu with Mark
   done and archive threads, New thread about this (without
-  [Studio Chat](../bb-studio-chat), whose New in Float starts threads),
+  [Studio Chat](../bb-studio-chat), whose Chat menu starts conversations),
   Archive threads, Move to project, Archive task and Delete.
 - **In a thread's side panel** the **Tasks** tab lists the tasks made in that
   thread, then the project's recent ones. **New** makes a task in the
@@ -63,7 +63,10 @@ and the Board, List and Calendar views.
   words ("Agent replied, check its answer", "Agent says it's ready for
   review"), its last note, **Open thread**, and **Send back** to reply with
   feedback, which moves the task back to In progress. Earlier handoffs are
-  listed below it.
+  listed below it. Open thread, earlier handoffs, linked threads, and the
+  handoff confirmation use the shared companion tabs, keeping the task open.
+  Reopening a thread focuses its existing tab. Without Float, they use normal
+  thread navigation.
 - **Studio Teams bots.** Assign a task to a bot and use **Send to bot** to
   create a dedicated channel and post the task there.
 - **Subtasks and recurrence.** A task includes its parent and flat subtask

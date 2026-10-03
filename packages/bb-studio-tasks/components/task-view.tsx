@@ -47,6 +47,7 @@ import {
   type TaskStatus,
 } from "../src/shared";
 import { HandoffPanel } from "./handoff-panel";
+import { openTaskThread } from "./navigation";
 import { ASSIGNEE_OPTIONS, DueChip, STATUS_ICONS } from "./pieces";
 import { SPIN, useTasksRpc, type Board, type Handoff, type Link, type Linkable, type Task, type TaskEvent } from "./types";
 
@@ -64,8 +65,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
   const rpc = useTasksRpc();
   const navigate = useBbNavigate();
   const projects = useProjects();
-  // Studio Chat's New in Float bar starts threads on the task's own page, so
-  // there the menu only offers New thread without it.
+  // Studio Chat's shared header starts conversations on the task's own page.
   const studioChat = useStudioChatPresent();
   const [loaded, setLoaded] = useState<Loaded | null>(null);
   const [columns, setColumns] = useState<{ id: string; label: string }[]>(STATUSES.map((id) => ({ id, label: STATUS_LABELS[id]! })));
@@ -311,7 +311,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
         </dl>
 
         <Section title="Agent">
-          {task.assignee?.startsWith("bot:") && !done ? <button type="button" className={OUTLINE_BUTTON} onClick={() => void rpc.call("handOffBot", { id: taskId, note: null }).then(({ threadId }) => openAppPath(`/threads/${threadId}`), (failure) => toast.error(errorMessage(failure)))}><Icon name="Bot" /> Send to bot</button> : null}
+          {task.assignee?.startsWith("bot:") && !done ? <button type="button" className={OUTLINE_BUTTON} onClick={() => void rpc.call("handOffBot", { id: taskId, note: null }).then(({ threadId }) => openTaskThread(navigate, threadId), (failure) => toast.error(errorMessage(failure)))}><Icon name="Bot" /> Send to bot</button> : null}
           {handingOff ? <HandoffPanel task={task} projects={projects} onClose={() => setHandingOff(false)} /> : null}
           {latest ? (
             <LatestHandoff handoff={latest} task={task} onSendBack={(message) => run(rpc.call("sendBack", { id: taskId, message }), "Couldn't send it")} />
@@ -334,7 +334,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
                     <button
                       type="button"
                       className="flex w-full items-center gap-2 rounded-md px-2 py-1.5 text-left hover:bg-state-hover"
-                      onClick={() => navigate.toThread(handoff.threadId)}
+                      onClick={() => openTaskThread(navigate, handoff.threadId)}
                     >
                       <Icon name="MessageSquare" className="size-4 shrink-0 text-muted-foreground" />
                       <span className="min-w-0 flex-1 truncate">{handoff.agent ?? "Agent"}</span>
@@ -357,7 +357,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
           <Links
             task={task}
             links={links}
-            onOpen={(link) => (link.target === "thread" ? navigate.toThread(link.itemId) : link.href ? openAppPath(link.href) : undefined)}
+            onOpen={(link) => (link.target === "thread" ? openTaskThread(navigate, link.itemId) : link.href ? openAppPath(link.href) : undefined)}
             onAdd={(link) => void run(rpc.call("link", { id: taskId, link }), "Couldn't add the link")}
             onRemove={(link) => void run(rpc.call("unlink", { id: taskId, target: link.target, itemId: link.itemId }), "Couldn't remove the link")}
           />
@@ -453,7 +453,7 @@ function LatestHandoff({ handoff, task, onSendBack }: { handoff: Handoff; task: 
         <span className="text-xs text-muted-foreground">
           {handoff.agent ?? "Agent"} · handed off {relativeTime(handoff.createdAt)}
         </span>
-        <button type="button" className={cn(GHOST_BUTTON, "ml-auto h-7 px-2")} onClick={() => navigate.toThread(handoff.threadId)}>
+        <button type="button" className={cn(GHOST_BUTTON, "ml-auto h-7 px-2")} onClick={() => openTaskThread(navigate, handoff.threadId)}>
           <Icon name="ArrowUpRight" /> Open thread
         </button>
       </div>

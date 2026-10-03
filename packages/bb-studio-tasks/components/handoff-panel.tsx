@@ -7,6 +7,7 @@ import { errorMessage } from "@bb-studio/kit/format";
 import { experimental_ProviderModelPicker as ProviderModelPicker, useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { useStored } from "./board";
 import { SPIN, useTasksRpc, type Task } from "./types";
+import { openTaskThread } from "./navigation";
 
 type Agent = ComponentProps<typeof ProviderModelPicker>["value"];
 type Workspace = "worktree" | "folder";
@@ -57,7 +58,7 @@ export function HandoffPanel({ task, projects, onClose }: { task: Task; projects
         note: note.trim() || null,
         workspace,
       });
-      toast.success("Handed to an agent", { action: { label: "Open thread", onClick: () => navigate.toThread(threadId) } });
+      toast.success("Handed to an agent", { action: { label: "Open thread", onClick: () => openTaskThread(navigate, threadId) } });
       onClose();
     } catch (failure) {
       toast.error(`Couldn't hand off the task: ${errorMessage(failure)}`);
