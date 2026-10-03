@@ -21,6 +21,13 @@ The New menu stays open to every available kind with a Pages filter active.
 The capture checks that Bots and Pages filters offer the same menu as the
 unfiltered collection.
 
+![Live BB screenshot of the Studio sidebar plus menu](assets/sidebar-new-menu.png)
+
+The **+** beside Studio opens a menu of the installed add-ons' creation actions.
+The staged capture checks keyboard opening, creates a page in the open thread's
+project, opens the New space dialog, and checks that the plus stays visible
+while its menu is open.
+
 ![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
 
 The Studio landing page with two seeded tasks: one in review and one due today

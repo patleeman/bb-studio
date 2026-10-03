@@ -19,7 +19,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           for (const type of ["rawKeyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
         } else await client.clickAriaButtonWithPointer("New Studio item");
         await client.waitForSelector('[role="menu"][aria-label="New Studio item"]');
-        await client.waitForText("Page");
+        await client.waitForSelector('[role="menu"][aria-label="New Studio item"] [role="menuitem"]:not([data-disabled])');
         const labels = await client.evaluate(`[...document.querySelectorAll('[role="menu"][aria-label="New Studio item"] [role="menuitem"]')].map(each => each.innerText.trim())`);
         for (const label of ["Page", "Drawing", "Table", "Space", "Recording"]) {
           if (!labels.includes(label)) throw new Error(`Sidebar New menu did not offer ${label}`);
