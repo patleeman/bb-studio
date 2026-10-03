@@ -88,9 +88,11 @@ longer publishes anything; cards in older replies still find their posts.
 - **Feed** in the sidebar opens a reader: one stream, newest first, with the
   day in the margin. Older posts load as you scroll. A story is listed once,
   by its newest post. Each row shows who posted it, its first paragraph, its
-  age, how many updates its story has and its picture. A rail lists unread
-  urgent posts under **Needs you** and stories with updates under
-  **Developing**.
+  age, how many updates its story has and its picture. A rail lists unresolved
+  urgent posts under **Needs you**, independently of the topic filter and older
+  feed pages. Reading an alert leaves it there; **Resolve** closes that post and
+  **Reopen** restores it. **Older alerts** loads further outstanding posts.
+  The rail lists stories with updates under **Developing**.
 - **Unread** posts are bold with a dot, and the count next to **Feed** in the
   sidebar counts them. **Read** posts dim to one line. **Mark all read** reads
   everything; each row has its own read and unread button.

@@ -200,12 +200,14 @@ export class FeedStore {
    * with its post count; otherwise every post is listed.
    */
   list(
-    options: { limit?: number; cursor?: string; topic?: string | null; since?: number; until?: number; query?: string; stories?: boolean; unread?: boolean } = {},
+    options: { limit?: number; cursor?: string; topic?: string | null; since?: number; until?: number; query?: string; stories?: boolean; unread?: boolean; attention?: boolean } = {},
   ): { rows: ListedRow[]; nextCursor: string | null } {
     const limit = Math.min(Math.max(options.limit ?? 30, 1), 200);
     const where: string[] = [];
     const params: Record<string, unknown> = { limit: limit + 1 };
-    if (options.stories !== false)
+    // Every unresolved alert remains actionable, even if its story has a newer post.
+    if (options.attention) where.push("p.priority = 'urgent' AND p.resolved_at IS NULL");
+    if (!options.attention && options.stories !== false)
       where.push("(p.story IS NULL OR p.id = (SELECT q.id FROM feed_posts q WHERE q.story = p.story ORDER BY q.created_at DESC, q.id DESC LIMIT 1))");
     if (options.topic) {
       where.push("lower(p.topic) = lower(@topic)");

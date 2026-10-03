@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { FeedService, type Notification, type NotifyMode, type Origin } from "./service";
 import type { Priority, RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS } from "./store";
+import { loadFeedWindow } from "./window";
 
 const ORIGINS: Record<string, Origin> = {
   bot: { author: "Commute Bot", botId: "bot_1", threadId: "thr_bot", projectId: "proj_1", channelId: "room_1", channelName: "command-center" },
@@ -120,6 +121,50 @@ describe("FeedService", () => {
     expect(store.unreadCount()).toBe(2);
     service.seen();
     expect(store.unreadCount()).toBe(0);
+  });
+
+  it("keeps urgent alerts outstanding after reading, until explicitly resolved", async () => {
+    const { service, store, advance, post } = setup();
+    const alert = await post("API errors", { priority: "urgent", topic: "Ops", story: "api" });
+    advance(1);
+    await post("Investigating", { story: "api" });
+    service.markRead(alert.id, true);
+    service.seen();
+    expect(store.unreadCount()).toBe(0);
+    expect(store.list({ attention: true }).rows.map(row => row.id)).toEqual([alert.id]);
+    service.edit(alert.id, { resolved: true }, "you");
+    expect(store.list({ attention: true }).rows).toEqual([]);
+    service.edit(alert.id, { resolved: false }, "you");
+    expect(store.list({ attention: true }).rows.map(row => row.id)).toEqual([alert.id]);
+    expect(store.get(alert.id)?.read_at).not.toBeNull();
+  });
+
+  it("pages all outstanding alerts independently of newer ordinary posts", async () => {
+    const { service, store, advance, post } = setup();
+    const alerts: string[] = [];
+    for (let i = 0; i < 125; i++) {
+      advance(1);
+      alerts.push((await post(`Alert ${i}`, { priority: "urgent", story: "same-story" })).id);
+    }
+    for (let i = 0; i < 45; i++) { advance(1); await post(`Report ${i}`); }
+    service.seen();
+    expect(store.list({ limit: 40 }).rows.every(row => row.priority === "normal")).toBe(true);
+    const limits: number[] = [];
+    const read = async (input: { limit: number; cursor?: string }) => {
+      limits.push(input.limit);
+      const page = store.list({ ...input, attention: true });
+      return { posts: page.rows.map(row => service.view(row)), nextCursor: page.nextCursor };
+    };
+    const first = await loadFeedWindow(read, 40);
+    expect(first.posts).toHaveLength(40);
+    expect(first.nextCursor).not.toBeNull();
+    const all = await loadFeedWindow(read, 160);
+    expect(all.posts.map(row => row.id)).toEqual([...alerts].reverse());
+    expect(all.nextCursor).toBeNull();
+    expect(limits.every(limit => limit <= 100)).toBe(true);
+    service.edit(alerts[0]!, { resolved: true }, "you");
+    expect(store.list({ attention: true, limit: 200 }).rows).toHaveLength(124);
+    expect(store.get(alerts[1]!)?.resolved_at).toBeNull();
   });
 
   it("filters by topic and words", async () => {

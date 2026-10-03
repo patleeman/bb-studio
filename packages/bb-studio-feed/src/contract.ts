@@ -67,6 +67,11 @@ export const postSchema = z.object({
 export type PostView = z.infer<typeof postSchema>;
 
 export const rpcContract = defineRpcContract({
+  /** Outstanding urgent posts, independent of read state and the reader's filters. */
+  attention: {
+    input: z.object({ cursor: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional() }),
+    output: z.object({ posts: z.array(postSchema), nextCursor: z.string().nullable() }),
+  },
   /** The feed, newest first: a story once, by its newest post. */
   list: {
     input: z.object({

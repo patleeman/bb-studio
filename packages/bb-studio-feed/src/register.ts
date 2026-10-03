@@ -228,6 +228,10 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
   // RPC ------------------------------------------------------------------------
 
   const rpc = {
+    attention: async ({ cursor, limit }: { cursor?: string; limit?: number }) => {
+      const page = store.list({ attention: true, cursor, limit: limit ?? 40 });
+      return { posts: await views(page.rows), nextCursor: page.nextCursor };
+    },
     list: async ({ cursor, limit, topic, query, unread, since, until }: { cursor?: string; limit?: number; topic?: string | null; query?: string; unread?: boolean; since?: number; until?: number }) => {
       const page = store.list({ cursor, limit: limit ?? 30, topic, query, unread, since, until });
       return { posts: await views(page.rows), nextCursor: page.nextCursor, lastSeenAt: store.lastSeenAt() };

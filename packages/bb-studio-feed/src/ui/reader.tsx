@@ -59,6 +59,30 @@ function useReadState(setPosts: (update: (posts: PostView[] | null) => PostView[
 
 function FeedReader() {
   const rpc = useRpc<typeof rpcContract>();
+  const discuss = useDiscuss();
+  const [attention, setAttention] = useState<PostView[]>([]);
+  const [attentionCount, setAttentionCount] = useState(PAGE);
+  const [attentionCursor, setAttentionCursor] = useState<string | null>(null);
+  const [attentionError, setAttentionError] = useState<string | null>(null);
+  const [attentionLoading, setAttentionLoading] = useState(false);
+  const attentionVersion = useRef(0);
+  const loadAttention = useCallback(() => {
+    const version = ++attentionVersion.current;
+    setAttentionLoading(true);
+    loadFeedWindow((input) => rpc.call("attention", input), attentionCount).then(
+      (result) => {
+        if (version !== attentionVersion.current) return;
+        setAttention(result.posts);
+        setAttentionCursor(result.nextCursor);
+        setAttentionError(null);
+      },
+      (cause: unknown) => { if (version === attentionVersion.current) setAttentionError(errorMessage(cause)); },
+    ).finally(() => { if (version === attentionVersion.current) setAttentionLoading(false); });
+  }, [rpc, attentionCount]);
+  useEffect(() => {
+    loadAttention();
+    return () => { attentionVersion.current++; };
+  }, [loadAttention]);
   useMinuteTick();
   const [posts, setPosts] = useState<PostView[] | null>(null);
   const [nextCursor, setNextCursor] = useState<string | null>(null);
@@ -91,7 +115,7 @@ function FeedReader() {
   // New posts and edits reload; reading ("seen") is already in the list.
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = feedEvent(payload);
-    if (event && event.type !== "seen") load();
+    if (event && event.type !== "seen") { load(); loadAttention(); }
   });
   const markRead = useReadState(setPosts);
 
@@ -163,9 +187,9 @@ function FeedReader() {
     else days.push({ day: key, at: post.createdAt, posts: [post] });
   }
   const unread = (posts ?? []).filter((post) => !post.read).length;
-  const attention = (posts ?? []).filter((post) => urgent(post) && !post.read);
   const developing = (posts ?? []).filter((post) => post.storyPosts > 1 && !post.resolvedAt).slice(0, 5);
-  const rail = attention.length > 0 || developing.length > 0;
+  const showAttention = attention.length > 0 || attentionError !== null || attentionLoading;
+  const rail = showAttention || developing.length > 0;
 
   return (
     <PageColumn className="max-w-6xl">
@@ -193,17 +217,12 @@ function FeedReader() {
             <div key={index} className="h-16 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" />
           ))}
         </div>
-      ) : posts.length === 0 ? (
-        <EmptyState icon={FEED_ICON} title={topic ? `Nothing in ${topic}` : "Nothing posted yet"}>
-          {topic ? null : (
-            <>
-              Agents post here when a task or automation asks them to: they end the reply with a <code>::post</code> line. Ask one to “post that to the feed”.
-            </>
-          )}
-        </EmptyState>
       ) : (
         <div className={cn("grid items-start gap-x-10 gap-y-6", rail && "@5xl/page:grid-cols-[minmax(0,1fr)_17rem]")}>
           <main className="min-w-0">
+            {posts.length === 0 ? <EmptyState icon={FEED_ICON} title={topic ? `Nothing in ${topic}` : "Nothing posted yet"}>
+              {topic ? null : "Ask an agent to post a report to the feed."}
+            </EmptyState> : null}
             {days.map((group) => {
               const marker = dayMarker(group.at);
               return (
@@ -231,11 +250,18 @@ function FeedReader() {
           </main>
           {rail ? (
             <aside className="space-y-4 pt-5 @5xl/page:sticky @5xl/page:top-0">
-              {attention.length ? (
+              {showAttention ? (
                 <RailBox title="Needs you" tone="danger">
                   {attention.map((post) => (
-                    <RailItem key={post.id} post={post} detail={`${post.author} · ${relativeTime(post.createdAt)}`} onOpen={() => toggle(post, true)} />
+                    <RailItem key={post.id} post={post} detail={`${post.author} · ${relativeTime(post.createdAt)}`} onOpen={() => {
+                      const listed = posts.find((each) => each.id === post.id);
+                      if (listed) toggle(listed, true);
+                      else discuss.openPost(post);
+                    }} />
                   ))}
+                  {attentionLoading ? <li className="text-xs text-muted-foreground" role="status">Loading alerts…</li> : null}
+                  {attentionError ? <li className="text-xs text-destructive" role="alert">{attentionError} <button type="button" className="underline" onClick={loadAttention}>Retry</button></li> : null}
+                  {attentionCursor ? <li><button type="button" className={GHOST_BUTTON} disabled={attentionLoading} onClick={() => setAttentionCount((count) => count + PAGE)}>Older alerts</button></li> : null}
                 </RailBox>
               ) : null}
               {developing.length ? (
@@ -411,11 +437,41 @@ function PostActions({ post, onRead, onRemoved, className }: { post: PostView; o
       <button type="button" className={GHOST_BUTTON} onClick={() => onRead(!post.read)}>
         <Icon name={post.read ? "Circle" : "Check"} /> {post.read ? "Mark unread" : "Mark read"}
       </button>
+      <ResolutionButton post={post} />
       <span className="ml-auto">
         <PostMenu post={post} onRemoved={onRemoved} />
       </span>
     </div>
   );
+}
+
+/** Reading and resolving a post are independent actions. */
+function ResolutionButton({ post }: { post: PostView }) {
+  const rpc = useRpc<typeof rpcContract>();
+  const [resolved, setResolved] = useState(post.resolvedAt !== null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  useEffect(() => { setResolved(post.resolvedAt !== null); }, [post.id, post.resolvedAt]);
+  const change = async () => {
+    if (pending) return;
+    setPending(true);
+    setError(null);
+    try {
+      const result = await rpc.call("edit", { postId: post.id, resolved: !resolved });
+      if (!result.post) throw new Error("This post was removed.");
+      setResolved(result.post.resolvedAt !== null);
+    } catch (cause) {
+      setError(errorMessage(cause));
+    } finally {
+      setPending(false);
+    }
+  };
+  return <>
+    <button type="button" className={GHOST_BUTTON} disabled={pending} onClick={() => void change()}>
+      <Icon name={resolved ? "RotateCcw" : "Check"} /> {pending ? "Saving…" : resolved ? "Reopen" : "Resolve"}
+    </button>
+    {error ? <span className="text-xs text-destructive" role="alert">{error}</span> : null}
+  </>;
 }
 
 /** A finding Studio Explore saved: write the page explaining it. The post links the page when it's done. */
