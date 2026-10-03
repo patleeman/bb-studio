@@ -26,9 +26,20 @@ import { agentConfiguration, registerTools } from "./src/tools";
 const INLINE_MIME = /^(image\/(png|jpeg|gif|webp|avif)|video\/(mp4|webm|ogg)|audio\/(mpeg|mp4|ogg|wav|webm)|application\/pdf)$/;
 
 export default async function plugin(bb: BbPluginApi) {
+  const settings = bb.settings.define({
+    snapshotsPerPage: {
+      type: "number",
+      label: "Saved versions per page",
+      description: "Keep the newest 1 to 1000 versions of each page, or 0 to keep all. Lowering this limit removes older versions the next time that page saves a version.",
+      default: 50,
+      experimental_schema: z.number().int().min(0).max(1000),
+    },
+  });
+  let config = await settings.get();
+  settings.onChange((next) => { config = next; });
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
-  const store = new PageStore(db);
+  const store = new PageStore(db, () => config.snapshotsPerPage);
   const bots = new BotDirectory(bb);
   const service = new PagesService(bb, store, bots);
 

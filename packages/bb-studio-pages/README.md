@@ -224,6 +224,11 @@ workflows.
 
 ## Storage
 
+In **Settings → Studio Pages**, **Saved versions per page** controls history
+retention. The default is 50. Set 1 to 1000 to keep that many versions, or 0
+to keep all. Lowering the limit removes older versions when that page next
+saves a version. Existing pages use the new limit without a restart.
+
 Pages, versions, uploads, and bot requests live in the plugin's SQLite
 database in the BB data directory. Uploads are limited to 15 MB each and are
 served back through the plugin's HTTP route.

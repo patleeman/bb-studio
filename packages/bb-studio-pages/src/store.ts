@@ -168,7 +168,7 @@ const META_COLUMNS =
 const SNAPSHOTS_PER_PAGE = 50;
 
 export class PageStore {
-  constructor(private readonly db: Database.Database) {}
+  constructor(private readonly db: Database.Database, private readonly snapshotLimit: () => number = () => SNAPSHOTS_PER_PAGE) {}
 
   setTemplate(id: string, template: boolean): void {
     this.db.prepare("UPDATE pages SET template = ? WHERE id = ?").run(template ? 1 : 0, id);
@@ -301,17 +301,18 @@ export class PageStore {
     this.db
       .prepare("INSERT INTO snapshots (id, page_id, state, label, actor, created_at) VALUES (?, ?, ?, ?, ?, ?)")
       .run(id, pageId, Buffer.from(state), label, actor, now);
-    this.db
+    const limit = this.snapshotLimit();
+    if (limit > 0) this.db
       .prepare(
-        "DELETE FROM snapshots WHERE page_id = ? AND id NOT IN (SELECT id FROM snapshots WHERE page_id = ? ORDER BY created_at DESC LIMIT ?)",
+        "DELETE FROM snapshots WHERE page_id = ? AND id NOT IN (SELECT id FROM snapshots WHERE page_id = ? ORDER BY created_at DESC, rowid DESC LIMIT ?)",
       )
-      .run(pageId, pageId, SNAPSHOTS_PER_PAGE);
+      .run(pageId, pageId, limit);
     return { id, page_id: pageId, label, actor, created_at: now };
   }
 
   snapshots(pageId: string): SnapshotMeta[] {
     return this.db
-      .prepare("SELECT id, page_id, label, actor, created_at FROM snapshots WHERE page_id = ? ORDER BY created_at DESC")
+      .prepare("SELECT id, page_id, label, actor, created_at FROM snapshots WHERE page_id = ? ORDER BY created_at DESC, rowid DESC")
       .all(pageId) as SnapshotMeta[];
   }
 

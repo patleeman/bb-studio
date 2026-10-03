@@ -5,6 +5,11 @@ description: Use when the user refers to a BB Page — a /plugins/pages/pages/<i
 
 # Pages
 
+**Settings → Studio Pages → Saved versions per page** controls history
+retention: 50 by default, 1 to 1000 for a limit, or 0 to keep all. Lowering it
+prunes older versions only when that page next saves a version. It never
+changes the current page text.
+
 Pages are collaborative documents inside BB. The user edits them live in the
 Pages panel while agents and Studio Teams bots edit the same document through
 tools. Every change merges in real time (Yjs), so nobody's typing is
