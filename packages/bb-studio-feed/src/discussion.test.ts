@@ -18,10 +18,11 @@ describe("Feed discussion creation", () => {
     expect(await startDiscussion(post.id, request, get, spawn)).toEqual({ threadId: "new_discussion" });
     expect(get).toHaveBeenCalledWith(post.id);
     const sent = spawn.mock.calls[0]![0] as unknown as NewThreadRequest;
-    expect(sent).toEqual({ ...request, input: [expect.objectContaining({ type: "text", text: expect.stringContaining(`feed_read id ${post.id}`) }), ...request.input] });
-    expect((sent.input[0] as { text: string }).text).toContain("Updated release window");
-    expect((sent.input[0] as { text: string }).text).toContain("Atlas in #launch");
-    for (let i = 0; i < request.input.length; i++) expect(sent.input[i + 1]).toBe(request.input[i]);
+    expect(sent).toEqual({ ...request, input: [...request.input, expect.objectContaining({ type: "text", text: expect.stringContaining(`feed_read id ${post.id}`) })] });
+    const context = sent.input.at(-1) as { text: string };
+    expect(context.text).toContain("Updated release window");
+    expect(context.text).toContain("Atlas in #launch");
+    for (let i = 0; i < request.input.length; i++) expect(sent.input[i]).toBe(request.input[i]);
     expect(sent.projectId).toBe("selected_project");
   });
 
