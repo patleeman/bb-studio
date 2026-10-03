@@ -121,3 +121,20 @@ The same commands were exercised on isolated server 52586, producing environment
 `testPluginStatusAndWorkspaceChoices` and `testNewThreadFromHomeAndTeam`.
 `node --check scripts/staged-bb.mjs` and `git diff --check` passed. The final
 fresh install will exercise the new staging option from its pushed commit.
+
+## Tables skip resolved
+
+`testTableViews` incorrectly skipped because it queried the removed
+`studio-tables` plugin. It now creates and deletes a deterministic table through
+`studio.tables_*`, searches for its unique title, and verifies text and number
+values in the native list and grid.
+
+Running it exposed a product defect: Route accepted the legacy Tables URL but
+not `/plugins/studio/tables/<id>`. The missing consolidated alias prevented table
+rows from opening natively. A one-line AppModel route fix restores navigation;
+the coordinator was notified. `/tmp/office-tables-fixed/results.xcresult` reports
+1 test passed, 0 failures. The original skip is resolved.
+
+Bulk-tag investigation remains open. Scrolling its chip fully into view still
+opened the neighboring Space menu in `/tmp/office-collection-tests/results.xcresult`.
+The experimental scrolling change was removed; the test was not weakened.

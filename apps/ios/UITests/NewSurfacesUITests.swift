@@ -78,18 +78,30 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     func testTableViews() throws {
-        guard rpc("studio-tables", "list", NSNull()) != nil else { throw XCTSkip("Studio Tables is not installed") }
-        let created = try XCTUnwrap(rpc("studio-tables", "create", [
-            "title": "QA iOS7 table", "projectId": projectId,
+        continueAfterFailure = false
+        let title = "QA table \(UUID().uuidString.prefix(8))"
+        let created = try XCTUnwrap(rpc("studio", "tables_create", [
+            "title": title, "projectId": projectId,
+            "columns": [["id": "name", "name": "Item", "type": "text"],
+                        ["id": "count", "name": "Count", "type": "number"]],
+            "rows": [["name": "Release notes", "count": 7]],
         ])?["table"] as? [String: Any])
         let id = try XCTUnwrap(created["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio-tables", "remove", ["id": id]) }
+        addTeardownBlock { _ = self.rpc("studio", "tables_remove", ["id": id]) }
         let app = launch()
         openCollection(app)
-        XCTAssertTrue(app.staticTexts["QA iOS7 table"].waitForExistence(timeout: 15))
-        app.staticTexts["QA iOS7 table"].tap()
+        let search = app.searchFields.firstMatch
+        if !search.waitForExistence(timeout: 3) { app.swipeDown() }
+        XCTAssertTrue(search.waitForExistence(timeout: 10))
+        search.tap(); search.typeText(title)
+        let row = app.buttons.matching(identifier: "studioItem")
+            .matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
+        XCTAssertTrue(row.waitForExistence(timeout: 15)); row.tap()
         XCTAssertTrue(app.descendants(matching: .any)["studioTable"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.staticTexts["Item, Release notes"].waitForExistence(timeout: 10), "list values")
         app.buttons["Table"].tap()
+        XCTAssertTrue(app.staticTexts["Release notes"].waitForExistence(timeout: 10), "grid text value")
+        XCTAssertTrue(app.staticTexts["7"].exists, "grid number value")
         shot(app, "table")
     }
 

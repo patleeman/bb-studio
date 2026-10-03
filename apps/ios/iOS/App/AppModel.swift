@@ -49,7 +49,7 @@ extension Route {
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("studio", "recordings"), ("talk", "recordings"): self = .recording(id: id)
         case ("studio-tasks", "tasks"), ("studio", "tasks"): self = .task(id: id)
-        case ("studio-tables", "tables"): self = .table(id: id)
+        case ("studio-tables", "tables"), ("studio", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"), ("studio", "bots"): self = .bot(id: id)
         // Channels lived at /views/<id>; both open the same channel.
         case ("bot-teams", "channels"), ("bot-teams", "views"), ("studio", "channels"), ("studio", "views"): self = .savedView(id: id)
