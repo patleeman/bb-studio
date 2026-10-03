@@ -78,6 +78,19 @@ export function tabCatalog(spaceId: string, deps: {
       const item = itemAtPath((await overview()).items.filter(i => belongs(i.projectId)), path);
       return item ? resolve(`item:${item.pluginId}:${item.id}`) : null;
     },
+    // BB's own thread search: titles and messages, active and archived, so
+    // the address bar finds any thread in this Space, not only open ones.
+    searchThreads: async query => {
+      if (!query.trim()) return [];
+      const { active, archived } = await bb.sdk.threads.search({ query, limitPerGroup: "20" });
+      return [...active.results, ...archived.results].map(result => result.thread)
+        .filter(thread => !thread.deletedAt && !thread.parentThreadId && thread.visibility !== "hidden" && belongs(thread.projectId))
+        .map(thread => ({ ref: `thread:${thread.id}`, kind: "thread" as const, title: thread.title || thread.titleFallback || "Untitled", icon: null, href: null, ...(thread.archivedAt ? { itemKind: "archived" } : {}) }));
+    },
+    reviveThread: async threadId => {
+      const thread = await bb.sdk.threads.get({ threadId });
+      if (thread.archivedAt) await bb.sdk.threads.unarchive({ threadId });
+    },
     seedThreads: async ids => {
       const found: string[] = [];
       for (const id of new Set(ids)) {

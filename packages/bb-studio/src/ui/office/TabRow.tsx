@@ -74,7 +74,10 @@ function TabState({ tab }: { tab: ShownTab }) {
 }
 
 export function openTab(tab: ShownTab, threadActions: ReturnType<typeof useSidebarThreadActions>, options: { split?: boolean } = {}) {
-  if (tab.thread) threadActions.open(tab.thread.id, { split: options.split ?? false });
+  // Search results for threads carry only their ref; opening one also brings
+  // it back from BB's archive (tabs_open does that on the way in).
+  const threadId = tab.thread?.id ?? (tab.ref.startsWith("thread:") ? tab.ref.slice("thread:".length) : null);
+  if (threadId) threadActions.open(threadId, { split: options.split ?? false });
   else if (tab.href) openAppPath(tab.href, { main: true });
 }
 

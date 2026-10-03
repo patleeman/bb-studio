@@ -123,17 +123,27 @@ function Bar({ spaceId, tabs, mode, onDone }: { spaceId: string | null; tabs: re
     const openRefs = new Set(tabs.map((tab) => tab.ref));
     const tabRows = tabs.filter((tab) => matches(tab.title, q)).slice(0, LIMIT)
       .map((tab) => ({ key: tab.ref, group: "Tabs", glyph: <TabGlyph tab={tab} />, label: tab.title, run: go(tab) }));
-    // Threads that aren't tabs yet, from BB's own list.
-    const threadRows = threads.filter((thread) => !openRefs.has(threadRef(thread.id)) && matches(thread.displayTitle, q)).slice(0, LIMIT)
+    // Threads that aren't tabs: open ones by title right away, then BB's
+    // search (titles and messages, archived threads too) as it answers.
+    const listed = threads.filter((thread) => !openRefs.has(threadRef(thread.id)) && matches(thread.displayTitle, q)).slice(0, LIMIT)
       .map((thread) => ({
         key: threadRef(thread.id),
         group: "Threads",
         glyph: <IconGlyph name="MessageSquare" />,
         label: thread.displayTitle,
-        detail: thread.isArchived ? "archived" : undefined,
         run: () => { onDone(); threadActions.open(thread.id); },
       }));
-    const more = found.filter((tab) => !openRefs.has(tab.ref)).map((tab) => ({
+    const listedRefs = new Set(listed.map((row) => row.key));
+    const searched = found.filter((tab) => tab.kind === "thread" && !openRefs.has(tab.ref) && !listedRefs.has(tab.ref)).map((tab) => ({
+      key: tab.ref,
+      group: "Threads",
+      glyph: <IconGlyph name="MessageSquare" />,
+      label: tab.title || "Untitled",
+      detail: tab.itemKind === "archived" ? "archived" : undefined,
+      run: go(asShown(tab)),
+    }));
+    const threadRows = [...listed, ...searched];
+    const more = found.filter((tab) => tab.kind !== "thread" && !openRefs.has(tab.ref)).map((tab) => ({
       key: tab.ref,
       group: "In this space",
       glyph: <TabGlyph tab={asShown(tab)} />,

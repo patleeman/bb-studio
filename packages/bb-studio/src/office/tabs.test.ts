@@ -111,7 +111,10 @@ it("drops unresolvable refs through reads, preserves data on resolver failure, a
   const handlers=officeTabHandlers(store,()=>({
     resolve: async ref=>{if(ref==="bot:offline") throw new Error("offline"); return live.get(ref) ?? null;},
     essentials:async()=>[],atPath:async()=>null,seedThreads:async()=>[],search:async()=>[...live.values()],
+    searchThreads:async query=>query.includes("old")?[{ref:"thread:old",kind:"thread",title:"An old plan",icon:null,href:null,itemKind:"archived"}]:[],
   }));
+  // Archived BB threads are found too, with their titles.
+  expect((await handlers.office_search({spaceId,query:"old plan"})).results.find(t=>t.ref==="thread:old")).toMatchObject({title:"An old plan",zone:"archived"});
   store.open(spaceId,"bot:gone");store.open(spaceId,"bot:live"); store.move(spaceId,"bot:live","pinned"); changed.mockClear();
   expect((await handlers.tabs_get({spaceId})).pinned[0]?.ref).toBe("bot:live");
   expect(store.rows(spaceId).some(t=>t.ref==="bot:gone")).toBe(false); expect(changed).toHaveBeenCalledTimes(1);

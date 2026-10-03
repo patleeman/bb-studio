@@ -14,7 +14,7 @@ async function setup() {
   const projects=["proj_personal","work"].map(id=>({id,name:id,kind:"personal" as const,sources:[],gitRemoteUrl:null,createdAt:1,updatedAt:1}));
   const {bb,harness}=createFakePluginHost({pluginId:"studio",sdk:{
     projects:{list:async()=>projects},
-    threads:{list:async()=>[],get:async({threadId})=>{ if(threadId==="deleted") throw Object.assign(new Error("not found"),{status:404}); return makeThreadResponse({id:threadId,projectId:threadId==="other"?"work":"proj_personal"}); }},
+    threads:{list:async()=>[],search:async()=>({active:{results:[]},archived:{results:[]}}) as never,get:async({threadId})=>{ if(threadId==="deleted") throw Object.assign(new Error("not found"),{status:404}); return makeThreadResponse({id:threadId,projectId:threadId==="other"?"work":"proj_personal"}); }},
     plugins:{list:async()=>({plugins:[]}),experimental_discoverRpc:async()=>[]},
   }});
   cleanups.push(()=>harness.lifecycle.dispose());

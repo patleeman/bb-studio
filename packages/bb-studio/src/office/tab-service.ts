@@ -8,6 +8,9 @@ export interface TabCatalog {
   atPath(href: string): Promise<TabTarget | null>;
   seedThreads(ids: string[]): Promise<string[]>;
   search(query: string): Promise<TabTarget[]>;
+  searchThreads(query: string): Promise<TabTarget[]>;
+  /** Unarchives a BB thread opened as a tab, so it comes back to the sidebar. */
+  reviveThread?(threadId: string): Promise<void>;
 }
 
 /** A request-scoped catalog batches provider reads. A provider failure throws,
@@ -43,6 +46,8 @@ export function officeTabHandlers(store: OfficeTabs, catalog: (spaceId: string) 
       const { spaceId } = input;
       const target = input.ref !== undefined ? await required(spaceId, input.ref) : await catalog(spaceId).atPath(input.href);
       if (!target) return { tab: null };
+      // Opening an archived thread brings it back, in BB and in Today.
+      if (target.ref.startsWith("thread:")) await catalog(spaceId).reviveThread?.(target.ref.slice("thread:".length));
       store.open(spaceId, target.ref);
       return { tab: store.tab(spaceId, target) };
     },
@@ -60,10 +65,12 @@ export function officeTabHandlers(store: OfficeTabs, catalog: (spaceId: string) 
     tab_folder_delete: ({ folderId }: OfficeInput<"tab_folder_delete">) => { store.deleteFolder(folderId); return { ok: true as const }; },
     office_search: async ({ spaceId, query, limit = 40 }: OfficeInput<"office_search">) => {
       const source = catalog(spaceId);
-      const [hits, saved] = await Promise.all([source.search(query), resolved(spaceId, store.rows(spaceId).filter(t => t.zone === "archived").map(t => t.ref), source)]);
+      const [hits, threads, saved] = await Promise.all([source.search(query), source.searchThreads(query), resolved(spaceId, store.rows(spaceId).filter(t => t.zone === "archived").map(t => t.ref), source)]);
       const results = new Map<string, Tab>();
       for (const hit of hits) if (hit.kind !== "thread") results.set(hit.ref, store.tab(spaceId, hit));
       for (const tab of saved) if (tab.kind !== "thread" && matches(tab, query)) results.set(tab.ref, tab);
+      // Threads, archived ones included; their titles come from the search.
+      for (const thread of threads) if (!results.has(thread.ref)) results.set(thread.ref, store.tab(spaceId, thread));
       return { results: [...results.values()].slice(0, limit) };
     },
   };
