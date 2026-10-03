@@ -253,11 +253,27 @@ capture-phase cleanup. The stable BB 0.45.0 [drag capture](../packages/bb-studio
 uses real mouse input to verify Escape cancellation, a successful drop into
 exactly one page tab, and removal of the drop zone in both cases.
 
+Talk now binds its microphone to the actual displayed composer, rather than
+the main thread. Thread companions keep their thread identity; new-conversation
+companions keep their canonical route and selected project. Go back focuses
+that same tab, and finished dictation waits until its originating composer
+returns. Talk's 127 tests, typecheck and build pass. The stable BB 0.45.0
+capture uses source `b52d193` with the compact-controls fix `fb4ca80`. It checks
+the saved recording's thread/project, exact native draft and attachment DOM,
+one tab per destination, and an unchanged main page after both return flows.
+The [desktop](../packages/bb-studio-talk/assets/companion-dictation.png) and
+[phone](../packages/bb-studio-talk/assets/companion-dictation-mobile.png)
+screenshots are visually checked. At 390 by 844 pixels, every visible Talk
+control stays inside the viewport; clipped inline controls fall back to the
+floating pill. All staged recordings, threads and pages are removed without
+running an agent. Recovery links also follow their originating companion;
+live recovery-list and interrupted-recording checks remain required.
+
 Remaining delivery includes publishing the native host changes, the SDK/CLI
 placement controller, embedded composer targeting,
 quote-draft recovery and compact composer checks, and the remaining suite
-entry points: task handoff verification, Talk
-return navigation, and split/swap actions. Initial main-view-to-companion transfer
+entry points: task handoff verification, Talk recovery navigation and playback
+continuity, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
 existing native capture verifies transfers after the companion is realized.
 The requirement-by-requirement completion audit and final release checks

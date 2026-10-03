@@ -37,6 +37,21 @@ the same dictation. Expanding and collapsing also retains keyboard focus.
 At a 390-pixel viewport, the controls use a second toolbar row and fit inside the
 input, including a tappable transcript expansion button.
 
+![Dictation returning to its companion conversation](assets/companion-dictation.png)
+
+The stable BB 0.45.0 capture starts the real composer microphone in a thread
+companion and a page's new-conversation companion. **Go back** focuses the
+original tab with the exact draft and attachment still mounted. The recording
+stores that composer's thread or page route and selected project, even when
+the main pane shows another item.
+
+![Companion dictation on a phone](assets/companion-dictation-mobile.png)
+
+The same draft and attachment stay in place at 390 by 844 pixels. If BB's
+compact input clips the inline toolbar, Talk uses its floating controls so
+Pause and Stop stay reachable. Run this capture in staged BB with
+`BB_CAPTURE_TALK_COMPANION=1 BB_CAPTURE_ONLY=talk-companion-return node scripts/capture-plugin-screenshots.mjs --plugin talk`.
+
 ![Talk recording page with cleanup and audio playback](assets/staged-preview.png)
 
 This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. It shows a
@@ -85,7 +100,8 @@ The same message at a 390-pixel viewport, with the source pill in view.
 - **Finish from anywhere.** Press ✓ from another thread and Talk holds the
   text. It types the text into the dictation's thread when you go back. BB
   keeps unsent composer text on the device, so Talk can't safely write into a
-  thread that isn't open.
+  thread that isn't open. A Studio companion's new-conversation draft also
+  holds its dictation until you return to that same tab.
 - **Hold to talk.** Hold Right Option (or the key set in settings) by itself
   to dictate into the focused composer or field, and let go to insert. A
   quick tap does nothing, and Option+key shortcuts and AltGr characters still
@@ -282,9 +298,9 @@ DOM, defined in [src/client/fields.ts](src/client/fields.ts):
   If BB changes that markup, the mic falls back to built-in dictation. Talk
   stays reachable from its commands and the Recordings page.
 - **Held text stays on the device.** A dictation finished away from its
-  thread waits on the device you dictated on. A new-thread dictation finished
-  after you leave that page is copied to the clipboard instead. Either way,
-  the dictation is also in Recordings.
+  thread or Studio companion waits on the device you dictated on. A main
+  new-thread dictation without a Studio route is copied to the clipboard
+  after you leave that page. Either way, the dictation is also in Recordings.
 - **Mobile backgrounding.** On mobile, the microphone stops when the BB app
   goes to the background. Talk resumes when the app returns, or shows
   **Resume** when the system needs a tap first.
