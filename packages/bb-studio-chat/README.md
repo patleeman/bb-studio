@@ -20,6 +20,13 @@ two independent item drafts, exact composer and attachment retention while
 switching and folding tabs, and companion-item targeting during real sidebar
 navigation. No agent runs.
 
+![Recovered image-quote draft on a phone](assets/quote-mobile.png)
+
+The same recovered crop, edited prompt, and attachment fit at 390 by 844
+pixels. Resizing keeps the exact native composer mounted; the capture checks
+the image and every visible composer button's bounds and click target.
+Run `BB_CAPTURE_CHAT_COMPACT=1 BB_CAPTURE_ONLY=studio-chat node scripts/capture-plugin-screenshots.mjs --plugin studio-chat` after sourcing staged BB's `capture.env`.
+
 ## What you get
 
 - **Chat.** Continue the item's linked conversation or start one in its
@@ -52,7 +59,8 @@ The shared companion controller prefers BB's native right workbench when
 the host supports retained companion views. BB's host implementation and its
 live release verification remain in the [full-suite delivery work](../../docs/unified-workbench.md).
 Stable BB currently opens threads in Float, or in the main view without Float.
-Pages keeps its standalone chat fallback until that migration is complete.
+Without Studio Chat, Pages uses the same companion tabs with its own native
+new-conversation composer.
 
 On stable SDK 0.5.29, embedded `ThreadChat` does not scope `useComposer()` to
 its thread. The Viewing chip only offers **Add to message** when the scope

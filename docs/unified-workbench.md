@@ -238,6 +238,14 @@ is visually checked. The workflow caught and fixed a server-only SDK import
 in the frontend and a quote card whose controls were behind Float. Artifacts'
 53 tests, typecheck, and build pass; the capture verifies the quote controls'
 actual click targets. No agent runs.
+The updated capture on stable BB 0.45.0, with Chat installed from `258d801`,
+also checks the recovered image quote at 390 by 844 pixels. Its crop, edited
+prompt and attachment remain intact, resizing retains the exact native
+composer, and every visible composer button and image stays in the viewport
+with an unobstructed hit target. The
+[phone screenshot](../packages/bb-studio-chat/assets/quote-mobile.png) is
+visually checked. The capture now waits for the new document after reload,
+preventing an old composer from satisfying the recovery assertion.
 
 Feed discussions now use the shared new-conversation composer and a canonical
 post-specific companion route. Source threads, post pages, linked items and
@@ -279,8 +287,7 @@ running an agent. Recovery links also follow their originating companion;
 live recovery-list and interrupted-recording checks remain required.
 
 Remaining delivery includes publishing the native host changes, the SDK/CLI
-placement controller, embedded composer targeting,
-quote-draft recovery and compact composer checks, and the remaining suite
+placement controller, embedded composer targeting, and the remaining suite
 entry points: task handoff creation and bot dispatch, Talk recovery navigation and playback
 continuity, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the

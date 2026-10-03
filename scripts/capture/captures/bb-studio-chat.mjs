@@ -39,6 +39,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         })`).catch(() => {});
         await rm(directory, { recursive: true, force: true });
         await client.evaluate("delete window.bbChatDraft").catch(() => {});
+        await client.evaluate("delete window.bbChatQuoteDraft").catch(() => {});
+        await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
       };
       const chat = async (selector) => {
         await client.waitForSelector(`${selector} > button:not(:disabled)`);
@@ -195,9 +197,34 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
           if (!state.visible || state.count !== 1 || !state.text.includes('Chat about "Release diagram"') || !state.text.includes('Clarify this retry arrow before release.') || !state.text.includes('Also align the arrowhead.') || !state.text.includes('release-review.txt') || !state.image?.startsWith('data:image/png;base64,')) throw new Error(`Image quote context lost: ${JSON.stringify(state)}`);
         };
         await expectQuote();
+        await client.evaluate("window.bbChatReloadPending = true");
         await client.command("Page.reload", {});
+        const reloadDeadline = Date.now() + 90000;
+        while (!(await client.evaluate(`!window.bbChatReloadPending && !!document.querySelector(${JSON.stringify(quotePrompt)})`).catch(() => false))) {
+          if (Date.now() > reloadDeadline) throw new Error("The quote composer did not return after reload");
+          await sleep(100);
+        }
         await client.waitForSelector(quotePrompt, 90000);
         await expectQuote();
+        if (process.env.BB_CAPTURE_CHAT_COMPACT === "1") {
+          await client.evaluate(`(() => { window.bbChatQuoteDraft = document.querySelector(${JSON.stringify(quotePrompt)}); return true; })()`);
+          await client.command("Emulation.setDeviceMetricsOverride", { width: 390, height: 844, deviceScaleFactor: 1, mobile: true });
+          await sleep(700); await expectQuote();
+          const same = await client.evaluate(`document.querySelector(${JSON.stringify(quotePrompt)}) === window.bbChatQuoteDraft`);
+          if (!same) throw new Error("Resizing replaced the native quote draft");
+          const clipped = await client.evaluate(`(() => {
+            const root = document.querySelector(${JSON.stringify(quoteRoot)});
+            return [...root.querySelectorAll('[data-promptbox] button, img[alt="Selected image area"]')].filter(node => node.checkVisibility()).filter(node => {
+              const r = node.getBoundingClientRect();
+              const hit = document.elementFromPoint(r.left + r.width / 2, r.top + r.height / 2);
+              return r.width <= 0 || r.height <= 0 || r.left < 0 || r.top < 0 || r.right > innerWidth || r.bottom > innerHeight || !hit || !node.contains(hit);
+            }).map(node => node.getAttribute('aria-label') ?? node.getAttribute('alt') ?? node.textContent);
+          })()`);
+          if (clipped.length) throw new Error(`The phone quote composer clips or covers controls: ${JSON.stringify(clipped)}`);
+          await client.capture(join(process.cwd(), "packages/bb-studio-chat/assets/quote-mobile.png"));
+          await client.command("Emulation.setDeviceMetricsOverride", { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
+          await sleep(500); await expectQuote();
+        }
         await client.clickAriaButtonWithPointer("Floating tab actions");
         await client.clickElementWithTextAndPointer('[role="menuitem"]', "Pin tab");
         await sleep(1000);
