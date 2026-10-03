@@ -91,8 +91,7 @@ establish physical-device latency, battery use, thermal behavior, dropped frames
 or a causal comparison with another build. A stable short sequence does not
 prove that every object is released or that an hours-long session cannot leak.
 
-Source inspection shows that `PageView.onDisappear` calls `PageModel.detach()`.
-That removes its realtime listener, but does not cancel its pending coalesced
-reload task. The task can retain the model until its delay and requests finish.
-This is a lifecycle suspicion, not a confirmed leak or post-close request in
-this review. No production change is justified by that source observation alone.
+A later [focused detach regression](detach/README.md) confirmed that a queued
+realtime reload retained `PageModel` and started an API read after detach.
+`PageModel.detach()` now cancels and clears that task. The fixed regression also
+verifies that content changes still reload while the model remains attached.

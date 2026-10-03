@@ -40,6 +40,8 @@ final class PageModel: ObservableObject {
     }
 
     func detach() {
+        reloadTask?.cancel()
+        reloadTask = nil
         if let listener { realtime?.removeListener(listener) }
         listener = nil
     }

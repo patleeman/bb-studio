@@ -1,0 +1,52 @@
+{
+  "devicesAndConfigurations" : [
+    {
+      "device" : {
+        "architecture" : "arm64",
+        "deviceId" : "9D39E933-F6BA-4759-AEA8-51889F3FA1F1",
+        "deviceName" : "BBPageDetachPrivate",
+        "modelName" : "iPhone 18 Pro",
+        "osBuildNumber" : "24A434",
+        "osVersion" : "27.0",
+        "platform" : "iOS Simulator"
+      },
+      "expectedFailures" : 0,
+      "failedTests" : 1,
+      "passedTests" : 0,
+      "skippedTests" : 0,
+      "testPlanConfiguration" : {
+        "configurationId" : "1",
+        "configurationName" : "Test Scheme Action"
+      }
+    }
+  ],
+  "environmentDescription" : "BBStudio · Built with macOS 26.6.2",
+  "expectedFailures" : 0,
+  "failedTests" : 1,
+  "finishTime" : 1791006768.932,
+  "passedTests" : 0,
+  "result" : "Failed",
+  "runtimeWarnings" : [
+
+  ],
+  "skippedTests" : 0,
+  "startTime" : 1791006757.952,
+  "statistics" : [
+
+  ],
+  "testFailures" : [
+    {
+      "failureText" : "XCTAssertNil failed: \"BBStudio.PageModel\" - Detached model must release without waiting for its queued reload",
+      "targetName" : "BBStudioTests",
+      "testIdentifier" : 1,
+      "testIdentifierString" : "PageModelDetachTests/testQueuedRealtimeReloadIsCancelledOnDetach()",
+      "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioTests/PageModelDetachTests/testQueuedRealtimeReloadIsCancelledOnDetach",
+      "testName" : "testQueuedRealtimeReloadIsCancelledOnDetach()"
+    }
+  ],
+  "title" : "Test - BBStudio",
+  "topInsights" : [
+
+  ],
+  "totalTestCount" : 1
+}

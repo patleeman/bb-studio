@@ -1,0 +1,49 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-native-performance/build/Build/Products/detach.xctestrun -destination "platform=iOS Simulator,id=9D39E933-F6BA-4759-AEA8-51889F3FA1F1" "-only-testing:BBStudioTests/PageModelDetachTests" -parallel-testing-enabled NO -resultBundlePath /tmp/bb-native-performance/detach/repro.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-native-performance/detach/repro.xcresult
+
+2026-10-03 01:52:43.708932-0400 BBStudio[9549:89135794] [WC] -[WCSession onqueue_handleUpdateSessionState:]_block_invoke dropping as pairingIDs no longer match. pairingID (null), client pairingID: (null)
+2026-10-03 01:52:43.714033-0400 BBStudio[9549:89135794] [WC] WCSession is not paired
+2026-10-03 01:52:44.076731-0400 BBStudio[9549:89134523] [API] cannot add handler to 0 from 0 - dropping
+2026-10-03 01:52:44.076890-0400 BBStudio[9549:89134523] [API] cannot add handler to 0 from 0 - dropping
+2026-10-03 01:52:44.081958-0400 BBStudio[9549:89134523] [XPCErrors] non-launching port is incompatible with service identifier "com.apple.PointerUI.pointeruid.default-service"
+2026-10-03 01:52:44.095607-0400 BBStudio[9549:89134523] [API] cannot add handler to 0 from 0 - dropping
+2026-10-03 01:52:44.095683-0400 BBStudio[9549:89134523] [API] cannot add handler to 0 from 0 - dropping
+Test Suite 'Selected tests' started at 2026-10-03 01:52:44.156.
+Test Suite 'BBStudioTests.xctest' started at 2026-10-03 01:52:44.156.
+Test Suite 'PageModelDetachTests' started at 2026-10-03 01:52:44.156.
+Test Case '-[BBStudioTests.PageModelDetachTests testQueuedRealtimeReloadIsCancelledOnDetach]' started.
+DETACH_PROBE fixture page: pg_07a6ac9b154d71db
+2026-10-03 01:52:44.222449-0400 BBStudio[9549:89135840] [connection] nw_socket_output_finished [C6:2] shutdown(22, SHUT_WR) [57: Socket is not connected]
+DETACH_PROBE detached; model retained: true
+/tmp/bb-native-performance/project/Tests/PageModelDetachTests.swift:63: error: -[BBStudioTests.PageModelDetachTests testQueuedRealtimeReloadIsCancelledOnDetach] : XCTAssertNil failed: "BBStudio.PageModel" - Detached model must release without waiting for its queued reload
+DETACH_PROBE markdown read started
+DETACH_PROBE post-detach markdown reads: 1
+/tmp/bb-native-performance/project/Tests/PageModelDetachTests.swift:67: error: -[BBStudioTests.PageModelDetachTests testQueuedRealtimeReloadIsCancelledOnDetach] : XCTAssertEqual failed: ("1") is not equal to ("0") - The queued reload must not start an API read after detach
+2026-10-03 01:52:46.562326-0400 BBStudio[9549:89135864] [connection] nw_socket_output_finished [C8:2] shutdown(22, SHUT_WR) [57: Socket is not connected]
+Test Case '-[BBStudioTests.PageModelDetachTests testQueuedRealtimeReloadIsCancelledOnDetach]' failed (4.464 seconds).
+Test Suite 'PageModelDetachTests' failed at 2026-10-03 01:52:48.622.
+	 Executed 1 test, with 2 failures (0 unexpected) in 4.464 (4.466) seconds
+Test Suite 'BBStudioTests.xctest' failed at 2026-10-03 01:52:48.622.
+	 Executed 1 test, with 2 failures (0 unexpected) in 4.464 (4.466) seconds
+Test Suite 'Selected tests' failed at 2026-10-03 01:52:48.622.
+	 Executed 1 test, with 2 failures (0 unexpected) in 4.464 (4.467) seconds
+2026-10-03 01:52:48.926 xcodebuild[9534:89133999]  IDETestOperationsObserverDebug: Failure collecting diagnostics from simulator: Process exited with error 72:
+ xcrun: error: unable to find utility "simctl", not a developer tool or in PATH
+
+2026-10-03 01:52:48.931 xcodebuild[9534:89133938] [MT] IDETestOperationsObserverDebug: 10.917 elapsed -- Testing started completed.
+2026-10-03 01:52:48.931 xcodebuild[9534:89133938] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 01:52:48.931 xcodebuild[9534:89133938] [MT] IDETestOperationsObserverDebug: 10.917 sec, +10.917 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-native-performance/detach/repro.xcresult
+
+Failing tests:
+	PageModelDetachTests.testQueuedRealtimeReloadIsCancelledOnDetach()
+	PageModelDetachTests.testQueuedRealtimeReloadIsCancelledOnDetach()
+
+** TEST EXECUTE FAILED **
+
+Testing started
