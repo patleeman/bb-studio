@@ -8,7 +8,7 @@
  *
  *   node scripts/staged-bb.mjs start [--ref <pushed commit>] [--plugin <id>]
  *   . "$TMPDIR/bb-studio-staged/capture.env"
- *   node scripts/capture-plugin-screenshots.mjs --plugin studio-navigation
+ *   node scripts/capture-plugin-screenshots.mjs --plugin studio
  *   node scripts/staged-bb.mjs stop
  *
  * BB_STAGED_DIR moves the instance (default $TMPDIR/bb-studio-staged) and

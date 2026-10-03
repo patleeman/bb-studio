@@ -1,0 +1,446 @@
+{
+  "baselineCommit": "e81d75bb3096b50a35d207456b183a48e393e613",
+  "consolidationCommit": "1cf45d46",
+  "stableBB": "0.45.0",
+  "pinnedSDK": "0.5.29",
+  "approvedSchemaDecisionCommit": "8d8d1d2",
+  "tools": [
+    {
+      "name": "artifacts_list",
+      "baselineSchemaSha256": "a1dbc18e6ab53d0a412181245cfd8694330fa32b370c518ea5b89766a5f750c2",
+      "currentSchemaSha256": "a1dbc18e6ab53d0a412181245cfd8694330fa32b370c518ea5b89766a5f750c2",
+      "identical": true
+    },
+    {
+      "name": "artifacts_read",
+      "baselineSchemaSha256": "621d881c156a7e93110e744d71ab54975aaf5c56215f05d0e87ea8d7df5e3dc9",
+      "currentSchemaSha256": "621d881c156a7e93110e744d71ab54975aaf5c56215f05d0e87ea8d7df5e3dc9",
+      "identical": true
+    },
+    {
+      "name": "artifacts_save",
+      "baselineSchemaSha256": "881b605f08bcd73239c2d2d7df5c828c3229e9722a312bcb65c24384769851fe",
+      "currentSchemaSha256": "881b605f08bcd73239c2d2d7df5c828c3229e9722a312bcb65c24384769851fe",
+      "identical": true
+    },
+    {
+      "name": "bots_create",
+      "baselineSchemaSha256": "6219c0e21184a2cbdade2bd70e19cd45d84c87d4808d7305ff316fb9675240b1",
+      "currentSchemaSha256": "5e7683232712ab9ee1cd708cc9b30dbafe40eaa320efcfa4c8e8872c7afda869",
+      "identical": false
+    },
+    {
+      "name": "bots_view_create",
+      "baselineSchemaSha256": "5b3e71f9748d81a5501448898fe027876dac2a4bf7f5e9afe427d566ce020055",
+      "currentSchemaSha256": "5b3e71f9748d81a5501448898fe027876dac2a4bf7f5e9afe427d566ce020055",
+      "identical": true
+    },
+    {
+      "name": "bots_view_read",
+      "baselineSchemaSha256": "e29a8a171d05c1d08e050b12229fc3b6afe2b651ad5c0ba97ed8d2464222a3e4",
+      "currentSchemaSha256": "e29a8a171d05c1d08e050b12229fc3b6afe2b651ad5c0ba97ed8d2464222a3e4",
+      "identical": true
+    },
+    {
+      "name": "bots_views",
+      "baselineSchemaSha256": "93ab7499dc3c616f8db8780fed0d9f69270803cda913882ad2ef3943db8d7225",
+      "currentSchemaSha256": "93ab7499dc3c616f8db8780fed0d9f69270803cda913882ad2ef3943db8d7225",
+      "identical": true
+    },
+    {
+      "name": "explore_explain",
+      "baselineSchemaSha256": "91d0677179197951751442cf32a425ed6e401ac8b6a97291a31ebea26f10e89d",
+      "currentSchemaSha256": "91d0677179197951751442cf32a425ed6e401ac8b6a97291a31ebea26f10e89d",
+      "identical": true
+    },
+    {
+      "name": "feed_edit",
+      "baselineSchemaSha256": "11379e99efeec78bcf83228de17bc338ba62b3eaa4366b9131cf5fa7b2e33636",
+      "currentSchemaSha256": "11379e99efeec78bcf83228de17bc338ba62b3eaa4366b9131cf5fa7b2e33636",
+      "identical": true
+    },
+    {
+      "name": "feed_list",
+      "baselineSchemaSha256": "1cb10346fd58b342e751cc1f2274db0614ce345659672bcefb28af285ad71fa9",
+      "currentSchemaSha256": "1cb10346fd58b342e751cc1f2274db0614ce345659672bcefb28af285ad71fa9",
+      "identical": true
+    },
+    {
+      "name": "feed_post",
+      "baselineSchemaSha256": "b0d61208b999832c56accebddb6e4a910c4480247b33440e4fe396ddff5739c4",
+      "currentSchemaSha256": "b0d61208b999832c56accebddb6e4a910c4480247b33440e4fe396ddff5739c4",
+      "identical": true
+    },
+    {
+      "name": "feed_read",
+      "baselineSchemaSha256": "ed6ed4ad3f067a7a61d5943b7350f0e12fd7f23a380d8fbe2bd4c52ee577ec2c",
+      "currentSchemaSha256": "ed6ed4ad3f067a7a61d5943b7350f0e12fd7f23a380d8fbe2bd4c52ee577ec2c",
+      "identical": true
+    },
+    {
+      "name": "feed_remove",
+      "baselineSchemaSha256": "2a585a65d24d803f39b2d20fae2f93aabffcac4a759403fe2053e330f5e29b17",
+      "currentSchemaSha256": "2a585a65d24d803f39b2d20fae2f93aabffcac4a759403fe2053e330f5e29b17",
+      "identical": true
+    },
+    {
+      "name": "pages_comment",
+      "baselineSchemaSha256": "6ad3cc93a58304b0bf53c9591c55e785d8853ffb717770196f45a1a35cb53305",
+      "currentSchemaSha256": "6ad3cc93a58304b0bf53c9591c55e785d8853ffb717770196f45a1a35cb53305",
+      "identical": true
+    },
+    {
+      "name": "pages_comment_reply",
+      "baselineSchemaSha256": "deb3852b7fc16e2ac9af90772ee0d524d4bf43910014e28df7893d7582e1c7f7",
+      "currentSchemaSha256": "deb3852b7fc16e2ac9af90772ee0d524d4bf43910014e28df7893d7582e1c7f7",
+      "identical": true
+    },
+    {
+      "name": "pages_comment_resolve",
+      "baselineSchemaSha256": "d0f5bc9da909741511a4eb49e7edb641bc2bf4d60aa6af4c617e0b524047473b",
+      "currentSchemaSha256": "d0f5bc9da909741511a4eb49e7edb641bc2bf4d60aa6af4c617e0b524047473b",
+      "identical": true
+    },
+    {
+      "name": "pages_comments",
+      "baselineSchemaSha256": "1ef86d391ff760ee154549f2baacacdf84cc1a98f0a591e3a465de159609bc8f",
+      "currentSchemaSha256": "1ef86d391ff760ee154549f2baacacdf84cc1a98f0a591e3a465de159609bc8f",
+      "identical": true
+    },
+    {
+      "name": "pages_create",
+      "baselineSchemaSha256": "aeba2cbd50fe04c424f766948fb117bda0aef2cbf53578e2cb0b2b0d63894d6a",
+      "currentSchemaSha256": "aeba2cbd50fe04c424f766948fb117bda0aef2cbf53578e2cb0b2b0d63894d6a",
+      "identical": true
+    },
+    {
+      "name": "pages_edit",
+      "baselineSchemaSha256": "79200cdfbf07cc0590bf195ecbd2108b98130c9ab168c00797d8c3eaddfd6d08",
+      "currentSchemaSha256": "79200cdfbf07cc0590bf195ecbd2108b98130c9ab168c00797d8c3eaddfd6d08",
+      "identical": true
+    },
+    {
+      "name": "pages_list",
+      "baselineSchemaSha256": "7577e0767072ca4e22fed4eab1323680d4ff6dd5a22c290bba27a08f6ae245b9",
+      "currentSchemaSha256": "7577e0767072ca4e22fed4eab1323680d4ff6dd5a22c290bba27a08f6ae245b9",
+      "identical": true
+    },
+    {
+      "name": "pages_read",
+      "baselineSchemaSha256": "5d5bc03e8851e3664a3072cd0847d1a66a2ba36a7c31ea29012f10aa7cca7943",
+      "currentSchemaSha256": "5d5bc03e8851e3664a3072cd0847d1a66a2ba36a7c31ea29012f10aa7cca7943",
+      "identical": true
+    },
+    {
+      "name": "studio_delete_items",
+      "baselineSchemaSha256": "02ce22495e9dea63437e1337f84be92396e3a15200f52662b2ef9d679fb01478",
+      "currentSchemaSha256": "02ce22495e9dea63437e1337f84be92396e3a15200f52662b2ef9d679fb01478",
+      "identical": true
+    },
+    {
+      "name": "studio_list_items",
+      "baselineSchemaSha256": "cdccd541b1db7279671f82ff4125646940ea4edddfccff070b0e59a5c96532de",
+      "currentSchemaSha256": "cdccd541b1db7279671f82ff4125646940ea4edddfccff070b0e59a5c96532de",
+      "identical": true
+    },
+    {
+      "name": "studio_list_spaces",
+      "baselineSchemaSha256": "93ab7499dc3c616f8db8780fed0d9f69270803cda913882ad2ef3943db8d7225",
+      "currentSchemaSha256": "93ab7499dc3c616f8db8780fed0d9f69270803cda913882ad2ef3943db8d7225",
+      "identical": true
+    },
+    {
+      "name": "studio_space_items",
+      "baselineSchemaSha256": "f95d73e7ea92c76e4f77f2d81039e6e4926efc7dde39151155758ea13a2bdce5",
+      "currentSchemaSha256": "f95d73e7ea92c76e4f77f2d81039e6e4926efc7dde39151155758ea13a2bdce5",
+      "identical": true
+    },
+    {
+      "name": "studio_tag_items",
+      "baselineSchemaSha256": "15df68ba79e9c7d11ced2286c53bad35f9bdbb0a75053158c51145d60d93273d",
+      "currentSchemaSha256": "15df68ba79e9c7d11ced2286c53bad35f9bdbb0a75053158c51145d60d93273d",
+      "identical": true
+    },
+    {
+      "name": "tables_create",
+      "baselineSchemaSha256": "7ec5393768c68513f1c6d758cf0abdc5f7d35cbe12990aa1f7075c92758e328f",
+      "currentSchemaSha256": "7ec5393768c68513f1c6d758cf0abdc5f7d35cbe12990aa1f7075c92758e328f",
+      "identical": true
+    },
+    {
+      "name": "tables_delete",
+      "baselineSchemaSha256": "3c82577142ba8500831e04fabc167cea166fd64013d32b3b3b4f87e524f37a6c",
+      "currentSchemaSha256": "3c82577142ba8500831e04fabc167cea166fd64013d32b3b3b4f87e524f37a6c",
+      "identical": true
+    },
+    {
+      "name": "tables_delete_rows",
+      "baselineSchemaSha256": "38789218d37ea3c2cdf9aab62380e95a3a37a0ec9d9fe03e2183640466b58f5e",
+      "currentSchemaSha256": "38789218d37ea3c2cdf9aab62380e95a3a37a0ec9d9fe03e2183640466b58f5e",
+      "identical": true
+    },
+    {
+      "name": "tables_insert",
+      "baselineSchemaSha256": "c2f2ea75b69f9292f6c52a01ff03b120f460903cc45e3f92f617e48abc5c6ae2",
+      "currentSchemaSha256": "c2f2ea75b69f9292f6c52a01ff03b120f460903cc45e3f92f617e48abc5c6ae2",
+      "identical": true
+    },
+    {
+      "name": "tables_list",
+      "baselineSchemaSha256": "93ab7499dc3c616f8db8780fed0d9f69270803cda913882ad2ef3943db8d7225",
+      "currentSchemaSha256": "93ab7499dc3c616f8db8780fed0d9f69270803cda913882ad2ef3943db8d7225",
+      "identical": true
+    },
+    {
+      "name": "tables_query",
+      "baselineSchemaSha256": "a9e7584ffea60f2e4d6253dec198138b4d7785640b56f02ff1063f39a2aa3db4",
+      "currentSchemaSha256": "a9e7584ffea60f2e4d6253dec198138b4d7785640b56f02ff1063f39a2aa3db4",
+      "identical": true
+    },
+    {
+      "name": "tables_schema",
+      "baselineSchemaSha256": "3c82577142ba8500831e04fabc167cea166fd64013d32b3b3b4f87e524f37a6c",
+      "currentSchemaSha256": "3c82577142ba8500831e04fabc167cea166fd64013d32b3b3b4f87e524f37a6c",
+      "identical": true
+    },
+    {
+      "name": "tables_update",
+      "baselineSchemaSha256": "1400179138e2c36507a7acee8e01ab5fdd921961038fc72911236a2472b61115",
+      "currentSchemaSha256": "1400179138e2c36507a7acee8e01ab5fdd921961038fc72911236a2472b61115",
+      "identical": true
+    },
+    {
+      "name": "talk_list",
+      "baselineSchemaSha256": "4f281280d0d30c20a2d9d8f25e54fa364e27ab5914497a20719a7e6b33463dad",
+      "currentSchemaSha256": "4f281280d0d30c20a2d9d8f25e54fa364e27ab5914497a20719a7e6b33463dad",
+      "identical": true
+    },
+    {
+      "name": "talk_read",
+      "baselineSchemaSha256": "33b2e7c128f016a05fb510283d3775233768ebffb81ba057e63e42159457dbca",
+      "currentSchemaSha256": "33b2e7c128f016a05fb510283d3775233768ebffb81ba057e63e42159457dbca",
+      "identical": true
+    },
+    {
+      "name": "talk_search",
+      "baselineSchemaSha256": "91ced60a0c1a404d632c6e6c26514f324bbb5cb0c408b1401792db7512cb93da",
+      "currentSchemaSha256": "91ced60a0c1a404d632c6e6c26514f324bbb5cb0c408b1401792db7512cb93da",
+      "identical": true
+    },
+    {
+      "name": "tasks_board_create",
+      "baselineSchemaSha256": "96066c7ea6f3a31b4cc1839d66acf967d545e5e5e90f8563a2de594c4195e387",
+      "currentSchemaSha256": "96066c7ea6f3a31b4cc1839d66acf967d545e5e5e90f8563a2de594c4195e387",
+      "identical": true
+    },
+    {
+      "name": "tasks_boards",
+      "baselineSchemaSha256": "7577e0767072ca4e22fed4eab1323680d4ff6dd5a22c290bba27a08f6ae245b9",
+      "currentSchemaSha256": "7577e0767072ca4e22fed4eab1323680d4ff6dd5a22c290bba27a08f6ae245b9",
+      "identical": true
+    },
+    {
+      "name": "tasks_create",
+      "baselineSchemaSha256": "c96b3e68c0dd854e950891c173b3781b41da6e7b8646bc60a7a16bfd99777ba8",
+      "currentSchemaSha256": "097fe11cabd14f5b5452900ed1344a005d5cb668698faeaa00d71ea32a63ecd3",
+      "identical": false
+    },
+    {
+      "name": "tasks_get",
+      "baselineSchemaSha256": "3f4ca4c56f81825cb27c509e188096adf58ffe5d7fcc60e25bce14bbe6da2d15",
+      "currentSchemaSha256": "3f4ca4c56f81825cb27c509e188096adf58ffe5d7fcc60e25bce14bbe6da2d15",
+      "identical": true
+    },
+    {
+      "name": "tasks_list",
+      "baselineSchemaSha256": "4081504fdd9ac8bee3c2a8009a1bfaa0bfc48731f24ae0e151d36f3d083d2fce",
+      "currentSchemaSha256": "4081504fdd9ac8bee3c2a8009a1bfaa0bfc48731f24ae0e151d36f3d083d2fce",
+      "identical": true
+    },
+    {
+      "name": "tasks_update",
+      "baselineSchemaSha256": "4aa8fb3183d640b7a7799a7d5f3d205680cd5d23b361351ccec5c88169794f09",
+      "currentSchemaSha256": "32ecfa381803f963f728a191a63b95d3226cbb66f676cc00931ef53b6f560104",
+      "identical": false
+    }
+  ],
+  "migration": {
+    "studio_tables": {
+      "id": "tbl_1f3a23d395a22855",
+      "present": true
+    },
+    "feed_posts": {
+      "id": "post_e0abd7e90804fa03",
+      "present": true
+    },
+    "tasks": {
+      "id": "tsk_4dac62662c367c6c",
+      "present": true
+    },
+    "bots": {
+      "id": "bot_4ccbe4989416b10d",
+      "present": true
+    },
+    "conversations": {
+      "id": "133ab2f3-1d63-40fb-b7f3-41a4488a0381",
+      "present": true
+    },
+    "artifacts": {
+      "id": "art_0a50d7843d0cd019",
+      "present": true
+    },
+    "recordings": {
+      "id": "rec_7997528ba70d716e",
+      "present": true
+    },
+    "bot_home_retained": true,
+    "recording_audio": {
+      "sha256": "643f8a8dc8bd9c19225afffad2becfec5426180b3749cb208abdf1a6c8354efc",
+      "bytes": 32044,
+      "exact": true
+    },
+    "import_receipts_unchanged_after_reload": true,
+    "original_databases_retained": true,
+    "installed_plugins": [
+      {
+        "id": "emoji-react",
+        "enabled": 1,
+        "git_resolved_commit": "8d8d1d2cf99deca4060719d0034cc2276b4f1ec0"
+      },
+      {
+        "id": "excalidraw",
+        "enabled": 1,
+        "git_resolved_commit": "8d8d1d2cf99deca4060719d0034cc2276b4f1ec0"
+      },
+      {
+        "id": "float",
+        "enabled": 1,
+        "git_resolved_commit": "8d8d1d2cf99deca4060719d0034cc2276b4f1ec0"
+      },
+      {
+        "id": "mobile",
+        "enabled": 1,
+        "git_resolved_commit": "8d8d1d2cf99deca4060719d0034cc2276b4f1ec0"
+      },
+      {
+        "id": "pages",
+        "enabled": 1,
+        "git_resolved_commit": "c3c528684ebcd2359c61aee57f7e53e68213a0b0"
+      },
+      {
+        "id": "studio",
+        "enabled": 1,
+        "git_resolved_commit": "c3c528684ebcd2359c61aee57f7e53e68213a0b0"
+      }
+    ]
+  },
+  "imports": [
+    {
+      "module": "artifacts",
+      "legacy_plugin_id": "artifacts",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/artifacts/data.db",
+      "imported_at": 1791024683438,
+      "settings_count": 0,
+      "kv_count": 0
+    },
+    {
+      "module": "chat",
+      "legacy_plugin_id": "studio-chat",
+      "source": null,
+      "imported_at": 1791021243250,
+      "settings_count": 0,
+      "kv_count": 1
+    },
+    {
+      "module": "decisions",
+      "legacy_plugin_id": "smart-decisions",
+      "source": null,
+      "imported_at": 1791025058246,
+      "settings_count": 1,
+      "kv_count": 1
+    },
+    {
+      "module": "feed",
+      "legacy_plugin_id": "feed",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/feed/data.db",
+      "imported_at": 1791022585245,
+      "settings_count": 2,
+      "kv_count": 0
+    },
+    {
+      "module": "navigation",
+      "legacy_plugin_id": "studio-navigation",
+      "source": null,
+      "imported_at": 1791026033876,
+      "settings_count": 0,
+      "kv_count": 0
+    },
+    {
+      "module": "sidebar",
+      "legacy_plugin_id": "thread-list-plus",
+      "source": null,
+      "imported_at": 1791026761564,
+      "settings_count": 0,
+      "kv_count": 2
+    },
+    {
+      "module": "tables",
+      "legacy_plugin_id": "studio-tables",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/studio-tables/data.db",
+      "imported_at": 1791021243243,
+      "settings_count": 0,
+      "kv_count": 0
+    },
+    {
+      "module": "talk",
+      "legacy_plugin_id": "talk",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/talk/data.db",
+      "imported_at": 1791025695059,
+      "settings_count": 0,
+      "kv_count": 0
+    },
+    {
+      "module": "tasks",
+      "legacy_plugin_id": "studio-tasks",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/studio-tasks/data.db",
+      "imported_at": 1791022585234,
+      "settings_count": 0,
+      "kv_count": 0
+    },
+    {
+      "module": "teams",
+      "legacy_plugin_id": "bot-teams",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/bot-teams/data.db",
+      "imported_at": 1791023838906,
+      "settings_count": 0,
+      "kv_count": 0
+    },
+    {
+      "module": "explore",
+      "legacy_plugin_id": "explore",
+      "source": "/tmp/bb-studio-consolidation-staged/data/plugins/explore/data.db",
+      "imported_at": 1791027663844,
+      "settings_count": 2,
+      "kv_count": 0
+    }
+  ],
+  "explore": {
+    "rowsExactlyEqual": true,
+    "feedDigest": false,
+    "workerTimeoutMinutes": 17,
+    "nestedCliVerified": "bb pages explore list",
+    "liveCompanionCapturePassed": true
+  },
+  "sidebar": {
+    "preferencesExactlyEqual": true,
+    "liveCapturePassed": true
+  },
+  "native": {
+    "verifiedCommit": "682547f plus TableView and SpaceViews compatibility fixes",
+    "tests": 96,
+    "skipped": 1,
+    "failures": 0,
+    "simulatorBuild": "passed",
+    "workerThread": "thr_wm4xxsxaax"
+  }
+}

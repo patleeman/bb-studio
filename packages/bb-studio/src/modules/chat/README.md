@@ -27,7 +27,7 @@ navigation. No agent runs.
 The same recovered crop, edited prompt, and attachment fit at 390 by 844
 pixels. Resizing keeps the exact native composer mounted; the capture checks
 the image and every visible composer button's bounds and click target.
-Run `BB_CAPTURE_CHAT_COMPACT=1 BB_CAPTURE_ONLY=studio-chat node scripts/capture-plugin-screenshots.mjs --plugin studio-chat` after sourcing staged BB's `capture.env`.
+Run `BB_CAPTURE_CHAT_COMPACT=1 BB_CAPTURE_ONLY=studio-chat node scripts/capture-plugin-screenshots.mjs --plugin studio` after sourcing staged BB's `capture.env`.
 
 ## What you get
 
@@ -100,7 +100,7 @@ pnpm install
 pnpm --filter @bb-studio/studio-chat test
 pnpm --filter @bb-studio/studio-chat typecheck
 bb plugin build packages/bb-studio
-node scripts/staged-bb.mjs start --plugin studio-chat
+node scripts/staged-bb.mjs start --plugin studio
 ```
 
 Requires [Studio](../../../../bb-studio) to resolve item context. The item header and

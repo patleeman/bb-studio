@@ -58,6 +58,12 @@ const captures = [
   ...bb_studio_navigation(context)
 ];
 
+const selectedCaptures = captures.filter(capture =>
+  (!captureOnly || captureOnly.has(capture.id)) &&
+  (!packageOnly || capture.packageDir === packageOnly || capture.packageDir.startsWith(packageOnly + "/")),
+);
+if (!selectedCaptures.length) throw new Error("No captures match the selected plugin and capture IDs.");
+
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
 const client = new CdpClient(webSocketUrl);
 await client.connect();
@@ -69,8 +75,7 @@ await client.command("Emulation.setDeviceMetricsOverride", {
 });
 
 try {
-  for (const capture of captures) {
-    if ((captureOnly && !captureOnly.has(capture.id)) || (packageOnly && capture.packageDir !== packageOnly && !capture.packageDir.startsWith(`${packageOnly}/src/modules/`))) continue;
+  for (const capture of selectedCaptures) {
     process.stdout.write(`Capturing ${capture.id}...\n`);
     const cleanup = await capture.setup(client);
     try {

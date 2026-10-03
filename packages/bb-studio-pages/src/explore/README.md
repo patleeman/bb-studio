@@ -28,8 +28,8 @@ The rows' wording is the agent's, so it changes from run to run.
 
 ![A pinned explainer and its saved page in shared companion tabs](assets/companion-preview.png)
 
-Captured on stable BB 0.45.0 with the full suite installed from 786fd2f and
-Explore updated from pushed commit 6d900de. The check seeds writing and ready
+Captured on stable BB 0.45.0 after upgrading Pages from the 17-plugin layout
+to pushed consolidation commit 1cf45d4. The check seeds writing and ready
 job states in the isolated plugin database and creates the saved HTML page
 through Pages RPC. It verifies both the complete and thread-filtered lists,
 progress becoming a document in the same destination, repeated opens without
@@ -38,7 +38,7 @@ and back, and the persisted pin. No worker runs; fixtures are removed.
 
 ```sh
 BB_CAPTURE_EXPLORE_COMPANIONS=1 BB_CAPTURE_ONLY=explore-companions \
-  node scripts/capture-plugin-screenshots.mjs --plugin explore
+  node scripts/capture-plugin-screenshots.mjs --plugin pages
 ```
 
 ## What you get
@@ -107,7 +107,7 @@ failing a job stops and archives its hidden thread.
 
 ## Track a finding as a task
 
-With Studio Tasks installed and running, **Track task** beside a finding
+With Studio installed and running, **Track task** beside a finding
 creates an unassigned task on the source project's main board. It preserves
 the source thread, message, and saved explainer, and joins the thread's Studio
 spaces when Studio is available. It does not start an agent. Open the task to
@@ -116,7 +116,7 @@ assign it and use the usual handoff and review controls.
 The button becomes **Open task**. Repeated or concurrent clicks reuse the
 same task, including after a restart. If you delete the task, another explicit
 click creates a replacement. Without Tasks, the button says **Tasks unavailable**;
-install or enable Tasks, then return to the window to check again.
+install or enable Studio, then return to the window to check again.
 
 ## With Studio Feed
 
@@ -167,7 +167,7 @@ the tool, and the CLI.
 
 ## Storage
 
-Explainers and their jobs live in this plugin's SQLite database in the BB
+Explainers and their jobs live in Pages’ separate explore.db SQLite database in the BB
 data directory. The pages themselves are in Studio Pages. Explainers written
 while Explore was part of Pages stay in Pages as ordinary pages, but their
 rows under old replies start fresh.

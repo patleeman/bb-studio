@@ -52,7 +52,7 @@ No agent runs, and the capture deletes its fixtures afterward.
 
 ```sh
 BB_CAPTURE_FEED_COMPANIONS=1 BB_CAPTURE_ONLY=feed-companions \
-  node scripts/capture-plugin-screenshots.mjs --plugin feed
+  node scripts/capture-plugin-screenshots.mjs --plugin studio
 ```
 
 ## Moving Feed views

@@ -38,7 +38,7 @@ Review. A task the user moved to To do or Done stays there.
 **If you're working on a handed-off task:** when the work is ready, call
 `tasks_update` with `status: "review"` and a one-line `note` saying what you
 did. Link what you made with `addLinks` (for a saved artifact,
-`{ pluginId: "artifacts", itemId: "art_…", label: "…" }`). Don't mark the
+`{ pluginId: "studio", itemId: "art_…", label: "…" }`). Don't mark the
 task done: the user does that after reviewing. The user may send feedback
 back into your thread, which moves the task to In progress again.
 

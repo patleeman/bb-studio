@@ -372,7 +372,7 @@ struct SpaceWidgetCard: View {
         guard let pluginId = kind.pluginId, let id = kind.id else { return }
         let spaceId = target.spaceId.addingPercentEncoding(withAllowedCharacters: .urlPathAllowed) ?? target.spaceId
         if kind.event != nil {
-            openWeb(pluginId == "bot-teams" ? "/plugins/bot-teams/bots/new/space/\(spaceId)" : "/plugins/studio/studio/space/\(spaceId)")
+            openWeb((pluginId == "bot-teams" || (pluginId == "studio" && id == "bot")) ? "/plugins/studio/bots/new/space/\(spaceId)" : "/plugins/studio/studio/space/\(spaceId)")
             return
         }
         busy = "\(pluginId):\(id)"

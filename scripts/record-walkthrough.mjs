@@ -79,8 +79,8 @@ const ownScenes = {
     return cleanup;
   },
   "studio-tasks": async (client) => {
-    const { board } = await pluginRpc("studio-tasks", "boardCreate", { title: "Fall launch", projectId });
-    const cleanup = () => pluginRpc("studio-tasks", "boardDelete", { id: board.id }).catch(() => {});
+    const { board } = await pluginRpc("studio", "tasks_boardCreate", { title: "Fall launch", projectId });
+    const cleanup = () => pluginRpc("studio", "tasks_boardDelete", { id: board.id }).catch(() => {});
     try {
       const tasks = [
         { title: "Write the launch post", status: "todo", assignee: "me", due: "2026-10-06", priority: "high", labels: ["launch"] },
@@ -89,7 +89,7 @@ const ownScenes = {
         { title: "Add offline sync to settings", status: "review", assignee: "agent" },
         { title: "Draft the Q3 usage report", status: "done", assignee: "me" },
       ];
-      for (const task of tasks) await pluginRpc("studio-tasks", "create", { ...task, projectId, boardId: board.id });
+      for (const task of tasks) await pluginRpc("studio", "tasks_create", { ...task, projectId, boardId: board.id });
       await client.navigate(`/plugins/studio-tasks/tasks/${board.id}`);
       for (const text of ["To do", "In progress", "Review", "Done", ...tasks.map((task) => task.title)]) await client.waitForText(text);
       await sleep(800);
@@ -107,8 +107,8 @@ const ownScenes = {
   },
   feed: async (client) => {
     // Seeded agent threads may already have posted; the capture counts unread posts.
-    for (const line of (await bbCli(["feed", "list", "--all"])).split("\n").filter(Boolean)) {
-      await pluginRpc("feed", "read", { postId: line.split("\t")[0], read: true });
+    for (const line of (await bbCli(["studio", "feed", "list", "--all"])).split("\n").filter(Boolean)) {
+      await pluginRpc("studio", "feed_read", { postId: line.split("\t")[0], read: true });
     }
     return captures.find((capture) => capture.id === "feed").setup(client);
   },

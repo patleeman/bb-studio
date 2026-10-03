@@ -28,7 +28,7 @@ struct StudioTableView: View {
         }
         .navigationTitle(table?.title ?? "Table")
         .toolbar { Button { showingRelated = true } label: { Label("Related", systemImage: "link") } }
-        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "studio-tables", itemId: id) }
+        .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "studio", itemId: id) }
         .accessibilityIdentifier("studioTable")
         .refreshable { await load() }
         .task(id: id) { await load() }

@@ -50,7 +50,7 @@ the main pane shows another item.
 The same draft and attachment stay in place at 390 by 844 pixels. If BB's
 compact input clips the inline toolbar, Talk uses its floating controls so
 Pause and Stop stay reachable. Run this capture in staged BB with
-`BB_CAPTURE_TALK_COMPANION=1 BB_CAPTURE_ONLY=talk-companion-return node scripts/capture-plugin-screenshots.mjs --plugin talk`.
+`BB_CAPTURE_TALK_COMPANION=1 BB_CAPTURE_ONLY=talk-companion-return node scripts/capture-plugin-screenshots.mjs --plugin studio`.
 
 ![Talk playback returned to its original main view](assets/companion-playback.png)
 
@@ -63,7 +63,7 @@ optimized host; no Talk source change was needed.
 
 ```sh
 BB_CAPTURE_TALK_PLAYBACK=1 BB_CAPTURE_ONLY=talk-playback-transfer \
-  node scripts/capture-plugin-screenshots.mjs --plugin talk
+  node scripts/capture-plugin-screenshots.mjs --plugin studio
 ```
 
 ![Talk recording page with cleanup and audio playback](assets/staged-preview.png)
