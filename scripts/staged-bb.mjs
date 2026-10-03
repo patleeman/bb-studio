@@ -21,6 +21,7 @@ import { cp, mkdir, open, readFile, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
+import { seedStudioItems } from "./staged-items.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const repoSource = "git:github.com/patleeman/bb-studio";
@@ -266,6 +267,9 @@ async function start() {
   for (const title of ORBIT_THREADS) {
     threads.push(await bb("thread", "spawn", "--project", project.id, "--title", title, "--prompt", `${title}.`, "--send-at", "30d"));
   }
+
+  const collection = await seedStudioItems(pluginRpc, project.id);
+  await writeFile(join(stagedDir, "collection-fixtures.json"), JSON.stringify(collection, null, 2) + "\n");
 
   // Talk's meeting notes and Studio Decisions fall back to this model.
   await bb(...(await hasStudioModule("decisions") ? ["studio", "smart-decisions"] : ["smart-decisions"]), "fallback", "codex", "gpt-6-luna", "low");
