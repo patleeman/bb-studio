@@ -189,6 +189,8 @@ function SettingsPage({ space }: { space: Space }) {
         <p className="text-sm text-muted-foreground">{bots.length ? `${bots.length} ${bots.length === 1 ? "bot works" : "bots work"} in this space.` : "No bots work in this space yet."}</p>
       </section>
 
+      <LegacyDataSection />
+
       {!space.isDefault
         ? <section className="mt-10 border-t border-border pt-6">
             <h2 className="mb-1 text-sm font-medium">Delete space</h2>
@@ -276,5 +278,68 @@ function NewBotPage({ space }: { space: Space }) {
         </div>
       </form>
     </PageColumn>
+  );
+}
+
+interface CleanupEntry { pluginId: string; path: string; status: "ready" | "retained" | "removed"; reason: string; files: number; bytes: number }
+interface CleanupResult { dryRun: boolean; archivePath: string | null; entries: CleanupEntry[] }
+
+/**
+ * Data left behind by the plugins Studio absorbed. Check first (nothing
+ * changes), then back up and remove: the archive is written and verified
+ * before anything is deleted.
+ */
+function LegacyDataSection() {
+  const call = useCall();
+  const [result, setResult] = useState<CleanupResult | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const run = async (dryRun: boolean) => {
+    setBusy(true); setError(null);
+    try { setResult(await call("modules_cleanup_legacy", { dryRun }) as CleanupResult); }
+    catch (cause) { setError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setBusy(false); }
+  };
+  const size = (bytes: number) => new Intl.NumberFormat(undefined, { style: "unit", unit: bytes >= 1e6 ? "megabyte" : "kilobyte", maximumFractionDigits: 1 }).format(bytes >= 1e6 ? bytes / 1e6 : bytes / 1e3);
+  const ready = result?.entries.filter((entry) => entry.status === "ready") ?? [];
+  return (
+    <section className="mt-10">
+      <h2 className="mb-1 text-sm font-medium">Old plugin data</h2>
+      <p className="mb-3 text-sm text-muted-foreground">Studio copied the data of the plugins it replaced. The old copies can be backed up to one archive and removed. This applies to all spaces.</p>
+      {error ? <p role="alert" className="mb-2 text-sm text-destructive">{error}</p> : null}
+      {result
+        ? <>
+            {result.archivePath && !result.dryRun
+              ? <p className="mb-2 text-sm">Backed up to <span className="font-mono text-xs">{result.archivePath}</span></p>
+              : null}
+            <ul className="mb-3 divide-y divide-border rounded-md border border-border">
+              {result.entries.map((entry) => (
+                <li key={entry.path} className="flex items-baseline gap-3 px-3 py-2 text-sm">
+                  <span className="w-28 shrink-0 font-medium">{entry.pluginId}</span>
+                  <span className="min-w-0 flex-1 text-muted-foreground">{entry.reason}</span>
+                  <span className="shrink-0 text-xs tabular-nums text-muted-foreground">{entry.files} files · {size(entry.bytes)}</span>
+                  <span className={`shrink-0 text-xs ${entry.status === "ready" ? "text-foreground" : entry.status === "removed" ? "text-success-foreground" : "text-muted-foreground"}`}>
+                    {entry.status === "ready" ? "Can remove" : entry.status === "removed" ? "Removed" : "Kept"}
+                  </span>
+                </li>
+              ))}
+              {!result.entries.length ? <li className="px-3 py-2 text-sm text-muted-foreground">No old plugin data found.</li> : null}
+            </ul>
+          </>
+        : null}
+      <div className="flex gap-2">
+        <button type="button" disabled={busy} onClick={() => void run(true)} className={OUTLINE_BUTTON}>{result ? "Check again" : "Check"}</button>
+        {result?.dryRun && ready.length
+          ? <button
+              type="button"
+              disabled={busy}
+              onClick={() => { if (confirm(`Back up and remove old data for ${ready.map((entry) => entry.pluginId).join(", ")}?`)) void run(false); }}
+              className={DANGER_BUTTON}
+            >
+              Back up and remove
+            </button>
+          : null}
+      </div>
+    </section>
   );
 }
