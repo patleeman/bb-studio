@@ -2,10 +2,13 @@
 
 ## Staged environment
 
-Stable BB 0.45.0, six-plugin Git install at `10acf56`, isolated server on 52186.
+Stable BB 0.45.0. Web and native captures use the six-plugin Git install at
+`6089c1d` on isolated server 52386; the native app includes `1bf08d1`. A second
+clean six-plugin install at `1bf08d1` on 52486 passes the [fresh install checks](fresh-install.json).
 The capture seed creates three bots (Atlas, Scribe, Quinn), a channel, an Atlas
 DM, a reviewed task, a report, and an inert plugin approval. No bot turn or
-approval is dispatched. `fixtures.json` records the staged IDs.
+approval is dispatched. `fresh-install.json` records the final install IDs; `capture-fixtures.json` records
+the screenshot fixture; `fixtures.json` preserves the first capture fixture.
 
 ## Web captures
 
@@ -32,12 +35,35 @@ Private simulator `CF1B0476-6432-46CB-8EB3-255297208A71`, iOS 27.0. Build succee
 - [Home](office-home-ios.png)
 - [Work](office-work-ios.png)
 - [Team](office-team-ios.png)
+- [Bot desk: Chat](office-bot-chat-ios.png)
+- [Bot desk: Tasks](office-bot-tasks-ios.png)
 
-Inbox, Home, and Work capture tests passed. Team rendered correctly, but tapping
-the Atlas NavigationLink did not open the bot desk. The failure reproduced with
-the actual accessible button after an initial static-text selector attempt.
-Reported to the coordinator; native bot-desk captures and the full UI-test result
-remain pending. Raw result: `/tmp/stage9-ios-office/results.xcresult`.
+All four Office capture tests pass, producing all six screenshots. The checks
+assert the real request, report, channel, Atlas desk, and assigned review task.
+Two navigation bugs found during capture were fixed by the coordinator in
+`c47f355` and `1bf08d1`. Raw result: `/tmp/stage9-ios-final/results.xcresult`.
+
+### Full UI test run
+
+[All failures and counts](ios-ui-results.json): **90 tests, 22 passed, 55 skipped,
+13 failed**. The runner uses the explicit isolated server on 52186; no production
+server is contacted. Raw results: `/tmp/stage9-ios-full/results.xcresult`.
+
+Failures are retained, not suppressed:
+
+- `testBotInStudio`, `testChannelAutomations`, `testChannelManagement`,
+  `testQuickCapture`, `testStudio`, `testStudioBulk`, `testStudioChat`, and
+  `testThreadExtras` expect old placement, controls, or menus.
+- `testMessageSentTime`, `testRecordingPlayback`, and `testTools` rely on
+  message, media, or Daily fixtures that this staged seed does not provide.
+- `testQueueRemove` finds the removal control but the queued card stays visible.
+  This remains a potential product failure, reported to the coordinator.
+- `testPluginStatusAndWorkspaceChoices` passes the plugin-status screen, then
+  cannot find the New thread navigation bar after opening `bbstudio://new`.
+
+Skipped tests are not evidence that their workflows work. The four Office
+capture tests deliberately skip in this broad run unless their capture fixture
+is explicitly enabled. Other skips retain their existing fixture guards.
 
 ## Legacy cleanup
 
@@ -47,6 +73,14 @@ was verified. All seven current collection items remained unchanged. Teams was
 retained because its bot homes still use that directory. A repeated dry run
 reports only the retained directory. No production data directory was touched.
 
-The RPC, generated contracts, and six focused tests are committed in `1eb716f`
-and `4d23945`. Full `pnpm check` passed before the final log-archive addition;
-its focused test suite passed afterward. Final suite/install verification is pending.
+The RPC is `modules_cleanup_legacy({dryRun})`; dry-run defaults to true.
+Implementation and archive hardening: `1eb716f`, `4d23945`, `4befc7b`.
+
+## Repository checks
+
+Full `pnpm check` passes, including stable compatibility, contracts, 167 native
+RPC call sites, 32 payload fixtures, marketplace, docs, and the packed kit.
+Log: `/tmp/stage9-release-check.log`. A timing-dependent table fixture failure
+was fixed in `2553c55` by stubbing its debounced notification RPC.
+The last fresh staged install uses final implementation commit `1bf08d1`;
+later changes only affect tests and evidence.

@@ -35,7 +35,7 @@ bb plugin install .
 
 The private iPhone simulator shows the staged Inbox request, review task, and
 report. [Office QA evidence](../../docs/review-evidence/2026-10-03/office/) includes
-Home, Work, and Team captures from the same server.
+Home, Work, Team, and bot desk Chat and Tasks captures from the same server.
 
 
 ![Studio Mobile settings in the running BB app](assets/staged-preview.png)

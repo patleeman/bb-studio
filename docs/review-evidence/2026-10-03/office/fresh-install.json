@@ -1,0 +1,100 @@
+{
+  "commit": "1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+  "bbVersion": "0.45.0",
+  "server": "http://127.0.0.1:52486",
+  "installed": [
+    {
+      "id": "emoji-react",
+      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "status": "running",
+      "enabled": true
+    },
+    {
+      "id": "excalidraw",
+      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "status": "running",
+      "enabled": true
+    },
+    {
+      "id": "float",
+      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "status": "running",
+      "enabled": true
+    },
+    {
+      "id": "mobile",
+      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "status": "running",
+      "enabled": true
+    },
+    {
+      "id": "pages",
+      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "status": "running",
+      "enabled": true
+    },
+    {
+      "id": "studio",
+      "source": "git:github.com/patleeman/bb-studio@1bf08d1db2bbccdfa1cb4f5f9a445f0c6603c811",
+      "status": "running",
+      "enabled": true
+    }
+  ],
+  "modules": {
+    "active": [
+      "sidebar",
+      "navigation",
+      "talk",
+      "decisions",
+      "artifacts",
+      "teams",
+      "tasks",
+      "feed",
+      "tables",
+      "chat"
+    ],
+    "legacyInstalled": []
+  },
+  "overviewKinds": [
+    "artifact",
+    "board",
+    "drawing",
+    "page",
+    "recording",
+    "table",
+    "task"
+  ],
+  "homeRecent": 8,
+  "inboxRequests": 2,
+  "inboxReports": 1,
+  "cleanup": {
+    "dryRun": true,
+    "archivePath": null,
+    "entries": []
+  },
+  "fixture": {
+    "projectId": "proj_p2na8gyi4c",
+    "threadId": "thr_s3iujkw47y",
+    "spaceId": "spc_personal",
+    "botId": "bot_bbf780c34abeefee",
+    "bots": [
+      {
+        "id": "bot_bbf780c34abeefee",
+        "name": "Atlas"
+      },
+      {
+        "id": "bot_b995e955f56823ca",
+        "name": "Scribe"
+      },
+      {
+        "id": "bot_6460afabc183d22c",
+        "name": "Quinn"
+      }
+    ],
+    "channelId": "3b053e47-d228-4b8b-9faf-27020e1db663",
+    "dmThreadId": "thr_9vtvdd9e68",
+    "taskId": "tsk_82244cb5e93e1c74",
+    "postId": "post_8877cab3444f679c",
+    "approvalId": "stage9-f1f687c4-8ed8-4f39-9298-c8accf3157f7"
+  }
+}
