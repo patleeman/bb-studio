@@ -45,7 +45,7 @@
       {
         "id": "bb-studio",
         "name": "BB Studio",
-        "description": "The Silk S icon's colors: teal-black ground, a warm coral accent. Light and dark.",
+        "description": "Neutral grays that take any Space color, with the Silk S icon's warm coral accent. Light and dark.",
         "css": "./themes/bb-studio.css"
       }
     ]
