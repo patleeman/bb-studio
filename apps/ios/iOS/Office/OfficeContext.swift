@@ -37,6 +37,12 @@ final class OfficeContext {
     var currentSpace: OfficeSpace? { spaces.currentSpace }
 
     func load() async {
+        // Capability discovery belongs to the root office, not a screen the
+        // user may never open. Settings and cold deep links read this cache.
+        if let running = try? await client.runningPlugins() {
+            UserDefaults.standard.set(running.sorted().joined(separator: ","),
+                forKey: ServerScope.key("runningPlugins", serverURL: client.baseURL))
+        }
         await spaces.load()
         rebuild()
         async let current: Void = refreshCurrent()
