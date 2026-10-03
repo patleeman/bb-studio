@@ -6,7 +6,7 @@ import { ChannelData } from "./channel-data";
 import { defaultLimits } from "./workspace-contract";
 import { publishChange } from "./realtime-server";
 import { isExecuting } from "./job-state";
-import { activitySnippetFromTimeline } from "./activity";
+import { activitySnippetFromTimeline, isPassReply } from "./activity";
 import { advanceTurnClock } from "./turn-clock";
 import { jobHasProgress, retryStalled, stalledAfterRetry } from "./mission-stall";
 export const errorText = (cause: unknown) => cause instanceof Error ? cause.message : String(cause);
@@ -355,7 +355,7 @@ complete( threadId: string, text: string | null, error?: string, providerFailure
       job.status = "error";
       job.error = error;
     } else {
-      job.reply = text?.trim() || null;
+      job.reply = isPassReply(text) ? null : text?.trim() || null;
       job.error = null;
       job.status = "done";
     }

@@ -10,7 +10,7 @@ Open **Studio → New → Channel** and select bots or existing threads from any
 
 Choose a **Channel view** above the conversation. The choice is saved for each channel on this device:
 
-- **Merged** keeps the existing chronological conversation of owner input and final replies. It hides tools, inter-agent input, unfinished output and empty replies.
+- **Merged** keeps the existing chronological conversation of owner input and final replies. It hides tools, inter-agent input, unfinished output, empty replies and `[PASS]` replies from older bot prompts.
 - **Grid** shows each member’s native BB transcript, including streaming output, tool activity and message directives. Spawned children appear as links beneath their parent; explicitly selected child threads have their own tiles.
 - **Active** gives working threads and requests for input the main area. All members stay visible in a compact rail. When nobody is working, select a member or send a channel message.
 - **Focus** shows one selected thread large, with the other members in the rail. Select a member or use a tile’s **Focus thread** button to switch.

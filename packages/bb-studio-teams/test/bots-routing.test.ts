@@ -21,7 +21,7 @@ import { setup, deferred } from "./bots-fixture";
 test("successful empty missions finish quietly instead of failing or synthesizing a reply", async () => {
   const x = setup();
   try {
-    for (const [index, text] of [null, "", " \n\t"].entries()) {
+    for (const [index, text] of [null, "", " \n\t", "[PASS]", "**[pass]**"].entries()) {
       const id = `quiet-${index}`;
       x.runtime.enqueue(x.a, { id, text: "Check for changes", conversationKey: id });
       await x.runtime.drive(x.a);

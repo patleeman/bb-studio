@@ -1,7 +1,10 @@
 import { expect, test } from "vitest";
 import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { MIGRATIONS } from "../migrations";
-import { Store } from "../store";
+import { mkdtemp, readFile, writeFile } from "node:fs/promises";
+import { tmpdir } from "node:os";
+import { join } from "node:path";
+import { Store, migrateAgentsFile } from "../store";
 
 test("migrates a database created before migration tracking without losing data", async () => {
   const host = createFakePluginHost({ pluginId: "bot-teams" });
@@ -37,4 +40,14 @@ test("former direct messages become threads with a profile, listed to be shown o
   ]);
   expect(store.profileThreadsToShow().sort()).toEqual(["thr_current", "thr_earlier"]);
   await host.harness.lifecycle.dispose();
+});
+
+test("rewrites the generated [PASS] line in existing bot AGENTS.md files", async () => {
+  const home = await mkdtemp(join(tmpdir(), "bot-home-"));
+  const path = join(home, "AGENTS.md");
+  await writeFile(path, "# Persistent bot workspace\n\nOwner note: keep this.\nIf you have nothing useful to add in a group turn, answer with exactly [PASS].\n");
+  expect(await migrateAgentsFile(home)).toBe(true);
+  expect(await readFile(path, "utf8")).toBe("# Persistent bot workspace\n\nOwner note: keep this.\nIf you have nothing useful to add, finish without a final assistant message.\n");
+  expect(await migrateAgentsFile(home)).toBe(false);
+  expect(await migrateAgentsFile(join(home, "missing"))).toBe(false);
 });

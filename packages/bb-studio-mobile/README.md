@@ -3,8 +3,8 @@
 Part of BB Studio. The server side of the [BB Studio iOS app](../../apps/ios/):
 it relays BB push notifications to the app over APNs, lets other Studio
 plugins notify the same phones through its `notify` RPC, and keeps muted threads in
-sync across devices. Completion pushes with no text are suppressed for both
-APNs and Expo devices. Attachment-only completions use a preview of the attachment. See
+sync across devices. Completion pushes with no text, or only `[PASS]`, are
+suppressed for both APNs and Expo devices. Attachment-only completions use a preview of the attachment. See
 [`skills/mobile-push/SKILL.md`](skills/mobile-push/SKILL.md) for settings and
 wiring.
 

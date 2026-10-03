@@ -11,7 +11,8 @@ at `POST /api/v1/plugins/mobile/http/push` (token auth). Tokens starting with
 official mobile app keeps working.
 
 Completion pushes with absent, empty, or whitespace-only text are suppressed
-for APNs and Expo. The relay returns a successful ticket without sending an
+for APNs and Expo. So is a reply of only `[PASS]`, which older bot prompts
+still send when they have nothing to add. The relay returns a successful ticket without sending an
 alert. Attachment-only completions use a preview of the attachment. Questions,
 errors, and useful completion replies still notify normally.
 

@@ -8,6 +8,10 @@ const asRecord = (value: unknown): RecordValue | null =>
 const asText = (value: unknown): string | null =>
   typeof value === "string" && value.trim() ? value : null;
 
+/** Older bot prompts answer exactly [PASS] when they have nothing to add; treat it like an empty reply. */
+export const isPassReply = (value: string | null | undefined): boolean =>
+  /^[\s`*_~]*\[pass\][\s`*_~]*$/iu.test(value ?? "");
+
 export const normalizeActivity = (value: unknown): string | null => {
   const text = asText(value)
     ?.replace(/```[\s\S]*?```/gu, " ")
@@ -17,7 +21,7 @@ export const normalizeActivity = (value: unknown): string | null => {
     .replace(/[\\`*_~#]/gu, "")
     .replace(/\s+/gu, " ")
     .trim();
-  if (!text) return null;
+  if (!text || isPassReply(text)) return null;
   const limit = 240;
   return text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
 };

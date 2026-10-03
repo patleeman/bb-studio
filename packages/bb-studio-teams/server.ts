@@ -5,7 +5,7 @@ import type { BbPluginApi, PluginRpcHandlers } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { rpcContract } from "./client-contract";
 import { profileInput, botSchema, type Bot, type BotCreateRequest, type Conversation } from "./contract";
-import { Store, newId, document } from "./store";
+import { Store, newId, document, migrateAgentsFile } from "./store";
 import { MIGRATIONS } from "./migrations";
 import { Runtime, missingThread } from "./mission-runtime";
 import { isExecuting } from "./job-state";
@@ -434,6 +434,10 @@ export default async function plugin(bb: BbPluginApi) {
   });
   bb.background.service("bots", { async start(signal) {
     await profiles.showMigrated();
+    for (const bot of store.all()) {
+      try { if (await migrateAgentsFile(bot.home)) bb.log.info(`Replaced the [PASS] instruction in ${bot.handle}'s AGENTS.md.`); }
+      catch (cause) { bb.log.warn(`Could not update ${bot.handle}'s AGENTS.md: ${String(cause)}`); }
+    }
     let migrationRetryAt = 0;
     while (!signal.aborted) {
       if (Date.now() >= migrationRetryAt) {

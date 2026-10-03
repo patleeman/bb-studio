@@ -6,6 +6,7 @@ import type { Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
 import { isBroadcastHandle } from "./mentions";
+import { isPassReply } from "./activity";
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
 type Row = Timeline["rows"][number];
@@ -53,7 +54,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
     }
   };
   walk(rows);
-  for (const row of replies.values()) if (row.text.trim()) entries.push({
+  for (const row of replies.values()) if (row.text.trim() && !isPassReply(row.text)) entries.push({
     id: `${row.threadId}:${row.id}`, threadId: row.threadId, role: "assistant", text: row.text,
     createdAt: row.createdAt, groupId: null,
   });

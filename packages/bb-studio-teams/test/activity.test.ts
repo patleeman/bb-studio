@@ -90,8 +90,8 @@ test("nested work rows are reduced to their latest visible detail", () => {
   );
 });
 
-test("empty replies never become visible channel activity", () => {
-  for (const text of ["", " \n "])
+test("empty and legacy [PASS] replies never become visible channel activity", () => {
+  for (const text of ["", " \n ", "[PASS]", " **[pass]** "])
     assert.equal(
       activitySnippetFromTimeline({
         rows: [{ kind: "conversation", role: "assistant", text }],

@@ -933,6 +933,22 @@ export class Store {
     );
   }
 }
+const LEGACY_PASS_LINES: Record<string, string> = {
+  "If you have nothing useful to add in a group turn, answer with exactly [PASS].":
+    "If you have nothing useful to add, finish without a final assistant message.",
+  "If another addressed thread already covered your result, answer with exactly [PASS]. Scheduled reports belong in Studio Feed, grouped with stable story keys.":
+    "If another addressed thread already covered your result, finish without a final assistant message. Scheduled reports belong in Studio Feed, grouped with stable story keys.",
+};
+/** Rewrites the generated [PASS] instruction in an existing bot's AGENTS.md. Other lines stay as they are. */
+export async function migrateAgentsFile(home: string): Promise<boolean> {
+  const path = join(home, "AGENTS.md");
+  let text: string;
+  try { text = await readFile(path, "utf8"); } catch { return false; }
+  const next = text.split("\n").map((line) => LEGACY_PASS_LINES[line] ?? line).join("\n");
+  if (next === text) return false;
+  await writeFile(path, next, { mode: 0o600 });
+  return true;
+}
 const version = (text: string) =>
   createHash("sha256").update(text).digest("hex");
 export async function document(home: string, file: "MISSION.md" | "MEMORY.md") {
