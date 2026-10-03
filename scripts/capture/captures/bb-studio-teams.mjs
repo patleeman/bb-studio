@@ -1,11 +1,13 @@
 import { launchRoomReplies } from "../bb.mjs";
 import teamsCompanions from "./teams-companions.mjs";
 import teamsLayouts from "./teams-layouts.mjs";
+import teamsEditor from "./teams-editor.mjs";
 
 export default context => {
  const {pluginRpc, launchRoomThread, getLaunchRoomId} = context;
  return [
  ...teamsLayouts(context),
+ ...teamsEditor(context),
  ...(process.env.BB_CAPTURE_TEAMS_COMPANIONS === "1" ? [teamsCompanions(context)] : []),
  {
   id:"bots-broadcasts",packageDir:"bb-studio-teams",fileName:"channel-broadcasts.png",

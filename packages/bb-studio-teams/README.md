@@ -82,3 +82,11 @@ and removal of a running thread in Active.
 The live sidebar check drags two ordinary threads together, creates a channel
 with both references, and verifies that their projects and parent links stay the
 same. The dialog also offers the existing **Nest threads** action.
+
+![The channel member editor with one scrolling list](assets/channel-editor.png)
+
+The [phone editor](assets/channel-editor-mobile.png) keeps the title, name,
+search field, and Save/Cancel actions visible. These captures use stable
+BB 0.45.0 with Teams installed from pushed commit 6e84e8f and a deterministic
+large roster. Live checks scroll the list, shrink the viewport to 480 pixels
+high, filter to one member and no matches, and save the selected member.
