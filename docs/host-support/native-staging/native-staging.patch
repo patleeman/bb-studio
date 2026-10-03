@@ -1,0 +1,794 @@
+diff --git a/.gitignore b/.gitignore
+index 13d1800e4..0600e7a54 100644
+--- a/.gitignore
++++ b/.gitignore
+@@ -96,3 +96,5 @@ provider-recordings/raw/
+ 
+ /plugins/.bundled-stage-*/
+ /plugins/*/.bundled-runtime/
++
++/apps/desktop/release-staging/
+diff --git a/apps/desktop/scripts/build.mjs b/apps/desktop/scripts/build.mjs
+index 483d27f37..63ac84ba7 100644
+--- a/apps/desktop/scripts/build.mjs
++++ b/apps/desktop/scripts/build.mjs
+@@ -1,9 +1,11 @@
+ import { execFileSync } from "node:child_process";
+-import { readFile, rm } from "node:fs/promises";
++import { readFile, rm, writeFile } from "node:fs/promises";
+ import { resolve } from "node:path";
+ import { build } from "esbuild";
+ import { resolveDesktopReleaseChannel } from "./desktop-release-channel.mjs";
+ 
++import { isDesktopStaging } from "./desktop-staging.mjs";
++const staging = isDesktopStaging(process.env);
+ const packageRoot = process.cwd();
+ const distDir = resolve(packageRoot, "dist");
+ const packageJsonPath = resolve(packageRoot, "package.json");
+@@ -75,7 +77,28 @@ const desktopBuildDate = readBuildDate(process.env);
+ 
+ const commonOptions = {
+   bundle: true,
++  metafile: true,
++  minifySyntax: staging,
++  plugins: staging
++    ? [
++        {
++          name: "staging-update-exclusion",
++          setup(builder) {
++            builder.onResolve(
++              { filter: /^\.\/desktop-update-runtime\.js$/ },
++              () => ({
++                path: resolve(
++                  packageRoot,
++                  "src/desktop-update-runtime-staging.ts",
++                ),
++              }),
++            );
++          },
++        },
++      ]
++    : [],
+   define: {
++    "process.env.BB_DESKTOP_STAGING": JSON.stringify(staging ? "1" : "0"),
+     "process.env.BB_DESKTOP_BUILD_DATE": JSON.stringify(desktopBuildDate),
+     "process.env.BB_DESKTOP_COMMIT": JSON.stringify(desktopCommit),
+     "process.env.BB_DESKTOP_PLUGIN_SDK_VERSION":
+@@ -91,7 +114,7 @@ const commonOptions = {
+   target: "node24",
+ };
+ 
+-await Promise.all([
++const results = await Promise.all([
+   build({
+     ...commonOptions,
+     entryPoints: [resolve(packageRoot, "src", "main.ts")],
+@@ -152,4 +175,27 @@ await Promise.all([
+   }),
+ ]);
+ 
++const inputs = results.flatMap((result) => Object.keys(result.metafile.inputs));
++if (
++  staging &&
++  inputs.some((input) =>
++    /electron-updater|desktop-update-runtime\.ts$/.test(input),
++  )
++) {
++  throw new Error("Staging build unexpectedly included updater runtime");
++}
++await writeFile(
++  resolve(distDir, "desktop-build-policy.json"),
++  JSON.stringify(
++    {
++      staging,
++      updaterRuntimeIncluded: inputs.some((input) =>
++        input.includes("electron-updater"),
++      ),
++      inputs,
++    },
++    null,
++    2,
++  ) + "\n",
++);
+ process.stdout.write("@bb/desktop: built Electron entries\n");
+diff --git a/apps/desktop/scripts/run-electron-builder.mjs b/apps/desktop/scripts/run-electron-builder.mjs
+index c4efca30c..c42f3d5ce 100644
+--- a/apps/desktop/scripts/run-electron-builder.mjs
++++ b/apps/desktop/scripts/run-electron-builder.mjs
+@@ -8,6 +8,11 @@ import {
+   resolveDesktopReleaseChannel,
+ } from "./desktop-release-channel.mjs";
+ 
++import {
++  isDesktopStaging,
++  applyDesktopStagingConfig,
++} from "./desktop-staging.mjs";
++
+ const scriptDirectory = dirname(fileURLToPath(import.meta.url));
+ const desktopPackageRoot = resolve(scriptDirectory, "..");
+ const baseConfigPath = resolve(
+@@ -158,8 +163,14 @@ function createSigningPlan(env) {
+   };
+ }
+ 
+-function resolveElectronBuilderConfig(baseConfig, env, electronBuilderArgs) {
+-  const signingPlan = createSigningPlan(env);
++export function resolveElectronBuilderConfig(
++  baseConfig,
++  env,
++  electronBuilderArgs,
++) {
++  const signingPlan = isDesktopStaging(env)
++    ? { mode: "disabled", identityName: undefined, notarizationEnabled: false }
++    : createSigningPlan(env);
+   const releaseChannel = resolveDesktopReleaseChannel(env);
+   const releaseConfig = createDesktopReleaseConfig(releaseChannel);
+   const config = cloneJson(baseConfig);
+@@ -206,16 +217,22 @@ function resolveElectronBuilderConfig(baseConfig, env, electronBuilderArgs) {
+   ];
+ 
+   return {
+-    config,
++    config: isDesktopStaging(env)
++      ? applyDesktopStagingConfig(config, electronBuilderArgs)
++      : config,
+     releaseChannel,
+     signingPlan,
+   };
+ }
+ 
+ function createElectronBuilderEnv(signingPlan) {
+-  const childEnv = {
+-    ...process.env,
+-  };
++  const childEnv = isDesktopStaging(process.env)
++    ? Object.fromEntries(
++        Object.entries(process.env).filter(
++          ([key]) => !key.startsWith("CSC") && !key.startsWith("APPLE_"),
++        ),
++      )
++    : { ...process.env };
+ 
+   childEnv.CSC_IDENTITY_AUTO_DISCOVERY =
+     signingPlan.mode !== "disabled" && !signingPlan.identityName
+@@ -289,10 +306,33 @@ async function main() {
+   } else {
+     logSigningPlan(signingPlan);
+   }
++  const staging = isDesktopStaging(process.env);
++  let policy = null;
++  try {
++    policy = JSON.parse(
++      await readFile(
++        resolve(desktopPackageRoot, "dist/desktop-build-policy.json"),
++        "utf8",
++      ),
++    );
++  } catch (error) {
++    if (staging || error.code !== "ENOENT") throw error;
++  }
++  if (policy !== null && policy.staging !== staging)
++    throw new Error(
++      "Desktop build/package staging policy mismatch; rebuild first",
++    );
++  if (staging && policy?.updaterRuntimeIncluded !== false)
++    throw new Error("Staging build contains updater runtime");
+   await mkdir(dirname(generatedConfigPath), { recursive: true });
+   await writeGeneratedConfig(config);
+   try {
+-    await runElectronBuilder(electronBuilderArgs, signingPlan);
++    await runElectronBuilder(
++      isDesktopStaging(process.env)
++        ? [...electronBuilderArgs, "--publish", "never"]
++        : electronBuilderArgs,
++      signingPlan,
++    );
+   } finally {
+     await removeGeneratedConfig();
+   }
+diff --git a/apps/desktop/src/desktop-update-provider.ts b/apps/desktop/src/desktop-update-provider.ts
+index 27f9b3cfe..f039afce7 100644
+--- a/apps/desktop/src/desktop-update-provider.ts
++++ b/apps/desktop/src/desktop-update-provider.ts
+@@ -6,16 +6,25 @@ import {
+ type DesktopReleaseChannel = "latest" | "nightly";
+ 
+ interface DesktopReleaseInfo {
+-  applicationName: "bb" | "bb Nightly";
++  applicationName: "bb" | "bb Nightly" | "bb Native Staging";
+   channel: DesktopReleaseChannel;
+   iconFileName: "icon.png" | "icon-nightly.png";
+-  releaseTag: "desktop-latest" | "desktop-nightly";
++  releaseTag: "desktop-latest" | "desktop-nightly" | null;
+   updateReleaseBaseUrl: string;
+ }
+ 
+ export function createDesktopReleaseInfo(
+   channel: DesktopReleaseChannel,
+ ): DesktopReleaseInfo {
++  if (process.env.BB_DESKTOP_STAGING === "1") {
++    return {
++      applicationName: "bb Native Staging",
++      channel,
++      iconFileName: "icon.png",
++      releaseTag: null,
++      updateReleaseBaseUrl: "",
++    };
++  }
+   const nightly = channel === "nightly";
+   const releaseTag = nightly ? "desktop-nightly" : "desktop-latest";
+ 
+@@ -55,6 +64,7 @@ const DESKTOP_UPDATE_RELEASE_BASE_URL =
+ export function createDesktopUpdateFeedUrl(
+   platform: BbDesktopVersionFeedPlatform,
+ ): string {
++  if (process.env.BB_DESKTOP_STAGING === "1") return "";
+   return `${DESKTOP_UPDATE_RELEASE_BASE_URL}${createBbDesktopVersionFeedFileName(platform)}`;
+ }
+ 
+diff --git a/apps/desktop/src/main.ts b/apps/desktop/src/main.ts
+index 4d0c3af69..526b5e99f 100644
+--- a/apps/desktop/src/main.ts
++++ b/apps/desktop/src/main.ts
+@@ -21,7 +21,6 @@ import {
+   type MessageBoxOptions,
+   type WebContents,
+ } from "electron";
+-import { autoUpdater } from "electron-updater";
+ import {
+   APP_SURFACE_DESKTOP,
+   APP_SURFACE_ENV_NAME,
+@@ -176,18 +175,14 @@ import {
+   getDesktopVersion,
+   resolveBbDesktopPlatform,
+ } from "./desktop-platform.js";
+-import { createDesktopUpdateService } from "./desktop-update-check.js";
++import { createDesktopUpdateRuntime } from "./desktop-update-runtime.js";
+ import {
+   createDesktopUpdateFeedUrl,
+   DESKTOP_RELEASE_CHANNEL,
+   DESKTOP_RELEASE_INFO,
+-  resolveDesktopUpdateSupport,
+ } from "./desktop-update-provider.js";
+ import type { DesktopUpdateService } from "./desktop-update-scheduler.js";
+ import {
+-  createDesktopAutoUpdateService,
+-  createElectronAutoUpdaterAdapter,
+-  shouldEnableDesktopAutoUpdate,
+   type DesktopAutoUpdateLogger,
+   type DesktopAutoUpdateService,
+ } from "./desktop-auto-update.js";
+@@ -2702,9 +2697,12 @@ async function runDesktopApp(): Promise<void> {
+     platform: process.platform,
+   });
+ 
+-  const applicationName = app.isPackaged
+-    ? DESKTOP_RELEASE_INFO.applicationName
+-    : "bb-dev";
++  const applicationName =
++    process.env.BB_DESKTOP_STAGING === "1"
++      ? "bb Native Staging"
++      : app.isPackaged
++        ? DESKTOP_RELEASE_INFO.applicationName
++        : "bb-dev";
+   app.setName(applicationName);
+   installAboutPanel(applicationName);
+ 
+@@ -2807,10 +2805,13 @@ async function runDesktopApp(): Promise<void> {
+   desktopBridgePath = bridgePath;
+   const desktopVersion = getDesktopVersion(process.env.BB_DESKTOP_VERSION);
+   const desktopPlatform = resolveBbDesktopPlatform(process.platform);
+-  const desktopUpdateFeedUrl = resolveDesktopUpdateFeedUrl({
+-    env: process.env,
+-    platform: desktopPlatform,
+-  });
++  const desktopUpdateFeedUrl =
++    process.env.BB_DESKTOP_STAGING === "1"
++      ? ""
++      : resolveDesktopUpdateFeedUrl({
++          env: process.env,
++          platform: desktopPlatform,
++        });
+   const userDataPath = app.getPath("userData");
+   desktopUserDataPath = userDataPath;
+ 
+@@ -2923,41 +2924,21 @@ async function runDesktopApp(): Promise<void> {
+     },
+   });
+ 
+-  const desktopUpdateSupport = resolveDesktopUpdateSupport({
++  const updateRuntime = createDesktopUpdateRuntime({
+     canReplaceAppImage,
+-    env: process.env,
+-    platform: desktopPlatform,
+-  });
+-  desktopUpdateService = createDesktopUpdateService({
+     channel: DESKTOP_RELEASE_CHANNEL,
+     currentVersion: desktopVersion,
+-    enabled:
+-      desktopUpdateSupport.versionCheck &&
+-      (app.isPackaged || process.env.BB_DESKTOP_VERSION_CHECK === "1"),
++    env: process.env,
+     feedUrl: desktopUpdateFeedUrl,
++    isPackaged: app.isPackaged,
+     logger: desktopLogger,
+     platform: desktopPlatform,
+   });
+-  desktopAutoUpdateService = createDesktopAutoUpdateService({
+-    currentVersion: desktopVersion,
+-    enabled:
+-      desktopUpdateSupport.autoUpdate &&
+-      shouldEnableDesktopAutoUpdate({
+-        env: process.env,
+-        isPackaged: app.isPackaged,
+-      }),
+-    forceDevUpdateConfig:
+-      !app.isPackaged && process.env.BB_DESKTOP_AUTO_UPDATE === "1",
+-    logger: desktopLogger,
+-    platform: desktopPlatform,
+-    updater: createElectronAutoUpdaterAdapter(autoUpdater),
+-  });
+-  desktopUpdateService.subscribe(() => {
+-    sendDesktopInfoChanged();
+-  });
+-  desktopAutoUpdateService.subscribe(() => {
+-    sendDesktopInfoChanged();
+-  });
++  const desktopUpdateSupport = updateRuntime.support;
++  desktopUpdateService = updateRuntime.versionService;
++  desktopAutoUpdateService = updateRuntime.autoService;
++  desktopUpdateService.subscribe(sendDesktopInfoChanged);
++  desktopAutoUpdateService.subscribe(sendDesktopInfoChanged);
+   registerDesktopUpdateIpc();
+   desktopFindViewManager = createDesktopFindViewManager({
+     preloadPath: findBarPreloadPath,
+@@ -3120,7 +3101,9 @@ async function runDesktopApp(): Promise<void> {
+     desktopAutoUpdateService.start();
+   } else {
+     desktopLogger.info(
+-      "Desktop auto-install is disabled: only the Linux AppImage build can replace itself. Version checks still report new releases.",
++      process.env.BB_DESKTOP_STAGING === "1"
++        ? "Desktop updates are disabled in this staging build."
++        : "Desktop auto-install is disabled: only the Linux AppImage build can replace itself. Version checks still report new releases.",
+     );
+   }
+ 
+diff --git a/docs/configuration.md b/docs/configuration.md
+index be17fe047..37409be1b 100644
+--- a/docs/configuration.md
++++ b/docs/configuration.md
+@@ -1934,3 +1934,9 @@ Publish updates with **Mobile Android (EAS)**, profile `preview`, **publish** on
+ 
+ The publishing workflow verifies the signed APK and publishes both the checksum-named
+ asset and the stable `bb-android.apk` alias, then `latest.json`.
++
++## Build-only native desktop staging
++
++In an owned source checkout, `BB_DESKTOP_STAGING=1 pnpm desktop:worktree --build-only` packages a native fixture without launching it. The build selects update services with no updater runtime imports. Automatic checks, manual checks, downloads, and installation are disabled even if runtime update flags are enabled. Packaging uses `dev.bb.qa.native-staging`, product `bb Native Staging`, and package/cache name `bb-native-staging`; it writes `apps/desktop/release-staging`, with no publish provider or update feed. Staging rejects publishing requests and mismatched build/package policy.
++
++Do not use `/Applications` as a staging target. Inspect the exact staged bundle and its updater exclusion before any separate launch. The staging build flag does not change normal release packaging when absent.
+diff --git a/packages/scripts/src/commands/run-desktop.ts b/packages/scripts/src/commands/run-desktop.ts
+index f070069af..2e63d2aff 100644
+--- a/packages/scripts/src/commands/run-desktop.ts
++++ b/packages/scripts/src/commands/run-desktop.ts
+@@ -72,6 +72,18 @@ export function resolveDesktopLaunchMode(args: string[]): DesktopLaunchMode {
+   );
+ }
+ 
++export function resolveDesktopBuildOptions(args: string[]): {
++  buildOnly: boolean;
++  mode: DesktopLaunchMode;
++} {
++  return {
++    buildOnly: args.includes("--build-only"),
++    mode: resolveDesktopLaunchMode(
++      args.filter((arg) => arg !== "--build-only"),
++    ),
++  };
++}
++
+ export function resolveDesktopUserDataDir(
+   baseEnv: NodeJS.ProcessEnv,
+   config: DevInstanceConfig,
+@@ -175,7 +187,7 @@ async function resolveExistingRepoRoot(): Promise<string> {
+ }
+ 
+ async function main(): Promise<void> {
+-  const mode = resolveDesktopLaunchMode(process.argv.slice(2));
++  const { buildOnly, mode } = resolveDesktopBuildOptions(process.argv.slice(2));
+   const resolvedRepoRoot = await resolveExistingRepoRoot();
+   const config = resolveCurrentDevInstanceConfig(resolvedRepoRoot);
+   if (mode === "worktree") {
+@@ -203,6 +215,8 @@ async function main(): Promise<void> {
+     return;
+   }
+ 
++  if (buildOnly) return;
++
+   const runCommand = createDesktopRunCommand();
+   process.exitCode = await runScriptProcess({
+     args: runCommand.args,
+diff --git a/packages/scripts/test/run-desktop.test.ts b/packages/scripts/test/run-desktop.test.ts
+index 1427056b4..a5092aff1 100644
+--- a/packages/scripts/test/run-desktop.test.ts
++++ b/packages/scripts/test/run-desktop.test.ts
+@@ -5,6 +5,7 @@ import {
+   createDesktopPackageCommand,
+   createDesktopRunCommand,
+   resolveDesktopLaunchMode,
++  resolveDesktopBuildOptions,
+   resolveDesktopPackageTask,
+   resolveDesktopUserDataDir,
+   toDesktopLaunchProcessEnv,
+@@ -126,3 +127,19 @@ describe("desktop launch environment", () => {
+     });
+   });
+ });
++
++describe("desktop build-only options", () => {
++  it("selects a build without a launch for isolated worktree mode", () => {
++    expect(resolveDesktopBuildOptions(["--worktree", "--build-only"])).toEqual({
++      mode: "worktree",
++      buildOnly: true,
++    });
++    expect(resolveDesktopBuildOptions(["--worktree"])).toEqual({
++      mode: "worktree",
++      buildOnly: false,
++    });
++    expect(() =>
++      resolveDesktopBuildOptions(["--build-only", "--unknown"]),
++    ).toThrow();
++  });
++});
+diff --git a/packages/templates/src/templates/bb-guide-customization.md b/packages/templates/src/templates/bb-guide-customization.md
+index c122fce1f..a772c9e83 100644
+--- a/packages/templates/src/templates/bb-guide-customization.md
++++ b/packages/templates/src/templates/bb-guide-customization.md
+@@ -464,3 +464,9 @@ upload date. The server fetches only public metadata, caches it for five minutes
+ and returns `android: null` if unavailable or inconsistent. Download links remain
+ usable during metadata failures. iOS version and release date are shown in TestFlight.
+ Publish updates with **Mobile Android (EAS)**, profile `preview`, **publish** on.
++
++## Build-only native desktop staging
++
++In an owned source checkout, `BB_DESKTOP_STAGING=1 pnpm desktop:worktree --build-only` packages a native fixture without launching it. The build selects update services with no updater runtime imports. Automatic checks, manual checks, downloads, and installation are disabled even if runtime update flags are enabled. Packaging uses `dev.bb.qa.native-staging`, product `bb Native Staging`, and package/cache name `bb-native-staging`; it writes `apps/desktop/release-staging`, with no publish provider or update feed. Staging rejects publishing requests and mismatched build/package policy.
++
++Do not use `/Applications` as a staging target. Inspect the exact staged bundle and its updater exclusion before any separate launch. The staging build flag does not change normal release packaging when absent.
+diff --git a/plugins/bb-guide/skills/bb-cli/references/configuration.md b/plugins/bb-guide/skills/bb-cli/references/configuration.md
+index 5bbb0e736..85c9d0f9f 100644
+--- a/plugins/bb-guide/skills/bb-cli/references/configuration.md
++++ b/plugins/bb-guide/skills/bb-cli/references/configuration.md
+@@ -225,3 +225,9 @@ The UI offers Replace binding or Cancel when assigning an occupied shortcut.
+ plugin defaults and availability are resolved in each app window, where the
+ plugin frontend runs. CLI/SDK callers should clear conflicting explicit
+ bindings in the same update; plugin defaults yield to explicit bindings.
++
++## Build-only native desktop staging
++
++In an owned source checkout, `BB_DESKTOP_STAGING=1 pnpm desktop:worktree --build-only` packages a native fixture without launching it. The build selects update services with no updater runtime imports. Automatic checks, manual checks, downloads, and installation are disabled even if runtime update flags are enabled. Packaging uses `dev.bb.qa.native-staging`, product `bb Native Staging`, and package/cache name `bb-native-staging`; it writes `apps/desktop/release-staging`, with no publish provider or update feed. Staging rejects publishing requests and mismatched build/package policy.
++
++Do not use `/Applications` as a staging target. Inspect the exact staged bundle and its updater exclusion before any separate launch. The staging build flag does not change normal release packaging when absent.
+diff --git a/turbo.json b/turbo.json
+index b408c37c5..945786fea 100644
+--- a/turbo.json
++++ b/turbo.json
+@@ -242,7 +242,7 @@
+     },
+     "@bb/desktop#build": {
+       "dependsOn": ["bb-app#build"],
+-      "env": ["BB_DESKTOP_RELEASE_CHANNEL"],
++      "env": ["BB_DESKTOP_RELEASE_CHANNEL", "BB_DESKTOP_STAGING"],
+       "inputs": [
+         "$TURBO_DEFAULT$",
+         "$TURBO_ROOT$/apps/desktop/**",
+@@ -286,18 +286,21 @@
+       "passThroughEnv": ["BB_DESKTOP_RELEASE_CHANNEL"]
+     },
+     "@bb/desktop#package": {
++      "env": ["BB_DESKTOP_STAGING", "BB_DESKTOP_RELEASE_CHANNEL"],
+       "dependsOn": ["bb-app#build", "@bb/desktop#build"],
+       "cache": false,
+       "outputs": ["release/**"],
+       "passThroughEnv": ["*"]
+     },
+     "@bb/desktop#package:linux": {
++      "env": ["BB_DESKTOP_STAGING", "BB_DESKTOP_RELEASE_CHANNEL"],
+       "dependsOn": ["bb-app#build", "@bb/desktop#build"],
+       "cache": false,
+       "outputs": ["release/**"],
+       "passThroughEnv": ["*"]
+     },
+     "@bb/desktop#package:win": {
++      "env": ["BB_DESKTOP_STAGING", "BB_DESKTOP_RELEASE_CHANNEL"],
+       "dependsOn": ["bb-app#build", "@bb/desktop#build"],
+       "cache": false,
+       "outputs": ["release/**"],
+diff --git a/apps/desktop/scripts/desktop-staging.mjs b/apps/desktop/scripts/desktop-staging.mjs
+new file mode 100644
+index 000000000..f9036a918
+--- /dev/null
++++ b/apps/desktop/scripts/desktop-staging.mjs
+@@ -0,0 +1,41 @@
++export function isDesktopStaging(env) {
++  const value = env.BB_DESKTOP_STAGING;
++  if (value === undefined || value === "0") return false;
++  if (value === "1") return true;
++  throw new Error("BB_DESKTOP_STAGING must be 0 or 1");
++}
++export const STAGING_IDENTITY = {
++  appId: "dev.bb.qa.native-staging",
++  productName: "bb Native Staging",
++  name: "bb-native-staging",
++};
++export function applyDesktopStagingConfig(config, args) {
++  const publishIndex = args.findIndex(
++    (arg) => arg === "--publish" || arg === "-p",
++  );
++  if (
++    (publishIndex !== -1 && args[publishIndex + 1] !== "never") ||
++    args.some(
++      (arg) => arg.startsWith("--publish=") && arg !== "--publish=never",
++    )
++  ) {
++    throw new Error("Staging packages cannot publish");
++  }
++  const result = structuredClone(config);
++  Object.assign(result, {
++    appId: STAGING_IDENTITY.appId,
++    productName: STAGING_IDENTITY.productName,
++  });
++  result.extraMetadata = {
++    ...result.extraMetadata,
++    name: STAGING_IDENTITY.name,
++    bbDesktopStaging: true,
++  };
++  result.artifactName = "bb-native-staging-${version}-${arch}.${ext}";
++  result.publish = null;
++  result.generateUpdatesFilesForAllChannels = false;
++  result.directories.output = "release-staging";
++  result.linux.executableName = STAGING_IDENTITY.name;
++  result.mac.notarize = false;
++  return result;
++}
+diff --git a/apps/desktop/src/desktop-update-runtime-staging.ts b/apps/desktop/src/desktop-update-runtime-staging.ts
+new file mode 100644
+index 000000000..2f3e28d46
+--- /dev/null
++++ b/apps/desktop/src/desktop-update-runtime-staging.ts
+@@ -0,0 +1,42 @@
++import type { BbDesktopInfo } from "@bb/desktop-contract";
++import type {
++  DesktopUpdateRuntime,
++  DesktopUpdateRuntimeArgs,
++} from "./desktop-update-runtime-types.js";
++
++export function createDesktopUpdateRuntime(
++  args: DesktopUpdateRuntimeArgs,
++): DesktopUpdateRuntime {
++  const info: BbDesktopInfo = {
++    downloadState: "idle",
++    lastCheckedAt: null,
++    latestVersion: null,
++    pendingVersion: null,
++    platform: args.platform,
++    updateAvailable: false,
++    updateDownloaded: false,
++    version: args.currentVersion,
++  };
++  const service = {
++    async checkAfterActive() {
++      return null;
++    },
++    async checkForUpdates() {
++      return info;
++    },
++    getInfo() {
++      return info;
++    },
++    start() {},
++    stop() {},
++    subscribe() {
++      return () => {};
++    },
++    installUpdate() {},
++  };
++  return {
++    support: { autoUpdate: false, versionCheck: false },
++    versionService: service,
++    autoService: service,
++  };
++}
+diff --git a/apps/desktop/src/desktop-update-runtime-types.ts b/apps/desktop/src/desktop-update-runtime-types.ts
+new file mode 100644
+index 000000000..1f63e8c34
+--- /dev/null
++++ b/apps/desktop/src/desktop-update-runtime-types.ts
+@@ -0,0 +1,22 @@
++import type { BbDesktopInfo } from "@bb/desktop-contract";
++import type {
++  DesktopAutoUpdateLogger,
++  DesktopAutoUpdateService,
++} from "./desktop-auto-update.js";
++import type { DesktopUpdateService } from "./desktop-update-scheduler.js";
++
++export interface DesktopUpdateRuntimeArgs {
++  canReplaceAppImage(path: string): boolean;
++  channel: "latest" | "nightly";
++  currentVersion: string;
++  env: NodeJS.ProcessEnv;
++  feedUrl: string;
++  isPackaged: boolean;
++  logger: DesktopAutoUpdateLogger;
++  platform: BbDesktopInfo["platform"];
++}
++export interface DesktopUpdateRuntime {
++  support: { autoUpdate: boolean; versionCheck: boolean };
++  versionService: DesktopUpdateService;
++  autoService: DesktopAutoUpdateService;
++}
+diff --git a/apps/desktop/src/desktop-update-runtime.ts b/apps/desktop/src/desktop-update-runtime.ts
+new file mode 100644
+index 000000000..93b34c8f9
+--- /dev/null
++++ b/apps/desktop/src/desktop-update-runtime.ts
+@@ -0,0 +1,55 @@
++import { autoUpdater } from "electron-updater";
++import { createDesktopUpdateService } from "./desktop-update-check.js";
++import {
++  createDesktopAutoUpdateService,
++  createElectronAutoUpdaterAdapter,
++  shouldEnableDesktopAutoUpdate,
++} from "./desktop-auto-update.js";
++import { resolveDesktopUpdateSupport } from "./desktop-update-provider.js";
++import type { DesktopUpdateRuntimeArgs } from "./desktop-update-runtime-types.js";
++
++export function createDesktopUpdateRuntime(args: DesktopUpdateRuntimeArgs) {
++  const {
++    canReplaceAppImage,
++    channel,
++    currentVersion: desktopVersion,
++    env,
++    feedUrl: desktopUpdateFeedUrl,
++    isPackaged,
++    logger,
++    platform: desktopPlatform,
++  } = args;
++  const desktopUpdateSupport = resolveDesktopUpdateSupport({
++    canReplaceAppImage,
++    env,
++    platform: desktopPlatform,
++  });
++  const desktopUpdateService = createDesktopUpdateService({
++    channel: channel,
++    currentVersion: desktopVersion,
++    enabled:
++      desktopUpdateSupport.versionCheck &&
++      (isPackaged || env.BB_DESKTOP_VERSION_CHECK === "1"),
++    feedUrl: desktopUpdateFeedUrl,
++    logger: logger,
++    platform: desktopPlatform,
++  });
++  const desktopAutoUpdateService = createDesktopAutoUpdateService({
++    currentVersion: desktopVersion,
++    enabled:
++      desktopUpdateSupport.autoUpdate &&
++      shouldEnableDesktopAutoUpdate({
++        env,
++        isPackaged: isPackaged,
++      }),
++    forceDevUpdateConfig: !isPackaged && env.BB_DESKTOP_AUTO_UPDATE === "1",
++    logger: logger,
++    platform: desktopPlatform,
++    updater: createElectronAutoUpdaterAdapter(autoUpdater),
++  });
++  return {
++    support: desktopUpdateSupport,
++    versionService: desktopUpdateService,
++    autoService: desktopAutoUpdateService,
++  };
++}
+diff --git a/apps/desktop/test/desktop-staging.test.ts b/apps/desktop/test/desktop-staging.test.ts
+new file mode 100644
+index 000000000..24756d456
+--- /dev/null
++++ b/apps/desktop/test/desktop-staging.test.ts
+@@ -0,0 +1,99 @@
++import { describe, it, expect, vi } from "vitest";
++import { readFile } from "node:fs/promises";
++import { build } from "esbuild";
++import { resolve } from "node:path";
++import { createDesktopUpdateRuntime } from "../src/desktop-update-runtime-staging.js";
++
++const packageRoot = process.cwd();
++describe("native staging build safety", () => {
++  it("never touches updater dependencies, checks, installs, timers, or supplied release feeds", async () => {
++    const dependencies = new Proxy(
++      {},
++      {
++        get() {
++          throw new Error("Staging accessed update dependency");
++        },
++      },
++    );
++    const runtime = createDesktopUpdateRuntime({
++      canReplaceAppImage: () => {
++        throw new Error("filesystem update probe");
++      },
++      channel: "latest",
++      currentVersion: "0.45.0",
++      env: { BB_DESKTOP_AUTO_UPDATE: "1", BB_DESKTOP_VERSION_CHECK: "1" },
++      feedUrl: "https://example.invalid/do-not-fetch",
++      isPackaged: true,
++      logger: dependencies as never,
++      platform: "macos",
++    });
++    const timer = vi.spyOn(globalThis, "setInterval");
++    const fetch = vi.spyOn(globalThis, "fetch");
++    for (const service of [runtime.versionService, runtime.autoService]) {
++      service.start();
++      expect(await service.checkAfterActive()).toBe(null);
++      expect((await service.checkForUpdates()).lastCheckedAt).toBe(null);
++      expect(service.getInfo().updateDownloaded).toBe(false);
++      service.subscribe(() => {
++        throw new Error("disabled service emitted");
++      })();
++      service.stop();
++    }
++    runtime.autoService.installUpdate();
++    expect(runtime.support).toEqual({ autoUpdate: false, versionCheck: false });
++    expect(timer).not.toHaveBeenCalled();
++    expect(fetch).not.toHaveBeenCalled();
++    vi.restoreAllMocks();
++  });
++  it("uses a distinct package identity and has no publishing feed", async () => {
++    const { resolveElectronBuilderConfig } = await import(
++      resolve(packageRoot, "scripts/run-electron-builder.mjs")
++    );
++    const base = JSON.parse(
++      await readFile(
++        resolve(packageRoot, "electron-builder.config.json"),
++        "utf8",
++      ),
++    );
++    const stage = resolveElectronBuilderConfig(
++      base,
++      { BB_DESKTOP_STAGING: "1", CSC_IDENTITY_AUTO_DISCOVERY: "false" },
++      ["--mac", "--dir", "--publish", "never"],
++    ).config;
++    expect(stage.appId).toBe("dev.bb.qa.native-staging");
++    expect(stage.productName).toBe("bb Native Staging");
++    expect(stage.extraMetadata.name).toBe("bb-native-staging");
++    expect(stage.publish).toBe(null);
++    expect(stage.directories.output).toBe("release-staging");
++    expect(() =>
++      resolveElectronBuilderConfig(base, { BB_DESKTOP_STAGING: "1" }, [
++        "--publish",
++        "always",
++      ]),
++    ).toThrow("cannot publish");
++    const normal = resolveElectronBuilderConfig(
++      base,
++      { CSC_IDENTITY_AUTO_DISCOVERY: "false" },
++      [],
++    ).config;
++    expect(normal.appId).toBe("dev.bb.desktop");
++    expect(normal.publish![0].url).toContain("desktop-latest/");
++  });
++  it("bundles the staging runtime without any updater or release feed implementation", async () => {
++    const result = await build({
++      entryPoints: [
++        resolve(packageRoot, "src/desktop-update-runtime-staging.ts"),
++      ],
++      bundle: true,
++      platform: "node",
++      write: false,
++      metafile: true,
++    });
++    expect(Object.keys(result.metafile!.inputs)).toEqual([
++      "src/desktop-update-runtime-staging.ts",
++    ]);
++    expect(result.outputFiles![0].text).not.toMatch(
++      /electron-updater|quitAndInstall|desktop-latest|desktop-nightly/,
++    );
++  });
++});

@@ -1,0 +1,3 @@
+# Unified diffs contain significant blank context markers and mail separators.
+# Validate whitespace on their source trees, not those patch-format markers.
+docs/host-support/**/*.patch whitespace=-blank-at-eol

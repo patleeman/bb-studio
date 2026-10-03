@@ -1,0 +1,7 @@
+{
+  "CFBundleIdentifier": "dev.bb.qa.native-staging",
+  "CFBundleDisplayName": "bb Native Staging",
+  "CFBundleName": "bb Native Staging",
+  "CFBundleExecutable": "bb Native Staging",
+  "CFBundleShortVersionString": "0.45.0"
+}

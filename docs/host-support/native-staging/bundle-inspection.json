@@ -1,0 +1,20 @@
+{
+  "bundle": "/private/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-build-yjkg4kuh/core/apps/desktop/release-staging/mac-arm64/bb Native Staging.app",
+  "appVersion": "0.45.0",
+  "packageName": "bb-native-staging",
+  "appId": "dev.bb.qa.native-staging",
+  "productName": "bb Native Staging",
+  "policy": {
+    "staging": true,
+    "updaterRuntimeIncluded": false,
+    "forbiddenInputs": []
+  },
+  "forbiddenStrings": [],
+  "updateFiles": [],
+  "retainedInactiveUpdaterFileEntries": 70,
+  "asarSha256": "f6f0a8d17c9a430832bf150136d41c5c72d23afa26ab950b007644967d7bfe38",
+  "mainSha256": "ce34e07fe2c2a55cb4254ca418330f6bd149eca6c6a499b5c57f96032fcb55f4",
+  "binarySha256": "588478afc5f2bc73b6433d6e565a214dc830144be39a3d79805723292754ccd8",
+  "infoPlistSha256": "f47fe8d116d9dd7ad7c54e950d649a809ba951d52bc116af7385debc0d945768",
+  "inspectionDoesNotLaunchApp": true
+}

@@ -1,0 +1,36 @@
+[WARN] The "pnpm" field in package.json is no longer read by pnpm. The following keys were ignored: "pnpm.supportedArchitectures", "pnpm.overrides", "pnpm.patchedDependencies". See https://pnpm.io/settings for the new home of each setting.
+• turbo 2.10.12
+
+   • Packages in scope: @bb/desktop
+   • Running test in 1 packages
+   • Remote caching disabled
+
+//:ensure-native-modules: cache bypass, force executing 2f8915da02a6db8b
+@bb/templates:generate:plugin-scaffold: cache hit, suppressing logs 75dc634cc38c3c03
+@bb/templates:generate:templates: cache hit, suppressing logs dc3c4f39c8445d4b
+//:ensure-native-modules:
+//:ensure-native-modules: > bb@ ensure-native-modules /private/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-build-yjkg4kuh/core
+//:ensure-native-modules: > node scripts/ensure-native-modules.mjs
+//:ensure-native-modules:
+@bb/desktop:test: cache miss, executing e046e3f0c6cc4ac8
+@bb/desktop:test:
+@bb/desktop:test: > @bb/desktop@0.45.0 test /private/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-build-yjkg4kuh/core/apps/desktop
+@bb/desktop:test: > install-electron && vitest run --config vitest.config.ts "test/desktop-staging.test.ts" "test/desktop-auto-update.test.ts" "test/desktop-update-provider.test.ts" "test/desktop-update-check.test.ts"
+@bb/desktop:test:
+@bb/desktop:test:
+@bb/desktop:test:  RUN  v4.1.1 /private/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-build-yjkg4kuh/core/apps/desktop
+@bb/desktop:test:
+@bb/desktop:test:  ✓ |@bb/desktop| test/desktop-staging.test.ts (3 tests) 45ms
+@bb/desktop:test:  ✓ |@bb/desktop| test/desktop-update-provider.test.ts (6 tests) 2ms
+@bb/desktop:test:  ✓ |@bb/desktop| test/desktop-auto-update.test.ts (8 tests) 6ms
+@bb/desktop:test:  ✓ |@bb/desktop:isolated| test/desktop-update-check.test.ts (11 tests) 15ms
+@bb/desktop:test:
+@bb/desktop:test:  Test Files  4 passed (4)
+@bb/desktop:test:       Tests  28 passed (28)
+@bb/desktop:test:    Start at  02:44:33
+@bb/desktop:test:    Duration  507ms (transform 822ms, setup 0ms, import 1.16s, tests 68ms, environment 0ms)
+@bb/desktop:test:
+
+ Tasks:    4 successful, 4 total
+Cached:    2 cached, 4 total
+  Time:    1.602s

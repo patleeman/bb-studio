@@ -1,0 +1,11 @@
+{
+  "observedAt": "2026-10-03T06:49:36.456048+00:00",
+  "operation": "cua.getState()",
+  "apps": [],
+  "browsers": [],
+  "errors": [
+    "Native apps: Error: Sky Computer Use native pipe startup failed"
+  ],
+  "ownedAppLaunched": false,
+  "nativeMenusVerified": false
+}

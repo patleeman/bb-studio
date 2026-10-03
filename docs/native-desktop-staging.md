@@ -4,6 +4,11 @@ The normal server and browser fixture in `scripts/staged-bb.mjs` does not
 exercise Electron-native menus. Native QA needs a separate desktop fixture.
 There is no verified native staging runner in this repository yet.
 
+The [build-only staging proposal](host-support/native-staging/README.md) now
+provides an inspected owned bundle with updater execution excluded and a
+distinct identity. Native automation cannot currently start, so the bundle has
+not launched and this does not yet constitute runtime or menu verification.
+
 Do not launch the installed app in `/Applications` as that fixture. On
 3 October 2026, a launch with a fresh `BB_DATA_DIR`, separate Chromium profile
 and isolated ports still activated the shared updater. It replaced the
