@@ -62,7 +62,8 @@ export default async function plugin(bb: BbPluginApi) {
   const spaces = new SpaceStore(db);
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
-  const searchIndex = new SearchIndex(db, hub);
+  const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
+  bb.onDispose(() => searchIndex.dispose());
   const contentSearch = async (query: string) => {
     await searchIndex.ensure();
     const indexed = searchIndex.search(query, { limit: 100 });

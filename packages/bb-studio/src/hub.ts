@@ -4,7 +4,7 @@ export { errorText };
 // publish `studio_describe` for discovery; the suite's own plugins are also
 // looked up by id, so an older version that predates Studio can be named.
 import { STUDIO_PLUGIN_ID, type StudioItem, type StudioKind, type StudioProviderInfo } from "@bb-studio/kit/contract";
-import { discoverProviders, fanOutProviders, rpcErrorStatus } from "@bb-studio/kit/server";
+import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, rpcErrorStatus, type ProviderItems } from "@bb-studio/kit/server";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
 import { schemas } from "./contract";
@@ -21,6 +21,7 @@ interface PluginEntry {
   status: string;
   statusDetail: string | null;
   version: string;
+  updatedAt?: string;
 }
 
 export interface HubSdk {
@@ -42,7 +43,7 @@ export interface LocalProvider {
 
 
 export class StudioHub {
-  private readonly described = new Map<string, { version: string; info: StudioProviderInfo }>();
+  private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
 
   constructor(
     private readonly sdk: HubSdk,
@@ -75,37 +76,30 @@ export class StudioHub {
     return (await this.providerSnapshot()).providers;
   }
 
-  private async providerSnapshot(): Promise<{ providers: ProviderView[]; discoveryComplete: boolean }> {
-    let discoveryComplete = true;
-    // The shared discovery helper falls back to known providers on failure.
-    // Keep that availability, but do not mistake an omitted add-on for an uninstall.
-    const candidates = await discoverProviders({ plugins: {
-      list: () => this.sdk.plugins.list(),
-      experimental_discoverRpc: async (args) => {
-        try { return await this.sdk.plugins.experimental_discoverRpc(args); }
-        catch (error) { discoveryComplete = false; throw error; }
-      },
-    } }, {
-      method: "studio_describe",
-      known: SUITE,
-      exclude: [STUDIO_PLUGIN_ID],
-    });
-    return { providers: [...(await Promise.all(candidates.map((entry) => this.describe(entry)))), ...this.localView()], discoveryComplete };
+  private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
+    const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", known: SUITE, exclude: [STUDIO_PLUGIN_ID] });
+    const installed = new Set(snapshot.installed.map((entry) => entry.id));
+    for (const id of this.described.keys()) if (!installed.has(id)) this.described.delete(id);
+    const candidates = snapshot.providers.filter((entry) => !only || only.has(entry.id));
+    const local = !only || only.has(STUDIO_PLUGIN_ID) ? this.localView() : [];
+    return { providers: [...await Promise.all(candidates.map((entry) => this.describe(entry))), ...local], discoveryComplete: snapshot.complete, installed };
   }
 
   private async describe(entry: PluginEntry): Promise<ProviderView> {
     const base = { pluginId: entry.id, name: entry.name ?? entry.id, panel: null, kinds: [] };
     if (!LIVE_STATES.has(entry.status)) {
+      this.described.delete(entry.id);
       return { ...base, state: "offline", detail: entry.statusDetail ?? `${base.name} isn't running (${entry.status}).` };
     }
+    const revision = `${entry.version}:${entry.updatedAt ?? ""}`;
     const cached = this.described.get(entry.id);
-    if (cached?.version === entry.version) return { ...base, state: "ready", detail: null, panel: cached.info.panel, kinds: cached.info.kinds };
+    if (cached?.revision === revision && cached.expiresAt > Date.now() && entry.status !== "starting") return { ...base, state: "ready", detail: null, panel: cached.info.panel, kinds: cached.info.kinds };
     try {
       const info = await this.call(entry.id, "studio_describe", null);
       if (info.version === 2 && info.kinds.some((kind) => !kind.capabilities || kind.mentionProviderId === undefined)) throw new Error("Studio provider v2 is missing capabilities or a mention provider id.");
       if (info.version !== 1 && info.version !== 2) throw new Error(`Unsupported Studio provider version: ${info.version}`);
       info.kinds = info.kinds.map((kind) => ({ ...kind, capabilities: kind.capabilities ?? { create: kind.create !== null, move: true, archive: kind.canArchive, delete: true, rename: true, duplicate: false, export: kind.actions.some((action) => action.id.startsWith("copy")), comments: false, versions: false, links: false }, mentionProviderId: kind.mentionProviderId ?? null }));
-      this.described.set(entry.id, { version: entry.version, info });
+      this.described.set(entry.id, { revision, expiresAt: Date.now() + 30_000, info });
       return { ...base, state: "ready", detail: null, panel: info.panel, kinds: info.kinds };
     } catch (error) {
       if (rpcErrorStatus(error) === 404) {
@@ -119,15 +113,16 @@ export class StudioHub {
    * Providers and every ready provider's items; a provider that fails to list
    * goes offline. `truncated` names the providers that listed only some.
    */
-  async overview(): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
-    const { providers, discoveryComplete } = await this.providerSnapshot();
+  async overview(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
+    const { providers, discoveryComplete } = await this.providerSnapshot(only);
     const lists = await fanOutProviders(
       providers,
       async (provider) => {
         if (provider.state !== "ready") return { provider, items: [] as HubItem[], truncated: false };
         if (provider.pluginId === STUDIO_PLUGIN_ID) return { provider, items: this.local?.items() ?? [], truncated: false };
-        const { items, truncated = false } = await this.call(provider.pluginId, "studio_list", null);
-        return { provider, items: items.map((item) => ({ ...item, pluginId: provider.pluginId })), truncated };
+        const result = await loadProviderItems(() => this.call(provider.pluginId, "studio_list", null));
+        if (result.status !== "ready") return { provider: { ...provider, state: "offline" as const, detail: result.status === "unavailable" ? result.error : null }, items: [] as HubItem[], truncated: false };
+        return { provider, items: result.items.map((item) => ({ ...item, pluginId: provider.pluginId })), truncated: !result.complete };
       },
       (provider, error) => ({ provider: { ...provider, state: "offline" as const, detail: errorText(error) }, items: [] as HubItem[], truncated: false }),
     );
@@ -139,16 +134,24 @@ export class StudioHub {
     };
   }
 
+  async itemsResult(pluginId: string, ids?: string[]): Promise<ProviderItems<HubItem>> {
+    if (ids?.length === 0) return { status: "ready", items: [], complete: true };
+    if (pluginId === STUDIO_PLUGIN_ID) return { status: "ready", items: this.local?.items().filter((item) => !ids || ids.includes(item.id)) ?? [], complete: true };
+    const snapshot = await this.providerSnapshot(new Set([pluginId])).catch(() => null);
+    if (!snapshot) return { status: "unavailable", error: "Provider inventory is unavailable." };
+    const info = snapshot.providers.find((provider) => provider.pluginId === pluginId);
+    if (!info) return snapshot.discoveryComplete || !snapshot.installed.has(pluginId)
+      ? { status: "absent" } : { status: "unavailable", error: "Provider discovery is unavailable." };
+    if (info.state !== "ready") return { status: "unavailable", error: info.detail ?? "Provider unavailable." };
+    const result = await loadProviderItems(() => ids && this.version(pluginId) === 2
+      ? this.call(pluginId, "studio_get", { ids }) : this.call(pluginId, "studio_list", null));
+    return result.status === "ready" ? { ...result, items: result.items.filter((item) => !ids || ids.includes(item.id)).map((item) => ({ ...item, pluginId })) } : result;
+  }
+
   async get(pluginId: string, ids: string[]): Promise<HubItem[]> {
-    if (!ids.length) return [];
-    if (pluginId === STUDIO_PLUGIN_ID) return this.local?.items().filter((item) => ids.includes(item.id)) ?? [];
-    const info = (await this.providers()).find((provider) => provider.pluginId === pluginId);
-    if (info?.state !== "ready") return [];
-    const version = this.described.get(pluginId)?.info.version;
-    const items = version === 2
-      ? (await this.call(pluginId, "studio_get", { ids })).items
-      : (await this.call(pluginId, "studio_list", null)).items.filter((item) => ids.includes(item.id));
-    return items.map((item) => ({ ...item, pluginId }));
+    const result = await this.itemsResult(pluginId, ids);
+    if (result.status === "unavailable") throw new Error(result.error);
+    return result.status === "ready" ? result.items : [];
   }
 
   /**

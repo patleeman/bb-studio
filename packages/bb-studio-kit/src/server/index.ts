@@ -3,7 +3,7 @@ export { createChangeBus } from "./change-bus";
 export { createStoreProvider, mustGet, storeActions, storeSearch } from "./provider";
 export { defineItemMention } from "./mention";
 export { serveBytes } from "./bytes";
-export { discoverProviders, fanOutProviders } from "./discovery";
+export { discoverProviders, discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems, type ProviderDiscovery } from "./discovery";
 export { actorName, type Actor } from "./actor";
 export { studioServices, type StudioActivity, type StudioLink, type StudioRef } from "./studio-services";
 

@@ -1,4 +1,6 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
+import { studioIndex } from "@bb-studio/kit/server";
+import { schemas } from "./contract";
 import { StudioHub, type HubSdk } from "./hub";
 
 function plugin(id: string, patch: Record<string, unknown> = {}) {
@@ -46,6 +48,71 @@ function fakeSdk(options: {
 }
 
 describe("StudioHub", () => {
+  it("shares absence, outage and partial-list behavior with the standalone picker", async () => {
+    const options = { plugins: [plugin("pages")], rpc: {
+      "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }),
+      "pages.studio_list": () => ({ items: [item("pg_1")], truncated: false }),
+    } };
+    const sdk = fakeSdk(options);
+    const hub = new StudioHub(sdk);
+    const picker = studioIndex(sdk as never, schemas);
+    expect((await picker.snapshot()).items.map((entry) => entry.id)).toEqual(["pg_1"]);
+    options.rpc["pages.studio_list"] = () => { throw new Error("Temporary outage"); };
+    picker.invalidate();
+    expect(await hub.itemsResult("pages", ["pg_1"])).toMatchObject({ status: "unavailable" });
+    await expect(hub.get("pages", ["pg_1"])).rejects.toThrow("Temporary outage");
+    expect(await picker.snapshot()).toMatchObject({ complete: false, items: [{ id: "pg_1" }] });
+    options.rpc["pages.studio_list"] = () => ({ items: [], truncated: true });
+    picker.invalidate();
+    expect(await hub.itemsResult("pages", ["pg_1"])).toEqual({ status: "ready", items: [], complete: false });
+    expect((await picker.items()).map((entry) => entry.id)).toEqual(["pg_1"]);
+    options.rpc["pages.studio_list"] = () => ({ items: [], truncated: false });
+    picker.invalidate();
+    expect(await hub.itemsResult("pages", ["pg_1"])).toEqual({ status: "ready", items: [], complete: true });
+    expect(await picker.items()).toEqual([]);
+    options.plugins = [];
+    expect(await hub.itemsResult("pages", ["pg_1"])).toEqual({ status: "absent" });
+  });
+
+  it("refreshes same-version descriptions after observed restart or public metadata change", async () => {
+    const entry = plugin("pages", { updatedAt: "2026-10-01T00:00:00Z" });
+    let label = "Before";
+    const sdk = fakeSdk({ plugins: [entry], rpc: { "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [{ ...kind, label }] }) } });
+    const hub = new StudioHub(sdk);
+    expect((await hub.providers())[0]!.kinds[0]!.label).toBe("Before");
+    entry.status = "error";
+    await hub.providers();
+    entry.status = "running";
+    label = "Restarted";
+    expect((await hub.providers())[0]!.kinds[0]!.label).toBe("Restarted");
+    Object.assign(entry, { updatedAt: "2026-10-02T00:00:00Z" });
+    label = "Updated";
+    expect((await hub.providers())[0]!.kinds[0]!.label).toBe("Updated");
+  });
+
+  it("lists and describes only the requested provider during targeted recovery", async () => {
+    const sdk = fakeSdk({ plugins: [plugin("pages"), plugin("talk")], rpc: {
+      "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }),
+      "pages.studio_list": () => ({ items: [item("pg_1")] }),
+    } });
+    expect((await new StudioHub(sdk).overview(new Set(["pages"]))).items.map((entry) => entry.id)).toEqual(["pg_1"]);
+    expect(sdk.calls.some((call) => call.startsWith("talk."))).toBe(false);
+  });
+
+  it("eventually refreshes descriptions when stable hosts expose no restart revision", async () => {
+    vi.useFakeTimers();
+    try {
+      let label = "Before reload";
+      const sdk = fakeSdk({ plugins: [plugin("pages")], rpc: {
+        "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [{ ...kind, label }] }),
+      } });
+      const hub = new StudioHub(sdk);
+      await hub.providers();
+      label = "After same-version reload";
+      await vi.advanceTimersByTimeAsync(30_001);
+      expect((await hub.providers())[0]!.kinds[0]!.label).toBe(label);
+    } finally { vi.useRealTimers(); }
+  });
   it("marks failed discovery incomplete while still loading known providers", async () => {
     const sdk = fakeSdk({ plugins: [plugin("pages"), plugin("custom")], rpc: {
       "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }),

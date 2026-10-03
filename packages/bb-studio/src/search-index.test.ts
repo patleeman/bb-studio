@@ -1,8 +1,11 @@
 import Database from "better-sqlite3";
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { SearchIndex, excerpt, tokens } from "./search-index";
 import { StudioHub, type HubItem, type HubSdk } from "./hub";
+
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => { vi.clearAllTimers(); vi.useRealTimers(); });
 
 const item = (id: string, title: string, updatedAt = 1): HubItem => ({
   pluginId: "pages", id, kind: "page", title, updatedAt, createdAt: 1, projectId: "one", href: `/pages/${id}`,
@@ -26,7 +29,7 @@ describe("Studio search index", () => {
       providers: async () => [{ pluginId: "pages", state: "ready" }],
       version: () => 2,
       call: async (_pluginId: string, method: string, input: { id: string; ids: string[] }) => method === "studio_get" ? { items: items.filter((entry) => input.ids.includes(entry.id)) } : ({ content: content[input.id] }),
-      get: async (_pluginId: string, ids: string[]) => items.filter((entry) => ids.includes(entry.id)),
+      itemsResult: async (_pluginId: string, ids: string[]) => ({ status: "ready", complete: true, items: items.filter((entry) => ids.includes(entry.id)) }),
     } as unknown as StudioHub;
     const index = new SearchIndex(db, hub);
     await index.ensure();
@@ -57,7 +60,7 @@ function fixture() {
       if (!state.online || (method === "studio_read" && state.failRead)) throw new Error("Unavailable");
       return method === "studio_get" ? { items: state.items.filter((entry) => input.ids.includes(entry.id)) } : { content: "searchable body" };
     },
-    get: async (_pluginId: string, ids: string[]) => state.online ? state.items.filter((entry) => ids.includes(entry.id)) : [],
+    itemsResult: async (_pluginId: string, ids: string[]) => state.online ? { status: "ready", complete: true, items: state.items.filter((entry) => ids.includes(entry.id)) } : { status: "unavailable", error: "Offline" },
   };
   return { db, state, hub, index: new SearchIndex(db, hub as unknown as StudioHub) };
 }
@@ -97,6 +100,7 @@ it("preserves unavailable providers and reconciles them after recovery", async (
   expect(index.search("searchable").map((hit) => hit.ref.id)).toEqual(["a"]);
   state.items = [item("b", "Recovered")];
   state.online = true;
+  await vi.advanceTimersByTimeAsync(5_000);
   await index.ensure();
   expect(index.search("searchable").map((hit) => hit.ref.id)).toEqual(["b"]);
   db.close();
@@ -111,6 +115,7 @@ it("keeps unlisted rows from truncated providers until a complete reconciliation
   await index.rebuild();
   expect(index.search("First").map((hit) => hit.ref.id)).toEqual(["a"]);
   state.truncated = false;
+  await vi.advanceTimersByTimeAsync(5_000);
   await index.ensure();
   expect(index.search("First")).toEqual([]);
   db.close();
@@ -124,8 +129,35 @@ it("preserves indexed text on failed reads and retries without another change ev
   await index.changed("pages", ["a"]);
   expect(index.search("searchable").map((hit) => hit.ref.id)).toEqual(["a"]);
   state.failRead = false;
+  await vi.advanceTimersByTimeAsync(5_000);
   await index.ensure();
   expect(index.search("New title").map((hit) => hit.ref.id)).toEqual(["a"]);
+  db.close();
+});
+
+it("recovers only pending providers in the background, coalesces queries, and cancels retries on disposal", async () => {
+  const { db, state, hub } = fixture();
+  state.online = false;
+  const recovered = vi.fn();
+  const index = new SearchIndex(db, hub as unknown as StudioHub, recovered);
+  await index.ensure();
+  const original = hub.overview;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const overview = vi.fn(async (_only?: ReadonlySet<string>) => { await gate; return original(); });
+  hub.overview = overview;
+  await vi.advanceTimersByTimeAsync(5_000);
+  expect(overview).toHaveBeenCalledOnce();
+  expect([...overview.mock.calls[0]![0]!]).toEqual(["pages"]);
+  // Even a provider that never answers cannot stall initialized search reads.
+  await Promise.all([index.ensure(), index.ensure(), index.ensure()]);
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(overview).toHaveBeenCalledOnce();
+  release();
+  await index.dispose();
+  await vi.advanceTimersByTimeAsync(20_000);
+  expect(overview).toHaveBeenCalledOnce();
+  expect(recovered).not.toHaveBeenCalled();
   db.close();
 });
 
@@ -170,7 +202,7 @@ it("keeps undiscovered providers through discovery failure, retries once due, an
     await restarted.ensure();
     expect(restarted.search("Recovered").map((hit) => hit.ref.pluginId)).toEqual(["custom"]);
     installed = false;
-    await restarted.changed("pages");
+    await restarted.rebuild();
     expect(restarted.search("Recovered")).toEqual([]);
   } finally {
     db.close();

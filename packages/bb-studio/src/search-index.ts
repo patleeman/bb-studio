@@ -51,10 +51,34 @@ export class SearchIndex {
   private syncing: Promise<void> = Promise.resolve();
   /** Providers whose last snapshot or content read was incomplete. */
   private readonly pending = new Set<string>();
-  /** Retry failed discovery on demand, at most once every five seconds. */
-  private rediscoverAt: number | null = null;
+  private discoveryIncomplete = false;
+  private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
+  private recovering = false;
+  private disposed = false;
 
-  constructor(private readonly db: Database.Database, private readonly hub: StudioHub) {}
+  constructor(private readonly db: Database.Database, private readonly hub: StudioHub, private readonly recovered: () => void = () => {}) {}
+
+  async dispose(): Promise<void> {
+    this.disposed = true;
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+    await this.syncing.catch(() => {});
+  }
+
+  private scheduleRecovery(): void {
+    if (this.disposed || this.recovering || this.recoveryTimer || (!this.discoveryIncomplete && !this.pending.size)) return;
+    this.recoveryTimer = setTimeout(() => {
+      this.recoveryTimer = null;
+      this.recovering = true;
+      void this.queue(async () => {
+        if (!this.disposed) await this.reconcile(this.discoveryIncomplete ? undefined : new Set(this.pending));
+      }).then(() => { if (!this.disposed) this.recovered(); }, () => { this.discoveryIncomplete = true; }).finally(() => {
+        this.recovering = false;
+        this.scheduleRecovery();
+      });
+    }, 5_000);
+    this.recoveryTimer.unref?.();
+  }
 
   private put(item: HubItem, body: string): void {
     this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(item.pluginId, item.id);
@@ -94,18 +118,16 @@ export class SearchIndex {
   }
 
   private async reconcile(only?: ReadonlySet<string>): Promise<number> {
-    const result = await this.hub.overview();
-    // A recovered discovery can reveal providers absent from the prior result.
-    if (this.rediscoverAt !== null) only = undefined;
+    const result = await this.hub.overview(only);
     const discoveryComplete = result.discoveryComplete !== false;
-    this.rediscoverAt = discoveryComplete ? null : Date.now() + 5_000;
+    this.discoveryIncomplete = !discoveryComplete;
     const versions = new Map(result.providers.map((provider) => [provider.pluginId, this.hub.version(provider.pluginId) === 2]));
     const installed = new Set(result.providers.map((provider) => provider.pluginId));
     const stored = this.db.prepare("SELECT DISTINCT plugin_id FROM studio_search_fts").all() as { plugin_id: string }[];
     for (const { plugin_id: pluginId } of stored) {
       if (discoveryComplete && (!only || only.has(pluginId)) && !installed.has(pluginId)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ?").run(pluginId);
     }
-    if (discoveryComplete) for (const pluginId of this.pending) if (!installed.has(pluginId)) this.pending.delete(pluginId);
+    if (discoveryComplete) for (const pluginId of this.pending) if ((!only || only.has(pluginId)) && !installed.has(pluginId)) this.pending.delete(pluginId);
     for (const provider of result.providers) {
       const pluginId = provider.pluginId;
       if (only && !only.has(pluginId)) continue;
@@ -126,43 +148,33 @@ export class SearchIndex {
   }
 
   async ensure(): Promise<void> {
-    if (!this.ready) await (this.initializing ??= this.rebuild().then(() => {}).finally(() => { this.initializing = null; }));
-    else if (this.rediscoverAt !== null && Date.now() >= this.rediscoverAt) await this.queue(async () => {
-      // Concurrent searches can queue together; only the first performs a due retry.
-      if (this.rediscoverAt !== null && Date.now() >= this.rediscoverAt) await this.reconcile();
-    });
-    else if (this.rediscoverAt === null && this.pending.size) await this.queue(() => this.reconcile(new Set(this.pending)).then(() => {}));
-    // Events received while initialization read provider content follow that
-    // snapshot in the same queue. The first search must wait for their replay.
-    await this.syncing;
+    if (!this.ready) {
+      await (this.initializing ??= this.rebuild().then(() => {}).finally(() => { this.initializing = null; }));
+      // Replay events received during initialization before serving its first search.
+      await this.syncing;
+    }
+    // Once initialized, serve the saved snapshot while recovery runs in the background.
+    this.scheduleRecovery();
   }
 
   private queue(work: () => Promise<void>): Promise<void> {
-    this.syncing = this.syncing.catch(() => {}).then(work);
+    this.syncing = this.syncing.catch(() => {}).then(() => this.disposed ? undefined : work()).finally(() => this.scheduleRecovery());
     return this.syncing;
   }
 
   changed(pluginId: string, ids?: string[], removed?: string[]): Promise<void> {
     if (!this.started) return Promise.resolve();
     return this.queue(async () => {
-      if (!ids && !removed) { await this.reconcile(); return; }
+      if (!ids && !removed) { await this.reconcile(new Set([pluginId])); return; }
       for (const id of removed ?? []) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
       if (ids?.length) {
-        // get() deliberately returns [] for offline providers; that must not
-        // be mistaken for confirmation that the items were deleted.
-        try {
-          const provider = (await this.hub.providers()).find((entry) => entry.pluginId === pluginId);
-          if (provider?.state !== "ready") { this.pending.add(pluginId); return; }
-          const v2 = this.hub.version(pluginId) === 2;
-          const result = v2 ? await this.hub.call(pluginId, "studio_get", { ids }) : await this.hub.call(pluginId, "studio_list", null);
-          const found = result.items.filter((item) => ids.includes(item.id)).map((item) => ({ ...item, pluginId }));
-          const live = new Set(found.map((item) => item.id));
-          if ("truncated" in result && result.truncated) this.pending.add(pluginId);
-          else for (const id of ids) if (!live.has(id)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
-          await this.add(found, new Map([[pluginId, v2]]));
-        } catch {
-          this.pending.add(pluginId);
-        }
+        const result = await this.hub.itemsResult(pluginId, ids);
+        if (result.status === "unavailable") { this.pending.add(pluginId); return; }
+        const found = result.status === "ready" ? result.items : [];
+        const live = new Set(found.map((item) => item.id));
+        if (result.status === "ready" && !result.complete) this.pending.add(pluginId);
+        else for (const id of ids) if (!live.has(id)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
+        await this.add(found, new Map([[pluginId, this.hub.version(pluginId) === 2]]));
       }
     });
   }

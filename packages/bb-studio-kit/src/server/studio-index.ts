@@ -5,7 +5,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { z } from "zod";
 import type { StudioSchemas } from "../contract";
 import { untitled } from "../format";
-import { discoverProviders, fanOutProviders } from "./discovery";
+import { discoverProviderSnapshot, fanOutProviders, loadProviderItems } from "./discovery";
 
 /** The Studio add-ons, in the order their items are offered. */
 export const STUDIO_SUITE = ["studio-tasks", "excalidraw", "artifacts", "talk", "pages", "studio-tables"];
@@ -52,38 +52,46 @@ export function indexItem(pluginId: string, item: ProviderItem, info: z.infer<St
 
 /** The newest live items across add-ons, cached for a few seconds. */
 export function studioIndex(sdk: BbPluginApi["sdk"], studio: StudioSchemas, options: { exclude?: readonly string[] } = {}) {
-  let cached: { at: number; items: Promise<StudioIndexItem[]> } | null = null;
+  type Snapshot = { items: StudioIndexItem[]; complete: boolean };
+  let cached: { at: number; snapshot: Promise<Snapshot> } | null = null;
+  const previous = new Map<string, StudioIndexItem[]>();
 
-  async function load(): Promise<StudioIndexItem[]> {
-    const providers = await discoverProviders(sdk, { method: "studio_list", known: STUDIO_SUITE, exclude: ["studio", ...(options.exclude ?? [])] });
-    const lists = await fanOutProviders(
-      providers.map((plugin) => plugin.id),
-      async (pluginId) => {
-        const [{ items }, info] = await Promise.all([
-          sdk.plugins.callRpc({ pluginId, method: "studio_list", input: null as never, outputSchema: studio.provider.studio_list.output }),
-          sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null as never, outputSchema: studio.info }),
+  async function load(): Promise<Snapshot> {
+    const discovery = await discoverProviderSnapshot(sdk, { method: "studio_list", known: STUDIO_SUITE, exclude: ["studio", ...(options.exclude ?? [])] });
+    const installed = new Set(discovery.installed.map((plugin) => plugin.id));
+    const discovered = new Set(discovery.providers.map((plugin) => plugin.id));
+    for (const id of previous.keys()) if (!installed.has(id) || (discovery.complete && !discovered.has(id))) previous.delete(id);
+    let complete = discovery.complete;
+    await fanOutProviders(discovery.providers, async (plugin) => {
+      if (!["running", "starting", "degraded"].includes(plugin.status)) { complete = false; return; }
+      const result = await loadProviderItems(async () => {
+        const [listed, info] = await Promise.all([
+          sdk.plugins.callRpc({ pluginId: plugin.id, method: "studio_list", input: null as never, outputSchema: studio.provider.studio_list.output, signal: AbortSignal.timeout(10_000) }),
+          sdk.plugins.callRpc({ pluginId: plugin.id, method: "studio_describe", input: null as never, outputSchema: studio.info, signal: AbortSignal.timeout(10_000) }),
         ]);
-        return items
-          .filter((item) => !item.archived)
-          .map((item) => indexItem(pluginId, item, info));
-      },
-      () => [],
-    );
-    return lists
-      .flat()
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, MAX_ITEMS);
+        return { items: listed.items.map((item) => ({ ...indexItem(plugin.id, item, info), archived: item.archived })), truncated: listed.truncated };
+      });
+      if (result.status !== "ready") { complete = false; return; }
+      const seen = new Set(result.items.map((item) => item.id));
+      const retained = result.complete ? [] : (previous.get(plugin.id) ?? []).filter((item) => !seen.has(item.id));
+      previous.set(plugin.id, [...retained, ...result.items.filter((item) => !item.archived).map(({ archived: _archived, ...item }) => item)]);
+      if (!result.complete) complete = false;
+    }, () => { complete = false; });
+    return { items: [...previous.values()].flat().sort((a, b) => b.updatedAt - a.updatedAt).slice(0, MAX_ITEMS), complete };
   }
 
+  const snapshot = (): Promise<Snapshot> => {
+    if (!cached || Date.now() - cached.at > FRESH_MS) {
+      const pending = load();
+      cached = { at: Date.now(), snapshot: pending };
+      pending.catch(() => { if (cached?.snapshot === pending) cached = null; });
+    }
+    return cached.snapshot;
+  };
+
   return {
-    items(): Promise<StudioIndexItem[]> {
-      if (!cached || Date.now() - cached.at > FRESH_MS) {
-        const items = load();
-        cached = { at: Date.now(), items };
-        items.catch(() => (cached = null));
-      }
-      return cached.items;
-    },
+    items: () => snapshot().then((result) => result.items),
+    snapshot,
     /** Drops the cache, so a just-made item is listed. */
     invalidate(): void {
       cached = null;
