@@ -1,0 +1,3 @@
+# These fixtures/downloads preserve exact bytes, including CSV CRLF and PDF xref padding.
+*.csv -text -diff
+*.pdf -text -diff

@@ -1,0 +1,38 @@
+{
+  "largeText": {
+    "width": 1440,
+    "height": 857,
+    "horizontalOverflow": false,
+    "download": true,
+    "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nText · 2.3 MB\nChat\nRelated\n\nThis file is large, so only its start is shown. Download it for the rest.\n\nToggle Sidebar"
+  },
+  "largeDownload": {
+    "bytes": 2375029,
+    "tail": "DOWNLOAD END Q6",
+    "actualBrowserDownload": true
+  },
+  "largeMobile": {
+    "width": 390,
+    "height": 844,
+    "horizontalOverflow": false,
+    "download": true,
+    "text": "Artifacts\n\nStudio\nChat\nLoading…\nToggle Sidebar"
+  },
+  "htmlSelection": {
+    "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nHTML · 408 B\nChat\nRelated\nPreview\nSource\nSend to thread\nToggle Sidebar",
+    "frames": [
+      {
+        "sandbox": "allow-scripts",
+        "title": "q6-interactive.html"
+      }
+    ]
+  },
+  "deletedId": "art_f6d2a1bbc831236c",
+  "deleted": {
+    "width": 1440,
+    "height": 857,
+    "horizontalOverflow": false,
+    "download": false,
+    "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nStudio\n\nStudio\nKind:\nArtifacts\nDisplay\nNew\nViews\n\nSave this search with +.\n\nKind\nArtifacts\n8\nBoards\n1\nTables\n1\nProject\nOrbit\n8\nStatus\nArchived\n0\n8 items\nName\nProject\nType\nSize\nVersions\nLast activity\nQ6 large\nOrbit\nText\n2.3 MB\n1\n3m ago\nQ6 corrupt\nOrbit\nPDF\n40 B\n1\n3m ago\nQ6 two pages\nOrbit\nPDF\n858 B\n1\n3m ago\nQ6 image\nOrbit\nImage\n3.8 KB\n1\n3m ago\nQ6 vector\nOrbit\nImage\n241 B\n1\n3m ago\nQ6 plain\nQ6 plain text café 東京\nOrbit\nText\n1.2 KB\n1\n3m ago\nQ6 notes\nQ6 Markdown café 東京\nOrbit\nMarkdown\n141 B\n1\n3m ago\nQ6 interactive\nbody{font:24px sans-serif;padding:24px;background:#f2f7f5;color:#163d34}button{font:inherit}Q6 HTML previewCafé 東京 — select this sentence.R…\nOrbit\nHTML\n408 B\n1\n3m ago\nToggle Sidebar\nThis artifact was deleted."
+  }
+}

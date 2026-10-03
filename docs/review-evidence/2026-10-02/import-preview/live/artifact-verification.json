@@ -1,0 +1,206 @@
+{
+  "formats": [
+    {
+      "kind": "html",
+      "id": "art_89d1f04ad86d2ac5",
+      "name": "q6-interactive.html",
+      "state": {
+        "images": [],
+        "frames": [
+          {
+            "title": "q6-interactive.html",
+            "src": "http://127.0.0.1:49486/api/v1/plugins/artifacts/http/content?artifact=art_89d1f04ad86d2ac5&version=888eaa28-e365-4dd3-869d-7e014d274ce2&quote=1",
+            "sandbox": "allow-scripts"
+          }
+        ],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nHTML · 408 B\nChat\nRelated\nPreview\nSource\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nToggle Sidebar"
+      }
+    },
+    {
+      "kind": "markdown",
+      "id": "art_ce087da7a3523a77",
+      "name": "q6-notes.md",
+      "state": {
+        "images": [],
+        "frames": [],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nMarkdown · 141 B\nChat\nRelated\nPreview\nSource\nQ6 Markdown café 東京\n\nBold marker and a safe link.\n\nFirst item\nSecond item\nJS\nconst answer = 42;\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nQ6 Markdown café 東京\n\nBold marker and a safe link.\n\nFirst item\nSecond item\nJS\nconst answer = 42;\nToggle Sidebar"
+      }
+    },
+    {
+      "kind": "text",
+      "id": "art_c199363f1aa256a1",
+      "name": "q6-plain.txt",
+      "state": {
+        "images": [],
+        "frames": [],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nText · 1.2 KB\nChat\nRelated\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nToggle Sidebar"
+      }
+    },
+    {
+      "kind": "svg",
+      "id": "art_49f7e8c48fd16399",
+      "name": "q6-vector.svg",
+      "state": {
+        "images": [
+          {
+            "alt": "q6-vector.svg",
+            "complete": true,
+            "naturalWidth": 960,
+            "naturalHeight": 480,
+            "title": "Click for actual size; drag to send an area to the thread"
+          }
+        ],
+        "frames": [],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nImage · 241 B\nChat\nRelated\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nToggle Sidebar"
+      }
+    },
+    {
+      "kind": "png",
+      "id": "art_715b49c5e718ab17",
+      "name": "q6-image.png",
+      "state": {
+        "images": [
+          {
+            "alt": "q6-image.png",
+            "complete": true,
+            "naturalWidth": 960,
+            "naturalHeight": 480,
+            "title": "Click for actual size; drag to send an area to the thread"
+          }
+        ],
+        "frames": [],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nImage · 3.8 KB\nChat\nRelated\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nToggle Sidebar"
+      }
+    },
+    {
+      "kind": "pdf",
+      "id": "art_4c03d3f8efa88e94",
+      "name": "q6-two-pages.pdf",
+      "state": {
+        "images": [],
+        "frames": [
+          {
+            "title": "q6-two-pages.pdf",
+            "src": "http://127.0.0.1:49486/api/v1/plugins/artifacts/http/content?artifact=art_4c03d3f8efa88e94&version=c382ec85-927d-47e6-9c67-fb08334c8e03",
+            "sandbox": null
+          }
+        ],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nPDF · 858 B\nChat\nRelated\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nToggle Sidebar"
+      }
+    },
+    {
+      "kind": "bad-pdf",
+      "id": "art_1e62dd919653ab24",
+      "name": "q6-corrupt.pdf",
+      "state": {
+        "images": [],
+        "frames": [
+          {
+            "title": "q6-corrupt.pdf",
+            "src": "http://127.0.0.1:49486/api/v1/plugins/artifacts/http/content?artifact=art_1e62dd919653ab24&version=d4dd58da-7ec3-45f9-afd8-8ab12d677981",
+            "sandbox": null
+          }
+        ],
+        "alerts": []
+      },
+      "desktop": {
+        "width": 1440,
+        "height": 857,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nPDF · 40 B\nChat\nRelated\nToggle Sidebar"
+      },
+      "mobile": {
+        "width": 390,
+        "height": 844,
+        "horizontalOverflow": false,
+        "download": true,
+        "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nChat\nToggle Sidebar"
+      }
+    }
+  ]
+}

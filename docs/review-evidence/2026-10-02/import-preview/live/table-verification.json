@@ -1,0 +1,82 @@
+{
+  "checkpoint": "371d367",
+  "tableId": "tbl_8c7f393689acfa9b",
+  "fileChooser": {
+    "mode": "selectSingle",
+    "opened": true
+  },
+  "table": {
+    "id": "tbl_8c7f393689acfa9b",
+    "title": "Q6 CSV Café",
+    "projectId": "proj_su3dznrbpw",
+    "columns": [
+      {
+        "id": "name",
+        "name": "Name",
+        "type": "text",
+        "options": []
+      },
+      {
+        "id": "col_f7a904ed89bb7d54",
+        "name": "Notes",
+        "type": "text",
+        "options": []
+      }
+    ],
+    "views": [
+      {
+        "id": "view_a9784cf2c803da36",
+        "name": "Table",
+        "type": "table",
+        "groupBy": null,
+        "dateBy": null,
+        "filters": [],
+        "sorts": [],
+        "hidden": []
+      }
+    ],
+    "rows": [
+      {
+        "id": "row_278dbf22333db48b",
+        "values": {
+          "name": "Café 東京",
+          "col_f7a904ed89bb7d54": "First line\r\nSecond, line with \"quotes\""
+        },
+        "createdAt": 1791001661064,
+        "updatedAt": 1791001661064
+      },
+      {
+        "id": "row_02b8d774bda6c94c",
+        "values": {
+          "name": "=SUM(1,2)",
+          "col_f7a904ed89bb7d54": "@literal"
+        },
+        "createdAt": 1791001661064,
+        "updatedAt": 1791001661064
+      }
+    ],
+    "archived": false,
+    "createdAt": 1791001633894,
+    "updatedAt": 1791001661064
+  },
+  "desktop": {
+    "width": 1440,
+    "height": 857,
+    "horizontalOverflow": false,
+    "download": false,
+    "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nTables\n\nStudio\nChat\nRelated\nImport\nExport\nTable\n2 rows\nFilter\nSort\nColumns\n\t\nName\n\t\nNotes\n\t\n\n\n1\n\t\nCafé 東京\n\t\nFirst line Second, line with \"quotes\"\n\t\n\n2\n\t\n=SUM(1,2)\n\t\n@literal\n\t\nNew row\nToggle Sidebar\nImported 2 rows."
+  },
+  "download": {
+    "name": "Q6 CSV Café.csv",
+    "bytes": 99,
+    "text": "\"Name\",\"Notes\"\r\n\"Café 東京\",\"First line\r\nSecond, line with \"\"quotes\"\"\"\r\n\"=SUM(1,2)\",\"@literal\"\r\n"
+  },
+  "mobile": {
+    "width": 390,
+    "height": 844,
+    "horizontalOverflow": false,
+    "download": false,
+    "text": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nTables\n\nStudio\n\nLoading table…\n\nToggle Sidebar\nImported 2 rows."
+  },
+  "pass": true
+}

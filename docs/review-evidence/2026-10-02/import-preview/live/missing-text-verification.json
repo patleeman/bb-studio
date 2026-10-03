@@ -1,0 +1,12 @@
+{
+  "id": "art_c199363f1aa256a1",
+  "rpc": {
+    "text": null,
+    "truncated": false
+  },
+  "ui": {
+    "body": "New thread\nPlugins\nSkills\nAutomations\nTeams\nExplore\nFeed\n1\nCompanions\nForecast\nStudio\nChat\nMore\nStudio\nTasks\nQ6 CSV Café\nQ6 interactive\nQ6 notes\nQ6 plain\nQ6 vector\nQ6 image\nQ6 two pages\nQ6 corrupt\nQ6 large\nThreads\nPick a database for the todo app\nPlan the Friday release window\nReview the launch checklist\nDraft the ORBIT-42 release notes\nSettings\nMobile apps\nProvider usage\nReport a bug\nMore\n\nArtifacts\n\nStudio\nText · 1.2 KB\nChat\nRelated\nToggle Sidebar",
+    "source": "afa;--diffs-dark-bg:#0a0a0a;--diffs-dark-addition-color:#07c480;--diffs-dark-deletion-color:#ff2e3f;--diffs-dark-modified-color:#009fff;--diffs-light:#0a0a0a;--diffs-light-bg:#ffffff;--diffs-light-addition-color:#18a46c;--diffs-light-deletion-color:#d52c36;--diffs-light-modified-color:#009fff;\n  }\n}",
+    "alerts": []
+  }
+}

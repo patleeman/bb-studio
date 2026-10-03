@@ -1,0 +1,6 @@
+{
+  "mode": "text-retry",
+  "restoreThenRetryRecovered": true,
+  "pass": true,
+  "checkpoint": "1a1981e"
+}
