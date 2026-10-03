@@ -68,6 +68,7 @@ function useHomeThreads(
   const cacheRef = useRef(cache);
   cacheRef.current = cache;
   const loading = useRef(new Set<string>());
+  const reloadAfterLoad = useRef(new Set<string>());
   const actionsRef = useRef(actions);
   actionsRef.current = actions;
 
@@ -75,14 +76,17 @@ function useHomeThreads(
     setCache((current) => new Map(current).set(key, thread));
   }, []);
   const load = useCallback(
-    (ref: ItemChatRef) => {
+    (ref: ItemChatRef): void => {
       const key = itemKey(ref);
       if (loading.current.has(key)) return;
       loading.current.add(key);
       rpc.call("home", { pluginId: ref.pluginId, id: ref.id }).then(
-        ({ thread }) => put(key, thread),
-        () => put(key, null),
-      ).finally(() => loading.current.delete(key));
+        ({ thread }) => { if (!reloadAfterLoad.current.has(key)) put(key, thread); },
+        () => { if (!reloadAfterLoad.current.has(key)) put(key, null); },
+      ).finally(() => {
+        loading.current.delete(key);
+        if (reloadAfterLoad.current.delete(key)) load(ref);
+      });
     },
     [rpc, put],
   );
@@ -90,7 +94,11 @@ function useHomeThreads(
   useEffect(() => {
     const started = (event: Event) => {
       const item = itemRefSchema.safeParse((event as CustomEvent).detail);
-      if (item.success) load(item.data);
+      if (item.success) {
+        const key = itemKey(item.data);
+        if (loading.current.has(key)) reloadAfterLoad.current.add(key);
+        else load(item.data);
+      }
     };
     window.addEventListener(CONVERSATION_STARTED, started);
     return () => window.removeEventListener(CONVERSATION_STARTED, started);

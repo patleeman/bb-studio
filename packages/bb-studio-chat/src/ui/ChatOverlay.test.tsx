@@ -100,6 +100,17 @@ describe("item Chat actions", () => {
     expect(state.rpc.call).toHaveBeenCalledWith("home", { pluginId: companion.pluginId, id: companion.id });
   });
 
+  it("refreshes again when a conversation is created during an earlier home lookup", async () => {
+    let release!: (value: any) => void;
+    state.rpc.call.mockImplementationOnce(() => new Promise(resolve => { release = resolve; }));
+    const started = () => window.dispatchEvent(new CustomEvent("bb-studio-chat:started", { detail: { pluginId: companion.pluginId, id: companion.id } }));
+    await act(async () => { started(); });
+    const thread = { threadId: "created_during_lookup", title: "New", origin: "chosen" };
+    state.rpc.call.mockResolvedValueOnce({ thread });
+    await act(async () => { started(); release({ thread: null }); });
+    expect(state.host!.home(companion)).toEqual(thread);
+  });
+
   it("keeps the quote available if durable storage is unavailable", async () => {
     state.available = true;
     vi.spyOn(quoteDrafts, "save").mockRejectedValue(new Error("Storage unavailable"));
