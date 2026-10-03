@@ -450,7 +450,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Opens voice chat on the scratch thread and checks it starts listening.
     func testVoiceChat() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        let id = try queuedScratchThread("Voice chat fixture")
         addUIInterruptionMonitor(withDescription: "permissions") { alert in
             for label in ["Allow", "OK"] where alert.buttons[label].exists {
                 alert.buttons[label].tap()
@@ -467,7 +467,16 @@ final class ThreadUITests: XCTestCase {
         app.tap()
         sleep(5)
         shot("voice-chat")
-        // The simulator can't grant speech recognition, so accept the Settings path too.
+        #if targetEnvironment(simulator)
+        if app.staticTexts["Speech recognition stopped: Failed to initialize recognizer"].exists {
+            app.buttons["Pause"].tap()
+            XCTAssertTrue(app.buttons["Resume"].waitForExistence(timeout: 5), "failed session can pause")
+            app.buttons["End"].tap()
+            XCTAssertTrue(more.waitForExistence(timeout: 5), "failed session can end")
+            throw XCTSkip("This Simulator cannot initialize Apple's speech recognizer; failed-session pause/end verified. Listening requires a speech-capable device.")
+        }
+        #endif
+        // A denied permission must offer a way to enable it.
         let listening = app.staticTexts.matching(NSPredicate(format: "label BEGINSWITH 'Listening'")).firstMatch
         XCTAssertTrue(listening.waitForExistence(timeout: 5) || app.links["Open Settings"].exists || app.buttons["Open Settings"].exists,
             "listening, or a way to fix the permission")
@@ -956,10 +965,10 @@ final class ThreadUITests: XCTestCase {
         shot("message-sent-time")
     }
 
-    /// Opens terminals from a scratch thread's menu, named by
-    /// `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
+    /// Opens and closes a terminal in the staged workspace fixture.
     func testTerminal() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        let id = threadId
+        XCTAssertNotNil(api("GET", "/threads/\(id)", [:])?["environmentId"], "staged workspace fixture")
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 15), "thread")

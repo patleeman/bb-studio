@@ -242,3 +242,22 @@ coverage. Neither depends on `BBGO_QA_PAGE` or prior test state.
 
 `/tmp/office-page-skips/results.xcresult`: 2 passed, 0 failures against staged
 server 52786 on the private simulator. `git diff --check` passed.
+
+## Terminal enabled; voice capability checked
+
+`testTerminal` now uses the staged thread with a provisioned checkout instead
+of skipping when an unrelated queue-thread environment variable is absent.
+It passed terminal creation, attachment, shell input and closure in
+`/tmp/office-terminal-voice/results.xcresult`.
+
+`testVoiceChat` now creates and removes its own scheduled scratch thread. Its
+first enabled run granted microphone/speech permission, then displayed the exact
+Apple error `Speech recognition stopped: Failed to initialize recognizer` on
+the iOS 27 Simulator. This is a runtime capability limitation, not a missing
+fixture. The test now checks pause/resume and end controls before skipping only
+that exact error on Simulator. Device listening and permission-recovery checks
+remain unchanged; other errors still fail.
+
+`/tmp/office-voice-capability/results.xcresult` verifies the failed-session
+controls and records 1 explicit capability skip, 0 failures. Speech recognition
+itself still requires a speech-capable device. `git diff --check` passed.
