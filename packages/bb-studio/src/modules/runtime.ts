@@ -4,6 +4,7 @@ import { officeTrustAgents } from "../office/trust-agents";
 import { ModuleAgents } from "./agents";
 import { moduleSettings } from "./settings";
 import { moduleStatusContract } from "./status";
+import { cleanupLegacyModules } from "./cleanup";
 import { migrateModuleRefs } from "./refs";
 import type Database from "better-sqlite3";
 import type { BbPluginApi, PluginCliRegistration, PluginRpcContract, PluginRpcHandlers, PluginStorage } from "@get-bb/plugin-sdk";
@@ -86,7 +87,19 @@ export class ModuleRuntime {
       Object.assign(this.coreHandlers, this.provider.handlers);
       this.host.rpc.register(moduleProviderContract, this.provider.handlers);
     }
-    this.host.rpc.register(moduleStatusContract, { modules_status: () => ({ active: modules.filter(module => this.activeIds.includes(module.legacyPluginId)).map(module => module.name), legacyInstalled: this.legacyInstalled }) });
+    let cleanupRunning = false;
+    this.host.rpc.register(moduleStatusContract, {
+      modules_status: () => ({ active: modules.filter(module => this.activeIds.includes(module.legacyPluginId)).map(module => module.name), legacyInstalled: this.legacyInstalled }),
+      modules_cleanup_legacy: async ({ dryRun }) => {
+        if (cleanupRunning) throw new Error("Legacy cleanup is already running");
+        cleanupRunning = true;
+        try {
+          const Constructor = this.host.storage.database().constructor as new (path: string, options?: Database.Options) => Database.Database;
+          return await cleanupLegacyModules({ dataDir: this.host.server.experimental_dataDir, dryRun,
+            open: (path, options) => new Constructor(path, options), installed: async () => (await this.host.sdk.plugins.list()).plugins });
+        } finally { cleanupRunning = false; }
+      },
+    });
     this.agents.register();
     this.hooks.register();
     const core = this.coreCommand;

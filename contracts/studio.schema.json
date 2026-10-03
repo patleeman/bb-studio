@@ -10629,6 +10629,83 @@
         "additionalProperties": false
       }
     },
+    "modules_cleanup_legacy": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "default": true,
+            "type": "boolean"
+          }
+        },
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "dryRun": {
+            "type": "boolean"
+          },
+          "archivePath": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "entries": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "pluginId": {
+                  "type": "string"
+                },
+                "path": {
+                  "type": "string"
+                },
+                "status": {
+                  "type": "string",
+                  "enum": [
+                    "ready",
+                    "retained",
+                    "removed"
+                  ]
+                },
+                "reason": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "files": {
+                  "type": "number"
+                },
+                "bytes": {
+                  "type": "number"
+                }
+              },
+              "required": [
+                "pluginId",
+                "path",
+                "status",
+                "reason",
+                "files",
+                "bytes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "dryRun",
+          "archivePath",
+          "entries"
+        ],
+        "additionalProperties": false
+      }
+    },
     "tables_list": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

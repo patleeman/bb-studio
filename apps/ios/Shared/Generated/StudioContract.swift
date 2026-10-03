@@ -100,6 +100,7 @@ public enum Studio {
     public static let studio_instantiate = "studio_instantiate"
     public static let studio_export = "studio_export"
     public static let modules_status = "modules_status"
+    public static let modules_cleanup_legacy = "modules_cleanup_legacy"
     public static let tables_list = "tables_list"
     public static let tables_get = "tables_get"
     public static let tables_create = "tables_create"
@@ -461,6 +462,8 @@ public enum Studio {
   public typealias ModulesStatusInput = StudioJSONValue
 
   public typealias ModulesStatus = ModulesStatusOutput
+
+  public typealias ModulesCleanupLegacy = ModulesCleanupLegacyOutput
 
   public typealias TablesListInput = StudioJSONValue
 
@@ -7726,6 +7729,71 @@ public enum Studio {
     public init(active: [String]? = nil, legacyInstalled: [String]? = nil) {
       self.active = active
       self.legacyInstalled = legacyInstalled
+    }
+  }
+
+  public struct ModulesCleanupLegacyInput: Sendable, Hashable, Codable {
+    public var dryRun: Bool?
+
+    public init(dryRun: Bool? = nil) {
+      self.dryRun = dryRun
+    }
+  }
+
+  public enum ModulesCleanupLegacyOutputEntriesItemStatus: Sendable, Hashable, Codable {
+    case ready
+    case retained
+    case removed
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "ready": self = .ready
+      case "retained": self = .retained
+      case "removed": self = .removed
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .ready: try container.encode("ready")
+      case .retained: try container.encode("retained")
+      case .removed: try container.encode("removed")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ModulesCleanupLegacyOutputEntriesItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var path: String?
+    public var status: ModulesCleanupLegacyOutputEntriesItemStatus?
+    public var reason: String?
+    public var files: Double?
+    public var bytes: Double?
+
+    public init(pluginId: String? = nil, path: String? = nil, status: ModulesCleanupLegacyOutputEntriesItemStatus? = nil, reason: String? = nil, files: Double? = nil, bytes: Double? = nil) {
+      self.pluginId = pluginId
+      self.path = path
+      self.status = status
+      self.reason = reason
+      self.files = files
+      self.bytes = bytes
+    }
+  }
+
+  public struct ModulesCleanupLegacyOutput: Sendable, Hashable, Codable {
+    public var dryRun: Bool?
+    public var archivePath: String?
+    public var entries: [ModulesCleanupLegacyOutputEntriesItem]?
+
+    public init(dryRun: Bool? = nil, archivePath: String? = nil, entries: [ModulesCleanupLegacyOutputEntriesItem]? = nil) {
+      self.dryRun = dryRun
+      self.archivePath = archivePath
+      self.entries = entries
     }
   }
 
