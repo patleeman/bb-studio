@@ -18,8 +18,9 @@ export type ThreadReadState = {
   deletedAt: number | null;
 };
 
-/** Nothing left to see: read with no open question, or gone. A thread that can't be loaded counts as gone. */
-export function settled(thread: ThreadReadState | null): boolean {
+/** null confirms deletion; undefined means the lookup failed and needs retrying. */
+export function settled(thread: ThreadReadState | null | undefined): boolean {
+  if (thread === undefined) return false;
   if (!thread || thread.archivedAt !== null || thread.deletedAt !== null) return true;
   return !thread.hasPendingInteraction && (thread.lastReadAt ?? 0) >= thread.latestAttentionAt;
 }
@@ -34,20 +35,20 @@ export function noteNotified(notified: Notified, threadIds: string[], now: numbe
 /** Splits tracked threads into those to clear now and those to keep watching. */
 export function partition(
   notified: Notified,
-  states: Record<string, ThreadReadState | null>,
+  states: Record<string, ThreadReadState | null | undefined>,
   now: number,
 ): { clear: string[]; keep: Notified } {
   const clear: string[] = [];
   const keep: Notified = {};
   for (const [threadId, sentAt] of Object.entries(notified)) {
     if (now - sentAt > NOTIFIED_TTL_MS) continue;
-    if (settled(states[threadId] ?? null)) clear.push(threadId);
+    if (settled(states[threadId])) clear.push(threadId);
     else keep[threadId] = sentAt;
   }
   return { clear, keep };
 }
 
 /** A silent push: the app removes delivered notifications for these threads. */
-export function clearPayload(threadIds: string[]): string {
-  return JSON.stringify({ aps: { "content-available": 1 }, clearThreadIds: threadIds });
+export function clearPayload(threadIds: string[], serverId?: string): string {
+  return JSON.stringify({ aps: { "content-available": 1 }, clearThreadIds: threadIds, ...(serverId ? { serverId } : {}) });
 }

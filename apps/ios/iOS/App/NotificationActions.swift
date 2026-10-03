@@ -45,8 +45,10 @@ enum NotificationActions {
         let info = response.notification.request.content.userInfo
         guard let threadId = info["threadId"] as? String else { return false }
         let interactionId = info["interactionId"] as? String
+        guard [approve, deny, reply].contains(response.actionIdentifier) || response.actionIdentifier.hasPrefix(choicePrefix) else { return false }
         let client = BBClient()
         do {
+            try await client.validateNotificationOrigin(info["serverId"] as? String)
             switch response.actionIdentifier {
             case approve, deny:
                 guard let interactionId else { return false }
@@ -55,9 +57,8 @@ enum NotificationActions {
                     decision: response.actionIdentifier == approve ? "allow_once" : "deny")
             case let action where action.hasPrefix(choicePrefix):
                 guard let interactionId, let index = Int(action.dropFirst(choicePrefix.count)) else { return false }
-                let pending = try await client.interactions(threadId)
-                guard let interaction = pending.first(where: { $0.id == interactionId }),
-                    let question = interaction.allQuestions?.first,
+                let interaction = try await client.pendingInteraction(threadId: threadId, interactionId: interactionId)
+                guard let question = interaction.allQuestions?.first,
                     let options = question.options, options.indices.contains(index)
                 else {
                     await confirm(threadId, "That question isn't waiting anymore. Tap to open the thread.")
@@ -69,9 +70,8 @@ enum NotificationActions {
                     .trimmingCharacters(in: .whitespacesAndNewlines) ?? ""
                 guard !text.isEmpty else { return true }
                 if let interactionId {
-                    let pending = try await client.interactions(threadId)
-                    guard let interaction = pending.first(where: { $0.id == interactionId }) ?? pending.first,
-                        let resolution = interaction.textAnswer(text)
+                    let interaction = try await client.pendingInteraction(threadId: threadId, interactionId: interactionId)
+                    guard let resolution = interaction.textAnswer(text)
                     else {
                         await confirm(threadId, "Couldn't answer from here. Tap to open the thread.")
                         return true
@@ -91,12 +91,20 @@ enum NotificationActions {
 
     /// Removes delivered notifications for threads that were read or answered,
     /// here or (by the relay's silent push) on another device.
-    static func clear(threadIds: Set<String>) async {
+    static func clear(threadIds: Set<String>, serverId: String? = nil, client: BBClient = BBClient()) async {
+        let origin: String?
+        if let serverId { origin = serverId } else { origin = try? await client.mobileServerIdentity() }
+        guard let origin else { return }
         let center = UNUserNotificationCenter.current()
         let identifiers = await center.deliveredNotifications()
-            .filter { ($0.request.content.userInfo["threadId"] as? String).map(threadIds.contains) ?? false }
+            .filter { matchesClear($0.request.content.userInfo, threadIds: threadIds, serverId: origin) }
             .map(\.request.identifier)
         if !identifiers.isEmpty { center.removeDeliveredNotifications(withIdentifiers: identifiers) }
+    }
+
+    static func matchesClear(_ info: [AnyHashable: Any], threadIds: Set<String>, serverId: String) -> Bool {
+        info["serverId"] as? String == serverId &&
+            ((info["threadId"] as? String).map(threadIds.contains) ?? false)
     }
 
     /// A quiet follow-up notification when an action fails.

@@ -230,13 +230,19 @@ extension BBClient {
 
     /// Resolves by ids only, for notification actions that have no payload at hand.
     public func resolve(threadId: String, interactionId: String, decision: String) async throws {
-        let pending = try await interactions(threadId)
-        guard let interaction = pending.first(where: { $0.id == interactionId }) ?? pending.first else {
-            throw BBError(status: 404, message: "Nothing is waiting in this thread.")
-        }
-        if decision == "deny" && !interaction.decisions.contains("deny") {
-            throw BBError(status: 400, message: "This request can't be denied.")
+        let interaction = try await pendingInteraction(threadId: threadId, interactionId: interactionId)
+        guard interaction.payload.kind == "approval", interaction.decisions.contains(decision) else {
+            throw BBError(status: 400, message: "That decision is not available for this request.")
         }
         try await resolve(interaction, interaction.approvalResolution(decision))
+    }
+
+    /// Never redirect an old notification's action onto a newer interaction.
+    public func pendingInteraction(threadId: String, interactionId: String) async throws -> PendingInteraction {
+        let pending = try await interactions(threadId)
+        guard let interaction = pending.first(where: { $0.id == interactionId && $0.status == "pending" }) else {
+            throw BBError(status: 404, message: "That request is no longer waiting in this thread.")
+        }
+        return interaction
     }
 }

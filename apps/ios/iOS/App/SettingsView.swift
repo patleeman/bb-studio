@@ -9,6 +9,8 @@ struct SettingsView: View {
     @AppStorage(VoiceChatEngine.rateKey) private var rate = 1.08
     @State private var preview = AVSpeechSynthesizer()
     @AppStorage("runningPlugins") private var runningPlugins = ""
+    @ObservedObject private var audioOutbox = TalkOutbox.shared
+    @State private var confirmingLegacyUpload = false
 
     var body: some View {
         Form {
@@ -25,6 +27,13 @@ struct SettingsView: View {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
             }
             ServerControls()
+            if audioOutbox.legacyPending > 0 {
+                Section("Older recordings") {
+                    Text("\(audioOutbox.legacyPending) recording(s) are preserved on this phone, but their original server was not saved.")
+                        .font(.footnote)
+                    Button("Resume older uploads…") { confirmingLegacyUpload = true }
+                }
+            }
             Section("Server") {
                 NavigationLink { PluginStatusView() } label: {
                     Label("Plugins", systemImage: "puzzlepiece.extension")
@@ -78,6 +87,14 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .onAppear { serverURL = app.serverURL.absoluteString }
+        .confirmationDialog("Resume older uploads to \(app.serverURL.host() ?? app.serverURL.absoluteString)?", isPresented: $confirmingLegacyUpload, titleVisibility: .visible) {
+            Button("Upload to this server") {
+                do { try audioOutbox.resumeLegacy(on: app.serverURL) }
+                catch { status = error.localizedDescription }
+            }
+        } message: {
+            Text("Continue only if these recordings were created on this server. To use another server, cancel and save its URL first.")
+        }
     }
 
     private static func quality(_ voice: AVSpeechSynthesisVoice) -> String {

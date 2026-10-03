@@ -72,9 +72,13 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         _ application: UIApplication, didReceiveRemoteNotification userInfo: [AnyHashable: Any],
         fetchCompletionHandler completionHandler: @escaping (UIBackgroundFetchResult) -> Void
     ) {
-        guard let threadIds = userInfo["clearThreadIds"] as? [String] else { return completionHandler(.noData) }
+        guard let threadIds = userInfo["clearThreadIds"] as? [String],
+              let serverId = userInfo["serverId"] as? String, !serverId.isEmpty
+        else { return completionHandler(.noData) }
         Task {
-            await NotificationActions.clear(threadIds: Set(threadIds))
+            // Match both origin and thread locally. A clear for server A can
+            // arrive while B is selected or Tailscale is offline.
+            await NotificationActions.clear(threadIds: Set(threadIds), serverId: serverId)
             completionHandler(.newData)
         }
     }
@@ -104,6 +108,15 @@ final class AppDelegate: NSObject, UIApplicationDelegate, UNUserNotificationCent
         Task {
             let userInfo = response.notification.request.content.userInfo
             if await !NotificationActions.handle(response) {
+                let client = BBClient()
+                do {
+                    try await client.validateNotificationOrigin(userInfo["serverId"] as? String)
+                    guard client.baseURL == BBClient.storedServerURL else { completionHandler(); return }
+                } catch {
+                    await MainActor.run { AppModel.shared.notificationError = error.localizedDescription }
+                    completionHandler()
+                    return
+                }
                 // A feed post's notification opens the post, not the thread that posted it.
                 if case .feedPost(let id)? = (userInfo["path"] as? String).flatMap(Route.init(href:)) {
                     await MainActor.run { AppModel.shared.openFeedPost(id) }

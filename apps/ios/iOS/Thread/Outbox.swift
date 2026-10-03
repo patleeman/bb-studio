@@ -13,6 +13,8 @@ final class Outbox: ObservableObject {
         var threadId: String
         var text: String
         var mentions: [Mention]
+        /// Optional only while decoding entries written before server scoping.
+        var serverURL: URL?
         var createdAt = Date()
         /// Set when a send failed in a way that might have reached BB.
         var failure: String?
@@ -20,20 +22,32 @@ final class Outbox: ObservableObject {
 
     @Published private(set) var messages: [Message] = []
 
-    private var client: BBClient { AppModel.shared.client }
+    private let currentClient: @MainActor () -> BBClient
+    private let persist: ([Message]) -> Void
     private var flushing: Task<Void, Never>?
     private var retry: Task<Void, Never>?
 
-    private init() {
-        messages = DiskCache.load([Message].self, key: "outbox") ?? []
+    init(messages: [Message]? = nil,
+         currentClient: @escaping @MainActor () -> BBClient = { AppModel.shared.client },
+         persist: @escaping ([Message]) -> Void = { DiskCache.save($0, as: "outbox") }) {
+        self.currentClient = currentClient
+        self.persist = persist
+        self.messages = (messages ?? DiskCache.load([Message].self, key: "outbox") ?? []).map {
+            var message = $0
+            if message.serverURL == nil {
+                message.failure = "This older message has no saved server. Select its original BB server, then tap Try again to send it there."
+            }
+            return message
+        }
+        save()
     }
 
     func messages(for threadId: String) -> [Message] {
-        messages.filter { $0.threadId == threadId }
+        messages.filter { $0.threadId == threadId && ($0.serverURL == nil || $0.serverURL == currentClient().baseURL) }
     }
 
-    func add(threadId: String, text: String, mentions: [Mention]) {
-        messages.append(Message(threadId: threadId, text: text, mentions: mentions))
+    func add(threadId: String, text: String, mentions: [Mention], serverURL: URL? = nil) {
+        messages.append(Message(threadId: threadId, text: text, mentions: mentions, serverURL: serverURL ?? currentClient().baseURL))
         save()
         scheduleRetry()
     }
@@ -46,21 +60,25 @@ final class Outbox: ObservableObject {
     /// Clears a failure so the message goes out with the next flush.
     func retry(_ id: UUID) {
         guard let index = messages.firstIndex(where: { $0.id == id }) else { return }
+        if messages[index].serverURL == nil { messages[index].serverURL = currentClient().baseURL }
         messages[index].failure = nil
         save()
         flush()
     }
 
     func flush() {
-        guard flushing == nil, messages.contains(where: { $0.failure == nil }) else { return }
+        let client = currentClient()
+        guard flushing == nil, messages.contains(where: { $0.failure == nil && $0.serverURL == client.baseURL }) else { return }
         flushing = Task {
-            await send()
+            await send(using: client)
             flushing = nil
+            if currentClient().baseURL != client.baseURL { flush() }
         }
     }
 
-    private func send() async {
-        while let message = messages.first(where: { $0.failure == nil }) {
+    func send(using client: BBClient) async {
+        while currentClient().baseURL == client.baseURL,
+              let message = messages.first(where: { $0.failure == nil && $0.serverURL == client.baseURL }) {
             do {
                 try await client.send(message.threadId, text: message.text, mentions: message.mentions)
                 remove(message.id)
@@ -86,6 +104,6 @@ final class Outbox: ObservableObject {
     }
 
     private func save() {
-        DiskCache.save(messages, as: "outbox")
+        persist(messages)
     }
 }

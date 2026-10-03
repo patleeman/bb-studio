@@ -170,7 +170,7 @@ final class ThreadModel: ObservableObject {
             await loadInteractions()
             await loadPlanReview()
             try? await client.markRead(threadId)
-            await NotificationActions.clear(threadIds: [threadId])
+            await NotificationActions.clear(threadIds: [threadId], client: client)
             await ThreadTitles.fetchUnknown(in: rows.compactMap(\.text), client: client)
         } catch where BBClient.isCancellation(error) {
         } catch {
@@ -384,7 +384,7 @@ final class ThreadModel: ObservableObject {
             await refreshLatest()
             return true
         } catch where BBClient.neverArrived(error) && attachments.isEmpty {
-            Outbox.shared.add(threadId: threadId, text: text, mentions: mentions)
+            Outbox.shared.add(threadId: threadId, text: text, mentions: mentions, serverURL: client.baseURL)
             return true
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

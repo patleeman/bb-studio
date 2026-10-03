@@ -104,6 +104,17 @@ The app talks to `https://patricks-megamac.tail5a01ec.ts.net`, which
 `tailscale serve` proxies to BB on `127.0.0.1:38886`. BB has no client auth,
 so the tailnet is the boundary. You can change the server in Settings.
 
+Queued messages and recorded audio belong to the server where they were created.
+Switching servers pauses that server's queued work until you switch back; sends
+already in flight finish against their original server. Older queued messages
+have no trustworthy server identity and wait for you to select their original
+server and tap Try again. Older audio stays on the phone until you confirm its
+server with Settings → Older recordings → Resume older uploads.
+
+Notification actions and links require the matching Studio Mobile relay's server
+identity. Update the relay with the app; notifications received before this
+identity was available must be reviewed manually in the app.
+
 ## Build
 
 ```sh

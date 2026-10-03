@@ -28,6 +28,14 @@ struct RootView: View {
                 .tag(Tab.settings)
         }
         .tabViewStyle(.sidebarAdaptable)
+        .alert("Notification unavailable", isPresented: Binding(
+            get: { model.notificationError != nil },
+            set: { if !$0 { model.notificationError = nil } }
+        )) {
+            Button("OK", role: .cancel) { model.notificationError = nil }
+        } message: {
+            Text(model.notificationError ?? "")
+        }
         .sheet(item: $model.sheet) { sheet in
             switch sheet {
             case .capture:

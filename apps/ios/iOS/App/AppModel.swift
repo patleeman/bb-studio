@@ -93,6 +93,7 @@ final class AppModel: ObservableObject {
     /// The Studio tab's space filter; nil for every space.
     @Published var studioSpace: String?
     @Published var sheet: Sheet?
+    @Published var notificationError: String?
     /// Opens the new-thread composer, optionally prefilled.
     @Published var newThreadDraft: String?
     /// Set by `bbstudio://reply/<id>`; that thread focuses its composer.
@@ -114,6 +115,9 @@ final class AppModel: ObservableObject {
     var serverURL: URL { client.baseURL }
 
     func setServerURL(_ url: URL) {
+        // Load legacy queues so their unknown origins are quarantined.
+        _ = Outbox.shared
+        _ = TalkOutbox.shared
         BBClient.storedServerURL = url
         realtime.stop()
         client = BBClient(baseURL: url)
@@ -121,6 +125,13 @@ final class AppModel: ObservableObject {
         realtime.start()
         realtime.subscribeThreadList()
         flushOutboxOnConnect()
+        path = []
+        studioPath = []
+        lastThreadId = ""
+        newThreadDraft = nil
+        replyThreadId = nil
+        Outbox.shared.flush()
+        TalkOutbox.shared.kick()
     }
 
     /// The socket keeps the radio awake, and nothing shows its updates in the

@@ -29,6 +29,11 @@ describe("settled", () => {
     expect(settled(thread({ deletedAt: 5 }))).toBe(true);
     expect(settled(null)).toBe(true);
   });
+
+  it("preserves notifications when a lookup failed or has no result", () => {
+    expect(settled(undefined)).toBe(false);
+    expect(partition({ thr_a: 100 }, {}, 200)).toEqual({ clear: [], keep: { thr_a: 100 } });
+  });
 });
 
 describe("partition", () => {

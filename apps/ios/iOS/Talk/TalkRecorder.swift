@@ -58,8 +58,9 @@ final class TalkRecorder: ObservableObject {
                 onLevel: { [weak self] level in Task { @MainActor in self?.level = level } },
                 onSegment: { [weak self] segment in
                     Task { @MainActor in
-                        self?.outbox.add(segment, recordingId: recording.id, sessionId: sessionId)
-                        self?.handedOff += 1
+                        guard let self else { return }
+                        self.outbox.add(segment, recordingId: recording.id, sessionId: sessionId, serverURL: self.client.baseURL)
+                        self.handedOff += 1
                     }
                 })
             startedAt = Date()
@@ -88,8 +89,8 @@ final class TalkRecorder: ObservableObject {
         try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
         await waitForHandoff(segments)
         let stats = capture.stats()
-        outbox.finishWhenSent(id)
-        guard await outbox.waitForFinish(id, until: Date().addingTimeInterval(120)) else {
+        outbox.finishWhenSent(id, serverURL: client.baseURL)
+        guard await outbox.waitForFinish(id, serverURL: client.baseURL, until: Date().addingTimeInterval(120)) else {
             phase = .failed("Still uploading. The transcript will show up in Studio once the audio reaches BB.")
             return nil
         }
@@ -129,7 +130,7 @@ final class TalkRecorder: ObservableObject {
         LiveItems.recordingEnded(id)
         Task {
             await waitForHandoff(segments)
-            outbox.finishWhenSent(id)
+            outbox.finishWhenSent(id, serverURL: client.baseURL)
         }
     }
 

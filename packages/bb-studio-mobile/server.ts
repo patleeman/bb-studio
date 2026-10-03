@@ -11,6 +11,7 @@
 // Once a notified thread is read or answered anywhere, a silent push tells the
 // app to remove its notifications (see clear.ts).
 import { readFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { defineRpcContract, type BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
@@ -77,6 +78,10 @@ export const mobileContract = defineRpcContract({
 });
 
 export default async function plugin(bb: BbPluginApi) {
+  // Durable identity lets the phone reject pushes from a different selected server.
+  const serverId = (await bb.storage.kv.get<string>("server-id")) ?? randomUUID();
+  await bb.storage.kv.set("server-id", serverId);
+  bb.http.route("GET", "/identity", (context) => context.json({ serverId }));
   const settings = bb.settings.define({
     apnsKey: {
       type: "string",
@@ -236,6 +241,7 @@ export default async function plugin(bb: BbPluginApi) {
 
     if (apnsIndexes.length > 0) {
       await enrichInteractions(apnsIndexes.map((index) => messages[index]!));
+      for (const index of apnsIndexes) messages[index]!.data = { ...messages[index]!.data, serverId };
       const apns = await apnsConfig();
       await Promise.all(
         apnsIndexes.map(async (index) => {
@@ -297,15 +303,19 @@ export default async function plugin(bb: BbPluginApi) {
     return withNotified(async (notified) => noteNotified(notified, threadIds, Date.now()));
   }
 
-  async function readState(threadId: string): Promise<ThreadReadState | null> {
+  async function readState(threadId: string): Promise<ThreadReadState | null | undefined> {
     try {
-      const [thread, interactions] = await Promise.all([
-        bb.sdk.threads.get({ threadId }),
-        bb.sdk.threads.interactions.list({ threadId }),
-      ]);
+      // Only a missing thread establishes deletion. A failed interactions
+      // request must not turn a still-pending approval into a clear push.
+      const thread = await bb.sdk.threads.get({ threadId }).catch((error: unknown) => {
+        if (error && typeof error === "object" && ("status" in error && error.status === 404 || "statusCode" in error && error.statusCode === 404)) return null;
+        throw error;
+      });
+      if (!thread) return null;
+      const interactions = await bb.sdk.threads.interactions.list({ threadId });
       return { ...thread, hasPendingInteraction: interactions.some((interaction) => interaction.status === "pending") };
     } catch {
-      return null;
+      return undefined;
     }
   }
 
@@ -321,11 +331,18 @@ export default async function plugin(bb: BbPluginApi) {
         .filter((to) => to.startsWith(APNS_TOKEN_PREFIX))
         .map((to) => to.slice(APNS_TOKEN_PREFIX.length));
       for (let start = 0; start < clear.length; start += CLEAR_BATCH) {
-        const payload = clearPayload(clear.slice(start, start + CLEAR_BATCH));
+        const batch = clear.slice(start, start + CLEAR_BATCH);
+        const payload = clearPayload(batch, serverId);
+        let delivered = devices.length > 0;
         for (const deviceToken of devices) {
           const result = await sendApns({ deviceToken, payload, pushType: "background", priority: 5 }, apns.config, apns.token, sender.send);
-          if (result.status !== 200) bb.log.warn(`clear push failed: ${result.reason ?? result.status}`);
+          if (result.status !== 200) {
+            delivered = false;
+            bb.log.warn(`clear push failed: ${result.reason ?? result.status}`);
+          }
         }
+        // Clearing twice is harmless; dropping a failed clear is permanent.
+        if (!delivered) for (const id of batch) keep[id] = notified[id]!;
       }
       return keep;
     });
@@ -410,10 +427,13 @@ export default async function plugin(bb: BbPluginApi) {
       const data = input.threadId
         ? { kind: input.kind, threadId: input.threadId, projectId: input.projectId, ...(input.path ? { path: input.path } : {}) }
         : { projectId: input.projectId, ...(input.path ? { path: input.path } : {}) };
-      if (devices.length > 0) {
-        await deliver(devices.map((to) => ({ to, title: input.title, body: input.body, sound: "default", data })));
-      }
-      return { ok: true as const, sent: devices.length };
+      const tickets = devices.length > 0
+        ? await deliver(devices.map((to) => ({ to, title: input.title, body: input.body, sound: "default", data })))
+        : [];
+      const muted = new Set((await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? []);
+      const sent = tickets.filter((ticket, index) => ticket.status === "ok" &&
+        !(devices[index]!.startsWith(APNS_TOKEN_PREFIX) && input.threadId && muted.has(input.threadId))).length;
+      return { ok: true as const, sent };
     },
     async mute_list() {
       return { threadIds: (await bb.storage.kv.get<string[]>(MUTED_KEY)) ?? [] };

@@ -10,6 +10,15 @@ wiring.
 
 Finished turns and errors arrive as plain alerts without a Reply field. Tap an
 alert to open the thread. Approval and question notifications keep their actions.
+Each push carries this relay's persistent server identity. The iOS app checks
+that identity before opening a notification, acting on it, or clearing it.
+Update the relay alongside the app: older notifications without an identity
+must be reviewed manually in the app. Actions target only the exact pending
+request named by the notification.
+
+The relay keeps notification tracking after transient lookup or APNs failures
+so the next check can retry. The `notify` response's `sent` count includes only
+successful, unmuted deliveries.
 
 Plugin ID: `mobile`.
 
