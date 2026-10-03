@@ -68,10 +68,12 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
         </div>
       </div>
 
-      <div role="tabpanel" className="min-h-0 flex-1 overflow-auto">
+      <div role="tabpanel" className={tab === "chat" && directThreadId ? "flex min-h-0 flex-1 flex-col" : "min-h-0 flex-1 overflow-auto"}>
         {tab === "chat"
           ? directThreadId
-            ? <ThreadChat key={directThreadId} threadId={directThreadId} variant="full" layout="document" className="h-full" />
+            ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4 @max-3xl/page:px-2">
+                <ThreadChat key={directThreadId} threadId={directThreadId} variant="full" layout="contained" className="min-h-0 flex-1" />
+              </div>
             : <div className="mx-auto max-w-3xl px-10 py-10 text-sm text-muted-foreground @max-3xl/page:px-4">
                 <p>You haven't talked with {bot.name} directly yet.</p>
                 <button type="button" disabled={starting} onClick={() => void startDirect()} className={cn(OUTLINE_BUTTON, "mt-3")}>Message {bot.name}</button>
