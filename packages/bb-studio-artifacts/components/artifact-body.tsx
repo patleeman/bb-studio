@@ -25,7 +25,7 @@ const SPIN = "animate-spin motion-reduce:animate-none";
 
 type Text = { text: string | null; truncated: boolean } | { error: string } | null;
 
-function useVersionText(artifactId: string, version: ArtifactVersion, wanted: boolean): Text {
+function useVersionText(artifactId: string, version: ArtifactVersion, wanted: boolean, retry: number): Text {
   const rpc = useRpc<typeof rpcContract>();
   const [text, setText] = useState<Text>(null);
   useEffect(() => {
@@ -39,7 +39,7 @@ function useVersionText(artifactId: string, version: ArtifactVersion, wanted: bo
     return () => {
       live = false;
     };
-  }, [rpc, artifactId, version.id, wanted]);
+  }, [rpc, artifactId, version.id, wanted, retry]);
   return text;
 }
 
@@ -56,20 +56,32 @@ export function ArtifactBody({
   onArea?: (picked: Picked) => void;
 }) {
   const src = contentUrl(artifactId, version.id);
+  const [retry, setRetry] = useState(0);
+  const [failedImage, setFailedImage] = useState<string | null>(null);
   const showText = isTextType(version.type) && (version.type !== "html" || view === "source");
-  const text = useVersionText(artifactId, version, showText);
+  const text = useVersionText(artifactId, version, showText, retry);
   const [actualSize, setActualSize] = useState(false);
   const area = useImageArea(`version ${version.number}`, (picked) => onArea?.(picked));
+  const retryPreview = () => { setFailedImage(null); setRetry((value) => value + 1); };
+  const recoveryActions = <div className="flex flex-wrap justify-center gap-2">
+    <button type="button" className={OUTLINE_BUTTON} onClick={retryPreview}>Retry preview</button>
+    <DownloadButton artifactId={artifactId} version={version} />
+  </div>;
 
   if (version.type === "image") {
+    if (failedImage === src) return <EmptyState icon="AlertTriangle" title="Couldn't display this image" actions={recoveryActions}>
+      The image could not be loaded or decoded. Retry, or download the original file to open it elsewhere.
+    </EmptyState>;
     return (
       <div className={cn("flex h-full min-h-0 overflow-auto bg-muted/40 p-6 max-md:p-3", actualSize ? "" : "items-center justify-center")}>
         <img
-          src={src}
+          key={`${src}:${retry}`}
+          src={retry ? `${src}&previewRetry=${retry}` : src}
           alt={version.name}
           title={`${actualSize ? "Click to fit to window" : "Click for actual size"}${onArea ? "; drag to send an area to the thread" : ""}`}
           onClick={() => setActualSize((current) => !current)}
           {...(onArea ? area.imgProps : {})}
+          onError={() => setFailedImage(src)}
           className={cn(
             "rounded-sm shadow-sm select-none",
             actualSize ? "m-auto max-w-none cursor-zoom-out" : "max-h-full max-w-full cursor-zoom-in object-contain",
@@ -112,7 +124,12 @@ export function ArtifactBody({
     );
   }
   if ("error" in text) {
-    return <EmptyState icon="AlertTriangle" title="Couldn't load this artifact">{text.error}</EmptyState>;
+    return <EmptyState icon="AlertTriangle" title="Couldn't load this artifact" actions={recoveryActions}>{text.error}</EmptyState>;
+  }
+  if (text.text === null) {
+    return <EmptyState icon="AlertTriangle" title="File content is unavailable" actions={recoveryActions}>
+      This version's file could not be found. Retry after restoring the file or choose another version.
+    </EmptyState>;
   }
   const truncated = text.truncated ? (
     <p className="border-b border-border/70 bg-muted/40 px-4 py-2 text-xs text-muted-foreground">
