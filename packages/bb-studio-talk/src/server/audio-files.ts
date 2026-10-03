@@ -1,6 +1,7 @@
 // Segment audio on disk beside the plugin database:
 // <dataDir>/plugins/talk/audio/<recordingId>/<segmentId>.<ext>
 import { mkdir, readFile, rename, rm, writeFile, open } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { dirname, join, relative, resolve, sep } from "node:path";
 import type Database from "better-sqlite3";
 
@@ -37,15 +38,19 @@ export class AudioFiles {
     const relativePath = join(recordingId, `${segmentId}.${extensionFor(mimeType)}`);
     const target = this.inside(relativePath);
     await mkdir(dirname(target), { recursive: true });
-    const temp = `${target}.${process.pid}.tmp`;
-    await writeFile(temp, bytes);
-    const handle = await open(temp, "r+");
+    const temp = `${target}.${randomUUID()}.tmp`;
     try {
-      await handle.sync();
+      await writeFile(temp, bytes, { flag: "wx" });
+      const handle = await open(temp, "r+");
+      try {
+        await handle.sync();
+      } finally {
+        await handle.close();
+      }
+      await rename(temp, target);
     } finally {
-      await handle.close();
+      await rm(temp, { force: true });
     }
-    await rename(temp, target);
     return relativePath;
   }
 
