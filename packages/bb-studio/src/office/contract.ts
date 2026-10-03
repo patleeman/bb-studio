@@ -5,7 +5,7 @@ export { inboxEventSchema, type InboxEvent } from "./inbox-contract";
 
 const id = z.string().min(1).max(200);
 const name = z.string().trim().min(1).max(100);
-export const trustSchema = z.enum(["read_only", "ask", "act"]);
+export const trustSchema = z.enum(["ask", "act"]);
 export const officeSpaceSchema = z.object({
   id, name, icon: z.string().max(100).nullable(), description: z.string(),
   isDefault: z.boolean(), defaultProjectId: id.nullable(),
