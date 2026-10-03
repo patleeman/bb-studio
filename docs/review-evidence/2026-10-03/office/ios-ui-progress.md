@@ -426,3 +426,25 @@ was requested. [Per-exclusion evidence and native crops](audit-policy/README.md)
 
 Eight broader Review tests still have unresolved findings after the Home
 clipping fix. The fresh latest-main full suite and final report remain pending.
+
+
+## Final audit checkpoint and time box
+
+The approved request grouping and semantic colors pass all four Inbox/plan tests
+at default and accessibility XXXL. Capture exact-text OCR, all four Large Content
+Viewer gestures and four Settings glyph-growth checks pass. The latest navigation
+run now leaves Studio Search clipping, unidentified Home Dynamic Type/clipping,
+and decorative compass contrast. The last issue has an approved, frame-contained
+labeled-image exception awaiting the final suite. [Detailed evidence and native
+before/after crops](audit-policy/README.md).
+
+Two clipping experiments were negative: removing the body cap did not clear the
+finding, nor did removing Home's top action section. Both experiments are fully
+restored. No nil clipping or Dynamic Type exception was introduced.
+
+Coordinator instruction: investigation is now time-boxed and finished. Next run
+must use a NEW staged install from the latest pushed main, then write
+`ios-ui-final.md` with actual counts, per-test decisions, skip groups, every
+approved exception and evidence, and any unresolved findings explicitly listed.
+Do not keep iterating on the audit failures after that run. Final full-suite
+counts remain pending.

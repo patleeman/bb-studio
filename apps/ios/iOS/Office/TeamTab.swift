@@ -122,7 +122,7 @@ private struct TeamList: View {
             if let error = store.error, store.bots.isEmpty {
                 Section { ConnectionBanner(message: error) { await store.refresh() } }
             }
-            Section("Team") {
+            Section {
                 if store.bots.isEmpty {
                     if !store.isLoading, store.error == nil {
                         Text("No bots work in this space yet.").foregroundStyle(.secondary)
@@ -150,10 +150,10 @@ private struct TeamList: View {
                     }
                     .padding(.vertical, 8)
                 }
-            }
+            } header: { Text("Team").foregroundStyle(Color(.label)) }
             let channels = store.conversations.filter { !$0.isDirect }
             if !channels.isEmpty {
-                Section("Conversations") {
+                Section {
                     ForEach(channels) { conversation in
                         NavigationLink(value: Route.savedView(id: conversation.id)) {
                             HStack(spacing: 10) {
@@ -176,7 +176,7 @@ private struct TeamList: View {
                             }
                         }
                     }
-                }
+                } header: { Text("Conversations").foregroundStyle(Color(.label)) }
             }
         }
         .listStyle(.insetGrouped)
@@ -299,8 +299,8 @@ struct BotDeskView: View {
                 LabeledContent("Trust", value: trustLabel(desk.bot.trust))
             }
             if let memory = desk.memory {
-                Section("Mission") { Text(memory.mission.isEmpty ? "No mission yet." : memory.mission).font(.callout) }
-                Section("Memory") { Text(memory.memory.isEmpty ? "Nothing remembered yet." : memory.memory).font(.callout) }
+                Section { Text(memory.mission.isEmpty ? "No mission yet." : memory.mission).font(.callout) } header: { Text("Mission").foregroundStyle(Color(.label)) }
+                Section { Text(memory.memory.isEmpty ? "Nothing remembered yet." : memory.memory).font(.callout) } header: { Text("Memory").foregroundStyle(Color(.label)) }
             }
             Section {
                 NavigationLink(value: Route.bot(id: botId)) { Label("Edit Profile", systemImage: "pencil") }

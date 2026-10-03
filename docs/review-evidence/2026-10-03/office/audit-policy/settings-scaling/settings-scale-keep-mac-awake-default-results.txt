@@ -1,0 +1,1 @@
+expected=Keep Mac awake; control=(16.0, 398.3333333333333, 370.0, 52.0); passed=true; observations=["Keep Mac awake confidence=1.0 bounds=(31.999999964840764, 418.75806451176896, 126.99825479930192, 15.08602150537633)"]

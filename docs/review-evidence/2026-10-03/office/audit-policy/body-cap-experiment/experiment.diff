@@ -1,0 +1,10 @@
+--- HomeTab-body-capped.swift
++++ HomeTab-body-uncapped.swift
+@@ -127,7 +127,6 @@
+                         }
+                         Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
+                             .font(.subheadline).foregroundStyle(Color(.label))
+-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
+                             .fixedSize(horizontal: false, vertical: true)
+                         if let space {
+                             Label(space.name, systemImage: "building.2").font(.caption).foregroundStyle(Color(.label))

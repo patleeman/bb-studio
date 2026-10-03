@@ -50,7 +50,7 @@ private struct HomeList: View {
                 Section { ConnectionBanner(message: error) { await store.refresh() } }
             }
 
-            Section("Needs You") {
+            Section {
                 if store.needsYou.isEmpty {
                     if store.home != nil, store.error == nil {
                         Text("Nothing is waiting on you.").foregroundStyle(.secondary)
@@ -60,26 +60,26 @@ private struct HomeList: View {
                         OfficeEventRow(event: event, bot: office.bot(event.botId)) { await store.refresh() }
                     }
                 }
-            }
+            } header: { Text("Needs You").foregroundStyle(Color(.label)) }
 
             if !store.working.isEmpty {
-                Section("Your Team Is Working On") {
+                Section {
                     ForEach(store.working) { task in OfficeTaskRow(task: task, bot: office.bot(task.botId)) }
-                }
+                } header: { Text("Your Team Is Working On").foregroundStyle(Color(.label)) }
             }
 
             if !store.reports.isEmpty {
-                Section("Reports") {
+                Section {
                     ForEach(store.reports.prefix(5)) { event in
                         OfficeEventRow(event: event, bot: office.bot(event.botId)) { await store.refresh() }
                     }
-                }
+                } header: { Text("Reports").foregroundStyle(Color(.label)) }
             }
 
             if !store.recent.isEmpty {
-                Section("Recent Work") {
+                Section {
                     ForEach(store.recent.prefix(8)) { item in OfficeItemRow(item: item, author: office.bot(item.authorBotId)) }
-                }
+                } header: { Text("Recent Work").foregroundStyle(Color(.label)) }
             }
         }
         .listStyle(.insetGrouped)
@@ -112,30 +112,33 @@ struct OfficeEventRow: View {
                     .font(.title3).foregroundStyle(.secondary).frame(width: 32, height: 32)
             }
             VStack(alignment: .leading, spacing: 4) {
-                let headingLayout = dynamicTypeSize.isAccessibilitySize
-                    ? AnyLayout(VStackLayout(alignment: .leading))
-                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
-                headingLayout {
-                    Button { open() } label: {
-                        Text(event.title)
-                            .font(.body.weight(event.type == .request || event.readAt == nil ? .semibold : .regular))
-                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                Button { open() } label: {
+                    VStack(alignment: .leading, spacing: 4) {
+                        let headingLayout = dynamicTypeSize.isAccessibilitySize
+                            ? AnyLayout(VStackLayout(alignment: .leading))
+                            : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                        headingLayout {
+                            Text(event.title)
+                                .font(.body.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
+                                .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            Text(Date(timeIntervalSince1970: event.createdAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
+                                .font(.footnote).monospacedDigit().foregroundStyle(Color(.label))
+                        }
+                        Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
+                            .font(.subheadline).foregroundStyle(Color(.label))
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
                             .fixedSize(horizontal: false, vertical: true)
-                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
-                            .contentShape(Rectangle())
+                        if let space {
+                            Label(space.name, systemImage: "building.2").font(.caption).foregroundStyle(Color(.label))
+                        }
                     }
-                    .buttonStyle(.plain)
-                    .accessibilityAddTraits(.isButton)
-                    .accessibilityIdentifier("officeRequestOpen")
-                    Text(Date(timeIntervalSince1970: event.createdAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
-                        .font(.caption).foregroundStyle(.secondary)
+                    .contentShape(Rectangle())
+                    .accessibilityElement(children: .combine)
                 }
-                Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
-                    .font(.subheadline).foregroundStyle(.secondary)
-                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
-                if let space {
-                    Label(space.name, systemImage: "building.2").font(.caption).foregroundStyle(.secondary)
-                }
+                .buttonStyle(.plain)
+                .accessibilityAddTraits(.isButton)
+                .accessibilityIdentifier("officeRequestOpen")
                 if event.answerable == true {
                     HStack {
                         TextField("Answer", text: $answer).textFieldStyle(.roundedBorder)
@@ -157,6 +160,7 @@ struct OfficeEventRow: View {
                                     Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
                                 }
                                     .buttonStyle(.bordered)
+                                    .tint(.primary)
                             }
                         }
                     }
@@ -250,6 +254,8 @@ struct OfficeTaskRow: View {
 
 struct OfficeItemRow: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @ScaledMetric(relativeTo: .body) private var iconWidth: CGFloat = 22
     let item: OfficeItem
     let author: OfficeTeamBot?
 
@@ -259,11 +265,13 @@ struct OfficeItemRow: View {
         } label: {
             HStack(spacing: 10) {
                 if let icon = item.icon, !icon.isEmpty {
-                    Text(icon).frame(width: 22)
+                    Text(icon).frame(width: iconWidth)
                 } else {
-                    Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: 22)
+                    Image(systemName: item.symbol).foregroundStyle(.secondary).frame(width: iconWidth)
                 }
-                Text(item.title.isEmpty ? "Untitled" : item.title).lineLimit(1)
+                Text(item.title.isEmpty ? "Untitled" : item.title)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                    .fixedSize(horizontal: false, vertical: true)
                 Spacer()
                 if let author { Face(author, size: 20).accessibilityLabel("Made by \(author.name)") }
             }
@@ -290,7 +298,7 @@ struct DelegateSheet: View {
     var body: some View {
         NavigationStack {
             Form {
-                Section("Who") {
+                Section {
                     ScrollView(.horizontal, showsIndicators: false) {
                         HStack(spacing: 14) {
                             ForEach(bots) { bot in
@@ -307,15 +315,15 @@ struct DelegateSheet: View {
                         }
                         .padding(.vertical, 6)
                     }
-                }
-                Section("What") {
+                } header: { Text("Who").foregroundStyle(Color(.label)) }
+                Section {
                     TextField("Describe the outcome you want", text: $brief, axis: .vertical).lineLimit(3...8)
-                }
-                Section("When") {
+                } header: { Text("What").foregroundStyle(Color(.label)) }
+                Section {
                     Picker("Schedule", selection: $schedule) {
                         ForEach(schedules, id: \.0) { Text($0.1).tag($0.0) }
                     }
-                }
+                } header: { Text("When").foregroundStyle(Color(.label)) }
                 if let error { Section { Text(error).foregroundStyle(.red) } }
             }
             .navigationTitle("Hand Off Work")

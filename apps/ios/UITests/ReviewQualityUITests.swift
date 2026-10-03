@@ -5,6 +5,11 @@ import UIKit
 final class ReviewQualityUITests: XCTestCase {
     private var fixture: String { StagedFixture.serverURL }
     private var auditFindings: [String] = []
+    private var capturePixelProof: Set<String> = []
+    private var largeContentProof: Set<String> = []
+    private var glyphHeights: [String: CGFloat] = [:]
+    private var settingsScaleProof: Set<String> = []
+    private let captureTextControls = ["capture-voice": "Record voice", "capture-dictate": "Dictate", "capture-file": "Photo or file", "capture-thread": "New thread", "captureNoteSave": "Save note"]
 
     override func setUpWithError() throws {
         continueAfterFailure = false
@@ -78,6 +83,7 @@ final class ReviewQualityUITests: XCTestCase {
     }
 
     func testStudioRowsAtAccessibilityText() throws {
+        try verifyFixedControlViewers()
         let app = application(largeText: true)
         app.launch()
         defer { app.terminate() }
@@ -117,56 +123,205 @@ final class ReviewQualityUITests: XCTestCase {
         try captureNativeDiagnostic(app, "home-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
 
-    func testCaptureTextPixelEvidenceAtBothSizes() throws {
+    func testCaptureLargeContentViewer() throws { try verifyFixedControlViewers() }
+
+    private func verifyFixedControlViewers() throws {
+        let app = try diagnosticApplication(largeText: true)
+        defer { app.terminate() }
+        app.open(URL(string: "bbstudio://capture")!)
+        let note = app.buttons["capture-note"]
+        XCTAssertTrue(note.waitForExistence(timeout: 10))
+        reveal(note, in: app)
+        note.tap()
+        try verifyLargeContentViewer(app.buttons["captureBack"], title: "Back", app: app)
+        if app.buttons["captureBack"].exists { app.buttons["captureBack"].tap() }
+        try verifyLargeContentViewer(app.buttons["captureClose"], title: "Close", app: app)
+        if app.buttons["captureClose"].exists { app.buttons["captureClose"].tap() }
+        app.open(URL(string: "bbstudio://studio")!)
+        try verifyLargeContentViewer(app.buttons["studioSelect"], title: "Select", app: app)
+        app.tabBars.buttons["Home"].tap()
+        let space = app.buttons["officeSpaceSwitcher"]
+        XCTAssertTrue(space.waitForExistence(timeout: 10))
+        let title = space.label.replacingOccurrences(of: "Space: ", with: "").replacingOccurrences(of: ". Switch space", with: "")
+        try verifyLargeContentViewer(space, title: title, app: app)
+    }
+
+    private func verifyLargeContentViewer(_ control: XCUIElement, title: String, app: XCUIApplication) throws {
+        XCTAssertTrue(control.waitForExistence(timeout: 10))
+        let identifier = control.identifier
+        let before = app.screenshot()
+        let beforeLines = try RenderedText.lines(in: before.image).filter { line in
+            let frame = CGRect(x: line.bounds.minX * app.frame.width, y: (1 - line.bounds.maxY) * app.frame.height,
+                               width: line.bounds.width * app.frame.width, height: line.bounds.height * app.frame.height)
+            return line.text.contains(title) && line.confidence >= 0.95 && control.frame.intersects(frame)
+        }
+        XCTAssertFalse(beforeLines.isEmpty, "Original toolbar title must be readable")
+        let captured = expectation(description: "Screenshot during Large Content Viewer gesture")
+        var held: XCUIScreenshot?
+        DispatchQueue.global().asyncAfter(deadline: .now() + 1.5) {
+            held = XCUIScreen.main.screenshot()
+            captured.fulfill()
+        }
+        control.press(forDuration: 4)
+        wait(for: [captured], timeout: 10)
+        let during = try XCTUnwrap(held)
+        for (name, shot) in [("before", before), ("held", during)] {
+            let attachment = XCTAttachment(screenshot: shot)
+            attachment.name = "lcv-\(identifier)-\(name)"
+            attachment.lifetime = .keepAlways
+            add(attachment)
+        }
+        let afterLines = try RenderedText.lines(in: during.image).filter { $0.text == title && $0.confidence >= 0.95 }
+        let originalHeight = beforeLines.map { $0.bounds.height }.max() ?? 0
+        let enlargedHeight = afterLines.map { $0.bounds.height }.max() ?? 0
+        let passed = originalHeight > 0 && enlargedHeight > originalHeight * 1.25
+        let evidence = "\(identifier): title=\(title); original=\(originalHeight); held=\(enlargedHeight); passed=\(passed); observations=\(afterLines)"
+        print("AUDIT-LCV: \(evidence)")
+        let record = XCTAttachment(string: evidence)
+        record.name = "lcv-\(identifier)-results"
+        record.lifetime = .keepAlways
+        add(record)
+        XCTAssertTrue(passed, "Long press must show an independently readable enlarged label: \(title)")
+        if passed { largeContentProof.insert(identifier) }
+    }
+
+    private func proveFixedControlDynamicType(_ finding: AuditFinding, app: XCUIApplication, name: String) -> Bool {
+        guard finding.type == .dynamicType, let element = finding.element else { return false }
+        for identifier in largeContentProof {
+            let control = app.buttons[identifier]
+            guard control.exists else { continue }
+            let sameControl = element.identifier == identifier || control.frame.insetBy(dx: -0.001, dy: -0.001).contains(element.frame)
+            guard sameControl else { continue }
+            print("AUDIT-EXCLUSION: \(name): fixed toolbar control \(identifier) has a verified enlarged label during long press; original=\(finding.description)")
+            return true
+        }
+        return false
+    }
+
+    func testSettingsTextActuallyScales() throws { try verifySettingsTextScaling() }
+
+    private func verifySettingsTextScaling() throws {
+        var labels = ["Keep Mac awake", "Threads at once", "Configured limit"]
         for large in [false, true] {
             let app = try diagnosticApplication(largeText: large)
-            app.open(URL(string: "bbstudio://capture")!)
-            XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 10))
-            let size = large ? "accessibility-xxxl" : "default"
-            for (id, text) in [("voice", "Record voice"), ("dictate", "Dictate"), ("file", "Photo or file"), ("thread", "New thread")] {
-                let control = app.buttons["capture-\(id)"]
-                reveal(control, in: app)
-                let label = control.staticTexts[text].firstMatch
-                XCTAssertTrue(label.exists)
-                // AX mixes Float32 and CGFloat rectangles; allow only subpixel conversion noise.
-                // The independently recognized glyph bounds below still use the exact control frame.
-                XCTAssertTrue(control.frame.insetBy(dx: -1.0 / 1024, dy: -1.0 / 1024).contains(label.frame), "Label \(label.frame) must fit inside control \(control.frame) for \(text)")
-                let wholeControl = XCTAttachment(screenshot: control.screenshot())
-                wholeControl.name = "ocr-\(id)-\(size)-control"
-                wholeControl.lifetime = .keepAlways
-                add(wholeControl)
-                let screenshot = label.screenshot()
-                let labelFrame = label.frame
-                let lines = try RenderedText.lines(in: screenshot.image).map { line in
-                    RenderedText.Line(text: line.text, confidence: line.confidence,
-                        bounds: CGRect(x: labelFrame.minX + line.bounds.minX * labelFrame.width,
-                                       y: labelFrame.maxY - line.bounds.maxY * labelFrame.height,
-                                       width: line.bounds.width * labelFrame.width,
-                                       height: line.bounds.height * labelFrame.height))
+            defer { app.terminate() }
+            if !large {
+                for text in app.staticTexts.allElementsBoundByIndex.map(\.label) where text.contains(", ") && text.hasSuffix(" at once") {
+                    labels.append(text.components(separatedBy: ", ").dropLast().joined(separator: ", "))
                 }
-                let crop = XCTAttachment(screenshot: screenshot)
-                crop.name = "ocr-\(id)-\(size)"
-                crop.lifetime = .keepAlways
-                add(crop)
-                let detail = "expected=\(text); control=\(control.frame); observations=\(lines.map { "\($0.text) confidence=\($0.confidence) bounds=\($0.bounds)" })"
-                let record = XCTAttachment(string: detail)
-                record.name = "ocr-\(id)-\(size)-results"
-                record.lifetime = .keepAlways
-                add(record)
-                print("AUDIT-OCR: \(detail)")
-                XCTAssertTrue(RenderedText.proves(text, lines: lines, inside: control.frame), detail)
+                labels = labels.reduce(into: [String]()) { if !$0.contains($1) { $0.append($1) } }
             }
-            app.terminate()
+            let size = large ? "accessibility-xxxl" : "default"
+            for label in labels {
+                let cell = app.cells.containing(.staticText, identifier: label).firstMatch
+                reveal(cell, in: app)
+                XCTAssertTrue(try captureTextPixels(cell, text: label, app: app, name: "settings-scale-\(label)-\(size)"))
+            }
+        }
+        for label in labels {
+            let normal = try XCTUnwrap(glyphHeights["settings-scale-\(label)-default"])
+            let large = try XCTUnwrap(glyphHeights["settings-scale-\(label)-accessibility-xxxl"])
+            print("AUDIT-FONT-SCALE: \(label): default glyph height=\(normal), XXXL=\(large)")
+            XCTAssertGreaterThanOrEqual(large, normal * 1.25, "The rendered glyphs must grow: \(label)")
+            if normal > 0, large >= normal * 1.25 { settingsScaleProof.insert(label) }
         }
     }
 
+    func testCaptureTextPixelEvidenceAtBothSizes() throws { try verifyCapturePixelsAtBothSizes() }
+
+    private func verifyCapturePixelsAtBothSizes() throws {
+        var proven = Set(captureTextControls.keys)
+        for large in [false, true] {
+            let app = try diagnosticApplication(largeText: large)
+            defer { app.terminate() }
+            app.open(URL(string: "bbstudio://capture")!)
+            XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 10))
+            let size = large ? "accessibility-xxxl" : "default"
+            for id in ["capture-voice", "capture-dictate", "capture-file", "capture-thread"] {
+                let control = app.buttons[id]
+                reveal(control, in: app)
+                let passed = try captureTextPixels(control, text: captureTextControls[id]!, app: app, name: "ocr-\(id)-\(size)")
+                XCTAssertTrue(passed, "Exact OCR proof failed for \(id) at \(size)")
+                if !passed { proven.remove(id) }
+            }
+            let note = app.buttons["capture-note"]
+            reveal(note, in: app)
+            note.tap()
+            let save = app.buttons["captureNoteSave"]
+            XCTAssertTrue(save.waitForExistence(timeout: 10))
+            let passed = try captureTextPixels(save, text: "Save note", app: app, name: "ocr-captureNoteSave-\(size)")
+            XCTAssertTrue(passed, "Exact OCR proof failed for Save note at \(size)")
+            if !passed { proven.remove("captureNoteSave") }
+        }
+        capturePixelProof = proven
+    }
+
+    private func captureTextPixels(_ control: XCUIElement, text: String, app: XCUIApplication, name: String) throws -> Bool {
+        print("OCR-SOURCE: \(name) exists=\(control.exists); frame=\(control.exists ? control.frame : .zero)")
+        guard control.exists, app.frame.contains(control.frame) else { return false }
+        let textLabel = control.staticTexts[text].firstMatch
+        let label = textLabel.exists ? textLabel : control
+        guard label.exists, label.label == text else { return false }
+        // AX mixes Float32 and CGFloat rectangles; allow only conversion noise.
+        // The independently recognized glyph bounds still use the exact frame.
+        guard control.frame.insetBy(dx: -1.0 / 1024, dy: -1.0 / 1024).contains(label.frame) else { return false }
+        let wholeControl = XCTAttachment(screenshot: control.screenshot())
+        wholeControl.name = name + "-control"
+        wholeControl.lifetime = .keepAlways
+        add(wholeControl)
+        let screenshot = label.screenshot()
+        let labelFrame = label.frame
+        let lines = try RenderedText.lines(in: screenshot.image).map { line in
+            RenderedText.Line(text: line.text, confidence: line.confidence,
+                bounds: CGRect(x: labelFrame.minX + line.bounds.minX * labelFrame.width,
+                               y: labelFrame.maxY - line.bounds.maxY * labelFrame.height,
+                               width: line.bounds.width * labelFrame.width,
+                               height: line.bounds.height * labelFrame.height))
+        }
+        let crop = XCTAttachment(screenshot: screenshot)
+        crop.name = name
+        crop.lifetime = .keepAlways
+        add(crop)
+        let passed = RenderedText.proves(text, lines: lines, inside: control.frame)
+        if passed { glyphHeights[name] = lines.map { $0.bounds.height }.sorted()[lines.count / 2] }
+        let detail = "expected=\(text); control=\(control.frame); passed=\(passed); observations=\(lines.map { "\($0.text) confidence=\($0.confidence) bounds=\($0.bounds)" })"
+        let record = XCTAttachment(string: detail)
+        record.name = name + "-results"
+        record.lifetime = .keepAlways
+        add(record)
+        print("AUDIT-OCR: \(detail)")
+        return passed
+    }
+
+    private func proveCaptureClipping(_ finding: AuditFinding, app: XCUIApplication, name: String) throws -> Bool {
+        guard finding.type == .textClipped, let element = finding.element,
+              let pair = captureTextControls.first(where: { $0.value == element.label }),
+              capturePixelProof.contains(pair.key) else { return false }
+        let control = app.buttons[pair.key]
+        guard control.exists, control.frame.insetBy(dx: -1.0 / 1024, dy: -1.0 / 1024).contains(element.frame) else { return false }
+        retainScreen(app, name + "-clipping-before-" + pair.key)
+        reveal(control, in: app)
+        guard try captureTextPixels(control, text: pair.value, app: app, name: name + "-clipping-proof-" + pair.key) else { return false }
+        print("AUDIT-EXCLUSION: \(name): clipping OCR exact text verified at both default and accessibility XXXL and in current control \(pair.key); original=\(finding.description)")
+        return true
+    }
+
     func testCaptureClippingAtAccessibilityText() throws {
+        try verifyCapturePixelsAtBothSizes()
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
         app.open(URL(string: "bbstudio://capture")!)
         XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 10))
         retainScreen(app, "capture-clipping-accessibility-xxxl")
-        // Keep Apple's original highlighted crop while diagnosing clipped text.
+        try captureNativeDiagnostic(app, "capture-clipping-accessibility-xxxl", audit: [.textClipped])
+    }
+
+    func testHomeClippingAtDefaultText() throws {
+        let app = try diagnosticApplication(largeText: false)
+        defer { app.terminate() }
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
+        retainScreen(app, "home-clipping-native-default")
         try app.performAccessibilityAudit(for: [.textClipped])
     }
 
@@ -213,7 +368,7 @@ final class ReviewQualityUITests: XCTestCase {
         defer { app.terminate() }
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
         for label in ["Approve", "Deny"] {
-            let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
+            let request = app.cells.containing(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "officeRequestOpen", "Native approval card QA")).firstMatch
             let action = request.buttons[label].firstMatch
             XCTAssertTrue(action.waitForExistence(timeout: 10))
             reveal(action, in: app)
@@ -222,7 +377,7 @@ final class ReviewQualityUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(action.frame.height, 44 - 0.001)
             retainScreen(app, "inbox-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-action-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
         }
-        let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
+        let request = app.cells.containing(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "officeRequestOpen", "Native approval card QA")).firstMatch
         let open = request.buttons["officeRequestOpen"]
         for _ in 0..<5 {
             if open.isHittable { break }
@@ -263,7 +418,7 @@ final class ReviewQualityUITests: XCTestCase {
         let app = try diagnosticApplication(largeText: largeText, tab: "inbox")
         defer { app.terminate() }
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
-        let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
+        let request = app.cells.containing(NSPredicate(format: "identifier == %@ AND label CONTAINS %@", "officeRequestOpen", "Native approval card QA")).firstMatch
         let open = request.buttons["officeRequestOpen"]
         XCTAssertTrue(open.waitForExistence(timeout: 20))
         reveal(open, in: app)
@@ -311,6 +466,12 @@ final class ReviewQualityUITests: XCTestCase {
         let description: String
         let key: String
         let scrollEdgeContrast: Bool
+        let element: XCUIElement?
+        let nativeBars: [CGRect]
+        let label: String
+        let identifier: String
+        let elementType: XCUIElement.ElementType?
+        let originalFrame: CGRect?
     }
 
     private func collectAudit(_ app: XCUIApplication, name: String, types: XCUIAccessibilityAuditType) throws -> [AuditFinding] {
@@ -328,56 +489,105 @@ final class ReviewQualityUITests: XCTestCase {
                 barFrames.contains { bar in
                     bar.intersects(element.frame) || (bar.midY > app.frame.midY && element.frame.minY >= bar.minY)
                 }
-            } ?? true
+            } ?? false
             findings.append(AuditFinding(type: issue.auditType, description: detail + " nativeBars=\(barFrames)",
                 key: "\(issue.auditType.rawValue)|\(identifier)|\(label)",
-                scrollEdgeContrast: issue.auditType == .contrast && atMaterialEdge))
+                scrollEdgeContrast: issue.auditType == .contrast && atMaterialEdge,
+                element: element, nativeBars: barFrames, label: label, identifier: identifier,
+                elementType: element?.elementType, originalFrame: element?.frame))
             return true
         }
         return findings
     }
 
-    private func auditedFindings(_ app: XCUIApplication, name: String, types: XCUIAccessibilityAuditType) throws -> [AuditFinding] {
-        let initial = try collectAudit(app, name: name, types: types)
-        guard initial.contains(where: \.scrollEdgeContrast) else { return initial }
-        retainScreen(app, name + "-material-before-scroll")
-        let collection = app.collectionViews.firstMatch
-        let scroll = collection.exists ? collection : app.scrollViews.firstMatch
-        guard scroll.exists, scroll.isHittable else { return initial }
-        var reachedEnd = false
-        for _ in 0..<30 {
-            let before = scroll.staticTexts.allElementsBoundByIndex.suffix(3).map { "\($0.label)|\($0.frame)" }
-            scroll.swipeUp(velocity: .fast)
-            let after = scroll.staticTexts.allElementsBoundByIndex.suffix(3).map { "\($0.label)|\($0.frame)" }
-            let bottom = app.tabBars.allElementsBoundByIndex.filter { $0.isHittable }.map { $0.frame.minY }.min() ?? app.frame.maxY
-            if !before.isEmpty && before == after,
-               let last = scroll.staticTexts.allElementsBoundByIndex.last,
-               last.isHittable, last.frame.maxY <= bottom {
-                reachedEnd = true
-                break
-            }
+    private func freshElement(for finding: AuditFinding, app: XCUIApplication) -> XCUIElement? {
+        guard finding.element != nil else { return nil }
+        if let original = finding.element, original.exists,
+           original.label == finding.label, original.identifier == finding.identifier { return original }
+        if let type = finding.elementType {
+            let matches = app.descendants(matching: type).matching(NSPredicate(format: "label == %@ AND identifier == %@", finding.label, finding.identifier))
+            if matches.count == 1 { return matches.firstMatch }
         }
-        retainScreen(app, name + "-material-after-scroll")
-        guard reachedEnd else { return initial }
-        let retry = try collectAudit(app, name: name + "-material-retry", types: [.contrast])
-        let knownContrast = Set(initial.filter { $0.type == .contrast && !$0.scrollEdgeContrast }.map(\.key))
-        let originalEdgeKeys = Set(initial.filter(\.scrollEdgeContrast).map(\.key))
-        let resolved = !retry.contains(where: \.scrollEdgeContrast)
-            && !retry.contains { originalEdgeKeys.contains($0.key) }
-            && retry.allSatisfy { knownContrast.contains($0.key) }
-        let evidence = "\(name): policy 2 scroll/reaudit: initial=\(initial.filter { $0.type == .contrast }.map(\.description)); retry=\(retry.map(\.description)); reachedEnd=\(reachedEnd); resolved=\(resolved)"
-        print("AUDIT-MATERIAL-RETRY: \(evidence)")
-        let record = XCTAttachment(string: evidence)
-        record.name = name + "-material-reaudit-results"
-        record.lifetime = .keepAlways
-        add(record)
-        if resolved { return initial.filter { !$0.scrollEdgeContrast } }
-        return initial + retry.filter { !knownContrast.contains($0.key) }
+        // Combined request content remains one explicitly identified button.
+        // Its exact body text identifies the parent when the inner text node is
+        // rebuilt by a Dynamic Type audit and no longer independently exposed.
+        if finding.label.count > 10 {
+            let parents = app.buttons.matching(identifier: "officeRequestOpen").matching(NSPredicate(format: "label CONTAINS %@", finding.label))
+            if parents.count == 1 { return parents.firstMatch }
+        }
+        return nil
+    }
+
+    private func auditedFindings(_ app: XCUIApplication, name: String, types: XCUIAccessibilityAuditType) throws -> [AuditFinding] {
+        let collected = try collectAudit(app, name: name, types: types)
+        return try resolveFindings(collected, app: app, name: name)
+    }
+
+    private func resolveFindings(_ collected: [AuditFinding], app: XCUIApplication, name: String) throws -> [AuditFinding] {
+        var initial: [AuditFinding] = []
+        for finding in collected {
+            if finding.type == .dynamicType, finding.element != nil, settingsScaleProof.contains(finding.label), app.navigationBars["Settings"].exists {
+                print("AUDIT-EXCLUSION: \(name): Settings rendered text \(finding.label) has exact OCR proof, contained bounds, and >=1.25x glyph growth at accessibility XXXL")
+                continue
+            }
+            if proveFixedControlDynamicType(finding, app: app, name: name) { continue }
+            if try !proveCaptureClipping(finding, app: app, name: name) { initial.append(finding) }
+        }
+        guard initial.contains(where: \.scrollEdgeContrast) else { return initial }
+        var remaining = initial.filter { !$0.scrollEdgeContrast }
+        for (index, finding) in initial.filter(\.scrollEdgeContrast).enumerated() {
+            guard let element = freshElement(for: finding, app: app) else {
+                remaining.append(finding)
+                continue
+            }
+            let proofIdentity = "\(element.identifier)|\(element.label)"
+            let originalFrame = finding.originalFrame ?? element.frame
+            let proofName = "\(name)-material-\(index)"
+            retainScreen(app, proofName + "-before")
+            let collection = app.collectionViews.firstMatch
+            let scroll = collection.exists ? collection : app.scrollViews.firstMatch
+            guard scroll.exists, scroll.isHittable else {
+                remaining.append(finding)
+                continue
+            }
+            var clear = false
+            for _ in 0..<6 {
+                let bars = app.tabBars.allElementsBoundByIndex + app.toolbars.allElementsBoundByIndex + app.navigationBars.allElementsBoundByIndex
+                let frames = bars.filter { $0.exists && $0.isHittable }.map(\.frame)
+                let top = frames.filter { $0.midY < app.frame.midY }.map(\.maxY).max() ?? app.frame.minY
+                let bottom = frames.filter { $0.midY > app.frame.midY }.map(\.minY).min() ?? app.frame.maxY
+                let frame = element.frame
+                if frame.minY > top + 8, frame.maxY < bottom - 8, element.isHittable {
+                    clear = true
+                    break
+                }
+                let distance = min(220, max(-220, (top + bottom) / 2 - frame.midY))
+                let start = app.coordinate(withNormalizedOffset: CGVector(dx: 0.5, dy: 0.5))
+                start.press(forDuration: 0.05, thenDragTo: start.withOffset(CGVector(dx: 0, dy: distance)))
+            }
+            retainScreen(app, proofName + "-after")
+            guard clear else { remaining.append(finding); continue }
+            let retry = try collectAudit(app, name: proofName + "-reaudit", types: [.contrast])
+            // This gate covers only the same resolved element after it clears
+            // the queried native bar. Unresolved findings are never eligible.
+            let sameElement = element.exists && "\(element.identifier)|\(element.label)" == proofIdentity
+            let resolved = sameElement && !retry.contains {
+                $0.key == finding.key || "\($0.identifier)|\($0.label)" == proofIdentity || $0.element == nil
+            }
+            let evidence = "policy 2: key=\(finding.key); original=\(originalFrame); bars=\(finding.nativeBars); clear=\(element.frame); resolved=\(resolved); initial=\(finding.description); retry=\(retry.map(\.description))"
+            print("AUDIT-MATERIAL-RETRY: \(evidence)")
+            let record = XCTAttachment(string: evidence)
+            record.name = proofName + "-results"
+            record.lifetime = .keepAlways
+            add(record)
+            if !resolved { remaining.append(finding) }
+        }
+        return remaining
     }
 
     /// Coordinator policy: identified disabled controls or independently sampled
     /// readable text on a resolved element may override native contrast findings.
-    /// Non-monochrome or insufficient pixel samples still fail closed.
+    /// Insufficient foreground/background pixel samples still fail closed.
     private func excludeVerifiedContrast(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication, name: String) -> Bool {
         guard issue.auditType == .contrast else { return false }
         guard let element = issue.element else {
@@ -389,10 +599,21 @@ final class ReviewQualityUITests: XCTestCase {
         var reason: String?
         if identifier == "captureNoteSave", !element.isEnabled {
             reason = "policy 1: captureNoteSave is disabled (inactive control)"
+        } else if element.label.count == 1,
+                  element.label.unicodeScalars.contains(where: { $0.properties.isEmojiPresentation }),
+                  !element.frame.isEmpty,
+                  let face = app.images.matching(identifier: "officeFace").allElementsBoundByIndex.first(where: {
+                      !$0.label.isEmpty && $0.frame.contains(element.frame)
+                  }) {
+            reason = "decorative emoji: glyph=\(element.label), labeled Face image=\(face.label), image frame=\(face.frame)"
+            let crop = XCTAttachment(screenshot: face.screenshot())
+            crop.name = name + "-decorative-face"
+            crop.lifetime = .keepAlways
+            add(crop)
         } else if !element.label.isEmpty, !element.frame.isEmpty,
                   app.frame.contains(element.frame) {
             let screenshot = element.screenshot()
-            if let sample = RenderedContrast.sample(screenshot.image), sample.ratio >= 4.5 {
+            if let sample = RenderedContrast.sampleColor(screenshot.image), sample.ratio >= 4.5 {
                 reason = "policy 3: resolved element id=\(identifier) label=\(element.label) sRGB foreground=\(sample.foreground), background=\(sample.background), contrast=\(sample.ratio):1"
                 let crop = XCTAttachment(screenshot: screenshot)
                 crop.name = name + "-verified-element-contrast"
@@ -426,6 +647,20 @@ final class ReviewQualityUITests: XCTestCase {
         XCTAssertNil(RenderedContrast.sample(swatch(0, sparse: true)))
     }
 
+    func testColoredContrastSampler() throws {
+        func swatch(_ background: CGFloat, sparse: Bool = false) -> UIImage {
+            UIGraphicsImageRenderer(size: CGSize(width: 100, height: 50)).image { context in
+                UIColor(white: background / 255, alpha: 1).setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 100, height: 50))
+                UIColor(red: 199.0 / 255, green: 67.0 / 255, blue: 26.0 / 255, alpha: 1).setFill()
+                context.fill(CGRect(x: 30, y: 15, width: sparse ? 1 : 40, height: sparse ? 1 : 20))
+            }
+        }
+        XCTAssertGreaterThan(try XCTUnwrap(RenderedContrast.sampleColor(swatch(255))).ratio, 4.5)
+        XCTAssertEqual(try XCTUnwrap(RenderedContrast.sampleColor(swatch(233))).ratio, 4.0818, accuracy: 0.02)
+        XCTAssertNil(RenderedContrast.sampleColor(swatch(255, sparse: true)))
+    }
+
     func testIsolatedLaunchMeasurement() {
         let app = application(largeText: false)
         let options = XCTMeasureOptions()
@@ -446,6 +681,9 @@ final class ReviewQualityUITests: XCTestCase {
     }
 
     private func navigation(largeText: Bool) throws {
+        try verifySettingsTextScaling()
+        try verifyCapturePixelsAtBothSizes()
+        try verifyFixedControlViewers()
         let app = application(largeText: largeText)
         app.launch()
         defer { app.terminate() }
@@ -528,7 +766,13 @@ final class ReviewQualityUITests: XCTestCase {
         tree.name = name + "-accessibility-tree"
         tree.lifetime = .keepAlways
         add(tree)
-        let findings = try auditedFindings(app, name: name, types: [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription, .dynamicType, .textClipped])
+        var collected: [AuditFinding] = []
+        for type: XCUIAccessibilityAuditType in [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription, .dynamicType, .textClipped] {
+            collected += try collectAudit(app, name: name, types: type)
+        }
+        // Gather every category on the original viewport before proof gestures
+        // or scrolling can change which controls the next category would audit.
+        let findings = try resolveFindings(collected, app: app, name: name)
         auditFindings.append(contentsOf: findings.map(\.description))
     }
 }

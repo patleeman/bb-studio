@@ -74,11 +74,12 @@ struct Face: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Circle()
-                .fill(Color(.tertiarySystemFill))
+                .fill(Color(.secondarySystemFill))
                 .frame(width: size, height: size)
                 .overlay {
                     Text(avatar?.isEmpty == false ? avatar! : String(name.prefix(1)).uppercased())
                         .font(.system(size: size * 0.5))
+                        .accessibilityHidden(true)
                 }
                 .overlay {
                     if state == .working {
@@ -107,6 +108,8 @@ struct Face: View {
             }
         }
         .accessibilityElement(children: .ignore)
+        .accessibilityAddTraits(.isImage)
+        .accessibilityIdentifier("officeFace")
         .accessibilityLabel([name, external.map { "\($0) agent" }, state == .needsYou ? "needs you" : state == .working ? "working" : nil]
             .compactMap { $0 }.joined(separator: ", "))
     }
@@ -125,7 +128,7 @@ struct SpaceMark: View {
 
     var body: some View {
         RoundedRectangle(cornerRadius: size * 0.25)
-            .fill(Color(.secondarySystemFill))
+            .fill(Color(.tertiarySystemFill))
             .frame(width: size, height: size)
             .overlay {
                 Text(space.icon?.isEmpty == false ? space.icon! : String(space.name.prefix(1)).uppercased())
@@ -168,6 +171,7 @@ struct SpaceSwitcher: View {
             .foregroundStyle(.primary)
         }
         .accessibilityLabel("Space: \(office.currentSpace?.name ?? "none"). Switch space")
+        .accessibilityIdentifier("officeSpaceSwitcher")
         .accessibilityShowsLargeContentViewer {
             Text(office.currentSpace?.name ?? "Spaces")
         }
