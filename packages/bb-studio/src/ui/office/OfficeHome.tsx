@@ -57,7 +57,7 @@ export function TaskRow({ task, bot }: { task: WorkingTask; bot: TeamBot | undef
 export function OfficeHome({ space }: { space: Space }) {
   const call = useCall();
   const threadActions = useSidebarThreadActions();
-  const home = useLive<Home>("home", { spaceId: space.id }, { pollMs: 30_000 });
+  const home = useLive<Home>("office_home", { spaceId: space.id }, { pollMs: 30_000 });
   const { bots } = useTeam(space.id);
   const botById = new Map(bots.map((bot) => [bot.id, bot]));
   const [notice, setNotice] = useState<string | null>(null);
@@ -76,7 +76,7 @@ export function OfficeHome({ space }: { space: Space }) {
         <span className="ml-auto text-sm text-muted-foreground">{today}</span>
       </header>
 
-      <div className="mt-6 rounded-lg border border-border bg-background">
+      <div className="mt-6">
         <NewThreadComposer
           layout="contained"
           draftKey={`office-home:${space.id}`}
