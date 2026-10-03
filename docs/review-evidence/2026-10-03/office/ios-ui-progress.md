@@ -304,3 +304,25 @@ thread without them. The runner retains all existing assertions.
 product repairs and the idle fixture timelines. Build, Node syntax checks,
 `git diff --check`, and stable compatibility (all seven plugins) passed.
 The fresh full-suite run and Review/Artifact/Share harness skip work remain.
+
+## Five Share runtime skips resolved
+
+The full isolated runner now builds and installs the real `UIActivityViewController`
+fixture host, pins app and app-group container preferences to the staged server,
+and supplies its verified project ID/name. `share-runtime.sh` is a focused entry
+point to that same runner. The retired hardcoded port and historical project ID
+are no longer prerequisites.
+
+Coverage remains through the actual system Share sheet. The failed-provider
+case scrolls past the populated destination list to assert its error section,
+recovery message, and disabled Send. The Send test additionally verifies one new
+thread in the staged project, the exact user message and local-file attachment,
+then deletes only that created thread in teardown.
+
+`/tmp/office-share-fixtures-2/results.xcresult`: 5 passed, 0 failures, 0 skips.
+URL/text, image, file, failed-provider, and actual Send checks all ran. The first
+run passed four tests; the failed-provider retry exposed its error section below
+the longer destination list. The final five-test run includes the scrolling and
+server assertions. Build, shell syntax, diff checks, and all seven stable plugin
+compatibility checks passed. Review and Artifact harness skips and the final
+fresh full-suite run remain.

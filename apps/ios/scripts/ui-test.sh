@@ -31,6 +31,12 @@ for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
 done
 xcodebuild build-for-testing -scheme BBStudio -destination "id=$BB_TEST_SIMULATOR_ID" \
   -derivedDataPath "$run_dir/DerivedData" > "$run_dir/build.log" 2>&1
+if [ -n "${BB_QA_DATA_DIR:-}" ]; then
+  bash scripts/setup-share-fixture.sh "$run_dir"
+  export BBGO_QA_SHARE_READY=YES
+  export BBGO_QA_SHARE_PROJECT_ID="$BB_QA_PROJECT_ID"
+  export BBGO_QA_SHARE_PROJECT_NAME=$(python3 -c 'import json,os,urllib.request; print(next(p["name"] for p in json.load(urllib.request.urlopen(os.environ["BB_QA_SERVER_URL"]+"/api/v1/projects")) if p["id"] == os.environ["BB_QA_PROJECT_ID"]))')
+fi
 python3 - "$run_dir" <<'PY'
 import glob, json, os, plistlib, sys
 path=glob.glob(sys.argv[1]+'/DerivedData/Build/Products/*.xctestrun')[0]

@@ -249,5 +249,8 @@ the repeated Studio page-navigation performance test. It also seeds read-only
 thread coverage for reactions, find, mentions, drafts, completed file-edit diffs,
 file links, images, inline HTML/Markdown and artifact cards. Every seeded timeline
 is parsed through the server API before the tests start. The seed is reused
-on later runs against that staged project. Share-sheet and accessibility tests
-still require their own fixtures; a skip is not a pass for those workflows.
+on later runs against that staged project. The runner also builds the real Share host and enables all five system
+share-sheet tests, including an upload/send to the verified staged project.
+The Send test checks the server message and file, then deletes its new thread.
+Accessibility tests still require their own fixtures; a skip is not a pass for
+those workflows.

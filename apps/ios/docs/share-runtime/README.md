@@ -32,7 +32,8 @@ server restoration or user simulator access occurred.
   `Share Runtime QA` project, assert the selection, and cancel.
 
 The final labeled build passed **4 presentation tests with no failures**. The
-separate Send test passed once; it is skipped by the ordinary harness.
+separate Send test passed once; the original harness skipped it by default.
+The Office suite integration below now runs all five tests on its staged project.
 [Presentation summary](presentation-summary.json) records the final results.
 The final screenshots and accessibility trees are saved alongside this report:
 [URL and text](url-and-text.png), [image](image.png), [file](file.png),
@@ -67,26 +68,29 @@ checks use the rebuilt extension with those labels.
 
 ![System sheet after successful staged Send](file-after-staged-send.png)
 
-## Repeat the presentation checks
+## Repeat all five checks
 
-Create a project named `Share Runtime QA` on the staged server at port 49486.
-Use that server's registered machine and an empty temporary project directory.
-Then run from the repository:
+Use a temporary stage from `scripts/staged-bb.mjs start --ui-tests`, source its
+`capture.env`, and use an owned private simulator. Run from the repository:
 
 ```sh
-BB_SHARE_QA_SERVER_URL=http://127.0.0.1:49486 apps/ios/scripts/share-runtime.sh
+BB_TEST_SIMULATOR_ID=<private-simulator-id> \
+BB_QA_DATA_DIR="$BB_DATA_DIR" \
+apps/ios/scripts/share-runtime.sh
 ```
 
-The harness creates a fresh private simulator, builds the normal app and the
-fixture host, installs both, pins and verifies both preference domains and
-container files, and runs only `ShareRuntimeUITests`. It never runs the existing
-UI test suite. It deletes only its own simulator and leaves logs, screenshots,
-and its result bundle under the printed temporary directory. The recorded run
-used the same commands in separate build and test steps; the wrapper received
-a shell syntax check. The ordinary
-harness cancels each share. Its optional Send test skips unless the exact
-historical QA project ID is explicitly supplied in the xctestrun environment;
-that test is evidence for this run, not an instruction to reuse a destination.
+This focused entry point uses the same isolated `ui-test.sh` runner as the full
+suite. The runner builds and installs the real fixture host and app, pins both
+app and app-group preference files to the verified staged origin, and passes
+the staged project ID and name to the tests. All five checks run, including
+Send. The Send check verifies a new thread in that project, its exact user
+message and local-file attachment, then removes only that new thread.
+
+The full suite prepares this harness automatically when `BB_QA_DATA_DIR` is
+provided. It retains the owned simulator and writes build logs, screenshots and
+its result bundle to the printed run directory. The historical port and project
+IDs above describe the original review evidence; the runner never uses them as
+a fallback destination.
 
 The fixture source lives in [fixture-host](fixture-host). An early fixture-host
 launch failed because iOS 27 requires scene lifecycle adoption; the host now
