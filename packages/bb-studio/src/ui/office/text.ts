@@ -44,7 +44,7 @@ export function plainPreview(markdown: string): string {
     .replace(/!\[([^\]]*)\]\([^)]*\)/g, "$1")
     .replace(/\[([^\]]+)\]\([^)]*\)/g, "$1")
     .replace(/@\[([^\]]+)\]\([^)]*\)/g, "$1")
-    .replace(/@thread:thr_[a-z0-9]+/gi, "a thread")
+    .replace(/\s*@thread:thr_[a-z0-9]+/gi, "")
     .replace(/\b(?:thr|tsk|pg|art|bot|brd|rec|spc)_[a-z0-9]{6,}\b/gi, "")
     .replace(/^#{1,6}\s+/gm, "")
     .replace(/^\s*[-*+]\s+/gm, "")
