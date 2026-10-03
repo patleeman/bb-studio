@@ -1,3 +1,4 @@
+import { TaskReportOutbox } from "../../office/report-outbox";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention } from "@bb-studio/kit/server";
@@ -276,6 +277,16 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new TaskStore(db);
+  const reports = new TaskReportOutbox(db, async report => {
+    await bb.sdk.plugins.callRpc({ pluginId: "feed", method: "publish", input: {
+      title: report.title.slice(0, 200), body: report.body, author: `Bot ${report.botId}`.slice(0, 80),
+      story: `task:${report.taskId}`, topic: "Work", threadId: report.threadId, projectId: report.projectId,
+    }, outputSchema: z.unknown() });
+  }, message => bb.log.warn(message));
+  const reportTimer = setInterval(() => { void reports.drain(); }, 60_000);
+  reportTimer.unref();
+  bb.onDispose(() => clearInterval(reportTimer));
+
   // Tasks from before boards go on their project's main board.
   const adopted = store.adoptLooseTasks();
   if (adopted.length) bb.log.info(`put existing tasks on ${adopted.length} new board(s)`);
@@ -415,8 +426,18 @@ export default async function plugin(bb: BbPluginApi) {
     const latest = store.latestHandoff(task.id)?.thread_id === threadId;
     const next = nextHandoff(handoff, task, latest, signal);
     if (!next) return;
-    store.setHandoff(threadId, next.state, next.note);
-    if (next.status) store.move(task.id, next.status, "agent");
+    db.transaction(() => {
+      store.setHandoff(threadId, next.state, next.note);
+      if (next.status) store.move(task.id, next.status, "agent");
+      if (latest && task.assignee?.startsWith("bot:") && ["ready", "replied"].includes(next.state)) {
+        const outputs = store.links(task.id).filter(link => link.target === "item");
+        reports.enqueue({ taskId: task.id, title: task.title || "Task ready for review", threadId,
+          projectId: task.project_id, botId: task.assignee.slice(4),
+          body: `[Open task](/plugins/studio/tasks/${task.id})\n\n${next.note ?? "The bot finished its turn. Review its work."}${outputs.length ? "\n\n" + outputs.map(link => `[${link.label.replace(/[\[\]]/g, "")}](${link.href})`).join("\n") : ""}`,
+        });
+      }
+    })();
+    void reports.drain();
     changed(task.id);
   }
 
@@ -556,6 +577,69 @@ export default async function plugin(bb: BbPluginApi) {
     store.update(task.id, { assignee: "agent" }, input.by);
     changed(task.id);
     return { threadId: thread.id };
+  }
+
+  const botHandoffs = new Map<string, Promise<{ threadId: string }>>();
+  async function handOffBot(id: string, note: string | null): Promise<{ threadId: string }> {
+    // Concurrent clicks/assignments share one send; later explicit handoffs can
+    // still send review feedback to the existing thread.
+    const key = `${id}:${mustGet(id).assignee}`;
+    const pending = botHandoffs.get(key);
+    if (pending) return pending;
+    const work = runBotHandoff(id, note);
+    botHandoffs.set(key, work);
+    try { return await work; } finally { if (botHandoffs.get(key) === work) botHandoffs.delete(key); }
+  }
+  async function runBotHandoff(id: string, note: string | null) {
+      const task = mustGet(id);
+      const botId = task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null;
+      if (!botId) throw new Error("Assign a Studio Teams bot first.");
+      const latest = store.latestHandoff(id);
+      const existing = store.links(id).find((link) => {
+        if (link.target !== "thread" || !link.label.startsWith("Bot work:")) return false;
+        const handoff = store.handoff(link.item_id);
+        // A thread can identify one task, and only its newest handoff moves it.
+        return !handoff || (handoff.task_id === id && latest?.thread_id === link.item_id);
+      });
+      let threadId = latest?.thread_id ?? existing?.item_id;
+      if (threadId) {
+        const profile = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "threadProfile", input: { threadId } as never,
+          outputSchema: z.object({ botId: z.string().nullable() }).nullable() });
+        if (profile?.botId !== botId) threadId = undefined;
+        else {
+          try {
+            const thread = await bb.sdk.threads.get({ threadId });
+            if (thread.deletedAt !== null || thread.archivedAt !== null) threadId = undefined;
+          } catch { threadId = undefined; }
+        }
+      }
+      if (!threadId) {
+        const thread = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "newConversation", input: { id: botId } as never,
+          outputSchema: z.object({ threadId: z.string() }) });
+        threadId = thread.threadId;
+      }
+      const input = await taskInput(task, note ?? null);
+      recordHandoff(id, threadId, `Bot ${botId}`);
+      store.setHandoff(threadId, "starting", null);
+      store.link(id, { target: "thread", plugin_id: null, item_id: threadId, label: `Bot work: ${task.title || "Task"}`, href: `/threads/${threadId}` });
+      if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
+      changed(id);
+      try {
+        await bb.sdk.threads.send({ threadId, input: [input], mode: "auto" });
+      } catch (error) {
+        apply(threadId, { type: "failed", error: errorMessage(error) });
+        throw error;
+      }
+      const recorded = store.handoff(threadId);
+      if (recorded) await catchUp(recorded, true);
+      return { threadId };
+    }
+
+  async function dispatchAssignment(id: string, previousAssignee: string | null = null) {
+    const task = mustGet(id);
+    if (task.archived_at !== null || task.status === "done" || !task.assignee?.startsWith("bot:") || task.assignee === previousAssignee) return;
+    try { await handOffBot(id, null); }
+    catch (cause) { throw new Error(`Task ${id} was saved, but its bot could not start: ${errorMessage(cause)}`); }
   }
 
   async function archiveThreads(id: string): Promise<{ archived: number; failed: number }> {
@@ -716,14 +800,15 @@ export default async function plugin(bb: BbPluginApi) {
       if (!task) return { task: null, links: [], handoffs: [] };
       return { task: toDto(task), links: store.links(id).map(toLinkDto), handoffs: store.handoffs(id).map(toHandoffDto) };
     },
-    create({ title, description, status, boardId, projectId, due, assignee, ...fields }) {
+    async create({ title, description, status, boardId, projectId, due, assignee, ...fields }) {
       const board = boardId ? mustGetBoard(boardId) : store.mainBoard(projectId ?? null);
       if (status && !hasColumn(board.id, status)) throw new Error("This board has no such column.");
       const task = store.create({ title, description, status, boardId: board.id, projectId, due, assignee: assignee as TaskRow["assignee"], ...fields, by: "user" });
       changed(task.id);
-      return { task: toDto(task) };
+      await dispatchAssignment(task.id);
+      return { task: toDto(mustGet(task.id)) };
     },
-    update({ id, boardId, ...patch }) {
+    async update({ id, boardId, ...patch }) {
       const before = mustGet(id);
       if (boardId && boardId !== before.board_id) {
         for (const moved of store.moveToBoard(id, boardId, "user")) changed(moved);
@@ -731,6 +816,7 @@ export default async function plugin(bb: BbPluginApi) {
       }
       store.update(id, { ...patch, assignee: patch.assignee as TaskRow["assignee"] }, "user");
       changed(id);
+      await dispatchAssignment(id, before.assignee);
       return { ok: true };
     },
     async move({ id, status, index }) {
@@ -823,50 +909,7 @@ export default async function plugin(bb: BbPluginApi) {
         outputSchema: z.object({ bots: z.array(z.object({ id: z.string(), name: z.string(), retired: z.boolean().optional() })) }) });
       return { bots: result.bots.filter((bot) => !bot.retired).map(({ id, name }) => ({ id, name })) };
     },
-    async handOffBot({ id, note }) {
-      const task = mustGet(id);
-      const botId = task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null;
-      if (!botId) throw new Error("Assign a Studio Teams bot first.");
-      const latest = store.latestHandoff(id);
-      const existing = store.links(id).find((link) => {
-        if (link.target !== "thread" || !link.label.startsWith("Bot work:")) return false;
-        const handoff = store.handoff(link.item_id);
-        // A thread can identify one task, and only its newest handoff moves it.
-        return !handoff || (handoff.task_id === id && latest?.thread_id === link.item_id);
-      });
-      let threadId = latest?.thread_id ?? existing?.item_id;
-      if (threadId) {
-        const profile = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "threadProfile", input: { threadId } as never,
-          outputSchema: z.object({ botId: z.string().nullable() }).nullable() });
-        if (profile?.botId !== botId) threadId = undefined;
-        else {
-          try {
-            const thread = await bb.sdk.threads.get({ threadId });
-            if (thread.deletedAt !== null || thread.archivedAt !== null) threadId = undefined;
-          } catch { threadId = undefined; }
-        }
-      }
-      if (!threadId) {
-        const thread = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "newConversation", input: { id: botId } as never,
-          outputSchema: z.object({ threadId: z.string() }) });
-        threadId = thread.threadId;
-      }
-      const input = await taskInput(task, note ?? null);
-      recordHandoff(id, threadId, `Bot ${botId}`);
-      store.setHandoff(threadId, "starting", null);
-      store.link(id, { target: "thread", plugin_id: null, item_id: threadId, label: `Bot work: ${task.title || "Task"}`, href: `/threads/${threadId}` });
-      if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
-      changed(id);
-      try {
-        await bb.sdk.threads.send({ threadId, input: [input], mode: "auto" });
-      } catch (error) {
-        apply(threadId, { type: "failed", error: errorMessage(error) });
-        throw error;
-      }
-      const recorded = store.handoff(threadId);
-      if (recorded) await catchUp(recorded, true);
-      return { threadId };
-    },
+    handOffBot: ({ id, note }) => handOffBot(id, note),
     async syncCheckbox({ id, checked }) {
       const task = store.get(id);
       if (!task) return { ok: false };
@@ -990,7 +1033,7 @@ export default async function plugin(bb: BbPluginApi) {
       priority: prioritySchema.optional(), labels: labelsSchema.optional(), parentId: idSchema.optional(),
       recurrence: z.enum(RECURRENCES).optional(), reminderAt: z.number().int().nonnegative().optional(),
     }),
-    execute({ title, boardId, description, status, due: rawDue, assignee, priority, labels, parentId, recurrence, reminderAt }, context) {
+    async execute({ title, boardId, description, status, due: rawDue, assignee, priority, labels, parentId, recurrence, reminderAt }, context) {
       const due = rawDue?.trim() || undefined;
       if (due && !isDay(due)) return { content: [{ type: "text", text: "Give `due` as a day, like 2026-10-01." }], isError: true };
       if (boardId && !store.getBoard(boardId)) return { content: [{ type: "text", text: `Board ${boardId} not found. List boards with tasks_boards.` }], isError: true };
@@ -999,6 +1042,7 @@ export default async function plugin(bb: BbPluginApi) {
       const task = store.create({ title, description, status, boardId: board.id, due: due ?? null, assignee: assignee ?? null, priority, labels, parentId, recurrence, reminderAt, ...(boardId ? {} : { projectId: context.projectId ?? null }), by: "agent" });
       changed(task.id);
       created(task.id, context.threadId);
+      await dispatchAssignment(task.id);
       return `Added ${taskLine(task)}\n\nTo show it in your reply, put this on its own line:\n${directive(task.id)}`;
     },
   });
@@ -1045,6 +1089,7 @@ export default async function plugin(bb: BbPluginApi) {
       else if (status && status !== task.status) await move(task.id, status, "agent");
       else if (note && own) store.setHandoff(context.threadId, handoff.state, firstLine(note));
       changed(task.id);
+      await dispatchAssignment(task.id, task.assignee);
       return `Updated ${taskLine(mustGet(task.id))}`;
     },
   });
@@ -1171,6 +1216,7 @@ export default async function plugin(bb: BbPluginApi) {
               by: "agent",
             });
             changed(task.id);
+            await dispatchAssignment(task.id);
             return { exitCode: 0, stdout: `${task.id}\n` };
           }
           case "show": {

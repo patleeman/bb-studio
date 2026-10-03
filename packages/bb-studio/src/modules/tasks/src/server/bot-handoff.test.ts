@@ -1,5 +1,5 @@
 import { createFakePluginHost, makeThreadResponse } from "@get-bb/plugin-sdk/testing";
-import { expect, it } from "vitest";
+import { expect, it, vi } from "vitest";
 import plugin from "../../server";
 
 async function setup() {
@@ -94,8 +94,8 @@ it("reuses its bot handoff after the conversation link gets a human title", asyn
 it("shows send failures in the recorded handoff", async () => {
   const { harness, create, hand, get } = await setup();
   try {
-    harness.inspection.sdk.stub("threads.send", async () => { throw new Error("Bot unavailable"); });
     const id = await create();
+    harness.inspection.sdk.stub("threads.send", async () => { throw new Error("Bot unavailable"); });
     await expect(hand(id)).rejects.toThrow("Bot unavailable");
     expect(await get(id)).toMatchObject({ handoffs: [{ state: "failed", note: "Bot unavailable" }] });
   } finally { await harness.lifecycle.dispose(); }
@@ -112,5 +112,52 @@ it("records the handoff before a fast bot emits its reply", async () => {
     const id = await create();
     await hand(id);
     expect(await get(id)).toMatchObject({ task: { status: "review" }, handoffs: [{ state: "replied", note: "Already checked" }] });
+  } finally { await harness.lifecycle.dispose(); }
+});
+
+
+it("starts bot assignments from create and update without restarting unchanged assignments", async () => {
+  const { harness, create, get } = await setup();
+  try {
+    const id = await create();
+    expect(await get(id)).toMatchObject({ task: { status: "in_progress" }, handoffs: [{ state: "starting" }] });
+    expect(harness.inspection.sdk.callsTo("threads.send")).toHaveLength(1);
+    await harness.behavior.callRpc("update", { id, assignee: "bot:bot_one", title: "Reworded" });
+    expect(harness.inspection.sdk.callsTo("threads.send")).toHaveLength(1);
+    const { task } = await harness.behavior.callRpc("create", { title: "Unassigned", projectId: "proj_test" }) as { task: { id: string } };
+    await harness.behavior.callRpc("update", { id: task.id, assignee: "bot:bot_one" });
+    expect((await get(task.id)).handoffs).toHaveLength(1);
+    expect(harness.inspection.sdk.callsTo("threads.send")).toHaveLength(2);
+  } finally { await harness.lifecycle.dispose(); }
+});
+
+it("keeps the task and failed handoff when dispatch during assignment fails", async () => {
+  const { harness, create } = await setup();
+  try {
+    harness.inspection.sdk.stub("threads.send", async () => { throw new Error("Bot unavailable"); });
+    await expect(create()).rejects.toThrow("was saved, but its bot could not start");
+    const board = await harness.behavior.callRpc("board", {}) as { tasks: { assignee: string; handoff: { state: string } }[] };
+    expect(board.tasks).toMatchObject([{ assignee: "bot:bot_one", handoff: { state: "failed" } }]);
+  } finally { await harness.lifecycle.dispose(); }
+});
+
+
+it("publishes a completion report with task outputs in the task's folder", async () => {
+  const { harness, create, get } = await setup();
+  try {
+    const id = await create();
+    const threadId = (await get(id)).handoffs[0]!.threadId;
+    const published: unknown[] = [];
+    harness.inspection.sdk.stub("plugins.callRpc", async ({ pluginId, method, input }) => {
+      if (pluginId === "feed" && method === "publish") { published.push(input); return {} as never; }
+      throw new Error("Optional service unavailable");
+    });
+    await harness.behavior.callRpc("link", { id, link: { target: "item", pluginId: "studio", itemId: "page", label: "Result", href: "/plugins/studio/pages/page" } });
+    await harness.behavior.emitThreadEvent("thread.idle", { thread: makeThreadResponse({ id: threadId }), lastAssistantText: "Ready for review" });
+    await vi.waitFor(() => expect(published).toHaveLength(1));
+    expect(published[0]).toMatchObject({ projectId: "proj_test", threadId, story: `task:${id}`, title: "Review the launch" });
+    expect((published[0] as { body: string }).body).toContain("[Result](/plugins/studio/pages/page)");
+    await harness.behavior.emitThreadEvent("thread.idle", { thread: makeThreadResponse({ id: threadId }), lastAssistantText: "Ready for review" });
+    expect(published).toHaveLength(1);
   } finally { await harness.lifecycle.dispose(); }
 });
