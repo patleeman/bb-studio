@@ -19,6 +19,7 @@ import { z } from "zod";
 import { mentionContext } from "./lib/mention";
 import { firstLine, nextHandoff, type ThreadSignal } from "./src/server/handoff";
 import { handoffInput } from "./src/server/prompt";
+import { primaryHostId } from "@bb-studio/kit/server";
 import { assigneeLabel, boardSummary, registerStudio } from "./src/server/studio";
 import { MIGRATIONS, TaskStore, type BoardRow, type HandoffRow, type LinkRow, type TaskRow, type Writer } from "./src/server/store";
 import { studioServices } from "@bb-studio/kit/server";
@@ -541,6 +542,7 @@ export default async function plugin(bb: BbPluginApi) {
       ...(task.title ? { title: task.title } : {}),
       environment: {
         type: "host",
+        hostId: await primaryHostId(bb),
         workspace: input.workspace === "worktree" ? { type: "managed-worktree", baseBranch: { kind: "default" } } : { type: "unmanaged", path: null },
       },
       pluginMetadata: { taskId: task.id },
