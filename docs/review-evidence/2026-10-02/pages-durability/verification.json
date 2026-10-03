@@ -1,0 +1,142 @@
+{
+  "source": {
+    "commit_hash": "54b829b46594c80a27a7515f13183ac7dd39089b",
+    "enabled": 1,
+    "artifact_hash": "sha256:3c6ed3a16c78391a7db909c346f4925b7aa4f4559eaaed4b8f051d2c43812322",
+    "resolvedCommit": "54b829b46594c80a27a7515f13183ac7dd39089b"
+  },
+  "phases": {
+    "control": {
+      "status": "Content saved to BB",
+      "diskConfirmed": true
+    },
+    "offline": {
+      "status": "Offline · Saved on this browser",
+      "recovery": {
+        "bytes": 292,
+        "sha256": "f4a102622441463e13fd0299113189a9b203c57fd96dbba26c5519a602aa073d",
+        "contains": "Offline recovery marker."
+      },
+      "absentFromServerDisk": true
+    },
+    "concurrentTabs": {
+      "first": {
+        "bytes": 352,
+        "sha256": "86b9bb6e87f72ac4361d36af476c6185720fa0e69754612edf6914de880491e0",
+        "contains": "First tab marker."
+      },
+      "second": {
+        "bytes": 352,
+        "sha256": "86b9bb6e87f72ac4361d36af476c6185720fa0e69754612edf6914de880491e0",
+        "contains": "Second tab marker."
+      },
+      "absentFromServerDisk": true
+    },
+    "reload": {
+      "oldTimeOrigin": 1791011147707.7,
+      "newTimeOrigin": 1791011149732.7,
+      "status": "Offline · Saved on this browser",
+      "recovery": {
+        "bytes": 352,
+        "sha256": "86b9bb6e87f72ac4361d36af476c6185720fa0e69754612edf6914de880491e0",
+        "contains": "Offline recovery marker."
+      },
+      "absentFromServerDisk": true
+    },
+    "reconnect": {
+      "status": "Content saved to BB",
+      "diskConfirmed": true,
+      "recoveryRemoved": true
+    },
+    "diskFailure": {
+      "status": "BB save failed · Saved on this browser",
+      "recovery": {
+        "bytes": 388,
+        "sha256": "f61a6b63f19afcd50f5b04a0d42d6f12bc16d8fca4fb46b3cc25b36789c97e44",
+        "contains": "Disk failure marker."
+      },
+      "absentFromServerDisk": true
+    },
+    "phone": {
+      "width": 390,
+      "height": 844,
+      "status": "BB save failed · Saved on this browser",
+      "controls": [
+        {
+          "text": "Retry save",
+          "left": 251.328125,
+          "right": 327.03125,
+          "top": 111,
+          "bottom": 155,
+          "hit": true
+        },
+        {
+          "text": "Download recovery file (.yjs)",
+          "left": 29,
+          "right": 207.515625,
+          "top": 161,
+          "bottom": 205,
+          "hit": true
+        }
+      ]
+    },
+    "export": {
+      "filename": "pg_f19459098aec42bf-recovery.yjs",
+      "bytes": 388,
+      "validYjs": true,
+      "containsLatestEdit": true
+    },
+    "diskRecovery": {
+      "status": "Content saved to BB",
+      "diskConfirmed": true
+    },
+    "quotaFailure": {
+      "status": "Local recovery failed · Keep this page open or download a recovery file",
+      "guard": {
+        "prevented": true,
+        "memoryRecords": 1
+      },
+      "afterNavigationGuard": {
+        "prevented": true,
+        "memoryRecords": 1
+      }
+    },
+    "quotaRecovery": {
+      "recovery": {
+        "bytes": 414,
+        "sha256": "87a7c037e7462bd3c8cb4e93474692e53ff42513640cc0225afb477bd9d5bd8e",
+        "contains": "Memory only quota marker."
+      },
+      "guard": {
+        "prevented": false,
+        "memoryRecords": 0
+      },
+      "diskConfirmed": true
+    }
+  },
+  "limits": [
+    "Staged stable BB and an owned Chrome profile; no production data or machine network changes.",
+    "The socket fault redirects only this browser’s Pages sync connections. HTTP metadata and the BB shell remain reachable; this is not a fully offline application-launch claim.",
+    "The SQLite failure trigger applies only to the disposable page. It tests a real rejected server database write, not a physically full disk.",
+    "The quota phase injects an IndexedDB write exception in the owned browser. Other phases use unmodified real IndexedDB.",
+    "Recovery downloads preserve Yjs blocks/comments but are not Markdown documents or a normal UI import workflow.",
+    "Phone proof uses a 390px Chrome viewport, not a physical device or VoiceOver."
+  ],
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/154.0.8037.93",
+    "revision": "@f89f3a4363808e117c592adedcf9947882ac3b79",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+    "jsVersion": "15.4.80.19"
+  },
+  "fixture": {
+    "pageId": "pg_f19459098aec42bf",
+    "projectId": "proj_su3dznrbpw"
+  },
+  "passed": true,
+  "cleanup": {
+    "ownedPageRemoved": true,
+    "ownedTriggerAbsent": true,
+    "ownedBrowserClosed": true
+  }
+}
