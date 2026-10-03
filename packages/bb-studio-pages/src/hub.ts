@@ -39,12 +39,14 @@ export interface LivePage {
   unloadTimer: ReturnType<typeof setTimeout> | null;
   /** Actor keys that changed the doc since the last save. */
   dirtyBy: Set<string>;
+  saveFailures: number;
   presences: Map<string, { awareness: awarenessProtocol.Awareness; clear: ReturnType<typeof setTimeout> }>;
 }
 
 export interface HubOptions {
   load(pageId: string): Uint8Array | null;
   save(pageId: string, doc: Y.Doc, actors: string[]): void;
+  saveError?(pageId: string, error: unknown): void;
   /** Called once a page is loaded, before any change reaches `changed`. */
   opened?(page: LivePage): void;
   /** Called after every doc change (debounced by the caller as needed). */
@@ -80,6 +82,7 @@ export class PageHub {
       saveTimer: null,
       unloadTimer: null,
       dirtyBy: new Set(),
+      saveFailures: 0,
       presences: new Map(),
     };
     doc.on("update", (update: Uint8Array, origin: unknown) => {
@@ -199,7 +202,16 @@ export class PageHub {
     if (!page.dirtyBy.size) return;
     const actors = [...page.dirtyBy];
     page.dirtyBy.clear();
-    this.options.save(page.id, page.doc, actors);
+    try {
+      this.options.save(page.id, page.doc, actors);
+      page.saveFailures = 0;
+    } catch (error) {
+      for (const actor of actors) page.dirtyBy.add(actor);
+      page.saveFailures++;
+      this.scheduleSave(page);
+      this.options.saveError?.(page.id, error);
+      throw error;
+    }
   }
 
   flushAll(): void {
@@ -250,14 +262,30 @@ export class PageHub {
 
   private scheduleSave(page: LivePage): void {
     if (page.saveTimer) return;
-    page.saveTimer = setTimeout(() => this.flush(page), this.options.saveDelayMs ?? 1000);
+    const delay = page.saveFailures
+      ? Math.min(30_000, 1000 * 2 ** Math.min(page.saveFailures - 1, 5))
+      : this.options.saveDelayMs ?? 1000;
+    page.saveTimer = setTimeout(() => {
+      try {
+        this.flush(page);
+      } catch {
+        // flush kept the dirty document, reported the error and scheduled a retry.
+      }
+    }, delay);
   }
 
   private scheduleUnload(page: LivePage): void {
     if (page.sockets.size || page.unloadTimer) return;
     page.unloadTimer = setTimeout(() => {
       page.unloadTimer = null;
-      if (!page.sockets.size) this.dispose(page, true);
+      if (!page.sockets.size) {
+        try {
+          this.dispose(page, true);
+        } catch {
+          // Keep the document in memory until persistence recovers.
+          this.scheduleUnload(page);
+        }
+      }
     }, this.options.unloadDelayMs ?? 120_000);
   }
 }

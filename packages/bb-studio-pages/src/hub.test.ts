@@ -41,6 +41,59 @@ function client(hub: PageHub, pageId: string) {
 }
 
 describe("PageHub", () => {
+  it("keeps dirty changes and their actors after a failed explicit save", () => {
+    vi.useFakeTimers();
+    const save = vi.fn().mockImplementationOnce(() => { throw new Error("disk busy"); });
+    const hub = new PageHub({ load: () => null, save });
+    try {
+      const page = hub.open("pg_retry");
+      applyEdits(page.doc, [{ op: "append", markdown: "Keep this" }], "agent:one");
+      expect(() => hub.flush(page)).toThrow("disk busy");
+      expect([...page.dirtyBy]).toEqual(["agent:one"]);
+      hub.flush(page);
+      expect(save).toHaveBeenCalledTimes(2);
+      expect(save.mock.calls[1]![2]).toEqual(["agent:one"]);
+      expect(readMarkdown(save.mock.calls[1]![1])).toContain("Keep this");
+      expect(page.dirtyBy.size).toBe(0);
+    } finally {
+      hub.disposeAll();
+      vi.useRealTimers();
+    }
+  });
+
+  it("retries timer save failures without throwing or unloading unsaved pages", () => {
+    vi.useFakeTimers();
+    let failing = true;
+    let stored = "";
+    const error = vi.fn();
+    const hub = new PageHub({
+      load: () => null,
+      save: (_id, doc) => {
+        if (failing) throw new Error("disk busy");
+        stored = readMarkdown(doc);
+      },
+      saveError: error,
+      saveDelayMs: 10,
+      unloadDelayMs: 100,
+    });
+    try {
+      const page = hub.open("pg_retry");
+      applyEdits(page.doc, [{ op: "append", markdown: "Keep this too" }], "user");
+      expect(() => vi.advanceTimersByTime(100)).not.toThrow();
+      expect(error).toHaveBeenCalled();
+      expect(hub.has(page.id)).toBe(true);
+      expect(page.dirtyBy.size).toBe(1);
+      failing = false;
+      vi.advanceTimersByTime(100);
+      expect(stored).toContain("Keep this too");
+      expect(hub.has(page.id)).toBe(false);
+    } finally {
+      failing = false;
+      hub.disposeAll();
+      vi.useRealTimers();
+    }
+  });
+
   it("syncs editors, relays server edits and agent presence, and saves", () => {
     vi.useFakeTimers();
     const seed = new Y.Doc();

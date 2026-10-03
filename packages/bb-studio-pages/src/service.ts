@@ -106,6 +106,7 @@ export class PagesService {
         this.store.saveContent(pageId, Y.encodeStateAsUpdate(doc), readMarkdown(doc), agent ?? actors[0] ?? HUMAN_USER_ID);
         this.publish({ type: "page", pageId });
       },
+      saveError: (pageId, error) => this.bb.log.error(`Could not save page ${pageId}; retrying: ${String(error)}`),
       // Take the watcher's baseline at load, so a page's first human change
       // (say, a comment mentioning a bot) counts as new.
       // A page reopened with requests still pending (Studio Teams was
