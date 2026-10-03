@@ -52,6 +52,8 @@ quotes have independent draft IDs; their context, including cropped images,
 is stored in IndexedDB before opening a companion. A successful submission
 replaces its originating tab with the new thread and refreshes the item's
 home link. Failed submissions retain the native draft and quote.
+Quote context remains stored after submission because a pinned companion or
+its Back history may still refer to that draft route.
 
 The Chat navigation panel offers a plain new-conversation composer. The
 conversation picker still uses Float's corner portal. Without Float, item

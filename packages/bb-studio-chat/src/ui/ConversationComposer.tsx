@@ -4,7 +4,7 @@ import { errorMessage, quoteMessage, untitled, type ItemQuote } from "@bb-studio
 import { useCallback, useEffect, useState } from "react";
 import type { rpcContract, Viewed } from "../contract";
 import { itemKey } from "../context";
-import { CONVERSATION_STARTED, draftRoute, quoteDrafts } from "./conversation-drafts";
+import { CHAT_ICON, CONVERSATION_STARTED, draftRoute, quoteDrafts } from "./conversation-drafts";
 
 export function ConversationComposer({ item, quote, draftKey, focusRequest, onSubmit, onClose }: {
   item: Viewed | null;
@@ -19,7 +19,7 @@ export function ConversationComposer({ item, quote, draftKey, focusRequest, onSu
   return (
     <section aria-label={item ? `Work with this ${kind}` : "New conversation"} className="studio-chat flex h-full min-h-0 flex-col bg-background text-foreground">
       <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
-        <Icon name={item?.kindIcon ?? "MessageCircle"} className="size-3.5 shrink-0" />
+        <Icon name={item?.kindIcon ?? CHAT_ICON} className="size-3.5 shrink-0" />
         <span className="min-w-0 flex-1 truncate">{item ? `Chat about "${untitled(item.title)}"` : "New conversation"}</span>
         {onClose ? <button type="button" aria-label="Close composer" onClick={onClose} className="rounded p-1 hover:bg-state-hover"><Icon name="X" className="size-4" /></button> : null}
       </header>
@@ -54,7 +54,7 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
   const navigateCompanion = useCompanionNavigate();
-  const [loaded, setLoaded] = useState<{ item: Viewed | null; quote?: ItemQuote; quoteId?: string; draftKey: string } | null>(null);
+  const [loaded, setLoaded] = useState<{ item: Viewed | null; quote?: ItemQuote; draftKey: string } | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [attempt, setAttempt] = useState(0);
   const load = useCallback(async () => {
@@ -69,7 +69,7 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
     return {
       item,
       draftKey: saved ? `studio-chat:${itemKey(item)}:quote:${saved.id}` : `studio-chat:${itemKey(item)}`,
-      ...(saved ? { quote: saved.quote, quoteId: saved.id } : {}),
+      ...(saved ? { quote: saved.quote } : {}),
     };
   }, [rpc, subPath]);
   useEffect(() => {
@@ -83,7 +83,6 @@ export function ConversationPage({ subPath }: PluginNavPanelProps) {
   return <ConversationComposer key={loaded.draftKey} {...loaded} focusRequest={1} onSubmit={async request => {
     const { threadId } = await rpc.call("start", { item: loaded.item ? { pluginId: loaded.item.pluginId, id: loaded.item.id } : null, request });
     if (loaded.item) window.dispatchEvent(new CustomEvent(CONVERSATION_STARTED, { detail: { pluginId: loaded.item.pluginId, id: loaded.item.id } }));
-    if (loaded.quoteId) void quoteDrafts.remove(loaded.quoteId).catch(() => {});
     const target = { kind: "thread" as const, threadId };
     if (!navigateCompanion(target) && !openCompanion(target, { tag: "studio-chat:item" })) navigate.toThread(threadId);
   }} />;

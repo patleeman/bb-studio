@@ -3,6 +3,7 @@ import type { ItemQuote } from "@bb-studio/kit/format";
 import { quote, ref, type ItemRef } from "../schemas";
 
 export const CHATS_PATH = "chats";
+export const CHAT_ICON = "MessageSquare";
 export const CONVERSATION_STARTED = "bb-studio-chat:started";
 const ROOT = `/plugins/studio-chat/${CHATS_PATH}`;
 const STORE = "quotes";

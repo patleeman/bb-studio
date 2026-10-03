@@ -208,12 +208,21 @@ store their passage and image in IndexedDB before opening. The originating
 tab becomes the new thread after submission. Studio Chat's tests verify
 draft and attachment DOM retention through placement changes, independent
 quote restoration, image forwarding, failed submissions, storage failures,
-and background submissions that leave another draft intact. The live
-new-composer capture is being updated and remains required before handoff.
+and background submissions that leave another draft intact. Its 38 tests,
+typecheck, build, and stable compatibility check pass. The live capture on
+stable BB 0.45.0 installs the suite from 5f570e3 and Artifacts from 902d642.
+It verifies conversation linking/reuse, exact native composer and attachment
+retention through real sidebar navigation, a second item draft and folding,
+and a cropped image quote whose image, edited prompt, and file attachment
+return after a browser reload. The [screenshot](../packages/bb-studio-chat/assets/staged-preview.png)
+is visually checked. The workflow caught and fixed a server-only SDK import
+in the frontend and a quote card whose controls were behind Float. Artifacts'
+53 tests, typecheck, and build pass; the capture verifies the quote controls'
+actual click targets. No agent runs.
 
 Remaining delivery includes publishing the native host changes, the SDK/CLI
 placement controller, embedded composer targeting, migrating standalone
-Pages composers, and the remaining suite
+Pages composers, quote-draft recovery and compact composer checks, and the remaining suite
 entry points: Feed discussions and links, task handoff verification, Talk
 return navigation, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the

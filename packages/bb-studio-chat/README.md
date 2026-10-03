@@ -10,13 +10,15 @@ something else.
 
 ## Staged preview
 
-![Live BB screenshot of Studio Chat on a drawing](assets/staged-preview.png)
+![Live BB screenshot of a retained image-quote conversation draft](assets/staged-preview.png)
 
-Captured from stable BB with the suite installed from a pushed commit:
-"Checkout flow" has one Chat action, and its chosen "Draft the ORBIT-42
-release notes" conversation opens in Float. The live capture also checks
-unlinked composers, companion-item targeting, preserved context during main
-navigation, conversation selection, and focusing an existing thread.
+Captured from stable BB 0.45.0 with the suite installed from pushed Git
+sources. A cropped area of "Release diagram" opens in a retained chat tab.
+Its image, edited prompt, and attached release review survive a browser
+reload. The live capture also checks conversation selection and reuse,
+two independent item drafts, exact composer and attachment retention while
+switching and folding tabs, and companion-item targeting during real sidebar
+navigation. No agent runs.
 
 ## What you get
 

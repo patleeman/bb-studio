@@ -118,7 +118,7 @@ describe("retained new-conversation tabs", () => {
     expect(body.textContent).toContain("Connection lost");
     await act(async () => { await state.submit.get(draftKey)!(request); });
     expect(state.rpc.call).toHaveBeenLastCalledWith("start", { item: ref, request: { input: [...request.input, { type: "image", url: quote.image }] } });
-    expect(remove).toHaveBeenCalledWith(id);
+    expect(remove).not.toHaveBeenCalled();
     expect(navigate).toHaveBeenCalledWith("quote", { kind: "thread", threadId: "created" });
   });
 

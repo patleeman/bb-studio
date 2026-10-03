@@ -158,7 +158,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
           if (Date.now() > deadline) throw new Error("The seeded release diagram did not load");
           await sleep(100);
         }
-        await client.dragBy('img[alt="release-diagram.png"]', 90, 50, { atX: 130 });
+        await client.dragBy('img[alt="release-diagram.png"]', 80, -55, { atX: 170 });
         await client.waitForSelector('section[aria-label="Send to thread"]');
         const quoteTargets = await client.evaluate(`(() => {
           const card = document.querySelector('section[aria-label="Send to thread"]');
@@ -178,13 +178,21 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         const quoteRoot = `[data-float-window=${JSON.stringify(`path:${quotePath}`)}]`;
         const quotePrompt = `${quoteRoot} [data-promptbox] [contenteditable="true"]`;
         await client.waitForSelector(quotePrompt);
+        await client.dragBy(quotePrompt, 0, 0);
+        for (const type of ["keyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", modifiers: 4 });
+        await client.command("Input.insertText", { text: "\nAlso align the arrowhead." });
+        const quoteDocument = await client.command("DOM.getDocument");
+        const quoteFile = await client.command("DOM.querySelector", { nodeId: quoteDocument.root.nodeId, selector: `${quoteRoot} input[type="file"]` });
+        if (!quoteFile.nodeId) throw new Error("Quote composer has no native attachment input");
+        await client.command("DOM.setFileInputFiles", { nodeId: quoteFile.nodeId, files: [attachment] });
+        await client.waitForText("release-review.txt");
         const expectQuote = async () => {
           const state = await client.evaluate(`(() => {
             const root = document.querySelector(${JSON.stringify(quoteRoot)});
             return { text: root?.textContent, image: root?.querySelector('img[alt="Selected image area"]')?.src,
               visible: root?.checkVisibility(), count: document.querySelectorAll(${JSON.stringify(quoteRoot)}).length };
           })()`);
-          if (!state.visible || state.count !== 1 || !state.text.includes('Chat about "Release diagram"') || !state.text.includes('Clarify this retry arrow before release.') || !state.image?.startsWith('data:image/png;base64,')) throw new Error(`Image quote context lost: ${JSON.stringify(state)}`);
+          if (!state.visible || state.count !== 1 || !state.text.includes('Chat about "Release diagram"') || !state.text.includes('Clarify this retry arrow before release.') || !state.text.includes('Also align the arrowhead.') || !state.text.includes('release-review.txt') || !state.image?.startsWith('data:image/png;base64,')) throw new Error(`Image quote context lost: ${JSON.stringify(state)}`);
         };
         await expectQuote();
         await client.command("Page.reload", {});

@@ -27,7 +27,7 @@ import { itemKey } from "../context";
 import { ThreadPicker } from "./ThreadPicker";
 import { useChatDialog } from "./use-chat-dialog";
 import { ConversationComposer } from "./ConversationComposer";
-import { CONVERSATION_STARTED, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
+import { CHAT_ICON, CONVERSATION_STARTED, itemDraftPath, quoteDraftPath, quoteDrafts } from "./conversation-drafts";
 
 type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 
@@ -229,7 +229,7 @@ export function ChatOverlay() {
           return;
         }
         const path = saved ? quoteDraftPath(saved.id) : itemDraftPath(current.item);
-        if (openCompanion({ kind: "path", path, title: `Chat: ${untitled(current.item.title)}`, icon: "MessageCircle" })) close(current.request);
+        if (openCompanion({ kind: "path", path, title: `Chat: ${untitled(current.item.title)}`, icon: CHAT_ICON })) close(current.request);
         else setFallbackRequest(current.request);
       } catch (cause) {
         if (live && isCurrent(current.request)) { reportError(cause); setFallbackRequest(current.request); }

@@ -87,7 +87,7 @@ describe("item Chat actions", () => {
     state.available = true;
     await render();
     await actHost(host => host.start!(companion));
-    const expected = { kind: "path", path: `/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: companion.pluginId, id: companion.id }))}`, title: "Chat: Companion drawing", icon: "MessageCircle" };
+    const expected = { kind: "path", path: `/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: companion.pluginId, id: companion.id }))}`, title: "Chat: Companion drawing", icon: "MessageSquare" };
     expect(state.float).toHaveBeenCalledWith(expected);
     expect(container.querySelector("textarea")).toBeNull();
     await actHost(host => host.start!(companion));
