@@ -5,6 +5,7 @@ import { viewContract, viewEntrySchema, threadViewSchema, type ThreadView, type 
 import type { Store } from "./store";
 import type { ThreadProfiles } from "./thread-profiles";
 import { missingThread } from "./mission-runtime";
+import { isBroadcastHandle } from "./mentions";
 
 type Timeline = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["timeline"]>>;
 type Row = Timeline["rows"][number];
@@ -229,14 +230,14 @@ export class ThreadViews {
   async recipients(view: ThreadView, input: ViewSend) {
     const threads = await this.threads(view);
     const targets = [...input.targets];
-    const tags = [...input.text.matchAll(/(?:^|\s)@(?:thread:)?([a-zA-Z0-9_-]+)(\+new)?/g)];
+    const tags = [...input.text.matchAll(/(?:^|[^a-zA-Z0-9_.-])@(?:thread:)?([a-zA-Z0-9][a-zA-Z0-9_.-]*)(\+new)?/g)];
     for (const [, handle] of tags) {
+      if (isBroadcastHandle(handle!)) { targets.push(...view.members); continue; }
       const bot = this.store.all().find(b => b.handle === handle);
       if (bot && view.members.some(m => m.kind === "bot" && m.id === bot.id)) targets.push({ kind: "bot", id: bot.id });
       else if (threads.some(t => t.id === handle)) targets.push({ kind: "thread", id: handle! });
-      else if (handle !== "all") throw new Error(`Choose a member for @${handle}.`);
+      else throw new Error(`Choose a member for @${handle}.`);
     }
-    if (tags.some(t => t[1] === "all")) targets.push(...view.members);
     if (!targets.length && input.replyThreadId) targets.push({ kind: "thread", id: input.replyThreadId });
     if (!targets.length && view.members.length === 1) targets.push(view.members[0]!);
     if (!targets.length) {

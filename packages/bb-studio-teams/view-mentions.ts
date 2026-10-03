@@ -1,8 +1,21 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import type { Store } from "./store";
 import type { ThreadViews } from "./thread-views";
+import { isBroadcastHandle, matchingBroadcastMentions } from "./mentions";
 
 export function registerViewMentions(bb: BbPluginApi, store: Store, views: ThreadViews) {
+  bb.ui.registerMentionProvider({
+    id: "broadcasts", label: "Channel mentions",
+    search({ query }) {
+      return matchingBroadcastMentions(query).map(({ handle }) => ({
+        id: handle, title: `@${handle}`, subtitle: "Everyone in this channel", icon: "Users",
+      }));
+    },
+    resolve(handle) {
+      if (!isBroadcastHandle(handle)) throw new Error("Unknown channel mention.");
+      return { context: `@${handle} addresses every member when sent from a Studio Teams channel.` };
+    },
+  });
   bb.ui.registerMentionProvider({
     id: "bots", label: "Bots",
     async search({ query }) {

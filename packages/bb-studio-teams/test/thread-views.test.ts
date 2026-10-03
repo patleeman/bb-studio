@@ -4,6 +4,7 @@ import { setup } from "./bots-fixture";
 import { ThreadProfiles } from "../thread-profiles";
 import { finalEntries, ThreadViews } from "../thread-views";
 import { viewSendInput } from "../view-contract";
+import { registerViewMentions } from "../view-mentions";
 
 function fixture() {
   const x = setup();
@@ -13,6 +14,52 @@ function fixture() {
   const profiles = new ThreadProfiles(x.bb, x.store, x.runtime, () => true);
   return { ...x, views: new ThreadViews(x.bb, x.store, profiles) };
 }
+
+test("BB's mention menu offers both channel broadcasts and resolves picked items", async () => {
+  const x = fixture();
+  try {
+    registerViewMentions(x.bb, x.store, x.views);
+    const provider = x.harness.inspection.registrations.mentionProviders.find(p => p.id === "broadcasts")!;
+    const context = { trigger: "@" as const, query: "", projectId: null, threadId: null };
+    expect(await provider.search(context)).toEqual([
+      { id: "all", title: "@all", subtitle: "Everyone in this channel", icon: "Users" },
+      { id: "channel", title: "@channel", subtitle: "Everyone in this channel", icon: "Users" },
+    ]);
+    expect((await provider.search({ ...context, query: "chan" })).map(p => p.id)).toEqual(["channel"]);
+    expect(await provider.resolve("channel")).toEqual({ context: "@channel addresses every member when sent from a Studio Teams channel." });
+    expect(() => provider.resolve("unrecognized")).toThrow("Unknown channel mention");
+  } finally { await x.close(); }
+});
+
+test.each(["all", "channel", "everyone", "CHANNEL"])("@%s delivers once to every channel member", async handle => {
+  const x = fixture();
+  try {
+    const members = [{ kind: "bot" as const, id: x.a.id }, { kind: "bot" as const, id: x.b.id }, { kind: "thread" as const, id: "thr_member" }];
+    const view = await x.views.create("Everyone", members);
+    const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: `(@${handle}), review this with @atlas`, targets: [members[0]], replyThreadId: "thr_member" });
+    expect((await x.views.send(input)).deliveries.map(d => [d.threadId, d.status])).toEqual([
+      ["thr_bot_1", "sent"], ["thr_bot_2", "sent"], ["thr_member", "sent"],
+    ]);
+    expect(x.harness.inspection.sdk.callsTo("plugins.callRpc")).toHaveLength(0);
+    expect((await x.views.page(view.id)).entries[0]?.text).toBe(input.text);
+  } finally { await x.close(); }
+});
+
+test("broadcasts don't match email addresses or longer handles", async () => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Broadcast boundaries", [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }]);
+    for (const text of ["mail@channel.com", "mail@all.com"]) {
+      const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text, targets: [{ kind: "bot", id: x.a.id }] });
+      expect((await x.views.recipients(view, input)).targets).toEqual(input.targets);
+    }
+    for (const handle of ["all-guide", "channel_guide", "all2"]) {
+      const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: `@${handle} review` });
+      await expect(x.views.send(input)).rejects.toThrow(`Choose a member for @${handle}`);
+    }
+    expect(x.harness.inspection.sdk.callsTo("threads.send")).toHaveLength(0);
+  } finally { await x.close(); }
+});
 test("fanout creates all normal threads before sending the shared roster; retries don't redeliver successes", async () => {
   const x = fixture();
   try {

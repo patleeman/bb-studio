@@ -1,6 +1,6 @@
 import { test } from "vitest";
 import assert from "node:assert/strict";
-import { mentionsEveryone, matchingBroadcastMentions, mentioned } from "../mentions";
+import { mentionsEveryone, matchingBroadcastMentions, mentioned, broadcastMentionText } from "../mentions";
 
 test("broadcast mentions match complete, case-insensitive handles", () => {
   for (const handle of ["all", "channel", "everyone"]) {
@@ -27,6 +27,14 @@ test("broadcast completion offers all and channel, and resolves the everyone ali
   assert.deepEqual(matchingBroadcastMentions("all"), [{ handle: "all" }]);
   assert.deepEqual(matchingBroadcastMentions("every"), [{ handle: "everyone" }]);
   assert.deepEqual(matchingBroadcastMentions("atlas"), []);
+});
+
+test("picked channel mentions keep their @ when converted to channel input", () => {
+  assert.equal(broadcastMentionText("broadcasts:all"), "@all");
+  assert.equal(broadcastMentionText("broadcasts:channel"), "@channel");
+  assert.equal(broadcastMentionText("broadcasts:everyone"), "@everyone");
+  assert.equal(broadcastMentionText("bots:all"), null);
+  assert.equal(broadcastMentionText("broadcasts:all-guide"), null);
 });
 
 import { linkifyMentions, mentionBotId, mentionHref } from "../mentions";

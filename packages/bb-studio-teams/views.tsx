@@ -11,6 +11,7 @@ import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import type { ThreadView, ViewAttachment, ViewEntry, ViewMember, ViewPermissionMode, ViewThread } from "./view-contract";
 import type { NewThreadRequest } from "@get-bb/plugin-sdk/app";
+import { broadcastMentionText } from "./mentions";
 
 type Contract = typeof rpcContract;
 type Page = { view: ThreadView; threads: ViewThread[]; entries: ViewEntry[]; hasOlder: boolean };
@@ -154,12 +155,13 @@ function ViewDetail({ id }: { id: string }) {
       let out = part.text;
       for (const m of [...(part.mentions ?? [])].sort((x, y) => y.start - x.start)) {
         const r = m.resource, label = r.label.replace(/^@/, "");
+        const broadcast = r.kind === "plugin" && r.pluginId === PLUGIN_ID ? broadcastMentionText(r.itemId) : null;
         const bot = r.kind === "plugin" && r.pluginId === PLUGIN_ID ? bots.find(b => b.id === r.itemId.replace(/^bots:/, "")) : undefined;
         if (bot && page.view.members.some(v => v.kind === "bot" && v.id === bot.id)) mentioned.push({ kind: "bot", id: bot.id });
         if (r.kind === "thread" && page.threads.some(t => t.id === r.threadId)) mentioned.push({ kind: "thread", id: r.threadId });
         // BB puts a space after a mention pill; "@Atlas +new" still asks for a fresh thread.
         const rest = out.slice(m.end), fresh = bot ? /^\s?\+new\b/.exec(rest) : null;
-        out = out.slice(0, m.start) + (bot ? `@${bot.handle}${fresh ? "+new" : ""}` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label) + (fresh ? rest.slice(fresh[0].length) : rest);
+        out = out.slice(0, m.start) + (broadcast ?? (bot ? `@${bot.handle}${fresh ? "+new" : ""}` : r.kind === "thread" ? `${label} (thread ${r.threadId})` : label)) + (fresh ? rest.slice(fresh[0].length) : rest);
       }
       return [out];
     }).join("\n").trim();
@@ -226,7 +228,7 @@ function ViewDetail({ id }: { id: string }) {
     </div></div>
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
     {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This channel is archived. Restore it from the ··· menu to send messages.</p>
-      : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @ to mention members.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}
+      : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @all to ping everyone.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}
     <div className="mt-1 flex min-h-6 select-none items-center justify-between gap-2 pl-[15px] pr-3.5">
       <div className="flex min-w-0 flex-1 items-center gap-1">
         {reply && <span className="flex min-w-0 items-center gap-1 text-xs text-muted-foreground"><Icon name="ArrowTurnBackward" className="size-3.5 shrink-0" /><span className="truncate">Replying to <span className="text-foreground">{botFor(reply)?.name || page.threads.find(t => t.id === reply)?.title || "thread"}</span></span><button type="button" aria-label="Cancel reply" title="Cancel reply" className={ROW_ICON_BUTTON} onClick={() => setReply(null)}><Icon name="X" className="size-3.5" /></button></span>}

@@ -11,6 +11,14 @@ export function mentioned(text: string, handle: string) {
 export const isBroadcastHandle = (handle: string) =>
   broadcastHandles.some((alias) => alias === handle.toLowerCase());
 
+/** BB namespaces picked items as <provider>:<item>. Keep the @ in channel input. */
+export const broadcastMentionText = (itemId: string) => {
+  const handle = itemId.replace(/^broadcasts:/, "");
+  return itemId.startsWith("broadcasts:") && isBroadcastHandle(handle)
+    ? `@${handle.toLowerCase()}`
+    : null;
+};
+
 export const mentionsEveryone = (text: string) =>
   broadcastHandles.some((handle) => mentioned(text, handle));
 
