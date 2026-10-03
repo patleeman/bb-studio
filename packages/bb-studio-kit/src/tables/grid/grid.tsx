@@ -4,7 +4,7 @@
 // Keys and clipboard events go to a hidden textarea that holds focus while
 // the grid is active. Being a text field, it also keeps a page editor the
 // grid is embedded in from treating those events as its own.
-import { useCallback, useEffect, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
+import { Fragment, useCallback, useEffect, useId, useLayoutEffect, useMemo, useRef, useState, type ClipboardEvent, type KeyboardEvent, type MouseEvent, type PointerEvent } from "react";
 import { ContextMenu, ContextMenuContent, ContextMenuItem, ContextMenuSeparator, ContextMenuTrigger } from "../../ui/context-menu";
 import { Icon } from "../../ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "../../ui/popover";
@@ -17,6 +17,7 @@ import { CellEditor, type Exit } from "./editors";
 import type { TableHost } from "./host";
 import { bounds, clearPatch, copyGrid, inBounds, pastePatch, step, tab, type Direction, type Pos, type Selection } from "./sheet";
 import { newRowId, type Change } from "./state";
+import { scrollToRow, visibleRows } from "./viewport";
 
 const GUTTER = 44;
 const ADD_COLUMN = 40;
@@ -53,6 +54,8 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
   const scroller = useRef<HTMLDivElement>(null);
   const dragging = useRef(false);
   const focusRow = useRef<{ id: string; edit: boolean } | null>(null);
+  const gridId = useId();
+  const [viewport, setViewport] = useState({ top: 0, height: 480, rowHeight: 33, headerHeight: 33 });
   const box = selection ? bounds(selection) : null;
   /** The active cell, which typing edits; `focus` is the far end of the range. */
   const cursor = selection?.anchor ?? null;
@@ -60,6 +63,29 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
   const many = !!box && (box.bottom > box.top || box.right > box.left);
   const width = (column: Column) => widths[column.id] ?? column.width ?? DEFAULT_COLUMN_WIDTH;
   const totalWidth = GUTTER + columns.reduce((sum, column) => sum + width(column), 0) + ADD_COLUMN;
+  const renderedRows = visibleRows(rows.length, viewport.top, viewport.height, viewport.rowHeight, [editing?.row ?? -1, cursor?.row ?? -1]);
+
+  const measure = useCallback(() => {
+    const node = scroller.current;
+    if (!node) return;
+    setViewport(previous => {
+      const next = {
+        top: node.scrollTop,
+        height: node.clientHeight || previous.height,
+        rowHeight: node.querySelector("tbody tr[data-row]")?.getBoundingClientRect().height || previous.rowHeight,
+        headerHeight: node.querySelector("thead")?.getBoundingClientRect().height || previous.headerHeight,
+      };
+      return Object.keys(next).every(key => next[key as keyof typeof next] === previous[key as keyof typeof previous]) ? previous : next;
+    });
+  }, []);
+  useLayoutEffect(measure, [measure, rows.length]);
+  useEffect(() => {
+    const node = scroller.current;
+    if (!node || typeof ResizeObserver === "undefined") return;
+    const observer = new ResizeObserver(measure);
+    observer.observe(node);
+    return () => observer.disconnect();
+  }, [measure]);
 
   const focusKeys = useCallback(() => {
     const field = keys.current;
@@ -108,9 +134,18 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [highlightRowId, rows.length > 0]);
 
-  useEffect(() => {
+  useLayoutEffect(() => {
     if (!focus) return;
-    scroller.current?.querySelector(`[data-cell="${focus.row}:${focus.col}"]`)?.scrollIntoView({ block: "nearest", inline: "nearest" });
+    const node = scroller.current;
+    if (!node) return;
+    node.scrollTop = scrollToRow(focus.row, node.scrollTop, node.clientHeight || viewport.height, viewport.rowHeight, viewport.headerHeight);
+    const left = GUTTER + columns.slice(0, focus.col).reduce((sum, column) => sum + width(column), 0);
+    const right = left + (columns[focus.col] ? width(columns[focus.col]!) : 0);
+    if (left < node.scrollLeft + GUTTER) node.scrollLeft = left - GUTTER;
+    else if (node.clientWidth && right > node.scrollLeft + node.clientWidth) node.scrollLeft = right - node.clientWidth;
+    measure();
+    // Scroll only when the keyboard/link selection moves, not on manual scrolling.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focus?.row, focus?.col]);
 
   useEffect(() => {
@@ -285,21 +320,22 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
   const rowCount = box ? box.bottom - box.top + 1 : 0;
 
   return (
-    <div className="relative flex min-h-0 flex-col">
+    <div className={cn("relative flex min-h-0 flex-col", !embedded && "flex-1")}>
       <textarea
         ref={keys}
         aria-label="Table cells"
+        aria-activedescendant={cursor ? `${gridId}-${cursor.row}-${cursor.col}` : undefined}
         className="pointer-events-none fixed top-0 left-0 size-px resize-none opacity-0"
-        tabIndex={-1}
+        tabIndex={0}
         onKeyDown={onKeyDown}
         onCopy={onCopy}
         onCut={onCut}
         onPaste={onPaste}
-        onFocus={() => setActive(true)}
+        onFocus={() => { setActive(true); if (!selection && rows.length && columns.length) select({ row: 0, col: 0 }); }}
         onBlur={() => setActive(false)}
         onChange={() => {}}
       />
-      <div ref={scroller} className={cn("relative min-h-0 overflow-auto overscroll-x-contain", embedded ? "max-h-[28rem]" : "flex-1")}>
+      <div ref={scroller} onScroll={measure} className={cn("relative min-h-0 overflow-auto overscroll-x-contain", embedded ? "max-h-[28rem]" : "flex-1")}>
         <ContextMenu>
           <table role="grid" aria-label={table.title} aria-rowcount={rows.length + 1} className="table-fixed border-separate border-spacing-0 text-sm select-none" style={{ width: totalWidth }}>
             <colgroup>
@@ -352,10 +388,14 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
             </thead>
             <ContextMenuTrigger asChild>
               <tbody>
-                {rows.map((row, r) => {
+                {renderedRows.map((r, index) => {
+                  const row = rows[r]!;
+                  const gap = r - (index ? renderedRows[index - 1]! + 1 : 0);
                   const rowSelected = !!box && r >= box.top && r <= box.bottom;
                   return (
-                    <tr key={row.id} aria-rowindex={r + 2} className={cn("group/row", flash === row.id && "animate-pulse")}>
+                    <Fragment key={row.id}>
+                    {gap > 0 ? <tr aria-hidden="true"><td colSpan={columns.length + 2} style={{ height: gap * viewport.rowHeight, padding: 0, border: 0 }} /></tr> : null}
+                    <tr data-row={r} aria-rowindex={r + 2} className={cn("group/row", flash === row.id && "animate-pulse")}>
                       <td
                         className={cn(
                           "sticky left-0 z-10 h-8 border-r border-b border-border bg-background p-0 text-right text-xs text-muted-foreground tabular-nums",
@@ -394,6 +434,7 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
                           <td
                             key={column.id}
                             role="gridcell"
+                            id={`${gridId}-${r}-${c}`}
                             data-cell={`${r}:${c}`}
                             aria-selected={selected}
                             className={cn(
@@ -427,8 +468,10 @@ export function Grid({ table, view, rows, columns, host, apply, undo, redo, onCo
                       })}
                       <td className="border-b border-border" />
                     </tr>
+                    </Fragment>
                   );
                 })}
+                {renderedRows.length && renderedRows[renderedRows.length - 1]! < rows.length - 1 ? <tr aria-hidden="true"><td colSpan={columns.length + 2} style={{ height: (rows.length - renderedRows[renderedRows.length - 1]! - 1) * viewport.rowHeight, padding: 0, border: 0 }} /></tr> : null}
               </tbody>
             </ContextMenuTrigger>
           </table>
