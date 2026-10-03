@@ -13,28 +13,67 @@ record audio, change server settings, or accept decisions.
 
 ## Reproduce
 
-Use a newly created empty simulator. Do not clone a user's booted simulator.
-With the staged BB running, from `apps/ios`:
+Use a newly created empty simulator and a private source copy. A launch argument
+alone is insufficient: app-group defaults and background initialization must
+also select the fixture before the first launch. Do not clone a user's simulator
+or build the test directly from a checkout with production fallback URLs.
+
+From the repository root, prepare the copy and empty device:
 
 ```sh
+set -euo pipefail
 export DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer
-QA_SIM=$(xcrun simctl create 'BB isolated quality review' \
+export BB_QUALITY_QA_DIR=$(mktemp -d /tmp/bb-quality-review.XXXXXX)
+export BB_QUALITY_QA_DEVICE=$(xcrun simctl create 'BB isolated quality review' \
   com.apple.CoreSimulator.SimDeviceType.iPhone-18-Pro \
   com.apple.CoreSimulator.SimRuntime.iOS-27-0)
-xcrun simctl boot "$QA_SIM"
-xcodegen generate -q
-xcodebuild build-for-testing -scheme BBStudio -destination "id=$QA_SIM" \
-  -derivedDataPath build/review-quality/DerivedData
+trap 'xcrun simctl shutdown "$BB_QUALITY_QA_DEVICE" >/dev/null 2>&1 || true; xcrun simctl delete "$BB_QUALITY_QA_DEVICE" >/dev/null 2>&1 || true' EXIT
+python3 - <<'PYTHON'
+import os, pathlib, shutil
+source = pathlib.Path('apps/ios')
+copy = pathlib.Path(os.environ['BB_QUALITY_QA_DIR']) / 'project'
+shutil.copytree(source, copy, ignore=shutil.ignore_patterns('build', '*.xcodeproj', '*.xcworkspace', 'docs'))
+for name in ['Shared/AppGroup.swift', 'Shared/BBClient.swift']:
+    path = copy / name
+    text = path.read_text()
+    old = 'https://patricks-megamac.tail5a01ec.ts.net'
+    assert old in text
+    path.write_text(text.replace(old, 'http://127.0.0.1:49486'))
+for path in (copy / 'UITests').glob('*.swift'):
+    if path.name != 'ReviewQualityUITests.swift':
+        path.unlink()
+PYTHON
+xcrun simctl boot "$BB_QUALITY_QA_DEVICE"
+xcodegen generate --spec "$BB_QUALITY_QA_DIR/project/project.yml"
+xcodebuild build-for-testing -project "$BB_QUALITY_QA_DIR/project/BBStudio.xcodeproj" \
+  -scheme BBStudio -destination "id=$BB_QUALITY_QA_DEVICE" \
+  -derivedDataPath "$BB_QUALITY_QA_DIR/build"
+xcrun simctl install "$BB_QUALITY_QA_DEVICE" \
+  "$BB_QUALITY_QA_DIR/build/Build/Products/Debug-iphonesimulator/BBStudio.app"
 ```
 
-Inject the runner environment into a separate xctestrun file. This handles both
-xctestrun formats and restricts the target to this suite:
+Set and read back both preference domains and both installed containers before
+launching. Then enable only the review suite in a separate runner file:
 
 ```sh
-python3 - <<'PY'
-import pathlib, plistlib
-root = pathlib.Path('build/review-quality/DerivedData/Build/Products')
-source = next(p for p in root.glob('*.xctestrun') if p.name != 'ReviewQuality.xctestrun')
+for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
+  xcrun simctl spawn "$BB_QUALITY_QA_DEVICE" defaults write "$domain" serverURL -string http://127.0.0.1:49486
+  test "$(xcrun simctl spawn "$BB_QUALITY_QA_DEVICE" defaults read "$domain" serverURL)" = http://127.0.0.1:49486 || exit 1
+done
+python3 - <<'PYTHON'
+import os, pathlib, plistlib, subprocess
+origin = 'http://127.0.0.1:49486'
+device = os.environ['BB_QUALITY_QA_DEVICE']
+for container, domain in [('data', 'nyc.plee.bbgo'), ('group.nyc.plee.bbgo', 'group.nyc.plee.bbgo')]:
+    root = pathlib.Path(subprocess.check_output(['xcrun', 'simctl', 'get_app_container', device, 'nyc.plee.bbgo', container], text=True).strip())
+    path = root / 'Library/Preferences' / f'{domain}.plist'
+    path.parent.mkdir(parents=True, exist_ok=True)
+    values = plistlib.loads(path.read_bytes()) if path.exists() else {}
+    values['serverURL'] = origin
+    path.write_bytes(plistlib.dumps(values))
+    assert plistlib.loads(path.read_bytes())['serverURL'] == origin
+root = pathlib.Path(os.environ['BB_QUALITY_QA_DIR']) / 'build/Build/Products'
+source = next(root.glob('*.xctestrun'))
 data = plistlib.loads(source.read_bytes())
 if 'TestConfigurations' in data:
     targets = [t for c in data['TestConfigurations'] for t in c['TestTargets']]
@@ -42,22 +81,25 @@ else:
     targets = [t for t in data.values() if isinstance(t, dict) and 'BlueprintName' in t]
 for target in targets:
     if target['BlueprintName'] == 'BBStudioUITests':
-        target.setdefault('EnvironmentVariables', {})['BB_QA_SERVER_URL'] = 'http://127.0.0.1:49486'
+        target.setdefault('EnvironmentVariables', {})['BB_QA_SERVER_URL'] = origin
         target['OnlyTestIdentifiers'] = ['ReviewQualityUITests']
     else:
         target['IsEnabled'] = False
 (root / 'ReviewQuality.xctestrun').write_bytes(plistlib.dumps(data))
-PY
+PYTHON
 xcodebuild test-without-building \
-  -xctestrun build/review-quality/DerivedData/Build/Products/ReviewQuality.xctestrun \
-  -destination "id=$QA_SIM" -parallel-testing-enabled NO \
+  -xctestrun "$BB_QUALITY_QA_DIR/build/Build/Products/ReviewQuality.xctestrun" \
+  -destination "id=$BB_QUALITY_QA_DEVICE" -parallel-testing-enabled NO \
   -only-testing:BBStudioUITests/ReviewQualityUITests \
-  -resultBundlePath /tmp/bb-native-quality.xcresult
-xcrun xcresulttool export attachments --path /tmp/bb-native-quality.xcresult \
-  --output-path /tmp/bb-native-quality-attachments
-xcrun simctl shutdown "$QA_SIM"
-xcrun simctl delete "$QA_SIM"
+  -resultBundlePath "$BB_QUALITY_QA_DIR/results.xcresult" || BB_QUALITY_QA_RESULT=$?
+xcrun xcresulttool export attachments --path "$BB_QUALITY_QA_DIR/results.xcresult" \
+  --output-path "$BB_QUALITY_QA_DIR/attachments"
+exit "${BB_QUALITY_QA_RESULT:-0}"
 ```
+
+Run these commands in one shell so the cleanup trap removes only this private
+device. Keep the result folder for review. The revised commands document the
+isolation steps exercised by later native lanes; they are not a new audit result.
 
 A missing/wrong environment causes an explicit skip before app launch. A skipped
 run is not verification. Use a new result-bundle path on every run.
