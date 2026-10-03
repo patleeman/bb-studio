@@ -30,9 +30,13 @@ export const COUNT_HOT =
 export const SHORTCUT = "shrink-0 text-xs text-subtle-foreground";
 
 export const MENU =
-  "z-50 min-w-60 overflow-hidden rounded-lg border border-border bg-popover p-1 text-popover-foreground shadow-lg outline-none";
+  "z-50 min-w-44 overflow-hidden rounded-md border border-border bg-popover p-1 text-popover-foreground shadow-md outline-none";
 
 export const MENU_ITEM =
-  "flex h-8 w-full cursor-default items-center gap-2 rounded-md px-2 text-sm outline-none select-none data-[highlighted]:bg-state-hover data-[disabled]:opacity-50 [&_svg]:size-4";
+  "flex h-7 w-full cursor-default items-center gap-2 rounded-sm px-2 text-[13px] outline-none select-none data-[highlighted]:bg-state-hover data-[disabled]:opacity-50 [&_svg]:size-3.5 [&_svg]:text-muted-foreground";
+
+/** Small icon buttons that appear on a row while it's hovered. */
+export const ROW_HOVER_BUTTON =
+  "hidden size-6 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground focus-visible:flex max-md:pointer-coarse:flex [&_svg]:size-3.5";
 
 export const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border";

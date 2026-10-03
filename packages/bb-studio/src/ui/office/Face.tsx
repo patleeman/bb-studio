@@ -1,6 +1,6 @@
 // A bot is a face: a round avatar, never a row. A dashed ring turns while it
 // works; a dot means it needs you. "A face is someone, a row is something."
-import { Icon } from "@bb-studio/kit/app";
+import type { ReactNode } from "react";
 import { cn } from "./styles";
 import type { BotState } from "./model";
 
@@ -17,8 +17,10 @@ export interface FaceProps {
   state?: BotState;
   size?: keyof typeof SIZES;
   selected?: boolean;
-  /** Runs on an outside agent (Hermes, OpenClaw): a small globe at the corner. */
+  /** Runs on an outside agent (Hermes, OpenClaw, Dot); named for screen readers. */
   external?: string | null;
+  /** Drawn at the bottom-right corner: the outside agent's logo. */
+  badge?: ReactNode;
   /** That agent can't be reached right now. */
   offline?: boolean;
   className?: string;
@@ -28,7 +30,7 @@ function isImage(avatar: string): boolean {
   return /^(https?:|data:image\/|\/)/.test(avatar);
 }
 
-export function Face({ name, avatar, state = "idle", size = "md", selected = false, external = null, offline = false, className }: FaceProps) {
+export function Face({ name, avatar, state = "idle", size = "md", selected = false, external = null, badge = null, offline = false, className }: FaceProps) {
   const showState = (size === "md" || size === "lg") && !offline;
   const label = [name, external ? `${external} agent` : null, offline ? "offline" : state === "needs_you" ? "needs you" : state === "working" ? "working" : null]
     .filter(Boolean).join(", ");
@@ -52,10 +54,8 @@ export function Face({ name, avatar, state = "idle", size = "md", selected = fal
       {showState && state === "needs_you"
         ? <span aria-hidden className="absolute -top-px -right-px size-2.5 rounded-full border-2 border-sidebar bg-warning-foreground" />
         : null}
-      {external && (size === "md" || size === "lg")
-        ? <span aria-hidden className="absolute -right-0.5 -bottom-0.5 flex size-3.5 items-center justify-center rounded-full border border-sidebar bg-muted text-muted-foreground">
-            <Icon name="Globe" className="size-2.5" />
-          </span>
+      {badge && (size === "md" || size === "lg")
+        ? <span aria-hidden className={cn("absolute -right-1 -bottom-1", size === "lg" ? "size-5" : "size-4")}>{badge}</span>
         : null}
     </span>
   );

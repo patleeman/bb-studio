@@ -1,5 +1,6 @@
-// The top of the sidebar: the Space switcher, then four rows (Home, Inbox,
-// Search, New thread). Every other navigation row, from BB or a plugin, is
+// The top of the sidebar: the Space switcher, then five rows (Home, Inbox,
+// Search, Library, New thread). Library is every item and old thread; the
+// sidebar below it shows only active work. Every other navigation row, from BB or a plugin, is
 // reachable from the switcher menu or ⌘K, never as its own row: plugins add
 // types, not places.
 import {
@@ -8,7 +9,7 @@ import {
   type ExperimentalSidebarNavigationItem,
   type ExperimentalSidebarNavigationProps,
 } from "@get-bb/plugin-sdk/app";
-import { Icon } from "@bb-studio/kit/app";
+import { Icon, openAppPath, studioPath } from "@bb-studio/kit/app";
 import type { ReactNode } from "react";
 import { usePathname } from "./location";
 import { requestCount, useInboxCounts, useSpaces } from "./model";
@@ -74,6 +75,12 @@ export function OfficeNavigation(_props: ExperimentalSidebarNavigationProps) {
       {search
         ? <NavRow icon={<NavigationIcon icon={search.icon} />} label="Search" onClick={() => actions.activate(search.id, { openInSplit: false })} shortcutLabel={shortcut(search)} />
         : null}
+      <NavRow
+        icon={<Icon name="Layers" className="size-4" />}
+        label="Library"
+        active={pathname.startsWith(studioPath())}
+        onClick={() => openAppPath(studioPath())}
+      />
       {newThread
         ? <NavRow icon={<NavigationIcon icon={newThread.icon} />} label="New thread" onClick={() => actions.activate(newThread.id, { openInSplit: false })} shortcutLabel={shortcut(newThread)} />
         : null}

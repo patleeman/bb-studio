@@ -23,7 +23,7 @@ export function RowMenu({ label, groups, children }: { label: string; groups: Ro
       <div key={index}>
         {index > 0 ? <Separator className={MENU_SEPARATOR} /> : null}
         {group.map((action) => (
-          <Item key={action.id} onSelect={action.run} className={cn(MENU_ITEM, action.danger && "text-destructive")}>
+          <Item key={action.id} onSelect={action.run} className={cn(MENU_ITEM, action.danger && "text-destructive [&_svg]:text-destructive")}>
             <Icon name={action.icon} aria-hidden />{action.label}
           </Item>
         ))}

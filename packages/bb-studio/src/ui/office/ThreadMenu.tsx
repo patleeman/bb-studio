@@ -53,7 +53,7 @@ export function ThreadMenu({ thread, children }: { thread: PluginSidebarThread; 
                     <div key={index}>
                       {index > 0 ? <Menu.Separator className={MENU_SEPARATOR} /> : null}
                       {group.map((item) => (
-                        <Menu.Item key={item.id} onSelect={item.run} className={cn(MENU_ITEM, item.danger && "text-destructive")}>
+                        <Menu.Item key={item.id} onSelect={item.run} className={cn(MENU_ITEM, item.danger && "text-destructive [&_svg]:text-destructive")}>
                           <Icon name={item.icon} aria-hidden />{item.label}
                         </Menu.Item>
                       ))}
@@ -71,7 +71,7 @@ export function ThreadMenu({ thread, children }: { thread: PluginSidebarThread; 
             <div key={index}>
               {index > 0 ? <ContextMenu.Separator className={MENU_SEPARATOR} /> : null}
               {group.map((item) => (
-                <ContextMenu.Item key={item.id} onSelect={item.run} className={cn(MENU_ITEM, item.danger && "text-destructive")}>
+                <ContextMenu.Item key={item.id} onSelect={item.run} className={cn(MENU_ITEM, item.danger && "text-destructive [&_svg]:text-destructive")}>
                   <Icon name={item.icon} aria-hidden />{item.label}
                 </ContextMenu.Item>
               ))}
