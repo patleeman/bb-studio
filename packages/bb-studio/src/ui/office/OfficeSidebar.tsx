@@ -19,7 +19,8 @@ import { currentOfficeSubPath, openOffice } from "./routes";
 import { ROW, ROW_ACTIVE, ROW_GLYPH, ROW_LABEL, SECTION_ACTION, SECTION_HEADER, cn } from "./styles";
 
 const FOLDER_PREVIEW = 8;
-const RUNNING = new Set(["active", "pending", "waiting-for-host", "host-reconnecting"]);
+// "pending" is work queued for later (a scheduled send), not work in progress.
+const RUNNING = new Set(["active", "waiting-for-host", "host-reconnecting"]);
 const BACKGROUND_ORIGINS = new Set(["bot-teams", "automations", "studio"]);
 
 const KIND_ICONS: Record<string, string> = {
@@ -87,9 +88,11 @@ function ThreadButton({ thread, active, indent, onOpen }: { thread: PluginSideba
         ? <span aria-label="Needs you" className="size-1.5 shrink-0 rounded-full bg-warning-foreground" />
         : running
           ? <span aria-label="Running" className="size-3 shrink-0 rounded-full border-[1.5px] border-muted-foreground/50 border-r-transparent motion-safe:animate-spin" />
-          : thread.isUnread
-            ? <span aria-label="Unread" className="size-1.5 shrink-0 rounded-full bg-foreground" />
-            : null}
+          : thread.runtimeStatus === "pending"
+            ? <span title="Scheduled" className="shrink-0 text-subtle-foreground"><Icon name="Clock" aria-label="Scheduled" className="size-3.5" /></span>
+            : thread.isUnread
+              ? <span aria-label="Unread" className="size-1.5 shrink-0 rounded-full bg-foreground" />
+              : null}
     </button>
   );
 }
