@@ -47,3 +47,12 @@ describe("Office Space ownership", () => {
     db.close();
   });
 });
+
+it("migrates the provisional read_only label without losing its original value", () => {
+  const { db, store } = setup(); const id=store.defaultSpace().id;
+  db.prepare("INSERT INTO space_settings VALUES (?, 'defaultTrust', ?)").run(id,JSON.stringify("read_only"));
+  expect(store.settings(id).defaultTrust).toBe("ask");
+  expect(db.prepare("SELECT value FROM space_settings WHERE key='office.previousDefaultTrust'").get()).toEqual({value:'"read_only"'});
+  expect(store.setSettings(id,{defaultTrust:"act"}).defaultTrust).toBe("act");
+  db.close();
+});

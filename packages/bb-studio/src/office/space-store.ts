@@ -111,7 +111,17 @@ export class OfficeSpaceStore {
   settings(id: string): SpaceSettings {
     this.get(id);
     const rows = this.db.prepare("SELECT key,value FROM space_settings WHERE space_id=?").all(id) as { key: string; value: string }[];
-    return spaceSettingsSchema.parse({ ...defaults, ...Object.fromEntries(rows.map(row => [row.key, JSON.parse(row.value)])) });
+    const saved = Object.fromEntries(rows.map(row => [row.key, JSON.parse(row.value)]));
+    // Early office builds exposed a read_only label without enforceable SDK
+    // support. Preserve that setting for recovery and adopt the supported ask mode.
+    if (saved.defaultTrust === "read_only") {
+      this.db.transaction(() => {
+        this.db.prepare("INSERT OR IGNORE INTO space_settings(space_id,key,value) VALUES (?,'office.previousDefaultTrust',?)").run(id, JSON.stringify(saved.defaultTrust));
+        this.db.prepare("UPDATE space_settings SET value=? WHERE space_id=? AND key='defaultTrust'").run(JSON.stringify("ask"), id);
+      })();
+      saved.defaultTrust = "ask";
+    }
+    return spaceSettingsSchema.parse({ ...defaults, ...saved });
   }
 
   setSettings(id: string, patch: Partial<SpaceSettings>): SpaceSettings {
