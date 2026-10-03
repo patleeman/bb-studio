@@ -1,9 +1,9 @@
 {
   "source": {
-    "commit_hash": "54b829b46594c80a27a7515f13183ac7dd39089b",
+    "commit_hash": "f04ab51b4efd77ceae7669b54f4993e98514e65e",
     "enabled": 1,
-    "artifact_hash": "sha256:3c6ed3a16c78391a7db909c346f4925b7aa4f4559eaaed4b8f051d2c43812322",
-    "resolvedCommit": "54b829b46594c80a27a7515f13183ac7dd39089b"
+    "artifact_hash": "sha256:c52eb824bad8681d4e0089c38e3fb28f1de09a2b8a3ee129ddb953736e992858",
+    "resolvedCommit": "f04ab51b4efd77ceae7669b54f4993e98514e65e"
   },
   "phases": {
     "control": {
@@ -13,32 +13,32 @@
     "offline": {
       "status": "Offline · Saved on this browser",
       "recovery": {
-        "bytes": 292,
-        "sha256": "f4a102622441463e13fd0299113189a9b203c57fd96dbba26c5519a602aa073d",
+        "bytes": 282,
+        "sha256": "80a190552619ca48a528bfd4784c24ba9a406b354cb0923e928e5a267e0494c3",
         "contains": "Offline recovery marker."
       },
       "absentFromServerDisk": true
     },
     "concurrentTabs": {
       "first": {
-        "bytes": 352,
-        "sha256": "86b9bb6e87f72ac4361d36af476c6185720fa0e69754612edf6914de880491e0",
+        "bytes": 334,
+        "sha256": "60d1bc6d03a4bc58c9ec3e7fc94813c173f9d5f95219dfff9fec91a14ca66d03",
         "contains": "First tab marker."
       },
       "second": {
-        "bytes": 352,
-        "sha256": "86b9bb6e87f72ac4361d36af476c6185720fa0e69754612edf6914de880491e0",
+        "bytes": 334,
+        "sha256": "60d1bc6d03a4bc58c9ec3e7fc94813c173f9d5f95219dfff9fec91a14ca66d03",
         "contains": "Second tab marker."
       },
       "absentFromServerDisk": true
     },
     "reload": {
-      "oldTimeOrigin": 1791011147707.7,
-      "newTimeOrigin": 1791011149732.7,
+      "oldTimeOrigin": 1791011524166.4,
+      "newTimeOrigin": 1791011526242.3,
       "status": "Offline · Saved on this browser",
       "recovery": {
-        "bytes": 352,
-        "sha256": "86b9bb6e87f72ac4361d36af476c6185720fa0e69754612edf6914de880491e0",
+        "bytes": 334,
+        "sha256": "60d1bc6d03a4bc58c9ec3e7fc94813c173f9d5f95219dfff9fec91a14ca66d03",
         "contains": "Offline recovery marker."
       },
       "absentFromServerDisk": true
@@ -51,8 +51,8 @@
     "diskFailure": {
       "status": "BB save failed · Saved on this browser",
       "recovery": {
-        "bytes": 388,
-        "sha256": "f61a6b63f19afcd50f5b04a0d42d6f12bc16d8fca4fb46b3cc25b36789c97e44",
+        "bytes": 370,
+        "sha256": "0a7abd8c0a3767889e63b4f3e2f91991448c97f67b7ecdcf4ada1b6483df52ef",
         "contains": "Disk failure marker."
       },
       "absentFromServerDisk": true
@@ -81,8 +81,8 @@
       ]
     },
     "export": {
-      "filename": "pg_f19459098aec42bf-recovery.yjs",
-      "bytes": 388,
+      "filename": "pg_9effbabba83ca270-recovery.yjs",
+      "bytes": 370,
       "validYjs": true,
       "containsLatestEdit": true
     },
@@ -103,8 +103,8 @@
     },
     "quotaRecovery": {
       "recovery": {
-        "bytes": 414,
-        "sha256": "87a7c037e7462bd3c8cb4e93474692e53ff42513640cc0225afb477bd9d5bd8e",
+        "bytes": 396,
+        "sha256": "49482fafc543f0fbe4678753090a39e056583fe7836a3c390a2016a54c822613",
         "contains": "Memory only quota marker."
       },
       "guard": {
@@ -112,6 +112,58 @@
         "memoryRecords": 0
       },
       "diskConfirmed": true
+    },
+    "metadataRetry": {
+      "recovered": true,
+      "recovery": {
+        "bytes": 441,
+        "sha256": "434587bdbfe57e1c17371d633fad148762731af1be2b77c1f1333125e9e03bcb",
+        "contains": "Deleted page recovery marker."
+      }
+    },
+    "deleted": {
+      "route": "/plugins/pages/pages/pg_9effbabba83ca270",
+      "recovery": {
+        "bytes": 441,
+        "sha256": "434587bdbfe57e1c17371d633fad148762731af1be2b77c1f1333125e9e03bcb",
+        "contains": "Deleted page recovery marker."
+      },
+      "serverPage": null,
+      "newTimeOrigin": 1791011534235,
+      "pagesSocketsAfterReload": 0,
+      "export": {
+        "filename": "pg_9effbabba83ca270-recovery.yjs",
+        "bytes": 441,
+        "validYjs": true,
+        "containsLatestEdit": true
+      },
+      "controls": [
+        {
+          "text": "Download recovery file",
+          "left": 36.171875,
+          "right": 204.03125,
+          "top": 300.5,
+          "bottom": 344.5,
+          "hit": true
+        },
+        {
+          "text": "Retry loading page",
+          "left": 212.03125,
+          "right": 353.828125,
+          "top": 300.5,
+          "bottom": 344.5,
+          "hit": true
+        },
+        {
+          "text": "Back to Studio",
+          "left": 137.59375,
+          "right": 252.390625,
+          "top": 352.5,
+          "bottom": 396.5,
+          "hit": true
+        }
+      ],
+      "notRecreated": true
     }
   },
   "limits": [
@@ -130,7 +182,7 @@
     "jsVersion": "15.4.80.19"
   },
   "fixture": {
-    "pageId": "pg_f19459098aec42bf",
+    "pageId": "pg_9effbabba83ca270",
     "projectId": "proj_su3dznrbpw"
   },
   "passed": true,

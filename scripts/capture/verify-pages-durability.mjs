@@ -88,6 +88,8 @@ try {
     };
     const originalPut=IDBObjectStore.prototype.put;
     IDBObjectStore.prototype.put=function(...args){if(window.__qaFailRecovery&&this.transaction.db.name==='bb-studio-pages:recovery')throw new DOMException('Controlled recovery quota failure','QuotaExceededError');return originalPut.apply(this,args);};
+    const originalGet=IDBObjectStore.prototype.get;
+    IDBObjectStore.prototype.get=function(...args){if(sessionStorage.getItem('qa-pages-fail-read')==='true'&&this.transaction.db.name==='bb-studio-pages:recovery')throw new DOMException('Controlled recovery read failure','UnknownError');return originalGet.apply(this,args);};
   ` });
   await client.command('Browser.setDownloadBehavior', { behavior: 'allow', downloadPath: downloads });
   await client.command('Emulation.setDeviceMetricsOverride', { width: 1440, height: 1000, deviceScaleFactor: 1, mobile: false });
@@ -193,6 +195,52 @@ try {
   assert.ok(disk().markdown.includes('Memory only quota marker.'));
   report.phases.quotaRecovery.diskConfirmed = true;
   await screenshot('all-recovered-phone');
+  if (process.env.BB_CAPTURE_PAGES_DELETED === '1') {
+    await blockSocket(true);
+    await edit(' Deleted page recovery marker.');
+    await waitStatus('Saved on this browser');
+    await client.command('Network.enable');
+    await client.command('Network.setBlockedURLs',{urls:[`${serverUrl}/api/v1/plugins/pages/rpc/get`]});
+    const beforeMetadataFault = await client.evaluate('performance.timeOrigin');
+    await client.command('Page.reload');
+    await wait(`performance.timeOrigin!==${beforeMetadataFault}&&document.body.innerText.includes('Page unavailable')`);
+    await client.waitForText('A local recovery copy is available.');
+    await client.command('Network.setBlockedURLs',{urls:[]});
+    await client.clickElementWithTextAndPointer('button','Retry loading page');
+    await wait(`document.querySelector('.pages-main .bn-editor')?.innerText.includes('Deleted page recovery marker.')`);
+    report.phases.metadataRetry = { recovered: true, recovery: await recordRecovery('Deleted page recovery marker.') };
+    await pluginRpc('pages', 'remove', { id });
+    removed = true;
+    await client.waitForText('Page unavailable');
+    await client.waitForText('A local recovery copy is available.');
+    report.phases.deleted = { route: await client.evaluate('location.pathname'), recovery: await recordRecovery('Deleted page recovery marker.'), serverPage: (await pluginRpc('pages','get',{id})).page };
+    assert.equal(report.phases.deleted.serverPage,null);
+    assert.ok(report.phases.deleted.route.endsWith(id),'Deletion must retain the recovery route');
+    await screenshot('deleted-page-recovery-phone');
+    await client.evaluate(`sessionStorage.setItem('qa-pages-fail-read','true')`);
+    const previousDocument = await client.evaluate('performance.timeOrigin');
+    await client.command('Page.reload');
+    await wait(`performance.timeOrigin!==${previousDocument}&&document.body.innerText.includes('Could not read local recovery')`);
+    await client.evaluate(`sessionStorage.setItem('qa-pages-fail-read','false')`);
+    await client.clickElementWithTextAndPointer('button', 'Retry reading recovery');
+    await client.waitForText('A local recovery copy is available.');
+    report.phases.deleted.newTimeOrigin = await client.evaluate('performance.timeOrigin');
+    report.phases.deleted.pagesSocketsAfterReload = await client.evaluate('window.__qaPageSockets.length');
+    assert.equal(report.phases.deleted.pagesSocketsAfterReload,0,'Missing metadata must not start page sync');
+    const deletedDownloads = `${output}/deleted-downloads`;
+    await mkdir(deletedDownloads,{recursive:true});
+    await client.command('Browser.setDownloadBehavior',{behavior:'allow',downloadPath:deletedDownloads});
+    await client.clickElementWithTextAndPointer('button','Download recovery file');
+    for(let i=0;i<100&&!(await readdir(deletedDownloads)).includes(`${id}-recovery.yjs`);i++) await sleep(100);
+    const deletedBackup = await readFile(`${deletedDownloads}/${id}-recovery.yjs`);
+    assert.ok(decoded(deletedBackup).includes('Deleted page recovery marker.'));
+    report.phases.deleted.export = { filename: `${id}-recovery.yjs`, bytes: deletedBackup.length, validYjs: true, containsLatestEdit: true };
+    report.phases.deleted.controls = await client.evaluate(`Array.from(document.querySelectorAll('button')).filter(el=>/Download recovery file|Retry loading page|Back to Studio/.test(el.innerText)).map(el=>{const r=el.getBoundingClientRect(),hit=document.elementFromPoint(r.left+r.width/2,r.top+r.height/2);return {text:el.innerText,left:r.left,right:r.right,top:r.top,bottom:r.bottom,hit:el===hit||el.contains(hit)};})`);
+    for(const control of report.phases.deleted.controls) assert.ok(control.left>=0&&control.right<=390&&control.top>=0&&control.bottom<=844&&control.bottom-control.top>=44&&control.hit,JSON.stringify(control));
+    await screenshot('deleted-page-reloaded-phone');
+    assert.equal((await pluginRpc('pages','get',{id})).page,null);
+    report.phases.deleted.notRecreated = true;
+  }
   report.passed = true;
   note('Verified offline reload, real server write rejection, local write failure, retry, download and phone bounds.');
 } catch (error) {
@@ -200,6 +248,7 @@ try {
   await screenshot('failure').catch(()=>{});
   throw error;
 } finally {
+  await client.command('Network.setBlockedURLs',{urls:[]}).catch(()=>{});
   try {
     if (triggerCreated) sql(`DROP TRIGGER ${trigger};`);
     if (id && !removed) { await pluginRpc('pages', 'remove', { id }); removed = true; }
