@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { definePluginApp, useRpc, useRealtime, useBbNavigate, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import type { Bot, BotListItem, Conversation, Job } from "./contract";
 import type { rpcContract } from "./client-contract";
-import { AddOnCollection, ComposerMore, CopyReferenceMenuItem, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, CopyReferenceMenuItem, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
 import { TabBar, ProfileForm, DocumentEditor, WorkList, ErrorMessage, message } from "./bot-ui";
@@ -351,7 +351,7 @@ export default definePluginApp((app) => {
   app.composer.customize({
     id: "thread-profile",
     scopes: ["thread", "new-thread"],
-    actions: [{ id: "profile", component: () => <ComposerMore pluginId={PLUGIN_ID} order={20}><ProfilePicker /></ComposerMore> }],
+    actions: [{ id: "profile", component: ProfilePicker }],
   });
   app.slots.navPanel({
     id: "bots",

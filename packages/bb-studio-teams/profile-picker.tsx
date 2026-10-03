@@ -1,8 +1,9 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { experimental_Icon as Icon, useComposer, useComposerView, useRpc, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, useComposerMoreSide } from "@bb-studio/kit/app";
+import { ComposerMore, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuSeparator, DropdownMenuTrigger, useComposerMoreSide } from "@bb-studio/kit/app";
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
+import { PLUGIN_ID } from "./studio-provider";
 import { message } from "./bot-ui";
 
 const pendingKey = (projectId: string) => `bb:bots:new-thread-profile:${projectId}`;
@@ -17,6 +18,9 @@ const savePick = (projectId: string, botId: string | null) =>
  * to a new channel with both. In the new-thread composer the pick also applies
  * the bot's model and permissions, which can still be changed before sending,
  * and attaches when the first message is sent.
+ *
+ * A new thread's pick, and the bot a thread works as, show beside the model
+ * picker; otherwise the control waits in the composer's ⋯ menu.
  */
 export function ProfilePicker() {
   const [triggerRef, side] = useComposerMoreSide();
@@ -123,14 +127,14 @@ export function ProfilePicker() {
 
   const label = bot ? bot.name : current ? "Archived bot" : "Work as bot";
   const others = bots.filter((b) => b.id !== current);
-  return (
+  const picker = (
     <DropdownMenu onOpenChange={(open) => open && loadBots()}>
       <DropdownMenuTrigger asChild>
         <button ref={triggerRef} type="button" className="channel-settings-trigger" disabled={pending}
           data-profile={current ? "" : undefined}
           aria-label={current ? `Working as ${label}` : "Work as a bot"}
           title={error ?? (current ? `Working as ${label}` : "Work as a bot")}>
-          {bot?.avatar ? <span aria-hidden="true">{bot.avatar}</span> : <Icon name={current ? "Bot" : "Plus"} />}
+          {bot?.avatar ? <span aria-hidden="true">{bot.avatar}</span> : <Icon name={current || projectId ? "Bot" : "Plus"} />}
           <span>{label}</span>
           <Icon name="ChevronDown" />
         </button>
@@ -172,6 +176,7 @@ export function ProfilePicker() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
+  return projectId || current ? picker : <ComposerMore pluginId={PLUGIN_ID} order={20}>{picker}</ComposerMore>;
 }
 
 function BotItem({ bot, description, disabled, onSelect }: {
