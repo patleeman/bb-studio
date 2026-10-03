@@ -210,7 +210,8 @@ draft and attachment DOM retention through placement changes, independent
 quote restoration, image forwarding, failed submissions, storage failures,
 and background submissions that leave another draft intact. Its 38 tests,
 typecheck, build, and stable compatibility check pass. The live capture on
-stable BB 0.45.0 installs the suite from 5f570e3 and Artifacts from 902d642.
+stable BB 0.45.0 installs the suite from 5f570e3, Chat from 30a10aa, and
+Artifacts from 902d642.
 It verifies conversation linking/reuse, exact native composer and attachment
 retention through real sidebar navigation, a second item draft and folding,
 and a cropped image quote whose image, edited prompt, and file attachment
