@@ -1,6 +1,6 @@
 import { untitled } from "@bb-studio/kit/format";
-import { ThreadTitle, useBbNavigate } from "@get-bb/plugin-sdk/app";
-import { ItemHeader, useFloatAvailable, useInFloat, useStudioChatPresent } from "@bb-studio/kit/app";
+import { ThreadTitle, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
+import { ItemHeader, useFloatAvailable, useInFloat, useStudioChatPresent, useOpenCompanion } from "@bb-studio/kit/app";
 import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
@@ -16,7 +16,8 @@ import { cn } from "@bb-studio/kit/ui";
 import type { BotView, PageMetaView, RequestView } from "../contract";
 import { PageConnection } from "./connection";
 import { HistoryDialog, KeepUpdatedDialog } from "./dialogs";
-import { PageChat, openPageConversation } from "./PageChat";
+import { PageChat } from "./PageChat";
+import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import { PageEditor, type SidePanel } from "./PageEditor";
 import { actorName, FLOATING, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
@@ -393,6 +394,13 @@ export function PageView({
     rpc.call("chats", { pageId: page.id }).then((result) => setChats(result.chats), () => {});
   }, [rpc, page.id]);
   useEffect(loadChats, [loadChats]);
+  useRealtime(REALTIME_CHANNEL, payload => {
+    const event = payload as RealtimeEvent;
+    if (event.type === "chats" && event.pageId === page.id) {
+      setChatThread(event.threadId);
+      loadChats();
+    }
+  });
 
   const saveTitle = (next: string) => {
     setTitle(next);
@@ -402,11 +410,11 @@ export function PageView({
   const floatAvailable = useFloatAvailable();
   const inFloat = useInFloat();
   const studioChat = useStudioChatPresent();
-  const navigate = useBbNavigate();
+  const open = useOpenCompanion();
   const openThread = useCallback((threadId: string) => {
     setChatThread(threadId);
-    openPageConversation(threadId, navigate);
-  }, [navigate]);
+    open({ kind: "thread", threadId });
+  }, [open]);
   const openedRoute = useRef<string | null>(null);
   useEffect(() => {
     if (!chatThreadId || openedRoute.current === chatThreadId) return;
@@ -503,8 +511,7 @@ export function PageView({
         onBack={onBack}
         item={{ title: title || "Untitled", href: `/plugins/pages/pages/${page.id}` }}
         leading={inFloat ? undefined : <Breadcrumbs page={shown} pages={pages} />}
-        chatAction={studioChat === false ? <PageChat page={page} rpc={rpc} threadId={chatThread ?? chats[0]?.threadId ?? null}
-          onStarted={(threadId) => { setChatThread(threadId); loadChats(); }} /> : undefined}
+        chatAction={studioChat === false ? <PageChat page={page} threadId={chatThread ?? chats[0]?.threadId ?? null} /> : undefined}
         trailing={
           <>
           <ConnectionBadge status={status} />

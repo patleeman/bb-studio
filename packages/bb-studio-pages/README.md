@@ -142,7 +142,10 @@ afterwards.
   navigation without Float. Existing page chats and links still work.
   [Studio Chat](../bb-studio-chat) provides the suite-wide item links and
   conversation picker when installed. Standalone Pages uses the same
-  destination and preserves its existing composer drafts. This works
+  retained companion tabs and preserves its existing composer draft keys.
+  New conversation focuses `/plugins/pages/pages/<id>/compose`; it keeps
+  drafts and attachments while you navigate other pages. The page's Chat
+  action updates when that draft becomes a thread. This works
   without Studio Teams.
 - **Version history.** Pages saves a version before an agent's or bot's first
   edit in a while. You can save one yourself and restore any version, and the

@@ -8,6 +8,7 @@ import { PLUGIN_ID, REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import type { PageMetaView, rpcContract, StudioEmbedItem } from "../contract";
 import { PagesUiContext, type PagesUi } from "./context";
 import { PageView } from "./PageView";
+import { PageConversation } from "./PageChat";
 import { useProjects, type BotsState, type Rpc } from "./shared";
 
 export function usePagesData(rpc: Rpc) {
@@ -164,6 +165,8 @@ export function PagesPanel({ subPath }: { subPath: string }) {
     <PagesUiContext.Provider value={ui}>
       {!pageId ? (
         <AddOnCollection pluginId="pages" title="Pages" kind="page" call={callStudio} refreshKey={pages} />
+      ) : pageMeta && section === "compose" ? (
+        <PageConversation key={pageId} page={pageMeta} rpc={rpc} />
       ) : pageMeta ? (
         <PageView
           key={pageId}

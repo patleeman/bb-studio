@@ -19,4 +19,5 @@ export type RealtimeEvent =
   | { type: "tree"; projectId: string | null }
   | { type: "page"; pageId: string }
   | { type: "requests"; pageId: string }
+  | { type: "chats"; pageId: string; threadId: string }
   | { type: "deleted"; pageIds: string[] };

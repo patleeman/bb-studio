@@ -1,24 +1,17 @@
 // @vitest-environment jsdom
-import React, { act, type ReactNode } from "react";
+import React, { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import type { PageMetaView } from "../contract";
-import { PageChat, openPageConversation } from "./PageChat";
+import { PageChat, PageConversation, pageConversationPath } from "./PageChat";
 
-const state = vi.hoisted(() => ({
-  companion: vi.fn(() => true), navigate: { toThread: vi.fn() }, rpc: { call: vi.fn() },
-  composer: null as any, started: vi.fn(), closeMenu: null as any,
+const state = vi.hoisted(() => ({ open: vi.fn(), rpc: { call: vi.fn() }, composer: null as any, closeMenu: null as any }));
+vi.mock("@bb-studio/kit/app", () => ({
+  FLOATING: "", useOpenCompanion: () => state.open,
+  NewConversationComposer: (props: any) => { state.composer = props; return <textarea aria-label="Page draft" />; },
 }));
-vi.mock("@get-bb/plugin-sdk/app", () => ({
-  useBbNavigate: () => state.navigate,
-  experimental_NewThreadComposer: (props: any) => { state.composer = props; return <textarea aria-label="Page draft" />; },
-}));
-vi.mock("@bb-studio/kit/app", () => ({ FLOATING: "", openCompanion: state.companion }));
 vi.mock("@bb-studio/kit/ui", () => ({
   cn: (...classes: string[]) => classes.join(" "), Icon: () => null,
-  Dialog: ({ open, onOpenChange, children }: any) => open ? <div><button onClick={() => onOpenChange(false)}>Close composer</button>{children}</div> : null,
-  DialogContent: ({ children }: any) => <div>{children}</div>,
-  DialogTitle: ({ children }: any) => <h2>{children}</h2>, DialogDescription: ({ children }: any) => <p>{children}</p>,
   DropdownMenu: ({ children }: any) => <div>{children}</div>, DropdownMenuTrigger: ({ children }: any) => children,
   DropdownMenuContent: ({ onCloseAutoFocus, children }: any) => { state.closeMenu = onCloseAutoFocus; return <div>{children}</div>; },
   DropdownMenuItem: ({ onSelect, children }: any) => <button onClick={() => { onSelect(); state.closeMenu({ preventDefault() {} }); }}>{children}</button>,
@@ -27,9 +20,8 @@ vi.mock("@bb-studio/kit/ui", () => ({
 const page = { id: "page_legacy", title: "Release review", projectId: "project_release" } as PageMetaView;
 let root: Root;
 let container: HTMLDivElement;
-const render = async (threadId: string | null = null) => act(async () => {
-  root.render(<PageChat page={page} rpc={state.rpc as any} threadId={threadId} onStarted={state.started} />);
-});
+const render = async (threadId: string | null = null) => act(async () => { root.render(<PageChat page={page} threadId={threadId} />); });
+const compose = async (subject = page) => act(async () => { root.render(<PageConversation page={subject} rpc={state.rpc as any} />); });
 const click = async (text: string) => act(async () => {
   const button = [...container.querySelectorAll("button")].find(node => node.textContent?.trim() === text);
   if (!button) throw new Error(`Missing ${text}`);
@@ -37,64 +29,57 @@ const click = async (text: string) => act(async () => {
 });
 beforeEach(() => {
   (globalThis as any).IS_REACT_ACT_ENVIRONMENT = true;
-  vi.clearAllMocks();
-  state.companion.mockReturnValue(true);
-  state.composer = null;
+  vi.clearAllMocks(); state.composer = null;
   container = document.createElement("div"); document.body.append(container); root = createRoot(container);
 });
 afterEach(async () => { await act(async () => root.unmount()); container.remove(); });
 
 it("continues an existing page conversation through the shared destination", async () => {
   await render("legacy_thread"); await click("Chat");
-  expect(state.companion).toHaveBeenCalledWith({ kind: "thread", threadId: "legacy_thread" });
-  expect(state.navigate.toThread).not.toHaveBeenCalled();
-  expect(state.composer).toBeNull();
-  expect(state.rpc.call).not.toHaveBeenCalled();
+  expect(state.open).toHaveBeenCalledWith({ kind: "thread", threadId: "legacy_thread" });
+  expect(state.composer).toBeNull(); expect(state.rpc.call).not.toHaveBeenCalled();
 });
 
-it("opens ordinary thread navigation when the shared companion host is absent", () => {
-  state.companion.mockReturnValue(false);
-  openPageConversation("legacy_thread", state.navigate as any);
-  expect(state.navigate.toThread).toHaveBeenCalledWith("legacy_thread");
+it("opens the canonical retained composer without replacing the existing thread", async () => {
+  await render("legacy_thread"); await click("New conversation");
+  const target = { kind: "path", path: "/plugins/pages/pages/page_legacy/compose", title: "Chat: Release review", icon: "MessageSquare" };
+  expect(state.open).toHaveBeenCalledWith(target);
+  await click("New conversation"); expect(state.open).toHaveBeenLastCalledWith(target);
+  expect(container.querySelector("textarea")).toBeNull(); expect(state.rpc.call).not.toHaveBeenCalled();
 });
 
-it("keeps the legacy draft key and page project when starting a conversation", async () => {
+it("keeps the legacy draft key, project and submitted inputs with the shared composer", async () => {
   state.rpc.call.mockResolvedValue({ threadId: "created_thread" });
-  await render(); await click("Chat");
+  await compose();
   expect(state.composer.draftKey).toBe("pages:page_legacy");
   expect(state.composer.defaultProjectId).toBe("project_release");
-  const request = { input: [{ type: "text", text: "Review this release" }] };
+  const request = { input: [{ type: "text", text: "Review this release", mentions: [] }, { type: "file", path: "release.txt" }], sendAt: 1_900_000_000_000 };
   await act(async () => { await state.composer.onSubmit(request); });
   expect(state.rpc.call).toHaveBeenCalledWith("work", { id: page.id, request });
-  expect(state.started).toHaveBeenCalledWith("created_thread");
-  expect(state.companion).toHaveBeenCalledWith({ kind: "thread", threadId: "created_thread" });
-  expect(container.querySelector("textarea")).toBeNull();
+  expect(state.open).toHaveBeenCalledWith({ kind: "thread", threadId: "created_thread" });
 });
 
-it("offers New conversation without replacing the existing thread", async () => {
-  await render("legacy_thread"); await click("New conversation");
-  expect(container.querySelector("textarea")).not.toBeNull();
-  expect(state.companion).not.toHaveBeenCalled();
-  expect(state.started).not.toHaveBeenCalled();
+it("lets global pages use the composer's chosen project", async () => {
+  await compose({ ...page, projectId: null });
+  expect(state.composer).not.toHaveProperty("defaultProjectId");
 });
 
-it("keeps a failed request open and rethrows so the SDK preserves its draft", async () => {
+it("rethrows a failed request so the shared composer and SDK preserve the draft", async () => {
   state.rpc.call.mockRejectedValue(new Error("Try again"));
-  await render(); await click("Chat");
-  await act(async () => { await expect(state.composer.onSubmit({ input: [] })).rejects.toThrow("Try again"); });
-  expect(container.querySelector('[role="alert"]')?.textContent).toBe("Try again");
-  expect(container.querySelector("textarea")).not.toBeNull();
-  expect(state.companion).not.toHaveBeenCalled();
+  await compose();
+  await expect(state.composer.onSubmit({ input: [] })).rejects.toThrow("Try again");
+  expect(container.querySelector("textarea")).not.toBeNull(); expect(state.open).not.toHaveBeenCalled();
 });
 
-it("does not let an older submitted composer close or redirect its replacement", async () => {
+it("retains the submitted page context while another page renders", async () => {
   let finish!: (value: { threadId: string }) => void;
   state.rpc.call.mockReturnValue(new Promise(resolve => { finish = resolve; }));
-  await render(); await click("Chat");
-  const submitted = state.composer.onSubmit({ input: [] });
-  await click("Close composer"); await click("Chat");
-  await act(async () => { finish({ threadId: "older_thread" }); await submitted; });
-  expect(container.querySelector("textarea")).not.toBeNull();
-  expect(state.started).not.toHaveBeenCalled();
-  expect(state.companion).not.toHaveBeenCalled();
+  await compose(); const submitted = state.composer.onSubmit({ input: [] });
+  await compose({ ...page, id: "other_page" });
+  await act(async () => { finish({ threadId: "created_thread" }); await submitted; });
+  expect(state.rpc.call).toHaveBeenCalledWith("work", { id: page.id, request: { input: [] } });
+});
+
+it("encodes the page id in its draft route", () => {
+  expect(pageConversationPath("page/one%two")).toBe("/plugins/pages/pages/page%2Fone%25two/compose");
 });
