@@ -1,5 +1,6 @@
 import type Database from "better-sqlite3";
 import type { HubItem, StudioHub } from "./hub";
+import type { SearchStatus } from "./contract";
 
 export interface SearchRange { start: number; end: number }
 export interface SearchSnippet { text: string; ranges: SearchRange[] }
@@ -52,6 +53,9 @@ export class SearchIndex {
   /** Providers whose last snapshot or content read was incomplete. */
   private readonly pending = new Set<string>();
   private discoveryIncomplete = false;
+  private readonly unavailable = new Set<string>();
+  private queued = 0;
+  private revision = 0;
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
   private recovering = false;
   private disposed = false;
@@ -65,18 +69,34 @@ export class SearchIndex {
     await this.syncing.catch(() => {});
   }
 
-  private scheduleRecovery(): void {
+  status(): SearchStatus {
+    return {
+      state: !this.ready ? "initializing" : this.recovering || this.queued > 0 ? "recovering" : this.pending.size || this.discoveryIncomplete ? "stale" : "current",
+      pendingProviders: [...this.pending].sort(), unavailableProviders: [...this.unavailable].sort(),
+      discoveryIncomplete: this.discoveryIncomplete, revision: this.revision,
+    };
+  }
+
+  retry(): SearchStatus {
+    if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
+    this.recoveryTimer = null;
+    this.scheduleRecovery(0);
+    return this.status();
+  }
+
+  private scheduleRecovery(delay = 5_000): void {
     if (this.disposed || this.recovering || this.recoveryTimer || (!this.discoveryIncomplete && !this.pending.size)) return;
     this.recoveryTimer = setTimeout(() => {
       this.recoveryTimer = null;
       this.recovering = true;
       void this.queue(async () => {
         if (!this.disposed) await this.reconcile(this.discoveryIncomplete ? undefined : new Set(this.pending));
-      }).then(() => { if (!this.disposed) this.recovered(); }, () => { this.discoveryIncomplete = true; }).finally(() => {
+      }).catch(() => { this.discoveryIncomplete = true; }).finally(() => {
         this.recovering = false;
+        if (!this.disposed) this.recovered();
         this.scheduleRecovery();
       });
-    }, 5_000);
+    }, delay);
     this.recoveryTimer.unref?.();
   }
 
@@ -127,12 +147,13 @@ export class SearchIndex {
     for (const { plugin_id: pluginId } of stored) {
       if (discoveryComplete && (!only || only.has(pluginId)) && !installed.has(pluginId)) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ?").run(pluginId);
     }
-    if (discoveryComplete) for (const pluginId of this.pending) if ((!only || only.has(pluginId)) && !installed.has(pluginId)) this.pending.delete(pluginId);
+    if (discoveryComplete) for (const pluginId of this.pending) if ((!only || only.has(pluginId)) && !installed.has(pluginId)) { this.pending.delete(pluginId); this.unavailable.delete(pluginId); }
     for (const provider of result.providers) {
       const pluginId = provider.pluginId;
       if (only && !only.has(pluginId)) continue;
-      if (provider.state !== "ready") { this.pending.add(pluginId); continue; }
+      if (provider.state !== "ready") { this.pending.add(pluginId); this.unavailable.add(pluginId); continue; }
       this.pending.delete(pluginId);
+      this.unavailable.delete(pluginId);
       const items = result.items.filter((item) => item.pluginId === pluginId);
       if (result.truncated.has(pluginId)) this.pending.add(pluginId);
       else {
@@ -158,7 +179,12 @@ export class SearchIndex {
   }
 
   private queue(work: () => Promise<void>): Promise<void> {
-    this.syncing = this.syncing.catch(() => {}).then(() => this.disposed ? undefined : work()).finally(() => this.scheduleRecovery());
+    this.queued += 1;
+    this.syncing = this.syncing.catch(() => {}).then(() => this.disposed ? undefined : work()).finally(() => {
+      this.queued -= 1;
+      this.revision += 1;
+      this.scheduleRecovery();
+    });
     return this.syncing;
   }
 
@@ -169,7 +195,8 @@ export class SearchIndex {
       for (const id of removed ?? []) this.db.prepare("DELETE FROM studio_search_fts WHERE plugin_id = ? AND item_id = ?").run(pluginId, id);
       if (ids?.length) {
         const result = await this.hub.itemsResult(pluginId, ids);
-        if (result.status === "unavailable") { this.pending.add(pluginId); return; }
+        if (result.status === "unavailable") { this.pending.add(pluginId); this.unavailable.add(pluginId); return; }
+        this.unavailable.delete(pluginId);
         const found = result.status === "ready" ? result.items : [];
         const live = new Set(found.map((item) => item.id));
         if (result.status === "ready" && !result.complete) this.pending.add(pluginId);

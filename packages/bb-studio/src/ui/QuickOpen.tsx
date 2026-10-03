@@ -5,6 +5,7 @@ import { useBbContext, useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent } from "react";
 import type { ProviderView, rpcContract } from "../contract";
 import { QUICK_OPEN_EVENT } from "../ids";
+import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 
 type Result = { ref: { pluginId: string; id: string }; kind: string; title: string; snippet: { text: string; ranges: { start: number; end: number }[] }; href: string; projectId: string | null; updatedAt: number; score: number };
 type Row = { type: "result"; hit: Result } | { type: "command"; label: string; run: () => void };
@@ -37,6 +38,7 @@ function Marked({ text, ranges }: { text: string; ranges: { start: number; end: 
 
 function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const rpc = useRpc<typeof rpcContract>();
+  const freshness = useSearchFreshness();
   const navigate = useBbNavigate();
   const context = useBbContext();
   const projects = useProjects();
@@ -62,7 +64,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
       (cause: unknown) => { if (live) { setError(cause instanceof Error ? cause.message : "Search failed."); setLoading(false); } },
     ), query ? DEBOUNCE_MS : 0);
     return () => { live = false; clearTimeout(timer); };
-  }, [rpc, query, threadOnly]);
+  }, [rpc, query, threadOnly, freshness.revision]);
 
   const kinds = useMemo(() => new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind]))), [providers]);
   const commands = useMemo(() => {
@@ -85,6 +87,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
   const visibleCommands = commands.filter((row) => row.type === "command" && (!query || row.label.toLocaleLowerCase().includes(query.toLocaleLowerCase())));
   const rows: Row[] = [...[...results].sort((a, b) => a.kind.localeCompare(b.kind) || b.score - a.score).map((hit): Row => ({ type: "result", hit })), ...visibleCommands];
   useEffect(() => setSelected(0), [query]);
+  useEffect(() => setSelected((index) => Math.min(index, Math.max(0, rows.length - 1))), [rows.length]);
   useEffect(() => { list.current?.querySelector(`[data-index="${selected}"]`)?.scrollIntoView({ block: "nearest" }); }, [selected]);
   const { open: openTarget, anchor } = useOpenTarget();
   // Mod opens a result in a split and Shift floats it, as clicking an item does anywhere.
@@ -116,6 +119,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
         <input autoFocus role="combobox" aria-expanded aria-controls="studio-quick-open-list" aria-activedescendant={rows.length ? `studio-quick-open-${selected}` : undefined} aria-label="Search Studio" placeholder={threadOnly ? "Search threads…" : "Search Studio, threads and channels…"} className="h-12 min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground" value={query} onChange={(event) => setQuery(event.target.value)} onKeyDown={onKeyDown} />
         {loading ? <span className="text-xs text-muted-foreground">Searching…</span> : null}
       </div>
+      <SearchFreshness {...freshness} />
       <div ref={list} id="studio-quick-open-list" role="listbox" aria-label="Search results" className="min-h-0 flex-1 overflow-y-auto p-1.5">
         {rows.map((row, index) => {
           const kind = row.type === "result" ? row.hit.kind : "command";
@@ -129,7 +133,7 @@ function QuickOpenDialog({ onClose }: { onClose: () => void }) {
           </div>;
         })}
         {error ? <p className="px-3 py-4 text-sm text-destructive">{error}</p> : null}
-        {!loading && !results.length && query && !error ? <p className="px-3 py-3 text-sm text-muted-foreground">No matches.</p> : null}
+        {!loading && !results.length && query && !error ? <p className="px-3 py-3 text-sm text-muted-foreground">{freshness.status?.state === "current" && !freshness.error ? "No matches." : "No matches in the available results."}</p> : null}
       </div>
       <div className="flex gap-4 border-t border-border px-4 py-2 text-xs text-muted-foreground"><span>↑↓ to move</span><span>↵ to open</span><span>⌘↵ in a split</span><span>⇧↵ to float</span><span>esc to close</span></div>
       {anchor}

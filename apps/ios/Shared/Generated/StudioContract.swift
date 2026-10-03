@@ -9,6 +9,8 @@ public enum Studio {
     public static let items = "items"
     public static let changes = "changes"
     public static let search = "search"
+    public static let searchStatus = "searchStatus"
+    public static let searchRetry = "searchRetry"
     public static let searchAll = "searchAll"
     public static let create = "create"
     public static let duplicate = "duplicate"
@@ -77,6 +79,14 @@ public enum Studio {
   public typealias Changes = ChangesOutput
 
   public typealias Search = SearchOutput
+
+  public typealias SearchStatusInput = StudioJSONValue
+
+  public typealias SearchStatus = SearchStatusOutput
+
+  public typealias SearchRetryInput = StudioJSONValue
+
+  public typealias SearchRetry = SearchRetryOutput
 
   public typealias SearchAllOutput = [SearchAllOutputItem]
 
@@ -1160,6 +1170,98 @@ public enum Studio {
     public init(keys: [String]? = nil, snippets: [String: String]? = nil) {
       self.keys = keys
       self.snippets = snippets
+    }
+  }
+
+  public enum SearchStatusOutputState: Sendable, Hashable, Codable {
+    case initializing
+    case current
+    case stale
+    case recovering
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "initializing": self = .initializing
+      case "current": self = .current
+      case "stale": self = .stale
+      case "recovering": self = .recovering
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .initializing: try container.encode("initializing")
+      case .current: try container.encode("current")
+      case .stale: try container.encode("stale")
+      case .recovering: try container.encode("recovering")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SearchStatusOutput: Sendable, Hashable, Codable {
+    public var state: SearchStatusOutputState?
+    public var pendingProviders: [String]?
+    public var unavailableProviders: [String]?
+    public var discoveryIncomplete: Bool?
+    public var revision: Int?
+
+    public init(state: SearchStatusOutputState? = nil, pendingProviders: [String]? = nil, unavailableProviders: [String]? = nil, discoveryIncomplete: Bool? = nil, revision: Int? = nil) {
+      self.state = state
+      self.pendingProviders = pendingProviders
+      self.unavailableProviders = unavailableProviders
+      self.discoveryIncomplete = discoveryIncomplete
+      self.revision = revision
+    }
+  }
+
+  public enum SearchRetryOutputState: Sendable, Hashable, Codable {
+    case initializing
+    case current
+    case stale
+    case recovering
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "initializing": self = .initializing
+      case "current": self = .current
+      case "stale": self = .stale
+      case "recovering": self = .recovering
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .initializing: try container.encode("initializing")
+      case .current: try container.encode("current")
+      case .stale: try container.encode("stale")
+      case .recovering: try container.encode("recovering")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SearchRetryOutput: Sendable, Hashable, Codable {
+    public var state: SearchRetryOutputState?
+    public var pendingProviders: [String]?
+    public var unavailableProviders: [String]?
+    public var discoveryIncomplete: Bool?
+    public var revision: Int?
+
+    public init(state: SearchRetryOutputState? = nil, pendingProviders: [String]? = nil, unavailableProviders: [String]? = nil, discoveryIncomplete: Bool? = nil, revision: Int? = nil) {
+      self.state = state
+      self.pendingProviders = pendingProviders
+      self.unavailableProviders = unavailableProviders
+      self.discoveryIncomplete = discoveryIncomplete
+      self.revision = revision
     }
   }
 

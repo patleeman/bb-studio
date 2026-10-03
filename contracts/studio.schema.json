@@ -1447,6 +1447,104 @@
         "additionalProperties": false
       }
     },
+    "searchStatus": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "initializing",
+              "current",
+              "stale",
+              "recovering"
+            ]
+          },
+          "pendingProviders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unavailableProviders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discoveryIncomplete": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "state",
+          "pendingProviders",
+          "unavailableProviders",
+          "discoveryIncomplete",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "searchRetry": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "state": {
+            "type": "string",
+            "enum": [
+              "initializing",
+              "current",
+              "stale",
+              "recovering"
+            ]
+          },
+          "pendingProviders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "unavailableProviders": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "discoveryIncomplete": {
+            "type": "boolean"
+          },
+          "revision": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 9007199254740991
+          }
+        },
+        "required": [
+          "state",
+          "pendingProviders",
+          "unavailableProviders",
+          "discoveryIncomplete",
+          "revision"
+        ],
+        "additionalProperties": false
+      }
+    },
     "searchAll": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

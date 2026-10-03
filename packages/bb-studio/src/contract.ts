@@ -8,6 +8,15 @@ const pluginId = z.string().min(1).max(100);
 const ids = z.array(z.string().min(1).max(200)).min(1).max(500);
 const projectId = z.string().min(1).max(200).nullable();
 
+const searchStatus = z.object({
+  state: z.enum(["initializing", "current", "stale", "recovering"]),
+  pendingProviders: z.array(z.string()),
+  unavailableProviders: z.array(z.string()),
+  discoveryIncomplete: z.boolean(),
+  revision: z.number().int().min(0),
+});
+export type SearchStatus = z.infer<typeof searchStatus>;
+
 const provider = z.object({
   pluginId: z.string(),
   name: z.string(),
@@ -166,6 +175,8 @@ export const rpcContract = defineRpcContract({
     input: z.object({ query: z.string().min(1).max(200) }),
     output: z.object({ keys: z.array(z.string()), snippets: z.record(z.string(), z.string()) }),
   },
+  searchStatus: { input: z.null(), output: searchStatus },
+  searchRetry: { input: z.null(), output: searchStatus },
   searchAll: {
     input: z.object({ query: z.string().max(200), kinds: z.array(z.string()).max(20).optional(), projectId: projectId.optional(), limit: z.number().int().min(1).max(100).default(40) }),
     output: z.array(z.object({

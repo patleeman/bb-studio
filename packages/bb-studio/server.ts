@@ -433,6 +433,8 @@ export default async function plugin(bb: BbPluginApi) {
     },
     overview: () => overview(),
     search: ({ query }) => contentSearch(query),
+    searchStatus: () => searchIndex.status(),
+    searchRetry: () => searchIndex.retry(),
     searchAll: async ({ query, kinds, projectId, limit }) => {
       await searchIndex.ensure();
       // Recent items leave out background kinds unless they're asked for; a search still finds them.

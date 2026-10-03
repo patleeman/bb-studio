@@ -35,6 +35,7 @@ import type { ProviderView, rpcContract, SavedViewView, SidebarView, SpaceView, 
 import { applyItemChanges } from "../partial";
 import { backgroundKinds, compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { NeedsYou } from "./HomePanel";
+import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
 import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, SpaceHome, useSpaceThreads, type ThreadKind } from "./Spaces";
 
@@ -251,6 +252,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   );
   // Words being typed after the last filter search; a field still waiting for its value doesn't.
   const searchText = useMemo(() => parseQuery(query.text).text.trim(), [query.text]);
+  const freshness = useSearchFreshness(Boolean(searchText));
   const [snippets, setSnippets] = useState<ReadonlyMap<string, string | null>>(() => new Map());
   useEffect(() => {
     if (!searchText) {
@@ -268,7 +270,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       live = false;
       clearTimeout(timer);
     };
-  }, [rpc, searchText]);
+  }, [rpc, searchText, freshness.revision]);
   const compiled = useMemo(() => compileQuery({ filters: query.filters, text: searchText }, vocabulary), [query.filters, searchText, vocabulary]);
   const matchesText = useCallback(
     (item: CollectionItem) => !searchText || untitled(item.title).toLowerCase().includes(searchText.toLowerCase()) || snippets.has(itemKey(item)),
@@ -444,6 +446,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const notice = (
     <>
       <NeedsYou />
+      {searchText ? <SearchFreshness {...freshness} /> : null}
       {unavailable.map((provider) => (
         <p key={provider.pluginId} className="mb-2 flex items-center gap-2 text-sm text-muted-foreground">
           <Icon name={provider.state === "outdated" ? "Info" : "AlertTriangle"} className="size-4 shrink-0" />

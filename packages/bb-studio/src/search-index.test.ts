@@ -128,6 +128,7 @@ it("preserves indexed text on failed reads and retries without another change ev
   state.items = [item("a", "New title")];
   await index.changed("pages", ["a"]);
   expect(index.search("searchable").map((hit) => hit.ref.id)).toEqual(["a"]);
+  expect(index.status()).toMatchObject({ state: "stale", pendingProviders: ["pages"], unavailableProviders: [] });
   state.failRead = false;
   await vi.advanceTimersByTimeAsync(5_000);
   await index.ensure();
@@ -208,4 +209,34 @@ it("keeps undiscovered providers through discovery failure, retries once due, an
     db.close();
     vi.useRealTimers();
   }
+});
+
+it("reports partial, unavailable, recovering and current snapshots without clearing saved results", async () => {
+  const { db, state, hub, index } = fixture();
+  expect(index.status().state).toBe("initializing");
+  await index.ensure();
+  expect(index.status()).toMatchObject({ state: "current", pendingProviders: [], unavailableProviders: [] });
+  state.truncated = true;
+  await index.rebuild();
+  expect(index.status()).toMatchObject({ state: "stale", pendingProviders: ["pages"], unavailableProviders: [] });
+  state.online = false;
+  await index.changed("pages", ["a"]);
+  expect(index.status()).toMatchObject({ state: "stale", unavailableProviders: ["pages"] });
+  const revision = index.status().revision;
+  let release!: () => void;
+  const gate = new Promise<void>((resolve) => { release = resolve; });
+  const original = hub.overview;
+  const overview = vi.fn(async () => { await gate; return original(); });
+  hub.overview = overview;
+  index.retry(); index.retry(); index.retry();
+  await vi.advanceTimersByTimeAsync(0);
+  expect(index.status().state).toBe("recovering");
+  expect(overview).toHaveBeenCalledOnce();
+  expect(index.search("searchable")).toHaveLength(1);
+  state.online = true; state.truncated = false;
+  release();
+  await vi.advanceTimersByTimeAsync(1);
+  expect(index.status()).toMatchObject({ state: "current", pendingProviders: [], unavailableProviders: [] });
+  expect(index.status().revision).toBeGreaterThan(revision);
+  await index.dispose(); db.close();
 });
