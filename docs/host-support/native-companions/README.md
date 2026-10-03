@@ -49,8 +49,7 @@ All checks use Turbo against that current BB base:
 
 The [live capture](../../../packages/bb-studio-float/assets/native-workbench-preview.png)
 runs the normal optimized BB application in its own data directory, with all
-17 Studio plugins installed from pushed `b241546`, Pages updated to
-`75ad5f5`, and Float to `598ee8b`. UI actions move the real Pages editor and native composer through
+17 Studio plugins installed from pushed `b241546`, Pages and Float updated to `85a73fa`. UI actions move the real Pages editor and native composer through
 floating, workbench and main placement. The capture verifies exact editor and
 composer DOM identity, the unsent draft, its file input, and shared pin state.
 SDK-to-server tests verify schema validation, unknown plugins, two-client
@@ -97,5 +96,9 @@ changes reviewable. Stable BB continues to use the suite's floating fallback.
 Initial main plugin-editor transfers, original main-thread composer adoption,
 and native split/swap now have live proof. Talk playback continuity also has live proof: the original audio/control
 objects retain advancing position, speed and volume through transfers and
-return after close. Legacy-host transfers and the final suite entry-point
-audit remain part of the delivery goal.
+return after close. Legacy-host transfers now have live proof at `85a73fa`, including both
+original companion editors and the neighboring ordinary main editor through
+split, with undo/redo. Stable BB guards a second Companions split because it
+reuses that pane; core `f86b430c0` fixes the route matching. The refreshed
+native two-companion split also passes. The [suite entry-point audit](../../workbench-entrypoint-audit.md)
+keeps release and native desktop QA boundaries explicit.

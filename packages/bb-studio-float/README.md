@@ -49,7 +49,7 @@ BB_CAPTURE_FLOAT_DRAG=1 BB_CAPTURE_ONLY=float-drag-cleanup \
 The native-host integration capture runs an optimized local BB build based
 on current core `32efd2e3f`, in its own data directory with all 17 suite
 plugins installed from GitHub `b241546`, with Pages and Float updated to
-`75ad5f5`. It records and edits the real main Pages editor before Float opens,
+`85a73fa`. It records and edits the real main Pages editor before Float opens,
 then moves that original editor and SDK composer through Float, workbench, and main while
 asserting DOM identity, the unsent draft, its file attachment, and the shared
 pin. Its optional CLI check also verifies saved placement, pin-protected
@@ -72,13 +72,29 @@ Set `BB_CAPTURE_COMPANION_REMOTE=1` when the staged CLI also includes
 
 ![Two original Pages editors retained in separate main panes](assets/native-split-preview.png)
 
-The split capture uses that isolated host plus Float `598ee8b`. It edits two
+The refreshed split capture uses that isolated host plus Pages and Float
+`85a73fa`. It edits two
 main pages, pins the first, swaps them twice, and moves the floating page to
 a split. Both original editor nodes, inserted drafts, tab identities, and
 pins survive. It requires two visible outlets in different real BB panes.
 
 ```sh
 BB_CAPTURE_COMPANION_SPLIT=1 BB_CAPTURE_ONLY=float-native-split \
+  node scripts/capture-plugin-screenshots.mjs --plugin float
+```
+
+![Stable BB retaining an ordinary page beside a companion](assets/legacy-transfer-preview.png)
+
+The stable BB 0.45.0 capture installs Pages and Float from `85a73fa`. It
+records two original main editors, inserts drafts, pins one, and swaps them
+twice. It checks the disabled duplicate-Companions split action, then splits
+beside a third ordinary page. All three editors retain their original nodes;
+the neighboring ordinary page also retains its draft and undo/redo history.
+Its two visible panes are distinct. The folded Float tab still owns the other
+original editor. No agent runs, and all three fixtures are removed.
+
+```sh
+BB_CAPTURE_LEGACY_TRANSFER=1 BB_CAPTURE_ONLY=float-legacy-transfer \
   node scripts/capture-plugin-screenshots.mjs --plugin float
 ```
 

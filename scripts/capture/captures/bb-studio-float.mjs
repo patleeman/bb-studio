@@ -1,4 +1,5 @@
 import companionHost from "./companion-host.mjs";
+import legacyCompanionTransfer from "./legacy-companion-transfer.mjs";
 import companionSplit from "./companion-split.mjs";
 import companionMainThread from "./companion-main-thread.mjs";
 import dragCleanup from "./float-drag-cleanup.mjs";
@@ -9,6 +10,7 @@ const STATE_KEY = "bb-studio-float:windows";
 export default ({ projectId, threadId, seedPages, seedDrawing, sleep, bbCli }) => [
   ...(process.env.BB_CAPTURE_MAIN_THREAD === "1" ? [companionMainThread({ projectId, threadId, seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_COMPANION_SPLIT === "1" ? [companionSplit({ seedPages, sleep })] : []),
+  ...(process.env.BB_CAPTURE_LEGACY_TRANSFER === "1" ? [legacyCompanionTransfer({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_MAIN_RETENTION === "1" ? [mainMobile({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_FLOAT_DRAG === "1" ? [dragCleanup({ seedPages, sleep })] : []),
   ...(process.env.BB_CAPTURE_NATIVE_COMPANION === "1" ? [companionHost({ threadId, seedPages, sleep, bbCli })] : []),

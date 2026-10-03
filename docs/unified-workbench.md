@@ -411,3 +411,28 @@ away, and returning after close. Position advances without restart; speed and
 volume remain set, and Pause stops the returned player at that position.
 The existing retained panel owner already delivers this behavior. No Talk
 controller, playback, outbox or recovery source changes were needed.
+
+
+Stable-host transfers now have [live proof](../packages/bb-studio-float/assets/legacy-transfer-preview.png)
+at `85a73fa`. Float keeps one persistent owner for each realized view through
+main transfers and swaps, including SDK composers. Two edited main Pages
+views retain their original nodes, drafts, identities and pins through two
+swaps. Splitting beside a third ordinary page keeps that neighboring editor's
+original node, draft and undo/redo history too. Kit carries a same-turn main
+pane remount to its replacement anchor, then disposes ordinary closed views.
+The focused regression and existing checks pass 97 Kit tests; the full suite
+passes 1,585 JavaScript tests and all package typechecks. All 16 consumer locks
+use the refreshed Kit archive.
+
+Stable BB 0.45.0 reuses an existing Companions pane when asked to split another
+Companions item. Float disables that action with an explanation to preserve
+both live views. It still splits beside an ordinary main view. The saved core
+patch fixes exact subpath matching; its refreshed two-companion split capture
+passes on the optimized isolated host with Pages and Float `85a73fa`.
+Native workbench release remains required. The [entry-point audit](workbench-entrypoint-audit.md)
+records source coverage, existing live evidence and remaining boundaries.
+
+The final `85a73fa` native regression rerun also passes UI/CLI placement,
+retained Pages/composer/file identity, pin-protected close, and original
+main-thread adoption with undo/redo and return after close. The captures use
+fresh browser profiles and the isolated current-core data directory.
