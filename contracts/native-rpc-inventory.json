@@ -986,6 +986,12 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/iOS/Office/TeamTab.swift",
+      "plugin": "studio",
+      "method": "teams_create",
+      "coverage": "generated method"
+    },
+    {
       "file": "apps/ios/iOS/Thread/InlineVis.swift",
       "plugin": "inline-vis",
       "method": "preparePreview",
