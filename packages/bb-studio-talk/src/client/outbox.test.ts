@@ -1,6 +1,7 @@
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import {
   ORPHAN_QUIET_MS,
+  Outbox,
   audioFileName,
   isOrphan,
   isPermanentRejection,
@@ -11,6 +12,21 @@ import {
 } from "./outbox";
 
 describe("outbox", () => {
+  it.each(["appendPart", "complete"] as const)("reports a missing durable row when %s is called", async (method) => {
+    const outbox = new Outbox();
+    const internals = outbox as unknown as { tx(mode: string, run: (store: IDBObjectStore) => Promise<void>): Promise<void> };
+    vi.spyOn(internals, "tx").mockImplementation(async (_mode, run) => run({
+      get() {
+        const request = { result: undefined, onsuccess: null as (() => void) | null };
+        queueMicrotask(() => request.onsuccess?.());
+        return request;
+      },
+    } as unknown as IDBObjectStore));
+    const key = { recordingId: "rec_missing", sessionId: "s1", index: 0 };
+    const write = method === "appendPart" ? outbox.appendPart(key, new ArrayBuffer(1)) : outbox.complete(key, 1000);
+    await expect(write).rejects.toThrow("local audio segment is missing");
+  });
+
   const now = 1_000_000;
   const open = { complete: false, lastPartAt: now - 1000 };
 

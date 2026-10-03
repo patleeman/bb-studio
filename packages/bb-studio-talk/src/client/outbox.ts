@@ -123,14 +123,14 @@ export class Outbox {
   private db: Promise<IDBDatabase> | null = null;
 
   private open(): Promise<IDBDatabase> {
-    this.db ??= new Promise((resolve, reject) => {
+    this.db ??= new Promise<IDBDatabase>((resolve, reject) => {
       const req = indexedDB.open(DB_NAME, 1);
       req.onupgradeneeded = () => {
         req.result.createObjectStore(STORE, { keyPath: ["recordingId", "sessionId", "index"] });
       };
       req.onsuccess = () => resolve(req.result);
       req.onerror = () => reject(req.error);
-    });
+    }).catch((error) => { this.db = null; throw error; });
     return this.db;
   }
 
@@ -142,8 +142,8 @@ export class Outbox {
       transaction.onerror = () => reject(transaction.error);
       transaction.onabort = () => reject(transaction.error ?? new Error("IndexedDB transaction aborted"));
     });
-    const result = await run(transaction.objectStore(STORE));
-    await done;
+    // Observe transaction failure even when an individual request rejects first.
+    const [result] = await Promise.all([run(transaction.objectStore(STORE)), done]);
     return result;
   }
 
@@ -158,7 +158,7 @@ export class Outbox {
   appendPart(key: OutboxKey, part: ArrayBuffer): Promise<void> {
     return this.tx("readwrite", async (store) => {
       const current = (await request(store.get(keyOf(key)))) as OutboxSegment | undefined;
-      if (!current) return;
+      if (!current) throw new Error("The local audio segment is missing.");
       current.parts.push(part);
       current.lastPartAt = Date.now();
       await request(store.put(current));
@@ -168,7 +168,7 @@ export class Outbox {
   complete(key: OutboxKey, durationMs: number): Promise<void> {
     return this.tx("readwrite", async (store) => {
       const current = (await request(store.get(keyOf(key)))) as OutboxSegment | undefined;
-      if (!current) return;
+      if (!current) throw new Error("The local audio segment is missing.");
       if (current.parts.length === 0) {
         await request(store.delete(keyOf(key)));
         return;
@@ -177,6 +177,11 @@ export class Outbox {
       current.durationMs = durationMs;
       await request(store.put(current));
     });
+  }
+
+  /** Restores a complete in-memory segment atomically after a local write failure. */
+  restore(segment: OutboxSegment): Promise<void> {
+    return this.tx("readwrite", async (store) => { await request(store.put(segment)); });
   }
 
   /**

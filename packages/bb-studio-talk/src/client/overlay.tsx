@@ -185,6 +185,8 @@ function statusLabel(state: TalkState, online: boolean): string {
       return "Paused";
     case "needs-resume":
       return "Microphone stopped";
+    case "storage-error":
+      return "Audio needs saving";
     case "finalizing":
       return state.pendingUploads > 0 ? `Saving ${state.pendingUploads}…` : "Saving…";
     case "transcribing":
@@ -203,7 +205,7 @@ export function TalkOverlay() {
   const navigate = useBbNavigate();
   const online = useOnline();
   const [expanded, toggleExpanded] = useExpanded(state);
-  const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError);
+  const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError);
   const drag = useDraggable<HTMLDivElement>();
   const capturing = state.phase === "recording";
   // Ticks whenever the pill shows: the clock runs, and the Back button
@@ -319,6 +321,16 @@ export function TalkOverlay() {
           <PillButton icon="CircleX" label="Stop waiting; keep it in recordings" onClick={() => talk.dismiss()} />
         ) : null}
       </div>
+      {state.localSaveError ? (
+        <div role="alert" className="space-y-2 border-t border-border px-3 py-2 text-xs">
+          <p>Recording stopped because audio could not be saved: {state.localSaveError}</p>
+          <p>Keep this window open. Unsaved audio is held here until you retry saving or download it. The dictation will not be inserted automatically.</p>
+          <div className="flex gap-3">
+            <button type="button" className="underline" onClick={() => void talk.retryLocalAudio()}>Retry saving audio</button>
+            <button type="button" className="underline" onClick={() => void talk.downloadLocalAudio()}>Download audio</button>
+          </div>
+        </div>
+      ) : null}
       {state.phase === "transcribing" && state.transcribeError ? (
         <div role="alert" className="flex items-start gap-2 border-t border-border px-3 py-2 text-xs text-red-600 dark:text-red-400">
           <Icon name="AlertTriangle" className="mt-px size-3.5 shrink-0" />

@@ -77,6 +77,8 @@ export type Phase =
   | "finalizing"
   /** Dictation only: waiting for the last segments to transcribe. */
   | "transcribing"
+  /** Capture stopped because audio could not be saved on this device. */
+  | "storage-error"
   /** The microphone could not be reopened without a user gesture. */
   | "needs-resume";
 
@@ -95,6 +97,7 @@ export interface TalkState {
   /** Segments not yet confirmed by the server. */
   pendingUploads: number;
   uploadError: string | null;
+  localSaveError: string | null;
   /** Segments the server refused for good, kept on this device; null until read. */
   setAside: SetAsideSegment[] | null;
   recording: Recording | null;
@@ -125,6 +128,10 @@ interface OpenSegment {
   writes: Promise<void>;
   /** Settles once the segment is sealed in the outbox. */
   closed: Promise<void>;
+  mimeType: string;
+  /** Retained until the entire segment is durably sealed. */
+  parts: Blob[];
+  failed: boolean;
 }
 
 interface Capture {
@@ -161,6 +168,7 @@ const INITIAL: TalkState = {
   captureStartedAt: null,
   pendingUploads: 0,
   uploadError: null,
+  localSaveError: null,
   setAside: null,
   recording: null,
   transcript: "",
@@ -216,6 +224,8 @@ export class TalkController {
   private readonly listeners = new Set<() => void>();
   private readonly outbox = new Outbox();
   private readonly live = new Set<string>();
+  private readonly unsaved = new Map<string, OpenSegment>();
+  private recoveringAudio = false;
   private rpc: PluginRpcClient<TalkRpcContract> | null = null;
   private initialized = false;
   private capture: Capture | null = null;
@@ -277,6 +287,11 @@ export class TalkController {
     window.addEventListener("pagehide", () => {
       const recorder = this.capture?.current?.recorder;
       if (recorder?.state === "recording") recorder.requestData();
+    });
+    window.addEventListener("beforeunload", (event) => {
+      if (!this.unsaved.size) return;
+      event.preventDefault();
+      event.returnValue = "";
     });
     window.addEventListener("storage", (event) => {
       if (event.key === PENDING_STORAGE_KEY) this.onPendingChanged();
@@ -384,6 +399,7 @@ export class TalkController {
   /** How the composer mic in `promptbox` should look and behave. */
   micState(promptbox: HTMLElement): MicState {
     if (!this.isActive()) return { mode: "idle", title: "Dictate with Talk" };
+    if (this.state.localSaveError) return { mode: "busy", title: this.busyMessage() };
     if (this.isDictating() && this.isSourceComposer(promptbox)) {
       return { mode: "active", title: "Stop Talk dictation and insert" };
     }
@@ -399,6 +415,7 @@ export class TalkController {
   }
 
   private busyMessage(): string {
+    if (this.state.localSaveError) return "Talk has unsaved audio. Retry saving it before starting another recording.";
     const { kind, threadId, field } = this.state;
     if (kind === "recording") return "Talk is recording. Stop it first.";
     if (field) return `Talk is already dictating into ${field.label}.`;
@@ -584,6 +601,7 @@ export class TalkController {
   async pause(): Promise<void> {
     if (this.state.phase !== "recording") return;
     await this.stopCapture();
+    if (this.state.localSaveError) return;
     this.set({ phase: "paused" });
     this.persistPhase("paused");
     void this.rpc?.call("recording_state", { id: this.state.recordingId!, status: "paused" }).catch(() => {});
@@ -715,6 +733,9 @@ export class TalkController {
       key,
       startedAt: Date.now(),
       elapsedMs: 0,
+      mimeType: recorder.mimeType || capture.mimeType || "audio/webm",
+      parts: [],
+      failed: false,
       closed: new Promise<void>((resolve) => (markClosed = resolve)),
       writes: this.outbox.begin({
         ...key,
@@ -723,22 +744,33 @@ export class TalkController {
       }),
     };
     const report = (error: unknown): void => {
-      toast.error(`Talk could not save audio locally: ${message(error)}`);
+      segment.failed = true;
+      this.unsaved.set(keyString(key), segment);
+      this.insertOnDone = false;
+      this.startEpoch++;
+      this.set({ phase: "storage-error", localSaveError: message(error) });
+      this.persistPhase("paused");
+      void this.stopCapture();
+      void this.rpc?.call("recording_state", { id: key.recordingId, status: "paused" }).catch(() => {});
     };
+    // begin can fail before the recorder emits its first chunk.
+    segment.writes = segment.writes.catch(report);
     recorder.addEventListener("dataavailable", (event) => {
       if (event.data.size === 0) return;
+      segment.parts.push(event.data);
       segment.writes = segment.writes
-        .then(() => event.data.arrayBuffer())
-        .then((buffer) => this.outbox.appendPart(key, buffer))
+        .then(async () => {
+          if (!segment.failed) await this.outbox.appendPart(key, await event.data.arrayBuffer());
+        })
         .catch(report);
     });
     recorder.addEventListener("stop", () => {
       const durationMs = segment.elapsedMs;
       segment.writes = segment.writes
-        .then(() => this.outbox.complete(key, durationMs))
+        .then(async () => { if (!segment.failed) await this.outbox.complete(key, durationMs); })
         .catch(report)
         .finally(() => {
-          this.live.delete(keyString(key));
+          if (!segment.failed) this.live.delete(keyString(key));
           capture.open.delete(segment);
           markClosed();
           void this.kickUpload();
@@ -798,7 +830,9 @@ export class TalkController {
       captureStartedAt: null,
       recordedMs: this.state.recordedMs + (started ? Date.now() - started : 0),
     });
-    this.unlock();
+    // A second window must not seal and upload a partial durable segment
+    // while the missing chunks are awaiting recovery in this window.
+    if (!this.unsaved.size) this.unlock();
   }
 
   private async onTrackEnded(capture: Capture): Promise<void> {
@@ -806,6 +840,7 @@ export class TalkController {
     // The device went away (unplugged, taken by a call, app backgrounded on
     // a phone). Keep what was recorded and try to reopen the microphone.
     await this.stopCapture();
+    if (this.state.localSaveError) return;
     this.set({ phase: "starting" });
     const epoch = this.startEpoch;
     while (this.restartAttempts < 3) {
@@ -859,6 +894,7 @@ export class TalkController {
       if (status === null) {
         // Deleted from another window while recording.
         await this.stopCapture();
+        if (this.state.localSaveError) return;
         this.persist(null);
         this.set(INITIAL);
         toast.info("The Talk recording was deleted, so recording stopped.");
@@ -872,6 +908,7 @@ export class TalkController {
   // ── Finishing ────────────────────────────────────────────────────────────
   private async finalize(): Promise<void> {
     await this.stopCapture();
+    if (this.state.localSaveError) return;
     this.set({ phase: "finalizing" });
     this.persistPhase("finalizing");
     await this.kickUpload();
@@ -880,7 +917,7 @@ export class TalkController {
   /** After the outbox drains: tell the server capture is over. */
   private async maybeFinish(): Promise<void> {
     const id = this.state.recordingId;
-    if (this.state.phase !== "finalizing" || !id || !this.rpc) return;
+    if (this.state.localSaveError || this.state.phase !== "finalizing" || !id || !this.rpc) return;
     const waiting = (await this.outbox.all()).some((segment) => segment.recordingId === id && !segment.rejected);
     if (waiting) return;
     const { kind } = this.state;
@@ -1152,8 +1189,8 @@ export class TalkController {
     if (this.isDictating() && threadId !== null) {
       statuses.set(threadId, {
         icon: "Mic",
-        label: phase === "transcribing" ? "Talk is transcribing a dictation" : "Talk is dictating here",
-        tone: phase === "paused" || phase === "needs-resume" ? "default" : "running",
+        label: phase === "storage-error" ? "Talk audio needs saving" : phase === "transcribing" ? "Talk is transcribing a dictation" : "Talk is dictating here",
+        tone: phase === "paused" || phase === "needs-resume" || phase === "storage-error" ? "default" : "running",
       });
     }
     return statuses;
@@ -1178,6 +1215,7 @@ export class TalkController {
   }
 
   private finishIdle(): void {
+    if (this.unsaved.size) return;
     if (this.refreshTimer !== null) clearInterval(this.refreshTimer);
     this.refreshTimer = null;
     this.target = null;
@@ -1206,6 +1244,38 @@ export class TalkController {
   }
 
   // ── Upload ───────────────────────────────────────────────────────────────
+  /** Retry durable storage without discarding the only remaining audio copy. */
+  async retryLocalAudio(): Promise<void> {
+    if (this.recoveringAudio || !this.unsaved.size) return;
+    this.recoveringAudio = true;
+    try {
+      for (const [key, segment] of this.unsaved) {
+        await segment.closed;
+        const parts = await Promise.all(segment.parts.map((part) => part.arrayBuffer()));
+        if (parts.length) await this.outbox.restore({ ...segment.key, startedAt: segment.startedAt, mimeType: segment.mimeType, lastPartAt: Date.now(), durationMs: segment.elapsedMs, complete: true, parts });
+        else await this.outbox.remove(segment.key);
+        this.unsaved.delete(key);
+        this.live.delete(key);
+      }
+      this.set({ localSaveError: null, phase: "paused" });
+      this.persistPhase("paused");
+      this.unlock();
+      await this.kickUpload();
+    } catch (error) {
+      this.set({ localSaveError: message(error) });
+    } finally {
+      this.recoveringAudio = false;
+    }
+  }
+
+  /** Download the in-memory copy; leave recovery available until saving succeeds. */
+  async downloadLocalAudio(): Promise<void> {
+    for (const segment of this.unsaved.values()) {
+      await segment.closed;
+      this.downloadAudio(new Blob(segment.parts, { type: segment.mimeType }), audioFileName({ ...segment.key, startedAt: segment.startedAt, mimeType: segment.mimeType }));
+    }
+  }
+
   async kickUpload(): Promise<void> {
     if (this.uploading) {
       this.uploadAgain = true;
@@ -1217,6 +1287,9 @@ export class TalkController {
         this.uploadAgain = false;
         await this.drain();
       } while (this.uploadAgain);
+    } catch (error) {
+      this.set({ uploadError: message(error) });
+      this.scheduleUpload();
     } finally {
       this.uploading = false;
       await this.refreshSetAside();
@@ -1241,10 +1314,14 @@ export class TalkController {
   async downloadSetAside(key: OutboxKey): Promise<void> {
     const segment = await this.outbox.get(key);
     if (!segment) return;
-    const url = URL.createObjectURL(new Blob(segment.parts, { type: segment.mimeType }));
+    this.downloadAudio(new Blob(segment.parts, { type: segment.mimeType }), audioFileName(segment));
+  }
+
+  private downloadAudio(blob: Blob, name: string): void {
+    const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
     link.href = url;
-    link.download = audioFileName(segment);
+    link.download = name;
     document.body.append(link);
     link.click();
     link.remove();
@@ -1264,7 +1341,7 @@ export class TalkController {
   private async drain(): Promise<void> {
     const rpc = this.rpc;
     if (!rpc) return;
-    let segments = (await this.outbox.all().catch(() => [])).filter((s) => !s.rejected);
+    let segments = (await this.outbox.all().catch(() => [])).filter((s) => !s.rejected && !this.unsaved.has(keyString(s)));
     for (const segment of segments.filter(isUploadable)) {
       this.set({ pendingUploads: segments.length });
       try {
