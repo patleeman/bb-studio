@@ -5,6 +5,9 @@ import { homedir } from "node:os";
 import { join } from "node:path";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import type { StudioHub } from "../hub";
+import { StudioServices } from "../services";
+import { ProviderComments } from "../provider-comments";
+import { commentSource, pageRequestSource } from "./item-sources";
 import { Inbox } from "./inbox";
 import { interactionSource } from "./interaction-source";
 import { officeContract } from "./contract";
@@ -42,7 +45,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
-  const inbox = new Inbox(db, [interactionSource(bb.sdk)], projectId => spaces.office.forProject(projectId).id);
+  const inbox = new Inbox(db, [interactionSource(bb.sdk), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub)], projectId => spaces.office.forProject(projectId).id);
   bb.rpc.register(officeContract, {
     inbox_list: input => inbox.list(input),
     inbox_counts: () => inbox.counts(spaces.office.list().map(s => s.id)),
