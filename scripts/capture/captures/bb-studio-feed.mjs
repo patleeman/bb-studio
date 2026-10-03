@@ -65,6 +65,12 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
           ids.push((await bbCli(["feed", "post", ...args])).split("\t")[0].trim());
           await sleep(50);
         }
+        // Other staged captures can leave a daily Explore digest. Verify the
+        // seven fixture stories, then include those existing rows in the count.
+        const listed = await pluginRpc("feed", "list", { limit: 30 });
+        const fixtures = listed.posts.filter((post) => ids.includes(post.id));
+        if (fixtures.length !== 7 || fixtures.some((post) => post.read)) throw new Error("Expected seven unread fixture stories");
+        const unread = listed.posts.filter((post) => !post.read).length;
         await client.navigate("/plugins/feed/feed");
         await client.waitForText("Mark all read");
         await client.waitForText("Today");
@@ -84,14 +90,14 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
           for (const title of ["Weekly research digest", "GPU spend down 18%"]) ${row("TITLE")}.querySelector('button[aria-label="Mark read"]').click();
           return true;
         })()`.replace('"TITLE"', "title"));
-        await client.waitForText("5 unread");
+        await client.waitForText(`${unread - 2} unread`);
         await client.evaluate(`(${row("Harlem Line delays cleared")}).querySelector("button[aria-expanded]").click()`);
         await client.waitForText("Earlier updates");
         await client.waitForText("Harlem Line delays growing to 20 minutes");
         await client.waitForText("Inbound trains are on time");
         await client.waitForText("New thread");
         await client.waitForText("Mark unread");
-        await client.waitForText("4 unread");
+        await client.waitForText(`${unread - 3} unread`);
         // Close it, and leave the launch post open with its checklist page previewed.
         await client.evaluate(`(${row("Harlem Line delays cleared")}).querySelector("button[aria-expanded]").click()`);
         await client.evaluate(`(${row("ORBIT-42 release window")}).querySelector("button[aria-expanded]").click()`);
@@ -103,7 +109,7 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
           if (![...preview.querySelectorAll("button")].some((button) => button.innerText.includes("Open"))) throw new Error("The page preview has no Open button");
           return true;
         })()`);
-        await client.waitForText("3 unread");
+        await client.waitForText(`${unread - 4} unread`);
         await client.evaluate(`document.querySelector("main").scrollIntoView()`);
         for (let tries = 0; ; tries += 1) {
           const loaded = await client.evaluate(`[...document.querySelectorAll("main img")].filter((img) => img.complete && img.naturalWidth > 0).length`);
