@@ -58,7 +58,9 @@ struct ThreadShelf: View {
             }
             if model.queued.count > 1, !queueExpanded {
                 queueSummary
-            } else {
+            } else if !model.queued.isEmpty {
+                // Remove the list itself after the last message. A zero-height List
+                // can retain its deleted row in the accessibility tree.
                 if model.queued.count > 1 { queueHeader }
                 List {
                     ForEach(model.queued) { message in

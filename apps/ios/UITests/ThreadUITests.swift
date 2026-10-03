@@ -358,14 +358,18 @@ final class ThreadUITests: XCTestCase {
         shot("page-demo-bottom")
     }
 
-    /// Needs a running thread with a queued message.
+    /// Removes this test's scheduled message; never depends on a shared queue.
     func testQueueRemove() throws {
-        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
+        continueAfterFailure = false
+        let id = try XCTUnwrap(scratchThread("QA queue removal \(UUID().uuidString.prefix(8))"))
+        addTeardownBlock { _ = self.api("DELETE", "/threads/\(id)", ["childThreadsConfirmed": false]) }
+        XCTAssertEqual(api("GET", "/threads/\(id)", [:])?["queuedMessageCount"] as? Int, 1)
+        app.open(URL(string: "bbstudio://thread/\(id)")!)
         let remove = app.buttons["Remove from queue"].firstMatch
-        guard remove.waitForExistence(timeout: 10) else { throw XCTSkip("nothing queued") }
-        let count = app.buttons.matching(identifier: "Remove from queue").count
+        XCTAssertTrue(remove.waitForExistence(timeout: 10), "scheduled message has a removal control")
         remove.tap()
-        XCTAssertTrue(wait(10) { app.buttons.matching(identifier: "Remove from queue").count < count }, "queued card removed")
+        XCTAssertTrue(wait(10) { self.api("GET", "/threads/\(id)", [:])?["queuedMessageCount"] as? Int == 0 }, "server removed the queued message")
+        XCTAssertTrue(remove.waitForNonExistence(timeout: 10), "queued card removed")
         shot("queue-removed")
     }
 

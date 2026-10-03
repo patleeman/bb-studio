@@ -18,8 +18,8 @@ that export without changing baseline product or test code.
 - Result bundle: `/tmp/office-ui-baseline/run/results.xcresult`.
 - Server queue after the test: `[]`.
 - Screenshot attachment `queue-removed` shows no visible queue card. The
-  failure uses an accessibility element count, so it does not by itself prove
-  that a card remained visible. Further investigation is required.
+  failure uses an accessibility element count. A follow-up reproduction
+  confirmed the removed row remains in the accessibility tree (see below).
 
 ## Original skip inventory
 
@@ -84,3 +84,20 @@ The test verifies the linked thread through consolidated `studio.chat_home`.
 - `testStudioChat` passed after the cold-start fix:
   `/tmp/office-capabilities-2/results.xcresult` (1 test, 0 failures).
 - Native build succeeded. No Office, RootView or AppModel changes were needed.
+
+## Queue removal diagnosis and fix
+
+A fresh scheduled scratch thread reproduced the pre-office failure on current
+main. The server queue count went from 1 to 0. XCTest reported the removal
+button as `exists=true`, `hittable=false`, count 1 after deletion; the visible
+card was gone. `/tmp/office-queue/results.xcresult` retains that failing run.
+
+ThreadShelf kept its empty List at height zero after deleting the last message.
+It now removes that List entirely when the queue is empty, including the stale
+accessibility row. The test creates and cleans up its own scheduled thread,
+checks the server count, and requires the removal control to disappear. It no
+longer skips when an unrelated shared thread has no queued message.
+
+Fixed validation: `/tmp/office-queue-fixed/results.xcresult`, 1 test passed,
+0 failures. The same staged server and private simulator reproduced the failure
+before the fix and passed afterward.
