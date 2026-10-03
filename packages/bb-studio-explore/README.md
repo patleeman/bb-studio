@@ -55,6 +55,13 @@ main, Float and workbench. The [stable capture](assets/companion-transfers-stabl
 passes two Float/main round trips. The seeded saved explainer starts ready;
 no investigation or agent runs.
 
+The global and thread-specific lists also keep their original explainer-row
+button, route and visible saved finding through the same moves. See
+[collection/main](assets/explore-list-companion-transfers-stable.png),
+[collection/workbench](assets/explore-list-companion-transfers-native.png),
+[thread/main](assets/explore-thread-companion-transfers-stable.png) and
+[thread/workbench](assets/explore-thread-companion-transfers-native.png).
+
 
 - **"Along the way" at the bottom of a reply.** When an answer involved
   reading code, the agent may end it with 1 to 4 findings, each an emoji and

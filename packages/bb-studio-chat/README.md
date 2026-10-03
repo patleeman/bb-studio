@@ -41,6 +41,15 @@ control, unsent wording and encoded item route through every placement. The
 [stable capture](assets/companion-transfers-stable.png) verifies the same
 draft and attachment through two Float/main round trips. No message is sent.
 
+![A saved quote reopened in main and moved without losing its draft](assets/chat-quote-companion-transfers-stable.png)
+
+Plain and saved-quote routes pass the same matrix, retaining the original
+prompt, file input and one selected attachment control. The quote keeps the
+source text, location, note and appended unsent wording after reopening from
+its saved route. See [plain/main](assets/chat-plain-companion-transfers-stable.png),
+[plain/workbench](assets/chat-plain-companion-transfers-native.png) and
+[quote/workbench](assets/chat-quote-companion-transfers-native.png).
+
 
 - **Chat.** Continue the item's linked conversation or start one in its
   project. New messages carry an item pill that tells the agent which tools

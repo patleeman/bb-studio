@@ -32,9 +32,9 @@ export default context => {
   ];
   return fixtures.map(fixture => ({
     id: `suite-${native ? "native" : "stable"}-${fixture.id}`, packageDir: fixture.packageDir,
-    fileName: `${fixture.id.startsWith("feed-") ? `${fixture.id}-` : ""}companion-transfers-${native ? "native" : "stable"}.png`, privateSidebar: true,
+    fileName: `${fixture.id.includes("-") ? `${fixture.id}-` : ""}companion-transfers-${native ? "native" : "stable"}.png`, privateSidebar: true,
     setup: async client => {
-      const seeded = await fixture.seed();
+      const seeded = await fixture.seed(client);
       const path = seeded.target ?? seeded.path;
       const key = `path:${path}`;
       const selector = `[data-float-window="${key}"] ${seeded.ready}`;
@@ -55,6 +55,7 @@ export default context => {
       let selectionChecked = false;
       const forget = async () => {
         if (frameSession) await client.command('Target.detachFromTarget', { sessionId: frameSession }).catch(() => {});
+        await seeded.beforeUnload?.();
         await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1'); delete window.bbSuiteTransfer`).catch(() => {});
         await client.command('Page.navigate', { url: 'about:blank' });
         await sleep(400);
@@ -105,9 +106,11 @@ export default context => {
           const draft = await client.evaluate(`window.bbSuiteTransfer[0].value ?? window.bbSuiteTransfer[0].textContent`);
           if (draft !== seeded.draft) throw new Error(`${fixture.id} draft changed in ${placement}: ${JSON.stringify(draft)}`);
         }
+        if (seeded.initialValue && await client.evaluate(`window.bbSuiteTransfer[0].value`) !== seeded.initialValue) throw new Error(`${fixture.id} choice changed in ${placement}`);
+        if (seeded.quoteText && !(await client.evaluate(`window.bbSuiteTransfer[0].textContent.includes(${JSON.stringify(seeded.quoteText)})`))) throw new Error(`${fixture.id} quote context changed in ${placement}`);
         if (originalFile) {
-          const file = await client.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(`[data-float-window="${key}"]`)}); const input = window.bbSuiteFile; const attachment = root.querySelector('button[aria-label="Remove review-notes.txt"]'); return { same: input === root.querySelector('input[type="file"]'), connected: input.isConnected, sameAttachment: attachment === window.bbSuiteAttachment, attachmentConnected: window.bbSuiteAttachment.isConnected, visible: !!attachment?.checkVisibility() }; })()`);
-          if (!file.same || !file.connected || !file.sameAttachment || !file.attachmentConnected || !file.visible) throw new Error(`${fixture.id} attachment changed in ${placement}: ${JSON.stringify(file)}`);
+          const file = await client.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(`[data-float-window="${key}"]`)}); const input = window.bbSuiteFile; const attachments = root.querySelectorAll('button[aria-label="Remove review-notes.txt"]'); const attachment = attachments[0]; return { same: input === root.querySelector('input[type="file"]'), connected: input.isConnected, sameAttachment: attachment === window.bbSuiteAttachment, attachmentCount: attachments.length, attachmentConnected: window.bbSuiteAttachment.isConnected, visible: !!attachment?.checkVisibility() }; })()`);
+          if (!file.same || !file.connected || !file.sameAttachment || file.attachmentCount !== 1 || !file.attachmentConnected || !file.visible) throw new Error(`${fixture.id} attachment changed in ${placement}: ${JSON.stringify(file)}`);
         }
       };
       const menu = async label => {
@@ -120,12 +123,25 @@ export default context => {
         if (await client.evaluate(`typeof window.__bbPluginRuntime?.pluginSdkApp?.experimental_CompanionOutlet === 'function'`) !== native)
           throw new Error("The suite capture requires its specified host capability");
         await client.evaluate(`(() => { window.bbSuiteTransfer = [...document.querySelectorAll(${JSON.stringify(seeded.ready)})]; return true; })()`);
-        if (seeded.draft) {
+        if (seeded.initialValue) {
+          await client.evaluate(`(() => { const select = window.bbSuiteTransfer[0]; select.focus(); select.value = ${JSON.stringify(seeded.initialValue)}; select.dispatchEvent(new Event('change', { bubbles: true })); })()`);
+          await sleep(350);
+          if (await client.evaluate(`window.bbSuiteTransfer[0].value`) !== seeded.initialValue) throw new Error("Could not choose the staged activity period");
+        }
+        if (seeded.appendDraft) {
+          const previous = await client.evaluate(`window.bbSuiteTransfer[0].textContent`);
+          await client.evaluate(`(() => { const node = window.bbSuiteTransfer[0]; node.focus(); const range = document.createRange(); range.selectNodeContents(node); range.collapse(false); getSelection().removeAllRanges(); getSelection().addRange(range); })()`);
+          await client.command('Input.insertText', { text: seeded.appendDraft });
+          seeded.draft = previous + seeded.appendDraft;
+        }
+        if (seeded.draft && !seeded.appendDraft) {
           await client.evaluate(`(() => { const node = window.bbSuiteTransfer[0]; node.focus(); if (node.select) node.select(); else { const range = document.createRange(); range.selectNodeContents(node); getSelection().removeAllRanges(); getSelection().addRange(range); } })()`);
           await client.command('Input.insertText', { text: seeded.draft });
         }
         if (seeded.visibleText) await client.waitForText(seeded.visibleText);
         if (seeded.attachment) {
+          await client.evaluate(`(() => { const root = document.querySelector(${JSON.stringify(`[data-studio-main-view=${JSON.stringify(seeded.path)}]`)}); root.querySelectorAll('button[aria-label="Remove review-notes.txt"]').forEach(button => button.click()); })()`);
+          await sleep(350);
           attachmentDir = await mkdtemp(join(tmpdir(), 'bb-suite-attachment-'));
           const file = join(attachmentDir, 'review-notes.txt');
           await writeFile(file, 'Keep this original attachment through every move.');

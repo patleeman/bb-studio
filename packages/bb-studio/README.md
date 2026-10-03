@@ -62,6 +62,21 @@ notes" query through Float, workbench, main, Float and workbench. The
 [stable capture](assets/companion-transfers-stable.png) checks Float/main
 round trips with the same input and visible seeded release notes.
 
+The same checks pass the legacy `/collection` address, Activity with its
+original **30 days** selector, and a space home with Pages actually disabled.
+Activity now offers Move; the legacy address keeps its own target so moving
+it carries the existing search input.
+
+![The original Activity view and period choice in the workbench](assets/studio-activity-companion-transfers-native.png)
+
+See the [stable Activity](assets/studio-activity-companion-transfers-stable.png),
+[stable legacy collection](assets/studio-collection-companion-transfers-stable.png),
+[native legacy collection](assets/studio-collection-companion-transfers-native.png),
+[stable space fallback](assets/studio-space-companion-transfers-stable.png) and
+[native space fallback](assets/studio-space-companion-transfers-native.png).
+The fallback capture deletes its synthetic space and re-enables Pages during
+cleanup. It runs only against the matching isolated capture environment.
+
 
 - **Needs you** sits above the collection, only when something does: pending
   thread approvals and questions, Teams attention, review and due tasks, and

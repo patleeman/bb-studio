@@ -149,9 +149,52 @@ guards the Explore database fixture; the saved HTML page and all other
 fixtures use normal plugin RPCs. No agent runs. The integrated checkpoint
 passes 1,631 JavaScript tests across 18 packages, including 106 Kit tests,
 plus all type, stable compatibility, documentation, marketplace, contract,
-native-payload and packed-Kit gates. These are representative routes; the
-space fallback, plain/quote composers and Explore list variants do not gain
-new placement-matrix coverage from these captures.
+native-payload and packed-Kit gates. The additional route variants below now
+extend this placement coverage.
+
+## Additional route variants
+
+Studio `1b2e5a2`, with Chat and Explore `c83c4fd`, passes seven more routes on
+both hosts. Each uses the same original-control, visibility, unique-tab and
+placement assertions. All initial moves use the displayed Move menu.
+
+| Route | Original state checked | Stable capture | Native capture |
+| --- | --- | --- | --- |
+| Studio's legacy collection address | Search input/query, seeded release notes and actual `/collection` target | [Main](../packages/bb-studio/assets/studio-collection-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-collection-companion-transfers-native.png) |
+| Studio Activity | Original period selector, selected 30 days and the nonexecuting staged thread | [Main](../packages/bb-studio/assets/studio-activity-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-activity-companion-transfers-native.png) |
+| Studio space without Pages | Original space-options control and synthetic fallback space | [Main](../packages/bb-studio/assets/studio-space-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-space-companion-transfers-native.png) |
+| Plain chat draft | Original prompt/file input, unsent wording and one selected attachment control | [Main](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-native.png) |
+| Saved quote draft | Original prompt/file input, source quote, location, note, appended wording and one attachment control | [Main](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-native.png) |
+| Explore collection | Original seeded explainer-row button and collection route | [Main](../packages/bb-studio-explore/assets/explore-list-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-list-companion-transfers-native.png) |
+| Explore thread list | Original seeded explainer-row button and thread-specific route | [Main](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-native.png) |
+
+The legacy Studio alias exposed another route mismatch: the main wrapper
+registered `/collection`, while the inner view constructed Move for the root
+collection. The view now keeps its actual subpath. Activity also now has the
+shared Move control. Its 134 tests, typecheck and build pass, including an
+independent rerun after the root full check.
+
+The fallback test disables the installed Pages plugin in the isolated app,
+creates its synthetic space through Studio RPC, checks every move, deletes
+that space, and re-enables Pages in cleanup. It does not mock provider
+availability. The quote fixture uses the production item-chat bridge, then
+unloads its initial companion and opens the saved quote route in main before
+editing and moving it. No message is sent. Repeated plain-draft captures
+remove only the previous synthetic `review-notes.txt` attachment before
+selecting their new file; every placement requires exactly one attachment.
+
+Use the prior command with the following capture IDs (and their `stable`
+equivalents):
+
+```sh
+BB_CAPTURE_ONLY=suite-native-studio-collection,suite-native-studio-activity,suite-native-studio-space,suite-native-chat-plain,suite-native-chat-quote,suite-native-explore-list,suite-native-explore-thread
+```
+
+The integrated root checkpoint `19dbbf2` passes 1,641 JavaScript tests across
+18 packages and all type, stable compatibility, documentation, marketplace,
+contract, native-payload and packed-Kit gates. These checks establish the
+listed routes and workflows, rather than every possible dialog/provider or
+browser combination.
 
 ## Remaining release and QA boundaries
 
