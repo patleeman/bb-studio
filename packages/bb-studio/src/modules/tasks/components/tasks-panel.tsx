@@ -22,7 +22,7 @@ function boardPath(boardId: string, view: BoardView): string {
 }
 
 export function TasksPanel({ subPath }: { subPath: string }) {
-  const { refreshKey: version } = useAddOnPanel(REALTIME_CHANNEL, PANEL_PATH, "board");
+  const { refreshKey: version } = useAddOnPanel(REALTIME_CHANNEL, PANEL_PATH, "board", "tasks_");
   const navigate = useBbNavigate();
   const [first = "", second = ""] = subPath.split("/").filter(Boolean);
 

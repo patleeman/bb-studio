@@ -64,8 +64,8 @@ export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
   artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
-  task: { pluginId: "studio-tasks", panel: "tasks", label: "Task", idPrefix: "tsk_" },
-  board: { pluginId: "studio-tasks", panel: "tasks", label: "Board", idPrefix: "brd_" },
+  task: { pluginId: "studio", panel: "tasks", label: "Task", idPrefix: "tsk_" },
+  board: { pluginId: "studio", panel: "tasks", label: "Board", idPrefix: "brd_" },
   table: { pluginId: "studio", panel: "tables", label: "Table" },
 } as const;
 export type StudioEmbedKind = keyof typeof STUDIO_EMBEDS;

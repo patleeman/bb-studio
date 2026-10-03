@@ -105,38 +105,38 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "statuses",
+      "plugin": "studio",
+      "method": "tasks_statuses",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "get",
+      "plugin": "studio",
+      "method": "tasks_get",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "board",
+      "plugin": "studio",
+      "method": "tasks_board",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "update",
+      "plugin": "studio",
+      "method": "tasks_update",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "create",
+      "plugin": "studio",
+      "method": "tasks_create",
       "coverage": "generated method"
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "handOffBot",
+      "plugin": "studio",
+      "method": "tasks_handOffBot",
       "coverage": "generated method"
     },
     {
@@ -407,6 +407,36 @@
       "file": "apps/ios/Shared/Feed.swift",
       "plugin": "studio",
       "method": "feed_unread",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "team_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "talk_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "talk_dm",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "delegate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "bot_desk",
       "coverage": "generated method"
     },
     {
@@ -861,86 +891,86 @@
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "board",
+      "plugin": "studio",
+      "method": "tasks_board",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "get",
+      "plugin": "studio",
+      "method": "tasks_get",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "create",
+      "plugin": "studio",
+      "method": "tasks_create",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "update",
+      "plugin": "studio",
+      "method": "tasks_update",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "move",
+      "plugin": "studio",
+      "method": "tasks_move",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "archive",
+      "plugin": "studio",
+      "method": "tasks_archive",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "delete",
+      "plugin": "studio",
+      "method": "tasks_delete",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "unlink",
+      "plugin": "studio",
+      "method": "tasks_unlink",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "linkables",
+      "plugin": "studio",
+      "method": "tasks_linkables",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "link",
+      "plugin": "studio",
+      "method": "tasks_link",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "handOff",
+      "plugin": "studio",
+      "method": "tasks_handOff",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "sendBack",
+      "plugin": "studio",
+      "method": "tasks_sendBack",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "archiveThreads",
+      "plugin": "studio",
+      "method": "tasks_archiveThreads",
       "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "settings",
+      "plugin": "studio",
+      "method": "tasks_settings",
       "coverage": "literal method checked against contract"
     },
     {
@@ -954,12 +984,6 @@
       "plugin": "artifacts",
       "method": "importFile",
       "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/iOS/Office/HomeTab.swift",
-      "plugin": "plugin",
-      "method": "method",
-      "coverage": "dynamic dispatch; runtime validation required"
     },
     {
       "file": "apps/ios/iOS/Thread/InlineVis.swift",

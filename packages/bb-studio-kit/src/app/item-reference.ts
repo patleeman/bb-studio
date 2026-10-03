@@ -30,6 +30,8 @@ function localPath(href: string, origin: string): string {
 export function parseItemReference(text: string, origin = typeof window === "undefined" ? "" : window.location.origin): StudioItemLink | null {
   const legacyTable = /^(?:item:)?studio-tables:([a-zA-Z0-9_-]+)$/.exec(text.trim());
   if (legacyTable) return { href: `/plugins/studio/tables/${legacyTable[1]}` };
+  const legacyTask = /^(?:item:)?studio-tasks:([a-zA-Z0-9_-]+)$/.exec(text.trim());
+  if (legacyTask) return { href: `/plugins/studio/tasks/${legacyTask[1]}` };
   const trimmed = rewriteLegacyText(text.trim());
   if (!trimmed || trimmed.length > 2_000) return null;
   const link = MARKDOWN_LINK.exec(trimmed);

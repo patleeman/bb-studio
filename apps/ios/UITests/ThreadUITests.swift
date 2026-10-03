@@ -869,7 +869,7 @@ final class ThreadUITests: XCTestCase {
                 let id = item["id"] as? String ?? ""
                 switch item["pluginId"] as? String {
                 case "pages": _ = self.rpc("pages", "remove", ["id": id])
-                case "studio-tasks": _ = self.rpc("studio-tasks", "delete", ["id": id])
+                case "studio-tasks", "studio": _ = self.rpc("studio", "tasks_delete", ["id": id])
                 default: break
                 }
             }
@@ -1049,11 +1049,11 @@ final class ThreadUITests: XCTestCase {
     /// moving it with the Status menu, and a swipe to the next column.
     func testTasks() throws {
         let title = "QA task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio-tasks", "create", [
+        let created = rpc("studio", "tasks_create", [
             "title": title, "description": "Scratch task for a **UI test**.", "due": "2026-10-02", "assignee": "me",
         ])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
+        addTeardownBlock { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
         app.open(URL(string: "bbstudio://tasks")!)
         app.segmentedControls.buttons.element(boundBy: 0).tap()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
@@ -1064,7 +1064,7 @@ final class ThreadUITests: XCTestCase {
         shot("task-detail")
         app.buttons["taskStatus"].tap()
         app.buttons["Review"].tap()
-        XCTAssertTrue(wait(10) { (self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "review" }, "moved to Review")
+        XCTAssertTrue(wait(10) { (self.rpc("studio", "tasks_get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "review" }, "moved to Review")
         shot("task-review")
         app.navigationBars.buttons.element(boundBy: 0).tap()
         app.segmentedControls.buttons.element(boundBy: 2).tap()
@@ -1072,7 +1072,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(moved.waitForExistence(timeout: 10), "in the Review column")
         moved.swipeRight()
         app.buttons["Done"].firstMatch.tap()
-        XCTAssertTrue(wait(10) { (self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "done" }, "swiped to Done")
+        XCTAssertTrue(wait(10) { (self.rpc("studio", "tasks_get", ["id": id])?["task"] as? [String: Any])?["status"] as? String == "done" }, "swiped to Done")
         shot("tasks-done")
     }
 
@@ -1080,14 +1080,14 @@ final class ThreadUITests: XCTestCase {
     func testStudioTags() throws {
         let stamp = Int(Date().timeIntervalSince1970)
         let title = "QA tag task \(stamp)", tagName = "QA tag \(stamp)"
-        let created = rpc("studio-tasks", "create", ["title": title, "description": ""])
+        let created = rpc("studio", "tasks_create", ["title": title, "description": ""])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
         addTeardownBlock {
             for tag in (overview()?["tags"] as? [[String: Any]]) ?? [] where tag["name"] as? String == tagName {
                 _ = self.rpc("studio", "deleteTag", ["id": tag["id"] as? String ?? ""])
             }
-            _ = self.rpc("studio-tasks", "delete", ["id": id])
+            _ = self.rpc("studio", "tasks_delete", ["id": id])
         }
         openStudioCollection()
         let row = app.buttons.containing(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
@@ -1099,7 +1099,7 @@ final class ThreadUITests: XCTestCase {
         app.alerts.buttons["Add"].tap()
         func tagged() -> Bool {
             let tagId = ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == tagName }?["id"] as? String
-            let item = ((overview()?["items"] as? [[String: Any]]) ?? []).first { $0["pluginId"] as? String == "studio-tasks" && $0["id"] as? String == id }
+            let item = ((overview()?["items"] as? [[String: Any]]) ?? []).first { $0["pluginId"] as? String == "studio" && $0["id"] as? String == id }
             return tagId != nil && (item?["tags"] as? [String])?.contains(tagId!) == true
         }
         XCTAssertTrue(wait(10, tagged), "task tagged")
@@ -1116,12 +1116,12 @@ final class ThreadUITests: XCTestCase {
     /// Starts a real Studio Chat thread from a scratch task, then deletes both.
     func testStudioChat() throws {
         let title = "QA chat task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio-tasks", "create", ["title": title, "description": "Scratch task.", "projectId": "proj_8ztiq6dkh5"])
+        let created = rpc("studio", "tasks_create", ["title": title, "description": "Scratch task.", "projectId": "proj_8ztiq6dkh5"])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
         var threadId: String?
         addTeardownBlock {
             if let threadId { _ = self.api("DELETE", "/threads/\(threadId)", ["childThreadsConfirmed": false]) }
-            _ = self.rpc("studio-tasks", "delete", ["id": id])
+            _ = self.rpc("studio", "tasks_delete", ["id": id])
         }
         app.open(URL(string: "bbstudio://task/\(id)")!)
         let more = app.buttons["More"].firstMatch
@@ -1134,7 +1134,7 @@ final class ThreadUITests: XCTestCase {
         shot("studio-chat-sheet")
         app.buttons["Start"].tap()
         XCTAssertTrue(wait(20) {
-            threadId = (self.rpc("studio-chat", "lastThread", ["pluginId": "studio-tasks", "id": id])?["threadId"] as? String)
+            threadId = (self.rpc("studio-chat", "lastThread", ["pluginId": "studio", "id": id])?["threadId"] as? String)
             return threadId != nil
         }, "thread linked to the task")
         XCTAssertTrue(app.staticTexts.containing(NSPredicate(format: "label CONTAINS 'automated UI test'")).firstMatch.waitForExistence(timeout: 15), "opened the thread")
@@ -1250,20 +1250,20 @@ final class ThreadUITests: XCTestCase {
         let tagName = "QA bulk tag \(stamp)", renamed = "QA renamed \(stamp)"
         var ids: [String] = []
         for title in [titleA, titleB] {
-            let created = rpc("studio-tasks", "create", ["title": title, "description": "Has \(word) inside.", "projectId": "proj_8ztiq6dkh5"])
+            let created = rpc("studio", "tasks_create", ["title": title, "description": "Has \(word) inside.", "projectId": "proj_8ztiq6dkh5"])
             ids.append(try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String))
         }
         func overview() -> [String: Any]? { self.rpc("studio", "overview", NSNull()) }
         func tagId(_ name: String) -> String? {
             ((overview()?["tags"] as? [[String: Any]]) ?? []).first { $0["name"] as? String == name }?["id"] as? String
         }
-        func task(_ id: String) -> [String: Any]? { self.rpc("studio-tasks", "get", ["id": id])?["task"] as? [String: Any] }
+        func task(_ id: String) -> [String: Any]? { self.rpc("studio", "tasks_get", ["id": id])?["task"] as? [String: Any] }
         addTeardownBlock {
             for name in [tagName, renamed] { if let id = tagId(name) { _ = self.rpc("studio", "deleteTag", ["id": id]) } }
-            for id in ids { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
+            for id in ids { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
         }
         let tag = try XCTUnwrap((rpc("studio", "createTag", ["name": tagName])?["tag"] as? [String: Any])?["id"] as? String)
-        _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio-tasks", "id": ids[0]]], "add": [tag], "remove": [String]()])
+        _ = rpc("studio", "tagItems", ["items": [["pluginId": "studio", "id": ids[0]]], "add": [tag], "remove": [String]()])
 
         openStudioCollection()
         let search = app.searchFields.firstMatch
@@ -1322,9 +1322,9 @@ final class ThreadUITests: XCTestCase {
     /// sheet's agent pickers without starting anything; deletes the task.
     func testTaskLinksAndHandOff() throws {
         let title = "QA link task \(Int(Date().timeIntervalSince1970))"
-        let created = rpc("studio-tasks", "create", ["title": title, "description": "", "projectId": "proj_8ztiq6dkh5"])
+        let created = rpc("studio", "tasks_create", ["title": title, "description": "", "projectId": "proj_8ztiq6dkh5"])
         let id = try XCTUnwrap((created?["task"] as? [String: Any])?["id"] as? String)
-        addTeardownBlock { _ = self.rpc("studio-tasks", "delete", ["id": id]) }
+        addTeardownBlock { _ = self.rpc("studio", "tasks_delete", ["id": id]) }
         app.open(URL(string: "bbstudio://task/\(id)")!)
         let add = app.buttons["addTaskLink"]
         XCTAssertTrue(add.waitForExistence(timeout: 10), "Add Link")
@@ -1335,7 +1335,7 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(first.waitForExistence(timeout: 10), "linkables")
         shot("task-link-picker")
         first.tap()
-        XCTAssertTrue(wait(10) { ((self.rpc("studio-tasks", "get", ["id": id])?["links"] as? [Any]) ?? []).count == 1 }, "linked")
+        XCTAssertTrue(wait(10) { ((self.rpc("studio", "tasks_get", ["id": id])?["links"] as? [Any]) ?? []).count == 1 }, "linked")
         shot("task-linked")
 
         let handOff = app.buttons["Hand to an Agent"]

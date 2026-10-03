@@ -7,7 +7,7 @@ it("checks optional Tasks without creating work and reports absence clearly", as
   const callRpc = vi.fn(async () => { throw new Error("Plugin not installed"); });
   const track = exploreTasks({ callRpc, pageId: () => null });
   expect(await track(finding)).toEqual({ available: false, task: null });
-  expect(callRpc).toHaveBeenCalledWith("studio-tasks", "trackFinding", expect.objectContaining({ create: false }), expect.anything());
+  expect(callRpc).toHaveBeenCalledWith("studio", "tasks_trackFinding", expect.objectContaining({ create: false }), expect.anything());
   await expect(track({ ...finding, create: true })).rejects.toThrow("Studio Tasks is installed and running");
 });
 

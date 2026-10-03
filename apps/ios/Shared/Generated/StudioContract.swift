@@ -133,6 +133,32 @@ public enum Studio {
     public static let feed_remove = "feed_remove"
     public static let feed_seen = "feed_seen"
     public static let feed_unread = "feed_unread"
+    public static let tasks_trackFinding = "tasks_trackFinding"
+    public static let tasks_boards = "tasks_boards"
+    public static let tasks_board = "tasks_board"
+    public static let tasks_boardCreate = "tasks_boardCreate"
+    public static let tasks_boardUpdate = "tasks_boardUpdate"
+    public static let tasks_boardArchive = "tasks_boardArchive"
+    public static let tasks_boardDelete = "tasks_boardDelete"
+    public static let tasks_statuses = "tasks_statuses"
+    public static let tasks_setStatuses = "tasks_setStatuses"
+    public static let tasks_get = "tasks_get"
+    public static let tasks_create = "tasks_create"
+    public static let tasks_update = "tasks_update"
+    public static let tasks_move = "tasks_move"
+    public static let tasks_archive = "tasks_archive"
+    public static let tasks_delete = "tasks_delete"
+    public static let tasks_link = "tasks_link"
+    public static let tasks_unlink = "tasks_unlink"
+    public static let tasks_linkables = "tasks_linkables"
+    public static let tasks_handoffDefaults = "tasks_handoffDefaults"
+    public static let tasks_handOff = "tasks_handOff"
+    public static let tasks_bots = "tasks_bots"
+    public static let tasks_handOffBot = "tasks_handOffBot"
+    public static let tasks_syncCheckbox = "tasks_syncCheckbox"
+    public static let tasks_sendBack = "tasks_sendBack"
+    public static let tasks_archiveThreads = "tasks_archiveThreads"
+    public static let tasks_settings = "tasks_settings"
   }
 
   public typealias Home = HomeOutput
@@ -424,6 +450,62 @@ public enum Studio {
   public typealias FeedSeen = FeedSeenOutput
 
   public typealias FeedUnread = FeedUnreadOutput
+
+  public typealias TasksTrackFinding = TasksTrackFindingOutput
+
+  public typealias TasksBoards = TasksBoardsOutput
+
+  public typealias TasksBoard = TasksBoardOutput
+
+  public typealias TasksBoardCreate = TasksBoardCreateOutput
+
+  public typealias TasksBoardUpdate = TasksBoardUpdateOutput
+
+  public typealias TasksBoardArchive = TasksBoardArchiveOutput
+
+  public typealias TasksBoardDelete = TasksBoardDeleteOutput
+
+  public typealias TasksStatuses = TasksStatusesOutput
+
+  public typealias TasksSetStatuses = TasksSetStatusesOutput
+
+  public typealias TasksGet = TasksGetOutput
+
+  public typealias TasksCreate = TasksCreateOutput
+
+  public typealias TasksUpdate = TasksUpdateOutput
+
+  public typealias TasksMove = TasksMoveOutput
+
+  public typealias TasksArchive = TasksArchiveOutput
+
+  public typealias TasksDelete = TasksDeleteOutput
+
+  public typealias TasksLink = TasksLinkOutput
+
+  public typealias TasksUnlink = TasksUnlinkOutput
+
+  public typealias TasksLinkables = TasksLinkablesOutput
+
+  public typealias TasksHandoffDefaults = TasksHandoffDefaultsOutput
+
+  public typealias TasksHandOff = TasksHandOffOutput
+
+  public typealias TasksBotsInput = StudioJSONValue
+
+  public typealias TasksBots = TasksBotsOutput
+
+  public typealias TasksHandOffBot = TasksHandOffBotOutput
+
+  public typealias TasksSyncCheckbox = TasksSyncCheckboxOutput
+
+  public typealias TasksSendBack = TasksSendBackOutput
+
+  public typealias TasksArchiveThreads = TasksArchiveThreadsOutput
+
+  public typealias TasksSettingsInput = StudioJSONValue
+
+  public typealias TasksSettings = TasksSettingsOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -11442,6 +11524,1756 @@ public enum Studio {
     public init(count: Double? = nil, lastSeenAt: Double? = nil) {
       self.count = count
       self.lastSeenAt = lastSeenAt
+    }
+  }
+
+  public struct TasksTrackFindingInput: Sendable, Hashable, Codable {
+    public var key: String?
+    public var threadId: String?
+    public var messageId: String?
+    public var title: String?
+    public var pageId: String?
+    public var create: Bool?
+
+    public init(key: String? = nil, threadId: String? = nil, messageId: String? = nil, title: String? = nil, pageId: String? = nil, create: Bool? = nil) {
+      self.key = key
+      self.threadId = threadId
+      self.messageId = messageId
+      self.title = title
+      self.pageId = pageId
+      self.create = create
+    }
+  }
+
+  public enum TasksTrackFindingOutputTaskPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksTrackFindingOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum TasksTrackFindingOutputTaskRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksTrackFindingOutputTaskHandoffState: Sendable, Hashable, Codable {
+    case starting
+    case working
+    case needs_input
+    case replied
+    case ready
+    case failed
+    case archived
+    case deleted
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "starting": self = .starting
+      case "working": self = .working
+      case "needs-input": self = .needs_input
+      case "replied": self = .replied
+      case "ready": self = .ready
+      case "failed": self = .failed
+      case "archived": self = .archived
+      case "deleted": self = .deleted
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .starting: try container.encode("starting")
+      case .working: try container.encode("working")
+      case .needs_input: try container.encode("needs-input")
+      case .replied: try container.encode("replied")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .archived: try container.encode("archived")
+      case .deleted: try container.encode("deleted")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksTrackFindingOutputTaskHandoff: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var state: TasksTrackFindingOutputTaskHandoffState?
+    public var note: String?
+    public var agent: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, state: TasksTrackFindingOutputTaskHandoffState? = nil, note: String? = nil, agent: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.state = state
+      self.note = note
+      self.agent = agent
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TasksTrackFindingOutputTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TasksTrackFindingOutputTaskPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: TasksTrackFindingOutputTaskSubtasks?
+    public var recurrence: TasksTrackFindingOutputTaskRecurrence?
+    public var reminderAt: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var doneAt: Double?
+    public var archived: Bool?
+    public var handoff: TasksTrackFindingOutputTaskHandoff?
+    public var openThreads: Double?
+    public var links: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksTrackFindingOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksTrackFindingOutputTaskSubtasks? = nil, recurrence: TasksTrackFindingOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksTrackFindingOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.status = status
+      self.statusLabel = statusLabel
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.doneAt = doneAt
+      self.archived = archived
+      self.handoff = handoff
+      self.openThreads = openThreads
+      self.links = links
+    }
+  }
+
+  public struct TasksTrackFindingOutput: Sendable, Hashable, Codable {
+    public var task: TasksTrackFindingOutputTask?
+
+    public init(task: TasksTrackFindingOutputTask? = nil) {
+      self.task = task
+    }
+  }
+
+  public struct TasksBoardsInput: Sendable, Hashable, Codable {
+    public var includeArchived: Bool?
+
+    public init(includeArchived: Bool? = nil) {
+      self.includeArchived = includeArchived
+    }
+  }
+
+  public struct TasksBoardsOutputBoardsItemColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct TasksBoardsOutputBoardsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TasksBoardsOutputBoardsItemColumnsItem]?
+    public var `open`: Double?
+    public var done: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TasksBoardsOutputBoardsItemColumnsItem]? = nil, `open`: Double? = nil, done: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.`open` = `open`
+      self.done = done
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct TasksBoardsOutput: Sendable, Hashable, Codable {
+    public var boards: [TasksBoardsOutputBoardsItem]?
+
+    public init(boards: [TasksBoardsOutputBoardsItem]? = nil) {
+      self.boards = boards
+    }
+  }
+
+  public struct TasksBoardInput: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var includeArchived: Bool?
+
+    public init(boardId: String? = nil, includeArchived: Bool? = nil) {
+      self.boardId = boardId
+      self.includeArchived = includeArchived
+    }
+  }
+
+  public struct TasksBoardOutputBoardColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct TasksBoardOutputBoard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TasksBoardOutputBoardColumnsItem]?
+    public var `open`: Double?
+    public var done: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TasksBoardOutputBoardColumnsItem]? = nil, `open`: Double? = nil, done: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.`open` = `open`
+      self.done = done
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public enum TasksBoardOutputTasksItemPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksBoardOutputTasksItemSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum TasksBoardOutputTasksItemRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksBoardOutputTasksItemHandoffState: Sendable, Hashable, Codable {
+    case starting
+    case working
+    case needs_input
+    case replied
+    case ready
+    case failed
+    case archived
+    case deleted
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "starting": self = .starting
+      case "working": self = .working
+      case "needs-input": self = .needs_input
+      case "replied": self = .replied
+      case "ready": self = .ready
+      case "failed": self = .failed
+      case "archived": self = .archived
+      case "deleted": self = .deleted
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .starting: try container.encode("starting")
+      case .working: try container.encode("working")
+      case .needs_input: try container.encode("needs-input")
+      case .replied: try container.encode("replied")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .archived: try container.encode("archived")
+      case .deleted: try container.encode("deleted")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksBoardOutputTasksItemHandoff: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var state: TasksBoardOutputTasksItemHandoffState?
+    public var note: String?
+    public var agent: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, state: TasksBoardOutputTasksItemHandoffState? = nil, note: String? = nil, agent: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.state = state
+      self.note = note
+      self.agent = agent
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TasksBoardOutputTasksItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TasksBoardOutputTasksItemPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: TasksBoardOutputTasksItemSubtasks?
+    public var recurrence: TasksBoardOutputTasksItemRecurrence?
+    public var reminderAt: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var doneAt: Double?
+    public var archived: Bool?
+    public var handoff: TasksBoardOutputTasksItemHandoff?
+    public var openThreads: Double?
+    public var links: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksBoardOutputTasksItemPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksBoardOutputTasksItemSubtasks? = nil, recurrence: TasksBoardOutputTasksItemRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksBoardOutputTasksItemHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.status = status
+      self.statusLabel = statusLabel
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.doneAt = doneAt
+      self.archived = archived
+      self.handoff = handoff
+      self.openThreads = openThreads
+      self.links = links
+    }
+  }
+
+  public struct TasksBoardOutput: Sendable, Hashable, Codable {
+    public var board: TasksBoardOutputBoard?
+    public var tasks: [TasksBoardOutputTasksItem]?
+
+    public init(board: TasksBoardOutputBoard? = nil, tasks: [TasksBoardOutputTasksItem]? = nil) {
+      self.board = board
+      self.tasks = tasks
+    }
+  }
+
+  public struct TasksBoardCreateInput: Sendable, Hashable, Codable {
+    public var title: String?
+    public var projectId: String?
+
+    public init(title: String? = nil, projectId: String? = nil) {
+      self.title = title
+      self.projectId = projectId
+    }
+  }
+
+  public struct TasksBoardCreateOutputBoardColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct TasksBoardCreateOutputBoard: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+    public var columns: [TasksBoardCreateOutputBoardColumnsItem]?
+    public var `open`: Double?
+    public var done: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var archived: Bool?
+    public var template: Bool?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil, columns: [TasksBoardCreateOutputBoardColumnsItem]? = nil, `open`: Double? = nil, done: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, archived: Bool? = nil, template: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+      self.columns = columns
+      self.`open` = `open`
+      self.done = done
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.archived = archived
+      self.template = template
+    }
+  }
+
+  public struct TasksBoardCreateOutput: Sendable, Hashable, Codable {
+    public var board: TasksBoardCreateOutputBoard?
+
+    public init(board: TasksBoardCreateOutputBoard? = nil) {
+      self.board = board
+    }
+  }
+
+  public struct TasksBoardUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var projectId: String?
+
+    public init(id: String? = nil, title: String? = nil, projectId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.projectId = projectId
+    }
+  }
+
+  public struct TasksBoardUpdateOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksBoardArchiveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.archived = archived
+    }
+  }
+
+  public struct TasksBoardArchiveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksBoardDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TasksBoardDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksStatusesInput: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var projectId: String?
+
+    public init(boardId: String? = nil, projectId: String? = nil) {
+      self.boardId = boardId
+      self.projectId = projectId
+    }
+  }
+
+  public struct TasksStatusesOutputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct TasksStatusesOutput: Sendable, Hashable, Codable {
+    public var columns: [TasksStatusesOutputColumnsItem]?
+
+    public init(columns: [TasksStatusesOutputColumnsItem]? = nil) {
+      self.columns = columns
+    }
+  }
+
+  public struct TasksSetStatusesInputColumnsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var label: String?
+
+    public init(id: String? = nil, label: String? = nil) {
+      self.id = id
+      self.label = label
+    }
+  }
+
+  public struct TasksSetStatusesInput: Sendable, Hashable, Codable {
+    public var boardId: String?
+    public var columns: [TasksSetStatusesInputColumnsItem]?
+
+    public init(boardId: String? = nil, columns: [TasksSetStatusesInputColumnsItem]? = nil) {
+      self.boardId = boardId
+      self.columns = columns
+    }
+  }
+
+  public struct TasksSetStatusesOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksGetInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public enum TasksGetOutputTaskPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum TasksGetOutputTaskRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksGetOutputTaskHandoffState: Sendable, Hashable, Codable {
+    case starting
+    case working
+    case needs_input
+    case replied
+    case ready
+    case failed
+    case archived
+    case deleted
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "starting": self = .starting
+      case "working": self = .working
+      case "needs-input": self = .needs_input
+      case "replied": self = .replied
+      case "ready": self = .ready
+      case "failed": self = .failed
+      case "archived": self = .archived
+      case "deleted": self = .deleted
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .starting: try container.encode("starting")
+      case .working: try container.encode("working")
+      case .needs_input: try container.encode("needs-input")
+      case .replied: try container.encode("replied")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .archived: try container.encode("archived")
+      case .deleted: try container.encode("deleted")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetOutputTaskHandoff: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var state: TasksGetOutputTaskHandoffState?
+    public var note: String?
+    public var agent: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, state: TasksGetOutputTaskHandoffState? = nil, note: String? = nil, agent: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.state = state
+      self.note = note
+      self.agent = agent
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TasksGetOutputTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TasksGetOutputTaskPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: TasksGetOutputTaskSubtasks?
+    public var recurrence: TasksGetOutputTaskRecurrence?
+    public var reminderAt: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var doneAt: Double?
+    public var archived: Bool?
+    public var handoff: TasksGetOutputTaskHandoff?
+    public var openThreads: Double?
+    public var links: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksGetOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksGetOutputTaskSubtasks? = nil, recurrence: TasksGetOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksGetOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.status = status
+      self.statusLabel = statusLabel
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.doneAt = doneAt
+      self.archived = archived
+      self.handoff = handoff
+      self.openThreads = openThreads
+      self.links = links
+    }
+  }
+
+  public enum TasksGetOutputLinksItemTarget: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetOutputLinksItem: Sendable, Hashable, Codable {
+    public var target: TasksGetOutputLinksItemTarget?
+    public var pluginId: String?
+    public var itemId: String?
+    public var label: String?
+    public var href: String?
+
+    public init(target: TasksGetOutputLinksItemTarget? = nil, pluginId: String? = nil, itemId: String? = nil, label: String? = nil, href: String? = nil) {
+      self.target = target
+      self.pluginId = pluginId
+      self.itemId = itemId
+      self.label = label
+      self.href = href
+    }
+  }
+
+  public enum TasksGetOutputHandoffsItemState: Sendable, Hashable, Codable {
+    case starting
+    case working
+    case needs_input
+    case replied
+    case ready
+    case failed
+    case archived
+    case deleted
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "starting": self = .starting
+      case "working": self = .working
+      case "needs-input": self = .needs_input
+      case "replied": self = .replied
+      case "ready": self = .ready
+      case "failed": self = .failed
+      case "archived": self = .archived
+      case "deleted": self = .deleted
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .starting: try container.encode("starting")
+      case .working: try container.encode("working")
+      case .needs_input: try container.encode("needs-input")
+      case .replied: try container.encode("replied")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .archived: try container.encode("archived")
+      case .deleted: try container.encode("deleted")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksGetOutputHandoffsItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var state: TasksGetOutputHandoffsItemState?
+    public var note: String?
+    public var agent: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, state: TasksGetOutputHandoffsItemState? = nil, note: String? = nil, agent: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.state = state
+      self.note = note
+      self.agent = agent
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TasksGetOutput: Sendable, Hashable, Codable {
+    public var task: TasksGetOutputTask?
+    public var links: [TasksGetOutputLinksItem]?
+    public var handoffs: [TasksGetOutputHandoffsItem]?
+
+    public init(task: TasksGetOutputTask? = nil, links: [TasksGetOutputLinksItem]? = nil, handoffs: [TasksGetOutputHandoffsItem]? = nil) {
+      self.task = task
+      self.links = links
+      self.handoffs = handoffs
+    }
+  }
+
+  public enum TasksCreateInputPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksCreateInputRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksCreateInput: Sendable, Hashable, Codable {
+    public var title: String?
+    public var description: String?
+    public var status: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TasksCreateInputPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var recurrence: TasksCreateInputRecurrence?
+    public var reminderAt: Int?
+
+    public init(title: String? = nil, description: String? = nil, status: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksCreateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: TasksCreateInputRecurrence? = nil, reminderAt: Int? = nil) {
+      self.title = title
+      self.description = description
+      self.status = status
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+    }
+  }
+
+  public enum TasksCreateOutputTaskPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksCreateOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum TasksCreateOutputTaskRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksCreateOutputTaskHandoffState: Sendable, Hashable, Codable {
+    case starting
+    case working
+    case needs_input
+    case replied
+    case ready
+    case failed
+    case archived
+    case deleted
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "starting": self = .starting
+      case "working": self = .working
+      case "needs-input": self = .needs_input
+      case "replied": self = .replied
+      case "ready": self = .ready
+      case "failed": self = .failed
+      case "archived": self = .archived
+      case "deleted": self = .deleted
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .starting: try container.encode("starting")
+      case .working: try container.encode("working")
+      case .needs_input: try container.encode("needs-input")
+      case .replied: try container.encode("replied")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .archived: try container.encode("archived")
+      case .deleted: try container.encode("deleted")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksCreateOutputTaskHandoff: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var state: TasksCreateOutputTaskHandoffState?
+    public var note: String?
+    public var agent: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, state: TasksCreateOutputTaskHandoffState? = nil, note: String? = nil, agent: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.state = state
+      self.note = note
+      self.agent = agent
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TasksCreateOutputTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TasksCreateOutputTaskPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: TasksCreateOutputTaskSubtasks?
+    public var recurrence: TasksCreateOutputTaskRecurrence?
+    public var reminderAt: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var doneAt: Double?
+    public var archived: Bool?
+    public var handoff: TasksCreateOutputTaskHandoff?
+    public var openThreads: Double?
+    public var links: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksCreateOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TasksCreateOutputTaskSubtasks? = nil, recurrence: TasksCreateOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TasksCreateOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.status = status
+      self.statusLabel = statusLabel
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.doneAt = doneAt
+      self.archived = archived
+      self.handoff = handoff
+      self.openThreads = openThreads
+      self.links = links
+    }
+  }
+
+  public struct TasksCreateOutput: Sendable, Hashable, Codable {
+    public var task: TasksCreateOutputTask?
+
+    public init(task: TasksCreateOutputTask? = nil) {
+      self.task = task
+    }
+  }
+
+  public enum TasksUpdateInputPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TasksUpdateInputRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksUpdateInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TasksUpdateInputPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var recurrence: TasksUpdateInputRecurrence?
+    public var reminderAt: Int?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TasksUpdateInputPriority? = nil, labels: [String]? = nil, parentId: String? = nil, recurrence: TasksUpdateInputRecurrence? = nil, reminderAt: Int? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+    }
+  }
+
+  public struct TasksUpdateOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksMoveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var status: String?
+    public var index: Int?
+
+    public init(id: String? = nil, status: String? = nil, index: Int? = nil) {
+      self.id = id
+      self.status = status
+      self.index = index
+    }
+  }
+
+  public struct TasksMoveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+    public var archivedThreads: Double?
+
+    public init(ok: Bool? = nil, archivedThreads: Double? = nil) {
+      self.ok = ok
+      self.archivedThreads = archivedThreads
+    }
+  }
+
+  public struct TasksArchiveInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var archived: Bool?
+
+    public init(id: String? = nil, archived: Bool? = nil) {
+      self.id = id
+      self.archived = archived
+    }
+  }
+
+  public struct TasksArchiveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksDeleteInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TasksDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public enum TasksLinkInputLinkTarget: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksLinkInputLink: Sendable, Hashable, Codable {
+    public var target: TasksLinkInputLinkTarget?
+    public var pluginId: String?
+    public var itemId: String?
+    public var label: String?
+    public var href: String?
+
+    public init(target: TasksLinkInputLinkTarget? = nil, pluginId: String? = nil, itemId: String? = nil, label: String? = nil, href: String? = nil) {
+      self.target = target
+      self.pluginId = pluginId
+      self.itemId = itemId
+      self.label = label
+      self.href = href
+    }
+  }
+
+  public struct TasksLinkInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var link: TasksLinkInputLink?
+
+    public init(id: String? = nil, link: TasksLinkInputLink? = nil) {
+      self.id = id
+      self.link = link
+    }
+  }
+
+  public struct TasksLinkOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public enum TasksUnlinkInputTarget: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksUnlinkInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var target: TasksUnlinkInputTarget?
+    public var itemId: String?
+
+    public init(id: String? = nil, target: TasksUnlinkInputTarget? = nil, itemId: String? = nil) {
+      self.id = id
+      self.target = target
+      self.itemId = itemId
+    }
+  }
+
+  public struct TasksUnlinkOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksLinkablesInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
+    }
+  }
+
+  public enum TasksLinkablesOutputItemsItemTarget: Sendable, Hashable, Codable {
+    case thread
+    case item
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "thread": self = .thread
+      case "item": self = .item
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .thread: try container.encode("thread")
+      case .item: try container.encode("item")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksLinkablesOutputItemsItem: Sendable, Hashable, Codable {
+    public var target: TasksLinkablesOutputItemsItemTarget?
+    public var pluginId: String?
+    public var itemId: String?
+    public var label: String?
+    public var href: String?
+    public var kind: String?
+    public var icon: String?
+
+    public init(target: TasksLinkablesOutputItemsItemTarget? = nil, pluginId: String? = nil, itemId: String? = nil, label: String? = nil, href: String? = nil, kind: String? = nil, icon: String? = nil) {
+      self.target = target
+      self.pluginId = pluginId
+      self.itemId = itemId
+      self.label = label
+      self.href = href
+      self.kind = kind
+      self.icon = icon
+    }
+  }
+
+  public struct TasksLinkablesOutput: Sendable, Hashable, Codable {
+    public var items: [TasksLinkablesOutputItemsItem]?
+    public var errors: [String]?
+
+    public init(items: [TasksLinkablesOutputItemsItem]? = nil, errors: [String]? = nil) {
+      self.items = items
+      self.errors = errors
+    }
+  }
+
+  public struct TasksHandoffDefaultsInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+
+    public init(projectId: String? = nil) {
+      self.projectId = projectId
+    }
+  }
+
+  public struct TasksHandoffDefaultsOutput: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+    }
+  }
+
+  public enum TasksHandOffInputWorkspace: Sendable, Hashable, Codable {
+    case worktree
+    case folder
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "worktree": self = .worktree
+      case "folder": self = .folder
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .worktree: try container.encode("worktree")
+      case .folder: try container.encode("folder")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TasksHandOffInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: String?
+    public var note: String?
+    public var workspace: TasksHandOffInputWorkspace?
+
+    public init(id: String? = nil, projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: String? = nil, note: String? = nil, workspace: TasksHandOffInputWorkspace? = nil) {
+      self.id = id
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.note = note
+      self.workspace = workspace
+    }
+  }
+
+  public struct TasksHandOffOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct TasksBotsOutputBotsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+
+    public init(id: String? = nil, name: String? = nil) {
+      self.id = id
+      self.name = name
+    }
+  }
+
+  public struct TasksBotsOutput: Sendable, Hashable, Codable {
+    public var bots: [TasksBotsOutputBotsItem]?
+
+    public init(bots: [TasksBotsOutputBotsItem]? = nil) {
+      self.bots = bots
+    }
+  }
+
+  public struct TasksHandOffBotInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var note: String?
+
+    public init(id: String? = nil, note: String? = nil) {
+      self.id = id
+      self.note = note
+    }
+  }
+
+  public struct TasksHandOffBotOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct TasksSyncCheckboxInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var checked: Bool?
+
+    public init(id: String? = nil, checked: Bool? = nil) {
+      self.id = id
+      self.checked = checked
+    }
+  }
+
+  public struct TasksSyncCheckboxOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct TasksSendBackInput: Sendable, Hashable, Codable {
+    public var id: String?
+    public var message: String?
+
+    public init(id: String? = nil, message: String? = nil) {
+      self.id = id
+      self.message = message
+    }
+  }
+
+  public struct TasksSendBackOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct TasksArchiveThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct TasksArchiveThreadsOutput: Sendable, Hashable, Codable {
+    public var archived: Double?
+    public var failed: Double?
+
+    public init(archived: Double? = nil, failed: Double? = nil) {
+      self.archived = archived
+      self.failed = failed
+    }
+  }
+
+  public struct TasksSettingsOutput: Sendable, Hashable, Codable {
+    public var archiveThreadsOnDone: Bool?
+
+    public init(archiveThreadsOnDone: Bool? = nil) {
+      self.archiveThreadsOnDone = archiveThreadsOnDone
     }
   }
 

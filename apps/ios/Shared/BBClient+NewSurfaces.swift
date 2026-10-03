@@ -10,24 +10,24 @@ extension BBClient {
         ]))
     }
 
-    public func taskStatuses(projectId: String?) async throws -> [Tasks.StatusesOutputColumnsItem] {
-        let result: Tasks.StatusesOutput = try await rpc("studio-tasks", Tasks.Method.statuses, [
+    public func taskStatuses(projectId: String?) async throws -> [Studio.TasksStatusesOutputColumnsItem] {
+        let result: Studio.TasksStatusesOutput = try await rpc("studio", Studio.Method.tasks_statuses, [
             "projectId": projectId.map(JSONValue.string) ?? .null,
         ])
         return result.columns ?? []
     }
 
-    public func taskGenerated(_ id: String) async throws -> Tasks.GetOutput {
-        try await rpc("studio-tasks", Tasks.Method.get, ["id": .string(id)])
+    public func taskGenerated(_ id: String) async throws -> Studio.TasksGetOutput {
+        try await rpc("studio", Studio.Method.tasks_get, ["id": .string(id)])
     }
 
-    public func taskSubtasks(_ id: String) async throws -> [Tasks.BoardOutputTasksItem] {
-        let result: Tasks.BoardOutput = try await rpc("studio-tasks", Tasks.Method.board, ["includeArchived": .bool(false)])
+    public func taskSubtasks(_ id: String) async throws -> [Studio.TasksBoardOutputTasksItem] {
+        let result: Studio.TasksBoardOutput = try await rpc("studio", Studio.Method.tasks_board, ["includeArchived": .bool(false)])
         return (result.tasks ?? []).filter { $0.parentId == id }
     }
 
     public func updateTaskFields(_ id: String, priority: String, labels: [String], recurrence: String?, reminderAt: Date?) async throws {
-        let _: Tasks.UpdateOutput = try await rpc("studio-tasks", Tasks.Method.update, [
+        let _: Studio.TasksUpdateOutput = try await rpc("studio", Studio.Method.tasks_update, [
             "id": .string(id), "priority": .string(priority),
             "labels": .array(labels.map(JSONValue.string)),
             "recurrence": recurrence.map(JSONValue.string) ?? .null,
@@ -36,14 +36,14 @@ extension BBClient {
     }
 
     public func createSubtask(_ title: String, parentId: String, projectId: String?) async throws {
-        let _: Tasks.CreateOutput = try await rpc("studio-tasks", Tasks.Method.create, [
+        let _: Studio.TasksCreateOutput = try await rpc("studio", Studio.Method.tasks_create, [
             "title": .string(title), "parentId": .string(parentId),
             "projectId": projectId.map(JSONValue.string) ?? .null,
         ])
     }
 
     public func sendTaskToBot(_ id: String) async throws -> String {
-        let result: Tasks.HandOffBotOutput = try await rpc("studio-tasks", Tasks.Method.handOffBot, [
+        let result: Studio.TasksHandOffBotOutput = try await rpc("studio", Studio.Method.tasks_handOffBot, [
             "id": .string(id), "note": .null,
         ])
         return result.threadId ?? ""

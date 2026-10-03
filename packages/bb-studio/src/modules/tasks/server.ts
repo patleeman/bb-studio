@@ -1089,16 +1089,16 @@ export default async function plugin(bb: BbPluginApi) {
     },
   }));
 
-  // CLI: `bb studio-tasks …`
+  // CLI: `bb studio studio-tasks …`
   const usage = {
-    boards: "bb studio-tasks boards",
-    board: "bb studio-tasks board <title> [--global]",
-    list: "bb studio-tasks list [--board <id>] [--status todo|in_progress|review|done]",
-    add: "bb studio-tasks add <title> [--board <id>] [--description <text>] [--due <YYYY-MM-DD>] [--priority <level>] [--labels <comma-separated>] [--repeat <frequency>] [--parent <task-id>] [--bot <id>|--me]",
-    show: "bb studio-tasks show <id>",
-    move: "bb studio-tasks move <id> <status>",
-    hand: "bb studio-tasks hand <id> [--note <text>] [--folder]",
-    done: "bb studio-tasks done <id>",
+    boards: "bb studio studio-tasks boards",
+    board: "bb studio studio-tasks board <title> [--global]",
+    list: "bb studio studio-tasks list [--board <id>] [--status todo|in_progress|review|done]",
+    add: "bb studio studio-tasks add <title> [--board <id>] [--description <text>] [--due <YYYY-MM-DD>] [--priority <level>] [--labels <comma-separated>] [--repeat <frequency>] [--parent <task-id>] [--bot <id>|--me]",
+    show: "bb studio studio-tasks show <id>",
+    move: "bb studio studio-tasks move <id> <status>",
+    hand: "bb studio studio-tasks hand <id> [--note <text>] [--folder]",
+    done: "bb studio studio-tasks done <id>",
   };
   bb.cli.register({
     name: "studio-tasks",
@@ -1206,3 +1206,5 @@ export default async function plugin(bb: BbPluginApi) {
     bb.log.info("disposed");
   });
 }
+
+export async function registerServer(ctx: import("../runtime").ModuleContext) { await plugin(ctx.bb); }

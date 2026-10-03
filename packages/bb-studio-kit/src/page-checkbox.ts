@@ -12,9 +12,9 @@ export function pageCheckboxes(markdown: string): PageCheckbox[] {
   const pattern = /<!-- \^([a-zA-Z0-9]{8}) -->\n([ \t]*- \[([ xX])\] ([^\n]*))/g;
   for (const match of markdown.matchAll(pattern)) {
     const line = match[2]!;
-    const taskId = /\]\(item:studio-tasks:(tsk_[a-z0-9]+)\)/.exec(line)?.[1] ?? null;
+    const taskId = /\]\(item:(?:studio-tasks|studio):(tsk_[a-z0-9]+)\)/.exec(line)?.[1] ?? null;
     found.push({ blockId: match[1]!, checked: match[3]!.toLowerCase() === "x",
-      title: match[4]!.replace(/\s*\[[^\]]+\]\(item:studio-tasks:tsk_[a-z0-9]+\)/, "").trim(), taskId, line });
+      title: match[4]!.replace(/\s*\[[^\]]+\]\(item:(?:studio-tasks|studio):tsk_[a-z0-9]+\)/, "").trim(), taskId, line });
   }
   return found;
 }

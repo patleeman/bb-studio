@@ -10,7 +10,7 @@ import { MIGRATIONS, TaskStore } from "./store";
 it("tracks a finding once across concurrent calls and retries, with Studio optional", async () => {
   const inherited: unknown[] = [];
   let studioAvailable = true;
-  const host = createFakePluginHost({ pluginId: "studio-tasks", sdk: {
+  const host = createFakePluginHost({ pluginId: "studio", sdk: {
     threads: { get: async ({ threadId }) => makeThreadResponse({ id: threadId, projectId: "proj_source", title: "Retry design" }) },
     plugins: { callRpc: async ({ method, input }) => { if (!studioAvailable) throw new Error("Studio unavailable"); if (method === "linkItemThread") inherited.push(input); return { ok: true } as never; } },
   } });
@@ -25,7 +25,7 @@ it("tracks a finding once across concurrent calls and retries, with Studio optio
     expect(task).toMatchObject({ projectId: "proj_source", status: "todo" });
     expect(task.description).toContain("/threads/thr_source");
     expect(task.description).toContain("msg_source");
-    expect(inherited).toContainEqual(expect.objectContaining({ thread: expect.objectContaining({ threadId: "thr_source", ref: { pluginId: "studio-tasks", id: task.id }, role: "created" }) }));
+    expect(inherited).toContainEqual(expect.objectContaining({ thread: expect.objectContaining({ threadId: "thr_source", ref: { pluginId: "studio", id: task.id }, role: "created" }) }));
     const full = await host.harness.behavior.callRpc("get", { id: task.id }) as { links: { itemId: string }[]; handoffs: unknown[] };
     expect(full.links.map(link => link.itemId).sort()).toEqual(["pg_explainer", "thr_source"]);
     expect(full.handoffs).toEqual([]);

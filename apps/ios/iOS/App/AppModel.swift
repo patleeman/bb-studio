@@ -46,7 +46,7 @@ extension Route {
         case ("artifacts", "artifacts"): self = .artifact(id: id)
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
-        case ("studio-tasks", "tasks"): self = .task(id: id)
+        case ("studio-tasks", "tasks"), ("studio", "tasks"): self = .task(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"): self = .bot(id: id)
         // Channels lived at /views/<id>; both open the same channel.

@@ -257,7 +257,7 @@ export function TaskView({ taskId, onBack, onOpenBoard, compact = false }: {
             </div>
           </Property>
           <Property label="Priority">
-            <Select label="Priority" value={task.priority} options={PRIORITIES.map((value) => ({ value, label: value[0]!.toUpperCase() + value.slice(1), icon: "studio-tasks/flag" }))} onChange={(priority) => void update({ priority: priority as Task["priority"] })} />
+            <Select label="Priority" value={task.priority} options={PRIORITIES.map((value) => ({ value, label: value[0]!.toUpperCase() + value.slice(1), icon: "studio/flag" }))} onChange={(priority) => void update({ priority: priority as Task["priority"] })} />
           </Property>
           <Property label="Labels">
             <input aria-label="Labels" defaultValue={task.labels.join(", ")} key={task.labels.join(",")}

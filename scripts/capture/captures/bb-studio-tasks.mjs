@@ -6,7 +6,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
   ...(process.env.BB_CAPTURE_TASKS_DISPATCH === "1" ? [dispatch({ projectId, pluginRpc, bbCli, sleep })] : []),
   {
     id: "studio-tasks",
-    packageDir: "bb-studio-tasks",
+    packageDir: "bb-studio/src/modules/tasks",
     privateSidebar: true,
     setup: async (client) => {
       const seeded = [
@@ -20,21 +20,21 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       let boardId = null;
       // Deleting the board deletes its tasks.
       const cleanup = async () => {
-        if (boardId) await pluginRpc("studio-tasks", "boardDelete", { id: boardId }).catch(() => {});
+        if (boardId) await pluginRpc("studio", "tasks_boardDelete", { id: boardId }).catch(() => {});
       };
       try {
-        ({ board: { id: boardId } } = await pluginRpc("studio-tasks", "boardCreate", { title: "Fall launch", projectId }));
+        ({ board: { id: boardId } } = await pluginRpc("studio", "tasks_boardCreate", { title: "Fall launch", projectId }));
         for (const task of seeded) {
-          const { task: created } = await pluginRpc("studio-tasks", "create", { ...task, projectId, boardId });
+          const { task: created } = await pluginRpc("studio", "tasks_create", { ...task, projectId, boardId });
           ids.push(created.id);
         }
-        const { task: subtask } = await pluginRpc("studio-tasks", "create", { title: "Review the launch draft", projectId, parentId: ids[0], priority: "medium" });
+        const { task: subtask } = await pluginRpc("studio", "tasks_create", { title: "Review the launch draft", projectId, parentId: ids[0], priority: "medium" });
         ids.push(subtask.id);
         // The boards index lists the seeded board, then it opens on its own page.
-        await client.navigate("/plugins/studio-tasks/tasks");
+        await client.navigate("/plugins/studio/tasks");
         await client.waitForText("Boards");
         await client.waitForText("Fall launch");
-        await client.navigate(`/plugins/studio-tasks/tasks/${boardId}`);
+        await client.navigate(`/plugins/studio/tasks/${boardId}`);
         await client.waitForInputValue("Board title", "Fall launch");
         for (const column of ["To do", "In progress", "Review", "Done"]) await client.waitForText(column);
         for (const task of seeded) await client.waitForText(task.title);

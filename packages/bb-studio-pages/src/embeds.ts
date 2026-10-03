@@ -11,7 +11,7 @@ import { z } from "zod";
 import { PLUGIN_ID, spaceWidgetSchema, type BoardCard, type RecordingCard, type TaskCard, type TaskColumn } from "./contract";
 
 const MAX_TEXT = 20_000;
-const TASKS_PLUGIN_ID = "studio-tasks";
+const TASKS_PLUGIN_ID = "studio";
 const TALK_PLUGIN_ID = "talk";
 const STUDIO_PLUGIN_ID = "studio";
 
@@ -120,28 +120,28 @@ export function studioEmbeds(sdk: Sdk, studio: StudioSchemas) {
       return result;
     },
     async task(id: string): Promise<{ task: TaskCard | null; columns: TaskColumn[] }> {
-      const { task } = await call(TASKS_PLUGIN_ID, "get", { id }, taskSchema);
+      const { task } = await call(TASKS_PLUGIN_ID, "tasks_get", { id }, taskSchema);
       if (!task) return { task: null, columns: [] };
-      const { columns } = await call(TASKS_PLUGIN_ID, "statuses", task.boardId ? { boardId: task.boardId } : { projectId: task.projectId }, columnsSchema);
+      const { columns } = await call(TASKS_PLUGIN_ID, "tasks_statuses", task.boardId ? { boardId: task.boardId } : { projectId: task.projectId }, columnsSchema);
       return { task, columns };
     },
     async updateTask({ id, status, index, ...fields }: { id: string; title?: string; status?: string; index?: number; due?: string | null }) {
-      if (Object.keys(fields).length) await call(TASKS_PLUGIN_ID, "update", { id, ...fields }, okSchema);
-      if (status) await call(TASKS_PLUGIN_ID, "move", { id, status, ...(index !== undefined ? { index } : {}) }, okSchema.extend({ archivedThreads: z.number() }));
+      if (Object.keys(fields).length) await call(TASKS_PLUGIN_ID, "tasks_update", { id, ...fields }, okSchema);
+      if (status) await call(TASKS_PLUGIN_ID, "tasks_move", { id, status, ...(index !== undefined ? { index } : {}) }, okSchema.extend({ archivedThreads: z.number() }));
       return { ok: true };
     },
     /** A board and its open tasks, top-level and subtasks alike, in board order. */
     async board(id: string): Promise<{ board: BoardCard | null; tasks: TaskCard[] }> {
-      const { board, tasks } = await call(TASKS_PLUGIN_ID, "board", { boardId: id }, boardSchema);
+      const { board, tasks } = await call(TASKS_PLUGIN_ID, "tasks_board", { boardId: id }, boardSchema);
       return { board, tasks: board ? tasks.filter((task) => !task.archived) : [] };
     },
     async renameBoard(id: string, title: string) {
-      await call(TASKS_PLUGIN_ID, "boardUpdate", { id, title }, okSchema);
+      await call(TASKS_PLUGIN_ID, "tasks_boardUpdate", { id, title }, okSchema);
       index.invalidate();
       return { ok: true };
     },
     async createBoardTask(boardId: string, title: string, status?: string) {
-      const { task } = await call(TASKS_PLUGIN_ID, "create", { boardId, title, ...(status ? { status } : {}) }, z.object({ task: z.object({ id: z.string() }) }));
+      const { task } = await call(TASKS_PLUGIN_ID, "tasks_create", { boardId, title, ...(status ? { status } : {}) }, z.object({ task: z.object({ id: z.string() }) }));
       index.invalidate();
       return { taskId: task.id };
     },

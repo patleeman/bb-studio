@@ -3,7 +3,7 @@ import { expect, it } from "vitest";
 import plugin from "../../server";
 
 async function setup(hostId: string | null) {
-  const host = createFakePluginHost({ pluginId: "studio-tasks", sdk: {
+  const host = createFakePluginHost({ pluginId: "studio", sdk: {
     system: { config: async () => ({ primaryHostId: hostId }) as never },
     plugins: { callRpc: async () => { throw new Error("Optional Studio service unavailable"); } },
     providers: { list: async () => [] },

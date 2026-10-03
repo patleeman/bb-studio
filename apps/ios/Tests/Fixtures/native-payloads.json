@@ -96,8 +96,8 @@
   },
   {
     "id": "task-fields",
-    "plugin": "studio-tasks",
-    "method": "update",
+    "plugin": "studio",
+    "method": "tasks_update",
     "input": {
       "id": "tsk_contract",
       "priority": "high",
@@ -113,8 +113,8 @@
   },
   {
     "id": "task-create",
-    "plugin": "studio-tasks",
-    "method": "create",
+    "plugin": "studio",
+    "method": "tasks_create",
     "input": {
       "title": "Contract task",
       "description": "Task body",
@@ -156,8 +156,8 @@
   },
   {
     "id": "task-handoff",
-    "plugin": "studio-tasks",
-    "method": "handOff",
+    "plugin": "studio",
+    "method": "tasks_handOff",
     "input": {
       "id": "tsk_contract",
       "projectId": null,

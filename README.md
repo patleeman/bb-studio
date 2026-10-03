@@ -15,7 +15,6 @@ agent.
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
-| [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | Boards of tasks you can hand to agents and embed in pages; each task follows its thread from working to review. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bot profiles and saved views of ordinary threads, with shared memory and missions. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
 | [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
@@ -24,7 +23,7 @@ agent.
 | [Studio Decisions](packages/bb-studio-decisions/) | `smart-decisions` | One place to set up the fast Jev model and a fallback model. Runs Smart Queue, which steers or queues a message sent to a busy thread, and chooses recipients in Studio Teams views. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
-Tables, Chat and Feed are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
+Tables, Chat, Feed and Tasks are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
 all. Studio Teams needs Studio Decisions to choose recipients in views, and Studio
 Explore needs Studio Pages.
@@ -57,7 +56,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
-   - studio-tasks: a task board you hand to agents
    - bot-teams: bot profiles and saved thread views
    - float: a panel of tabs for threads, views and Studio items, docked
      or dragged anywhere
@@ -117,7 +115,7 @@ pnpm test
 pnpm check:compat        # every plugin installs on the current stable BB
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
-scripts/refresh-locks.sh bb-studio-tasks  # refresh a plugin npm lock in a clean clone
+scripts/refresh-locks.sh bb-studio  # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
 node scripts/staged-bb.mjs start --plugin studio # all plugins, only this capture's fixtures
 ```

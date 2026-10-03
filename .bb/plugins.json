@@ -32,10 +32,6 @@
       "source": "./packages/bb-studio-artifacts"
     },
     {
-      "name": "studio-tasks",
-      "source": "./packages/bb-studio-tasks"
-    },
-    {
       "name": "bot-teams",
       "source": "./packages/bb-studio-teams"
     },

@@ -17,7 +17,7 @@ describe("mentionContext", () => {
       new Date(2026, 9, 1, 12),
     );
     expect(text).toContain('Studio task "Write the [launch] post" (id tsk_0123456789abcdef): In progress, assigned to an agent, due Tomorrow (2026-10-02).');
-    expect(text).toContain("[Write the launch post](/plugins/studio-tasks/tasks/tsk_0123456789abcdef)");
+    expect(text).toContain("[Write the launch post](/plugins/studio/tasks/tsk_0123456789abcdef)");
     expect(text).toContain("Linked: Launch plan");
     expect(text).toContain("Its thread: Agent needs your input");
   });

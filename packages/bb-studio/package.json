@@ -24,7 +24,10 @@
         "link": "./icons/link.svg",
         "bookmark": "./icons/bookmark.svg",
         "feed": "./src/modules/feed/icons/feed.svg",
-        "mark-read": "./src/modules/feed/icons/mark-read.svg"
+        "mark-read": "./src/modules/feed/icons/mark-read.svg",
+        "task": "./src/modules/tasks/assets/icon.svg",
+        "board": "./src/modules/tasks/assets/icon-board.svg",
+        "flag": "./src/modules/tasks/assets/icon-flag.svg"
       }
     },
     "server": "./server.ts",

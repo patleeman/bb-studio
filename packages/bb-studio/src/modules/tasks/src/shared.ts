@@ -1,11 +1,11 @@
 // Names, statuses and labels the server and the app share.
 import type { StudioTone } from "@bb-studio/kit/contract";
 
-export const PLUGIN_ID = "studio-tasks";
-/** The nav panel: /plugins/studio-tasks/tasks lists boards; tasks/<id> is a board or a task. */
+export const PLUGIN_ID = "studio";
+/** The nav panel: /plugins/studio/tasks lists boards; tasks/<id> is a board or a task. */
 export const PANEL_PATH = "tasks";
-export const TASK_ICON = "studio-tasks/task";
-export const BOARD_ICON = "studio-tasks/board";
+export const TASK_ICON = "studio/task";
+export const BOARD_ICON = "studio/board";
 /** Realtime channel: the server says when a task changed. */
 export const REALTIME_CHANNEL = "tasks";
 export const TASK_UPDATE_TYPE = "task:updated";

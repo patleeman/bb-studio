@@ -31,7 +31,7 @@ another desktop chat panel.
 | Draw | Retained canvas, shared item Chat and companion-aware related references | [Original first-move canvas and compact header](../packages/bb-studio-draw/README.md) |
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio-artifacts/README.md) |
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio/src/modules/tables/README.md) |
-| Tasks | Shared task/board header; current/earlier handoffs, discussions and dispatch use companions | [Retained handoff composer and real bot dispatch](../packages/bb-studio-tasks/README.md) |
+| Tasks | Shared task/board header; current/earlier handoffs, discussions and dispatch use companions | [Retained handoff composer and real bot dispatch](../packages/bb-studio/src/modules/tasks/README.md) |
 | Teams | Bot Chat, channels and member-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Channel composer/file retention and conversation reuse](../packages/bb-studio-teams/README.md) |
 | Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio/src/modules/feed/README.md) |
 | Explore | Shared explainer/page destinations; old owner-scoped panel and main fallback when companions are absent | [Explainer/page reuse and retained state](../packages/bb-studio-explore/README.md) |
@@ -74,7 +74,7 @@ requested placement and one saved tab for its target.
 | Artifacts | HTML iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-artifacts/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-artifacts/assets/companion-transfers-native.png) |
 | Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio-talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-talk/assets/companion-transfers-native.png) |
 | Tables | Title input and seeded table row | [Main](../packages/bb-studio/src/modules/tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/tables/assets/companion-transfers-native.png) |
-| Tasks | Board title input and seeded task | [Main](../packages/bb-studio-tasks/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tasks/assets/companion-transfers-native.png) |
+| Tasks | Board title input and seeded task | [Main](../packages/bb-studio/src/modules/tasks/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio/src/modules/tasks/assets/companion-transfers-native.png) |
 | Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](../packages/bb-studio-teams/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-teams/assets/companion-transfers-native.png) |
 
 These checks exposed three defects: Teams reset resolved model defaults and

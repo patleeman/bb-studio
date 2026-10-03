@@ -47,16 +47,16 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     func testTaskFieldsAndRelated() throws {
-        let task = try XCTUnwrap(rpc("studio-tasks", "create", [
+        let task = try XCTUnwrap(rpc("studio", "tasks_create", [
             "title": "QA iOS7 task", "description": "Search and task fields", "projectId": projectId,
         ])?["task"] as? [String: Any])
         let id = try XCTUnwrap(task["id"] as? String)
         addTeardownBlock {
-            let tasks = self.rpc("studio-tasks", "board", ["includeArchived": true])?["tasks"] as? [[String: Any]] ?? []
+            let tasks = self.rpc("studio", "tasks_board", ["includeArchived": true])?["tasks"] as? [[String: Any]] ?? []
             for child in tasks where child["parentId"] as? String == id || child["title"] as? String == "QA iOS7 subtask" {
-                if let childId = child["id"] as? String { _ = self.rpc("studio-tasks", "delete", ["id": childId]) }
+                if let childId = child["id"] as? String { _ = self.rpc("studio", "tasks_delete", ["id": childId]) }
             }
-            _ = self.rpc("studio-tasks", "delete", ["id": id])
+            _ = self.rpc("studio", "tasks_delete", ["id": id])
         }
         let app = launch()
         app.open(URL(string: "bbstudio://task/\(id)")!)
@@ -70,7 +70,7 @@ final class NewSurfacesUITests: XCTestCase {
         subtask.typeText("QA iOS7 subtask")
         app.buttons["Add"].tap()
         if !app.staticTexts["QA iOS7 subtask"].waitForExistence(timeout: 10) {
-            let tasks = rpc("studio-tasks", "board", ["includeArchived": false])?["tasks"] as? [[String: Any]] ?? []
+            let tasks = rpc("studio", "tasks_board", ["includeArchived": false])?["tasks"] as? [[String: Any]] ?? []
             XCTAssertTrue(tasks.contains { $0["title"] as? String == "QA iOS7 subtask" && $0["parentId"] == nil },
                 "The subtask should appear when the updated Tasks plugin is installed")
         }

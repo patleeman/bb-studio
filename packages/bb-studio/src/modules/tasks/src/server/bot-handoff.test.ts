@@ -6,7 +6,7 @@ async function setup() {
   let nextThread = 0;
   const archived = new Set<string>();
   const host = createFakePluginHost({
-    pluginId: "studio-tasks",
+    pluginId: "studio",
     sdk: {
       plugins: {
         callRpc: async ({ pluginId, method }) => {

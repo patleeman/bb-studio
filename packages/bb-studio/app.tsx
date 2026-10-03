@@ -1,3 +1,4 @@
+import { registerApp as registerTasks } from "./src/modules/tasks/app";
 import { registerApp as registerFeed } from "./src/modules/feed/app";
 import { ModuleNotice } from "./src/modules/Notice";
 import { registerApp as registerTables } from "./src/modules/tables/app";
@@ -26,6 +27,7 @@ function StudioRoot({ subPath }: { subPath: string }) {
 
 export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "module-import-notice", component: ModuleNotice });
+  registerTasks(app);
   registerFeed(app);
   registerTables(app);
   registerChat(app);

@@ -313,18 +313,18 @@ export default async function plugin(bb: BbPluginApi) {
       const item = recording.meetingNotes?.actionItems[index];
       if (!item) throw new Error("Action item not found.");
       const created = await bb.sdk.plugins.callRpc({
-        pluginId: "studio-tasks", method: "create",
+        pluginId: "studio", method: "tasks_create",
         input: { title: item.title, description: `From ${recording.title}: /plugins/talk/recordings/${id}`, projectId: recording.projectId, assignee: item.assignee } as never,
         outputSchema: z.object({ task: z.object({ id: z.string() }) }), signal: lifetime.signal,
       });
       const taskId = created.task.id;
       await bb.sdk.plugins.callRpc({
-        pluginId: "studio-tasks", method: "link",
+        pluginId: "studio", method: "tasks_link",
         input: { id: taskId, link: { target: "item", pluginId: "talk", itemId: id, label: recording.title, href: `/plugins/talk/recordings/${id}` } } as never,
         outputSchema: z.object({ ok: z.boolean() }), signal: lifetime.signal,
       });
       await services.replaceLinks({ pluginId: "talk", id }, `meeting-task:${taskId}`, [{
-        from: { pluginId: "talk", id }, to: { pluginId: "studio-tasks", id: taskId }, kind: "task-link", source: `meeting-task:${taskId}`,
+        from: { pluginId: "talk", id }, to: { pluginId: "studio", id: taskId }, kind: "task-link", source: `meeting-task:${taskId}`,
       }]).catch(() => { /* Studio is optional. */ });
       return { taskId };
     },

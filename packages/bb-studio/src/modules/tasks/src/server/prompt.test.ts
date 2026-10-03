@@ -33,7 +33,7 @@ describe("handoffInput", () => {
 
   it("mentions a linked Studio task", () => {
     const input = handoffInput(task, [
-      { target: "item", plugin_id: "studio-tasks", item_id: "tsk_other", label: "Follow-up", href: "/plugins/studio-tasks/tasks/tsk_other" },
+      { target: "item", plugin_id: "studio-tasks", item_id: "tsk_other", label: "Follow-up", href: "/plugins/studio/tasks/tsk_other" },
     ], null, new Date(), new Map([["studio-tasks", "task"]]));
     expect(input.mentions).toEqual([{
       start: input.text.indexOf("@Follow-up"),

@@ -8,8 +8,8 @@ struct TaskFieldsView: View {
     let id: String
     let projectId: String?
     let changed: () -> Void
-    @State private var detail: Tasks.GetOutputTask?
-    @State private var subtasks: [Tasks.BoardOutputTasksItem] = []
+    @State private var detail: Studio.TasksGetOutputTask?
+    @State private var subtasks: [Studio.TasksBoardOutputTasksItem] = []
     @State private var firstStatus = "todo"
     @State private var priority = "none"
     @State private var labels = ""

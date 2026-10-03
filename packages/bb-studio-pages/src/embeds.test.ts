@@ -5,7 +5,7 @@ import { codeLanguageId } from "./ui/code";
 describe("studio embeds", () => {
   it("maps embeds to add-on items and back", () => {
     expect(studioRef("drawing", "drw_1")).toEqual({ pluginId: "excalidraw", id: "drw_1" });
-    expect(studioRef("task", "tsk_1")).toEqual({ pluginId: "studio-tasks", id: "tsk_1" });
+    expect(studioRef("task", "tsk_1")).toEqual({ pluginId: "studio", id: "tsk_1" });
     expect(studioRef("item", "notes:nt_1:a")).toEqual({ pluginId: "notes", id: "nt_1:a" });
     expect(studioRef("item", "notes:")).toBeNull();
     expect(studioRef("drawing", "")).toBeNull();
@@ -19,7 +19,7 @@ describe("studio embeds", () => {
   it("tells a Tasks board from a task", () => {
     expect(studioEmbedFor("studio-tasks", "tsk_0123456789abcdef")).toEqual({ kind: "task", target: "tsk_0123456789abcdef" });
     expect(studioEmbedFor("studio-tasks", "brd_0123456789abcdef")).toEqual({ kind: "board", target: "brd_0123456789abcdef" });
-    expect(studioRef("board", "brd_1/view/list")).toEqual({ pluginId: "studio-tasks", id: "brd_1" });
+    expect(studioRef("board", "brd_1/view/list")).toEqual({ pluginId: "studio", id: "brd_1" });
   });
 
   it("keeps a board embed's view in its target", () => {

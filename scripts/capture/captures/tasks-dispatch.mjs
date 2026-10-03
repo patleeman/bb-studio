@@ -3,7 +3,7 @@ import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 
 export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
-  id: "tasks-dispatch", packageDir: "bb-studio-tasks", fileName: "companion-dispatch.png", privateSidebar: true,
+  id: "tasks-dispatch", packageDir: "bb-studio/src/modules/tasks", fileName: "companion-dispatch.png", privateSidebar: true,
   setup: async client => {
     const dataDir = process.env.BB_DATA_DIR;
     const manifest = await readFile(resolve(dataDir, "../capture.env"), "utf8");
@@ -16,32 +16,32 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
     const botReplies = [];
     const onWire = event => {
       const message = JSON.parse(event.data);
-      if (message.method === "Network.responseReceived" && message.params.response.url.endsWith("/api/v1/plugins/studio-tasks/rpc/handOffBot")) botReplies.push(message.params);
+      if (message.method === "Network.responseReceived" && message.params.response.url.endsWith("/api/v1/plugins/studio/rpc/handOffBot")) botReplies.push(message.params);
     };
     client.socket.addEventListener("message", onWire);
     await client.command("Network.enable");
     const forget = async () => {
       client.socket.removeEventListener("message", onWire);
       for (const task of [agentTask, botTask].filter(Boolean)) {
-        const result = await pluginRpc("studio-tasks", "get", { id: task.id }).catch(() => null);
+        const result = await pluginRpc("studio", "tasks_get", { id: task.id }).catch(() => null);
         for (const handoff of result?.handoffs ?? []) threads.add(handoff.threadId);
       }
       for (const threadId of threads) await bbCli(["thread", "delete", threadId, "--yes", "--json"]);
-      if (boardId) await pluginRpc("studio-tasks", "boardDelete", { id: boardId });
+      if (boardId) await pluginRpc("studio", "tasks_boardDelete", { id: boardId });
       if (bot) {
         await pluginRpc("bot-teams", "retire", { id: bot.id, retired: true });
       }
       await rm(directory, { recursive: true, force: true });
       await client.evaluate("sessionStorage.removeItem('bb-studio-float:windows'); delete window.bbDispatchDraft").catch(() => {});
     };
-    const taskPath = task => `/plugins/studio-tasks/tasks/${task.id}`;
+    const taskPath = task => `/plugins/studio/tasks/${task.id}`;
     const root = id => `[data-float-window=${JSON.stringify(`thread:${id}`)}]`;
     const prompt = id => `${root(id)} [data-promptbox] [contenteditable=true]`;
     const selected = id => `[data-float-tab=${JSON.stringify(`thread:${id}`)}][aria-selected=true]`;
     const handoff = async task => {
       const deadline = Date.now() + 30000;
       do {
-        const result = await pluginRpc("studio-tasks", "get", { id: task.id });
+        const result = await pluginRpc("studio", "tasks_get", { id: task.id });
         if (result.handoffs[0]) { threads.add(result.handoffs[0].threadId); return result; }
         await sleep(100);
       } while (Date.now() < deadline);
@@ -66,9 +66,9 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
       if (!state.same || !state.visible || !state.text?.includes("Keep the dispatch feedback draft.") || !state.file || state.tabs !== 1 || state.path !== taskPath(task)) throw new Error(`Dispatch lost its originating companion: ${JSON.stringify(state)}`);
     };
     try {
-      ({ board: { id: boardId } } = await pluginRpc("studio-tasks", "boardCreate", { title: "Live handoff checks", projectId }));
+      ({ board: { id: boardId } } = await pluginRpc("studio", "tasks_boardCreate", { title: "Live handoff checks", projectId }));
       const description = "This is a staged UI verification. Reply with one sentence acknowledging the fixture. Do not inspect or edit files, run commands, or create more threads. Only update this task to review if required.";
-      ({ task: agentTask } = await pluginRpc("studio-tasks", "create", { title: "Verify an agent handoff", projectId, boardId, description }));
+      ({ task: agentTask } = await pluginRpc("studio", "tasks_create", { title: "Verify an agent handoff", projectId, boardId, description }));
       await client.navigate(taskPath(agentTask));
       await client.waitForText("No agent yet.");
       await client.clickElementWithTextAndPointer("button", "Hand off");
@@ -99,7 +99,7 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
 
       bot = await pluginRpc("bot-teams", "create", { name: "Companion dispatch verifier", description: "A temporary staged handoff fixture.", mission: description,
         intervalMinutes: 0, limits: { turnsPerHour: 3, turnsPerDay: 3, minutesPerTurn: 1, concurrentForks: 1 } });
-      ({ task: botTask } = await pluginRpc("studio-tasks", "create", { title: "Verify a bot handoff", projectId, boardId, description, assignee: `bot:${bot.id}` }));
+      ({ task: botTask } = await pluginRpc("studio", "tasks_create", { title: "Verify a bot handoff", projectId, boardId, description, assignee: `bot:${bot.id}` }));
       await client.clickAriaButtonWithPointer("Fold floating tabs");
       await client.navigate(taskPath(botTask));
       await client.waitForText("Send to bot");
@@ -112,13 +112,13 @@ export default ({ projectId, pluginRpc, bbCli, sleep }) => ({
       const botText = await client.evaluate(`document.querySelector(${JSON.stringify(root(botThread))}).textContent`);
       if (!botText.includes(botTask.id)) throw new Error("The live bot conversation lost its task context");
       await bbCli(["thread", "update", botThread, "--title", "Reviewed bot handoff", "--json"]);
-      await pluginRpc("studio-tasks", "link", { id: botTask.id, link: { target: "thread", pluginId: null, itemId: botThread, label: "Reviewed bot handoff", href: `/threads/${botThread}` } });
+      await pluginRpc("studio", "tasks_link", { id: botTask.id, link: { target: "thread", pluginId: null, itemId: botThread, label: "Reviewed bot handoff", href: `/threads/${botThread}` } });
       await client.clickAriaButtonWithPointer("Fold floating tabs");
       await client.clickElementWithTextAndPointer("button", "Send to bot");
       await client.waitForSelector(selected(botThread));
       await client.dragBy(prompt(botThread), 0, 0);
       await client.waitForText("dispatch-review.txt"); await retained(botTask, botThread);
-      const resent = await pluginRpc("studio-tasks", "get", { id: botTask.id });
+      const resent = await pluginRpc("studio", "tasks_get", { id: botTask.id });
       if (resent.handoffs.length !== 1 || resent.handoffs[0].threadId !== botThread) throw new Error("Repeating Send to bot duplicated the handoff");
       const historyDeadline = Date.now() + 10000;
       while (botReplies.length < 2) {

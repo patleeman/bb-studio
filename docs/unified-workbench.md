@@ -186,7 +186,7 @@ pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
 [Talk](../packages/bb-studio-talk/assets/compact-header.png),
 [Tables](../packages/bb-studio/src/modules/tables/assets/compact-header.png),
-[Tasks](../packages/bb-studio-tasks/assets/compact-header.png), and
+[Tasks](../packages/bb-studio/src/modules/tasks/assets/compact-header.png), and
 [Teams](../packages/bb-studio-teams/assets/compact-header.png).
 Each checks the primary Chat action, every visible header button's bounds
 and hit target, page overflow, and the Related popover at 390 by 844 pixels.
@@ -213,8 +213,8 @@ installed from `258d801`, now checks the current handoff, earlier handoff and
 linked discussion from the real task page. It verifies one companion per
 destination, the unchanged main task, and exact reply draft/attachment DOM
 retention after returning and folding. The
-[desktop](../packages/bb-studio-tasks/assets/companion-handoffs.png) and
-[phone](../packages/bb-studio-tasks/assets/companion-handoffs-mobile.png)
+[desktop](../packages/bb-studio/src/modules/tasks/assets/companion-handoffs.png) and
+[phone](../packages/bb-studio/src/modules/tasks/assets/companion-handoffs-mobile.png)
 screenshots are visually checked; all phone composer controls fit at 390 by
 844 pixels. Deterministic handoff rows and scheduled threads seed the workflow;
 all fixtures are deleted without running agents.
@@ -228,7 +228,7 @@ The created conversations contain their task context and the agent's edited
 note. This exposed two fixed bugs: a missing host ID during ordinary handoff,
 and bot reuse depending on a mutable human link label. All 60 Tasks tests,
 typecheck and build pass. The
-[dispatch screenshot](../packages/bb-studio-tasks/assets/companion-dispatch.png)
+[dispatch screenshot](../packages/bb-studio/src/modules/tasks/assets/companion-dispatch.png)
 is visually checked. Brief fixture agent turns run; cleanup deletes their
 tasks, board and threads and retires the temporary bot.
 

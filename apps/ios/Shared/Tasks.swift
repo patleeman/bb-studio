@@ -134,7 +134,7 @@ extension BBClient {
 
     public func tasksBoard(includeArchived: Bool = false) async throws -> [StudioTask] {
         struct Result: Decodable { var tasks: [StudioTask] }
-        let result: Result = try await rpc("studio-tasks", "board", ["includeArchived": .bool(includeArchived)])
+        let result: Result = try await rpc("studio", "tasks_board", ["includeArchived": .bool(includeArchived)])
         return result.tasks
     }
 
@@ -144,7 +144,7 @@ extension BBClient {
             var links: [TaskLink]
             var handoffs: [TaskHandoff]
         }
-        let result: Result = try await rpc("studio-tasks", "get", ["id": .string(id)])
+        let result: Result = try await rpc("studio", "tasks_get", ["id": .string(id)])
         return TaskDetail(task: result.task, links: result.links, handoffs: result.handoffs)
     }
 
@@ -152,7 +152,7 @@ extension BBClient {
         title: String, description: String, status: String = "todo", projectId: String?, due: String?, assignee: String?
     ) async throws -> StudioTask {
         struct Result: Decodable { var task: StudioTask }
-        let result: Result = try await rpc("studio-tasks", "create", [
+        let result: Result = try await rpc("studio", "tasks_create", [
             "title": .string(title), "description": .string(description), "status": .string(status),
             "projectId": projectId.map(JSONValue.string) ?? .null, "due": due.map(JSONValue.string) ?? .null,
             "assignee": assignee.map(JSONValue.string) ?? .null,
@@ -164,7 +164,7 @@ extension BBClient {
     public func updateTask(
         _ id: String, title: String, description: String, projectId: String?, due: String?, assignee: String?
     ) async throws {
-        let _: OK = try await rpc("studio-tasks", "update", [
+        let _: OK = try await rpc("studio", "tasks_update", [
             "id": .string(id), "title": .string(title), "description": .string(description),
             "projectId": projectId.map(JSONValue.string) ?? .null, "due": due.map(JSONValue.string) ?? .null,
             "assignee": assignee.map(JSONValue.string) ?? .null,
@@ -175,20 +175,20 @@ extension BBClient {
     @discardableResult
     public func moveTask(_ id: String, to status: String) async throws -> Int {
         struct Result: Decodable { var archivedThreads: Int }
-        let result: Result = try await rpc("studio-tasks", "move", ["id": .string(id), "status": .string(status)])
+        let result: Result = try await rpc("studio", "tasks_move", ["id": .string(id), "status": .string(status)])
         return result.archivedThreads
     }
 
     public func archiveTask(_ id: String, archived: Bool) async throws {
-        let _: OK = try await rpc("studio-tasks", "archive", ["id": .string(id), "archived": .bool(archived)])
+        let _: OK = try await rpc("studio", "tasks_archive", ["id": .string(id), "archived": .bool(archived)])
     }
 
     public func deleteTask(_ id: String) async throws {
-        let _: OK = try await rpc("studio-tasks", "delete", ["id": .string(id)])
+        let _: OK = try await rpc("studio", "tasks_delete", ["id": .string(id)])
     }
 
     public func unlinkTask(_ id: String, link: TaskLink) async throws {
-        let _: OK = try await rpc("studio-tasks", "unlink", [
+        let _: OK = try await rpc("studio", "tasks_unlink", [
             "id": .string(id), "target": .string(link.target), "itemId": .string(link.itemId),
         ])
     }
@@ -196,12 +196,12 @@ extension BBClient {
     /// Pages, drawings, artifacts, recordings and the project's recent threads.
     public func taskLinkables(projectId: String?) async throws -> [TaskLinkable] {
         struct Result: Decodable { var items: [TaskLinkable] }
-        let result: Result = try await rpc("studio-tasks", "linkables", ["projectId": projectId.map(JSONValue.string) ?? .null])
+        let result: Result = try await rpc("studio", "tasks_linkables", ["projectId": projectId.map(JSONValue.string) ?? .null])
         return result.items
     }
 
     public func linkTask(_ id: String, link: TaskLink) async throws {
-        let _: OK = try await rpc("studio-tasks", "link", [
+        let _: OK = try await rpc("studio", "tasks_link", [
             "id": .string(id),
             "link": [
                 "target": .string(link.target), "pluginId": link.pluginId.map(JSONValue.string) ?? .null,
@@ -216,7 +216,7 @@ extension BBClient {
         note: String?, workspace: String
     ) async throws -> String {
         struct Result: Decodable { var threadId: String }
-        let result: Result = try await rpc("studio-tasks", "handOff", [
+        let result: Result = try await rpc("studio", "tasks_handOff", [
             "id": .string(id), "projectId": projectId.map(JSONValue.string) ?? .null,
             "providerId": providerId.map(JSONValue.string) ?? .null, "model": model.map(JSONValue.string) ?? .null,
             "reasoningLevel": reasoningLevel.map(JSONValue.string) ?? .null,
@@ -228,7 +228,7 @@ extension BBClient {
     /// Review feedback into the latest handoff's thread.
     public func sendBackTask(_ id: String, message: String) async throws -> String {
         struct Result: Decodable { var threadId: String }
-        let result: Result = try await rpc("studio-tasks", "sendBack", ["id": .string(id), "message": .string(message)])
+        let result: Result = try await rpc("studio", "tasks_sendBack", ["id": .string(id), "message": .string(message)])
         return result.threadId
     }
 
@@ -237,13 +237,13 @@ extension BBClient {
             var archived: Int
             var failed: Int
         }
-        let result: Result = try await rpc("studio-tasks", "archiveThreads", ["id": .string(id)])
+        let result: Result = try await rpc("studio", "tasks_archiveThreads", ["id": .string(id)])
         return (result.archived, result.failed)
     }
 
     public func tasksSettings() async throws -> Bool {
         struct Result: Decodable { var archiveThreadsOnDone: Bool }
-        let result: Result = try await rpc("studio-tasks", "settings")
+        let result: Result = try await rpc("studio", "tasks_settings")
         return result.archiveThreadsOnDone
     }
 }

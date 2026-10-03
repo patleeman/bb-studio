@@ -1,6 +1,6 @@
 # Studio Tasks
 
-> **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../bb-studio-pages), [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../bb-studio-teams).
+> **Studio Tasks** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio-talk), [Studio Draw](../../../../bb-studio-draw), [Studio Artifacts](../../../../bb-studio-artifacts), Studio Tasks, [Studio Chat](../bb-studio/src/modules/chat), and [Studio Teams](../../../../bb-studio-teams).
 
 Boards of tasks you can do yourself or hand to an agent. Each board is a
 Studio item like a page: it has its own columns, shows as a board, list or
@@ -42,7 +42,7 @@ with all composer controls inside the viewport. Handoff rows are deterministic
 staged fixtures; the threads have messages scheduled 30 days ahead and are
 deleted after the check, so no agent runs. This checks navigation and retention;
 handoff creation and bot dispatch have separate live checks below.
-Run with `BB_CAPTURE_TASKS_COMPANIONS=1 BB_CAPTURE_ONLY=tasks-companions node scripts/capture-plugin-screenshots.mjs --plugin studio-tasks` after sourcing staged BB's `capture.env`.
+Run with `BB_CAPTURE_TASKS_COMPANIONS=1 BB_CAPTURE_ONLY=tasks-companions node scripts/capture-plugin-screenshots.mjs --plugin studio` after sourcing staged BB's `capture.env`.
 
 ![A real bot handoff with its retained reply](assets/companion-dispatch.png)
 
@@ -55,17 +55,17 @@ handoff and the exact retained composer and `dispatch-review.txt` attachment.
 The task and edited note appear in the created conversations. These fixtures
 run brief agent turns; cleanup deletes their tasks, board and threads and
 retires the temporary bot.
-Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node scripts/capture-plugin-screenshots.mjs --plugin studio-tasks` after sourcing staged BB's `capture.env`.
+Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node scripts/capture-plugin-screenshots.mjs --plugin studio` after sourcing staged BB's `capture.env`.
 
 ## What you get
 
-- **Boards** (`/plugins/studio-tasks/tasks`): every board, newest first, with
+- **Boards** (`/plugins/studio/tasks`): every board, newest first, with
   its columns and open and done counts. **New board** makes one in the
   project BB has open. Each project gets a main board, "Tasks", where tasks
   go when no board is named; make as many others as you like, for a launch
   or a sprint. A board's header has its title, its project (moving a board
   moves its tasks) and Archive and Delete.
-- **A board** (`/plugins/studio-tasks/tasks/<board id>`): To do, In progress,
+- **A board** (`/plugins/studio/tasks/<board id>`): To do, In progress,
   Review and Done unless you change them. Drag cards between and within
   columns, add a task with **+** at the top of a column, and filter by
   assignee.
@@ -74,7 +74,7 @@ Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node script
   **List** sorts by due date, title, priority or recent activity and groups by
   status, priority or project. **Calendar** places tasks on their due dates.
   Each view has its own path (`<board id>/list`, `<board id>/calendar`).
-- **A task** (`/plugins/studio-tasks/tasks/<id>`): editable title, status,
+- **A task** (`/plugins/studio/tasks/<id>`): editable title, status,
   assignee, due day, priority, labels, recurrence, reminder, board and project; a Markdown description; links to threads,
   pages, artifacts, drawings and recordings; and the agent section. The
   header has **Hand off**, **Mark done** / **Reopen**, and a menu with Mark
@@ -108,7 +108,7 @@ Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node script
   the end of the board adds one before Done. Deleting a column moves its
   tasks to the first one. Moving a task to another board keeps its column
   when that board has it, and otherwise puts it in the first.
-- **Boards in pages.** In [Studio Pages](../bb-studio-pages), `/board`
+- **Boards in pages.** In [Studio Pages](../../../../bb-studio-pages), `/board`
   embeds a live board: drag cards between columns, add tasks, rename it, or
   switch to a checklist. Pasting a board link embeds it too.
 - **Pages checkboxes.** In a Pages checkbox, use the **Task from checkbox**
@@ -124,7 +124,7 @@ Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node script
   what it made. `::task{id="tsk_…"}` in a reply shows a task card.
 - **`@task` mentions** give the agent the task's details, links and handoff
   state.
-- **`bb studio-tasks` CLI**: `boards`, `board`, `list`, `add`, `show`,
+- **`bb studio studio-tasks` CLI**: `boards`, `board`, `list`, `add`, `show`,
   `move`, `hand`, `done`; `list` and `add` take `--board <id>`.
 - **In Studio.** With the [Studio](../bb-studio) plugin installed,
   boards and tasks join Studio's collection. A board is its tasks' parent;

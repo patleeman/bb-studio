@@ -13,7 +13,7 @@ export function exploreTasks(deps: TaskTrackingDeps) {
   return async (input: TaskFinding) => {
     const key = explainerKey(input);
     try {
-      const result = await deps.callRpc("studio-tasks", "trackFinding", {
+      const result = await deps.callRpc("studio", "tasks_trackFinding", {
         key: `explore:${key}`, threadId: input.threadId, messageId: input.messageId,
         title: input.label, pageId: deps.pageId(key, input.parentId), create: input.create ?? false,
       }, resultSchema);

@@ -36,7 +36,7 @@ export async function verifyExploreTask(client, {
       pluginRpc("explore", "taskForFinding", { ...finding, create: true })));
     evidence.retryIds = retries.map(result => result.task?.id);
     assert.ok(evidence.retryIds.every(id => id === taskId));
-    const { task, links } = await pluginRpc("studio-tasks", "get", { id: taskId });
+    const { task, links } = await pluginRpc("studio", "tasks_get", { id: taskId });
     assert.equal(task.projectId, projectId);
     assert.ok(links.some(link => link.target === "thread" && link.itemId === threadId));
     evidence.projectId = task.projectId;
@@ -46,7 +46,7 @@ export async function verifyExploreTask(client, {
     evidence.spaceId = space.id;
     evidence.inheritedSpace = true;
     await client.evaluate(`document.querySelector(${JSON.stringify(selector("Open task"))}).click()`);
-    await client.waitForSelector(`[data-float-window="path:/plugins/studio-tasks/tasks/${taskId}"]`);
+    await client.waitForSelector(`[data-float-window="path:/plugins/studio/tasks/${taskId}"]`);
     await client.waitForText("Finding source");
     evidence.openTask = true;
     await client.capture(join(outputDir, "explore-linked-task.png"));
@@ -69,7 +69,7 @@ export async function verifyExploreTask(client, {
   } finally {
     if (disabled) await bbCli(["plugin", "enable", "studio-tasks"]);
     taskId ??= (await lookup()).task?.id;
-    if (taskId) await pluginRpc("studio-tasks", "delete", { id: taskId });
+    if (taskId) await pluginRpc("studio", "tasks_delete", { id: taskId });
     if (space) {
       await pluginRpc("studio", "deleteSpace", { id: space.id });
       if (space.pageId) await pluginRpc("pages", "remove", { id: space.pageId });

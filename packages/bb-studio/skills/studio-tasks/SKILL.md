@@ -61,14 +61,14 @@ board in a Studio page, embed it: `{"kind":"board","target":"brd_…"}`, or
 ## CLI (works in every agent session)
 
 ```sh
-bb studio-tasks boards
-bb studio-tasks board <title> [--global]                # in this project unless --global
-bb studio-tasks list [--board <id>] [--status <column>]
-bb studio-tasks add <title> [--board <id>] [--description <text>] [--due <YYYY-MM-DD>] [--me]
-bb studio-tasks show <id>
-bb studio-tasks move <id> <column>
-bb studio-tasks hand <id> [--note <text>] [--folder]   # new thread, project's default agent
-bb studio-tasks done <id>
+bb studio studio-tasks boards
+bb studio studio-tasks board <title> [--global]                # in this project unless --global
+bb studio studio-tasks list [--board <id>] [--status <column>]
+bb studio studio-tasks add <title> [--board <id>] [--description <text>] [--due <YYYY-MM-DD>] [--me]
+bb studio studio-tasks show <id>
+bb studio studio-tasks move <id> <column>
+bb studio studio-tasks hand <id> [--note <text>] [--folder]   # new thread, project's default agent
+bb studio studio-tasks done <id>
 ```
 
 ## Settings

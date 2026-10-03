@@ -87,7 +87,7 @@ const LINK_ICONS: Record<string, string> = {
 /** The icon for the item a link opens, read from the link itself: /plugins/<plugin>/<panel>/<id>. */
 export function itemLinkIcon(href: string): string {
   const [, , pluginId = "", panel = "", id = ""] = href.split(/[?#]/)[0]!.split("/");
-  if (pluginId === "studio-tasks" && panel === "tasks") return id.startsWith("brd_") ? "studio-tasks/board" : "studio-tasks/task";
+  if ((pluginId === "studio-tasks" || pluginId === "studio") && panel === "tasks") return id.startsWith("brd_") ? "studio/board" : "studio/task";
   if (pluginId === "studio" && id === "space") return "Layers";
   return LINK_ICONS[`${pluginId}/${panel}`] ?? "GridView";
 }

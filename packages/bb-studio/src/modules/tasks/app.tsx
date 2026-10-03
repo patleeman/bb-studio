@@ -1,3 +1,4 @@
+import { moduleApp } from "../app";
 // Studio Tasks — frontend entry.
 //
 // Surfaces:
@@ -15,7 +16,8 @@ import { TasksPanel } from "./components/tasks-panel";
 import { TaskView } from "./components/task-view";
 import { BOARD_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL } from "./src/shared";
 
-export default definePluginApp((app) => {
+export function registerApp(host: import("@get-bb/plugin-sdk/app").PluginAppBuilder) {
+  const app = moduleApp(host, "tasks");
   app.slots.navPanel({
     id: "tasks",
     title: "Tasks",
@@ -24,7 +26,7 @@ export default definePluginApp((app) => {
     component: retainPanel(PANEL_PATH, TasksPanel),
   });
   // Shows the panel in Float windows open on its paths.
-  app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <TasksPanel subPath={subPath} />} /> });
+  app.slots.experimental_appOverlay({ id: "tasks-float", component: () => <FloatPanels path={PANEL_PATH} render={(subPath) => <TasksPanel subPath={subPath} />} /> });
   app.slots.threadPanelAction({
     id: "tasks",
     title: "Tasks",
@@ -42,4 +44,6 @@ export default definePluginApp((app) => {
   });
 
   app.slots.messageDirective({ id: "task", component: TaskDirective });
-});
+}
+
+export default definePluginApp(registerApp);

@@ -17,10 +17,10 @@ export default context => {
       await pluginRpc("studio", "tables_insert", { id: table.id, values: { name: "Review notes" } });
       return { path: `/plugins/studio/tables/${table.id}`, ready: 'input[aria-label="Table title"]', cleanup: () => pluginRpc("studio", "tables_remove", { id: table.id }) };
     } },
-    { id: "tasks", packageDir: "bb-studio-tasks", seed: async () => {
-      const { board } = await pluginRpc("studio-tasks", "boardCreate", { title: "Retained release checklist", projectId });
-      await pluginRpc("studio-tasks", "create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
-      return { path: `/plugins/studio-tasks/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio-tasks", "boardDelete", { id: board.id }) };
+    { id: "tasks", packageDir: "bb-studio/src/modules/tasks", seed: async () => {
+      const { board } = await pluginRpc("studio", "tasks_boardCreate", { title: "Retained release checklist", projectId });
+      await pluginRpc("studio", "tasks_create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
+      return { path: `/plugins/studio/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio", "tasks_boardDelete", { id: board.id }) };
     } },
     { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
       const { bots } = await pluginRpc("bot-teams", "list", null);
