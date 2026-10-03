@@ -12,7 +12,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
   if (existing) {
    const page = await pluginRpc("bot-teams", "view", { id: existing.id });
    await settleBots(page);
-   fixture = { id: existing.id, threadId: page.view.members.at(-1).id };
+   fixture = { id: existing.id, threadId: page.view.members.filter(member => member.kind === "thread").at(-1).id };
    return fixture;
   }
   await launchRoomThread();

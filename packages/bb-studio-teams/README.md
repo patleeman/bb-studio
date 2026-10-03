@@ -80,20 +80,21 @@ transcript scrolls edge to edge at the composer's width, and a floating box in
 the left margin lists the members. Click a name to swap threads. The current
 row has Reply in channel and Open thread. When the margin is too narrow for
 names, the box [shows avatars only](assets/channel-focus-compact.png).
-The [Active view](assets/channel-active.png) uses the same page and box, but
-follows the work: it shows whichever thread starts working and keeps it on
-screen after it finishes. Picking a member in the box holds that thread until
-another thread starts. On a phone, [Grid](assets/channel-grid-mobile.png)
+The [Active view](assets/channel-active.png) sits between Focus and Grid: the
+same member box, beside a closer grid with a pane for every working thread.
+Finished threads stay on screen until new work starts. Picking a member in the
+box adds its pane first, and Stop showing removes it again. On a phone, [Grid](assets/channel-grid-mobile.png)
 stacks the transcripts and [Focus](assets/channel-focus-mobile.png) turns the
 box into a row above the transcript.
 
 These captures run in the full stable BB 0.45.0 application with Studio Teams
-installed from pushed commit 51b5c3a. Live assertions check concise owner input
+installed from pushed commit bd81493. Live assertions check concise owner input
 without transport envelopes in Grid and phone Focus, native reaction rendering and reply routing,
 retention of the exact composer and its draft across all four views, and promotion
-that Active follows a thread when it starts working, keeps it after it stops,
-and swaps on a pick, and that the member box stays in the margin at full and
-compact widths.
+that Active shows two working threads side by side, keeps them after they
+stop, and adds and removes a pick, that the member box stays clear of the
+transcripts at full and compact widths, and that the unstarted Quinn has a
+dashed outline in Grid, Focus, and Active.
 The arrange check drags a pane over another in the live grid, then confirms
 the drop, the order after a reload, and Reset order.
 
