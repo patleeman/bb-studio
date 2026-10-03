@@ -46,7 +46,17 @@ struct ArtifactView: View {
             if let artifact, let version {
                 content(artifact, version)
             } else if let error {
-                ContentUnavailableView("Couldn't open the artifact", systemImage: "exclamationmark.triangle", description: Text(error))
+                ContentUnavailableView {
+                    Label("Couldn't open the artifact", systemImage: "exclamationmark.triangle")
+                } description: {
+                    Text(error)
+                } actions: {
+                    Button("Retry") {
+                        self.error = nil
+                        Task { await load() }
+                    }
+                    .buttonStyle(.borderedProminent)
+                }
             } else {
                 ProgressView()
             }

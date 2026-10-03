@@ -37,6 +37,12 @@ Raw private results: `/tmp/bb-artifact-runtime/verified.xcresult`; build log: `/
 
 ## Repeat safely
 
+A later source review added Retry to the initial artifact lookup error as well.
+It clears the error immediately and repeats the lookup through the view's
+captured server client. The seven UI tests above exercise content preview
+failures after lookup; they do not establish initial-lookup network recovery.
+That small follow-up is checked by the native build separately.
+
 The opt-in suite refuses to launch without the exact staged origin, a private-simulator marker, and owned fixture JSON. `run.sh` copies the project, includes only ArtifactRuntimeUITests, creates a new device, seeds its own artifact IDs, verifies preferences, and removes only its own device and artifact IDs on exit. `seed.py` removes bytes only after confirming the blob has exactly the owned fixture reference. It never alters another artifact.
 
 ```sh
