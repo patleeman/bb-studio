@@ -4,17 +4,20 @@ final class NewSurfacesUITests: XCTestCase {
     private let projectId = "proj_8ztiq6dkh5"
 
     func testHomeAndCollection() throws {
-        guard rpc("studio", "home", ["periodDays": 7]) != nil else { throw XCTSkip("Updated Studio plugin is not installed") }
-        let app = launch()
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
+        guard let spaces = rpc("studio", "spaces_list", [:])?["spaces"] as? [[String: Any]],
+              let spaceId = spaces.first?["id"] as? String,
+              rpc("studio", "home", ["spaceId": spaceId]) != nil else {
+            throw XCTSkip("Office RPCs are not installed")
+        }
+        let app = launch(tab: "inbox")
+        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 15))
+        shot(app, "inbox")
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 15))
+        shot(app, "home")
+        openCollection(app)
         XCTAssertTrue(studioSearch(app).exists)
         shot(app, "collection")
-        app.buttons["studioToday"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        shot(app, "home")
-        app.buttons["studioCollection"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
     }
 
     func testSearch() throws {
@@ -22,7 +25,7 @@ final class NewSurfacesUITests: XCTestCase {
             throw XCTSkip("Updated Studio search is not installed")
         }
         let app = launch()
-        app.tabBars.buttons["Studio"].tap()
+        openCollection(app)
         let search = studioSearch(app)
         XCTAssertTrue(search.exists)
         search.tap()
@@ -82,8 +85,7 @@ final class NewSurfacesUITests: XCTestCase {
         let id = try XCTUnwrap(created["id"] as? String)
         addTeardownBlock { _ = self.rpc("studio-tables", "remove", ["id": id]) }
         let app = launch()
-        app.open(URL(string: "bbstudio://studio")!)
-        app.tabBars.buttons["Studio"].tap()
+        openCollection(app)
         XCTAssertTrue(app.staticTexts["QA iOS7 table"].waitForExistence(timeout: 15))
         app.staticTexts["QA iOS7 table"].tap()
         XCTAssertTrue(app.descendants(matching: .any)["studioTable"].waitForExistence(timeout: 10))
@@ -102,11 +104,16 @@ final class NewSurfacesUITests: XCTestCase {
         shot(app, "meeting-notes")
     }
 
-    private func launch() -> XCUIApplication {
+    private func launch(tab: String = "work") -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-skipPushPrompt", "YES"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", tab]
         app.launch()
         return app
+    }
+
+    private func openCollection(_ app: XCUIApplication) {
+        app.open(URL(string: "bbstudio://studio")!)
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 15))
     }
 
     private func shot(_ app: XCUIApplication, _ name: String) {

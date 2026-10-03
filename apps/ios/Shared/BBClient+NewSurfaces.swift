@@ -1,17 +1,6 @@
 import Foundation
 
 extension BBClient {
-    public func studioHome(projectId: String? = nil) async throws -> Studio.HomeOutput {
-        try await rpc("studio", Studio.Method.home, .object(omittingNil: ["projectId": projectId.map(JSONValue.string)]))
-    }
-
-    public func respondToStudioNeed(threadId: String, interactionId: String, action: String, answer: String? = nil) async throws {
-        let _: Studio.HomeRespondOutput = try await rpc("studio", Studio.Method.homeRespond, .object(omittingNil: [
-            "threadId": .string(threadId), "interactionId": .string(interactionId),
-            "action": .string(action), "answer": answer.map(JSONValue.string),
-        ]))
-    }
-
     /// Searches every project unless one is given; a null projectId would mean global items only.
     public func studioSearchAll(_ query: String, projectId: String? = nil) async throws -> Studio.SearchAllOutput {
         try await rpc("studio", Studio.Method.searchAll, .object(omittingNil: [

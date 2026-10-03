@@ -84,7 +84,7 @@ final class ReviewQualityUITests: XCTestCase {
         let server = app.descendants(matching: .any)["settingsServerURL"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         XCTAssertEqual(server.value as? String, fixture)
-        app.tabBars.buttons["Studio"].tap()
+        app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
         XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
@@ -107,30 +107,26 @@ final class ReviewQualityUITests: XCTestCase {
         try captureNativeDiagnostic(app, "settings-second-contrast-native-default", audit: [.contrast], skipIssues: 1)
     }
 
-    func testTodayContrastNativeDiagnosticAtAccessibilityText() throws {
+    func testHomeContrastNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
-        app.buttons["studioToday"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        try captureNativeDiagnostic(app, "today-contrast-native-accessibility-xxxl", audit: [.contrast])
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
+        try captureNativeDiagnostic(app, "home-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
 
-    func testTodayClippingNativeDiagnosticAtAccessibilityText() throws {
+    func testHomeClippingNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
-        app.buttons["studioToday"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        try captureNativeDiagnostic(app, "today-clipping-native-accessibility-xxxl", audit: [.textClipped])
+        app.tabBars.buttons["Home"].tap()
+        XCTAssertTrue(app.buttons["Hand Off to a Bot"].waitForExistence(timeout: 20))
+        try captureNativeDiagnostic(app, "home-clipping-native-accessibility-xxxl", audit: [.textClipped])
     }
 
     func testStudioRowContrastNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
-        app.tabBars.buttons["Studio"].tap()
+        app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
         XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
@@ -141,7 +137,7 @@ final class ReviewQualityUITests: XCTestCase {
     func testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
-        app.tabBars.buttons["Studio"].tap()
+        app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
         XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
@@ -149,31 +145,29 @@ final class ReviewQualityUITests: XCTestCase {
     }
 
     /// Read-only approval-row review; opening its thread must not decide it.
-    func testTodayApprovalActionsAtAccessibilityText() throws {
-        try todayApprovalActions(largeText: true)
+    func testInboxApprovalActionsAtAccessibilityText() throws {
+        try inboxApprovalActions(largeText: true)
     }
 
-    func testTodayApprovalActionsAtDefaultText() throws {
-        try todayApprovalActions(largeText: false)
+    func testInboxApprovalActionsAtDefaultText() throws {
+        try inboxApprovalActions(largeText: false)
     }
 
-    private func todayApprovalActions(largeText: Bool) throws {
-        let app = try diagnosticApplication(largeText: largeText)
+    private func inboxApprovalActions(largeText: Bool) throws {
+        let app = try diagnosticApplication(largeText: largeText, tab: "inbox")
         defer { app.terminate() }
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
-        app.buttons["studioToday"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        for label in ["Open thread", "Approve once", "Deny"] {
+        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
+        for label in ["Approve", "Deny"] {
             let action = app.buttons[label].firstMatch
             XCTAssertTrue(action.waitForExistence(timeout: 10))
             reveal(action, in: app)
             checkTarget(action)
             XCTAssertGreaterThanOrEqual(action.frame.width, 44 - 0.001)
             XCTAssertGreaterThanOrEqual(action.frame.height, 44 - 0.001)
-            retainScreen(app, "today-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-action-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
+            retainScreen(app, "inbox-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-action-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
         }
-        let open = app.buttons["Open thread"].firstMatch
+        let request = app.cells.containing(.button, identifier: "Approve").firstMatch
+        let open = request.staticTexts.firstMatch
         for _ in 0..<5 {
             if open.isHittable { break }
             app.swipeDown()
@@ -181,9 +175,9 @@ final class ReviewQualityUITests: XCTestCase {
         XCTAssertTrue(open.isHittable)
         open.tap()
         let thread = app.navigationBars["Watch approval QA 0700"]
-        XCTAssertTrue(thread.waitForExistence(timeout: 10), "Open thread must show the held fixture's thread")
+        XCTAssertTrue(thread.waitForExistence(timeout: 10), "Opening the Inbox request must show the held fixture's thread")
         XCTAssertTrue(thread.isHittable, "Destination thread must be visible")
-        retainScreen(app, "today-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-open-thread")
+        retainScreen(app, "inbox-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-open-thread")
     }
 
     private func retainScreen(_ app: XCUIApplication, _ name: String) {
@@ -210,13 +204,11 @@ final class ReviewQualityUITests: XCTestCase {
               title == "Native approval card QA" else {
             throw XCTSkip("Requires the isolated held inert plan fixture")
         }
-        let app = try diagnosticApplication(largeText: largeText)
+        let app = try diagnosticApplication(largeText: largeText, tab: "inbox")
         defer { app.terminate() }
-        app.tabBars.buttons["Studio"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
-        app.buttons["studioToday"].tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        let open = app.buttons["Open thread"].firstMatch
+        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
+        let request = app.cells.containing(.button, identifier: "Approve").firstMatch
+        let open = request.staticTexts.firstMatch
         XCTAssertTrue(open.waitForExistence(timeout: 20))
         reveal(open, in: app)
         open.tap()
@@ -233,14 +225,15 @@ final class ReviewQualityUITests: XCTestCase {
         try app.performAccessibilityAudit(for: [.hitRegion])
     }
 
-    private func diagnosticApplication(largeText: Bool) throws -> XCUIApplication {
-        let app = application(largeText: largeText)
+    private func diagnosticApplication(largeText: Bool, tab: String = "settings") throws -> XCUIApplication {
+        let app = application(largeText: largeText, tab: tab)
         app.launch()
         XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
         app.tabBars.buttons["Settings"].tap()
         let server = app.descendants(matching: .any)["settingsServerURL"]
         XCTAssertTrue(server.waitForExistence(timeout: 10))
         XCTAssertEqual(server.value as? String, fixture)
+        if tab != "settings" { app.tabBars.buttons[tab.capitalized].tap() }
         return app
     }
 
@@ -280,9 +273,9 @@ final class ReviewQualityUITests: XCTestCase {
         }
     }
 
-    private func application(largeText: Bool) -> XCUIApplication {
+    private func application(largeText: Bool, tab: String = "settings") -> XCUIApplication {
         let app = XCUIApplication()
-        app.launchArguments = ["-serverURL", fixture, "-skipPushPrompt", "YES"]
+        app.launchArguments = ["-serverURL", fixture, "-skipPushPrompt", "YES", "-officeTab", tab]
         if largeText {
             app.launchArguments += ["-UIPreferredContentSizeCategoryName", "UICTContentSizeCategoryAccessibilityXXXL"]
         }
@@ -303,17 +296,17 @@ final class ReviewQualityUITests: XCTestCase {
         checkTarget(app.buttons["Save and test"])
         try captureAndAudit(app, "settings-\(size)")
 
-        app.tabBars.buttons["Studio"].tap()
+        app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
-        let today = app.buttons["studioToday"]
-        checkTarget(today, requireMinimumFrame: false)
         try captureAndAudit(app, "studio-\(size)")
-        today.tap()
-        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
-        checkTarget(app.buttons["studioCollection"], requireMinimumFrame: false)
-        try captureAndAudit(app, "today-\(size)")
-        app.buttons["studioCollection"].tap()
-        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10))
+        app.tabBars.buttons["Home"].tap()
+        let handoff = app.buttons["Hand Off to a Bot"]
+        XCTAssertTrue(handoff.waitForExistence(timeout: 20))
+        checkTarget(handoff)
+        try captureAndAudit(app, "home-\(size)")
+        app.tabBars.buttons["Inbox"].tap()
+        XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 10))
+        try captureAndAudit(app, "inbox-\(size)")
 
         app.open(URL(string: "bbstudio://capture")!)
         XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 10))

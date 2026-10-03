@@ -9,15 +9,16 @@ final class ThreadUITests: XCTestCase {
 
     override func setUp() {
         continueAfterFailure = true
+        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "work"]
         app.launch()
     }
 
-    func testHome() {
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
-        shot("home-top")
+    func testWork() {
+        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 10))
+        shot("work-top")
         app.swipeUp()
         app.swipeUp()
-        shot("home-bottom")
+        shot("work-bottom")
     }
 
     /// The split view and keyboard shortcuts; run on an iPad simulator. Nothing is sent.
@@ -482,7 +483,7 @@ final class ThreadUITests: XCTestCase {
 
     func testShelfDemo() {
         app.terminate()
-        app.launchArguments = ["-qaShelfDemo"]
+        app.launchArguments = ["-qaShelfDemo", "-skipPushPrompt", "YES", "-officeTab", "work"]
         app.launch()
         app.open(URL(string: "bbstudio://thread/\(threadId)")!)
         XCTAssertTrue(app.staticTexts["Plan mode"].waitForExistence(timeout: 10))
@@ -510,17 +511,17 @@ final class ThreadUITests: XCTestCase {
         field.typeText(String(repeating: XCUIKeyboardKey.delete.rawValue, count: value.count + 4))
     }
 
-    /// Studio opens on the collection.
+    /// The Studio deep link opens All items in Work.
     private func openStudioCollection() {
         app.open(URL(string: "bbstudio://studio")!)
-        XCTAssertTrue(app.buttons["studioToday"].waitForExistence(timeout: 10), "Studio collection")
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 10), "Studio collection")
     }
 
     /// The socket closes in the background: on return the inbox catches up on what
     /// changed meanwhile, then stays live. Creates two scratch threads, held
     /// with a far-off send, and deletes them.
     func testResumeReconnects() throws {
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10))
+        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 10))
         let tag = String(UUID().uuidString.prefix(6))
         XCUIDevice.shared.press(.home)
         sleep(3)
@@ -783,7 +784,7 @@ final class ThreadUITests: XCTestCase {
         let deletes = app.buttons.matching(NSPredicate(format: "label == 'Delete Channel'"))
         XCTAssertTrue(deletes.element(boundBy: 1).waitForExistence(timeout: 5), "confirmation")
         deletes.element(boundBy: deletes.count - 1).tap()
-        XCTAssertTrue(app.navigationBars["Home"].waitForExistence(timeout: 10), "back home")
+        XCTAssertTrue(app.navigationBars["Work"].waitForExistence(timeout: 10), "back to Work")
         XCTAssertNil(channel(), "deleted")
     }
 
