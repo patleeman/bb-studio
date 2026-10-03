@@ -26,6 +26,21 @@ way** section:
 
 The rows' wording is the agent's, so it changes from run to run.
 
+![A pinned explainer and its saved page in shared companion tabs](assets/companion-preview.png)
+
+Captured on stable BB 0.45.0 with the full suite installed from 786fd2f and
+Explore updated from pushed commit 6d900de. The check seeds writing and ready
+job states in the isolated plugin database and creates the saved HTML page
+through Pages RPC. It verifies both the complete and thread-filtered lists,
+progress becoming a document in the same destination, repeated opens without
+duplicates, the exact iframe and its scroll position after switching to Pages
+and back, and the persisted pin. No worker runs; fixtures are removed.
+
+```sh
+BB_CAPTURE_EXPLORE_COMPANIONS=1 BB_CAPTURE_ONLY=explore-companions \
+  node scripts/capture-plugin-screenshots.mjs --plugin explore
+```
+
 ## What you get
 
 - **"Along the way" at the bottom of a reply.** When an answer involved

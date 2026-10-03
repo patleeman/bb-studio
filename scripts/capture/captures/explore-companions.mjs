@@ -37,6 +37,8 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
       await client.navigate("/plugins/explore/explainers");
       await client.waitForText(label);
       await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
+      await client.navigate(`/plugins/explore/explainers/thread/${threadId}`);
+      await client.waitForText(label);
       await client.dragBy(`button[data-explainer-open="${id}"]`, 0, 0);
       await client.waitForSelector(panel);
       await client.waitForText("Investigating the upload queue");

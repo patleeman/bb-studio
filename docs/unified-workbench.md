@@ -185,10 +185,28 @@ Visual review caught Tables' sticky grid header covering Export and More;
 the corrected layering passes both the hit checks and final screenshot review.
 All seven captures are visually checked, with seeded fixtures removed.
 
+Explore now registers shared companion views for its explainers and lists.
+Finding rows and the thread launcher use that policy; the legacy thread panel
+remains available without Float. Open in Pages now targets Pages rather than
+the owner-only SDK panel route. Its 67 tests and typecheck pass. The repeatable
+stable BB 0.45.0 [companion capture](../packages/bb-studio-explore/assets/companion-preview.png)
+uses Explore from pushed 6d900de with the suite installed from 786fd2f. Seeded
+writing/ready job states verify both list routes, progress becoming the saved
+document, destination reuse, exact iframe and scroll retention after switching
+to Pages and back, and the persisted pin. No worker runs. The live check caught
+an undefined RPC field in the new list and also verifies the running list
+refreshes if it misses the completion event.
+
+Task handoff confirmations, bot handoffs, current and earlier handoffs, and
+linked threads now use the shared companion policy in pushed commit 6854481.
+Tasks' 49 tests and typecheck pass. Live handoff entry-point verification
+remains part of the suite completion audit.
+
 Remaining delivery includes publishing the native host changes, the SDK/CLI
-placement controller, embedded composer targeting, and the remaining suite
-entry points: Explore, Feed discussions and links, task handoffs, Talk return
-navigation, and split/swap actions. Initial main-view-to-companion transfer
+placement controller, embedded composer targeting, moving new-conversation
+composers into the retained companion stack, and the remaining suite
+entry points: Feed discussions and links, task handoff verification, Talk
+return navigation, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
 existing native capture verifies transfers after the companion is realized.
 The requirement-by-requirement completion audit and final release checks
