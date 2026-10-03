@@ -1,0 +1,35 @@
+{
+  "baselineApp": "e81d75b",
+  "stable": "0.45.0",
+  "fractional": {
+    "status": 400,
+    "body": {
+      "ok": false,
+      "error": {
+        "code": "invalid_input",
+        "message": "rpc input validation failed",
+        "issues": [
+          {
+            "message": "Invalid input: expected int, received number",
+            "path": [
+              "trigger",
+              "runAt"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "accepted": [
+    {
+      "id": "once",
+      "status": 200,
+      "enabled": false
+    },
+    {
+      "id": "schedule",
+      "status": 200,
+      "enabled": false
+    }
+  ]
+}
