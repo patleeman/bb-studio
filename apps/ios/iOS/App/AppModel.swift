@@ -125,6 +125,16 @@ final class AppModel: ObservableObject {
         // relay, a Live Activity token) doesn't open a socket.
         realtime.subscribeThreadList()
         flushOutboxOnConnect()
+        #if DEBUG
+        // `simctl launch <device> nyc.plee.bbgo -officeTab work` opens a tab, for screenshots.
+        switch UserDefaults.standard.string(forKey: "officeTab") {
+        case "inbox": tab = .inbox
+        case "work": tab = .work
+        case "team": tab = .team
+        case "settings": tab = .settings
+        default: break
+        }
+        #endif
     }
 
     var serverURL: URL { client.baseURL }
@@ -219,6 +229,7 @@ final class AppModel: ObservableObject {
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)
         case "inbox": tab = .inbox
+        case "work": tab = .work
         case "team": tab = .team
         case "web", "settings": tab = .settings
         case "file": break  // Opened by the thread view, which knows the workspace.

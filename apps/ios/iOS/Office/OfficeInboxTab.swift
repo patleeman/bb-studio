@@ -34,13 +34,13 @@ struct OfficeInboxTab: View {
                 let requests = shown.filter { $0.type == .request }
                 let rest = shown.filter { $0.type != .request }
                 Section("Needs You") {
-                    if requests.isEmpty, !store.isLoading {
+                    if requests.isEmpty, !store.isLoading, store.error == nil {
                         Text("Nothing is waiting on you.").foregroundStyle(.secondary)
                     }
                     ForEach(requests) { event in row(event, store) }
                 }
                 Section("Reports and Comments") {
-                    if rest.isEmpty, !store.isLoading {
+                    if rest.isEmpty, !store.isLoading, store.error == nil {
                         Text("You're caught up.").foregroundStyle(.secondary)
                     }
                     ForEach(rest) { event in row(event, store) }

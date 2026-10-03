@@ -38,7 +38,7 @@ private struct TeamList: View {
             }
             Section("Team") {
                 if store.bots.isEmpty {
-                    if !store.isLoading {
+                    if !store.isLoading, store.error == nil {
                         Text("No bots work in this space yet.").foregroundStyle(.secondary)
                     }
                 } else {

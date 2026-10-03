@@ -46,7 +46,7 @@ private struct HomeList: View {
 
             Section("Needs You") {
                 if store.needsYou.isEmpty {
-                    if store.home != nil {
+                    if store.home != nil, store.error == nil {
                         Text("Nothing is waiting on you.").foregroundStyle(.secondary)
                     }
                 } else {
