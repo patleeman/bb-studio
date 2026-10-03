@@ -654,8 +654,8 @@ final class ThreadUITests: XCTestCase {
     /// Plays real recordings, read-only: WebM/Opus ones from the browser and MP4 ones
     /// from the phone. Playback crosses segments, skips, jumps from the transcript, and speeds up.
     func testRecordingPlayback() throws {
-        let webm = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"] ?? "rec_ad0bc5936076aad9"
-        let mp4 = ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"] ?? "rec_4e03a488bb709b29"
+        let webm = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_RECORDING"], "Seed playback fixtures with BB_QA_DATA_DIR")
+        let mp4 = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_RECORDING_MP4"], "Seed playback fixtures with BB_QA_DATA_DIR")
         let position = app.staticTexts["playerPosition"]
         func seconds() -> Int {
             let parts = position.label.split(separator: ":").compactMap { Int($0) }
@@ -679,12 +679,11 @@ final class ThreadUITests: XCTestCase {
             app.buttons["Back 15 seconds"].tap()
             sleep(1)
             XCTAssertLessThan(seconds(), 47, "skipped back")
-            let links = app.links
-            if links.count > 1 {
-                links.element(boundBy: 0).tap()
-                sleep(2)
-                XCTAssertLessThan(seconds(), 10, "jumped to the first sentence")
-            }
+            let firstSentence = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Play from '")).firstMatch
+            XCTAssertTrue(firstSentence.waitForExistence(timeout: 5), "seeded transcript seek control")
+            firstSentence.tap()
+            sleep(2)
+            XCTAssertLessThan(seconds(), 10, "jumped to the first sentence")
             app.buttons["Speed"].tap()
             app.buttons["2×"].firstMatch.tap()
             let before = seconds()
@@ -938,13 +937,13 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(wait(5) { !pending.exists }, "undo clears it")
     }
 
-    /// A message's menu ends with when it was sent. Read-only on a real thread.
+    /// A seeded assistant message's menu ends with when it was sent.
     func testMessageSentTime() throws {
-        app.open(URL(string: "bbstudio://thread/\(threadId)")!)
-        let texts = app.staticTexts.matching(NSPredicate(format: "label MATCHES %@", "(?s).{20,}"))
-        XCTAssertTrue(texts.firstMatch.waitForExistence(timeout: 15), "messages")
-        sleep(2)
-        let message = try XCTUnwrap(texts.allElementsBoundByIndex.last { $0.isHittable }, "a message on screen")
+        let fixture = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_MESSAGE_THREAD"], "Seed the assistant fixture with BB_QA_DATA_DIR")
+        let text = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_MESSAGE_TEXT"])
+        app.open(URL(string: "bbstudio://thread/\(fixture)")!)
+        let message = app.staticTexts[text].firstMatch
+        XCTAssertTrue(message.waitForExistence(timeout: 15), "seeded assistant message")
         message.press(forDuration: 1)
         let sent = app.staticTexts.containing(NSPredicate(format: "label BEGINSWITH 'Sent '")).firstMatch
         let button = app.buttons.containing(NSPredicate(format: "label BEGINSWITH 'Sent '")).firstMatch

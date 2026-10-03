@@ -17,6 +17,9 @@ PY
 run_dir="${BB_UI_TEST_RUN_DIR:-/tmp/bb-studio-ui-tests-$(date +%Y%m%d-%H%M%S)}"
 mkdir -p "$run_dir"
 trap 'printf "UI test evidence: %s\n" "$run_dir"' EXIT
+if [ -n "${BB_QA_DATA_DIR:-}" ]; then
+  node scripts/seed-ui-fixtures.mjs "$run_dir/fixture-inputs.json"
+fi
 xcodegen generate -q
 for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do
   xcrun simctl spawn "$BB_TEST_SIMULATOR_ID" defaults write "$domain" serverURL -string "$BB_QA_SERVER_URL"
@@ -24,7 +27,7 @@ done
 xcodebuild build-for-testing -scheme BBStudio -destination "id=$BB_TEST_SIMULATOR_ID" \
   -derivedDataPath "$run_dir/DerivedData" > "$run_dir/build.log" 2>&1
 python3 - "$run_dir" <<'PY'
-import glob, os, plistlib, sys
+import glob, json, os, plistlib, sys
 path=glob.glob(sys.argv[1]+'/DerivedData/Build/Products/*.xctestrun')[0]
 with open(path,'rb') as f: data=plistlib.load(f)
 def anchor(value):
@@ -37,6 +40,9 @@ targets=[data['BBStudioUITests']] if 'BBStudioUITests' in data else [t for c in 
 for target in targets:
  env=target.setdefault('EnvironmentVariables',{})
  env.update({k:v for k,v in os.environ.items() if k.startswith(('BB_QA_', 'BBGO_QA_', 'BB_OFFICE_CAPTURE_'))})
+ fixture_inputs=sys.argv[1]+'/fixture-inputs.json'
+ if os.path.exists(fixture_inputs):
+  with open(fixture_inputs) as f: env.update(json.load(f))
 with open(sys.argv[1]+'/fixture.xctestrun','wb') as f: plistlib.dump(data,f)
 PY
 xcodebuild test-without-building -xctestrun "$run_dir/fixture.xctestrun" \

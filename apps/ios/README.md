@@ -232,6 +232,7 @@ launch. It supplies the same origin to the app and test RPC helpers.
 
 ```sh
 BB_TEST_SIMULATOR_ID=<private-simulator-id> \
+BB_QA_DATA_DIR="$BB_DATA_DIR" \
 apps/ios/scripts/ui-test.sh
 ```
 
@@ -240,5 +241,10 @@ For the deterministic Office screenshots, first run
 `BB_OFFICE_CAPTURE_DIR=/tmp/office-captures` and
 `BB_UI_TEST_ONLY=BBStudioUITests/OfficeCaptureUITests` to select the capture tests.
 The result bundle and logs remain in the printed run directory (or the directory
-set by `BB_UI_TEST_RUN_DIR`). Specialized audio, share-sheet, and accessibility
-tests still require their own fixtures; a skip is not a pass for those workflows.
+set by `BB_UI_TEST_RUN_DIR`). With `BB_QA_DATA_DIR`, setup seeds an inert
+assistant message and two 90-second
+segmented recordings (WebM/Opus and MP4/AAC) using `ffmpeg`. It accepts only
+temporary staged data directories. No model or transcription is run. The runner
+passes the generated IDs to the sent-time and playback tests. The seed is reused
+on later runs against that staged project. Share-sheet and accessibility tests
+still require their own fixtures; a skip is not a pass for those workflows.
