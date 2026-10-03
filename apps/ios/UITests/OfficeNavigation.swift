@@ -17,8 +17,7 @@ extension XCUIApplication {
 
     func openOfficeScreen(_ name: String, file: StaticString = #filePath, line: UInt = #line) {
         showOfficeTabs(file: file, line: line)
-        // Tap runs the menu's primary New Thread action; hold exposes its menu.
-        buttons["officeTabsNew"].press(forDuration: 1)
+        buttons["officeTabsNew"].tap()
         let item = buttons[name].firstMatch
         XCTAssertTrue(item.waitForExistence(timeout: 5), file: file, line: line)
         item.tap()

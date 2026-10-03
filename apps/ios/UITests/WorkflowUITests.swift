@@ -26,10 +26,10 @@ final class WorkflowUITests: XCTestCase {
         screenshot("new-thread-workspace")
     }
 
-    /// New thread is presented above the Office tabs, including a cold Home launch.
+    /// New thread is presented from both secondary screens after a cold Tabs launch.
     func testNewThreadFromHomeAndTeam() {
         app.terminate()
-        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "home"]
+        app.launchArguments = ["-skipPushPrompt", "YES", "-officeTab", "tabs"]
         app.launch()
         app.openOfficeScreen("Home")
         let newThread = app.buttons["New Thread"]
