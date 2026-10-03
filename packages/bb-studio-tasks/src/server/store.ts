@@ -68,6 +68,11 @@ export const MIGRATIONS = [
    CREATE TABLE board_columns (board_id TEXT NOT NULL REFERENCES boards (id) ON DELETE CASCADE, id TEXT NOT NULL, label TEXT NOT NULL, position INTEGER NOT NULL, PRIMARY KEY (board_id, id));
    ALTER TABLE tasks ADD COLUMN board_id TEXT REFERENCES boards (id) ON DELETE CASCADE;
    CREATE INDEX tasks_board_column ON tasks (board_id, status, rank);`,
+  `CREATE TABLE task_source_keys (
+     source_key TEXT PRIMARY KEY,
+     task_id TEXT NOT NULL REFERENCES tasks (id) ON DELETE CASCADE,
+     thread_id TEXT NOT NULL
+   );`,
 ];
 
 export type BoardRow = {
@@ -377,6 +382,27 @@ export class TaskStore {
     return this.db
       .prepare(`SELECT * FROM tasks ${where.length ? `WHERE ${where.join(" AND ")}` : ""} ORDER BY rank, created_at`)
       .all(options.boardId ? { boardId: options.boardId } : {}) as TaskRow[];
+  }
+
+  /** The ordinary task already tracking this source, if it still exists. */
+  sourceTask(key: string): TaskRow | null {
+    const row = this.db.prepare("SELECT task_id FROM task_source_keys WHERE source_key = ?").get(key) as { task_id: string } | undefined;
+    return row ? this.get(row.task_id) : null;
+  }
+
+  sourceThreads(): { task_id: string; thread_id: string }[] {
+    return this.db.prepare("SELECT s.task_id, s.thread_id FROM task_source_keys s JOIN tasks t ON t.id = s.task_id").all() as { task_id: string; thread_id: string }[];
+  }
+
+  /** The task and its durable source key commit together, including concurrent retries. */
+  createFromSource(key: string, threadId: string, input: NewTask): TaskRow {
+    return this.db.transaction(() => {
+      const existing = this.sourceTask(key);
+      if (existing) return existing;
+      const task = this.create(input);
+      this.db.prepare("INSERT INTO task_source_keys VALUES (?, ?, ?) ON CONFLICT(source_key) DO UPDATE SET task_id=excluded.task_id, thread_id=excluded.thread_id").run(key, task.id, threadId);
+      return task;
+    })();
   }
 
   /** New tasks go to the top of their column. */

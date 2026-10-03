@@ -19,6 +19,7 @@ import { MAX_LABEL_LENGTH, STAGES, parseExploreItem } from "./shared";
 import { ExploreStore, MIGRATIONS, type ExplainerRow } from "./store";
 import { walk } from "./timeline";
 import { exploreWorkers } from "./worker";
+import { exploreTasks } from "./tasks";
 
 export const EXPLORE_TOOL = "explore_explain";
 
@@ -135,6 +136,10 @@ export function registerExplore(bb: BbPluginApi, options: {
   // RPC ------------------------------------------------------------------------
 
   const rpc = {
+    taskForFinding: exploreTasks({
+      callRpc: (pluginId, method, input, schema) => bb.sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema: schema, signal: AbortSignal.timeout(RPC_TIMEOUT_MS) }),
+      pageId: (key, parentId) => store.byKey(key)?.page_id ?? (parentId ? store.explainer(parentId)?.page_id : null) ?? null,
+    }),
     explore: ({ threadId, messageId, turnId, emoji, label, parentId }: { threadId: string; messageId: string; turnId?: string | null; emoji?: string; label: string; parentId?: string | null }) => {
       const result = service.explore({ threadId, messageId, turnId, emoji, label, parentId });
       return { explainer: service.view(result.explainer), started: result.started };

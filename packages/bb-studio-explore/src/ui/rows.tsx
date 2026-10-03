@@ -5,8 +5,9 @@
 // so it survives a reload. Clicking one opens it in Explore's side-panel tab.
 // A reply's findings can also be saved to Studio Feed, to read later.
 import { errorMessage } from "@bb-studio/kit/format";
+import { useOpenCompanion } from "@bb-studio/kit/app";
 import { useBbNavigate, useRealtime, useRpc, type PluginMessageDirectiveProps } from "@get-bb/plugin-sdk/app";
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { relativeTime } from "@bb-studio/kit/format";
@@ -43,6 +44,7 @@ export interface ExploreRowsProps {
 export function ExploreRows({ items, threadId, messageId, turnId, parentId = null, title = "Along the way", settingsHint = false, className }: ExploreRowsProps) {
   const rpc = useRpc<typeof rpcContract>();
   const navigate = useBbNavigate();
+  const openCompanion = useOpenCompanion();
   useMinuteTick();
   const [explainers, setExplainers] = useState<ExplainerView[]>([]);
   /** Labels whose click is in flight, and clicks that failed before a job existed. */
@@ -52,6 +54,43 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
   const [saved, setSaved] = useState<Set<string>>(new Set());
   const [saving, setSaving] = useState<Record<string, "busy" | string>>({});
   const savable = parentId === null;
+  const [tasks, setTasks] = useState<Record<string, { available: boolean; task: { id: string; title: string } | null }>>({});
+  const [tracking, setTracking] = useState<Record<string, boolean>>({});
+  const [taskErrors, setTaskErrors] = useState<Record<string, string>>({});
+  const taskVersions = useRef<Record<string, number>>({});
+  useEffect(() => {
+    let active = true;
+    const loadTasks = () => { for (const item of items) {
+      const key = labelKey(item.label);
+      const version = taskVersions.current[key] ?? 0;
+      void rpc.call("taskForFinding", { threadId, messageId, label: item.label, parentId }).then(
+        (result) => { if (active && version === (taskVersions.current[key] ?? 0)) setTasks((current) => ({ ...current, [key]: result })); },
+        () => { if (active && version === (taskVersions.current[key] ?? 0)) setTasks((current) => ({ ...current, [key]: { available: false, task: null } })); },
+      );
+    } };
+    setTasks({});
+    loadTasks();
+    window.addEventListener("focus", loadTasks);
+    return () => { active = false; window.removeEventListener("focus", loadTasks); };
+  }, [rpc, threadId, messageId, parentId, items]);
+
+  async function track(item: ExploreItem) {
+    const key = labelKey(item.label);
+    if (tracking[key]) return;
+    taskVersions.current[key] = (taskVersions.current[key] ?? 0) + 1;
+    setTracking((current) => ({ ...current, [key]: true }));
+    setTaskErrors(({ [key]: _, ...rest }) => rest);
+    try {
+      // Always ask Tasks: the source key also recovers a task deleted since lookup.
+      const result = await rpc.call("taskForFinding", { threadId, messageId, label: item.label, parentId, create: true });
+      setTasks((current) => ({ ...current, [key]: result }));
+      if (result.task) openCompanion({ kind: "path", path: `/plugins/studio-tasks/tasks/${result.task.id}`, title: result.task.title });
+    } catch (cause) {
+      setTaskErrors((current) => ({ ...current, [key]: errorMessage(cause) }));
+    } finally {
+      setTracking(({ [key]: _, ...rest }) => rest);
+    }
+  }
 
   const load = useCallback(() => {
     rpc.call("explainersForMessage", { threadId, messageId, parentId }).then(
@@ -151,6 +190,7 @@ export function ExploreRows({ items, threadId, messageId, turnId, parentId = nul
               onOpen={() => void act(item, explainer, false)}
               onRegenerate={() => void act(item, explainer, true)}
               feed={savable ? { saved: saved.has(key), saving: saving[key] ?? null, onSave: () => void save(item) } : null}
+              task={{ available: tasks[key]?.available ?? false, loading: tasks[key] === undefined || Boolean(tracking[key]), linked: Boolean(tasks[key]?.task), error: taskErrors[key] ?? null, onTrack: () => void track(item) }}
             />
           );
         })}
@@ -167,6 +207,7 @@ function ExploreRow({
   onOpen,
   onRegenerate,
   feed,
+  task,
 }: {
   item: ExploreItem;
   explainer: ExplainerView | undefined;
@@ -176,6 +217,7 @@ function ExploreRow({
   onRegenerate(): void;
   /** Saving to Studio Feed: reply findings only. `saving` is "busy" or the error. */
   feed: { saved: boolean; saving: string | null; onSave(): void } | null;
+  task: { available: boolean; loading: boolean; linked: boolean; error: string | null; onTrack(): void };
 }) {
   const state = clickError ? "error" : rowState(explainer);
   const progress = Math.round(explainer?.job?.progress ?? 0);
@@ -198,7 +240,7 @@ function ExploreRow({
   }
 
   return (
-    <li className="group relative flex items-stretch">
+    <li className="group relative flex flex-wrap items-stretch">
       <button
         type="button"
         onClick={onOpen}
@@ -254,6 +296,13 @@ function ExploreRow({
           />
         </button>
       ) : null}
+      <button type="button" onClick={task.onTrack} disabled={!task.available || task.loading}
+        title={!task.available ? "Install or enable Studio Tasks to track findings. Availability refreshes when you return to this window." : task.linked ? "Open the linked task" : "Create a task with this finding and its source"}
+        aria-label={`${task.linked ? "Open task" : "Track task"}: ${item.label}`}
+        className="shrink-0 px-2 py-2 text-xs text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:opacity-50">
+        {task.loading ? "Checking…" : !task.available ? "Tasks unavailable" : task.linked ? "Open task" : "Track task"}
+      </button>
+      {task.error ? <p role="alert" className="w-full px-3 pb-2 text-xs text-destructive">{task.error}</p> : null}
       {state === "running" ? (
         <>
           <span aria-hidden className="pointer-events-none absolute inset-x-0 bottom-0 h-0.5 bg-foreground/[0.06]">

@@ -3,6 +3,7 @@ import Foundation
 
 public enum Tasks {
   public enum Method {
+    public static let trackFinding = "trackFinding"
     public static let boards = "boards"
     public static let board = "board"
     public static let boardCreate = "boardCreate"
@@ -29,6 +30,8 @@ public enum Tasks {
     public static let archiveThreads = "archiveThreads"
     public static let settings = "settings"
   }
+
+  public typealias TrackFinding = TrackFindingOutput
 
   public typealias Boards = BoardsOutput
 
@@ -83,6 +86,217 @@ public enum Tasks {
   public typealias SettingsInput = StudioJSONValue
 
   public typealias Settings = SettingsOutput
+
+  public struct TrackFindingInput: Sendable, Hashable, Codable {
+    public var key: String?
+    public var threadId: String?
+    public var messageId: String?
+    public var title: String?
+    public var pageId: String?
+    public var create: Bool?
+
+    public init(key: String? = nil, threadId: String? = nil, messageId: String? = nil, title: String? = nil, pageId: String? = nil, create: Bool? = nil) {
+      self.key = key
+      self.threadId = threadId
+      self.messageId = messageId
+      self.title = title
+      self.pageId = pageId
+      self.create = create
+    }
+  }
+
+  public enum TrackFindingOutputTaskPriority: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case urgent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "urgent": self = .urgent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .urgent: try container.encode("urgent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TrackFindingOutputTaskSubtasks: Sendable, Hashable, Codable {
+    public var total: Double?
+    public var done: Double?
+
+    public init(total: Double? = nil, done: Double? = nil) {
+      self.total = total
+      self.done = done
+    }
+  }
+
+  public enum TrackFindingOutputTaskRecurrence: Sendable, Hashable, Codable {
+    case daily
+    case weekly
+    case monthly
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "daily": self = .daily
+      case "weekly": self = .weekly
+      case "monthly": self = .monthly
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .daily: try container.encode("daily")
+      case .weekly: try container.encode("weekly")
+      case .monthly: try container.encode("monthly")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum TrackFindingOutputTaskHandoffState: Sendable, Hashable, Codable {
+    case starting
+    case working
+    case needs_input
+    case replied
+    case ready
+    case failed
+    case archived
+    case deleted
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "starting": self = .starting
+      case "working": self = .working
+      case "needs-input": self = .needs_input
+      case "replied": self = .replied
+      case "ready": self = .ready
+      case "failed": self = .failed
+      case "archived": self = .archived
+      case "deleted": self = .deleted
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .starting: try container.encode("starting")
+      case .working: try container.encode("working")
+      case .needs_input: try container.encode("needs-input")
+      case .replied: try container.encode("replied")
+      case .ready: try container.encode("ready")
+      case .failed: try container.encode("failed")
+      case .archived: try container.encode("archived")
+      case .deleted: try container.encode("deleted")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct TrackFindingOutputTaskHandoff: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var state: TrackFindingOutputTaskHandoffState?
+    public var note: String?
+    public var agent: String?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(threadId: String? = nil, state: TrackFindingOutputTaskHandoffState? = nil, note: String? = nil, agent: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.threadId = threadId
+      self.state = state
+      self.note = note
+      self.agent = agent
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct TrackFindingOutputTask: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var description: String?
+    public var status: String?
+    public var statusLabel: String?
+    public var boardId: String?
+    public var projectId: String?
+    public var due: String?
+    public var assignee: String?
+    public var priority: TrackFindingOutputTaskPriority?
+    public var labels: [String]?
+    public var parentId: String?
+    public var subtasks: TrackFindingOutputTaskSubtasks?
+    public var recurrence: TrackFindingOutputTaskRecurrence?
+    public var reminderAt: Double?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+    public var updatedBy: String?
+    public var doneAt: Double?
+    public var archived: Bool?
+    public var handoff: TrackFindingOutputTaskHandoff?
+    public var openThreads: Double?
+    public var links: Double?
+
+    public init(id: String? = nil, title: String? = nil, description: String? = nil, status: String? = nil, statusLabel: String? = nil, boardId: String? = nil, projectId: String? = nil, due: String? = nil, assignee: String? = nil, priority: TrackFindingOutputTaskPriority? = nil, labels: [String]? = nil, parentId: String? = nil, subtasks: TrackFindingOutputTaskSubtasks? = nil, recurrence: TrackFindingOutputTaskRecurrence? = nil, reminderAt: Double? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, updatedBy: String? = nil, doneAt: Double? = nil, archived: Bool? = nil, handoff: TrackFindingOutputTaskHandoff? = nil, openThreads: Double? = nil, links: Double? = nil) {
+      self.id = id
+      self.title = title
+      self.description = description
+      self.status = status
+      self.statusLabel = statusLabel
+      self.boardId = boardId
+      self.projectId = projectId
+      self.due = due
+      self.assignee = assignee
+      self.priority = priority
+      self.labels = labels
+      self.parentId = parentId
+      self.subtasks = subtasks
+      self.recurrence = recurrence
+      self.reminderAt = reminderAt
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+      self.updatedBy = updatedBy
+      self.doneAt = doneAt
+      self.archived = archived
+      self.handoff = handoff
+      self.openThreads = openThreads
+      self.links = links
+    }
+  }
+
+  public struct TrackFindingOutput: Sendable, Hashable, Codable {
+    public var task: TrackFindingOutputTask?
+
+    public init(task: TrackFindingOutputTask? = nil) {
+      self.task = task
+    }
+  }
 
   public struct BoardsInput: Sendable, Hashable, Codable {
     public var includeArchived: Bool?

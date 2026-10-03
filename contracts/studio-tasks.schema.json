@@ -1,6 +1,288 @@
 {
   "pluginId": "studio-tasks",
   "methods": {
+    "trackFinding": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "threadId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "messageId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 300
+          },
+          "pageId": {
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 100
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "create": {
+            "default": false,
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "key",
+          "threadId",
+          "messageId",
+          "title"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "task": {
+            "anyOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string"
+                  },
+                  "title": {
+                    "type": "string"
+                  },
+                  "description": {
+                    "type": "string"
+                  },
+                  "status": {
+                    "type": "string",
+                    "minLength": 1,
+                    "maxLength": 60,
+                    "pattern": "^[a-z][a-z0-9_-]*$"
+                  },
+                  "statusLabel": {
+                    "type": "string"
+                  },
+                  "boardId": {
+                    "type": "string"
+                  },
+                  "projectId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "due": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "assignee": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "priority": {
+                    "type": "string",
+                    "enum": [
+                      "none",
+                      "low",
+                      "medium",
+                      "high",
+                      "urgent"
+                    ]
+                  },
+                  "labels": {
+                    "maxItems": 20,
+                    "type": "array",
+                    "items": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 60
+                    }
+                  },
+                  "parentId": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "subtasks": {
+                    "type": "object",
+                    "properties": {
+                      "total": {
+                        "type": "number"
+                      },
+                      "done": {
+                        "type": "number"
+                      }
+                    },
+                    "required": [
+                      "total",
+                      "done"
+                    ],
+                    "additionalProperties": false
+                  },
+                  "recurrence": {
+                    "anyOf": [
+                      {
+                        "type": "string",
+                        "enum": [
+                          "daily",
+                          "weekly",
+                          "monthly",
+                          "weekdays"
+                        ]
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "reminderAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "createdAt": {
+                    "type": "number"
+                  },
+                  "updatedAt": {
+                    "type": "number"
+                  },
+                  "updatedBy": {
+                    "type": [
+                      "string",
+                      "null"
+                    ]
+                  },
+                  "doneAt": {
+                    "type": [
+                      "number",
+                      "null"
+                    ]
+                  },
+                  "archived": {
+                    "type": "boolean"
+                  },
+                  "handoff": {
+                    "anyOf": [
+                      {
+                        "type": "object",
+                        "properties": {
+                          "threadId": {
+                            "type": "string"
+                          },
+                          "state": {
+                            "type": "string",
+                            "enum": [
+                              "starting",
+                              "working",
+                              "needs-input",
+                              "replied",
+                              "ready",
+                              "failed",
+                              "archived",
+                              "deleted"
+                            ]
+                          },
+                          "note": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "agent": {
+                            "type": [
+                              "string",
+                              "null"
+                            ]
+                          },
+                          "createdAt": {
+                            "type": "number"
+                          },
+                          "updatedAt": {
+                            "type": "number"
+                          }
+                        },
+                        "required": [
+                          "threadId",
+                          "state",
+                          "note",
+                          "agent",
+                          "createdAt",
+                          "updatedAt"
+                        ],
+                        "additionalProperties": false
+                      },
+                      {
+                        "type": "null"
+                      }
+                    ]
+                  },
+                  "openThreads": {
+                    "type": "number"
+                  },
+                  "links": {
+                    "type": "number"
+                  }
+                },
+                "required": [
+                  "id",
+                  "title",
+                  "description",
+                  "status",
+                  "statusLabel",
+                  "boardId",
+                  "projectId",
+                  "due",
+                  "assignee",
+                  "priority",
+                  "labels",
+                  "parentId",
+                  "subtasks",
+                  "recurrence",
+                  "reminderAt",
+                  "createdAt",
+                  "updatedAt",
+                  "updatedBy",
+                  "doneAt",
+                  "archived",
+                  "handoff",
+                  "openThreads",
+                  "links"
+                ],
+                "additionalProperties": false
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "task"
+        ],
+        "additionalProperties": false
+      }
+    },
     "boards": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

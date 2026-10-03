@@ -128,6 +128,11 @@ const boardSchema = z.object({
 });
 
 export const rpcContract = defineRpcContract({
+  /** Explicitly tracks an Explore finding; lookup never creates work. */
+  trackFinding: {
+    input: z.object({ key: z.string().min(1).max(200), threadId: threadIdSchema, messageId: z.string().min(1).max(200), title: z.string().trim().min(1).max(300), pageId: idSchema.nullable().optional(), create: z.boolean().default(false) }),
+    output: z.object({ task: taskSchema.nullable() }),
+  },
   boards: {
     input: z.object({ includeArchived: z.boolean().optional() }),
     output: z.object({ boards: z.array(boardSchema) }),
@@ -287,6 +292,8 @@ export default async function plugin(bb: BbPluginApi) {
   const services = studioServices(bb.sdk);
   /** Tells Studio an agent made a board or task, so it joins the thread's spaces. */
   const created = (id: string, threadId: string) => void services.created({ pluginId: PLUGIN_ID, id }, threadId).catch(() => { /* The hub is optional. */ });
+  // Replay source inheritance when Studio was absent or unavailable at creation.
+  for (const source of store.sourceThreads()) created(source.task_id, source.thread_id);
   const syncLinks = (id: string) => services.replaceLinks({ pluginId: PLUGIN_ID, id }, PLUGIN_ID,
     store.links(id).filter((link) => link.target === "item" && link.plugin_id).map((link) => ({
       from: { pluginId: PLUGIN_ID, id }, to: { pluginId: link.plugin_id!, id: link.item_id }, kind: "task-link" as const, source: PLUGIN_ID,
@@ -649,6 +656,23 @@ export default async function plugin(bb: BbPluginApi) {
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
+    async trackFinding({ key, threadId, messageId, title, pageId, create }) {
+      let task = store.sourceTask(key);
+      if (!create) return { task: task ? toDto(task) : null };
+      if (!task) {
+        const thread = await bb.sdk.threads.get({ threadId });
+        task = store.createFromSource(key, threadId, {
+          title, projectId: thread.projectId ?? null, by: "user",
+          description: `Explore finding: ${title}\n\nSource: [${(thread.title || "Original thread").replace(/[\\[\\]]/g, "")}](/threads/${threadId})\nSource message: ${messageId}`,
+        });
+      }
+      store.link(task.id, { target: "thread", plugin_id: null, item_id: threadId, label: "Finding source", href: `/threads/${threadId}` });
+      if (pageId) store.link(task.id, { target: "item", plugin_id: "pages", item_id: pageId, label: "Explore explainer", href: `/plugins/pages/pages/${pageId}` });
+      await services.created({ pluginId: PLUGIN_ID, id: task.id }, threadId).catch(() => { /* Studio is optional; sourceThreads replays this on reload. */ });
+      await syncLinks(task.id);
+      changed(task.id);
+      return { task: toDto(task) };
+    },
     boards({ includeArchived }) {
       return { boards: store.boards({ includeArchived }).map(toBoardDto) };
     },

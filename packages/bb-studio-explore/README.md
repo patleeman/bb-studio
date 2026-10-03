@@ -85,6 +85,19 @@ it, or follows the job already writing it. A job that runs for 20 minutes
 fails, and jobs cut off by a BB restart show as interrupted. Stopping or
 failing a job stops and archives its hidden thread.
 
+## Track a finding as a task
+
+With Studio Tasks installed and running, **Track task** beside a finding
+creates an unassigned task on the source project's main board. It preserves
+the source thread, message, and saved explainer, and joins the thread's Studio
+spaces when Studio is available. It does not start an agent. Open the task to
+assign it and use the usual handoff and review controls.
+
+The button becomes **Open task**. Repeated or concurrent clicks reuse the
+same task, including after a restart. If you delete the task, another explicit
+click creates a replacement. Without Tasks, the button says **Tasks unavailable**;
+install or enable Tasks, then return to the window to check again.
+
 ## With Studio Feed
 
 **Daily digest hour** chooses when the digest starts, from 0 to 23 in the BB
