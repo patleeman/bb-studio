@@ -157,14 +157,17 @@ struct PageView: View {
     }
 
     private var meta: PageMeta? { store.page(model.pageId) }
+    private var hasLocalDraft: Bool { PageDraftStore().exists(server: model.serverURL, page: model.pageId) }
     private var gone: Bool { model.missing || store.deleted.contains(model.pageId) }
 
     var body: some View {
         Group {
             if gone {
-                ContentUnavailableView(
-                    "Page deleted", systemImage: "doc.questionmark",
-                    description: Text("This page no longer exists."))
+                VStack {
+                    ContentUnavailableView(
+                        "Page deleted", systemImage: "doc.questionmark",
+                        description: Text("This page no longer exists."))
+                }
             } else {
                 content
             }
@@ -180,8 +183,14 @@ struct PageView: View {
         })
         .navigationTitle(meta?.displayTitle ?? "Page")
         .navigationBarTitleDisplayMode(.inline)
+        .safeAreaInset(edge: .top) {
+            if hasLocalDraft {
+                Button("Resume draft on this phone") { showingEditor = true }
+                    .font(.subheadline).frame(maxWidth: .infinity).padding(10).background(.bar)
+            }
+        }
         .toolbar {
-            if !gone {
+            if !gone || hasLocalDraft {
                 ToolbarItem(placement: .topBarTrailing) {
                     Button { showingEditor = true } label: { Image(systemName: "square.and.pencil") }
                         .accessibilityLabel("Edit page")
@@ -241,7 +250,7 @@ struct PageView: View {
         }
         .sensoryFeedback(.success, trigger: copied)
         .safeAreaInset(edge: .bottom) {
-            if !gone { PageWorkBar(page: meta, pageId: model.pageId, notice: $notice) { await loadChats() } }
+            if !gone || PageDraftStore().exists(server: model.serverURL, page: model.pageId, kind: "work") { PageWorkBar(page: meta, pageId: model.pageId, notice: $notice) { await loadChats() } }
         }
         .overlay(alignment: .top) {
             if let notice {

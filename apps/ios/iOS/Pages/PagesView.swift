@@ -140,9 +140,19 @@ struct PagesView: View {
     @State private var query = ""
     @State private var serverMatches: [PageMeta] = []
     @State private var collapsed: Set<String> = []
+    @State private var localDraftPages: [String] = []
 
     var body: some View {
         List {
+            if !localDraftPages.isEmpty {
+                Section("Drafts on this phone") {
+                    ForEach(localDraftPages, id: \.self) { id in
+                        NavigationLink(value: Route.page(id: id)) {
+                            Label(store.page(id)?.displayTitle ?? "Recover page draft", systemImage: "doc.badge.clock")
+                        }
+                    }
+                }
+            }
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(app.client) } }
             }
@@ -172,9 +182,9 @@ struct PagesView: View {
         }
         .listStyle(.sidebar)
         .overlay {
-            if !store.loaded {
+            if !store.loaded && localDraftPages.isEmpty {
                 ProgressView()
-            } else if store.pages.isEmpty, store.error == nil, query.isEmpty {
+            } else if store.pages.isEmpty, store.error == nil, query.isEmpty, localDraftPages.isEmpty {
                 ContentUnavailableView(
                     "No pages", systemImage: "doc.richtext",
                     description: Text("Pages you and your agents write in BB show up here."))
@@ -184,7 +194,9 @@ struct PagesView: View {
         .searchable(text: $query, prompt: "Search pages")
         .task(id: query) { await search() }
         .refreshable { await store.load(app.client) }
+        .onAppear { localDraftPages = PageDraftStore().pages(server: app.serverURL) }
         .task(id: app.serverURL) {
+            localDraftPages = PageDraftStore().pages(server: app.serverURL)
             store.restore()
             store.attach(app)
             await store.load(app.client)

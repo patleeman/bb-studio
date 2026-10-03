@@ -5,72 +5,88 @@ import SwiftUI
 /// elsewhere in the meantime is never overwritten; the text stays on screen.
 struct PageEditor: View {
     @EnvironmentObject private var app: AppModel
-    private let operation = ServerOperation()
-    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let pageId: String
     var onSaved: () async -> Void
-
-    /// The page with block ids, as the server last confirmed it.
-    @State private var expected: String?
-    @State private var text = ""
-    @State private var saved = ""
-    @State private var saving = false
-    @State private var error: String?
+    @StateObject private var model: PageEditorModel
     @State private var dictating = false
     @State private var confirmingDiscard = false
+    @State private var showingServer = false
+    @State private var copied = false
     @State private var controller = PageTextController()
+
+    init(pageId: String, onSaved: @escaping () async -> Void) {
+        self.pageId = pageId
+        self.onSaved = onSaved
+        _model = StateObject(wrappedValue: PageEditorModel(pageId: pageId))
+    }
 
     private static let autosaveDelay: Duration = .milliseconds(1200)
 
     var body: some View {
         NavigationStack {
-            Group {
-                if expected == nil, let error {
-                    ContentUnavailableView("Couldn't load the page", systemImage: "exclamationmark.triangle", description: Text(error))
-                } else if expected == nil {
+            VStack(spacing: 0) {
+                if let message = model.localError ?? model.error {
+                    VStack(alignment: .leading, spacing: 8) {
+                        Text(message).font(.footnote).foregroundStyle(.red)
+                        HStack {
+                            Button("Retry") { Task { await model.retry() } }
+                            Button("Copy local text") { UIPasteboard.general.string = model.text; copied = true }
+                            if model.serverMarkdown != nil {
+                                Button("View server") { Task { await model.load(); showingServer = true } }
+                            }
+                        }.font(.footnote)
+                        Button("Discard local draft…", role: .destructive) { confirmingDiscard = true }
+                            .font(.footnote).disabled(model.saving)
+                        if model.localError != nil, FileManager.default.fileExists(atPath: model.draftFile.path) {
+                            ShareLink("Export stored draft", item: model.draftFile).font(.footnote)
+                        }
+                    }.padding()
+                }
+                if model.expected != nil {
+                    PageTextView(text: Binding(get: { model.text }, set: { model.updateText($0) }), controller: controller)
+                        .safeAreaInset(edge: .bottom) { formatBar }
+                } else if model.error == nil && model.localError == nil {
                     ProgressView()
                 } else {
-                    VStack(spacing: 0) {
-                        if let error {
-                            HStack {
-                                Text(error).font(.footnote).foregroundStyle(.red)
-                                Spacer()
-                                Button("Reload") { Task { await load() } }.font(.footnote)
-                            }
-                            .padding(.horizontal).padding(.vertical, 8)
-                        }
-                        PageTextView(text: $text, controller: controller)
-                    }
-                    // Rides above the keyboard, and stays when a hardware keyboard hides it.
-                    .safeAreaInset(edge: .bottom) { formatBar }
+                    Spacer()
                 }
             }
             .navigationTitle("Edit page")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
-                    Button("Done") { Task { await finish() } }
+                    Button(model.dirty && model.error != nil ? "Keep draft and close" : "Done") { Task { await finish() } }
+                        .disabled(!model.canClose)
                 }
             }
-            .task { await load() }
-            .task(id: text) {
-                guard text != saved, expected != nil else { return }
-                // Typing again cancels the wait, but never a save in flight.
+            .task { await model.load() }
+            .task(id: model.text + "\(model.saving)") {
+                guard model.dirty, model.expected != nil, model.error == nil, !model.saving else { return }
                 guard (try? await Task.sleep(for: Self.autosaveDelay)) != nil else { return }
-                Task { await save() }
+                Task { await model.save() }
             }
-            .confirmationDialog("Your latest changes aren't saved.", isPresented: $confirmingDiscard, titleVisibility: .visible) {
-                Button("Discard changes", role: .destructive) { operation.complete(on: app) { dismiss() } }
+            .confirmationDialog("Discard this phone's draft?", isPresented: $confirmingDiscard, titleVisibility: .visible) {
+                Button("Discard and load server text", role: .destructive) { Task { await model.discardAndReload() } }
                 Button("Keep editing", role: .cancel) {}
+            } message: {
+                Text("This removes your local changes. Copy or export them first if you want to keep them. The server page is unchanged.")
             }
+            .sheet(isPresented: $showingServer) {
+                NavigationStack {
+                    ScrollView { Text(PageEditorModel.plain(model.serverMarkdown ?? "")).textSelection(.enabled).padding() }
+                        .navigationTitle("Server text")
+                        .toolbar { Button("Done") { showingServer = false } }
+                }
+            }
+            .sensoryFeedback(.success, trigger: copied)
             .sheet(isPresented: $dictating) {
                 DictationView(threadId: nil, autoStart: true, insertLabel: ("Insert in page", "text.insert")) { spoken in
                     controller.insert(spoken)
                 }
             }
         }
-        .interactiveDismissDisabled(text != saved)
+        .interactiveDismissDisabled(!model.canClose)
     }
 
     private var formatBar: some View {
@@ -100,68 +116,17 @@ struct PageEditor: View {
     }
 
     private var status: String {
-        if saving { return "Saving…" }
-        if error != nil { return "Not saved" }
-        return text == saved ? "Saved" : "Edited"
-    }
-
-    private func load() async {
-        if pageId == "qa-demo", ProcessInfo.processInfo.arguments.contains("-qaPageDemo") {
-            expected = "<!-- ^11111111-1111-1111-1111-111111111111 -->\n# Launch plan\n\n<!-- ^22222222-2222-2222-2222-222222222222 -->\nShip it"
-            text = Self.plain(expected!)
-            saved = text
-            return
-        }
-        do {
-            let markdown = try await client.editablePageMarkdown(pageId)
-            expected = markdown
-            text = Self.plain(markdown)
-            saved = text
-            error = nil
-        } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
-        }
-    }
-
-    /// Saves the current text. Saves run one at a time; a later one picks up
-    /// whatever was typed while an earlier one was in flight.
-    private func save() async {
-        guard !saving, let current = expected, text != saved else { return }
-        if pageId == "qa-demo", ProcessInfo.processInfo.arguments.contains("-qaPageDemo") {
-            saved = text
-            return
-        }
-        let sending = text
-        saving = true
-        defer { saving = false }
-        do {
-            expected = try await client.editPageDocument(pageId, expected: current, markdown: sending)
-            saved = sending
-            error = nil
-        } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
-            return
-        }
-        saving = false
-        if text != saved { await save() }
+        if model.saving { return "Saving…" }
+        if model.localError != nil { return "Not saved locally" }
+        return model.dirty ? "Draft on this phone" : "Saved"
     }
 
     private func finish() async {
-        while saving { try? await Task.sleep(for: .milliseconds(100)) }
-        if error == nil { await save() }
-        guard text == saved else { confirmingDiscard = true; return }
-        guard client.baseURL == app.serverURL else { return }
-        await onSaved()
-        operation.complete(on: app) { dismiss() }
+        if model.error == nil { await model.save() }
+        guard model.canClose, model.client.baseURL == app.serverURL else { return }
+        if !model.dirty { await onSaved() }
+        ServerOperation(client: model.client).complete(on: app) { dismiss() }
     }
 
-    /// The editable Markdown without its `<!-- ^id -->` block markers.
-    static func plain(_ markdown: String) -> String {
-        markdown
-            .split(separator: "\n", omittingEmptySubsequences: false)
-            .filter { !$0.trimmingCharacters(in: .whitespaces).hasPrefix("<!-- ^") }
-            .joined(separator: "\n")
-            .replacing(/\n{3,}/, with: "\n\n")
-            .trimmingCharacters(in: .newlines)
-    }
+    static func plain(_ markdown: String) -> String { PageEditorModel.plain(markdown) }
 }
