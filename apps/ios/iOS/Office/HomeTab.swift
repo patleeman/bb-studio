@@ -85,6 +85,7 @@ private struct HomeList: View {
 
 /// A request, report or comment addressed to you, acted on in place.
 struct OfficeEventRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
     let event: OfficeInboxEvent
     let bot: OfficeTeamBot?
@@ -125,16 +126,19 @@ struct OfficeEventRow: View {
                     }
                 }
                 if let actions = event.actions, !actions.isEmpty {
-                    HStack {
+                    let layout = dynamicTypeSize.isAccessibilitySize
+                        ? AnyLayout(VStackLayout(alignment: .leading)) : AnyLayout(HStackLayout())
+                    layout {
                         ForEach(actions) { action in
                             if action.primary == true {
-                                Button(action.label) { act(action.id) }.buttonStyle(.borderedProminent)
+                                Button { act(action.id) } label: { Text(action.label).frame(minHeight: 44) }
+                                    .buttonStyle(.borderedProminent)
                             } else {
-                                Button(action.label) { act(action.id) }.buttonStyle(.bordered)
+                                Button { act(action.id) } label: { Text(action.label).frame(minHeight: 44) }
+                                    .buttonStyle(.bordered)
                             }
                         }
                     }
-                    .controlSize(.small)
                     .disabled(busy || event.isPending)
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }

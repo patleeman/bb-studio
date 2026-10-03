@@ -33,6 +33,10 @@ extension Route {
     /// A Studio add-on's BB web path: `/plugins/pages/pages/<id>` and the like.
     init?(href: String) {
         let parts = (URL(string: href)?.path() ?? href).split(separator: "/").map(String.init)
+        if parts.count == 2, parts[0] == "threads" {
+            self = .thread(id: parts[1])
+            return
+        }
         if (parts == ["plugins", "feed", "feed"] || parts == ["plugins", "studio", "feed"]) {
             self = .feed
             return

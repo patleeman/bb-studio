@@ -2,13 +2,13 @@ import XCTest
 
 /// Opt-in, read-only UI review. Never inherit BB's production/default server.
 final class ReviewQualityUITests: XCTestCase {
-    private let fixture = "http://127.0.0.1:49486"
+    private var fixture: String { StagedFixture.serverURL }
     private var auditFindings: [String] = []
 
     override func setUpWithError() throws {
         continueAfterFailure = false
-        guard ProcessInfo.processInfo.environment["BB_QA_SERVER_URL"] == fixture else {
-            throw XCTSkip("Set BB_QA_SERVER_URL=http://127.0.0.1:49486 in this test target's xctestrun EnvironmentVariables. Only the isolated review fixture is allowed.")
+        guard StagedFixture.isIsolated else {
+            throw XCTSkip("Use the isolated UI runner and its private simulator.")
         }
     }
 
@@ -100,11 +100,11 @@ final class ReviewQualityUITests: XCTestCase {
         try captureNativeDiagnostic(app, "settings-contrast-native-default", audit: [.contrast])
     }
 
-    /// Select the second reported Settings contrast issue for localization only.
+    /// Retain an additional Settings capture with the same strict contrast gate.
     func testSettingsSecondContrastNativeDiagnostic() throws {
         let app = try diagnosticApplication(largeText: false)
         defer { app.terminate() }
-        try captureNativeDiagnostic(app, "settings-second-contrast-native-default", audit: [.contrast], skipIssues: 1)
+        try captureNativeDiagnostic(app, "settings-second-contrast-native-default", audit: [.contrast])
     }
 
     func testHomeContrastNativeDiagnosticAtAccessibilityText() throws {
@@ -133,7 +133,7 @@ final class ReviewQualityUITests: XCTestCase {
         try captureNativeDiagnostic(app, "studio-row-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
 
-    /// Skip the already captured Select issue to retain the next original region.
+    /// Retain an additional Studio-row capture with the same strict contrast gate.
     func testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText() throws {
         let app = try diagnosticApplication(largeText: true)
         defer { app.terminate() }
@@ -141,7 +141,7 @@ final class ReviewQualityUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
         XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
-        try captureNativeDiagnostic(app, "studio-row-second-contrast-native-accessibility-xxxl", audit: [.contrast], skipIssues: 1)
+        try captureNativeDiagnostic(app, "studio-row-second-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
 
     /// Read-only approval-row review; opening its thread must not decide it.
@@ -158,7 +158,8 @@ final class ReviewQualityUITests: XCTestCase {
         defer { app.terminate() }
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
         for label in ["Approve", "Deny"] {
-            let action = app.buttons[label].firstMatch
+            let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
+            let action = request.buttons[label].firstMatch
             XCTAssertTrue(action.waitForExistence(timeout: 10))
             reveal(action, in: app)
             checkTarget(action)
@@ -166,7 +167,7 @@ final class ReviewQualityUITests: XCTestCase {
             XCTAssertGreaterThanOrEqual(action.frame.height, 44 - 0.001)
             retainScreen(app, "inbox-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-action-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
         }
-        let request = app.cells.containing(.button, identifier: "Approve").firstMatch
+        let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
         let open = request.staticTexts.firstMatch
         for _ in 0..<5 {
             if open.isHittable { break }
@@ -174,7 +175,7 @@ final class ReviewQualityUITests: XCTestCase {
         }
         XCTAssertTrue(open.isHittable)
         open.tap()
-        let thread = app.navigationBars["Watch approval QA 0700"]
+        let thread = app.navigationBars["Native approval card QA"]
         XCTAssertTrue(thread.waitForExistence(timeout: 10), "Opening the Inbox request must show the held fixture's thread")
         XCTAssertTrue(thread.isHittable, "Destination thread must be visible")
         retainScreen(app, "inbox-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-open-thread")
@@ -200,14 +201,14 @@ final class ReviewQualityUITests: XCTestCase {
     }
 
     private func planApprovalActions(largeText: Bool) throws {
-        guard let title = ProcessInfo.processInfo.environment["BB_QA_PLAN_THREAD_TITLE"],
+        guard let title = ProcessInfo.processInfo.environment["BBGO_QA_PLAN_THREAD_TITLE"],
               title == "Native approval card QA" else {
             throw XCTSkip("Requires the isolated held inert plan fixture")
         }
         let app = try diagnosticApplication(largeText: largeText, tab: "inbox")
         defer { app.terminate() }
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
-        let request = app.cells.containing(.button, identifier: "Approve").firstMatch
+        let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
         let open = request.staticTexts.firstMatch
         XCTAssertTrue(open.waitForExistence(timeout: 20))
         reveal(open, in: app)
@@ -237,7 +238,7 @@ final class ReviewQualityUITests: XCTestCase {
         return app
     }
 
-    private func captureNativeDiagnostic(_ app: XCUIApplication, _ name: String, audit: XCUIAccessibilityAuditType, skipIssues: Int = 0) throws {
+    private func captureNativeDiagnostic(_ app: XCUIApplication, _ name: String, audit: XCUIAccessibilityAuditType) throws {
         let screenshot = XCTAttachment(screenshot: app.screenshot())
         screenshot.name = name
         screenshot.lifetime = .keepAlways
@@ -247,19 +248,9 @@ final class ReviewQualityUITests: XCTestCase {
         tree.lifetime = .keepAlways
         add(tree)
         if #available(iOS 17.0, *) {
-            if skipIssues == 0 {
-                // No handler: Apple records the original finding and highlighted region.
-                try app.performAccessibilityAudit(for: audit)
-            } else {
-                // Diagnostic selection only; the strict aggregate tests never use this.
-                var seen = 0
-                try app.performAccessibilityAudit(for: audit) { issue in
-                    seen += 1
-                    print("NATIVE-DIAGNOSTIC: \(name) issue \(seen): \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")]")
-                    return seen <= skipIssues
-                }
-                XCTAssertGreaterThan(seen, skipIssues, "Requested diagnostic issue was not reported")
-            }
+            // These former diagnostic reproducers are now regression checks:
+            // no expected finding and no discarded first issue.
+            try app.performAccessibilityAudit(for: audit)
         }
     }
 

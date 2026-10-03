@@ -122,6 +122,23 @@ if (!fixtures.performancePages) {
 }
 await seedThreadFixtures({db,api,rpc,fixtures,dataDir,projectId});
 await writeFile(marker, JSON.stringify(fixtures,null,2)+'\n');
+if (!fixtures.BBGO_QA_PLAN_THREAD) {
+  const title = 'Native approval card QA';
+  const made = await api('/threads', {projectId, origin:'app', title, environment:{type:'project-default'}, sendAt:1924992000000, input:[{type:'text',text:'Inert plan display fixture. Do not run.',mentions:[]}]});
+  const id = made.id ?? made.thread.id;
+  for (const queued of await api('/threads/'+id+'/queued-messages',null,'GET')) await api('/threads/'+id+'/queued-messages/'+queued.id,null,'DELETE');
+  db.prepare("UPDATE threads SET status='idle', environment_id=(SELECT environment_id FROM threads WHERE id=?) WHERE id=?").run(process.env.BBGO_QA_THREAD,id);
+  const interactionId = 'pint_'+randomUUID().replace(/[^2-9a-f]/g,'').slice(0,10), now=Date.now();
+  db.prepare(`INSERT INTO pending_interactions
+    (id,thread_id,turn_id,origin_kind,provider_id,provider_thread_id,provider_request_id,status,payload,created_at,updated_at)
+    VALUES (?,?,?,'provider','codex',?,?,'pending',?,?,?)`).run(interactionId,id,randomUUID(),'native-plan-fixture',randomUUID(),JSON.stringify({kind:'approval',subject:{kind:'plan',itemId:randomUUID(),planFilePath:null,plan:'After approval, return only QA_OK. Do not use tools, change files, execute commands, access the network, or send messages.'},reason:null,availableDecisions:['allow_once','deny']}),now,now);
+  const interactions = await api('/threads/'+id+'/interactions',null,'GET');
+  if (!interactions.some(i=>i.id===interactionId)) throw new Error('Plan fixture absent from real interaction API');
+  fixtures.BBGO_QA_PLAN_THREAD=id;
+  fixtures.BBGO_QA_PLAN_THREAD_TITLE=title;
+  fixtures.BBGO_QA_PLAN_INTERACTION=interactionId;
+  await writeFile(marker,JSON.stringify(fixtures,null,2)+'\n');
+}
 db.close();
 const env = Object.fromEntries(Object.entries(fixtures).filter(([key])=>key.startsWith('BBGO_QA_') || key.startsWith('BBGO_PROBE_')));
 env.BBGO_QA_PERFORMANCE_READY = fixtures.performancePages.length === 24 ? 'YES' : 'NO';

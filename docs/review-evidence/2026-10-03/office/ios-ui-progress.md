@@ -352,3 +352,43 @@ the distinctive blue rectangle and PDF page text render. Additional proxy
 checks rejected unowned import/delete payloads with 403. Native builds, Python
 and shell syntax, diff checks, and all seven stable compatibility checks passed.
 Only the Review harness skip group remains before the final fresh full run.
+
+
+## Review harness enabled; approval navigation and targets repaired
+
+The remaining Review harness now uses the isolated runner's actual loopback
+origin and its private simulator guard. Its plan checks use a deterministic
+pending plan interaction seeded into the temporary staged database, validated
+through the real interactions API. No provider is invoked and no approval is
+submitted. Two diagnostic tests previously skipped one native issue and required
+another issue to exist; they now run the same strict audit without expecting a
+product failure.
+
+`/tmp/office-review-fixtures/results.xcresult`: all 16 Review tests ran, with
+3 passes, 13 failures, and 0 skips. This exposed two Office defects: request links
+use `/threads/<id>` but the native route parser did not recognize that path;
+and inline Approve/Deny targets were only 28 points tall at default text size.
+The parser now opens the native thread, and Office actions have a minimum
+44-point label height and stack vertically at accessibility text sizes.
+
+The first focused retry passed both Inbox checks and the large-text plan check.
+The default plan screen's native hit-region audit then identified the separate
+“Read the full plan” link as undersized. Its label now has a minimum 44-point
+height and a rectangular hit shape. The approval buttons themselves retain
+their existing behavior and styling.
+
+Broader Review audits still require follow-up; the final full-suite result is
+not yet available. Native failure attachments were exported under
+`/tmp/office-review-fixtures/attachments`. Inspected crops show Home/Settings
+contrast reports include content behind the translucent tab bar, and the Studio
+contrast report targets the black Select toolbar label on its light background.
+Home's large-text request title is visibly truncated. These findings need
+individual verification; no general audit exclusion has been added.
+
+`/tmp/office-review-approval-final/results.xcresult`: 4 passed, 0 failures,
+0 skips (Inbox and plan approval screens at default and accessibility text
+sizes). The pending interaction remained pending after the checks. Build,
+JavaScript syntax, diff checks, and all seven plugin compatibility checks passed;
+the compatibility script currently reports stable BB 0.45.0 / SDK 0.6.15.
+Nine of the Review tests still need their broader accessibility findings
+resolved before the fresh full-suite run.
