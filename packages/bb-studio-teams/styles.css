@@ -704,6 +704,39 @@
   gap: 10px;
 }
 
+/* Keep the editor's title, fields and actions outside its only scroll area. */
+.channel-dialog.channel-editor-dialog {
+  display: flex;
+  flex-direction: column;
+  max-height: calc(100dvh - 24px);
+  overflow: hidden;
+}
+.channel-editor-dialog > header,
+.channel-editor-form > :not(.channel-editor-members),
+.channel-editor-members > :not(.channel-editor-list) {
+  flex: 0 0 auto;
+}
+.channel-editor-form,
+.channel-editor-members {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-height: 0;
+  min-width: 0;
+}
+.channel-editor-form { gap: 16px; }
+.channel-editor-members { gap: 6px; }
+.channel-editor-list {
+  min-height: 0;
+  max-height: 360px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  overscroll-behavior: contain;
+  scrollbar-gutter: stable;
+  margin-inline: -4px;
+  padding-inline: 4px;
+}
+
 .channel-tooltip {
   z-index: 80;
   max-width: 240px;

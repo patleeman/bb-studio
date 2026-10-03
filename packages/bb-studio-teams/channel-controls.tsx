@@ -77,17 +77,19 @@ export function Modal({
   open,
   onOpenChange,
   children,
+  className = "",
 }: {
   title: string;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   children: ReactNode;
+  className?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
       <Dialog.Portal>
         <Dialog.Overlay className="channel-dialog-overlay" />
-        <Dialog.Content className="channel-dialog" aria-describedby={undefined}>
+        <Dialog.Content className={`channel-dialog ${className}`} aria-describedby={undefined}>
           <header>
             <Dialog.Title>{title}</Dialog.Title>
             <Dialog.Close asChild>

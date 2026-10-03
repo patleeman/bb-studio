@@ -57,16 +57,16 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
     try { onSaved(initial ? await rpc.call("viewUpdate", { ...initial, name, members, expectedUpdatedAt: initial.updatedAt }) : await rpc.call("viewCreate", { name, members, requestId: requestId.current })); }
     catch (e) { setError(message(e)); } finally { setPending(false); }
   };
-  return <Modal title={initial ? "Edit channel" : "New channel"} open={open} onOpenChange={value => { if (!value) onClose(); }}>
-    <form onSubmit={event => { event.preventDefault(); void save(); }} className="flex flex-col gap-4">
+  return <Modal title={initial ? "Edit channel" : "New channel"} open={open} onOpenChange={value => { if (!value) onClose(); }} className="channel-editor-dialog">
+    <form onSubmit={event => { event.preventDefault(); void save(); }} className="channel-editor-form">
       <label className="flex flex-col gap-1.5"><span className="text-xs font-medium text-muted-foreground">Name</span><Input aria-label="Channel name" value={name} maxLength={80} onChange={e => setName(e.target.value)} placeholder="Command Center" autoFocus /></label>
-      <div className="flex flex-col gap-1.5">
+      <div className="channel-editor-members">
         <div className="flex items-baseline justify-between"><span className="text-xs font-medium text-muted-foreground">Members</span><span className={`text-xs ${members.length > 32 ? "text-destructive" : "text-subtle-foreground"}`}>{members.length > 32 ? `${members.length} of 32 allowed` : `${members.length} selected`}</span></div>
         <div className="relative"><Icon name="Search" className="pointer-events-none absolute top-1/2 left-2.5 size-3.5 -translate-y-1/2 text-subtle-foreground" /><Input aria-label="Find bots and threads" value={query} onChange={e => setQuery(e.target.value)} placeholder="Find bots and threads" className="pl-8" /></div>
-        <div className="-mx-1 max-h-72 overflow-auto px-1" role="group" aria-label="Channel members">
+        <div className="channel-editor-list" role="group" aria-label="Channel members">
           {sections.map(section => <section key={section.label} aria-label={section.label} className="pt-2 first:pt-1">
             <h3 className="px-2 pb-1 text-[11px] font-medium tracking-wide text-subtle-foreground uppercase">{section.label}</h3>
-            {section.rows.map(c => <label key={memberKey(c.member)} className="flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-state-hover"><Checkbox checked={isMember(c.member)} onCheckedChange={() => toggle(c.member)} aria-label={c.label} /><ItemTile icon={c.icon} kindIcon={c.kindIcon} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>{c.detail && <span className="max-w-40 shrink-0 truncate text-xs text-subtle-foreground">{c.detail}</span>}</label>)}
+            {section.rows.map(c => <label key={memberKey(c.member)} className="relative flex min-w-0 cursor-pointer items-center gap-2.5 rounded-md px-2 py-1.5 transition-colors hover:bg-state-hover"><Checkbox checked={isMember(c.member)} onCheckedChange={() => toggle(c.member)} aria-label={c.label} /><ItemTile icon={c.icon} kindIcon={c.kindIcon} size="sm" /><span className="min-w-0 flex-1 truncate text-sm">{c.label}</span>{c.detail && <span className="max-w-40 shrink-0 truncate text-xs text-subtle-foreground">{c.detail}</span>}</label>)}
           </section>)}
           {!sections.length && <p className="px-2 py-6 text-center text-sm text-muted-foreground">{bots.length || threads.length ? `Nothing matches "${query.trim()}".` : "Loading bots and threads…"}</p>}
         </div>
