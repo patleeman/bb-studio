@@ -157,7 +157,7 @@ export function SidebarSection({
         </span>
         <span
           className={cn(
-            "flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/studio-section:opacity-100 focus-within:opacity-100 pointer-coarse:opacity-100",
+            "flex shrink-0 items-center gap-0.5 opacity-0 transition-opacity group-hover/studio-section:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 pointer-coarse:opacity-100",
             menuOpen && "opacity-100",
           )}
         >

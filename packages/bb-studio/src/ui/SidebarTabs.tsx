@@ -26,6 +26,7 @@ import type { rpcContract, TabView } from "../contract";
 import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
 import { SidebarItemRow } from "./SidebarItemRow";
+import { SidebarCreateMenu } from "./SidebarCreateMenu";
 import { SpaceMembers, useSpaceTree, type SpaceTree } from "./SidebarSpaces";
 
 const REFETCH_DEBOUNCE_MS = 300;
@@ -129,6 +130,7 @@ export function SidebarTabs() {
       <SidebarSection
         title="Studio"
         actions={[{ label: "Open Studio", icon: "studio/studio", onClick: () => (openAppPath(studioPath()), navigated()) }]}
+        trailing={<SidebarCreateMenu onNavigate={navigated} />}
         menu={
           <>
             <SidebarDisplayMenuItems

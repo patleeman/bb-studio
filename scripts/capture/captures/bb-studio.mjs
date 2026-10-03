@@ -1,4 +1,70 @@
-export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
+export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
+  {
+    id: "studio-sidebar-new-menu",
+    packageDir: "bb-studio",
+    fileName: "sidebar-new-menu.png",
+    showSidebar: true,
+    setup: async (client) => {
+      const pages = await seedPages();
+      const created = [];
+      const cleanup = async () => {
+        await pluginRpc("studio", "closeTabs", { items: [...created, { pluginId: "pages", id: pages.page.id }] }).catch(() => {});
+        for (const item of created) await pluginRpc("studio", "remove", { pluginId: item.pluginId, ids: [item.id] }).catch(() => {});
+        await pages.cleanup();
+      };
+      const openNew = async (keyboard = false) => {
+        await client.waitForAriaButton("New Studio item");
+        if (keyboard) {
+          await client.evaluate(`document.querySelector('button[aria-label="New Studio item"]').focus()`);
+          for (const type of ["rawKeyDown", "keyUp"]) await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+        } else await client.clickAriaButtonWithPointer("New Studio item");
+        await client.waitForSelector('[role="menu"][aria-label="New Studio item"]');
+        await client.waitForText("Page");
+        const labels = await client.evaluate(`[...document.querySelectorAll('[role="menu"][aria-label="New Studio item"] [role="menuitem"]')].map(each => each.innerText.trim())`);
+        for (const label of ["Page", "Drawing", "Table", "Space", "Recording"]) {
+          if (!labels.includes(label)) throw new Error(`Sidebar New menu did not offer ${label}`);
+        }
+        if (labels.includes("Artifact")) throw new Error("The sidebar offers an artifact even though artifacts cannot be created here");
+      };
+      try {
+        await client.navigate(`/plugins/pages/pages/${pages.page.id}`);
+        await client.waitForSelector(`[data-studio-tab="pages:${pages.page.id}"]`);
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await openNew(true);
+        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Page");
+        await client.waitForSelector('[data-studio-tab][data-studio-tab^="pages:"][aria-current="page"], .tiptap');
+        const pageId = await client.evaluate(`location.pathname.split('/plugins/pages/pages/')[1]?.split('/')[0]`);
+        if (!pageId || pageId === pages.page.id) throw new Error("New Page did not open the created page");
+        created.push({ pluginId: "pages", id: pageId });
+        await client.waitForSelector(`[data-studio-tab="pages:${pageId}"]`);
+        const { items } = await pluginRpc("studio", "items", { pluginId: "pages", ids: [pageId] });
+        if (items[0]?.projectId !== projectId) throw new Error("Sidebar New Page did not use the open thread's project");
+        await openNew();
+        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Space");
+        await client.waitForSelector('[role="dialog"]');
+        const dialog = await client.evaluate(`document.querySelector('[role="dialog"]').innerText`);
+        if (!dialog.includes("New space") || !dialog.includes("Default project")) throw new Error("Sidebar New Space did not open its creation dialog");
+        await client.clickElementWithTextAndPointer('[role="dialog"] button', "Cancel");
+        await client.navigate(`/projects/${projectId}/threads/${threadId}`);
+        await openNew();
+        await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 800, y: 800 });
+        await sleep(350);
+        const visible = await client.evaluate(`(() => {
+          const button = document.querySelector('button[aria-label="New Studio item"]');
+          return button.getAttribute('aria-expanded') === 'true' && getComputedStyle(button.parentElement).opacity === '1';
+        })()`);
+        if (!visible) throw new Error("The sidebar plus faded while its menu was open");
+      } catch (error) { await cleanup(); throw error; }
+      return cleanup;
+    },
+    clip: async (client) => client.evaluate(`(() => {
+      const section = document.querySelector('[data-studio-sidebar-section="studio:tabs"]').getBoundingClientRect();
+      const menu = document.querySelector('[role="menu"][aria-label="New Studio item"]').getBoundingClientRect();
+      const x = Math.max(0, Math.min(section.x, menu.x) - 8);
+      const y = Math.max(0, Math.min(section.y, menu.y) - 8);
+      return { x, y, width: Math.max(section.right, menu.right) - x + 8, height: Math.max(section.bottom, menu.bottom) - y + 8 };
+    })()`),
+  },
   {
     id: "studio-new-menu",
     packageDir: "bb-studio",
