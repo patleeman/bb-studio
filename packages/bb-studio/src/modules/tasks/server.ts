@@ -623,7 +623,7 @@ export default async function plugin(bb: BbPluginApi) {
         }
       }
       if (!threadId) {
-        const thread = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "newConversation", input: { id: botId } as never,
+        const thread = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "newConversation", input: { id: botId, projectId: task.project_id ?? "proj_personal" } as never,
           outputSchema: z.object({ threadId: z.string() }) });
         threadId = thread.threadId;
       }

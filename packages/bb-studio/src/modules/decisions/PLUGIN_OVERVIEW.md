@@ -15,8 +15,8 @@ let Studio Teams pick which bots answer a channel message.
   live here too.
 - If the standalone Smart Queue plugin is on, this one's queue pauses, so each
   message is decided once.
-- `bb smart-decisions recent` lists each decision and the provider that made it,
-  and `bb smart-decisions classify` dry-runs one.
+- `bb studio smart-decisions recent` lists each decision and the provider that made it,
+  and `bb studio smart-decisions classify` dry-runs one.
 
 ## Choose how to reach Jev
 

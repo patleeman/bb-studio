@@ -415,36 +415,36 @@ export default async function plugin(bb: BbPluginApi) {
 
   const usage = [
     "Usage:",
-    "  bb smart-decisions status [--json]",
-    "  bb smart-decisions recent [--limit <n>] [--json]",
-    "  bb smart-decisions classify <thread-id> <message> [--json]",
-    "  bb smart-decisions check [--json]",
-    "  bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
+    "  bb studio smart-decisions status [--json]",
+    "  bb studio smart-decisions recent [--limit <n>] [--json]",
+    "  bb studio smart-decisions classify <thread-id> <message> [--json]",
+    "  bb studio smart-decisions check [--json]",
+    "  bb studio smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
   ].join("\n");
   bb.cli.register({
     name: "smart-decisions",
     summary: "Inspect Studio Decisions' Jev providers, fallback model, and Smart Queue decisions",
     commands: [
-      { name: "status", summary: "Show the Jev providers, the fallback model, and whether Smart Queue is on", usage: "bb smart-decisions status [--json]" },
+      { name: "status", summary: "Show the Jev providers, the fallback model, and whether Smart Queue is on", usage: "bb studio smart-decisions status [--json]" },
       {
         name: "recent",
         summary: "List recent Smart Queue steer and follow-up decisions",
-        usage: "bb smart-decisions recent [--limit <n>] [--json]",
+        usage: "bb studio smart-decisions recent [--limit <n>] [--json]",
       },
       {
         name: "classify",
         summary: "Dry-run Smart Queue for a message to a thread without sending it",
-        usage: "bb smart-decisions classify <thread-id> <message> [--json]",
+        usage: "bb studio smart-decisions classify <thread-id> <message> [--json]",
       },
       {
         name: "check",
         summary: "Test the Jev connection with a fixed sample message",
-        usage: "bb smart-decisions check [--json]",
+        usage: "bb studio smart-decisions check [--json]",
       },
       {
         name: "fallback",
         summary: "Show or set the model used when no Jev provider answers",
-        usage: "bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
+        usage: "bb studio smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]",
       },
     ],
     async run(argv) {
@@ -571,3 +571,5 @@ export default async function plugin(bb: BbPluginApi) {
     },
   });
 }
+
+export async function registerServer(ctx: import("../runtime").ModuleContext) { await plugin(ctx.bb); }

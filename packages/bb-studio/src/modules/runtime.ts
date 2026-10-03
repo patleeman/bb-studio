@@ -1,3 +1,4 @@
+import { join } from "node:path";
 import { ModuleHooks } from "./hooks";
 import { officeTrustAgents } from "../office/trust-agents";
 import { ModuleAgents } from "./agents";
@@ -108,7 +109,7 @@ export class ModuleRuntime {
     this.host.onDispose(() => { if (db.open) db.close(); });
     const contract: Record<string, PluginRpcContract[string]> = {};
     const handlers: Record<string, PluginRpcHandlers<PluginRpcContract>[string]> = {};
-    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), experimental_hooks: this.hooks.scope(), agents: this.agents.scope(module.skills), settings: moduleSettings(this.host.settings, db, module.name), storage: {
+    const api: BbPluginApi = { ...this.host, sdk: this.sdk(), experimental_hooks: this.hooks.scope(), agents: this.agents.scope(module.skills), settings: moduleSettings(this.host.settings, db, module.name, join(this.host.server.experimental_dataDir, "plugins", module.legacyPluginId, "secrets")), storage: {
       ...this.host.storage, database: () => db, kv: moduleKv(db),
     }, rpc: { register: (methods, implementations, options) => {
       const exposed: Record<string, PluginRpcContract[string]> = {};

@@ -12,7 +12,7 @@ export type ModelAsk = (
   signal: AbortSignal,
 ) => Promise<string | null>;
 
-const installHint = "Install and enable Studio Decisions, then set up its Jev provider or fallback model.";
+const installHint = "Install and enable Studio, then set up its Jev provider or fallback model.";
 const setupHint = "Set up a Jev provider or fallback model in Studio Decisions settings.";
 
 class DecisionsFailure extends Error {}
@@ -31,7 +31,7 @@ async function callRpc<T extends { ok: true }>(
   signal.throwIfAborted();
   try {
     const result = await bb.sdk.plugins.callRpc({
-      signal, pluginId: "smart-decisions", method, input: input as never,
+      signal, pluginId: "studio", method: `decisions_${method}`, input: input as never,
       outputSchema: outputSchema as typeof publicContract["systemOne.ask"]["output"],
     });
     signal.throwIfAborted();

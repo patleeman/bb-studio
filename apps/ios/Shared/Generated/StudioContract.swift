@@ -207,6 +207,13 @@ public enum Studio {
     public static let artifacts_saveFiles = "artifacts_saveFiles"
     public static let artifacts_importFile = "artifacts_importFile"
     public static let artifacts_saveAsPage = "artifacts_saveAsPage"
+    public static let decisions_systemOne_ask = "decisions_systemOne.ask"
+    public static let decisions_model_ask = "decisions_model.ask"
+    public static let decisions_fallback_get = "decisions_fallback.get"
+    public static let decisions_fallback_set = "decisions_fallback.set"
+    public static let decisions_fallback_suggest = "decisions_fallback.suggest"
+    public static let decisions_jev_status = "decisions_jev.status"
+    public static let decisions_jev_check = "decisions_jev.check"
   }
 
   public typealias Home = HomeOutput
@@ -666,6 +673,40 @@ public enum Studio {
   public typealias ArtifactsImportFile = ArtifactsImportFileOutput
 
   public typealias ArtifactsSaveAsPage = ArtifactsSaveAsPageOutput
+
+  public typealias DecisionsSystemOneAskOutput = StudioJSONValue
+
+  public typealias DecisionsSystemOneAsk = DecisionsSystemOneAskOutput
+
+  public typealias DecisionsModelAskOutput = StudioJSONValue
+
+  public typealias DecisionsModelAsk = DecisionsModelAskOutput
+
+  public typealias DecisionsFallbackGetInput = StudioJSONValue
+
+  public typealias DecisionsFallbackGetOutput = StudioJSONValue
+
+  public typealias DecisionsFallbackGet = DecisionsFallbackGetOutput
+
+  public typealias DecisionsFallbackSetInput = StudioJSONValue
+
+  public typealias DecisionsFallbackSetOutput = StudioJSONValue
+
+  public typealias DecisionsFallbackSet = DecisionsFallbackSetOutput
+
+  public typealias DecisionsFallbackSuggestInput = StudioJSONValue
+
+  public typealias DecisionsFallbackSuggest = DecisionsFallbackSuggestOutput
+
+  public typealias DecisionsJevStatusInput = StudioJSONValue
+
+  public typealias DecisionsJevStatus = DecisionsJevStatusOutput
+
+  public typealias DecisionsJevCheckInput = StudioJSONValue
+
+  public typealias DecisionsJevCheckOutput = StudioJSONValue
+
+  public typealias DecisionsJevCheck = DecisionsJevCheckOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -17289,9 +17330,11 @@ public enum Studio {
 
   public struct TeamsNewConversationInput: Sendable, Hashable, Codable {
     public var id: String?
+    public var projectId: String?
 
-    public init(id: String? = nil) {
+    public init(id: String? = nil, projectId: String? = nil) {
       self.id = id
+      self.projectId = projectId
     }
   }
 
@@ -18055,6 +18098,220 @@ public enum Studio {
 
     public init(href: String? = nil) {
       self.href = href
+    }
+  }
+
+  public struct DecisionsSystemOneAskInput: Sendable, Hashable, Codable {
+    public var caller: String?
+    public var state: StudioJSONValue?
+    public var questions: [String: StudioJSONValue]?
+
+    public init(caller: String? = nil, state: StudioJSONValue? = nil, questions: [String: StudioJSONValue]? = nil) {
+      self.caller = caller
+      self.state = state
+      self.questions = questions
+    }
+  }
+
+  public enum DecisionsModelAskInputModelSelectionReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DecisionsModelAskInputModelSelectionServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DecisionsModelAskInputModelSelection: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: DecisionsModelAskInputModelSelectionReasoningLevel?
+    public var serviceTier: DecisionsModelAskInputModelSelectionServiceTier?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: DecisionsModelAskInputModelSelectionReasoningLevel? = nil, serviceTier: DecisionsModelAskInputModelSelectionServiceTier? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct DecisionsModelAskInput: Sendable, Hashable, Codable {
+    public var caller: String?
+    public var requestId: String?
+    public var hostId: String?
+    public var prompt: String?
+    public var providerId: String?
+    public var modelSelection: DecisionsModelAskInputModelSelection?
+
+    public init(caller: String? = nil, requestId: String? = nil, hostId: String? = nil, prompt: String? = nil, providerId: String? = nil, modelSelection: DecisionsModelAskInputModelSelection? = nil) {
+      self.caller = caller
+      self.requestId = requestId
+      self.hostId = hostId
+      self.prompt = prompt
+      self.providerId = providerId
+      self.modelSelection = modelSelection
+    }
+  }
+
+  public enum DecisionsFallbackSuggestOutputReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum DecisionsFallbackSuggestOutputServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct DecisionsFallbackSuggestOutput: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: DecisionsFallbackSuggestOutputReasoningLevel?
+    public var serviceTier: DecisionsFallbackSuggestOutputServiceTier?
+    public var mode: String?
+
+    public init(providerId: String? = nil, model: String? = nil, reasoningLevel: DecisionsFallbackSuggestOutputReasoningLevel? = nil, serviceTier: DecisionsFallbackSuggestOutputServiceTier? = nil, mode: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+      self.mode = mode
+    }
+  }
+
+  public struct DecisionsJevStatusOutputRoutesItem: Sendable, Hashable, Codable {
+    public var name: String?
+    public var model: String?
+
+    public init(name: String? = nil, model: String? = nil) {
+      self.name = name
+      self.model = model
+    }
+  }
+
+  public struct DecisionsJevStatusOutput: Sendable, Hashable, Codable {
+    public var provider: String?
+    public var routes: [DecisionsJevStatusOutputRoutesItem]?
+    public var problems: [String]?
+
+    public init(provider: String? = nil, routes: [DecisionsJevStatusOutputRoutesItem]? = nil, problems: [String]? = nil) {
+      self.provider = provider
+      self.routes = routes
+      self.problems = problems
     }
   }
 

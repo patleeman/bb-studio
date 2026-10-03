@@ -1,8 +1,8 @@
+import { moduleApp, useModuleRpc } from "../app";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import {
   definePluginApp,
   experimental_ProviderModelPicker as ProviderModelPicker,
-  useRpc,
   useSettings,
 } from "@get-bb/plugin-sdk/app";
 import { Button } from "@bb-studio/kit/ui";
@@ -25,7 +25,7 @@ function Row({ label, description, children }: { label: string; description: Rea
 }
 
 function JevConnection() {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("decisions");
   const { values } = useSettings();
   const [status, setStatus] = useState<{ provider: string; routes: { name: string; model: string }[]; problems: string[] } | null>(null);
   const [check, setCheck] = useState<{ state: "idle" | "running" } | { state: "done"; text: string; ok: boolean }>({
@@ -103,7 +103,7 @@ const modeLabels = {
 } as const;
 
 function FallbackModel() {
-  const rpc = useRpc<typeof rpcContract>();
+  const rpc = useModuleRpc<typeof rpcContract>("decisions");
   const [value, setValue] = useState<Fallback | null>(null);
   const [error, setError] = useState<string | null>(null);
 
@@ -183,7 +183,8 @@ function FallbackModel() {
   );
 }
 
-export default definePluginApp((app) => {
+export function registerApp(host: import("@get-bb/plugin-sdk/app").PluginAppBuilder) {
+  const app = moduleApp(host, "decisions");
   app.slots.settingsSection({
     id: "jev-connection",
     title: "Jev connection",
@@ -196,4 +197,6 @@ export default definePluginApp((app) => {
     description: "The model that decides when no Jev provider answers.",
     component: FallbackModel,
   });
-});
+}
+
+export default definePluginApp(registerApp);

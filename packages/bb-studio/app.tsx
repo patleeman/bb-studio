@@ -1,3 +1,4 @@
+import { registerApp as registerDecisions } from "./src/modules/decisions/app";
 import { registerApp as registerArtifacts } from "./src/modules/artifacts/app";
 import { registerApp as registerTeams } from "./src/modules/teams/app";
 import { registerApp as registerTasks } from "./src/modules/tasks/app";
@@ -29,6 +30,7 @@ function StudioRoot({ subPath }: { subPath: string }) {
 
 export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "module-import-notice", component: ModuleNotice });
+  registerDecisions(app);
   registerArtifacts(app);
   registerTeams(app);
   registerTasks(app);

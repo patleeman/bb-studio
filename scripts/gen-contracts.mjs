@@ -1,3 +1,4 @@
+import { rpcContract as decisionsContract } from "../packages/bb-studio/src/modules/decisions/contract.ts";
 import { rpcContract as artifactsContract } from "../packages/bb-studio/src/modules/artifacts/server.ts";
 import { rpcContract as teamsContract } from "../packages/bb-studio/src/modules/teams/client-contract.ts";
 import { rpcContract as tasksContract } from "../packages/bb-studio/src/modules/tasks/server.ts";
@@ -27,7 +28,6 @@ const plugins = [
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
-  ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
 ];
 
 const swiftKeywords = new Set("associatedtype class deinit enum extension fileprivate func import init inout internal let open operator private protocol public rethrows static struct subscript typealias var break case catch continue default defer do else fallthrough for guard if in repeat return switch throw try while as Any false is nil self Self super throws true where await async actor some".split(" "));
@@ -146,7 +146,7 @@ const item = schemaOf(studioSchemas(z).item, "output");
 const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
-  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract), ...prefixed("feed_", feedContract), ...prefixed("tasks_", tasksContract), ...prefixed("teams_", teamsContract), ...prefixed("artifacts_", artifactsContract) } : mod[exportName];
+  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract, ...moduleProviderContract, ...moduleStatusContract, ...prefixed("tables_", tablesContract), ...prefixed("chat_", chatContract), ...prefixed("feed_", feedContract), ...prefixed("tasks_", tasksContract), ...prefixed("teams_", teamsContract), ...prefixed("artifacts_", artifactsContract), ...prefixed("decisions_", decisionsContract) } : mod[exportName];
   if (!contract) throw new Error(`Missing ${exportName} in ${path}`);
   const methods = Object.fromEntries(Object.entries(contract).map(([name, value]) => [name, {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),

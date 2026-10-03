@@ -109,7 +109,7 @@ card starts a fresh decision for the new text.
 
 ## Settings
 
-Open **Settings → Plugins → Studio Decisions**, or use `bb plugin config smart-decisions`.
+Open **Settings → Plugins → Studio**, or use `bb plugin config studio`.
 
 | Setting | Default | Purpose |
 | --- | --- | --- |
@@ -130,16 +130,16 @@ Below the form, two sections complete the page:
 - **Fallback model** chooses what decides when no Jev provider answers: the
   caller's provider (the busy thread's, or the bot's for Studio Teams), a
   specific model picked with BB's own provider, model, and reasoning picker,
-  or off. The same choice is available as `bb smart-decisions fallback`.
+  or off. The same choice is available as `bb studio smart-decisions fallback`.
 
 ## Commands
 
 ```sh
-bb smart-decisions status              # Jev routes, problems, and the fallback model
-bb smart-decisions recent [--limit n]  # Recent decisions, newest first
-bb smart-decisions classify <thread-id> <message>  # Dry run; sends nothing
-bb smart-decisions check               # Test the Jev connection with a sample message
-bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
+bb studio smart-decisions status              # Jev routes, problems, and the fallback model
+bb studio smart-decisions recent [--limit n]  # Recent decisions, newest first
+bb studio smart-decisions classify <thread-id> <message>  # Dry run; sends nothing
+bb studio smart-decisions check               # Test the Jev connection with a sample message
+bb studio smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning>]]
 ```
 
 Every command accepts `--json`.
@@ -185,13 +185,13 @@ low reasoning. The capture restores the staged settings afterwards.
 ## Install
 
 ```sh
-bb plugin install ./packages/bb-studio-decisions --yes
+bb plugin install ./packages/bb-studio/src/modules/decisions --yes
 ```
 
 ## Development
 
 ```sh
-pnpm --dir packages/bb-studio-decisions test
-pnpm --dir packages/bb-studio-decisions typecheck
-pnpm --dir packages/bb-studio-decisions build
+pnpm --dir packages/bb-studio/src/modules/decisions test
+pnpm --dir packages/bb-studio/src/modules/decisions typecheck
+pnpm --dir packages/bb-studio/src/modules/decisions build
 ```

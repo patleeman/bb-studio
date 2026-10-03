@@ -1,6 +1,6 @@
 ---
 name: smart-decisions
-description: Set up or troubleshoot Studio Decisions, the one place BB Studio configures its fast Jev (System One) model and fallback model. Use it to check the Jev providers Smart Queue and Studio Teams use, explain why a message sent to a busy BB thread steered the running turn or waited as a follow-up, or dry-run that decision with the bb smart-decisions CLI.
+description: Set up or troubleshoot Studio Decisions, the one place BB Studio configures its fast Jev (System One) model and fallback model. Use it to check the Jev providers Smart Queue and Studio Teams use, explain why a message sent to a busy BB thread steered the running turn or waited as a follow-up, or dry-run that decision with the bb studio smart-decisions CLI.
 ---
 
 # Studio Decisions
@@ -20,11 +20,11 @@ BB Studio. Two things use them:
 ## Commands
 
 ```sh
-bb smart-decisions status [--json]
-bb smart-decisions recent [--limit <n>] [--json]
-bb smart-decisions classify <thread-id> <message> [--json]
-bb smart-decisions check [--json]
-bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]
+bb studio smart-decisions status [--json]
+bb studio smart-decisions recent [--limit <n>] [--json]
+bb studio smart-decisions classify <thread-id> <message> [--json]
+bb studio smart-decisions check [--json]
+bb studio smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-level>]] [--json]
 ```
 
 - `status` shows whether Smart Queue is on or paused, the Jev providers it will try in
@@ -44,7 +44,7 @@ bb smart-decisions fallback [thread | off | <provider-id> <model> [<reasoning-le
 
 ## Settings
 
-Change settings with `bb plugin config smart-decisions set <key> <value>`.
+Change settings with `bb plugin config studio set decisions_<key> <value>`.
 
 - `jevProvider`: `auto` (default), `typesafe`, `vercel`, `openrouter`,
   `opencode-zen`, or `custom`. `auto` tries each configured provider in that
@@ -62,15 +62,15 @@ Change settings with `bb plugin config smart-decisions set <key> <value>`.
 - `jevTimeoutMs` applies to every caller. `steerConfidence`, `batchConfidence` and
   `enabled` apply to Smart Queue only; Studio Teams keeps its own confidence threshold.
 - The fallback model is not a `bb plugin config` setting. Use
-  `bb smart-decisions fallback`, or the picker on the settings page.
+  `bb studio smart-decisions fallback`, or the picker on the settings page.
 
-Run `bb smart-decisions status` after a change. It lists the Jev routes in order
+Run `bb studio smart-decisions status` after a change. It lists the Jev routes in order
 and any configuration problems.
 
 ## Troubleshooting
 
 - `no classifier answered`: no Jev provider answered, and the fallback model
-  failed too. Read `bb plugin logs smart-decisions` for the reason.
+  failed too. Read `bb plugin logs studio` for the reason.
 - A queued card that says *Smart Queue: follow-up after the current turn* is
   released when the thread goes idle. The owner can use the card's **Send now**
   or **Steer** button to override it. Sending a card by hand cancels its
@@ -80,9 +80,9 @@ and any configuration problems.
   many were grouped (`Smart Queue grouped 1 of 2 follow-ups with …`). Raise
   `batchConfidence` to group less, or set it to 1 to turn grouping off.
 - `request failed (HTTP 400)` from a Jev provider ends with the provider's own
-  reason, such as an unsupported model name. Run `bb smart-decisions check` to
+  reason, such as an unsupported model name. Run `bb studio smart-decisions check` to
   retry with a fixed sample.
 - Studio Teams says *Studio Decisions did not answer*: Studio Decisions is not
   installed or is disabled. *No Jev provider is configured*: add a key here.
 - To stop Smart Queue, run
-  `bb plugin config smart-decisions set enabled false`.
+  `bb plugin config studio set decisions_enabled false`.
