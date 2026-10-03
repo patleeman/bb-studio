@@ -64,6 +64,16 @@ public enum Studio {
     public static let versions = "versions"
     public static let versionCreate = "versionCreate"
     public static let versionRead = "versionRead"
+    public static let spaces_list = "spaces_list"
+    public static let space_create = "space_create"
+    public static let space_update = "space_update"
+    public static let space_delete = "space_delete"
+    public static let space_move_project = "space_move_project"
+    public static let space_settings_get = "space_settings_get"
+    public static let space_settings_set = "space_settings_set"
+    public static let folder_create = "folder_create"
+    public static let folder_archive = "folder_archive"
+    public static let space_tree = "space_tree"
   }
 
   public typealias Home = HomeOutput
@@ -207,6 +217,26 @@ public enum Studio {
   public typealias VersionCreate = VersionCreateOutput
 
   public typealias VersionRead = VersionReadOutput
+
+  public typealias SpacesList = SpacesListOutput
+
+  public typealias SpaceCreate = SpaceCreateOutput
+
+  public typealias SpaceUpdate = SpaceUpdateOutput
+
+  public typealias SpaceDelete = SpaceDeleteOutput
+
+  public typealias SpaceMoveProject = SpaceMoveProjectOutput
+
+  public typealias SpaceSettingsGet = SpaceSettingsGetOutput
+
+  public typealias SpaceSettingsSet = SpaceSettingsSetOutput
+
+  public typealias FolderCreate = FolderCreateOutput
+
+  public typealias FolderArchive = FolderArchiveOutput
+
+  public typealias SpaceTree2 = SpaceTree2Output
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var projectId: String?
@@ -4680,6 +4710,527 @@ public enum Studio {
 
     public init(bytes: String? = nil) {
       self.bytes = bytes
+    }
+  }
+
+  public struct SpacesListInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct SpacesListOutputSpacesItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+    public var isDefault: Bool?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.description = description
+      self.isDefault = isDefault
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpacesListOutput: Sendable, Hashable, Codable {
+    public var spaces: [SpacesListOutputSpacesItem]?
+
+    public init(spaces: [SpacesListOutputSpacesItem]? = nil) {
+      self.spaces = spaces
+    }
+  }
+
+  public struct SpaceCreateInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+
+    public init(name: String? = nil, icon: String? = nil, description: String? = nil) {
+      self.name = name
+      self.icon = icon
+      self.description = description
+    }
+  }
+
+  public struct SpaceCreateOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+    public var isDefault: Bool?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.description = description
+      self.isDefault = isDefault
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpaceCreateOutput: Sendable, Hashable, Codable {
+    public var space: SpaceCreateOutputSpace?
+
+    public init(space: SpaceCreateOutputSpace? = nil) {
+      self.space = space
+    }
+  }
+
+  public struct SpaceUpdateInput: Sendable, Hashable, Codable {
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+    public var spaceId: String?
+
+    public init(name: String? = nil, icon: String? = nil, description: String? = nil, spaceId: String? = nil) {
+      self.name = name
+      self.icon = icon
+      self.description = description
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct SpaceUpdateOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+    public var isDefault: Bool?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.description = description
+      self.isDefault = isDefault
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpaceUpdateOutput: Sendable, Hashable, Codable {
+    public var space: SpaceUpdateOutputSpace?
+
+    public init(space: SpaceUpdateOutputSpace? = nil) {
+      self.space = space
+    }
+  }
+
+  public struct SpaceDeleteInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct SpaceDeleteOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct SpaceMoveProjectInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var spaceId: String?
+
+    public init(projectId: String? = nil, spaceId: String? = nil) {
+      self.projectId = projectId
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct SpaceMoveProjectOutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+    public var isDefault: Bool?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.description = description
+      self.isDefault = isDefault
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpaceMoveProjectOutput: Sendable, Hashable, Codable {
+    public var space: SpaceMoveProjectOutputSpace?
+
+    public init(space: SpaceMoveProjectOutputSpace? = nil) {
+      self.space = space
+    }
+  }
+
+  public struct SpaceSettingsGetInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public enum SpaceSettingsGetOutputSettingsDefaultTrust: Sendable, Hashable, Codable {
+    case read_only
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "read_only": self = .read_only
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .read_only: try container.encode("read_only")
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceSettingsGetOutputSettingsDefaultBotModel: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+
+    public init(providerId: String? = nil, model: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public struct SpaceSettingsGetOutputSettings: Sendable, Hashable, Codable {
+    public var enabledItemKinds: [String]?
+    public var defaultTrust: SpaceSettingsGetOutputSettingsDefaultTrust?
+    public var defaultBotModel: SpaceSettingsGetOutputSettingsDefaultBotModel?
+
+    public init(enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsGetOutputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsGetOutputSettingsDefaultBotModel? = nil) {
+      self.enabledItemKinds = enabledItemKinds
+      self.defaultTrust = defaultTrust
+      self.defaultBotModel = defaultBotModel
+    }
+  }
+
+  public struct SpaceSettingsGetOutput: Sendable, Hashable, Codable {
+    public var settings: SpaceSettingsGetOutputSettings?
+
+    public init(settings: SpaceSettingsGetOutputSettings? = nil) {
+      self.settings = settings
+    }
+  }
+
+  public enum SpaceSettingsSetInputSettingsDefaultTrust: Sendable, Hashable, Codable {
+    case read_only
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "read_only": self = .read_only
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .read_only: try container.encode("read_only")
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceSettingsSetInputSettingsDefaultBotModel: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+
+    public init(providerId: String? = nil, model: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public struct SpaceSettingsSetInputSettings: Sendable, Hashable, Codable {
+    public var enabledItemKinds: [String]?
+    public var defaultTrust: SpaceSettingsSetInputSettingsDefaultTrust?
+    public var defaultBotModel: SpaceSettingsSetInputSettingsDefaultBotModel?
+
+    public init(enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsSetInputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsSetInputSettingsDefaultBotModel? = nil) {
+      self.enabledItemKinds = enabledItemKinds
+      self.defaultTrust = defaultTrust
+      self.defaultBotModel = defaultBotModel
+    }
+  }
+
+  public struct SpaceSettingsSetInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var settings: SpaceSettingsSetInputSettings?
+
+    public init(spaceId: String? = nil, settings: SpaceSettingsSetInputSettings? = nil) {
+      self.spaceId = spaceId
+      self.settings = settings
+    }
+  }
+
+  public enum SpaceSettingsSetOutputSettingsDefaultTrust: Sendable, Hashable, Codable {
+    case read_only
+    case ask
+    case act
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "read_only": self = .read_only
+      case "ask": self = .ask
+      case "act": self = .act
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .read_only: try container.encode("read_only")
+      case .ask: try container.encode("ask")
+      case .act: try container.encode("act")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceSettingsSetOutputSettingsDefaultBotModel: Sendable, Hashable, Codable {
+    public var providerId: String?
+    public var model: String?
+
+    public init(providerId: String? = nil, model: String? = nil) {
+      self.providerId = providerId
+      self.model = model
+    }
+  }
+
+  public struct SpaceSettingsSetOutputSettings: Sendable, Hashable, Codable {
+    public var enabledItemKinds: [String]?
+    public var defaultTrust: SpaceSettingsSetOutputSettingsDefaultTrust?
+    public var defaultBotModel: SpaceSettingsSetOutputSettingsDefaultBotModel?
+
+    public init(enabledItemKinds: [String]? = nil, defaultTrust: SpaceSettingsSetOutputSettingsDefaultTrust? = nil, defaultBotModel: SpaceSettingsSetOutputSettingsDefaultBotModel? = nil) {
+      self.enabledItemKinds = enabledItemKinds
+      self.defaultTrust = defaultTrust
+      self.defaultBotModel = defaultBotModel
+    }
+  }
+
+  public struct SpaceSettingsSetOutput: Sendable, Hashable, Codable {
+    public var settings: SpaceSettingsSetOutputSettings?
+
+    public init(settings: SpaceSettingsSetOutputSettings? = nil) {
+      self.settings = settings
+    }
+  }
+
+  public struct FolderCreateInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var name: String?
+
+    public init(spaceId: String? = nil, name: String? = nil) {
+      self.spaceId = spaceId
+      self.name = name
+    }
+  }
+
+  public struct FolderCreateOutputFolder: Sendable, Hashable, Codable {
+    public var id: String?
+    public var spaceId: String?
+    public var name: String?
+    public var path: String?
+    public var archived: Bool?
+    public var isDefault: Bool?
+
+    public init(id: String? = nil, spaceId: String? = nil, name: String? = nil, path: String? = nil, archived: Bool? = nil, isDefault: Bool? = nil) {
+      self.id = id
+      self.spaceId = spaceId
+      self.name = name
+      self.path = path
+      self.archived = archived
+      self.isDefault = isDefault
+    }
+  }
+
+  public struct FolderCreateOutput: Sendable, Hashable, Codable {
+    public var folder: FolderCreateOutputFolder?
+
+    public init(folder: FolderCreateOutputFolder? = nil) {
+      self.folder = folder
+    }
+  }
+
+  public struct FolderArchiveInput: Sendable, Hashable, Codable {
+    public var folderId: String?
+
+    public init(folderId: String? = nil) {
+      self.folderId = folderId
+    }
+  }
+
+  public struct FolderArchiveOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct SpaceTree2Input: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct SpaceTree2OutputSpace: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var icon: String?
+    public var description: String?
+    public var isDefault: Bool?
+    public var defaultProjectId: String?
+    public var projectIds: [String]?
+    public var createdAt: Double?
+    public var updatedAt: Double?
+
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, description: String? = nil, isDefault: Bool? = nil, defaultProjectId: String? = nil, projectIds: [String]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
+      self.id = id
+      self.name = name
+      self.icon = icon
+      self.description = description
+      self.isDefault = isDefault
+      self.defaultProjectId = defaultProjectId
+      self.projectIds = projectIds
+      self.createdAt = createdAt
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpaceTree2OutputFoldersItemThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var state: String?
+    public var updatedAt: Double?
+    public var authorBotId: String?
+
+    public init(id: String? = nil, title: String? = nil, state: String? = nil, updatedAt: Double? = nil, authorBotId: String? = nil) {
+      self.id = id
+      self.title = title
+      self.state = state
+      self.updatedAt = updatedAt
+      self.authorBotId = authorBotId
+    }
+  }
+
+  public struct SpaceTree2OutputFoldersItemItemsItem: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var kind: String?
+    public var title: String?
+    public var href: String?
+    public var projectId: String?
+    public var authorBotId: String?
+    public var updatedAt: Double?
+
+    public init(pluginId: String? = nil, id: String? = nil, kind: String? = nil, title: String? = nil, href: String? = nil, projectId: String? = nil, authorBotId: String? = nil, updatedAt: Double? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.kind = kind
+      self.title = title
+      self.href = href
+      self.projectId = projectId
+      self.authorBotId = authorBotId
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpaceTree2OutputFoldersItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var spaceId: String?
+    public var name: String?
+    public var path: String?
+    public var archived: Bool?
+    public var isDefault: Bool?
+    public var threads: [SpaceTree2OutputFoldersItemThreadsItem]?
+    public var items: [SpaceTree2OutputFoldersItemItemsItem]?
+
+    public init(id: String? = nil, spaceId: String? = nil, name: String? = nil, path: String? = nil, archived: Bool? = nil, isDefault: Bool? = nil, threads: [SpaceTree2OutputFoldersItemThreadsItem]? = nil, items: [SpaceTree2OutputFoldersItemItemsItem]? = nil) {
+      self.id = id
+      self.spaceId = spaceId
+      self.name = name
+      self.path = path
+      self.archived = archived
+      self.isDefault = isDefault
+      self.threads = threads
+      self.items = items
+    }
+  }
+
+  public struct SpaceTree2Output: Sendable, Hashable, Codable {
+    public var space: SpaceTree2OutputSpace?
+    public var folders: [SpaceTree2OutputFoldersItem]?
+
+    public init(space: SpaceTree2OutputSpace? = nil, folders: [SpaceTree2OutputFoldersItem]? = nil) {
+      self.space = space
+      self.folders = folders
     }
   }
 

@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { studioSchemas } from "../packages/bb-studio-kit/src/contract.ts";
+import { officeContract } from "../packages/bb-studio/src/office/contract.ts";
 import { nativeRpcInventory } from "./native-rpc-inventory.mjs";
 
 const root = resolve(import.meta.dirname, "..");
@@ -141,7 +142,7 @@ const item = schemaOf(studioSchemas(z).item, "output");
 const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
-  const contract = mod[exportName];
+  const contract = pluginId === "studio" ? { ...mod[exportName], ...officeContract } : mod[exportName];
   if (!contract) throw new Error(`Missing ${exportName} in ${path}`);
   const methods = Object.fromEntries(Object.entries(contract).map(([name, value]) => [name, {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),

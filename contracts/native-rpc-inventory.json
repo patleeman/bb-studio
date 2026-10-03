@@ -422,6 +422,72 @@
       "coverage": "generated method"
     },
     {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "spaces_list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_delete",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_move_project",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_settings_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_settings_set",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "folder_create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "folder_archive",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/BBClient+Office.swift",
+      "plugin": "studio",
+      "method": "space_tree",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Office/OfficeProvisionalAPI.swift",
+      "plugin": "studio",
+      "method": "method",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "tree",
