@@ -36,7 +36,7 @@ extension OfficeTab {
 enum OfficeRouting: String {
     case own, current
     static let key = "officeRouting"
-    static var setting: OfficeRouting { OfficeRouting(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .own }
+    static var setting: OfficeRouting { OfficeRouting(rawValue: UserDefaults.standard.string(forKey: key) ?? "") ?? .current }
 }
 
 extension TabsStore {

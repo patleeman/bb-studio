@@ -194,7 +194,9 @@ export function useTrackOpen(spaceId: string | null, activeThreadId: string | nu
 const ROUTING_KEY = "bb-studio.office.routing";
 export type Routing = "own" | "current";
 export function readRouting(): Routing {
-  try { return globalThis.localStorage?.getItem(ROUTING_KEY) === "current" ? "current" : "own"; } catch { return "own"; }
+  // Off by default, as in Arc ("most recent Space"): routing everything away
+  // made a Space with no projects of its own keep only one tab.
+  try { return globalThis.localStorage?.getItem(ROUTING_KEY) === "own" ? "own" : "current"; } catch { return "current"; }
 }
 export function writeRouting(routing: Routing): void {
   try { globalThis.localStorage?.setItem(ROUTING_KEY, routing); } catch { /* private mode */ }
