@@ -12,7 +12,7 @@ import { InboxRow } from "./InboxRow";
 import { useCall, useLive, useTeam, type Home, type Space, type TeamBot, type WorkingTask } from "./model";
 import { openOffice } from "./routes";
 import { SpaceMark } from "./SpaceSwitcher";
-import { KIND_ICONS } from "./OfficeSidebar";
+import { KIND_ICONS } from "./TabRow";
 import { cn } from "./styles";
 import { describeSchedule } from "./text";
 

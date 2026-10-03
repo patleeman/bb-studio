@@ -21,3 +21,8 @@ function subscribe(listener: () => void) {
 export function usePathname(): string {
   return useSyncExternalStore(subscribe, () => globalThis.location?.pathname ?? "", () => "");
 }
+
+/** Path and query, for tabs whose address carries a filter (a Library view). */
+export function useLocationHref(): string {
+  return useSyncExternalStore(subscribe, () => `${globalThis.location?.pathname ?? ""}${globalThis.location?.search ?? ""}`, () => "");
+}

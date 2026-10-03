@@ -1,11 +1,12 @@
 // Registers the office UI: its panel, the approval card for bots that ask
-// first, and the sidebar (navigation on top, Team/Favorites/Folders below),
-// which replaces the Studio Sidebar and Studio Navigation modules.
+// first, and the sidebar (address bar and Essentials on top, Pinned and Today
+// tabs below), which replaces the Studio Sidebar and Studio Navigation modules.
 import { retainPanel } from "@bb-studio/kit/app";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
-import { OfficeNavigation } from "./OfficeNavigation";
+import { openCommandBar } from "./CommandBar";
 import { OfficePanel } from "./OfficePanel";
-import { OfficeSidebar } from "./OfficeSidebar";
+import { OfficeTabs } from "./OfficeTabs";
+import { OfficeTop } from "./OfficeTop";
 import { OFFICE_PANELS, OFFICE_PANEL_PATH } from "./routes";
 import { TrustRequest } from "./TrustRequest";
 
@@ -22,6 +23,10 @@ export function registerOfficeApp(app: PluginAppBuilder, options: { sidebar: Plu
   }
   // Approvals for bots set to "Ask first" (office/trust.ts, origin rendererId office-trust).
   app.slots.pendingInteraction({ id: "office-trust", component: TrustRequest });
-  options.navigation?.slots.experimental_sidebarNavigation({ id: "office-navigation", title: "Office", description: "Space switcher, Home, Inbox, Search and New thread.", component: OfficeNavigation });
-  options.sidebar?.slots.experimental_threadList({ id: "office-sidebar", title: "Office", description: "Your team, favorites and folders for the current space.", component: OfficeSidebar });
+  // The Arc-style sidebar (docs/office-tabs.md).
+  options.navigation?.slots.experimental_sidebarNavigation({ id: "office-navigation", title: "Office", description: "Address bar and Essentials.", component: OfficeTop });
+  options.sidebar?.slots.experimental_threadList({ id: "office-sidebar", title: "Office", description: "Pinned and Today tabs for the current space.", component: OfficeTabs });
+  if (options.navigation) {
+    app.commands.register({ id: "office-open", title: "Search or open", defaultShortcut: { key: "t", mod: true }, run: () => openCommandBar() });
+  }
 }

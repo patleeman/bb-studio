@@ -83,7 +83,7 @@ export function ThreadMenu({ thread, children }: { thread: PluginSidebarThread; 
   );
 }
 
-function RenameField({ thread, onDone }: { thread: PluginSidebarThread; onDone: () => void }) {
+export function RenameField({ thread, onDone, className = "pl-7" }: { thread: PluginSidebarThread; onDone: () => void; className?: string }) {
   const actions = useSidebarThreadActions();
   const [value, setValue] = useState(thread.title ?? thread.displayTitle);
   const input = useRef<HTMLInputElement>(null);
@@ -94,7 +94,7 @@ function RenameField({ thread, onDone }: { thread: PluginSidebarThread; onDone: 
     onDone();
   };
   return (
-    <div className={cn(ROW, "bg-sidebar-accent pl-7")}>
+    <div className={cn(ROW, "bg-sidebar-accent", className)}>
       <input
         ref={input}
         aria-label="Thread title"
