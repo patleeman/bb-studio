@@ -1,6 +1,6 @@
 import UIKit
 
-/// A deliberately narrow check for the native Select control's monochrome text.
+/// A deliberately narrow pixel check for nearly monochrome native text.
 /// Other palettes or insufficient text/background samples fail closed.
 enum RenderedContrast {
     struct Sample {
@@ -31,7 +31,7 @@ enum RenderedContrast {
             for x in insetX..<(width - insetX) {
                 let index = (y * width + x) * 4
                 let rgb = pixels[index..<(index + 3)].map(Int.init)
-                guard pixels[index + 3] == 255, rgb.max()! - rgb.min()! <= 2 else { continue }
+                guard pixels[index + 3] == 255, rgb.max()! - rgb.min()! <= 4 else { continue }
                 let gray = rgb.reduce(0, +) / 3
                 if gray <= 128 { dark.append(gray) }
                 if gray >= 220 { light.append(gray) }

@@ -74,7 +74,7 @@ struct Face: View {
     var body: some View {
         ZStack(alignment: .topTrailing) {
             Circle()
-                .fill(Color(.secondarySystemFill))
+                .fill(Color(.tertiarySystemFill))
                 .frame(width: size, height: size)
                 .overlay {
                     Text(avatar?.isEmpty == false ? avatar! : String(name.prefix(1)).uppercased())
@@ -130,6 +130,7 @@ struct SpaceMark: View {
             .overlay {
                 Text(space.icon?.isEmpty == false ? space.icon! : String(space.name.prefix(1)).uppercased())
                     .font(.system(size: size * 0.6, weight: .semibold))
+                    .foregroundStyle(.primary)
             }
             .accessibilityHidden(true)
     }
@@ -167,6 +168,9 @@ struct SpaceSwitcher: View {
             .foregroundStyle(.primary)
         }
         .accessibilityLabel("Space: \(office.currentSpace?.name ?? "none"). Switch space")
+        .accessibilityShowsLargeContentViewer {
+            Text(office.currentSpace?.name ?? "Spaces")
+        }
         .sheet(isPresented: $creating) { NewSpaceSheet() }
     }
 }

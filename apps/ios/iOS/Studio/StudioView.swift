@@ -485,6 +485,7 @@ struct StudioView: View {
                     ToolbarItem(placement: .topBarTrailing) {
                         Button("Select") { withAnimation { editMode = .active } }
                             .accessibilityIdentifier("studioSelect")
+                            .accessibilityShowsLargeContentViewer()
                     }
                 }
             }

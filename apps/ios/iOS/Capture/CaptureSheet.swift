@@ -75,6 +75,8 @@ struct CaptureSheet: View {
                         else if choosingFile { choosingFile = false }
                         else { operation.complete(on: app) { dismiss() } }
                     }
+                    .accessibilityIdentifier(writingNote || choosingFile ? "captureBack" : "captureClose")
+                    .accessibilityShowsLargeContentViewer()
                 }
             }
         }

@@ -27,7 +27,7 @@ struct SettingsView: View {
                 Button("Save and test") { Task { await save() } }
                 if let status { Text(status).font(.footnote).foregroundStyle(Color.primary.opacity(0.75)) }
             } header: {
-                Text("BB server").foregroundStyle(Color.primary.opacity(0.75))
+                Text("BB server").foregroundStyle(Color(uiColor: .label))
             } footer: {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
                     .foregroundStyle(Color.primary.opacity(0.75))
@@ -74,7 +74,7 @@ struct SettingsView: View {
                     }
                 }
             } header: {
-                Text("Server").foregroundStyle(Color.primary.opacity(0.75))
+                Text("Server").foregroundStyle(Color(uiColor: .label))
             }
             Section {
                 NavigationLink { ArchivedView() } label: {
@@ -92,13 +92,15 @@ struct SettingsView: View {
                     Label("Automations", systemImage: "clock.arrow.circlepath")
                 }
             } header: {
-                Text("Threads").foregroundStyle(Color.primary.opacity(0.75))
+                Text("Threads").foregroundStyle(Color(uiColor: .label))
             }
             if runningPlugins.split(separator: ",").contains("custom-instructions") {
-                Section("Agents") {
+                Section {
                     NavigationLink { CustomInstructionsView() } label: {
                         Label("Custom Instructions", systemImage: "text.quote")
                     }
+                } header: {
+                    Text("Agents").foregroundStyle(Color(uiColor: .label))
                 }
             }
             Section {
@@ -119,16 +121,18 @@ struct SettingsView: View {
                     preview.speak(utterance)
                 }
             } header: {
-                Text("Voice chat").foregroundStyle(Color.primary.opacity(0.75))
+                Text("Voice chat").foregroundStyle(Color(uiColor: .label))
             } footer: {
                 Text("Download Premium or Enhanced voices in Settings → Accessibility → Spoken Content → Voices. Talk over BB to interrupt it.")
                     .foregroundStyle(Color.primary.opacity(0.75))
             }
-            Section("Action button") {
+            Section {
                 Text(
                     "Settings → Action Button → Shortcut, then pick a BB Studio action: Dictate to BB, Voice chat with BB, or Open BB thread."
                 )
                 .font(.footnote)
+            } header: {
+                Text("Action button").foregroundStyle(Color(uiColor: .label))
             }
         }
         .navigationTitle("Settings")
