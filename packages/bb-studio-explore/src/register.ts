@@ -35,11 +35,15 @@ type CliResult = PluginCliResult;
 const DIGEST_CHECK_MS = 10 * 60_000;
 const RPC_TIMEOUT_MS = 15_000;
 
-export function registerExplore(bb: BbPluginApi, options: { feedDigest: () => boolean } = { feedDigest: () => true }) {
+export function registerExplore(bb: BbPluginApi, options: {
+  feedDigest: () => boolean;
+  digestHour?: () => number;
+  workerTimeoutMs?: () => number;
+} = { feedDigest: () => true }) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new ExploreStore(db);
-  const workers = exploreWorkers(bb);
+  const workers = exploreWorkers(bb, { timeoutMs: options.workerTimeoutMs });
   const explainerPages = explorePages(bb.sdk.plugins);
   const publish = (explainer: ExplainerRow) => {
     const event: RealtimeEvent = {
@@ -67,6 +71,7 @@ export function registerExplore(bb: BbPluginApi, options: { feedDigest: () => bo
   });
   const feed = exploreFeed({
     store,
+    digestHour: options.digestHour,
     callRpc: (pluginId, method, input, schema) =>
       bb.sdk.plugins.callRpc({ pluginId, method, input: input as never, outputSchema: schema, signal: AbortSignal.timeout(RPC_TIMEOUT_MS) }),
     explainerPage: (finding) => {

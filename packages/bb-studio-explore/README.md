@@ -87,6 +87,14 @@ failing a job stops and archives its hidden thread.
 
 ## With Studio Feed
 
+**Daily digest hour** chooses when the digest starts, from 0 to 23 in the BB
+server's local time (default 18). Explore checks every 10 minutes and posts at
+most once per day. Changing the hour takes effect at the next check.
+
+**Explainer time limit (minutes)** caps new explainer runs, from 1 to 120
+minutes (default 20). An unfinished worker is stopped and archived at the
+limit. Its model and reasoning follow the source thread.
+
 When [Studio Feed](../bb-studio-feed) is installed, findings don't have to be
 explored right away:
 

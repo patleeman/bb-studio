@@ -29,6 +29,7 @@ export interface FeedDeps {
   explainerPage(finding: FindingRow): { pageId: string; href: string } | null;
   projectName(projectId: string): Promise<string | null>;
   now?: () => number;
+  digestHour?: () => number;
 }
 
 /** The findings line a reply ends with, if it has one. */
@@ -111,11 +112,11 @@ export function exploreFeed(deps: FeedDeps) {
       if (finding?.post_id) await linkExplainer(finding);
     },
 
-    /** Posts the day's digest, once a day after DIGEST_HOUR. Returns how many posts it made. */
+    /** Posts the day's digest, once a day after the selected hour. Returns how many posts it made. */
     async digest(): Promise<number> {
       const at = now();
       const day = localDay(at);
-      if (new Date(at).getHours() < DIGEST_HOUR || store.meta(DIGEST_DAY_KEY) === day) return 0;
+      if (new Date(at).getHours() < (deps.digestHour?.() ?? DIGEST_HOUR) || store.meta(DIGEST_DAY_KEY) === day) return 0;
       const findings = store.undigested(at - DIGEST_WINDOW_MS);
       const byProject = new Map<string, FindingRow[]>();
       for (const finding of findings) {

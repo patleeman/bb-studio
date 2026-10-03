@@ -3,7 +3,7 @@ import { describe, expect, it } from "vitest";
 import { digestPost, exploreFeed, replyFindings } from "./feed";
 import { ExploreStore, MIGRATIONS } from "./store";
 
-function setup(at: Date) {
+function setup(at: Date, digestHour?: () => number) {
   const db = new Database(":memory:");
   for (const statement of MIGRATIONS) db.exec(statement);
   let now = at.getTime();
@@ -19,6 +19,7 @@ function setup(at: Date) {
     explainerPage: (finding) => pages.get(finding.key) ?? null,
     projectName: async (projectId) => (projectId === "proj_1" ? "bb-studio" : null),
     now: () => now,
+    digestHour,
   });
   const finding = (label: string, emoji = "🏗️", projectId: string | null = "proj_1") =>
     store.addFinding({ threadId: "thr_1", messageId: "msg_1", turnId: null, emoji, label, projectId, threadTitle: "Fix the [queue]" });
@@ -26,6 +27,20 @@ function setup(at: Date) {
 }
 
 describe("Explore and the Feed", () => {
+  it("uses the saved digest hour, including midnight, without reposting that day", async () => {
+    let hour = 21;
+    const { feed, finding, advance, calls } = setup(new Date(2026, 9, 1, 19), () => hour);
+    finding("A late digest");
+    expect(await feed.digest()).toBe(0);
+    hour = 19;
+    expect(await feed.digest()).toBe(1);
+    hour = 0;
+    expect(await feed.digest()).toBe(0);
+    advance(5 * 3_600_000);
+    finding("A midnight digest");
+    expect(await feed.digest()).toBe(1);
+    expect(calls).toHaveLength(2);
+  });
   it("reads the findings line a reply ends with", () => {
     expect(replyFindings('Answer.\n\n::explore{items="🐛 Retry delay is off|🏗️ How the queue works"}')).toEqual([
       { emoji: "🐛", label: "Retry delay is off" },

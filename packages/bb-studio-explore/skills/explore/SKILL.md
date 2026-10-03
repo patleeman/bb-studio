@@ -5,6 +5,13 @@ description: Use when the user asks about Explore findings ("Along the way" rows
 
 # Explore (experimental)
 
+In **Settings → Studio Explore**, **Daily digest in Studio Feed** controls
+automatic posting. **Daily digest hour** accepts 0 to 23 in the BB server's
+local time (default 18); checks run every 10 minutes. **Explainer time limit
+(minutes)** accepts 1 to 120 (default 20), applies to new runs, and stops and
+archives unfinished workers. Explainers use the source thread's model and
+reasoning level.
+
 When Explore is on (the *Suggest things to explore* setting), your
 instructions ask you to end an answer that involved reading code with one
 line of findings you noticed but didn't cover:

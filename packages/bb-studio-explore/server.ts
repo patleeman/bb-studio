@@ -3,6 +3,7 @@
 // The work is in src/register.ts; this wires it into BB.
 import { usage } from "@bb-studio/kit/cli";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
+import { z } from "zod";
 import { rpcContract } from "./src/contract";
 import { EXPLORE_USAGE, registerExplore } from "./src/register";
 import { isExploreWorker } from "./src/worker";
@@ -22,16 +23,38 @@ export default async function plugin(bb: BbPluginApi) {
       description: "Each evening, post what agents noticed that day and nobody explored or saved: one post per project. Needs Studio Feed.",
       default: true,
     },
+    digestHour: {
+      type: "number",
+      label: "Daily digest hour",
+      description: "Hour from 0 to 23 in the BB server's local time. When the daily digest is on, Explore checks every 10 minutes after this hour.",
+      default: 18,
+      experimental_schema: z.number().int().min(0).max(23),
+    },
+    workerTimeoutMinutes: {
+      type: "number",
+      label: "Explainer time limit (minutes)",
+      description: "Stop and archive an unfinished explainer after 1 to 120 minutes. Applies to new explainers; their model follows the source thread.",
+      default: 20,
+      experimental_schema: z.number().int().min(1).max(120),
+    },
   });
   // `bb.agents.configure` is synchronous, so keep the latest values in memory.
   const initial = await settings.get();
   let enabled = initial.explore !== false;
   let feedDigest = initial.feedDigest !== false;
+  let digestHour = initial.digestHour;
+  let workerTimeoutMinutes = initial.workerTimeoutMinutes;
   settings.onChange((next) => {
     enabled = next.explore !== false;
     feedDigest = next.feedDigest !== false;
+    digestHour = next.digestHour;
+    workerTimeoutMinutes = next.workerTimeoutMinutes;
   });
-  const explore = registerExplore(bb, { feedDigest: () => feedDigest });
+  const explore = registerExplore(bb, {
+    feedDigest: () => feedDigest,
+    digestHour: () => digestHour,
+    workerTimeoutMs: () => workerTimeoutMinutes * 60_000,
+  });
 
   bb.rpc.register(rpcContract, explore.rpc);
 

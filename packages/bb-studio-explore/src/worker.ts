@@ -34,7 +34,7 @@ export function workerOutput(input: { text: string | null; inherited: string | n
   return text;
 }
 
-export function exploreWorkers(bb: BbPluginApi) {
+export function exploreWorkers(bb: BbPluginApi, options: { timeoutMs?: () => number } = {}) {
   /** Workers that settled (idle or failed) since their poller last looked, and wake-ups for their pollers. */
   const settled = new Map<string, { failed: boolean; text: string | null }>();
   const wakers = new Map<string, () => void>();
@@ -109,6 +109,7 @@ export function exploreWorkers(bb: BbPluginApi) {
 
   async function awaitWorker(workerId: string, signal: AbortSignal, progress: (update: WorkerProgress) => void): Promise<string> {
     const started = Date.now();
+    const timeoutMs = options.timeoutMs?.() ?? WORKER_TIMEOUT_MS;
     let sawActive = false;
     let polls = 0;
     let reads = 0;
@@ -121,7 +122,7 @@ export function exploreWorkers(bb: BbPluginApi) {
       const inherited = (await bb.sdk.threads.output({ threadId: workerId, signal }).catch(() => null))?.output ?? null;
       while (!signal.aborted) {
         const elapsed = Date.now() - started;
-        if (elapsed > WORKER_TIMEOUT_MS) throw new Error("The explainer took too long. Try again.");
+        if (elapsed > timeoutMs) throw new Error("The explainer reached its time limit. Increase it in Studio Explore settings or try again.");
         const event = settled.get(workerId);
         settled.delete(workerId);
         const thread = await bb.sdk.threads.get({ threadId: workerId, signal });
