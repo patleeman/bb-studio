@@ -73,6 +73,17 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
         const unread = listed.posts.filter((post) => !post.read).length;
         await client.navigate("/plugins/feed/feed");
         await client.waitForText("Mark entire feed read");
+        // The reader intentionally restores filters from earlier captures.
+        // This fixture shows the complete feed, so clear them through its UI.
+        await client.evaluate(`(() => {
+          [...document.querySelectorAll('button')].find(button => button.textContent === 'Clear filters')?.click();
+        })()`);
+        await client.waitForSelector('form[aria-label="Filter feed"] input[type="search"]');
+        await client.waitForText("Unread only");
+        await client.waitForText("Apply filters");
+        await client.evaluate(`(() => {
+          if (document.querySelectorAll('form[aria-label="Filter feed"] input[type="date"]').length !== 2) throw new Error("Feed must expose From and Through dates");
+        })()`);
         await client.waitForText("Today");
         await client.waitForText("Payments API error rate above 2% for 15 minutes");
         await client.waitForText("Needs you");

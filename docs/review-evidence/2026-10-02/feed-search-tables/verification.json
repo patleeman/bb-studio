@@ -1,0 +1,159 @@
+{
+  "checkpoint": "3979fe1",
+  "rpc": {
+    "actual": 12,
+    "expected": 12,
+    "includesDayStart": true,
+    "includesDayEnd": true
+  },
+  "tables": {
+    "rows": 1200,
+    "pages": 12,
+    "unique": 1200,
+    "mutationRejected": "The table or query changed during pagination. Restart at offset 0 without expectedRevision."
+  },
+  "filters": {
+    "ids": [
+      "post_87517fe3f6bb1047",
+      "post_ef4fae572174f5bc",
+      "post_b14840e7cfb842a8",
+      "post_570934e8d90fcfbd",
+      "post_dbcd843b40ec50e8",
+      "post_d64dc6d638a7ef4c",
+      "post_707fe4febff028b0",
+      "post_db3e7ce9fb958957",
+      "post_4c92bd90e8224424",
+      "post_a50eb38f8acf5465",
+      "post_f1229dcee646435f",
+      "post_9fd1bfe7549f2fab"
+    ],
+    "attention": "Needs you\nL\nVerification outstanding alert\nLive verification · 2d ago",
+    "inputs": [
+      {
+        "type": "search",
+        "value": "needle",
+        "checked": false
+      },
+      {
+        "type": "date",
+        "value": "2026-10-01",
+        "checked": false
+      },
+      {
+        "type": "date",
+        "value": "2026-10-01",
+        "checked": false
+      },
+      {
+        "type": "checkbox",
+        "value": "on",
+        "checked": true
+      }
+    ]
+  },
+  "mobile": {
+    "width": 390,
+    "scrollWidth": 390,
+    "controls": [
+      {
+        "type": "search",
+        "text": "",
+        "left": 16,
+        "right": 226,
+        "width": 210
+      },
+      {
+        "type": "date",
+        "text": "",
+        "left": 238,
+        "right": 374,
+        "width": 136
+      },
+      {
+        "type": "date",
+        "text": "",
+        "left": 16,
+        "right": 152,
+        "width": 136
+      },
+      {
+        "type": "checkbox",
+        "text": "",
+        "left": 164,
+        "right": 177,
+        "width": 13
+      },
+      {
+        "type": "submit",
+        "text": "Apply filters",
+        "left": 271.65625,
+        "right": 371.484375,
+        "width": 99.828125
+      },
+      {
+        "type": "button",
+        "text": "Clear filters",
+        "left": 16,
+        "right": 110.96875,
+        "width": 94.96875
+      }
+    ]
+  },
+  "before": {
+    "filters": {
+      "query": "",
+      "unread": false,
+      "from": "",
+      "through": "",
+      "topic": null
+    },
+    "open": "post_1bd2b95a0dcc81ff",
+    "count": 120,
+    "position": {
+      "postId": "post_f41fe2b7c8ee9bf8",
+      "offset": -39.5,
+      "scrollTop": 4769
+    }
+  },
+  "returned": {
+    "filters": {
+      "query": "",
+      "unread": false,
+      "from": "",
+      "through": "",
+      "topic": null
+    },
+    "open": "post_1bd2b95a0dcc81ff",
+    "count": 120,
+    "position": {
+      "postId": "post_f41fe2b7c8ee9bf8",
+      "offset": -39.5,
+      "scrollTop": 4769
+    }
+  },
+  "reloaded": {
+    "filters": {
+      "query": "",
+      "unread": false,
+      "from": "",
+      "through": "",
+      "topic": null
+    },
+    "open": "post_1bd2b95a0dcc81ff",
+    "count": 120,
+    "position": {
+      "postId": "post_f41fe2b7c8ee9bf8",
+      "offset": -39.5,
+      "scrollTop": 4769
+    }
+  },
+  "keyboardJ": "post_24708e38f362a33d",
+  "keyboardM": true,
+  "tableUi": {
+    "elapsedMs": 1733,
+    "rows": 1201,
+    "cells": 4800,
+    "gridcells": 2400,
+    "nodes": 18696
+  }
+}

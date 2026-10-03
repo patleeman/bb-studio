@@ -29,6 +29,15 @@ with **Open**. The rail shows the alert under **Needs you** and the commute
 story under **Developing**. Every post was made seconds before the capture, so
 each shows "just now".
 
+![Combined Feed filters with an independent urgent alert](assets/filters-preview.png)
+
+A separate live check at `3979fe1` seeds 129 posts. Search, topic, unread,
+and inclusive From/Through dates combine to select 12 posts, including both
+ends of the day. **Needs you** still shows the older outstanding alert.
+The same controls fit a 390-pixel viewport. Filters survive reload; after
+loading 120 posts, the open post and exact reading position survive a visit
+to its discussion and a reload. The check also exercises `j`, `k`, and `m`.
+
 ![A retained Feed discussion draft with a file attachment](assets/discussion-draft.png)
 
 The companion capture uses one local release post, its source thread and a
