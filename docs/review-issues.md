@@ -70,8 +70,11 @@ through e0f5dd8. The owner has stopped further work and confirmed that both owne
 
 Latest root JavaScript checkpoint passed 1,641 tests and all 18 package
 typechecks, compatibility, docs, marketplace, contracts and kit checks. Pages
-has 131 tests; Studio has 134. Concurrent Teams composer placement has separate
-owner evidence: 121 tests, typecheck/build and actual staged placement captures.
+has 131 tests; Studio has 134. Concurrent Teams composer placement has separate owner evidence: final source
+2b6b31c passes 121 tests, typecheck and build and is reloaded in the working BB.
+Its final placement is not staged-verified: demo seeding timed out before the
+composer check. Earlier right-side placement 27d82a5 has staged proof. This final
+visual check remains open; the Teams owner is stopped and its stage removed.
 See the [native checkpoint record](review-evidence/2026-10-02/native-checkpoint.json)
 and the earlier [Pages checkpoint](review-evidence/2026-10-02/pages-checkpoint.json).
 The native combined unit checkpoint remains 76 tests: 75 passed, one existing

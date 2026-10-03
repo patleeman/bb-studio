@@ -54,6 +54,13 @@
       "rootStagedRuntime": "stopped; ports 49486, 49487 and 49488 closed",
       "companionStagedRuntimes": "owner confirmed stopped; ports 49386, 49387, 49389, 19966, 27966 and 49589 closed",
       "unrelatedWorkspaceFiles": "preserved"
+    },
+    "teamsFinalPlacement": {
+      "source": "2b6b31c",
+      "ownerChecks": "121 tests, typecheck and build passed; reloaded in working BB",
+      "stagedVisualCheck": "open: demo seeding timed out before composer check",
+      "previousStagedEvidence": "27d82a5 verifies earlier right-side placement",
+      "ownerStatus": "stopped; stage removed"
     }
   }
 }
