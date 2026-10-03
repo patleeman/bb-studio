@@ -1,0 +1,242 @@
+{
+  "source": {
+    "commit_hash": "c2bc4da",
+    "enabled": 1,
+    "artifact_hash": "sha256:677f50dc1489bbb0526e24c22627bca6936ced8c97083a22912a17936498b529",
+    "resolvedCommit": "c2bc4da5c2019fee6704b891a9d11e5ad954d472"
+  },
+  "profiles": [
+    {
+      "profile": {
+        "name": "local-control",
+        "latency": 0,
+        "downloadThroughput": -1,
+        "uploadThroughput": -1
+      },
+      "load": {
+        "elapsedMs": 84.79999995231628,
+        "loadingSeen": true,
+        "loadingAt": 1135.8000001907349,
+        "error": null,
+        "ready": true,
+        "routeToReadyMs": 136.9
+      },
+      "request": {
+        "phase": "local-control",
+        "requestId": "46055.278",
+        "started": 2122169.465428,
+        "method": "POST",
+        "status": 200,
+        "responseAt": 2122169.486657,
+        "mimeType": "application/json",
+        "finished": 2122169.487131,
+        "encodedBytes": 76078,
+        "elapsedMs": 22,
+        "decodedBytes": 668240,
+        "returnedRows": 5000
+      },
+      "finalRow": {
+        "text": "4,999",
+        "top": 1067,
+        "bottom": 1100,
+        "height": 1100,
+        "mountedRows": 37
+      }
+    },
+    {
+      "profile": {
+        "name": "150ms-1.5Mbps",
+        "latency": 150,
+        "downloadThroughput": 187500,
+        "uploadThroughput": 46875
+      },
+      "load": {
+        "elapsedMs": 736.5999999046326,
+        "loadingSeen": true,
+        "loadingAt": 1503.2000000476837,
+        "error": null,
+        "ready": true,
+        "routeToReadyMs": 748.6
+      },
+      "request": {
+        "phase": "150ms-1.5Mbps",
+        "requestId": "46055.303",
+        "started": 2122169.833614,
+        "method": "POST",
+        "status": 200,
+        "responseAt": 2122170.080778,
+        "mimeType": "application/json",
+        "finished": 2122170.495145,
+        "encodedBytes": 76078,
+        "elapsedMs": 662,
+        "decodedBytes": 668240,
+        "returnedRows": 5000
+      },
+      "finalRow": {
+        "text": "4,999",
+        "top": 1067,
+        "bottom": 1100,
+        "height": 1100,
+        "mountedRows": 37
+      }
+    },
+    {
+      "profile": {
+        "name": "400ms-512Kbps",
+        "latency": 400,
+        "downloadThroughput": 64000,
+        "uploadThroughput": 16000
+      },
+      "load": {
+        "elapsedMs": 2032.0999999046326,
+        "loadingSeen": true,
+        "loadingAt": 2458.800000190735,
+        "error": null,
+        "ready": true,
+        "routeToReadyMs": 2044.4
+      },
+      "request": {
+        "phase": "400ms-512Kbps",
+        "requestId": "46055.324",
+        "started": 2122170.788983,
+        "method": "POST",
+        "status": 200,
+        "responseAt": 2122171.481434,
+        "mimeType": "application/json",
+        "finished": 2122172.752194,
+        "encodedBytes": 76078,
+        "elapsedMs": 1963,
+        "decodedBytes": 668240,
+        "returnedRows": 5000
+      },
+      "finalRow": {
+        "text": "4,999",
+        "top": 1067,
+        "bottom": 1100,
+        "height": 1100,
+        "mountedRows": 37
+      }
+    }
+  ],
+  "recovery": {
+    "failure": {
+      "elapsedMs": 36.5,
+      "loadingSeen": true,
+      "loadingAt": 4706.800000190735,
+      "error": "Failed to fetch",
+      "ready": false
+    },
+    "errorControls": [
+      {
+        "text": "Studio",
+        "label": "Back to Studio"
+      }
+    ],
+    "afterRestore": {
+      "observationMs": 6002,
+      "newGetRequests": 0,
+      "error": "Failed to fetch",
+      "ready": false,
+      "retryAvailable": false
+    },
+    "reopen": {
+      "elapsedMs": 130.5,
+      "loadingSeen": true,
+      "loadingAt": 10840.5,
+      "error": null,
+      "ready": true,
+      "routeToReadyMs": 142.9,
+      "finalRow": {
+        "text": "4,999",
+        "top": 1067,
+        "bottom": 1100,
+        "height": 1100,
+        "mountedRows": 37
+      }
+    }
+  },
+  "limits": [
+    "CDP emulation applies only to this owned Chrome session. The server and machine network are unchanged.",
+    "Local staged BB with simulated latency/bandwidth, not an actual remote server, physical phone, VPN, radio, packet loss, thermal or battery test.",
+    "Studio shell and plugin code are loaded before measurements. Each measured table editor mounts afresh; this is not a cold application launch.",
+    "Whole 5000-row table data still loads before the editor becomes ready; row windowing does not paginate the server request.",
+    "One sample per profile on a shared development host; timings are fixture observations, not a controlled benchmark or guarantee.",
+    "The failure phase blocks only the table get endpoint. It tests initial load and recovery, not offline writes or durable queues."
+  ],
+  "browser": {
+    "protocolVersion": "1.3",
+    "product": "Chrome/154.0.8037.93",
+    "revision": "@f89f3a4363808e117c592adedcf9947882ac3b79",
+    "userAgent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) HeadlessChrome/154.0.0.0 Safari/537.36",
+    "jsVersion": "15.4.80.19"
+  },
+  "document": {
+    "timeOrigin": 1791005790203.1,
+    "token": "fa766cd2-bab8-4aea-b138-39353535a7f6"
+  },
+  "requests": [
+    {
+      "phase": "shell",
+      "requestId": "46055.226",
+      "started": 2122168.705932,
+      "method": "POST",
+      "status": 200,
+      "responseAt": 2122168.736131,
+      "mimeType": "application/json",
+      "finished": 2122168.736608,
+      "encodedBytes": 76078
+    },
+    {
+      "phase": "local-control",
+      "requestId": "46055.278",
+      "started": 2122169.465428,
+      "method": "POST",
+      "status": 200,
+      "responseAt": 2122169.486657,
+      "mimeType": "application/json",
+      "finished": 2122169.487131,
+      "encodedBytes": 76078
+    },
+    {
+      "phase": "150ms-1.5Mbps",
+      "requestId": "46055.303",
+      "started": 2122169.833614,
+      "method": "POST",
+      "status": 200,
+      "responseAt": 2122170.080778,
+      "mimeType": "application/json",
+      "finished": 2122170.495145,
+      "encodedBytes": 76078
+    },
+    {
+      "phase": "400ms-512Kbps",
+      "requestId": "46055.324",
+      "started": 2122170.788983,
+      "method": "POST",
+      "status": 200,
+      "responseAt": 2122171.481434,
+      "mimeType": "application/json",
+      "finished": 2122172.752194,
+      "encodedBytes": 76078
+    },
+    {
+      "phase": "blocked-initial-get",
+      "requestId": "46055.344",
+      "started": 2122173.037148,
+      "method": "POST",
+      "failed": "",
+      "finished": 2122173.037162
+    },
+    {
+      "phase": "reopen-recovery",
+      "requestId": "46055.362",
+      "started": 2122179.170717,
+      "method": "POST",
+      "status": 200,
+      "responseAt": 2122179.197449,
+      "mimeType": "application/json",
+      "finished": 2122179.197534,
+      "encodedBytes": 76078
+    }
+  ]
+}
