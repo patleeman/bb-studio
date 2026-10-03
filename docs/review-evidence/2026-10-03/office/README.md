@@ -2,13 +2,14 @@
 
 ## Staged environment
 
-Stable BB 0.45.0. Web and native captures use the six-plugin Git install at
-`6089c1d` on isolated server 52386; the native app includes `1bf08d1`. A second
-clean six-plugin install at `09bb66a8` on 52586 passes the [fresh install checks](fresh-install.json).
+Stable BB 0.45.0. Web captures use the clean six-plugin Git install at
+`09bb66a8` on isolated server 52586, including the corrected Office and item
+icons. It passes the [fresh install checks](fresh-install.json). Native captures
+use server 52386 at `6089c1d`; the native app includes `1bf08d1`.
 The capture seed creates three bots (Atlas, Scribe, Quinn), a channel, an Atlas
 DM, a reviewed task, a report, and an inert plugin approval. No bot turn or
 approval is dispatched. `fresh-install.json` records the final install IDs; `capture-fixtures.json` records
-the screenshot fixture; `fixtures.json` preserves the first capture fixture.
+the native screenshot fixture; `fixtures.json` preserves the first capture fixture.
 
 ## Web captures
 
