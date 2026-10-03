@@ -1,5 +1,46 @@
 export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, sleep }) => [
   {
+    id: "studio-new-menu",
+    packageDir: "bb-studio",
+    fileName: "new-menu.png",
+    privateSidebar: true,
+    setup: async (client) => {
+      const pages = await seedPages();
+      try {
+        const openNew = async () => {
+          await client.waitForSelector('input[aria-label="Search and filter studio"]');
+          await client.evaluate(`(() => {
+            const button = [...document.querySelectorAll('button')].find(each => each.innerText.trim() === 'New');
+            if (!button || button.getAttribute('aria-haspopup') !== 'menu') throw new Error('New must open a menu');
+            button.focus();
+          })()`);
+          for (const type of ["rawKeyDown", "keyUp"]) {
+            await client.command("Input.dispatchKeyEvent", { type, key: "ArrowDown", code: "ArrowDown", windowsVirtualKeyCode: 40 });
+          }
+          await client.waitForSelector('[role="menuitem"]');
+          return client.evaluate(`[...document.querySelectorAll('[role="menuitem"]')].map(each => each.innerText.trim())`);
+        };
+        await client.navigate("/plugins/studio/studio/collection");
+        await client.evaluate(`localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
+        await client.navigate("/plugins/studio/studio/collection");
+        const unfiltered = await openNew();
+        for (const label of ["Page", "Drawing", "Bot"]) {
+          if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
+        }
+        for (const kind of ["bot", "page"]) {
+          await client.navigate("/plugins/studio/studio/collection");
+          await client.evaluate(`localStorage.setItem('studio:query:all', ${JSON.stringify(`kind:${kind}`)})`);
+          await client.navigate("/plugins/studio/studio/collection");
+          await client.waitForText(kind === "bot" ? "Kind: Bots" : "Kind: Pages");
+          const filtered = await openNew();
+          if (JSON.stringify(filtered) !== JSON.stringify(unfiltered)) throw new Error(`The ${kind} filter changed the New menu`);
+        }
+        await sleep(500);
+      } catch (error) { await pages.cleanup(); throw error; }
+      return pages.cleanup;
+    },
+  },
+  {
     id: "studio-needs-you",
     packageDir: "bb-studio",
     fileName: "needs-you.png",

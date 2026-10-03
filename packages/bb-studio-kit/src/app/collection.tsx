@@ -417,18 +417,14 @@ export function CollectionPage({
 
   // New items land in the filtered project, else the one BB has open.
   const newProject = filter || project === ALL ? defaultProjectId : project === GLOBAL ? null : project;
-  const creatable = kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true));
-  const createTargets = activeKind ? creatable.filter((kind) => kind.id === activeKind.id) : creatable;
+  // Kind filters narrow the list, while New always offers every available kind.
+  const createTargets = kinds.filter((kind) => kind.create && (kind.capabilities?.create ?? true));
   const newButton = (className = PRIMARY_BUTTON) =>
-    createTargets.length === 0 && !extraCreateItems?.length ? null : createTargets.length === 1 && !extraCreateItems?.length ? (
-      <button type="button" className={className} onClick={() => void handlers.onCreate(createTargets[0]!, newProject)}>
-        <Icon name="Plus" /> New {createTargets[0]!.label.toLowerCase()}
-      </button>
-    ) : (
+    createTargets.length === 0 && !extraCreateItems?.length ? null : (
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
           <button type="button" className={className}>
-            <Icon name="Plus" /> {createTargets.length === 1 ? `New ${createTargets[0]!.label.toLowerCase()}` : "New"} <Icon name="ChevronDown" className="-mr-1 opacity-70" />
+            <Icon name="Plus" /> New <Icon name="ChevronDown" className="-mr-1 opacity-70" />
           </button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-48">
