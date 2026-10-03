@@ -68,7 +68,11 @@ Captured on stable BB 0.45.0 with the full suite installed from pushed commit ad
 A segmented switcher above the channel picks Merged, Grid, Active, or Focus.
 Grid shows every member's native transcript. Threads that need input or are
 failing come first, then working threads, then the rest by most recent update.
-Bots that have no thread yet share one quiet row instead of empty panes. The
+Bots that have no thread yet share one quiet row instead of empty panes. To
+[rearrange the grid](assets/channel-grid-arrange.png), drag a pane by its
+header and drop it where the blue line shows. You can also focus the pane's
+grip and use the arrow keys. Each channel remembers its order. New threads
+follow in attention order, and Reset order returns to it. The
 [Active view](assets/channel-active.png) lists every member in a status strip
 and shows only working transcripts below it. When nobody is working, it names
 the last thread to reply. The [Focus view](assets/channel-focus.png) pairs a
@@ -82,6 +86,8 @@ installed from pushed commit 501a9eb. Live assertions check concise owner input
 without transport envelopes in Grid and phone Focus, native reaction rendering and reply routing,
 retention of the exact composer and its draft across all four views, and promotion
 and removal of a running thread in Active, including the idle note that names the last reply.
+The arrange check drags a pane over another in the live grid, then confirms
+the drop, the order after a reload, and Reset order.
 
 ![Dragging ordinary threads opens the Combine threads dialog](assets/channel-thread-drop.png)
 
