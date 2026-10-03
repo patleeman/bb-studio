@@ -25,3 +25,18 @@ it("lists offered decisions and rechecks live status before responding", async (
   expect(await source.list()).toEqual([]);
   await harness.lifecycle.dispose();
 });
+
+it("routes only Studio trust approvals to plugin form submission", async () => {
+  let response: unknown;
+  const interaction = { id: "trust", status: "pending", createdAt: 1, origin: { kind: "plugin", pluginId: "studio", rendererId: "office-trust" }, payload: { kind: "plugin", title: "Helper wants to delete a task" } };
+  const { bb, harness } = createFakePluginHost({ pluginId: "studio", sdk: { threads: {
+    list: async () => [{ ...makeThreadResponse({ id: "thread" }), hasPendingInteraction: true }],
+    interactions: { list: async () => [interaction] as never, get: async () => interaction as never, respond: async args => { response = args.value; return {} as never; } },
+  } } });
+  const source = interactionSource(bb.sdk), [event] = await source.list();
+  expect(event).toMatchObject({ title: interaction.payload.title, actions: [{ id: "approve" }, { id: "deny" }] });
+  await source.act(event!, "approve"); expect(response).toEqual({ approved: true });
+  await source.act(event!, "deny"); expect(response).toEqual({ approved: false });
+  await expect(source.act(event!, "answer", "yes")).rejects.toThrow("Approve or Deny");
+  await harness.lifecycle.dispose();
+});

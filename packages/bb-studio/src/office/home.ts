@@ -4,6 +4,7 @@ import type { OfficeOutput } from "./contract";
 import type { Inbox } from "./inbox";
 import type { OfficeSpaceStore } from "./space-store";
 import { taskList } from "./module-sources";
+import { officeTask } from "./task";
 
 export async function officeHome(spaceId: string, inbox: Inbox, spaces: OfficeSpaceStore, hub: StudioHub, modules?: ModuleServices): Promise<OfficeOutput<"home">> {
   if (spaceId !== "all") spaces.get(spaceId);
@@ -21,10 +22,6 @@ export async function officeHome(spaceId: string, inbox: Inbox, spaces: OfficeSp
         id: i.id, pluginId: i.pluginId, kind: i.kind, title: i.title, href: i.href, projectId: i.projectId, updatedAt: i.updatedAt,
         authorBotId: (i as typeof i & { authorBotId?: string }).authorBotId ?? null,
       })),
-    working: (taskData?.tasks ?? []).filter(t => !t.archived && t.status !== "done" && t.assignee?.startsWith("bot:") && belongs(t.projectId)).map(t => ({
-      id: t.id, botId: t.assignee!.slice(4), title: t.title,
-      status: /review/i.test(t.statusLabel) ? "review" : /wait|block|fail/i.test(t.handoff?.state ?? t.status) ? "waiting" : "working",
-      note: t.handoff?.note ?? null, recurring: t.recurrence, href: `/plugins/studio/tasks/${t.id}`, updatedAt: t.updatedAt,
-    })),
+    working: (taskData?.tasks ?? []).filter(t => !t.archived && t.status !== "done" && t.assignee?.startsWith("bot:") && belongs(t.projectId)).map(officeTask),
   };
 }
