@@ -363,7 +363,9 @@
             "proj_personal"
           ],
           "createdAt": 1,
-          "updatedAt": 2
+          "updatedAt": 2,
+          "color": "#3b82f6",
+          "position": 0
         }
       ]
     }
@@ -388,7 +390,9 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2
+        "updatedAt": 2,
+        "color": "#3b82f6",
+        "position": 0
       }
     }
   },
@@ -414,7 +418,9 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2
+        "updatedAt": 2,
+        "color": "#3b82f6",
+        "position": 0
       }
     }
   },
@@ -449,7 +455,9 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2
+        "updatedAt": 2,
+        "color": "#3b82f6",
+        "position": 0
       }
     }
   },
@@ -462,6 +470,7 @@
     },
     "output": {
       "settings": {
+        "todayArchiveAfter": "3d",
         "enabledItemKinds": null,
         "defaultTrust": "ask",
         "defaultBotModel": null
@@ -482,6 +491,7 @@
     },
     "output": {
       "settings": {
+        "todayArchiveAfter": "3d",
         "enabledItemKinds": null,
         "defaultTrust": "ask",
         "defaultBotModel": null
@@ -537,7 +547,9 @@
           "proj_personal"
         ],
         "createdAt": 1,
-        "updatedAt": 2
+        "updatedAt": 2,
+        "color": "#3b82f6",
+        "position": 0
       },
       "folders": [
         {
