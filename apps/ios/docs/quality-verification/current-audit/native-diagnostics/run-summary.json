@@ -1,0 +1,43 @@
+{
+  "strictGate": "failed: 37 historical raw reports; unchanged aggregate assertions",
+  "nativeDiagnostics": {
+    "noHandlerTestExitCode": 65,
+    "secondIssueSelectionTestExitCode": 65,
+    "secondIssueFilter": "Skip first contrast report only; retain next native issue. Not a gate waiver."
+  },
+  "approvalVerification": {
+    "testExitCode": 0,
+    "tests": [
+      {
+        "name": "testTodayApprovalActionsAtAccessibilityText",
+        "result": "passed",
+        "seconds": 22.386
+      },
+      {
+        "name": "testTodayApprovalActionsAtDefaultText",
+        "result": "passed",
+        "seconds": 23.237
+      }
+    ],
+    "onlyActionTapped": "Open thread",
+    "threadId": "thr_yh9925ram6",
+    "interactionId": "pint_7ffsz5e9wj",
+    "beforeStatus": "pending",
+    "afterStatus": "pending",
+    "exactRecordUnchanged": true,
+    "beforeSHA256": "f55a341acb94e891a3925088de8d9c48f336ec9524203afaf261001b72ce7240",
+    "afterSHA256": "f55a341acb94e891a3925088de8d9c48f336ec9524203afaf261001b72ce7240"
+  },
+  "resultBundles": [
+    "/tmp/bb-current-diagnostic.6v09KU/results.xcresult",
+    "/tmp/bb-current-diagnostic.6v09KU/second-results.xcresult",
+    "/tmp/bb-current-diagnostic.6v09KU/approval-verified-results.xcresult"
+  ],
+  "buildSucceeded": true,
+  "sourceFingerprints": {
+    "iOS/Studio/StudioHomeView.swift": "2b4488aff35cf872722dfe4a3045f0223a8e7fcf8b57fe78fe686f2f7d462fc7",
+    "UITests/ReviewQualityUITests.swift": "e31db2d7c99fae30897c75cf4e8b0bfd3dd3513115bbdb7881be6969d63438fb",
+    "iOS/Studio/ArtifactView.swift": "1677707edc78b8b3f580e71ccba2539ae7715a51c2c83a66079b92499fc7488e",
+    "iOS/Studio/ArtifactPDFPreview.swift": "fba0f1f0e72be2605adde119341b614e2e2eb7a5ab1b53d2c72f05ff86ea378d"
+  }
+}

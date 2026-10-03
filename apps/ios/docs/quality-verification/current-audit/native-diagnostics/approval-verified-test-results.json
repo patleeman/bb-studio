@@ -1,0 +1,62 @@
+{
+  "devices" : [
+    {
+      "architecture" : "arm64",
+      "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+      "deviceName" : "BB isolated native contrast diagnostics",
+      "modelName" : "iPhone 18 Pro",
+      "osBuildNumber" : "24A434",
+      "osVersion" : "27.0",
+      "platform" : "iOS Simulator"
+    }
+  ],
+  "testNodes" : [
+    {
+      "children" : [
+        {
+          "children" : [
+            {
+              "children" : [
+                {
+                  "duration" : "22s",
+                  "durationInSeconds" : 22.38610601425171,
+                  "name" : "testTodayApprovalActionsAtAccessibilityText()",
+                  "nodeIdentifier" : "ReviewQualityUITests/testTodayApprovalActionsAtAccessibilityText()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testTodayApprovalActionsAtAccessibilityText",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                },
+                {
+                  "duration" : "23s",
+                  "durationInSeconds" : 23.236841082572937,
+                  "name" : "testTodayApprovalActionsAtDefaultText()",
+                  "nodeIdentifier" : "ReviewQualityUITests/testTodayApprovalActionsAtDefaultText()",
+                  "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testTodayApprovalActionsAtDefaultText",
+                  "nodeType" : "Test Case",
+                  "result" : "Passed"
+                }
+              ],
+              "name" : "ReviewQualityUITests",
+              "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests",
+              "nodeType" : "Test Suite",
+              "result" : "Passed"
+            }
+          ],
+          "name" : "BBStudioUITests",
+          "nodeIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests",
+          "nodeType" : "UI test bundle",
+          "result" : "Passed"
+        }
+      ],
+      "name" : "BBStudio",
+      "nodeType" : "Test Plan",
+      "result" : "Passed"
+    }
+  ],
+  "testPlanConfigurations" : [
+    {
+      "configurationId" : "1",
+      "configurationName" : "Test Scheme Action"
+    }
+  ]
+}

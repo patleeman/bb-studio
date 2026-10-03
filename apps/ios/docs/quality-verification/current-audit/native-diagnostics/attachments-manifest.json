@@ -1,0 +1,275 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "83C54EB0-C7D4-4755-8F58-0134E72416EB.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "settings-contrast-native-default-accessibility-tree_0_07EBE31F-1FE3-4C8D-A9B8-D1CF3AED112C.txt",
+        "timestamp" : 1791014383.258
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "94C02656-9444-4F09-9DCC-13AB27E9B617.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "settings-contrast-native-default_0_6B1F0855-03E1-4E1C-AFF9-9229C72CECCE.png",
+        "timestamp" : 1791014383.024
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "547828BB-E0C6-4D1B-BBBD-C19D759E5A54",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 03.59.39 AM",
+        "timestamp" : 1791014379.917
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "1CA7C71A-AF54-4F96-933F-B48F82757854.mp4",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Screen Recording 2026-10-03 at 03.59.33 AM.mp4",
+        "timestamp" : 1791014373.006
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "36A51E90-1A1B-42B3-BB95-47B284C6BAEC.txt",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Complete Issue Description.txt"
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "BA458028-EA16-4DA1-A7E3-E00C0B67CDE2.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "App Screenshot_0_A4FD4720-140C-490E-9F81-D7B289B8E8E9.png",
+        "timestamp" : 1791014383.599
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "44C27FEE-A924-4A42-AF33-23B303A5618B.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Element Screenshot_1_DAE7260C-E098-4DB9-A273-DF2D3B46272B.png",
+        "timestamp" : 1791014383.599
+      }
+    ],
+    "testIdentifier" : "ReviewQualityUITests/testSettingsContrastNativeDiagnostic()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testSettingsContrastNativeDiagnostic"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "F66B634B-7F09-4339-A2EA-490EA51C3382.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "studio-row-contrast-native-accessibility-xxxl-accessibility-tree_0_2D133547-ED74-4222-B50A-4ACFEF896041.txt",
+        "timestamp" : 1791014399.74
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "EA28A3EE-4A90-457F-B20A-2C1A610A6651.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "studio-row-contrast-native-accessibility-xxxl_0_55C0D2E9-866F-48FF-833D-6A89B3690A08.png",
+        "timestamp" : 1791014399.55
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "0A973665-6E9E-401C-A768-7AC018724D44",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "UI Snapshot 2026-10-03 at 03.59.57 AM",
+        "timestamp" : 1791014397.377
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "EC52481E-8DE0-424C-BBBE-12AA7A48DAC7",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 03.59.57 AM",
+        "timestamp" : 1791014397.799
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "0C89C23D-87DA-4127-BA3C-FC8135AC2555",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 03.59.54 AM",
+        "timestamp" : 1791014394.428
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "EB2199C5-DBB6-4DC0-9B3F-C2255AE15943",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 03.59.51 AM",
+        "timestamp" : 1791014391.189
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "D73C7AFC-D4F5-46B9-AA40-98772E4A371C.mp4",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Screen Recording 2026-10-03 at 03.59.44 AM.mp4",
+        "timestamp" : 1791014384.1
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "DF2B9FE1-AA7D-45B5-B0DE-77E2D6FD8517.txt",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Complete Issue Description.txt"
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "ED1F46A3-6071-4A2B-88FB-A89D89A5869B.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "App Screenshot_0_AE75D002-9A4E-4289-BFC9-650DB2839E2B.png",
+        "timestamp" : 1791014400.075
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "5148DAF3-0B95-467E-B93E-B6FBA6D62637.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Element Screenshot_1_C6774D13-D711-44A8-90B5-DAD55CD04330.png",
+        "timestamp" : 1791014400.075
+      }
+    ],
+    "testIdentifier" : "ReviewQualityUITests/testStudioRowContrastNativeDiagnosticAtAccessibilityText()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testStudioRowContrastNativeDiagnosticAtAccessibilityText"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "3E54C1F6-434C-41FD-BB34-10435729773D.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "today-clipping-native-accessibility-xxxl-accessibility-tree_0_FE82B7BF-4E66-47AE-B978-F5BABAC064BB.txt",
+        "timestamp" : 1791014415.25
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "9FD4A241-BBB5-4F4B-BFD8-DDAF856DC438.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "today-clipping-native-accessibility-xxxl_0_ABC161F7-38D7-4C38-94EB-55614C1B7566.png",
+        "timestamp" : 1791014415.105
+      }
+    ],
+    "testIdentifier" : "ReviewQualityUITests/testTodayClippingNativeDiagnosticAtAccessibilityText()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testTodayClippingNativeDiagnosticAtAccessibilityText"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "F5B9D208-DDD5-46A3-BFD2-1768D5495A81.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "today-contrast-native-accessibility-xxxl-accessibility-tree_0_7D4BB443-544C-45C5-BC28-7B0C80F6F07A.txt",
+        "timestamp" : 1791014432.013
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "7E84A1C3-2841-4824-AEA5-25433248E137.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "today-contrast-native-accessibility-xxxl_0_1B3AC684-7E3F-4422-BBCA-F828B4A31811.png",
+        "timestamp" : 1791014431.832
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "A2C605BB-96C8-4E06-AC19-4EB283CA8A77",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.00.30 AM",
+        "timestamp" : 1791014430.674
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "27C89448-E8ED-4047-952E-99F67FC4BF8E",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.00.27 AM",
+        "timestamp" : 1791014427.306
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "70B27F9A-7BA0-4856-A372-7D6ADE931570",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.00.24 AM",
+        "timestamp" : 1791014424.049
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "E0AF19EF-EAE7-4D73-AE86-8E915CF0C7BE.mp4",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Screen Recording 2026-10-03 at 04.00.18 AM.mp4",
+        "timestamp" : 1791014418.186
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "B433E734-5365-4525-976D-0B4163FB891A.txt",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Complete Issue Description.txt"
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "F5C080FE-E274-4D85-8F12-D7A2E592F049.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "App Screenshot_0_FC04512B-5905-4CA3-ACD5-3D9D44DA65E7.png",
+        "timestamp" : 1791014432.334
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+        "deviceName" : "BB isolated native contrast diagnostics",
+        "exportedFileName" : "4CF5F898-2F88-45D5-8189-2134BD135F84.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Element Screenshot_1_B0C30CB4-7E40-4DCB-B714-D6A570C43171.png",
+        "timestamp" : 1791014432.334
+      }
+    ],
+    "testIdentifier" : "ReviewQualityUITests/testTodayContrastNativeDiagnosticAtAccessibilityText()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testTodayContrastNativeDiagnosticAtAccessibilityText"
+  }
+]

@@ -3,6 +3,7 @@ import SwiftUI
 /// Studio opens on the collection; Today (what needs you, due and recent work) is one tap away.
 struct StudioHomeView: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @State private var home: Studio.HomeOutput?
     @State private var error: String?
     @State private var collection = true
@@ -29,19 +30,10 @@ struct StudioHomeView: View {
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text(need.title ?? "Needs you").font(.subheadline.weight(.semibold))
                                         Text(need.body ?? "").font(.subheadline).foregroundStyle(.secondary)
-                                        HStack {
-                                            if let threadId = need.threadId {
-                                                Button("Open thread") { app.studioPath.append(.thread(id: threadId)) }
-                                            } else if let route = need.href.flatMap(Route.init(href:)) {
-                                                Button("Open") { app.studioPath.append(route) }
-                                            }
-                                            if need.responseKind == .approval {
-                                                Button("Approve once") { Task { await respond(need, action: "approve") } }
-                                                Button("Deny") { Task { await respond(need, action: "deny") } }
-                                            } else if need.responseKind == .question {
-                                                Button("Answer") { answering = need }
-                                            }
+                                        needActionLayout {
+                                            needActions(need)
                                         }
+                                        .buttonStyle(.borderless)
                                         .font(.caption)
                                     }
                                     .accessibilityIdentifier("studioNeed")
@@ -149,6 +141,40 @@ struct StudioHomeView: View {
                     }
                 }
             }
+        }
+    }
+
+    private var needActionLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+        }
+        return AnyLayout(HStackLayout())
+    }
+
+    @ViewBuilder
+    private func needActions(_ need: Studio.HomeOutputNeedsYouItem) -> some View {
+        if let threadId = need.threadId {
+            needAction("Open thread") { app.studioPath.append(.thread(id: threadId)) }
+        } else if let route = need.href.flatMap(Route.init(href:)) {
+            needAction("Open") { app.studioPath.append(route) }
+        }
+        if need.responseKind == .approval {
+            needAction("Approve once") { Task { await respond(need, action: "approve") } }
+            needAction("Deny") { Task { await respond(need, action: "deny") } }
+        } else if need.responseKind == .question {
+            needAction("Answer") { answering = need }
+        }
+    }
+
+    private func needAction(_ title: String, action: @escaping () -> Void) -> some View {
+        Button(action: action) {
+            Text(title)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(minWidth: 44,
+                       maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
+                       minHeight: 44,
+                       alignment: .leading)
+                .contentShape(Rectangle())
         }
     }
 

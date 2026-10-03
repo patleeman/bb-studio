@@ -1,0 +1,32 @@
+{
+  "fallbacks": [
+    {
+      "path": "Shared/AppGroup.swift",
+      "fallbackURL": "http://127.0.0.1:49486"
+    },
+    {
+      "path": "Shared/BBClient.swift",
+      "fallbackURL": "http://127.0.0.1:49486"
+    }
+  ],
+  "testSourceSHA256": "4ad0a6e1bb12871d24b95ff332acfe3c8b41c431586d2689ff8d5617e4a4ac79",
+  "containers": [
+    {
+      "domain": "nyc.plee.bbgo",
+      "plist": "/Users/patrick/Library/Developer/CoreSimulator/Devices/4EBAF4F2-D80A-4662-B6BC-B0515679913D/data/Containers/Data/Application/9A71FDB1-FE48-4CEA-BAEE-70507631095A/Library/Preferences/nyc.plee.bbgo.plist",
+      "serverURLReadback": "http://127.0.0.1:49486"
+    },
+    {
+      "domain": "group.nyc.plee.bbgo",
+      "plist": "/Users/patrick/Library/Developer/CoreSimulator/Devices/4EBAF4F2-D80A-4662-B6BC-B0515679913D/data/Containers/Shared/AppGroup/83877EA6-2043-422E-9040-27508E3B7B95/Library/Preferences/group.nyc.plee.bbgo.plist",
+      "serverURLReadback": "http://127.0.0.1:49486"
+    }
+  ],
+  "selectedTests": [
+    "ReviewQualityUITests/testNavigationAtDefaultText",
+    "ReviewQualityUITests/testNavigationAtAccessibilityText",
+    "ReviewQualityUITests/testStudioRowsAtAccessibilityText"
+  ],
+  "deviceId": "4EBAF4F2-D80A-4662-B6BC-B0515679913D",
+  "serverURL": "http://127.0.0.1:49486"
+}

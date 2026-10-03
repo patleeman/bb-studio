@@ -1,0 +1,129 @@
+Attributes: Application, 0x1120b4a00, pid: 76307, label: 'BB Studio'
+Element subtree:
+ →Application, 0x1120b4a00, pid: 76307, label: 'BB Studio'
+    Window (Main), 0x1120b4b40, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1120b4c80, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1120b4dc0, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x1120b4f00, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x1120b5040, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x1120b5180, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x1120b52c0, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x1120b5400, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x1120b5540, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x1120b5680, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x1120b57c0, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x1120b5900, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x1120b5a40, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x1120b6580, {{0.0, 62.0}, {402.0, 106.0}}, identifier: 'Studio'
+                              Button, 0x1120b66c0, {{20.0, 66.0}, {36.0, 36.0}}, identifier: 'studioToday', label: 'Today'
+                              Other, 0x1120b6800, {{206.3, 66.0}, {37.7, 36.0}}
+                                Other, 0x1120b6940, {{206.3, 66.0}, {37.7, 36.0}}
+                                  Button, 0x1120b6a80, {{206.3, 66.0}, {37.7, 36.0}}, label: 'New'
+                                    Button, 0x1120b6bc0, {{206.3, 66.0}, {37.7, 36.0}}
+                                      Image, 0x1120b6d00, {{216.0, 75.0}, {18.0, 18.0}}, identifier: 'plus', label: 'Add'
+                              Other, 0x1120b6e40, {{260.0, 66.0}, {44.0, 36.0}}
+                                Other, 0x1120b6f80, {{260.0, 66.0}, {44.0, 36.0}}
+                                  Button, 0x1120b70c0, {{260.0, 66.0}, {44.0, 36.0}}, label: 'Project'
+                                    Button, 0x1120b7200, {{260.0, 66.0}, {44.0, 36.0}}
+                                      Image, 0x1120b7340, {{269.7, 74.0}, {24.7, 20.0}}, identifier: 'folder', label: 'Move'
+                              Other, 0x1120b7480, {{320.0, 66.0}, {62.0, 36.0}}
+                                Other, 0x1120b75c0, {{320.0, 66.0}, {62.0, 36.0}}
+                                  Button, 0x1120b7700, {{320.0, 66.0}, {62.0, 36.0}}, label: 'Select'
+                              StaticText, 0x1120b7840, {{16.0, 119.7}, {103.3, 40.7}}, label: 'Studio'
+                            Other, 0x1120b7980, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x1120b7ac0, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x1120b7c00, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x1120b7d40, {{0.0, 0.0}, {402.0, 874.0}}
+                                    CollectionView, 0x1120b7e80, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x110695900, {{-16.0, -1580.0}, {434.0, 1834.0}}
+                                      Other, 0x110695a40, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x110695b80, {{0.0, 0.0}, {402.0, 156.0}}
+                                        Other, 0x110695cc0, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Other, 0x110696080, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Cell, 0x1106961c0, {{16.0, 168.0}, {370.0, 80.0}}
+                                        Other, 0x110696300, {{16.0, 168.0}, {370.0, 80.0}}
+                                          Other, 0x110696440, {{16.0, 168.0}, {370.0, 80.0}}
+                                            Other, 0x110696580, {{16.0, 168.0}, {370.0, 80.0}}
+                                              Other, 0x110695180, {{16.0, 168.0}, {370.0, 80.0}}
+                                        Other, 0x110695400, {{16.0, 168.0}, {370.0, 80.0}}
+                                          Other, 0x110695540, {{16.0, 168.0}, {370.0, 80.0}}
+                                            Other, 0x110695680, {{16.0, 168.0}, {370.0, 80.0}}
+                                              Other, 0x1106957c0, {{16.0, 172.0}, {370.0, 72.0}}
+                                                Button, 0x1106952c0, {{16.0, 172.0}, {85.0, 72.0}}, identifier: 'studioAction', label: 'Dictate'
+                                                  Image, 0x110694f00, {{50.7, 185.7}, {15.7, 23.0}}, identifier: 'mic.fill', label: 'Microphone'
+                                                  StaticText, 0x110695040, {{36.0, 216.7}, {45.0, 15.7}}, label: 'Dictate'
+                                                Button, 0x110694b40, {{111.0, 172.0}, {85.0, 72.0}}, identifier: 'studioAction', label: 'Write'
+                                                  Image, 0x110694dc0, {{144.0, 185.7}, {23.0, 23.0}}, identifier: 'square.and.pencil', label: 'Compose'
+                                                  StaticText, 0x110694c80, {{136.8, 216.7}, {33.3, 15.7}}, label: 'Write'
+                                                Button, 0x110694a00, {{206.0, 172.0}, {85.0, 72.0}}, identifier: 'studioAction', label: 'Task'
+                                                  Image, 0x110695e00, {{236.3, 186.3}, {24.3, 22.0}}, identifier: 'checklist', label: 'Checklist With Checkmarks'
+                                                  StaticText, 0x110695f40, {{234.2, 216.2}, {28.7, 15.7}}, label: 'Task'
+                                                Button, 0x110693ac0, {{301.0, 172.0}, {85.0, 72.0}}, identifier: 'studioAction', label: 'Record'
+                                                  Image, 0x110691cc0, {{332.7, 186.3}, {22.0, 22.0}}, identifier: 'record.circle', label: 'Screen Recording'
+                                                  StaticText, 0x110693340, {{321.3, 216.2}, {44.3, 15.7}}, label: 'Record'
+                                      Other, 0x110692940, {{-16.0, 254.0}, {434.0, 1880.0}}
+                                      Cell, 0x1106917c0, {{16.0, 254.0}, {370.0, 40.3}}
+                                        Other, 0x1106935c0, {{16.0, 254.0}, {370.0, 40.3}}
+                                        Other, 0x110692080, {{16.0, 254.0}, {370.0, 40.3}}
+                                          Other, 0x110692800, {{16.0, 254.0}, {370.0, 40.3}}
+                                            Other, 0x1106912c0, {{16.0, 254.0}, {370.0, 40.3}}
+                                              StaticText, 0x110692e40, {{16.0, 254.0}, {370.0, 40.3}}, label: 'Yesterday'
+                                      Cell, 0x110691400, {{16.0, 294.3}, {370.0, 71.7}}
+                                        Other, 0x111dec000, {{16.0, 294.3}, {370.0, 71.7}}
+                                          Other, 0x111dec140, {{16.0, 294.3}, {370.0, 71.7}}
+                                        Other, 0x111dec280, {{16.0, 294.3}, {370.0, 71.7}}
+                                          Other, 0x111dec3c0, {{16.0, 294.3}, {370.0, 71.7}}
+                                            Other, 0x111dec500, {{16.0, 294.3}, {370.0, 71.7}}
+                                              Button, 0x111dec640, {{16.0, 294.3}, {370.0, 71.7}}, identifier: 'studioItem', label: 'Tasks, 5 hr. ago, Board · Orbit · 0 · 0'
+                                                StaticText, 0x111dec780, {{32.0, 311.3}, {316.0, 37.7}}, label: 'Tasks, 5 hr. ago, Board · Orbit · 0 · 0'
+                                                  StaticText, 0x111dec8c0, {{80.0, 311.3}, {44.3, 20.3}}, label: 'Tasks'
+                                                  Image, 0x111deca00, {{40.0, 321.7}, {19.7, 15.7}}, identifier: 'rectangle.split.3x1', label: 'Column View'
+                                                  StaticText, 0x111decb40, {{298.3, 316.3}, {49.7, 14.3}}, label: '5 hr. ago'
+                                                  StaticText, 0x111decc80, {{80.0, 334.7}, {108.0, 14.3}}, label: 'Board · Orbit · 0 · 0'
+                                                Image, 0x111decdc0, {{360.7, 324.3}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x111decf00, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x111ded040, {{396.0, 781.0}, {3.0, 7.0}}
+                                      Other, 0x111ded180, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x111ded2c0, {{396.0, 781.0}, {3.0, 7.0}}
+                            Toolbar, 0x111ded400, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x111ded540, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x111ded680, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x111ded7c0, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x111ded900, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x111deda40, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x111dedb80, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x111dedcc0, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x111dede00, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x111dedf40, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home'
+                              Image, 0x111dee080, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x111dee1c0, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio', Selected
+                              Image, 0x111dee300, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x111dee440, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x111dee580, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x111dee6c0, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x111dee800, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x111dee940, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x111deea80, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x111deebc0, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x111deed00, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x111deee40, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x111deef80, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x111def0c0, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x111def200, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x111def340, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x111def480, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x111def5c0, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x111def700, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x111def840, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x111def980, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x111defac0, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x111defc00, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x111defd40, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x111defe80, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x1120b4a00, pid: 76307, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x1120b5b80, pid: 76307, label: 'BB Studio'
+  }

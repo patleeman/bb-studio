@@ -1,0 +1,44 @@
+{
+  "countsByScreen": {
+    "settings-default": 6,
+    "settings-accessibility-xxxl": 0,
+    "studio-default": 3,
+    "studio-accessibility-xxxl": 2,
+    "today-default": 4,
+    "today-accessibility-xxxl": 2,
+    "capture-default": 6,
+    "capture-accessibility-xxxl": 5,
+    "note-default": 3,
+    "note-accessibility-xxxl": 3,
+    "studio-rows-accessibility-xxxl": 3
+  },
+  "countsByAuditRawValue": {
+    "1": 11,
+    "65536": 13,
+    "131072": 13
+  },
+  "totalReports": 37,
+  "testExitCode": 65,
+  "sourceCommit": "668bb6f9256ff20c089bece633635511b73911d8",
+  "tests": [
+    [
+      "BBStudioUITests.ReviewQualityUITests testNavigationAtAccessibilityText",
+      "failed",
+      "40.685 seconds"
+    ],
+    [
+      "BBStudioUITests.ReviewQualityUITests testNavigationAtDefaultText",
+      "failed",
+      "48.932 seconds"
+    ],
+    [
+      "BBStudioUITests.ReviewQualityUITests testStudioRowsAtAccessibilityText",
+      "failed",
+      "24.538 seconds"
+    ]
+  ],
+  "resultBundle": "/tmp/bb-current-audit.rleYYF/results.xcresult",
+  "buildLog": "/tmp/bb-current-audit.rleYYF/build.log",
+  "testLog": "/tmp/bb-current-audit.rleYYF/test.log",
+  "attachments": "/tmp/bb-current-audit.rleYYF/attachments"
+}

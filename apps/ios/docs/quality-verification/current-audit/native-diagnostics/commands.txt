@@ -1,0 +1,28 @@
+# Recorded local command paths
+
+The first setup was interrupted before compilation. The existing owned empty
+simulator and private project were resumed, not recreated. All scripts below
+verified both fallback files, defaults domains and installed container plists
+before test launch. The original recipe is ../../../quality-verification.md.
+
+Build (executed after each narrow source change):
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild build-for-testing -project /tmp/bb-current-diagnostic.6v09KU/project/BBStudio.xcodeproj -scheme BBStudio -destination id=B805849A-D95F-46D4-9CCE-0BE0C2FFD474 -derivedDataPath /tmp/bb-current-diagnostic.6v09KU/build
+
+Executed setup/runner scripts (retained locally):
+/tmp/bb-current-diagnostic-resume.sh — 4 no-handler diagnostic tests
+/tmp/bb-current-diagnostic-second.sh — 2 diagnostic second-issue selectors
+/tmp/bb-current-approval-run.sh — first focused approval checks (default immediate navigation assertion failed; pending unchanged)
+/tmp/bb-current-approval-final-run.sh — bounded navigation checks (default passed; XXXL 43.999999999999886pt float comparison failed)
+/tmp/bb-current-approval-verified-run.sh — final positive destination checks; both passed
+
+Final test command:
+DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild test-without-building -xctestrun /tmp/bb-current-diagnostic.6v09KU/build/Build/Products/ReviewQuality.xctestrun -destination id=B805849A-D95F-46D4-9CCE-0BE0C2FFD474 -parallel-testing-enabled NO -only-testing:BBStudioUITests/ReviewQualityUITests/testTodayApprovalActionsAtDefaultText -only-testing:BBStudioUITests/ReviewQualityUITests/testTodayApprovalActionsAtAccessibilityText -resultBundlePath /tmp/bb-current-diagnostic.6v09KU/approval-verified-results.xcresult
+
+Final exact pending-state GET (before and after; identical record):
+curl --fail --silent http://127.0.0.1:49486/api/v1/threads/thr_yh9925ram6/interactions/pint_7ffsz5e9wj
+
+All result bundles and intermediate logs remain in the local temporary folder.
+Final build/test logs, result JSON, screenshots, trees and isolation readbacks
+are copied here. The 0.001pt target assertion tolerance handles floating-point
+frame arithmetic; the SwiftUI label minimum remains 44pt.
+The copied build log removes trailing whitespace; the original raw build log remains local.

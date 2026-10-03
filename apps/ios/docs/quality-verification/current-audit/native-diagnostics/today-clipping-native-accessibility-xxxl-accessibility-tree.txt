@@ -1,0 +1,110 @@
+Attributes: Application, 0x1112bb840, pid: 22797, label: 'BB Studio'
+Element subtree:
+ →Application, 0x1112bb840, pid: 22797, label: 'BB Studio'
+    Window (Main), 0x1112bb980, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1112bbac0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1112bb480, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x1112bb0c0, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x1112bb340, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x1112bb200, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x1112baf80, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x1112b9540, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x1112ba580, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x1112b9f40, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x1112ba080, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x1112ba1c0, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x1112ba300, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x1112ba440, {{0.0, 62.0}, {402.0, 127.0}}, identifier: 'Today'
+                              Button, 0x1112b9900, {{346.0, 66.0}, {36.0, 36.0}}, identifier: 'studioCollection', label: 'Collection'
+                              StaticText, 0x1112b9a40, {{16.0, 116.0}, {165.7, 71.7}}, label: 'Today'
+                            Other, 0x1112b9b80, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x1112b9cc0, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x1112b9e00, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x1112b97c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                    CollectionView, 0x1112b9680, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x1112b8500, {{-16.0, -1559.0}, {434.0, 2277.7}}
+                                      Other, 0x1112b8780, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x1112b88c0, {{0.0, 0.0}, {402.0, 156.0}}
+                                        Other, 0x1112b8a00, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Other, 0x1112b8b40, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x1112b8c80, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Cell, 0x1112b8dc0, {{16.0, 189.0}, {370.0, 83.3}}
+                                        Other, 0x1112b8f00, {{16.0, 189.0}, {370.0, 83.3}}
+                                        Other, 0x1112b9040, {{16.0, 189.0}, {370.0, 83.3}}
+                                          Other, 0x1112b9180, {{16.0, 189.0}, {370.0, 83.3}}
+                                            Other, 0x1112b92c0, {{16.0, 189.0}, {370.0, 83.3}}
+                                              StaticText, 0x1112b9400, {{16.0, 189.0}, {370.0, 83.3}}, label: 'Needs you'
+                                      Cell, 0x1112ba940, {{16.0, 272.3}, {370.0, 428.7}}
+                                        Other, 0x1112baa80, {{16.0, 272.3}, {370.0, 428.7}}
+                                          Other, 0x1112ba6c0, {{16.0, 272.3}, {370.0, 428.7}}
+                                        Other, 0x1112ba800, {{16.0, 272.3}, {370.0, 428.7}}
+                                          Other, 0x1112babc0, {{16.0, 272.3}, {370.0, 428.7}}
+                                            Other, 0x1112bad00, {{16.0, 272.3}, {370.0, 428.7}}
+                                              StaticText, 0x1112bae40, {{32.0, 287.3}, {206.3, 116.7}}, identifier: 'studioNeed', label: 'Approval needed'
+                                              StaticText, 0x1112bb5c0, {{32.0, 410.0}, {332.0, 116.7}}, identifier: 'studioNeed', label: 'Watch approval QA 0700'
+                                              Button, 0x1112bbc00, {{32.0, 532.7}, {110.7, 153.3}}, identifier: 'studioNeed', label: 'Open thread'
+                                              Button, 0x1112bbd40, {{150.7, 532.7}, {111.0, 153.3}}, identifier: 'studioNeed', label: 'Approve once'
+                                              Button, 0x1112bbe80, {{269.7, 583.7}, {96.3, 51.3}}, identifier: 'studioNeed', label: 'Deny'
+                                      Other, 0x1112b8640, {{-16.0, 718.7}, {434.0, 936.0}}
+                                      Cell, 0x106e9ef80, {{16.0, 718.7}, {370.0, 145.3}}
+                                        Other, 0x1112c0000, {{16.0, 718.7}, {370.0, 145.3}}
+                                        Other, 0x1112c0140, {{16.0, 718.7}, {370.0, 145.3}}
+                                          Other, 0x1112c0280, {{16.0, 718.7}, {370.0, 145.3}}
+                                            Other, 0x1112c03c0, {{16.0, 718.7}, {370.0, 145.3}}
+                                              StaticText, 0x1112c0500, {{16.0, 718.7}, {370.0, 145.3}}, label: 'Agents working now'
+                                      Cell, 0x1112c0640, {{16.0, 864.0}, {370.0, 217.3}}
+                                        Other, 0x1112c0780, {{16.0, 864.0}, {370.0, 217.3}}
+                                          Other, 0x1112c08c0, {{16.0, 864.0}, {370.0, 217.3}}
+                                        Other, 0x1112c0a00, {{16.0, 864.0}, {370.0, 217.3}}
+                                          Other, 0x1112c0b40, {{16.0, 864.0}, {370.0, 217.3}}
+                                            Other, 0x1112c0c80, {{16.0, 864.0}, {370.0, 217.3}}
+                                              Button, 0x1112c0dc0, {{16.0, 864.0}, {370.0, 217.3}}, label: 'Watch approval QA 0700'
+                                                StaticText, 0x1112c0f00, {{43.0, 879.0}, {274.3, 187.3}}, label: 'Watch approval QA 0700'
+                                                Image, 0x1112c1040, {{43.0, 890.7}, {45.3, 42.7}}, identifier: 'bubble.left', label: 'Comment Left'
+                                                Image, 0x1112c1180, {{339.7, 954.0}, {21.7, 37.3}}, identifier: 'chevron.forward'
+                                      Other, 0x1112c12c0, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                                        Other, 0x1112c1400, {{396.0, 781.0}, {3.0, 7.0}}
+                                      Other, 0x1112c1540, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 3 pages', value: 0%
+                                        Other, 0x1112c1680, {{396.0, 781.0}, {3.0, 7.0}}
+                            Toolbar, 0x1112c17c0, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x1112c1900, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x1112c1a40, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x1112c1b80, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x1112c1cc0, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x1112c1e00, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x1112c1f40, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x1112c2080, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x1112c21c0, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x1112c2300, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home'
+                              Image, 0x1112c2440, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x1112c2580, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio', Selected
+                              Image, 0x1112c26c0, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x1112c2800, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x1112c2940, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x1112c2a80, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x1112c2bc0, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x1112c2d00, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x1112c2e40, {{109.7, 795.0}, {98.0, 54.0}}
+                            Other, 0x1112c2f80, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x1112c30c0, {{109.7, 795.0}, {98.0, 54.0}}
+                              Other, 0x1112c3200, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x1112c3340, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x1112c3480, {{109.7, 795.0}, {98.0, 54.0}}
+                                    Other, 0x1112c35c0, {{109.7, 795.0}, {98.0, 54.0}}
+                                  Other, 0x1112c3700, {{109.7, 795.0}, {98.0, 54.0}}
+                                Other, 0x1112c3840, {{109.7, 795.0}, {98.0, 54.0}}
+                    Other, 0x1112c3980, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x1112c3ac0, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x1112c3c00, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x1112c3d40, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x1112c3e80, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x11150c000, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x11150c140, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x11150c280, {{0.0, 791.0}, {402.0, 83.0}}
+Path to element:
+ →Application, 0x1112bb840, pid: 22797, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x11150c3c0, pid: 22797, label: 'BB Studio'
+  }

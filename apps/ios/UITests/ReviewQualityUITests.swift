@@ -92,6 +92,148 @@ final class ReviewQualityUITests: XCTestCase {
         XCTAssertTrue(auditFindings.isEmpty, auditFindings.joined(separator: "\n"))
     }
 
+    /// Diagnostics retain Apple's native region attachments. The aggregate
+    /// navigation/row audits above remain strict and collect every finding.
+    func testSettingsContrastNativeDiagnostic() throws {
+        let app = try diagnosticApplication(largeText: false)
+        defer { app.terminate() }
+        try captureNativeDiagnostic(app, "settings-contrast-native-default", audit: [.contrast])
+    }
+
+    /// Select the second reported Settings contrast issue for localization only.
+    func testSettingsSecondContrastNativeDiagnostic() throws {
+        let app = try diagnosticApplication(largeText: false)
+        defer { app.terminate() }
+        try captureNativeDiagnostic(app, "settings-second-contrast-native-default", audit: [.contrast], skipIssues: 1)
+    }
+
+    func testTodayContrastNativeDiagnosticAtAccessibilityText() throws {
+        let app = try diagnosticApplication(largeText: true)
+        defer { app.terminate() }
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+        app.buttons["studioToday"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
+        try captureNativeDiagnostic(app, "today-contrast-native-accessibility-xxxl", audit: [.contrast])
+    }
+
+    func testTodayClippingNativeDiagnosticAtAccessibilityText() throws {
+        let app = try diagnosticApplication(largeText: true)
+        defer { app.terminate() }
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+        app.buttons["studioToday"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
+        try captureNativeDiagnostic(app, "today-clipping-native-accessibility-xxxl", audit: [.textClipped])
+    }
+
+    func testStudioRowContrastNativeDiagnosticAtAccessibilityText() throws {
+        let app = try diagnosticApplication(largeText: true)
+        defer { app.terminate() }
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+        app.swipeUp()
+        XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
+        try captureNativeDiagnostic(app, "studio-row-contrast-native-accessibility-xxxl", audit: [.contrast])
+    }
+
+    /// Skip the already captured Select issue to retain the next original region.
+    func testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText() throws {
+        let app = try diagnosticApplication(largeText: true)
+        defer { app.terminate() }
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+        app.swipeUp()
+        XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
+        try captureNativeDiagnostic(app, "studio-row-second-contrast-native-accessibility-xxxl", audit: [.contrast], skipIssues: 1)
+    }
+
+    /// Read-only approval-row review; opening its thread must not decide it.
+    func testTodayApprovalActionsAtAccessibilityText() throws {
+        try todayApprovalActions(largeText: true)
+    }
+
+    func testTodayApprovalActionsAtDefaultText() throws {
+        try todayApprovalActions(largeText: false)
+    }
+
+    private func todayApprovalActions(largeText: Bool) throws {
+        let app = try diagnosticApplication(largeText: largeText)
+        defer { app.terminate() }
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+        app.buttons["studioToday"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
+        for label in ["Open thread", "Approve once", "Deny"] {
+            let action = app.buttons[label].firstMatch
+            XCTAssertTrue(action.waitForExistence(timeout: 10))
+            reveal(action, in: app)
+            checkTarget(action)
+            XCTAssertGreaterThanOrEqual(action.frame.width, 44 - 0.001)
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44 - 0.001)
+            retainScreen(app, "today-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-action-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
+        }
+        let open = app.buttons["Open thread"].firstMatch
+        for _ in 0..<5 {
+            if open.isHittable { break }
+            app.swipeDown()
+        }
+        XCTAssertTrue(open.isHittable)
+        open.tap()
+        let thread = app.navigationBars["Watch approval QA 0700"]
+        XCTAssertTrue(thread.waitForExistence(timeout: 10), "Open thread must show the held fixture's thread")
+        XCTAssertTrue(thread.isHittable, "Destination thread must be visible")
+        retainScreen(app, "today-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-open-thread")
+    }
+
+    private func retainScreen(_ app: XCUIApplication, _ name: String) {
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = name + "-accessibility-tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+    }
+
+    private func diagnosticApplication(largeText: Bool) throws -> XCUIApplication {
+        let app = application(largeText: largeText)
+        app.launch()
+        XCTAssertTrue(app.tabBars.buttons["Settings"].waitForExistence(timeout: 20))
+        app.tabBars.buttons["Settings"].tap()
+        let server = app.descendants(matching: .any)["settingsServerURL"]
+        XCTAssertTrue(server.waitForExistence(timeout: 10))
+        XCTAssertEqual(server.value as? String, fixture)
+        return app
+    }
+
+    private func captureNativeDiagnostic(_ app: XCUIApplication, _ name: String, audit: XCUIAccessibilityAuditType, skipIssues: Int = 0) throws {
+        let screenshot = XCTAttachment(screenshot: app.screenshot())
+        screenshot.name = name
+        screenshot.lifetime = .keepAlways
+        add(screenshot)
+        let tree = XCTAttachment(string: app.debugDescription)
+        tree.name = name + "-accessibility-tree"
+        tree.lifetime = .keepAlways
+        add(tree)
+        if #available(iOS 17.0, *) {
+            if skipIssues == 0 {
+                // No handler: Apple records the original finding and highlighted region.
+                try app.performAccessibilityAudit(for: audit)
+            } else {
+                // Diagnostic selection only; the strict aggregate tests never use this.
+                var seen = 0
+                try app.performAccessibilityAudit(for: audit) { issue in
+                    seen += 1
+                    print("NATIVE-DIAGNOSTIC: \(name) issue \(seen): \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")]")
+                    return seen <= skipIssues
+                }
+                XCTAssertGreaterThan(seen, skipIssues, "Requested diagnostic issue was not reported")
+            }
+        }
+    }
+
     func testIsolatedLaunchMeasurement() {
         let app = application(largeText: false)
         let options = XCTMeasureOptions()

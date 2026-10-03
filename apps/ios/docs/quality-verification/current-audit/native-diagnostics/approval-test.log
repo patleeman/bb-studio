@@ -1,0 +1,253 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-current-diagnostic.6v09KU/build/Build/Products/ReviewQuality.xctestrun -destination id=B805849A-D95F-46D4-9CCE-0BE0C2FFD474 -parallel-testing-enabled NO "-only-testing:BBStudioUITests/ReviewQualityUITests/testTodayApprovalActionsAtDefaultText" "-only-testing:BBStudioUITests/ReviewQualityUITests/testTodayApprovalActionsAtAccessibilityText" -resultBundlePath /tmp/bb-current-diagnostic.6v09KU/approval-verified-results.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-current-diagnostic.6v09KU/approval-verified-results.xcresult
+
+2026-10-03 04:13:55.381746-0400 BBStudioUITests-Runner[88957:90488708] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 04:13:57.930.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 04:13:57.930.
+Test Suite 'ReviewQualityUITests' started at 2026-10-03 04:13:57.930.
+Test Case '-[BBStudioUITests.ReviewQualityUITests testTodayApprovalActionsAtAccessibilityText]' started.
+    t =     0.00s Start Test at 2026-10-03 04:13:57.932
+    t =     0.02s Set Up
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 04:13:57.996 xcodebuild[88944:90488552] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:13:57.996 xcodebuild[88944:90488552] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.68s         Setting up automation session
+objc[88957]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x1033cc398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x106828310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     3.06s         Wait for nyc.plee.bbgo to idle
+    t =     4.96s Waiting 20.0s for "Settings" Button to exist
+    t =     6.00s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     6.00s         Checking existence of `"Settings" Button`
+    t =     6.11s Tap "Settings" Button
+    t =     6.11s     Wait for nyc.plee.bbgo to idle
+    t =     6.11s     Find the "Settings" Button
+    t =     6.14s     Check for interrupting elements affecting "Settings" Button
+    t =     6.16s     Synthesize event
+    t =     6.45s     Wait for nyc.plee.bbgo to idle
+    t =     8.28s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.32s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.32s         Checking existence of `"settingsServerURL" Any`
+    t =     9.37s Find the "settingsServerURL" Any
+    t =     9.38s Tap "Studio" Button
+    t =     9.38s     Wait for nyc.plee.bbgo to idle
+    t =     9.38s     Find the "Studio" Button
+    t =     9.40s     Check for interrupting elements affecting "square.stack" Button
+    t =     9.42s     Synthesize event
+    t =     9.70s     Wait for nyc.plee.bbgo to idle
+    t =    11.55s Waiting 20.0s for "Studio" NavigationBar to exist
+    t =    12.59s     Checking `Expect predicate `existsNoRetry == 1` for object "Studio" NavigationBar`
+    t =    12.59s         Checking existence of `"Studio" NavigationBar`
+    t =    12.64s Tap "studioToday" Button
+    t =    12.64s     Wait for nyc.plee.bbgo to idle
+    t =    12.64s     Find the "studioToday" Button
+    t =    12.67s     Check for interrupting elements affecting "studioToday" Button
+    t =    12.70s     Synthesize event
+    t =    13.00s     Wait for nyc.plee.bbgo to idle
+    t =    13.00s Waiting 10.0s for "Today" NavigationBar to exist
+    t =    14.04s     Checking `Expect predicate `existsNoRetry == 1` for object "Today" NavigationBar`
+    t =    14.04s         Checking existence of `"Today" NavigationBar`
+    t =    14.07s Waiting 10.0s for "Open thread" Button to exist
+    t =    15.10s     Checking `Expect predicate `existsNoRetry == 1` for object "Open thread" Button`
+    t =    15.10s         Checking existence of `"Open thread" Button`
+    t =    15.15s Checking existence of `"Open thread" Button`
+    t =    15.19s Find the "Open thread" Button
+    t =    15.24s Checking existence of `"studioNeed" Button`
+    t =    15.29s Find the "studioNeed" Button
+    t =    15.34s Find the "studioNeed" Button
+    t =    15.40s Find the "studioNeed" Button
+    t =    15.45s Find the "studioNeed" Button
+    t =    15.50s Find the "studioNeed" Button
+    t =    15.55s Find the "studioNeed" Button
+    t =    15.60s Find the Target Application 'nyc.plee.bbgo'
+    t =    15.68s Added attachment named 'today-approval-accessibility-xxxl-action-open-thread'
+    t =    15.68s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    15.78s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    15.81s Added attachment named 'today-approval-accessibility-xxxl-action-open-thread-accessibility-tree'
+    t =    15.81s Waiting 10.0s for "Approve once" Button to exist
+    t =    16.84s     Checking `Expect predicate `existsNoRetry == 1` for object "Approve once" Button`
+    t =    16.84s         Checking existence of `"Approve once" Button`
+    t =    16.91s Checking existence of `"Approve once" Button`
+    t =    16.96s Find the "Approve once" Button
+    t =    17.02s Checking existence of `"studioNeed" Button`
+    t =    17.06s Find the "studioNeed" Button
+    t =    17.11s Find the "studioNeed" Button
+    t =    17.16s Find the "studioNeed" Button
+    t =    17.21s Find the "studioNeed" Button
+    t =    17.26s Find the "studioNeed" Button
+    t =    17.30s Find the "studioNeed" Button
+    t =    17.35s Find the Target Application 'nyc.plee.bbgo'
+    t =    17.43s Added attachment named 'today-approval-accessibility-xxxl-action-approve-once'
+    t =    17.43s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    17.52s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    17.55s Added attachment named 'today-approval-accessibility-xxxl-action-approve-once-accessibility-tree'
+    t =    17.55s Waiting 10.0s for "Deny" Button to exist
+    t =    18.59s     Checking `Expect predicate `existsNoRetry == 1` for object "Deny" Button`
+    t =    18.59s         Checking existence of `"Deny" Button`
+    t =    18.65s Checking existence of `"Deny" Button`
+    t =    18.70s Find the "Deny" Button
+    t =    18.75s Checking existence of `"studioNeed" Button`
+    t =    18.79s Find the "studioNeed" Button
+    t =    18.84s Find the "studioNeed" Button
+    t =    18.89s Find the "studioNeed" Button
+    t =    18.94s Find the "studioNeed" Button
+    t =    18.98s Find the "studioNeed" Button
+    t =    19.03s Find the "studioNeed" Button
+QUALITY: Target below 44 points: Deny (338.0, 43.999999999999886)
+    t =    19.09s Find the "studioNeed" Button
+    t =    19.15s Find the "studioNeed" Button
+    t =    19.20s Find the Target Application 'nyc.plee.bbgo'
+    t =    19.28s Added attachment named 'today-approval-accessibility-xxxl-action-deny'
+    t =    19.28s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    19.39s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    19.42s Added attachment named 'today-approval-accessibility-xxxl-action-deny-accessibility-tree'
+    t =    19.42s Find the "Open thread" Button
+    t =    19.47s Find the "studioNeed" Button
+    t =    19.52s Tap "studioNeed" Button
+    t =    19.52s     Wait for nyc.plee.bbgo to idle
+    t =    19.53s     Find the "studioNeed" Button
+    t =    19.57s     Check for interrupting elements affecting "studioNeed" Button
+    t =    19.59s     Synthesize event
+    t =    19.88s     Wait for nyc.plee.bbgo to idle
+    t =    19.97s Waiting 10.0s for "Watch approval QA 0700" NavigationBar to exist
+    t =    21.00s     Checking `Expect predicate `existsNoRetry == 1` for object "Watch approval QA 0700" NavigationBar`
+    t =    21.00s         Checking existence of `"Watch approval QA 0700" NavigationBar`
+    t =    21.05s Find the "Watch approval QA 0700" NavigationBar
+    t =    21.08s Find the Target Application 'nyc.plee.bbgo'
+    t =    21.17s Added attachment named 'today-approval-accessibility-xxxl-open-thread'
+    t =    21.17s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    21.26s Requesting snapshot of accessibility hierarchy for app with pid 88977
+    t =    21.29s Added attachment named 'today-approval-accessibility-xxxl-open-thread-accessibility-tree'
+    t =    21.29s Terminate nyc.plee.bbgo:88977
+    t =    22.35s Tear Down
+Test Case '-[BBStudioUITests.ReviewQualityUITests testTodayApprovalActionsAtAccessibilityText]' passed (22.386 seconds).
+Test Case '-[BBStudioUITests.ReviewQualityUITests testTodayApprovalActionsAtDefaultText]' started.
+    t =     0.00s Start Test at 2026-10-03 04:14:20.319
+    t =     0.02s Set Up
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 04:14:20.336 xcodebuild[88944:90488552] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:14:20.336 xcodebuild[88944:90488552] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.23s         Setting up automation session
+    t =     2.49s         Wait for nyc.plee.bbgo to idle
+    t =     4.52s Waiting 20.0s for "Settings" Button to exist
+    t =     5.54s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.55s         Checking existence of `"Settings" Button`
+    t =     5.77s Tap "Settings" Button
+    t =     5.77s     Wait for nyc.plee.bbgo to idle
+    t =     5.77s     Find the "Settings" Button
+    t =     5.84s     Check for interrupting elements affecting "gear" Button
+    t =     5.89s     Synthesize event
+    t =     6.20s     Wait for nyc.plee.bbgo to idle
+    t =     8.13s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.16s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.17s         Checking existence of `"settingsServerURL" Any`
+    t =     9.23s Find the "settingsServerURL" Any
+    t =     9.26s Tap "Studio" Button
+    t =     9.26s     Wait for nyc.plee.bbgo to idle
+    t =     9.26s     Find the "Studio" Button
+    t =     9.29s     Check for interrupting elements affecting "square.stack" Button
+    t =     9.32s     Synthesize event
+    t =     9.61s     Wait for nyc.plee.bbgo to idle
+    t =    11.44s Waiting 20.0s for "Studio" NavigationBar to exist
+    t =    12.48s     Checking `Expect predicate `existsNoRetry == 1` for object "Studio" NavigationBar`
+    t =    12.48s         Checking existence of `"Studio" NavigationBar`
+    t =    12.54s Tap "studioToday" Button
+    t =    12.54s     Wait for nyc.plee.bbgo to idle
+    t =    12.54s     Find the "studioToday" Button
+    t =    12.57s     Check for interrupting elements affecting "studioToday" Button
+    t =    12.60s     Synthesize event
+    t =    12.89s     Wait for nyc.plee.bbgo to idle
+    t =    12.90s Waiting 10.0s for "Today" NavigationBar to exist
+    t =    13.94s     Checking `Expect predicate `existsNoRetry == 1` for object "Today" NavigationBar`
+    t =    13.94s         Checking existence of `"Today" NavigationBar`
+    t =    14.00s Waiting 10.0s for "Open thread" Button to exist
+    t =    15.03s     Checking `Expect predicate `existsNoRetry == 1` for object "Open thread" Button`
+    t =    15.03s         Checking existence of `"Open thread" Button`
+    t =    15.11s Checking existence of `"Open thread" Button`
+    t =    15.17s Find the "Open thread" Button
+    t =    15.24s Checking existence of `"studioNeed" Button`
+    t =    15.30s Find the "studioNeed" Button
+    t =    15.36s Find the "studioNeed" Button
+    t =    15.43s Find the "studioNeed" Button
+    t =    15.49s Find the "studioNeed" Button
+    t =    15.55s Find the "studioNeed" Button
+    t =    15.61s Find the "studioNeed" Button
+    t =    15.68s Find the Target Application 'nyc.plee.bbgo'
+    t =    15.76s Added attachment named 'today-approval-default-action-open-thread'
+    t =    15.76s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    15.95s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    16.00s Added attachment named 'today-approval-default-action-open-thread-accessibility-tree'
+    t =    16.00s Waiting 10.0s for "Approve once" Button to exist
+    t =    17.04s     Checking `Expect predicate `existsNoRetry == 1` for object "Approve once" Button`
+    t =    17.04s         Checking existence of `"Approve once" Button`
+    t =    17.13s Checking existence of `"Approve once" Button`
+    t =    17.19s Find the "Approve once" Button
+    t =    17.26s Checking existence of `"studioNeed" Button`
+    t =    17.32s Find the "studioNeed" Button
+    t =    17.38s Find the "studioNeed" Button
+    t =    17.45s Find the "studioNeed" Button
+    t =    17.51s Find the "studioNeed" Button
+    t =    17.57s Find the "studioNeed" Button
+    t =    17.64s Find the "studioNeed" Button
+    t =    17.72s Find the Target Application 'nyc.plee.bbgo'
+    t =    17.81s Added attachment named 'today-approval-default-action-approve-once'
+    t =    17.81s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    18.00s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    18.04s Added attachment named 'today-approval-default-action-approve-once-accessibility-tree'
+    t =    18.04s Waiting 10.0s for "Deny" Button to exist
+    t =    19.08s     Checking `Expect predicate `existsNoRetry == 1` for object "Deny" Button`
+    t =    19.08s         Checking existence of `"Deny" Button`
+    t =    19.17s Checking existence of `"Deny" Button`
+    t =    19.23s Find the "Deny" Button
+    t =    19.30s Checking existence of `"studioNeed" Button`
+    t =    19.36s Find the "studioNeed" Button
+    t =    19.43s Find the "studioNeed" Button
+    t =    19.51s Find the "studioNeed" Button
+    t =    19.57s Find the "studioNeed" Button
+    t =    19.63s Find the "studioNeed" Button
+    t =    19.70s Find the "studioNeed" Button
+    t =    19.76s Find the Target Application 'nyc.plee.bbgo'
+    t =    19.85s Added attachment named 'today-approval-default-action-deny'
+    t =    19.85s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    20.04s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    20.08s Added attachment named 'today-approval-default-action-deny-accessibility-tree'
+    t =    20.09s Find the "Open thread" Button
+    t =    20.15s Find the "studioNeed" Button
+    t =    20.21s Tap "studioNeed" Button
+    t =    20.21s     Wait for nyc.plee.bbgo to idle
+    t =    20.22s     Find the "studioNeed" Button
+    t =    20.27s     Check for interrupting elements affecting "studioNeed" Button
+    t =    20.30s     Synthesize event
+    t =    20.60s     Wait for nyc.plee.bbgo to idle
+    t =    20.79s Waiting 10.0s for "Watch approval QA 0700" NavigationBar to exist
+    t =    21.82s     Checking `Expect predicate `existsNoRetry == 1` for object "Watch approval QA 0700" NavigationBar`
+    t =    21.82s         Checking existence of `"Watch approval QA 0700" NavigationBar`
+    t =    21.86s Find the "Watch approval QA 0700" NavigationBar
+    t =    21.89s Find the Target Application 'nyc.plee.bbgo'
+    t =    21.98s Added attachment named 'today-approval-default-open-thread'
+    t =    21.98s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    22.08s Requesting snapshot of accessibility hierarchy for app with pid 90170
+    t =    22.11s Added attachment named 'today-approval-default-open-thread-accessibility-tree'
+    t =    22.11s Terminate nyc.plee.bbgo:90170
+    t =    23.17s Tear Down
+Test Case '-[BBStudioUITests.ReviewQualityUITests testTodayApprovalActionsAtDefaultText]' passed (23.237 seconds).
+Test Suite 'ReviewQualityUITests' passed at 2026-10-03 04:14:43.555.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 45.623 (45.625) seconds
+Test Suite 'BBStudioUITests.xctest' passed at 2026-10-03 04:14:43.556.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 45.623 (45.626) seconds
+Test Suite 'Selected tests' passed at 2026-10-03 04:14:43.557.
+	 Executed 2 tests, with 0 failures (0 unexpected) in 45.623 (45.627) seconds
+2026-10-03 04:14:43.867 xcodebuild[88944:90488552] [MT] IDETestOperationsObserverDebug: 50.162 elapsed -- Testing started completed.
+2026-10-03 04:14:43.867 xcodebuild[88944:90488552] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 04:14:43.867 xcodebuild[88944:90488552] [MT] IDETestOperationsObserverDebug: 50.162 sec, +50.162 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-current-diagnostic.6v09KU/approval-verified-results.xcresult
+
+** TEST EXECUTE SUCCEEDED **
+
+Testing started

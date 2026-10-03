@@ -1,0 +1,32 @@
+{
+  "fallbacks": [
+    {
+      "path": "Shared/AppGroup.swift",
+      "fallbackURL": "http://127.0.0.1:49486"
+    },
+    {
+      "path": "Shared/BBClient.swift",
+      "fallbackURL": "http://127.0.0.1:49486"
+    }
+  ],
+  "containers": [
+    {
+      "domain": "nyc.plee.bbgo",
+      "plist": "/Users/patrick/Library/Developer/CoreSimulator/Devices/B805849A-D95F-46D4-9CCE-0BE0C2FFD474/data/Containers/Data/Application/C29D25C8-757A-482E-9BF5-549F11CD4F61/Library/Preferences/nyc.plee.bbgo.plist",
+      "serverURLReadback": "http://127.0.0.1:49486"
+    },
+    {
+      "domain": "group.nyc.plee.bbgo",
+      "plist": "/Users/patrick/Library/Developer/CoreSimulator/Devices/B805849A-D95F-46D4-9CCE-0BE0C2FFD474/data/Containers/Shared/AppGroup/23EB0F72-4699-48E7-A83E-9006B2058CCF/Library/Preferences/group.nyc.plee.bbgo.plist",
+      "serverURLReadback": "http://127.0.0.1:49486"
+    }
+  ],
+  "selectedTests": [
+    "ReviewQualityUITests/testSettingsSecondContrastNativeDiagnostic",
+    "ReviewQualityUITests/testStudioRowSecondContrastNativeDiagnosticAtAccessibilityText"
+  ],
+  "deviceId": "B805849A-D95F-46D4-9CCE-0BE0C2FFD474",
+  "serverURL": "http://127.0.0.1:49486",
+  "initialPreparationTestSourceSHA256": "9f4669b9f4c8f837f787bcddbf9266cfc1034d1d7cccff879dc686e267d1d44e",
+  "sourceHashNote": "Inherited from initial preparation; not a fingerprint of the rebuilt second-issue source."
+}
