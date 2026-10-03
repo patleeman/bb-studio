@@ -11,32 +11,66 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { Icon } from "@bb-studio/kit/app";
 import { useMemo, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { openCommandBar } from "./CommandBar";
+import { useTabDragState, zoneKey } from "./tabDrag";
 import { useLocationHref } from "./location";
 import { requestCount, setCurrentSpaceId, useInboxCounts, useSpaces } from "./model";
 import { openOffice } from "./routes";
 import { TAB, TabRow, openTab, type TabMoves } from "./TabRow";
-import { isTabActive, useTabActions, useTabs, useTrackOpen, type ShownTab, type TabFolder } from "./tabs";
+import { isTabActive, useTabActions, useTabs, useTrackOpen, type ShownTab, type TabFolder, type TabZone } from "./tabs";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE, cn } from "./styles";
 
 /** BB's settings-like rows, reachable from the footer menu. */
 const BB_ROWS = /plugins|skills|automations/i;
 
-function Divider({ label, action }: { label: string; action?: ReactNode }) {
+/** A section's label and rule; dropping a tab on it puts the tab first in that section. */
+function Divider({ label, zone, action }: { label: string; zone: TabZone; action?: ReactNode }) {
+  const drag = useTabDragState();
+  const target = drag?.target;
+  const here = !!target && !target.beside && target.zoneKey === zone;
   return (
-    <div className="group/divider flex h-7 items-center gap-2 px-2.5 pt-2 text-xs font-medium text-subtle-foreground">
+    <div
+      data-tab-drop-zone=""
+      data-zone={zone}
+      data-at="start"
+      className={cn("group/divider flex h-7 items-center gap-2 rounded-md px-2.5 pt-2 text-xs font-medium text-subtle-foreground", here && "text-foreground")}
+    >
       <span>{label}</span>
-      <span aria-hidden className="h-px flex-1 bg-border" />
+      <span aria-hidden className={cn("h-px flex-1 bg-border", here && "h-0.5 bg-ring")} />
       {action}
     </div>
   );
 }
 
+/** Follows the pointer while a tab is dragged inside the sidebar. */
+function DragGhost() {
+  const drag = useTabDragState();
+  if (!drag || drag.outside) return null;
+  return createPortal(
+    <div {...PORTAL_SCOPE} className="pointer-events-none fixed z-50 max-w-56 truncate rounded-lg bg-popover px-2.5 py-1.5 text-sm text-popover-foreground shadow-lg ring-1 ring-border" style={{ left: drag.x + 12, top: drag.y + 8 }}>
+      {drag.title}
+    </div>,
+    document.body,
+  );
+}
+
 function FolderRow({ folder, onToggle, onRename, onDelete }: { folder: TabFolder; onToggle: () => void; onRename: () => void; onDelete: () => void }) {
+  const drag = useTabDragState();
+  const here = !!drag?.target && !drag.target.beside && drag.target.zoneKey === zoneKey("pinned", folder.id);
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <button type="button" onClick={onToggle} aria-expanded={folder.open} className={TAB}>
+        <button
+          type="button"
+          onClick={onToggle}
+          aria-expanded={folder.open}
+          data-tab-drop-zone=""
+          data-zone="pinned"
+          data-folder={folder.id}
+          data-at="end"
+          className={cn(TAB, here && "bg-sidebar-accent ring-1 ring-ring")}
+        >
           <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center text-subtle-foreground [&_svg]:size-4">
             <Icon name={folder.open ? "FolderOpen" : "Folder"} />
           </span>
@@ -137,11 +171,15 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
 
   const loose = tabs.pinned.filter((tab) => !tab.folderId);
   const folders = [...tabs.folders].sort((a, b) => a.position - b.position);
+  // While a tab is dragged, Pinned shows even when empty, so there's somewhere to pin it.
+  const dragging = useTabDragState() !== null;
 
   return (
     <div className="flex min-h-full flex-col px-2">
-      {loose.length || folders.length ? <Divider label="Pinned" /> : null}
+      {loose.length || folders.length || dragging ? <Divider label="Pinned" zone="pinned" /> : null}
       <div className="space-y-px">
+        {/* Loose tabs first, so dropping on "Pinned" lands right under it. */}
+        {loose.map((tab) => row(tab))}
         {folders.map((folder) => (
           <div key={folder.id} className="space-y-px">
             <FolderRow
@@ -153,24 +191,25 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
             {folder.open ? tabs.pinned.filter((tab) => tab.folderId === folder.id).map((tab) => row(tab, true)) : null}
           </div>
         ))}
-        {loose.map((tab) => row(tab))}
       </div>
 
       <Divider
         label="Today"
+        zone="today"
         action={tabs.today.length
           ? <button type="button" onClick={() => { for (const tab of tabs.today) actions.archive(tab.ref); }} className="rounded px-1 text-xs text-subtle-foreground opacity-0 hover:text-foreground focus-visible:opacity-100 group-hover/divider:opacity-100">Clear</button>
           : null}
       />
       <div className="space-y-px">
         {tabs.today.map((tab) => row(tab))}
-        <button type="button" onClick={() => openCommandBar()} className={cn(TAB, "text-muted-foreground")}>
+        <button type="button" onClick={() => openCommandBar()} data-tab-drop-zone="" data-zone="today" data-at="end" className={cn(TAB, "text-muted-foreground")}>
           <span aria-hidden className="inline-flex size-5 shrink-0 items-center justify-center [&_svg]:size-4"><Icon name="Plus" /></span>
           <span className="min-w-0 flex-1 truncate">New tab</span>
         </button>
       </div>
 
       <SpacesFooter />
+      <DragGhost />
     </div>
   );
 }

@@ -4,6 +4,7 @@
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import {
   experimental_useSidebarThreadActions as useSidebarThreadActions,
+  experimental_useSidebarThreadSplit as useSidebarThreadSplit,
   useBbContext,
   type ExperimentalSidebarNavigationProps,
 } from "@get-bb/plugin-sdk/app";
@@ -13,7 +14,8 @@ import { CommandBar, openCommandBar } from "./CommandBar";
 import { useLocationHref } from "./location";
 import { useSpaces } from "./model";
 import { Hint } from "./ProviderBadge";
-import { TabGlyph, openTab } from "./TabRow";
+import { DropLine, TabGlyph, openTab } from "./TabRow";
+import { useTabDrag, useTabDragState, type DropTarget } from "./tabDrag";
 import { isTabActive, useTabActions, useTabs, type ShownTab } from "./tabs";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE, cn } from "./styles";
 
@@ -37,17 +39,30 @@ function AddressBar({ where }: { where: string | null }) {
   );
 }
 
-function EssentialTile({ tab, active, onRemove }: { tab: ShownTab; active: boolean; onRemove: () => void }) {
+function EssentialTile({ tab, active, onRemove, onDrop }: { tab: ShownTab; active: boolean; onRemove: () => void; onDrop: (target: DropTarget) => void }) {
   const threadActions = useSidebarThreadActions();
+  const split = useSidebarThreadSplit(tab.thread?.id ?? "");
+  const startDrag = useTabDrag(tab, onDrop, split.splitProps.onPointerDown);
+  const drag = useTabDragState();
+  const beside = drag?.target?.beside?.ref === tab.ref ? drag.target.beside : null;
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <div className="relative">
+        <div
+          className={cn("relative", drag?.ref === tab.ref && "opacity-40")}
+          data-tab-drop-row=""
+          data-ref={tab.ref}
+          data-zone="essential"
+          data-folder=""
+          data-axis="x"
+        >
+          {beside ? <DropLine after={beside.after} axis="x" /> : null}
           <Hint label={tab.title}>
             <button
               type="button"
               aria-label={[tab.title, tab.badge ? `${tab.badge} waiting` : null, tab.needsYou ? "needs you" : null, tab.unread ? "unread" : null].filter(Boolean).join(", ")}
               aria-current={active ? "page" : undefined}
+              onPointerDown={startDrag}
               onClick={(event) => openTab(tab, threadActions, { split: event.metaKey || event.ctrlKey })}
               className={cn(
                 "flex h-12 w-full items-center justify-center rounded-lg bg-sidebar-accent/70 transition-colors hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring",
@@ -104,6 +119,7 @@ export function OfficeTop(_props: ExperimentalSidebarNavigationProps) {
   const locationHref = useLocationHref();
   const tabs = useTabs(spaceId);
   const actions = useTabActions(spaceId, tabs.refresh);
+  const drag = useTabDragState();
 
   const all = [...tabs.essentials, ...tabs.pinned, ...tabs.today];
   const here = all.find((tab) => isTabActive(tab, threadId, locationHref));
@@ -113,12 +129,28 @@ export function OfficeTop(_props: ExperimentalSidebarNavigationProps) {
     <nav ref={nav} aria-label="Office" className="shrink-0 space-y-2 px-2 pt-1 pb-1">
       <AddressBar where={where} />
       {tabs.essentials.length
-        ? <div className="grid grid-cols-4 gap-1.5">
+        ? <div className="grid grid-cols-4 gap-1.5" data-tab-drop-zone="" data-zone="essential" data-at="end">
             {tabs.essentials.map((tab) => (
-              <EssentialTile key={tab.ref} tab={tab} active={isTabActive(tab, threadId, locationHref)} onRemove={() => actions.move(tab.ref, "pinned")} />
+              <EssentialTile
+                key={tab.ref}
+                tab={tab}
+                active={isTabActive(tab, threadId, locationHref)}
+                onRemove={() => actions.move(tab.ref, "pinned")}
+                onDrop={(target) => actions.move(tab.ref, target.zone, { folderId: target.folderId, index: target.index })}
+              />
             ))}
           </div>
-        : null}
+        : drag && !drag.outside
+          // Nothing in Essentials yet: somewhere to drop the first one.
+          ? <div
+              data-tab-drop-zone=""
+              data-zone="essential"
+              data-at="end"
+              className={cn("flex h-12 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground", drag.target?.zoneKey === "essential" && "border-ring text-foreground")}
+            >
+              Drop here to add to Essentials
+            </div>
+          : null}
       <CommandBar spaceId={spaceId} tabs={all} />
     </nav>
   );

@@ -1,13 +1,17 @@
 // One tab: a big row with the thing's face or icon, its title, its state on
 // the right, and × on hover to archive it. Right-click for everything else.
 // Archiving a tab only takes it out of the sidebar; the thread or page stays.
+// Drag a tab to reorder it or move it between sections (tabDrag.ts); drag a
+// thread out to the page to open it in a split.
 import * as ContextMenu from "@radix-ui/react-context-menu";
 import {
   experimental_useSidebarThreadActions as useSidebarThreadActions,
+  experimental_useSidebarThreadSplit as useSidebarThreadSplit,
 } from "@get-bb/plugin-sdk/app";
 import { Icon, copyReferenceWithToast, openAppPath } from "@bb-studio/kit/app";
-import { useState, type ReactNode } from "react";
+import { useCallback, useState, type ReactNode } from "react";
 import { RUNNING } from "./activeWork";
+import { useTabDrag, useTabDragState, type DropTarget } from "./tabDrag";
 import { Face } from "./Face";
 import { externalAgentName } from "./external";
 import { useCall } from "./model";
@@ -75,7 +79,7 @@ export function openTab(tab: ShownTab, threadActions: ReturnType<typeof useSideb
 }
 
 export interface TabMoves {
-  move: (ref: string, zone: TabZone, options?: { folderId?: string | null }) => void;
+  move: (ref: string, zone: TabZone, options?: { folderId?: string | null; index?: number }) => void;
   archive: (ref: string) => void;
   newFolder: (name: string) => void;
 }
@@ -135,6 +139,19 @@ function useTabMenu(tab: ShownTab, folders: readonly TabFolder[], moves: TabMove
   return { groups, folderMoves };
 }
 
+/** Where a dragged tab will land: a line on the row's top or bottom edge. */
+export function DropLine({ after, axis = "y" }: { after: boolean; axis?: "x" | "y" }) {
+  return (
+    <span
+      aria-hidden
+      className={cn(
+        "pointer-events-none absolute z-10 rounded-full bg-ring",
+        axis === "y" ? cn("inset-x-1 h-0.5", after ? "-bottom-px" : "-top-px") : cn("inset-y-1 w-0.5", after ? "-right-1" : "-left-1"),
+      )}
+    />
+  );
+}
+
 export function TabRow({ tab, active, folders, moves, indent, onOpen, trailing }: {
   tab: ShownTab;
   active: boolean;
@@ -146,13 +163,28 @@ export function TabRow({ tab, active, folders, moves, indent, onOpen, trailing }
 }) {
   const [renaming, setRenaming] = useState(false);
   const { groups, folderMoves } = useTabMenu(tab, folders, moves, () => setRenaming(true));
+  const split = useSidebarThreadSplit(tab.thread?.id ?? "");
+  const drop = useCallback((target: DropTarget) => moves.move(tab.ref, target.zone, { folderId: target.folderId, index: target.index }), [moves, tab.ref]);
+  const startDrag = useTabDrag(tab, drop, split.splitProps.onPointerDown);
+  const drag = useTabDragState();
+  const dragging = drag?.ref === tab.ref;
+  const beside = drag?.target?.beside?.ref === tab.ref ? drag.target.beside : null;
   if (renaming && tab.thread) return <RenameField thread={tab.thread} onDone={() => setRenaming(false)} className={cn("h-9 rounded-lg", indent ? "pl-8" : "pl-2.5")} />;
   return (
     <ContextMenu.Root>
       <ContextMenu.Trigger asChild>
-        <div className="group/tab relative">
+        <div
+          className={cn("group/tab relative", dragging && "opacity-40")}
+          data-tab-drop-row=""
+          data-ref={tab.ref}
+          data-zone={tab.zone}
+          data-folder={tab.folderId ?? ""}
+          data-axis="y"
+        >
+          {beside ? <DropLine after={beside.after} /> : null}
           <button
             type="button"
+            onPointerDown={startDrag}
             onClick={(event) => onOpen(tab, { split: event.metaKey || event.ctrlKey })}
             aria-current={active ? "page" : undefined}
             className={cn(TAB, indent && "pl-8", active && TAB_ACTIVE, "group-hover/tab:pr-9")}
