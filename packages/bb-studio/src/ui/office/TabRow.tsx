@@ -145,7 +145,7 @@ function useTabMenu(tab: ShownTab, folders: readonly TabFolder[], moves: TabMove
       },
       { id: "folder", label: "Move to folder", icon: "Folder", children: folderMoves },
       ...(context.spaces.length
-        ? [{ id: "space", label: "Move to Space", icon: "ArrowRightLeft", children: context.spaces.map((space) => ({ id: space.id, label: space.icon ? `${space.icon} ${space.name}` : space.name, icon: "Layers", run: () => moves.moveToSpace(tab.ref, space.id) })) }]
+        ? [{ id: "space", label: "Move to Space", icon: "MoveTo", children: context.spaces.map((space) => ({ id: space.id, label: space.icon ? `${space.icon} ${space.name}` : space.name, icon: "Layers", run: () => moves.moveToSpace(tab.ref, space.id) })) }]
         : []),
     ],
     [
@@ -158,7 +158,7 @@ function useTabMenu(tab: ShownTab, folders: readonly TabFolder[], moves: TabMove
       {
         id: "copy",
         label: "Copy link",
-        icon: "Link",
+        icon: "Copy",
         run: () => {
           if (thread) void navigator.clipboard.writeText(`@thread:${thread.id}`);
           else if (tab.href) copyReferenceWithToast({ href: tab.href, title: tab.title, ...(tab.icon && tab.kind === "item" ? { icon: tab.icon } : {}) });
@@ -168,8 +168,8 @@ function useTabMenu(tab: ShownTab, folders: readonly TabFolder[], moves: TabMove
     [
       // Closing a tab archives it: it leaves the sidebar, and ⌘⇧T or the address bar brings it back.
       { id: "close", label: "Close tab", icon: "X", run: () => moves.archive(tab.ref) },
-      ...(below.length ? [{ id: "below", label: "Close tabs below", icon: "ArrowDownToLine", run: () => moves.closeMany(below) }] : []),
-      ...(others.length ? [{ id: "others", label: "Close other tabs", icon: "CopyX", run: () => moves.closeMany(others) }] : []),
+      ...(below.length ? [{ id: "below", label: "Close tabs below", icon: "ChevronsDown", run: () => moves.closeMany(below) }] : []),
+      ...(others.length ? [{ id: "others", label: "Close other tabs", icon: "CircleX", run: () => moves.closeMany(others) }] : []),
     ],
     [
       ...(thread

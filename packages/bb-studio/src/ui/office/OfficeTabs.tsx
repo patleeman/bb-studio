@@ -206,7 +206,7 @@ function SpaceMarkButton({ space, isCurrent, waiting, order, onChanged }: { spac
         <ContextMenu.Portal>
           <ContextMenu.Content {...PORTAL_SCOPE} className={MENU} onCloseAutoFocus={(event) => event.preventDefault()}>
             <ContextMenu.Item onSelect={() => setEditing("name")} className={MENU_ITEM}><Icon name="Edit" aria-hidden />Change name…</ContextMenu.Item>
-            <ContextMenu.Item onSelect={() => setEditing("icon")} className={MENU_ITEM}><Icon name="Smile" aria-hidden />Change icon…</ContextMenu.Item>
+            <ContextMenu.Item onSelect={() => setEditing("icon")} className={MENU_ITEM}><Icon name="Square" aria-hidden />Change icon…</ContextMenu.Item>
             <ContextMenu.Sub>
               <ContextMenu.SubTrigger className={MENU_ITEM}><Icon name="Palette" aria-hidden />Color<Icon name="ChevronRight" aria-hidden className="ml-auto" /></ContextMenu.SubTrigger>
               <ContextMenu.Portal>
@@ -309,7 +309,7 @@ function SpacesFooter() {
         <Menu.Portal>
           <Menu.Content {...PORTAL_SCOPE} side="top" align="end" className={MENU}>
             <Menu.Item onSelect={() => openOffice("settings")} className={MENU_ITEM}><Icon name="SlidersHorizontal" aria-hidden />{current ? `${current.name} settings` : "Space settings"}</Menu.Item>
-            <Menu.Item onSelect={() => openOffice("team/new")} className={MENU_ITEM}><Icon name="UserPlus" aria-hidden />Add a bot</Menu.Item>
+            <Menu.Item onSelect={() => openOffice("team/new")} className={MENU_ITEM}><Icon name="UserRoundPlus" aria-hidden />Add a bot</Menu.Item>
             <Menu.Item onSelect={() => openOffice("spaces/new")} className={MENU_ITEM}><Icon name="Plus" aria-hidden />New space</Menu.Item>
             <Menu.Separator className={MENU_SEPARATOR} />
             {/* Space routing, like Arc's: open things in the Space they belong to. */}
@@ -352,7 +352,17 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
   // A folder being named in place: a new one (filing `withRef` when set), or a rename.
   const [naming, setNaming] = useState<{ withRef?: string } | null>(null);
   const [renaming, setRenaming] = useState<string | null>(null);
-  const moves: TabMoves = useMemo(() => ({ ...actions, newFolder: (withRef: string) => setNaming({ withRef }) }), [actions]);
+  // A split you separate stays separated while those panes are still open.
+  const [separated, setSeparated] = useState<string | null>(null);
+  const moves: TabMoves = useMemo(() => ({
+    ...actions,
+    newFolder: (withRef: string) => setNaming({ withRef }),
+    separate: (ref: string) => {
+      const split = [...tabs.essentials, ...tabs.pinned, ...tabs.today].find((tab) => tab.ref === ref);
+      if (split?.members) setSeparated(split.members.map((member) => member.ref).join(","));
+      actions.separate(ref);
+    },
+  }), [actions, tabs.essentials, tabs.pinned, tabs.today]);
   const open = (tab: ShownTab, options: { split: boolean }) => { openTab(tab, threadActions, options); onNavigate(); };
   // Threads open side by side become one split tab, as in Arc; it stays after
   // the split closes, so you can come back to the pair.
@@ -364,12 +374,12 @@ export function OfficeTabs({ activeThreadId, onNavigate }: PluginThreadListProps
   const paneKey = paneRefs.join(",");
   const splitKeys = useMemo(() => new Set(all.flatMap((tab) => (tab.members ? [tab.members.map((member) => member.ref).join(",")] : []))), [all]);
   useEffect(() => {
-    if (paneRefs.length < 2 || splitKeys.has(paneKey)) return;
+    if (paneRefs.length < 2 || splitKeys.has(paneKey) || paneKey === separated) return;
     // Wait for the layout to settle: a drag passes through several.
     const timer = setTimeout(() => actions.keepSplit(paneRefs), 800);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps -- paneKey stands for paneRefs
-  }, [paneKey, splitKeys, actions]);
+  }, [paneKey, splitKeys, separated, actions]);
 
   // ⌘⇧T, and Reopen closed tab in the menus: the tab closed last comes back and opens.
   const reopen = useCallback(() => {

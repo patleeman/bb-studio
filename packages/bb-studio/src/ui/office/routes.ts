@@ -15,7 +15,7 @@ export const OFFICE_NAV_ITEM_ID = `${OFFICE_PLUGIN_ID}/office`;
 /** Sub-path heads that have their own panel, and the panel's path and title. */
 export const OFFICE_PANELS = {
   inbox: { path: "office-inbox", title: "Inbox", icon: "studio/inbox" },
-  team: { path: "office-team", title: "Team", icon: "Users" },
+  team: { path: "office-team", title: "Team", icon: "UserRound" },
   settings: { path: "office-settings", title: "Space settings", icon: "SlidersHorizontal" },
   spaces: { path: "office-spaces", title: "New space", icon: "Plus" },
 } as const;

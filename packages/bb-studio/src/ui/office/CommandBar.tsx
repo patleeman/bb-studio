@@ -110,7 +110,7 @@ function Bar({ spaceId, tabs, mode, onDone }: { spaceId: string | null; tabs: re
       { key: "home", group: "Actions", glyph: <IconGlyph name="studio/home" />, label: "Home", run: () => { onDone(); openOffice(""); } },
       { key: "library", group: "Actions", glyph: <IconGlyph name="Layers" />, label: "Library", run: () => { onDone(); openAppPath(studioPath(), { main: true }); } },
       { key: "archived", group: "Actions", glyph: <IconGlyph name="Archive" />, label: "Archived tabs", run: () => { onDone(); setTimeout(() => openCommandBar("archived"), 0); } },
-      { key: "add-bot", group: "Actions", glyph: <IconGlyph name="UserPlus" />, label: "Add a bot", run: () => { onDone(); openOffice("team/new"); } },
+      { key: "add-bot", group: "Actions", glyph: <IconGlyph name="UserRoundPlus" />, label: "Add a bot", run: () => { onDone(); openOffice("team/new"); } },
       { key: "settings", group: "Actions", glyph: <IconGlyph name="SlidersHorizontal" />, label: "Space settings", run: () => { onDone(); openOffice("settings"); } },
     ].filter((row) => !q || row.key === "new-thread" || matches(row.label, q));
     if (!q) {
