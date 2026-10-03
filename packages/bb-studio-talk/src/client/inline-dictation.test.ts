@@ -61,6 +61,16 @@ describe("inline dictation placement", () => {
     dock.remove(); expect(source.innerHTML).toBe(before);
   });
 
+  it("uses the global controls when a compact composer clips the inline dock", () => {
+    const source = composer(); source.style.overflow = "hidden";
+    vi.mocked(HTMLElement.prototype.getBoundingClientRect).mockImplementation(function (this: HTMLElement) {
+      return this === source ? { ...rect, bottom: 620, height: 20 } : rect;
+    });
+    expect(inlineMic(source)).toBeNull();
+    source.style.overflow = "visible";
+    expect(inlineMic(source)).toBe(source.querySelector("button"));
+  });
+
   it("pops out on navigation and redocks when the source input remounts", async () => {
     const source = composer(); vi.mocked(talk.dictationComposer).mockReturnValue(source);
     await render(true); expect(source.querySelector("[data-talk-inline-host]")).not.toBeNull();

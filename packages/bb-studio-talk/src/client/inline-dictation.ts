@@ -19,7 +19,14 @@ export function inlineMic(composer: HTMLElement | null): HTMLButtonElement | nul
   const anchor = mic.hasAttribute("data-talk-inline-mic") ? mic.parentElement?.querySelector<HTMLElement>("[data-talk-inline-host]") : mic;
   if (!anchor) return null;
   const rect = anchor.getBoundingClientRect();
-  return rect.width > 0 && rect.height > 0 && rect.bottom > 0 && rect.top < innerHeight && rect.right > 0 && rect.left < innerWidth ? mic : null;
+  if (rect.width <= 0 || rect.height <= 0 || rect.top < 0 || rect.bottom > innerHeight || rect.left < 0 || rect.right > innerWidth) return null;
+  for (let parent = anchor.parentElement; parent; parent = parent.parentElement) {
+    const style = getComputedStyle(parent);
+    const bounds = parent.getBoundingClientRect();
+    if (/hidden|clip|auto|scroll/.test(style.overflowX || style.overflow) && (rect.left < bounds.left || rect.right > bounds.right)) return null;
+    if (/hidden|clip|auto|scroll/.test(style.overflowY || style.overflow) && (rect.top < bounds.top || rect.bottom > bounds.bottom)) return null;
+  }
+  return mic;
 }
 
 /** A portal beside the mic; removing it restores the native toolbar exactly. */
