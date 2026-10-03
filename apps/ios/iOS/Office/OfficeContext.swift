@@ -179,6 +179,27 @@ struct SpaceSwitcher: View {
     @Environment(OfficeContext.self) private var office
     @EnvironmentObject private var app: AppModel
     @State private var creating = false
+    @State private var renaming = false
+    @State private var deleting = false
+    @State private var draftName = ""
+    @State private var draftIcon = ""
+    @AppStorage(OfficeRouting.key) private var routing = OfficeRouting.own.rawValue
+
+    /// Arc's Space colors, by name, for the color menu.
+    private static let colors: [(name: String, hex: String)] = [
+        ("Blue", "#3b82f6"), ("Violet", "#8b5cf6"), ("Pink", "#ec4899"), ("Orange", "#f97316"), ("Green", "#22c55e"),
+        ("Teal", "#14b8a6"), ("Yellow", "#eab308"), ("Red", "#ef4444"), ("Slate", "#64748b"),
+    ]
+
+    private func update(_ input: [String: JSONValue]) {
+        guard let space = office.currentSpace else { return }
+        Task {
+            var body = input
+            body["spaceId"] = .string(space.id)
+            let _: JSONValue? = try? await app.client.rpc("studio", Studio.Method.space_update, .object(body))
+            await office.spaces.refresh()
+        }
+    }
 
     var body: some View {
         Menu {
@@ -195,8 +216,33 @@ struct SpaceSwitcher: View {
                     }
                 }
             }
+            if let space = office.currentSpace {
+                Section(space.name) {
+                    Button {
+                        draftName = space.name
+                        draftIcon = space.icon ?? ""
+                        renaming = true
+                    } label: { Label("Change Name and Icon…", systemImage: "pencil") }
+                    Menu {
+                        ForEach(Self.colors, id: \.hex) { color in
+                            Button {
+                                update(["color": .string(color.hex)])
+                            } label: {
+                                if space.color == color.hex { Label(color.name, systemImage: "checkmark") } else { Text(color.name) }
+                            }
+                        }
+                    } label: { Label("Color", systemImage: "paintpalette") }
+                    if !space.isDefault {
+                        Button(role: .destructive) { deleting = true } label: { Label("Delete Space…", systemImage: "trash") }
+                    }
+                }
+            }
             Button { creating = true } label: { Label("New Space", systemImage: "plus") }
             Button { app.tab = .settings } label: { Label("Space Settings", systemImage: "gearshape") }
+            // Space routing, as in Arc: something new opens in the Space it belongs to.
+            Toggle(isOn: Binding(get: { routing == OfficeRouting.own.rawValue }, set: { routing = ($0 ? OfficeRouting.own : .current).rawValue })) {
+                Label("Open Things in Their Own Space", systemImage: "arrow.triangle.branch")
+            }
         } label: {
             HStack(spacing: 6) {
                 if let space = office.currentSpace { SpaceMark(space: space, size: 20) }
@@ -211,6 +257,28 @@ struct SpaceSwitcher: View {
             Text(office.currentSpace?.name ?? "Spaces")
         }
         .sheet(isPresented: $creating) { NewSpaceSheet() }
+        .alert("Change Space", isPresented: $renaming) {
+            TextField("Name", text: $draftName)
+            TextField("Icon (emoji)", text: $draftIcon)
+            Button("Cancel", role: .cancel) {}
+            Button("Save") {
+                let name = draftName.trimmingCharacters(in: .whitespaces)
+                let icon = draftIcon.trimmingCharacters(in: .whitespaces)
+                var input: [String: JSONValue] = ["icon": icon.isEmpty ? .null : .string(icon)]
+                if !name.isEmpty { input["name"] = .string(name) }
+                update(input)
+            }
+        }
+        .confirmationDialog("Delete \(office.currentSpace?.name ?? "this Space")?", isPresented: $deleting, titleVisibility: .visible) {
+            Button("Delete Space", role: .destructive) {
+                guard let space = office.currentSpace else { return }
+                Task {
+                    try? await app.client.officeDeleteSpace(space.id)
+                    await office.spaces.refresh()
+                    if let fallback = office.spaces.spaces.first(where: \.isDefault) { await office.select(fallback.id) }
+                }
+            }
+        } message: { Text("Its folders move to your default Space.") }
     }
 }
 

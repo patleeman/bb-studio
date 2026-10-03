@@ -32,6 +32,11 @@ struct TabsTab: View {
                         Button { app.push(.officeTeam) } label: { Label("Team", systemImage: "person.2") }
                         Button { app.push(.studioCollection) } label: { Label("Library", systemImage: "square.stack") }
                         Button { folderName = ""; namingFolder = true } label: { Label("New Folder", systemImage: "folder.badge.plus") }
+                        Button {
+                            Task {
+                                if let tab = await office.tabs?.reopen() { openTab(tab, app: app) }
+                            }
+                        } label: { Label("Reopen Closed Tab", systemImage: "arrow.uturn.backward") }
                     } label: {
                         Image(systemName: "plus")
                     }
@@ -40,7 +45,6 @@ struct TabsTab: View {
                 }
             }
             .navigationBarTitleDisplayMode(.inline)
-            .searchable(text: $query, prompt: "Search or open")
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             .alert("New Folder", isPresented: $namingFolder) {
                 TextField("Name", text: $folderName)
@@ -60,14 +64,18 @@ struct TabsTab: View {
 private struct TabsList: View {
     @EnvironmentObject private var app: AppModel
     @Environment(OfficeContext.self) private var office
-    @Environment(\.isSearching) private var isSearching
+    @FocusState private var searchFocused: Bool
     let store: TabsStore
     @Binding var query: String
 
     var body: some View {
         List {
-            if isSearching || !query.isEmpty {
-                SearchResults(store: store, query: query)
+            GrowingSearchField(text: $query, prompt: "Search or open", label: "Search or open",
+                               identifier: "officeTabsSearch", isFocused: $searchFocused, onSubmit: submitSearch)
+                .listRowInsets(EdgeInsets(top: 0, leading: 0, bottom: 0, trailing: 0))
+                .listRowBackground(Color.clear)
+            if searchFocused || !query.isEmpty {
+                SearchResults(store: store, query: query, endSearch: endSearch)
             } else {
                 if let error = store.error, store.today.isEmpty, store.essentials.isEmpty {
                     Section { ConnectionBanner(message: error) { await store.refresh() } }
@@ -87,15 +95,9 @@ private struct TabsList: View {
                     ForEach(store.folders.sorted { $0.position < $1.position }) { folder in
                         FolderRows(store: store, folder: folder)
                     }
-                    if loose.isEmpty, store.folders.isEmpty, !store.isLoading {
-                        Text("Drag tabs here to keep them.")
-                            .font(.subheadline)
-                            .foregroundStyle(.secondary)
-                            .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .pinned) }
-                    }
                 } header: {
                     Text("Pinned").foregroundStyle(Color(.label))
-                        .frame(maxWidth: .infinity, alignment: .leading)
+                        .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                         .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .pinned) }
                 }
                 Section {
@@ -103,22 +105,27 @@ private struct TabsList: View {
                     if store.today.isEmpty, !store.isLoading {
                         Text("What you open shows up here, and is archived after a few days.")
                             .font(.subheadline)
-                            .foregroundStyle(.secondary)
+                            .foregroundStyle(Color(.label))
                             .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .today) }
                     }
                 } header: {
-                    HStack {
+                    HStack(alignment: .firstTextBaseline) {
                         Text("Today").foregroundStyle(Color(.label))
                             .frame(maxWidth: .infinity, alignment: .leading)
                             .dropDestination(for: String.self) { refs, _ in drop(refs, zone: .today) }
                         Spacer()
                         if !store.today.isEmpty {
-                            Button("Clear") { Task { await store.clearToday() } }
+                            Button { Task { await store.clearToday() } } label: {
+                                Text("Clear")
+                                    .frame(minWidth: 44, minHeight: 44, alignment: .trailing)
+                                    .contentShape(Rectangle())
+                            }
                                 .font(.subheadline)
                                 .textCase(nil)
                                 .accessibilityLabel("Archive every Today tab")
                         }
                     }
+                    .frame(minHeight: 44)
                 }
             }
         }
@@ -140,6 +147,24 @@ private struct TabsList: View {
         guard let ref = refs.first else { return false }
         Task { await store.drop(ref, zone: zone) }
         return true
+    }
+
+    private func endSearch() {
+        query = ""
+        searchFocused = false
+    }
+
+    private func submitSearch() {
+        let submitted = query
+        let trimmed = submitted.trimmingCharacters(in: .whitespacesAndNewlines)
+        Task {
+            let matches = trimmed.isEmpty
+                ? try? await store.archived(query: nil)
+                : try? await store.search(trimmed)
+            guard query == submitted, let first = matches?.first else { return }
+            endSearch()
+            openTab(first, app: app)
+        }
     }
 }
 
@@ -165,6 +190,31 @@ extension TabsStore {
         let atEnd = zone == .essential || folderId != nil
         let index = target.flatMap { others.firstIndex(of: $0) } ?? (atEnd ? others.count : 0)
         await move(ref, to: zone, folderId: folderId, index: index)
+    }
+}
+
+/// A split tab's tabs side by side, as Arc draws them; each half opens its own.
+private struct SplitHalves: View {
+    @EnvironmentObject private var app: AppModel
+    let store: TabsStore
+    let members: [OfficeTab]
+
+    var body: some View {
+        HStack(spacing: 8) {
+            ForEach(Array(members.enumerated()), id: \.element.ref) { index, member in
+                if index > 0 { Divider().frame(height: 18) }
+                Button { openTab(member, app: app) } label: {
+                    HStack(spacing: 6) {
+                        TabGlyph(tab: member, title: store.title(for: member), size: 20)
+                        Text(store.title(for: member)).foregroundStyle(Color(.label)).lineLimit(1)
+                    }
+                    .frame(maxWidth: .infinity, alignment: .leading)
+                    .contentShape(Rectangle())
+                }
+                .buttonStyle(.borderless)
+                .accessibilityLabel("Open \(store.title(for: member))")
+            }
+        }
     }
 }
 
@@ -201,8 +251,11 @@ private struct TabDragPreview: View {
 
 private struct EssentialsGrid: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let store: TabsStore
-    private let columns = Array(repeating: GridItem(.flexible(), spacing: 10), count: 4)
+    private var columns: [GridItem] {
+        Array(repeating: GridItem(.flexible(), spacing: 10), count: dynamicTypeSize.isAccessibilitySize ? 2 : 4)
+    }
 
     var body: some View {
         LazyVGrid(columns: columns, spacing: 10) {
@@ -234,12 +287,14 @@ private struct EssentialsGrid: View {
 private struct EssentialTile: View {
     let tab: OfficeTab
     let title: String
+    @ScaledMetric(relativeTo: .title2) private var tileHeight: CGFloat = 60
+    @ScaledMetric(relativeTo: .title2) private var glyphSize: CGFloat = 30
 
     var body: some View {
         RoundedRectangle(cornerRadius: 14, style: .continuous)
             .fill(Color(.secondarySystemGroupedBackground))
-            .frame(height: 60)
-            .overlay { TabGlyph(tab: tab, title: title, size: 30) }
+            .frame(height: tileHeight)
+            .overlay { TabGlyph(tab: tab, title: title, size: min(glyphSize, 60)) }
             .overlay(alignment: .topTrailing) {
                 if let badge = tab.badge, badge > 0 {
                     Text("\(badge)")
@@ -299,6 +354,8 @@ struct TabGlyph: View {
 
 private struct TabRow: View {
     @EnvironmentObject private var app: AppModel
+    @Environment(OfficeContext.self) private var office
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let store: TabsStore
     let tab: OfficeTab
     @State private var namingFolder = false
@@ -308,11 +365,17 @@ private struct TabRow: View {
         let title = store.title(for: tab)
         Button { openTab(tab, app: app) } label: {
             HStack(spacing: 12) {
+                if let members = tab.members {
+                    SplitHalves(store: store, members: members)
+                } else {
                 TabGlyph(tab: tab, title: title)
                 Text(title)
-                    .fontWeight(tab.unread == true ? .semibold : .regular)
+                    .font(.body.weight(tab.unread == true ? .semibold : .regular))
                     .foregroundStyle(Color(.label))
-                    .lineLimit(2)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    .fixedSize(horizontal: false, vertical: true)
+                    .accessibilityIdentifier("officeTabTitle:\(tab.ref)")
+                }
                 Spacer(minLength: 4)
                 if tab.needsYou == true {
                     Circle().fill(Color.orange).frame(width: 8, height: 8).accessibilityLabel("Needs you")
@@ -330,7 +393,7 @@ private struct TabRow: View {
             return true
         }
         .swipeActions(edge: .trailing) {
-            Button { Task { await store.archive(tab.ref) } } label: { Label("Archive", systemImage: "archivebox") }
+            Button { Task { await store.archive(tab.ref) } } label: { Label("Close", systemImage: "xmark") }
                 .tint(.gray)
         }
         .swipeActions(edge: .leading) {
@@ -343,7 +406,13 @@ private struct TabRow: View {
             Button { Task { await store.move(tab.ref, to: tab.zone == .pinned ? .today : .pinned) } } label: {
                 Label(tab.zone == .pinned ? "Unpin" : "Pin", systemImage: tab.zone == .pinned ? "pin.slash" : "pin")
             }
-            Button { Task { await store.move(tab.ref, to: .essential) } } label: { Label("Add to Essentials", systemImage: "star") }
+            if tab.members != nil {
+                Button { Task { await store.separate(tab.ref) } } label: { Label("Separate Tabs", systemImage: "rectangle.split.2x1.slash") }
+            }
+            if tab.zone != .essential {
+                Button { Task { await store.move(tab.ref, to: .essential) } } label: { Label("Add to Essentials (\(store.essentials.count)/8)", systemImage: "star") }
+                    .disabled(store.essentials.count >= 8)
+            }
             Menu {
                 ForEach(store.folders.filter { $0.id != tab.folderId }) { folder in
                     Button(folder.name) { Task { await store.move(tab.ref, to: .pinned, folderId: folder.id) } }
@@ -353,9 +422,26 @@ private struct TabRow: View {
                 }
                 Button { folderName = ""; namingFolder = true } label: { Label("New Folder…", systemImage: "folder.badge.plus") }
             } label: { Label("Move to Folder", systemImage: "folder") }
+            let otherSpaces = office.spaces.spaces.filter { $0.id != store.spaceId }
+            if !otherSpaces.isEmpty {
+                Menu {
+                    ForEach(otherSpaces) { space in
+                        Button(space.icon.map { "\($0) \(space.name)" } ?? space.name) { Task { await store.moveToSpace(tab.ref, to: space.id) } }
+                    }
+                } label: { Label("Move to Space", systemImage: "arrow.left.arrow.right") }
+            }
             CopyLinkButton(tab: tab, title: title)
             Divider()
-            Button { Task { await store.archive(tab.ref) } } label: { Label("Archive Tab", systemImage: "archivebox") }
+            let siblings = (tab.zone == .today ? store.today : store.pinned.filter { $0.folderId == tab.folderId }).map(\.ref)
+            let below = siblings.firstIndex(of: tab.ref).map { Array(siblings[($0 + 1)...]) } ?? []
+            let others = siblings.filter { $0 != tab.ref }
+            Button { Task { await store.archive(tab.ref) } } label: { Label("Close Tab", systemImage: "xmark") }
+            if !below.isEmpty {
+                Button { Task { await store.closeMany(below) } } label: { Label("Close Tabs Below", systemImage: "chevron.down.2") }
+            }
+            if !others.isEmpty {
+                Button { Task { await store.closeMany(others) } } label: { Label("Close Other Tabs", systemImage: "xmark.circle") }
+            }
         }
         .alert("New Folder", isPresented: $namingFolder) {
             TextField("Name", text: $folderName)
@@ -421,9 +507,9 @@ private struct CopyLinkButton: View {
 
 private struct SearchResults: View {
     @EnvironmentObject private var app: AppModel
-    @Environment(\.dismissSearch) private var dismissSearch
     let store: TabsStore
     let query: String
+    var endSearch: () -> Void
     @State private var results: [OfficeTab] = []
     @State private var archived: [OfficeTab] = []
     @State private var failed: String?
@@ -432,7 +518,7 @@ private struct SearchResults: View {
         let trimmed = query.trimmingCharacters(in: .whitespaces)
         Section {
             Button {
-                dismissSearch()
+                endSearch()
                 app.newThread(text: trimmed)
             } label: {
                 Label(trimmed.isEmpty ? "New Thread" : "New Thread: “\(trimmed)”", systemImage: "square.and.pencil")
@@ -470,7 +556,7 @@ private struct SearchResults: View {
     private func resultRow(_ tab: OfficeTab) -> some View {
         let title = store.title(for: tab)
         return Button {
-            dismissSearch()
+            endSearch()
             openTab(tab, app: app)
         } label: {
             HStack(spacing: 12) {
@@ -480,6 +566,7 @@ private struct SearchResults: View {
                 Text(detail(tab)).font(.caption).foregroundStyle(Color(.secondaryLabel))
             }
         }
+        .accessibilityIdentifier("officeSearchResult:\(tab.ref)")
     }
 
     private func detail(_ tab: OfficeTab) -> String {

@@ -4,6 +4,13 @@ struct RootView: View {
     @EnvironmentObject private var model: AppModel
     @State private var office = OfficeContext(client: AppModel.shared.client)
 
+    /// Whatever opens joins Today; something new from another Space opens
+    /// there, and the app follows it (Space routing).
+    private func noteOpened(_ route: Route) async {
+        guard let landed = await office.tabs?.noteOpened(route, client: model.client) else { return }
+        await office.select(landed)
+    }
+
     var body: some View {
         TabView(selection: $model.tab) {
             OfficeInboxTab()
@@ -37,10 +44,10 @@ struct RootView: View {
         .onDisappear { office.stopObserving() }
         // Whatever you open, in either stack, joins Today (docs/office-tabs.md).
         .onChange(of: model.path.last) { _, route in
-            if let route { Task { await office.tabs?.noteOpened(route) } }
+            if let route { Task { await noteOpened(route) } }
         }
         .onChange(of: model.inboxPath.last) { _, route in
-            if let route { Task { await office.tabs?.noteOpened(route) } }
+            if let route { Task { await noteOpened(route) } }
         }
         .sheet(
             isPresented: Binding(get: { model.newThreadDraft != nil }, set: { if !$0 { model.newThreadDraft = nil } })
