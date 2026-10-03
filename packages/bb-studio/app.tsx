@@ -16,7 +16,7 @@ import { ActivityPanel } from "./src/ui/HomePanel";
 function StudioRoot({ subPath }: { subPath: string }) {
   const path = subPath.replace(/^\/+|\/+$/g, "");
   // "collection" is the old address of the landing page.
-  return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path === "collection" ? "" : path} />;
+  return path === "activity" ? <ActivityPanel /> : <StudioPanel subPath={path} />;
 }
 
 export default definePluginApp((app) => {

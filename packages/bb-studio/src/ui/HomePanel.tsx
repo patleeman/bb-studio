@@ -1,4 +1,4 @@
-import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
+import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -103,7 +103,10 @@ export function ActivityPanel() {
         <button type="button" onClick={() => navigate.toPluginPanel("studio", { subPath: "" })} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><Icon name="ChevronLeft" className="size-4" /> Studio</button>
         <h1 className="text-2xl font-semibold">Activity</h1>
       </div>
-      <label className="flex items-center gap-2 text-sm">Period <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="rounded-md border border-border bg-background px-2 py-1"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select></label>
+      <div className="flex items-center gap-3">
+        <label className="flex items-center gap-2 text-sm">Period <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="rounded-md border border-border bg-background px-2 py-1"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select></label>
+        <ViewMoveMenu item={{ href: "/plugins/studio/studio/activity", title: "Activity" }} onBack={() => navigate.toPluginPanel("studio", { subPath: "" })} />
+      </div>
     </div>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     {!data && !error ? <p className="text-sm text-muted-foreground">Loading activity…</p> : null}
