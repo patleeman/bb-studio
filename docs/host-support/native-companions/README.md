@@ -1,6 +1,6 @@
 # Native companion host support
 
-[native-companions.patch](native-companions.patch) contains three verified
+[native-companions.patch](native-companions.patch) contains six verified
 BB core commits based on `get-bb/bb` commit `32efd2e3f`:
 
 - `bda6f61ef`: persistent plugin portals, dynamic native workbench tabs, and
@@ -9,6 +9,13 @@ BB core commits based on `get-bb/bb` commit `32efd2e3f`:
   owner-scoped signals and the current view callbacks.
 - `1050e72f3`: leading context actions in an embedded chat target its own
   bottom composer, including when another chat surrounds it.
+- `99e2d01ac`: distinct main companions remain visible in unfocused split
+  panes; duplicate outlets share their one live view and follow focus.
+- `a91ced4bc`: outlet ownership is observed as a React store snapshot so
+  the optimized app renders an outlet after its initial registration.
+- `f86b430c0`: split opens and drag indicators distinguish plugin items by
+  subpath. Reopening an exact item focuses it; normal navigation updates
+  the focused panel while preserving the other item.
 
 The isolated checkout is `/tmp/bb-companion-current`; no unrelated edits from
 the shared BB checkout are included. The patch is an ordinary `git am` series.
@@ -28,12 +35,15 @@ All checks use Turbo against that current BB base:
 | Core SDK tests | 109 passed |
 | Plugin SDK tests | 362 passed |
 | Plugin Guide tests | 75 passed |
+| Split routing, navigation, outlet and layout tests | 112 passed |
+| Existing split workspace UI tests | 75 passed |
 | Optimized BB runtime build | 50 tasks passed |
+| Applying all six commits to the stated base | Exact verified source tree |
 
 The [live capture](../../../packages/bb-studio-float/assets/native-workbench-preview.png)
 runs the normal optimized BB application in its own data directory, with all
-17 Studio plugins installed from pushed `ba0ae10` and Float updated to
-`f962c2c`. UI actions move the real Pages editor and native composer through
+17 Studio plugins installed from pushed `b241546`, Pages updated to
+`75ad5f5`, and Float to `598ee8b`. UI actions move the real Pages editor and native composer through
 floating, workbench and main placement. The capture verifies exact editor and
 composer DOM identity, the unsent draft, its file input, and shared pin state.
 SDK-to-server tests verify schema validation, unknown plugins, two-client
@@ -41,11 +51,21 @@ delivery, and every supported action. Live CLI checks verify both delivery
 and the resulting saved placement, retained drafts, pin-protected close,
 and returning to a main companion after another main view opens.
 
+The [split/swap capture](../../../packages/bb-studio-float/assets/native-split-preview.png)
+edits two real main Pages editors before their first companion moves. It
+checks both exact original DOM nodes, inserted drafts, stable tab identities,
+and each item's pin through two swaps and Move to split. Both final outlets
+must be visible in separate BB panes. This optimized-runtime check caught
+the initial outlet subscription failure that unit tests did not reproduce.
+
 Run after sourcing the isolated instance's `capture.env`:
 
 ```sh
 BB_CAPTURE_NATIVE_COMPANION=1 BB_CAPTURE_COMPANION_REMOTE=1 \
 BB_CAPTURE_ONLY=float-native \
+node scripts/capture-plugin-screenshots.mjs --plugin float
+
+BB_CAPTURE_COMPANION_SPLIT=1 BB_CAPTURE_ONLY=float-native-split \
 node scripts/capture-plugin-screenshots.mjs --plugin float
 ```
 
@@ -56,8 +76,7 @@ account's permission on authoritative `get-bb/bb` as `READ`; this agent cannot
 publish a BB host release. The patch and live evidence make the required
 changes reviewable. Stable BB continues to use the suite's floating fallback.
 
-The native capture starts retention after a companion is realized. Moving an
-already-open main editor into its first companion must additionally preserve
-that original instance's unsaved state. Split/swap flows and the final suite
-entry-point audit remain part of the delivery goal. This patch does not
-declare those workflows complete.
+Initial main plugin-editor transfers and native split/swap now have live
+proof. Original core main-thread composer adoption, legacy-host transfers,
+Talk playback continuity, and the final suite entry-point audit remain part
+of the delivery goal.

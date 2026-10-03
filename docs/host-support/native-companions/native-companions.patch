@@ -1,7 +1,7 @@
 From bda6f61ef39120067f248c095f495d4d37bebf39 Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Fri, 2 Oct 2026 18:09:15 -0400
-Subject: [PATCH 1/3] feat(plugin): retain companion views across native panel
+Subject: [PATCH 1/6] feat(plugin): retain companion views across native panel
  and main outlets
 
 ---
@@ -991,13 +991,13 @@ index 8bd24cf6a..0b3ddaee0 100644
    useSecondaryPanelSizing,
  } from "./secondaryPanelSizing";
 +import { useCompanionPanelVisibility } from "@/components/plugin/useCompanionPanel";
- 
+
  const FULL_PANEL_SIZE_PERCENT = 100;
- 
+
 @@ -76,7 +77,16 @@ interface SecondaryPanelLayoutProps {
    composerHost: PluginComposerHost | null;
  }
- 
+
 -export function SecondaryPanelLayout({
 +export function SecondaryPanelLayout(props: SecondaryPanelLayoutProps) {
 +  const visibility = useCompanionPanelVisibility(
@@ -1032,7 +1032,7 @@ index e35ed2aa8..e6cd8e150 100644
    SecondaryPanelTabReorderHandler,
 @@ -163,7 +165,11 @@ export interface SecondaryPanelFixedTab {
  }
- 
+
  export interface ThreadSecondaryPanelProps {
 -  activeTab: SecondaryFixedPanelTab | MarketplacePluginDetailPanelTab | null;
 +  activeTab:
@@ -1045,13 +1045,13 @@ index e35ed2aa8..e6cd8e150 100644
    gitDiffTabStatus?: GitDiffTabStatus;
 @@ -202,7 +208,7 @@ export interface ThreadSecondaryPanelProps {
  }
- 
+
  export function ThreadSecondaryPanel(props: ThreadSecondaryPanelProps) {
 -  const panelProps = usePluginDetailPanelProps(props);
 +  const panelProps = usePluginDetailPanelProps(useCompanionPanelProps(props));
    return <ThreadSecondaryPanelContent {...panelProps} />;
  }
- 
+
 diff --git a/apps/app/src/components/secondary-panel/secondaryPanelTab.ts b/apps/app/src/components/secondary-panel/secondaryPanelTab.ts
 index 1743fd5e7..fcc656037 100644
 --- a/apps/app/src/components/secondary-panel/secondaryPanelTab.ts
@@ -1059,7 +1059,7 @@ index 1743fd5e7..fcc656037 100644
 @@ -6,6 +6,11 @@ export interface MarketplacePluginDetailPanelTab {
    kind: "marketplace-plugin-detail";
  }
- 
+
 +export interface CompanionPanelTab {
 +  id: string;
 +  kind: "companion";
@@ -1105,9 +1105,9 @@ index b4f126392..3a85b6011 100644
 --- a/docs/api_to_audit.md
 +++ b/docs/api_to_audit.md
 @@ -51,6 +51,35 @@ composer contributions, and whether commands need an availability callback.
- 
+
  `experimental_page: "mobile"` mounts a plugin settings section exclusively on Settings → Mobile when that plugin owns the selected access provider, retaining plugin context, lifecycle, and error boundaries. Omission keeps the section on its plugin configuration page. Stabilization requires verifying placement isolation, plugin disable/uninstall, loading and failure states, and pairing lifecycle on Mobile.
- 
+
 +## `experimental_CompanionView` and `experimental_CompanionOutlet`
 +
 +An app-overlay owner keeps a companion component mounted while BB moves one
@@ -1138,7 +1138,7 @@ index b4f126392..3a85b6011 100644
 +
 +
  ## `app.commands.register`
- 
+
  `app.commands.register` requires SDK 0.4.91; `defaultShortcut` and keyboard
 diff --git a/packages/plugin-sdk/src/app-contract.ts b/packages/plugin-sdk/src/app-contract.ts
 index 22860e618..eb10314e2 100644
@@ -1147,7 +1147,7 @@ index 22860e618..eb10314e2 100644
 @@ -3290,6 +3290,43 @@ export interface ExperimentalAppPanel {
    ): boolean;
  }
- 
+
 +/** The destination of a retained companion view within this app window. */
 +export type ExperimentalCompanionPlacement = "floating" | "workbench" | "main";
 +
@@ -1222,7 +1222,7 @@ index d7984ebb4..13e9e9e48 100644
 +++ b/packages/plugin-sdk/src/testing/app.tsx
 @@ -946,6 +946,14 @@ function TestDiff({
  }
- 
+
  const testPluginSdkApp = {
 +  experimental_CompanionView: ({
 +    children,
@@ -1259,14 +1259,14 @@ index 4af7e39f6..f6e0c3a49 100644
            "useBbContext",
            "useBbNavigate",
            "BbNavigate.toPluginPanel",
--- 
+--
 2.50.1 (Apple Git-155)
 
 
 From 24d2201fc7094bddbc31ad5bd15287d8e04dcebf Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Fri, 2 Oct 2026 23:41:48 -0400
-Subject: [PATCH 2/3] Control existing companion placement through SDK and CLI
+Subject: [PATCH 2/6] Control existing companion placement through SDK and CLI
 
 ---
  .../plugin/PluginCompanionView.test.tsx       | 46 +++++++++
@@ -1298,12 +1298,12 @@ index 78048e6ef..6d3328ade 100644
  import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
 +import { wsManager } from "@/lib/ws";
 +import { PLUGIN_COMPANION_ACTION_CHANNEL } from "@bb/server-contract";
- 
+
  const noop = () => {};
  const browser = createBrowserFixedPanelTab({
 @@ -173,6 +175,50 @@ function renderExperience(route = "page-a") {
  }
- 
+
  describe("retained native companion views", () => {
 +  it("routes remote controls to their owner, retains the live draft through placement, and protects pins", () => {
 +    renderExperience();
@@ -1403,7 +1403,7 @@ index 21bf6b76d..8d028ad93 100644
 @@ -1,4 +1,5 @@
  import type { ExperimentalCompanionViewProps } from "@get-bb/plugin-sdk";
 +import type { PluginCompanionAction } from "@bb/server-contract";
- 
+
  interface CompanionSession {
    selected: string | null;
 @@ -57,6 +58,39 @@ export function createCompanionViewStore(
@@ -1716,7 +1716,7 @@ index 3a85b6011..e2a2c60ca 100644
 @@ -67,6 +67,18 @@ tab order, dismissal, and activation baselines in per-window session storage.
  Removing the owner disposes its live view. The test runtime renders
  View children inline and has no native panel or main outlet implementation.
- 
+
 +`bb.sdk.plugins.experimental_companionAction({ pluginId, id, action })` and
 +`bb plugin companion <plugin-id> <view-id> <action>` send dock, float, main,
 +focus, close, pin, unpin or back to existing views in connected apps. The
@@ -1730,7 +1730,7 @@ index 3a85b6011..e2a2c60ca 100644
 +placement changes, and deciding whether per-view acknowledgements are needed.
 +
  Before stabilization:
- 
+
  1. Verify real plugin views and SDK composers across floating, native panel,
 diff --git a/packages/sdk/src/areas/plugins.ts b/packages/sdk/src/areas/plugins.ts
 index 1a217ae4b..7721e3666 100644
@@ -1749,7 +1749,7 @@ index 1a217ae4b..7721e3666 100644
    type PluginRpcDiscoveryQuery,
 @@ -238,6 +242,9 @@ export interface PluginMarketplacesArea {
  }
- 
+
  export interface PluginsArea {
 +  experimental_companionAction(
 +    args: PluginIdArgs & PluginCompanionActionRequest,
@@ -1759,7 +1759,7 @@ index 1a217ae4b..7721e3666 100644
    ): Promise<PublishedPluginRpcMethod[]>;
 @@ -397,6 +404,17 @@ export function createPluginsArea(args: CreateSdkAreaArgs): PluginsArea {
    };
- 
+
    return {
 +    async experimental_companionAction(input) {
 +      const body = pluginCompanionActionRequestSchema.parse({
@@ -1782,7 +1782,7 @@ index 25e84731b..de4f804a6 100644
 @@ -6,6 +6,34 @@ import {
  } from "@bb/domain";
  import { z } from "zod";
- 
+
 +export const pluginCompanionActionSchema = z.enum([
 +  "dock",
 +  "float",
@@ -1850,7 +1850,7 @@ index c8823eb32..8a81c177b 100644
 +`sdk.plugins.experimental_companionAction({ pluginId, id, action })`.
  Discover contributed command paths through `bb plugin list`, the generated
  `plugin-commands` skill, or `bb plugin run <id> --help`.
- 
+
 diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
 index f6e0c3a49..1539eb79a 100644
 --- a/plugins/plugin-api-docs/src/surfaces.ts
@@ -1871,14 +1871,14 @@ index f6e0c3a49..1539eb79a 100644
            "useBbContext",
            "useBbNavigate",
            "BbNavigate.toPluginPanel",
--- 
+--
 2.50.1 (Apple Git-155)
 
 
 From 1050e72f34e7c98c54152f79bc88c7bebfe682ec Mon Sep 17 00:00:00 2001
 From: Patrick Lee <me@patricklee.nyc>
 Date: Fri, 2 Oct 2026 23:47:50 -0400
-Subject: [PATCH 3/3] Scope embedded leading context to its own composer
+Subject: [PATCH 3/6] Scope embedded leading context to its own composer
 
 ---
  .../embedded-chat/EmbeddedThreadChat.test.tsx | 80 ++++++++++++++++++-
@@ -1905,7 +1905,7 @@ index ee0779253..f40a49322 100644
 +} from "@/components/plugin/plugin-composer-host";
  import { getPromptDraftAccessor } from "@/hooks/usePromptDraftStorage";
  import { EmbeddedThreadChat } from "./EmbeddedThreadChat";
- 
+
 @@ -170,6 +176,7 @@ vi.mock("@/components/thread/timeline", () => ({
      mocks.timelineProjectIds.push(props.projectId as string | undefined);
      return (
@@ -1938,7 +1938,7 @@ index ee0779253..f40a49322 100644
 @@ -709,6 +719,74 @@ describe("EmbeddedThreadChat", () => {
      );
    });
- 
+
 +  it("binds leading context actions to the embedded composer instead of an outer draft", () => {
 +    const parentDraft = { text: "Parent draft", mentions: [], attachments: [] };
 +    const parentHost: PluginComposerHost = {
@@ -2036,7 +2036,7 @@ index 853983b67..af6ed8e90 100644
    type ThreadTimelineAddToChatHandler,
 @@ -1251,10 +1255,28 @@ function EmbeddedThreadChatWithComposer({
    );
- 
+
    const maxWidthClassName = measure === "page" ? "max-w-[760px]" : "max-w-none";
 +  const leadingComposerView = usePluginComposerViewModel({
 +    scope: bottomScope ?? { kind: "thread", threadId },
@@ -2094,6 +2094,430 @@ index 1539eb79a..61e95605a 100644
            "Register inline React artwork with app.experimental_icons.register({ name, component }); namespacing is recommended, but any plugin can use any name",
            "Add names or override built-in app icons; conflicts between plugins use the first plugin id in lexical order and warn, while duplicate names within one plugin reject setup",
            "Render experimental_ProviderIcon with required providerKind (agent, machine, environment), provider={provider}, and optional fallback (Code by default). Pass an existing provider record: it reads id, logoUrl, icon, and strings.iconTint, resolving the matching kind/id slot override, then legacy unscoped overrides, then declared artwork. It fetches no metadata. Marks are decorative by default; pass aria-label for a meaningful standalone image",
--- 
+--
+2.50.1 (Apple Git-155)
+
+
+From 99e2d01ac798fea8191b688877c89805a2893f10 Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Sat, 3 Oct 2026 00:38:50 -0400
+Subject: [PATCH 4/6] Keep distinct main companions visible in unfocused split
+ panes
+
+---
+ .../plugin/PluginCompanionView.test.tsx       | 48 +++++++++++++++++++
+ .../components/plugin/PluginCompanionView.tsx |  9 +++-
+ .../plugin/main-companion-outlets.ts          | 39 +++++++++++++++
+ docs/api_to_audit.md                          |  5 +-
+ plugins/plugin-api-docs/src/surfaces.ts       |  2 +-
+ 5 files changed, 100 insertions(+), 3 deletions(-)
+ create mode 100644 apps/app/src/components/plugin/main-companion-outlets.ts
+
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.test.tsx b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+index 6d3328ade..832492431 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.test.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+@@ -35,6 +35,8 @@ import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
+ import { wsManager } from "@/lib/ws";
+ import { PLUGIN_COMPANION_ACTION_CHANNEL } from "@bb/server-contract";
+
++import { PaneContext, type PaneContextValue } from "@/views/thread-detail/PaneContext";
++
+ const noop = () => {};
+ const browser = createBrowserFixedPanelTab({
+   environmentId: null,
+@@ -462,3 +464,49 @@ describe("companion selection policy", () => {
+     expect(store.getSnapshot().selected).toBeNull();
+   });
+ });
++
++describe("main companion split outlets", () => {
++  const pane = (paneId: string, isFocused: boolean): PaneContextValue => ({
++    paneId, isFocused, isSplitPane: true, secondaryPanelHost: null,
++    reservesWindowPanelToggle: false, onRequestClose: null, isMaximized: false,
++    onToggleMaximize: null, isBoundedPane: false, isTopRow: true,
++    ownsWindowTopLeft: false, navigateInPane: noop,
++  });
++  const props = (id: string): ExperimentalCompanionViewProps => ({
++    id, title: id, placement: "main", activation: 1,
++    onSelect: noop, onClose: noop, onPlacementChange: noop, children: <Editor />,
++  });
++
++  it("shows separate retained views in both split panes while only one pane is focused", () => {
++    render(<PluginContext.Provider value="pages">
++      <PluginCompanionView {...props("first")} />
++      <PluginCompanionView {...props("second")} />
++      <PaneContext.Provider value={pane("first-pane", false)}><div data-testid="first-pane"><PluginCompanionOutlet id="first" /></div></PaneContext.Provider>
++      <PaneContext.Provider value={pane("second-pane", true)}><div data-testid="second-pane"><PluginCompanionOutlet id="second" /></div></PaneContext.Provider>
++    </PluginContext.Provider>);
++    expect(screen.getByTestId("first-pane").querySelector("textarea")).toBeTruthy();
++    expect(screen.getByTestId("second-pane").querySelector("textarea")).toBeTruthy();
++    expect(screen.getAllByRole("textbox", { name: "Draft" })).toHaveLength(2);
++  });
++
++  it("moves one live editor between duplicate outlets as focus changes and returns it when the focused pane closes", () => {
++    const view = (secondFocused: boolean, showSecond = true) => <PluginContext.Provider value="pages">
++      <PluginCompanionView {...props("same")} />
++      <PaneContext.Provider value={pane("first-pane", !secondFocused)}><div data-testid="first-pane"><PluginCompanionOutlet id="same" /></div></PaneContext.Provider>
++      {showSecond ? <PaneContext.Provider value={pane("second-pane", secondFocused)}><div data-testid="second-pane"><PluginCompanionOutlet id="same" /></div></PaneContext.Provider> : null}
++    </PluginContext.Provider>;
++    const result = render(view(false));
++    const editor = screen.getByRole("textbox", { name: "Draft" });
++    const file = screen.getByLabelText("Attachment");
++    fireEvent.change(editor, { target: { value: "Keep split draft" } });
++    expect(screen.getByTestId("first-pane").contains(editor)).toBe(true);
++    result.rerender(view(true));
++    expect(screen.getByTestId("second-pane").contains(editor)).toBe(true);
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(editor);
++    expect(screen.getByLabelText("Attachment")).toBe(file);
++    expect(editor instanceof HTMLTextAreaElement && editor.value).toBe("Keep split draft");
++    result.rerender(view(true, false));
++    expect(screen.getByTestId("first-pane").contains(editor)).toBe(true);
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(editor);
++  });
++});
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.tsx b/apps/app/src/components/plugin/PluginCompanionView.tsx
+index 6a27bf82f..8da9923d8 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.tsx
+@@ -21,6 +21,7 @@ import {
+   companionViewStore,
+   type CompanionViewEntry,
+ } from "./companion-view-store";
++import { mainCompanionOutlets } from "./main-companion-outlets";
+
+ export const useCompanionViews = () =>
+   useSyncExternalStore(
+@@ -120,11 +121,17 @@ export function PluginCompanionOutlet({
+   const pluginId = usePluginId();
+   const pane = useOptionalPaneContext();
+   const key = JSON.stringify([pluginId, id]);
++  const [token] = useState(() => Symbol());
++  useSyncExternalStore(mainCompanionOutlets.subscribe, mainCompanionOutlets.getSnapshot, mainCompanionOutlets.getSnapshot);
++  useLayoutEffect(() => {
++    mainCompanionOutlets.put(key, token, pane?.isFocused ?? true);
++  }, [key, token, pane?.isFocused]);
++  useLayoutEffect(() => () => mainCompanionOutlets.remove(key, token), [key, token]);
+   const entry = useCompanionViews().entries.find(
+     (candidate) =>
+       candidate.key === key && candidate.props.placement === "main",
+   );
+-  return entry && (pane === null || pane.isFocused) ? (
++  return entry && mainCompanionOutlets.owns(key, token) ? (
+     <CompanionViewOutlet entry={entry} />
+   ) : null;
+ }
+diff --git a/apps/app/src/components/plugin/main-companion-outlets.ts b/apps/app/src/components/plugin/main-companion-outlets.ts
+new file mode 100644
+index 000000000..a18ee85b0
+--- /dev/null
++++ b/apps/app/src/components/plugin/main-companion-outlets.ts
+@@ -0,0 +1,39 @@
++export function createMainCompanionOutletRegistry() {
++  const outlets = new Map<string, Map<symbol, boolean>>();
++  const owners = new Map<string, symbol>();
++  const listeners = new Set<() => void>();
++  let revision = 0;
++  const updateOwner = (key: string) => {
++    const entries = outlets.get(key);
++    const current = owners.get(key);
++    const owner = [...(entries ?? [])].find(([, focused]) => focused)?.[0]
++      ?? (current && entries?.has(current) ? current : entries?.keys().next().value);
++    if (owner === current) return;
++    if (owner) owners.set(key, owner);
++    else owners.delete(key);
++    revision += 1;
++    listeners.forEach(listener => listener());
++  };
++  return {
++    subscribe: (listener: () => void) => {
++      listeners.add(listener);
++      return () => { listeners.delete(listener); };
++    },
++    getSnapshot: () => revision,
++    owns: (key: string, token: symbol) => owners.get(key) === token,
++    put: (key: string, token: symbol, focused: boolean) => {
++      const entries = outlets.get(key) ?? new Map<symbol, boolean>();
++      entries.set(token, focused);
++      outlets.set(key, entries);
++      updateOwner(key);
++    },
++    remove: (key: string, token: symbol) => {
++      const entries = outlets.get(key);
++      entries?.delete(token);
++      if (entries?.size === 0) outlets.delete(key);
++      updateOwner(key);
++    },
++  };
++}
++
++export const mainCompanionOutlets = createMainCompanionOutletRegistry();
+diff --git a/docs/api_to_audit.md b/docs/api_to_audit.md
+index e2a2c60ca..fb4ba41d4 100644
+--- a/docs/api_to_audit.md
++++ b/docs/api_to_audit.md
+@@ -56,7 +56,10 @@ composer contributions, and whether commands need an availability callback.
+ An app-overlay owner keeps a companion component mounted while BB moves one
+ persistent DOM container between its floating placeholder, a dynamic tab in
+ the native right panel, and a matching main nav-panel outlet. Identity is
+-scoped by plugin ID and companion ID. The portal keeps its React ownership,
++scoped by plugin ID and companion ID. Distinct main outlets stay visible in
++unfocused split panes. Duplicate outlets for one companion give the live view
++to the focused pane, then return it to another outlet when that pane closes.
++The portal keeps its React ownership,
+ plugin CSS root, draft and attachment inputs, editor state, and scroll during
+ placement and route changes. Increment `activation` for explicit focus;
+ zero registers in the background. Metadata updates do not reverse dismissal
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index 61e95605a..f309e429c 100644
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -91,7 +91,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "Get its own URL, so the page can be linked to and bb's back and forward buttons work",
+           "Register ordered, non-closable fixed tabs beside Browser and Terminal; bb persists selection and mounts each component only while its tab is visible in an open pane",
+           "Open an owned fixed tab with experimental_useAppPanel and read its validated JSON target with experimental_useFixedTabTarget; targets survive route changes in the current session, but not a refresh",
+-          "Keep an experimental_CompanionView mounted in an app overlay to move one live portal between Float, the native workbench tab strip, and an experimental_CompanionOutlet in the same plugin's main nav panel; activation requests focus while title updates preserve dismissal",
++          "Keep an experimental_CompanionView mounted in an app overlay to move one live portal between Float, the native workbench tab strip, and an experimental_CompanionOutlet in the same plugin's main nav panel; activation requests focus while title updates preserve dismissal; different companions remain visible in unfocused split panes, while duplicate outlets share one live view in the focused pane",
+           "Control an existing owner-scoped companion with bb.sdk.plugins.experimental_companionAction or bb plugin companion: dock, float, main, focus, close, pin, unpin and back; delivery counts connected apps, pinned tabs resist close, and absent views are not created",
+           "Add headerContent to the page title bar, or a non-interactive experimental_sidebarAccessory to the desktop sidebar row",
+         ],
+--
+2.50.1 (Apple Git-155)
+
+
+From a91ced4bcd90a9b24888bd3cd62323630775d0a7 Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Sat, 3 Oct 2026 00:46:18 -0400
+Subject: [PATCH 5/6] Observe main outlet ownership in the optimized app
+
+---
+ apps/app/src/components/plugin/PluginCompanionView.tsx | 8 ++++++--
+ 1 file changed, 6 insertions(+), 2 deletions(-)
+
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.tsx b/apps/app/src/components/plugin/PluginCompanionView.tsx
+index 8da9923d8..3904fb3b1 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.tsx
+@@ -122,7 +122,11 @@ export function PluginCompanionOutlet({
+   const pane = useOptionalPaneContext();
+   const key = JSON.stringify([pluginId, id]);
+   const [token] = useState(() => Symbol());
+-  useSyncExternalStore(mainCompanionOutlets.subscribe, mainCompanionOutlets.getSnapshot, mainCompanionOutlets.getSnapshot);
++  const ownsOutlet = useSyncExternalStore(
++    mainCompanionOutlets.subscribe,
++    () => mainCompanionOutlets.owns(key, token),
++    () => false,
++  );
+   useLayoutEffect(() => {
+     mainCompanionOutlets.put(key, token, pane?.isFocused ?? true);
+   }, [key, token, pane?.isFocused]);
+@@ -131,7 +135,7 @@ export function PluginCompanionOutlet({
+     (candidate) =>
+       candidate.key === key && candidate.props.placement === "main",
+   );
+-  return entry && mainCompanionOutlets.owns(key, token) ? (
++  return entry && ownsOutlet ? (
+     <CompanionViewOutlet entry={entry} />
+   ) : null;
+ }
+--
+2.50.1 (Apple Git-155)
+
+
+From f86b430c0e1b862a2a508029a13f5fbe3b19badd Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Sat, 3 Oct 2026 00:51:37 -0400
+Subject: [PATCH 6/6] Distinguish plugin items when opening split panes
+
+---
+ .../sidebar/paneContentSplitIndicator.ts      |  4 +-
+ .../sidebar/usePaneContentSplitDrag.ts        |  6 +--
+ .../openPaneContentInSplit.test.ts            | 41 +++++++++++++++++++
+ .../split-layout/openPaneContentInSplit.ts    |  3 +-
+ apps/app/src/lib/split-layout/ops.ts          | 11 +++++
+ .../thread-detail/splitThreadNavigation.ts    |  5 ++-
+ plugins/plugin-api-docs/src/surfaces.ts       |  2 +-
+ 7 files changed, 64 insertions(+), 8 deletions(-)
+ create mode 100644 apps/app/src/lib/split-layout/openPaneContentInSplit.test.ts
+
+diff --git a/apps/app/src/components/sidebar/paneContentSplitIndicator.ts b/apps/app/src/components/sidebar/paneContentSplitIndicator.ts
+index 6fcd78dbf..cf15874a2 100644
+--- a/apps/app/src/components/sidebar/paneContentSplitIndicator.ts
++++ b/apps/app/src/components/sidebar/paneContentSplitIndicator.ts
+@@ -5,7 +5,7 @@ import { splitLayoutAtom } from "@/lib/split-layout/atoms";
+ import {
+   computePaneRects,
+   countPanes,
+-  findPaneByContent,
++  findPaneByExactContent,
+   listPanes,
+   type PaneContent,
+   type PaneRect,
+@@ -84,7 +84,7 @@ export function usePaneContentSplitIndicator(
+     ) {
+       return NO_INDICATOR;
+     }
+-    const pane = findPaneByContent(layout.root, content);
++    const pane = findPaneByExactContent(layout.root, content);
+     if (pane === null) {
+       return NO_INDICATOR;
+     }
+diff --git a/apps/app/src/components/sidebar/usePaneContentSplitDrag.ts b/apps/app/src/components/sidebar/usePaneContentSplitDrag.ts
+index b29f88160..0787476db 100644
+--- a/apps/app/src/components/sidebar/usePaneContentSplitDrag.ts
++++ b/apps/app/src/components/sidebar/usePaneContentSplitDrag.ts
+@@ -17,7 +17,7 @@ import { splitLayoutAtom } from "@/lib/split-layout/atoms";
+ import { openPaneContentInSplit } from "@/lib/split-layout/openPaneContentInSplit";
+ import {
+   countPanes,
+-  findPaneByContent,
++  findPaneByExactContent,
+   listPanes,
+   MAX_PANES,
+   replacePaneContent,
+@@ -191,14 +191,14 @@ export function beginSidebarPaneContentSplitDrag({
+       if (layout === null) return null;
+       return decideThreadDrop({
+         zone,
+-        threadAlreadyOpen: findPaneByContent(layout.root, content) !== null,
++        threadAlreadyOpen: findPaneByExactContent(layout.root, content) !== null,
+         atMaxPanes: countPanes(layout.root) >= MAX_PANES,
+       });
+     },
+     onDrop: (target) => {
+       const layout = store.get(splitLayoutAtom);
+       if (layout === null) return;
+-      const existing = findPaneByContent(layout.root, content);
++      const existing = findPaneByExactContent(layout.root, content);
+       const next =
+         existing !== null
+           ? setFocus(layout, existing.paneId)
+diff --git a/apps/app/src/lib/split-layout/openPaneContentInSplit.test.ts b/apps/app/src/lib/split-layout/openPaneContentInSplit.test.ts
+new file mode 100644
+index 000000000..9ad285b04
+--- /dev/null
++++ b/apps/app/src/lib/split-layout/openPaneContentInSplit.test.ts
+@@ -0,0 +1,41 @@
++import { describe, expect, it, vi } from "vitest";
++import { createStore } from "jotai";
++import { splitLayoutAtom } from "./atoms";
++import { listPanes } from "./ops";
++import { openPaneContentInSplit } from "./openPaneContentInSplit";
++import { reconcileLayoutForContent } from "@/views/thread-detail/splitThreadNavigation";
++
++describe("opening distinct plugin items in splits", () => {
++  it("keeps two companions from one panel and refocuses the exact existing item", () => {
++    const store = createStore();
++    const first = { kind: "plugin-panel", pluginId: "float", panelPath: "companions", subPath: "path:/plugins/pages/pages/first" } as const;
++    const second = { ...first, subPath: "path:/plugins/pages/pages/second" };
++    const navigate = vi.fn();
++    store.set(splitLayoutAtom, reconcileLayoutForContent(null, first));
++    const open = (content: typeof second) => openPaneContentInSplit({ store, navigate, content, route: `/plugins/float/companions/${encodeURIComponent(content.subPath)}`, enabled: true });
++    open(second);
++    const split = store.get(splitLayoutAtom)!;
++    expect(listPanes(split.root).map(pane => pane.content)).toEqual([first, second]);
++    const reconciled = reconcileLayoutForContent(split, second);
++    expect(listPanes(reconciled.root).map(pane => pane.content)).toEqual([first, second]);
++    store.set(splitLayoutAtom, reconciled);
++    open(first);
++    const refocused = store.get(splitLayoutAtom)!;
++    expect(listPanes(refocused.root)).toHaveLength(2);
++    expect(refocused.focusedPaneId).toBe(listPanes(refocused.root)[0]!.paneId);
++    expect(navigate).toHaveBeenLastCalledWith(`/plugins/float/companions/${encodeURIComponent(first.subPath)}`, { replace: true });
++  });
++
++  it("normal navigation replaces the focused item without overwriting another item in that panel", () => {
++    const first = { kind: "plugin-panel", pluginId: "pages", panelPath: "pages", subPath: "first" } as const;
++    const store = createStore();
++    const second = { ...first, subPath: "second" };
++    store.set(splitLayoutAtom, reconcileLayoutForContent(null, first));
++    openPaneContentInSplit({ store, navigate: vi.fn(), content: second, route: "/plugins/pages/pages/second", enabled: true });
++    const after = reconcileLayoutForContent(store.get(splitLayoutAtom)!, { ...first, subPath: "third" });
++    expect(listPanes(after.root).map(pane => pane.content)).toEqual([first, { ...first, subPath: "third" }]);
++    const back = reconcileLayoutForContent(after, first);
++    expect(listPanes(back.root).map(pane => pane.content)).toEqual([first, { ...first, subPath: "third" }]);
++    expect(back.focusedPaneId).toBe(listPanes(back.root)[0]!.paneId);
++  });
++});
+diff --git a/apps/app/src/lib/split-layout/openPaneContentInSplit.ts b/apps/app/src/lib/split-layout/openPaneContentInSplit.ts
+index bbe3cd753..f710f3315 100644
+--- a/apps/app/src/lib/split-layout/openPaneContentInSplit.ts
++++ b/apps/app/src/lib/split-layout/openPaneContentInSplit.ts
+@@ -2,6 +2,7 @@ import { splitLayoutAtom } from "./atoms";
+ import {
+   countPanes,
+   findPaneByContent,
++  findPaneByExactContent,
+   MAX_PANES,
+   replacePaneContent,
+   setFocus,
+@@ -38,7 +39,7 @@ export function openPaneContentInSplit({
+     void navigate(route);
+     return;
+   }
+-  const existing = findPaneByContent(layout.root, content);
++  const existing = findPaneByExactContent(layout.root, content);
+   const next =
+     existing !== null
+       ? setFocus(layout, existing.paneId)
+diff --git a/apps/app/src/lib/split-layout/ops.ts b/apps/app/src/lib/split-layout/ops.ts
+index fc8e5eded..8d130c84e 100644
+--- a/apps/app/src/lib/split-layout/ops.ts
++++ b/apps/app/src/lib/split-layout/ops.ts
+@@ -95,6 +95,17 @@ export function findPaneByContent(
+   );
+ }
+
++export function findPaneByExactContent(
++  root: LayoutNode,
++  content: PaneContent,
++): PaneNode | null {
++  return listPanes(root).find((pane) =>
++    isSamePaneContent(pane.content, content) &&
++    (content.kind !== "plugin-panel" ||
++      (pane.content.kind === "plugin-panel" && pane.content.subPath === content.subPath)),
++  ) ?? null;
++}
++
+ function replacePaneNode(
+   node: LayoutNode,
+   paneId: string,
+diff --git a/apps/app/src/views/thread-detail/splitThreadNavigation.ts b/apps/app/src/views/thread-detail/splitThreadNavigation.ts
+index 8d8c53337..e99dcbf0e 100644
+--- a/apps/app/src/views/thread-detail/splitThreadNavigation.ts
++++ b/apps/app/src/views/thread-detail/splitThreadNavigation.ts
+@@ -4,6 +4,7 @@ import {
+   countPanes,
+   findPane,
+   findPaneByContent,
++  findPaneByExactContent,
+   findPaneByThread,
+   isSamePaneContent,
+   MAX_PANES,
+@@ -110,7 +111,9 @@ export function reconcileLayoutForContent(
+   if (layout === null) {
+     return createSinglePaneContentLayout(content);
+   }
+-  const existing = findPaneByContent(layout.root, content);
++  const focused = findPane(layout.root, layout.focusedPaneId);
++  const existing = findPaneByExactContent(layout.root, content)
++    ?? (focused && isSamePaneContent(focused.content, content) ? focused : findPaneByContent(layout.root, content));
+   if (existing !== null) {
+     const withRouteState =
+       existing.content.kind === "plugin-panel" &&
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index f309e429c..a1ca49cd2 100644
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -91,7 +91,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "Get its own URL, so the page can be linked to and bb's back and forward buttons work",
+           "Register ordered, non-closable fixed tabs beside Browser and Terminal; bb persists selection and mounts each component only while its tab is visible in an open pane",
+           "Open an owned fixed tab with experimental_useAppPanel and read its validated JSON target with experimental_useFixedTabTarget; targets survive route changes in the current session, but not a refresh",
+-          "Keep an experimental_CompanionView mounted in an app overlay to move one live portal between Float, the native workbench tab strip, and an experimental_CompanionOutlet in the same plugin's main nav panel; activation requests focus while title updates preserve dismissal; different companions remain visible in unfocused split panes, while duplicate outlets share one live view in the focused pane",
++          "Keep an experimental_CompanionView mounted in an app overlay to move one live portal between Float, the native workbench tab strip, and an experimental_CompanionOutlet in the same plugin's main nav panel; activation requests focus while title updates preserve dismissal; different companions remain visible in unfocused split panes, while duplicate outlets share one live view in the focused pane; explicit split opens distinguish each plugin item's subPath and refocus an exact existing item",
+           "Control an existing owner-scoped companion with bb.sdk.plugins.experimental_companionAction or bb plugin companion: dock, float, main, focus, close, pin, unpin and back; delivery counts connected apps, pinned tabs resist close, and absent views are not created",
+           "Add headerContent to the page title bar, or a non-interactive experimental_sidebarAccessory to the desktop sidebar row",
+         ],
+--
 2.50.1 (Apple Git-155)
 

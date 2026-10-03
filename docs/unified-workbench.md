@@ -369,3 +369,18 @@ destination is reused. Float's menu lists companions in every placement,
 while its tab strip shows floating tabs. Float's 50 tests, types, build, and
 stable compatibility pass; live split/swap proof and legacy-host transfers
 remain required.
+
+Native split/swap live proof now passes on the optimized isolated host. Two
+edited Pages views retain their original editor nodes, drafts, identities,
+and separate pins through two swaps and Move to split. The final screenshot
+shows two visible outlets in different real BB panes. Host pane matching
+now distinguishes individual plugin subpaths for explicit split actions and
+drag indicators, while normal navigation updates the focused panel. A
+store snapshot makes outlet ownership observable to the optimized React
+build; the live capture caught the previous empty main outlet. Distinct
+unfocused companions remain visible, and duplicate outlets retain one owner
+through focus changes or closing a pane. The saved core patch includes all
+six commits. Split routing/navigation/outlet checks pass 112 tests, existing
+split workspace UI checks pass 75, app types and the 50-task optimized build
+pass, and Plugin Guide's 75 tests pass. Legacy-host transfers, original core
+main-thread adoption, playback continuity, and the final audit remain open.

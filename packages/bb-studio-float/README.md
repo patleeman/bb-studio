@@ -70,6 +70,18 @@ capability is absent; ordinary stable captures keep using `float`.
 Set `BB_CAPTURE_COMPANION_REMOTE=1` when the staged CLI also includes
 `bb plugin companion` to verify its controls in the same live workflow.
 
+![Two original Pages editors retained in separate main panes](assets/native-split-preview.png)
+
+The split capture uses that isolated host plus Float `598ee8b`. It edits two
+main pages, pins the first, swaps them twice, and moves the floating page to
+a split. Both original editor nodes, inserted drafts, tab identities, and
+pins survive. It requires two visible outlets in different real BB panes.
+
+```sh
+BB_CAPTURE_COMPANION_SPLIT=1 BB_CAPTURE_ONLY=float-native-split \
+  node scripts/capture-plugin-screenshots.mjs --plugin float
+```
+
 ## What you get
 
 - **Float from the sidebar.** **Float** is in the menu of every thread row (with
