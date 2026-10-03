@@ -161,3 +161,37 @@ it("publishes a completion report with task outputs in the task's folder", async
     expect(published).toHaveLength(1);
   } finally { await harness.lifecycle.dispose(); }
 });
+
+it("prepares scheduled work without sending immediately and tracks each later run", async () => {
+  const { harness, get } = await setup();
+  try {
+    const { task } = await harness.behavior.callRpc("create", { title: "Daily check", projectId: "proj_test" }) as { task: { id: string } };
+    harness.inspection.sdk.stub("threads.defaultExecutionOptions", async () => ({ model: "model", reasoningLevel: "medium" }) as never);
+    const schedules: unknown[] = [];
+    harness.inspection.sdk.stub("plugins.callRpc", async ({ method, input }) => {
+      if (method === "get") return { bot: { trust: "ask" } } as never;
+      if (method === "newConversation") return { threadId: "scheduled-thread" } as never;
+      if (method === "threadProfile") return { botId: "bot_one" } as never;
+      if (method === "automations_list") return [] as never;
+      if (method === "automations_create") { schedules.push(input); return { ...input as object, id: "automation" } as never; }
+      return {} as never;
+    });
+    await harness.behavior.callRpc("scheduleBot", { id: task.id, botId: "bot_one", schedule: "daily" });
+    expect(harness.inspection.sdk.callsTo("threads.send")).toHaveLength(0);
+    expect(schedules).toHaveLength(1);
+    expect(await get(task.id)).toMatchObject({ task: { schedule: "daily", status: "todo" } });
+    const thread = makeThreadResponse({ id: "scheduled-thread", status: "active" });
+    await harness.behavior.emitThreadEvent("thread.active", { thread });
+    expect(await get(task.id)).toMatchObject({ task: { status: "in_progress" } });
+    await harness.behavior.emitThreadEvent("thread.idle", { thread: { ...thread, status: "idle" }, lastAssistantText: "Done" });
+    expect(await get(task.id)).toMatchObject({ task: { status: "review" } });
+    await harness.behavior.callRpc("move", { id: task.id, status: "done" });
+    await harness.behavior.emitThreadEvent("thread.active", { thread });
+    expect(await get(task.id)).toMatchObject({ task: { status: "in_progress" } });
+    await harness.behavior.callRpc("archive", { id: task.id, archived: true });
+    await harness.behavior.callRpc("archive", { id: task.id, archived: false });
+    await harness.behavior.callRpc("delete", { id: task.id });
+    const controls = harness.inspection.sdk.callsTo("plugins.callRpc").map(call => (call[0] as { method: string }).method).filter(method => ["automations_pause", "automations_resume", "automations_delete"].includes(method));
+    expect(controls).toEqual(["automations_resume", "automations_pause", "automations_resume", "automations_delete"]);
+  } finally { await harness.lifecycle.dispose(); }
+});

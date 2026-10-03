@@ -13,7 +13,6 @@ const taskResult = z.object({ task: taskList.shape.tasks.element });
 
 export async function delegateOffice(input: OfficeInput<"delegate">, modules: ModuleServices, spaces: OfficeSpaceStore, folders: Pick<FolderService, "ensureCatchAll" | "list">, hub: Pick<StudioHub, "overview">): Promise<OfficeOutput<"delegate">> {
   if (!modules.has("bot-teams") || !modules.has("studio-tasks")) throw new Error("Teams and Tasks must finish loading before delegating work.");
-  if (input.schedule) throw new Error("Recurring delegation is not available yet. Choose a one-time task.");
   const { bot } = botResult.parse(await modules.call("bot-teams", "get", { id: input.botId }));
   if (bot.retired) throw new Error("Restore this bot before assigning work.");
   const { items, providers } = await hub.overview();
@@ -36,7 +35,8 @@ export async function delegateOffice(input: OfficeInput<"delegate">, modules: Mo
     for (const item of context) await modules.call("studio-tasks", "link", { id: task.id, link: {
       target: "item", pluginId: item.pluginId, itemId: item.id, label: item.title, href: item.href,
     } });
-    await modules.call("studio-tasks", "update", { id: task.id, assignee: `bot:${bot.id}` });
+    if (input.schedule) await modules.call("studio-tasks", "scheduleBot", { id: task.id, botId: bot.id, schedule: input.schedule });
+    else await modules.call("studio-tasks", "update", { id: task.id, assignee: `bot:${bot.id}` });
   } catch (error) { throw new Error(`Task ${task.id} was saved. Delegation could not finish: ${String(error)}`); }
   return { taskId: task.id, task: officeTask(taskResult.parse(await modules.call("studio-tasks", "get", { id: task.id })).task) };
 }

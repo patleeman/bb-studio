@@ -10,6 +10,7 @@ const feedPage = z.object({ posts: z.array(z.object({
 export const taskList = z.object({ tasks: z.array(z.object({
   id: z.string(), title: z.string(), description: z.string(), status: z.string(), statusLabel: z.string(), projectId: z.string().nullable(),
   assignee: z.string().nullable(), archived: z.boolean(), updatedAt: z.number(), recurrence: z.string().nullable(),
+  schedule: z.string().nullable().optional(),
   handoff: z.object({ threadId: z.string(), state: z.string(), note: z.string().nullable() }).nullable(),
 })) });
 const roster = z.object({ bots: z.array(z.object({ id: z.string(), projectId: z.string().nullable() })), botCreateRequests: z.array(z.object({

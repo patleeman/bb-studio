@@ -1,3 +1,4 @@
+import { OfficeTaskSchedules } from "../../office/scheduling";
 import { TaskReportOutbox } from "../../office/report-outbox";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 export { parseFlags } from "@bb-studio/kit/cli";
@@ -90,6 +91,7 @@ const taskSchema = z.object({
   parentId: z.string().nullable(),
   subtasks: z.object({ total: z.number(), done: z.number() }),
   recurrence: recurrenceSchema,
+  schedule: z.string().nullable().optional(),
   reminderAt: z.number().nullable(),
   createdAt: z.number(),
   updatedAt: z.number(),
@@ -233,6 +235,7 @@ export const rpcContract = defineRpcContract({
     output: z.object({ threadId: z.string() }),
   },
   bots: { input: z.null(), output: z.object({ bots: z.array(z.object({ id: z.string(), name: z.string() })) }) },
+  scheduleBot: { input: z.object({ id: idSchema, botId: z.string().min(1), schedule: z.enum(["hourly", "daily", "weekdays", "weekly"]) }), output: z.object({ threadId: z.string() }) },
   handOffBot: { input: z.object({ id: idSchema, note: z.string().max(20_000).nullable() }), output: z.object({ threadId: z.string() }) },
   syncCheckbox: { input: z.object({ id: idSchema, checked: z.boolean() }), output: z.object({ ok: z.boolean() }) },
   /** Sends the latest handoff's thread a follow-up, e.g. review feedback. */
@@ -277,6 +280,7 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new TaskStore(db);
+  const schedules = new OfficeTaskSchedules(db, bb.sdk);
   const reports = new TaskReportOutbox(db, async report => {
     await bb.sdk.plugins.callRpc({ pluginId: "feed", method: "publish", input: {
       title: report.title.slice(0, 200), body: report.body, author: `Bot ${report.botId}`.slice(0, 80),
@@ -402,6 +406,7 @@ export default async function plugin(bb: BbPluginApi) {
       parentId: task.parent_id,
       subtasks: store.subtasks(task.id),
       recurrence: task.recurrence,
+      schedule: schedules.label(task.id),
       reminderAt: task.reminder_at,
       createdAt: task.created_at,
       updatedAt: task.updated_at,
@@ -426,6 +431,10 @@ export default async function plugin(bb: BbPluginApi) {
     const latest = store.latestHandoff(task.id)?.thread_id === threadId;
     const next = nextHandoff(handoff, task, latest, signal);
     if (!next) return;
+    if (latest && schedules.label(task.id) && ["todo", "done"].includes(task.status)) {
+      if (signal.type === "active") next.status = "in_progress";
+      else if (["ready", "replied"].includes(next.state)) next.status = "review";
+    }
     db.transaction(() => {
       store.setHandoff(threadId, next.state, next.note);
       if (next.status) store.move(task.id, next.status, "agent");
@@ -580,17 +589,17 @@ export default async function plugin(bb: BbPluginApi) {
   }
 
   const botHandoffs = new Map<string, Promise<{ threadId: string }>>();
-  async function handOffBot(id: string, note: string | null): Promise<{ threadId: string }> {
+  async function handOffBot(id: string, note: string | null, prepareOnly = false): Promise<{ threadId: string }> {
     // Concurrent clicks/assignments share one send; later explicit handoffs can
     // still send review feedback to the existing thread.
-    const key = `${id}:${mustGet(id).assignee}`;
+    const key = `${id}:${mustGet(id).assignee}:${prepareOnly}`;
     const pending = botHandoffs.get(key);
     if (pending) return pending;
-    const work = runBotHandoff(id, note);
+    const work = runBotHandoff(id, note, prepareOnly);
     botHandoffs.set(key, work);
     try { return await work; } finally { if (botHandoffs.get(key) === work) botHandoffs.delete(key); }
   }
-  async function runBotHandoff(id: string, note: string | null) {
+  async function runBotHandoff(id: string, note: string | null, prepareOnly: boolean) {
       const task = mustGet(id);
       const botId = task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null;
       if (!botId) throw new Error("Assign a Studio Teams bot first.");
@@ -622,6 +631,7 @@ export default async function plugin(bb: BbPluginApi) {
       recordHandoff(id, threadId, `Bot ${botId}`);
       store.setHandoff(threadId, "starting", null);
       store.link(id, { target: "thread", plugin_id: null, item_id: threadId, label: `Bot work: ${task.title || "Task"}`, href: `/threads/${threadId}` });
+      if (prepareOnly) { changed(id); return { threadId }; }
       if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);
       try {
@@ -683,7 +693,7 @@ export default async function plugin(bb: BbPluginApi) {
       const next = store.completeRecurring(before, by);
       if (next) changed(next.id);
     }
-    if (status !== "done" || before.status === "done" || !(await settings.get()).archiveThreadsOnDone) return { archivedThreads: 0 };
+    if (status !== "done" || before.status === "done" || schedules.label(id) || !(await settings.get()).archiveThreadsOnDone) return { archivedThreads: 0 };
     return { archivedThreads: (await archiveThreads(id)).archived };
   }
 
@@ -779,13 +789,15 @@ export default async function plugin(bb: BbPluginApi) {
       if (projectId !== undefined && projectId !== before.project_id) for (const task of store.list({ boardId: id, includeArchived: true })) changed(task.id);
       return { ok: true };
     },
-    boardArchive({ id, archived }) {
+    async boardArchive({ id, archived }) {
+      for (const task of store.list({ boardId: id, includeArchived: true })) if (!task.archived_at) await schedules.control(task.id, archived ? "pause" : "resume");
       store.setBoardArchived(id, archived);
       changed(id);
       return { ok: true };
     },
-    boardDelete({ id }) {
+    async boardDelete({ id }) {
       mustGetBoard(id);
+      for (const task of store.list({ boardId: id, includeArchived: true })) await schedules.control(task.id, "delete");
       for (const task of store.deleteBoard(id)) changeBus.changed(task);
       changeBus.changed(id);
       return { ok: true };
@@ -823,13 +835,15 @@ export default async function plugin(bb: BbPluginApi) {
       const { archivedThreads } = await move(id, status, "user", index);
       return { ok: true, archivedThreads };
     },
-    archive({ id, archived }) {
+    async archive({ id, archived }) {
+      await schedules.control(id, archived ? "pause" : "resume");
       store.setArchived(id, archived);
       changed(id);
       return { ok: true };
     },
-    delete({ id }) {
+    async delete({ id }) {
       const task = store.get(id);
+      await schedules.control(id, "delete");
       if (store.delete(id)) {
         changeBus.changed(id);
         if (task) changed(task.board_id);
@@ -910,6 +924,16 @@ export default async function plugin(bb: BbPluginApi) {
       return { bots: result.bots.filter((bot) => !bot.retired).map(({ id, name }) => ({ id, name })) };
     },
     handOffBot: ({ id, note }) => handOffBot(id, note),
+    async scheduleBot({ id, botId, schedule }) {
+      const task = mustGet(id);
+      if (task.assignee && task.assignee !== `bot:${botId}`) throw new Error("This task is assigned to someone else.");
+      if (!task.project_id) throw new Error("Choose a folder before scheduling work.");
+      const profile = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "get", input: { id: botId }, outputSchema: z.object({ bot: z.object({ trust: z.enum(["ask", "act"]).default("ask") }) }) });
+      store.update(id, { assignee: `bot:${botId}` }, "user");
+      const { threadId } = await handOffBot(id, null, true);
+      await schedules.ensure({ taskId: id, projectId: task.project_id, threadId, schedule, trust: profile.bot.trust });
+      changed(id); return { threadId };
+    },
     async syncCheckbox({ id, checked }) {
       const task = store.get(id);
       if (!task) return { ok: false };

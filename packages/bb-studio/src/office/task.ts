@@ -9,12 +9,13 @@ type Task = z.infer<typeof taskList>["tasks"][number];
 export function officeTask(task: Task): z.infer<typeof workingTaskSchema> {
   const state = task.handoff?.state;
   const status = task.status === "done" ? "done"
+    : task.schedule && task.status === "todo" ? "waiting"
     : state === "needs-input" || state === "failed" || state === "archived" || state === "deleted" ? "waiting"
     : task.status === "review" || /review/i.test(task.statusLabel) || state === "ready" || state === "replied" ? "review"
     : /wait|block|fail/i.test(state ?? task.status) ? "waiting" : "working";
   return {
     id: task.id, botId: task.assignee?.startsWith("bot:") ? task.assignee.slice(4) : null,
     title: task.title, status, note: task.handoff?.note ?? null,
-    recurring: task.recurrence, href: `/plugins/studio/tasks/${task.id}`, updatedAt: task.updatedAt,
+    recurring: task.schedule ?? task.recurrence, href: `/plugins/studio/tasks/${task.id}`, updatedAt: task.updatedAt,
   };
 }
