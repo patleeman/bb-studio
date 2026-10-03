@@ -173,7 +173,8 @@ export class TableStore {
   /** Adds CSV rows, matching headers to columns by name and adding columns for the rest. */
   importCsv(id: string, source: string): number {
     const table = this.require(id);
-    const { columns, rows } = importGrid(table.columns, parseCsv(source), () => newId("col"));
+    // A UTF-8 BOM is a file marker, not part of the first (possibly quoted) header.
+    const { columns, rows } = importGrid(table.columns, parseCsv(source.replace(/^\uFEFF/, "")), () => newId("col"));
     if (!rows.length) return 0;
     const now = Date.now();
     this.save({
