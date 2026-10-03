@@ -48,8 +48,8 @@ final class OfficeTabsTests: XCTestCase {
         let results = try await store.search("Matching")
         XCTAssertEqual(results.map(\.ref), ["thread:t", "thread:other", "item:pages:p"])
         XCTAssertEqual(results[1].zone, .archived)
-        await store.noteOpened(.savedView(id: "channel"))
-        await store.noteOpened(.page(id: "p"))
+        await store.noteOpened(.savedView(id: "channel"), client: client)
+        await store.noteOpened(.page(id: "p"), client: client)
         await store.move("thread:t", to: .pinned, folderId: "f")
         await store.createFolder(name: "Notes")
         await store.renameFolder("f", to: "Work")
@@ -100,7 +100,7 @@ private actor TabsStub {
         case "tabs_move" where failMove:
             failMove = false
             throw BBError(status: 500, message: "Move failed")
-        case "tabs_open": result = ["tab": tab]
+        case "tabs_open": result = ["tab": tab, "spaceId": "s"]
         case "office_search": result = ["results": [tab, ["ref": "item:pages:p", "kind": "item", "title": "Matching page", "zone": "archived", "openedAt": 1]]]
         case "tabs_archived": result = ["tabs": [tab, ["kind": "future"]]]
         case "tab_folder_create", "tab_folder_update": result = ["folder": ["id": "f", "name": "Work", "open": false, "position": 0]]
