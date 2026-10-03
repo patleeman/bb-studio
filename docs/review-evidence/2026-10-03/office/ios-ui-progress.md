@@ -202,3 +202,21 @@ The updated seed was exercised against the fresh install.
 `/tmp/office-studio-fixture/results.xcresult`: testStudio passed, 1 test,
 0 failures. Staging script syntax and `git diff --check` passed.
 These focused runs do not replace the required final full-suite run.
+
+## Five fixture-only skips resolved
+
+After the coordinator explicitly handed off all runner/fixture ownership,
+`ui-test.sh` was extended to seed Office and export `BB_OFFICE_CAPTURE_DIR`
+automatically when `BB_QA_DATA_DIR` is supplied. The existing guarded Office
+seeder creates inert local data; the four capture tests now run in the normal
+fixture-enabled suite. `/tmp/office-capture-skip-fix/results.xcresult` confirms
+all four pass, 0 failures.
+
+The native fixture seeder also creates one completed recording with deterministic
+meeting notes directly in the isolated Talk store. It does not invoke summary
+generation or transcription. `testMeetingNotes` requires the exported recording
+ID and checks the exact summary, replacing its missing-recording skip.
+`/tmp/office-notes-skip-fix/results.xcresult`: 1 passed, 0 failures. This run also
+exercised the automatic Office seed invocation; its generated xctestrun contains
+the capture directory and meeting recording ID. Node/shell syntax checks and
+`git diff --check` pass.

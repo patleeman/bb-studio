@@ -106,13 +106,11 @@ final class NewSurfacesUITests: XCTestCase {
     }
 
     func testMeetingNotes() throws {
-        let recordings = rpc("studio", "talk_recordings_list", ["limit": 200])?["recordings"] as? [[String: Any]] ?? []
-        guard let id = recordings.first(where: { $0["meetingNotes"] is [String: Any] })?["id"] as? String else {
-            throw XCTSkip("No recording with meeting notes is available for read-only QA")
-        }
+        let id = try XCTUnwrap(ProcessInfo.processInfo.environment["BBGO_QA_MEETING_RECORDING"], "Seed meeting notes with BB_QA_DATA_DIR")
         let app = launch()
         app.open(URL(string: "bbstudio://recording/\(id)")!)
         XCTAssertTrue(app.descendants(matching: .any)["recordingMeetingNotes"].waitForExistence(timeout: 15))
+        XCTAssertTrue(app.staticTexts["The release checklist is ready for Friday."].exists)
         shot(app, "meeting-notes")
     }
 

@@ -19,6 +19,10 @@ mkdir -p "$run_dir"
 trap 'printf "UI test evidence: %s\n" "$run_dir"' EXIT
 if [ -n "${BB_QA_DATA_DIR:-}" ]; then
   node scripts/seed-ui-fixtures.mjs "$run_dir/fixture-inputs.json"
+  BB_DATA_DIR="$BB_QA_DATA_DIR" BB_SERVER_URL="$BB_QA_SERVER_URL" \
+    BB_CAPTURE_PROJECT_ID="$BB_QA_PROJECT_ID" BB_CAPTURE_THREAD_ID="$BBGO_QA_THREAD" \
+    node --input-type=module -e 'const { seedOffice } = await import("../../scripts/capture/seed-office.mjs"); await seedOffice();'
+  export BB_OFFICE_CAPTURE_DIR="$run_dir/office-captures"
 fi
 xcodegen generate -q
 for domain in nyc.plee.bbgo group.nyc.plee.bbgo; do

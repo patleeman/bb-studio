@@ -94,6 +94,18 @@ if (!fixtures) {
     throw error;
   }
 }
+// A completed summary is local fixture data; never invoke the summary model.
+if (!fixtures.BBGO_QA_MEETING_RECORDING) {
+  const recording = await rpc('talk_recording_create', {kind:'recording',projectId,threadId:null});
+  await rpc('talk_recording_rename', {id:recording.id,title:'Native meeting notes fixture'});
+  const talk = new Database(join(dataDir,'plugins/studio/talk.db'));
+  try {
+    talk.prepare("UPDATE recordings SET status = 'done', meeting_notes = ? WHERE id = ?")
+      .run(JSON.stringify({summary:'The release checklist is ready for Friday.',decisions:['Review before release.'],actionItems:[]}),recording.id);
+  } finally { talk.close(); }
+  fixtures.BBGO_QA_MEETING_RECORDING = recording.id;
+  await writeFile(marker, JSON.stringify(fixtures,null,2)+'\n');
+}
 db.close();
 const env = Object.fromEntries(Object.entries(fixtures).filter(([key])=>key.startsWith('BBGO_QA_')));
 await writeFile(process.argv[2],JSON.stringify(env,null,2)+'\n');
