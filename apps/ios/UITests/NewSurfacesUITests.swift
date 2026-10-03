@@ -94,7 +94,7 @@ final class NewSurfacesUITests: XCTestCase {
         if !search.waitForExistence(timeout: 3) { app.swipeDown() }
         XCTAssertTrue(search.waitForExistence(timeout: 10))
         search.tap(); search.typeText(title)
-        let row = app.buttons.matching(identifier: "studioItem")
+        let row = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:"))
             .matching(NSPredicate(format: "label CONTAINS %@", title)).firstMatch
         XCTAssertTrue(row.waitForExistence(timeout: 15)); row.tap()
         XCTAssertTrue(app.descendants(matching: .any)["studioTable"].waitForExistence(timeout: 10))

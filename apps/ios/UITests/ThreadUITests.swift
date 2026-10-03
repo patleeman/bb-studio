@@ -295,7 +295,7 @@ final class ThreadUITests: XCTestCase {
             sleep(1)
             shot("studio-\(name)s")
             // Items only: the quick-action tiles start real recordings.
-            let first = app.descendants(matching: .any).matching(identifier: "studioItem").firstMatch
+            let first = app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:")).firstMatch
             XCTAssertTrue(first.waitForExistence(timeout: 5), "seeded \(name) item")
             first.tap()
             sleep(3)

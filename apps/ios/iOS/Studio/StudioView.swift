@@ -360,6 +360,7 @@ struct StudioView: View {
     @ObservedObject private var store = StudioStore.shared
     @AppStorage(ServerScope.key("studioProject")) private var project = ""
     @State private var query = ""
+    @FocusState private var searchFocused: Bool
     /// Content matches, keyed like items, with the matching text.
     @State private var contentMatches: [String: String] = [:]
     @State private var externalMatches: [Studio.SearchAllOutputItem] = []
@@ -385,23 +386,9 @@ struct StudioView: View {
 
     var body: some View {
         List(selection: $selection) {
-            HStack(alignment: .firstTextBaseline, spacing: 8) {
-                Image(systemName: "magnifyingglass").accessibilityHidden(true)
-                TextField("Search Studio", text: $query, axis: .vertical)
-                    .textInputAutocapitalization(.never)
-                    .autocorrectionDisabled()
-                    .accessibilityIdentifier("studioSearch")
-                    .fixedSize(horizontal: false, vertical: true)
-                if !query.isEmpty {
-                    Button { query = "" } label: {
-                        Image(systemName: "xmark.circle.fill")
-                            .frame(minWidth: 44, minHeight: 44)
-                    }
-                    .buttonStyle(.borderless)
-                    .accessibilityLabel("Clear search")
-                }
-            }
-            .foregroundStyle(.primary)
+            GrowingSearchField(text: $query, prompt: "Search", label: "Search Studio",
+                               identifier: "studioSearch", isFocused: $searchFocused)
+                .listRowBackground(Color.clear)
             if let error = store.error {
                 Section { PagesErrorRow(message: error) { await store.load(client) } }
             }
@@ -777,7 +764,7 @@ struct StudioView: View {
         Group {
             if !selecting, let route = route(item) {
                 NavigationLink(value: route) { content }
-                    .accessibilityIdentifier("studioItem")
+                    .accessibilityIdentifier("studioItem:\(item.id)")
             } else {
                 content
             }
@@ -1251,6 +1238,7 @@ struct StudioRow: View {
                     Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .fixedSize(horizontal: false, vertical: true)
+                        .accessibilityIdentifier("studioMetadata:\(item.id)")
                     if let badge = item.badge {
                         Text(badge.label)
                             .font(.caption2.weight(.semibold))

@@ -120,6 +120,7 @@ struct OfficeEventRow: View {
                                 .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
                             Text(Date(timeIntervalSince1970: event.createdAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
                                 .font(.footnote).monospacedDigit().foregroundStyle(Color(.label))
+                                .accessibilityIdentifier("officeEventTime:\(event.id)")
                         }
                         Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
                             .font(.subheadline).foregroundStyle(Color(.label))
@@ -151,12 +152,14 @@ struct OfficeEventRow: View {
                                     Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
                                 }
                                     .buttonStyle(.borderedProminent)
+                                    .accessibilityIdentifier("officeEventAction:\(event.id):\(action.id)")
                             } else {
                                 Button { act(action.id) } label: {
                                     Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
                                 }
                                     .buttonStyle(.bordered)
                                     .tint(.primary)
+                                    .accessibilityIdentifier("officeEventAction:\(event.id):\(action.id)")
                             }
                         }
                     }

@@ -26,7 +26,7 @@ final class ReviewPerformanceUITests: XCTestCase {
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.buttons["Pages"].tap()
         app.swipeUp()
-        let rows = app.buttons.matching(identifier: "studioItem")
+        let rows = app.buttons.matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:"))
         XCTAssertTrue(rows.firstMatch.waitForExistence(timeout: 15))
         XCTAssertTrue(visibleFixtureRows(rows).count >= 2, "Seed 24 Native Performance pages before this suite")
 

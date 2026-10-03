@@ -9,6 +9,7 @@ final class ReviewQualityUITests: XCTestCase {
     private var largeContentProof: Set<String> = []
     private var glyphHeights: [String: CGFloat] = [:]
     private var settingsScaleProof: Set<String> = []
+    private var essentialScaleProof: Set<String> = []
     private let captureTextControls = ["capture-voice": "Record voice", "capture-dictate": "Dictate", "capture-file": "Photo or file", "capture-thread": "New thread", "captureNoteSave": "Save note"]
 
     override func setUpWithError() throws {
@@ -20,6 +21,77 @@ final class ReviewQualityUITests: XCTestCase {
 
     func testNavigationAtDefaultText() throws { try navigation(largeText: false) }
     func testNavigationAtAccessibilityText() throws { try navigation(largeText: true) }
+
+    func testEssentialGlyphsScaleInsideCombinedTiles() throws { try verifyEssentialScaling() }
+
+    /// The coordinator-approved Essentials exception requires measured ink
+    /// growth, containment, and the same information in the combined label.
+    private func verifyEssentialScaling() throws {
+        var normal: [String: CGSize] = [:]
+        for large in [false, true] {
+            let app = application(largeText: large, tab: "tabs")
+            app.launch()
+            defer { app.terminate() }
+            XCTAssertTrue(app.buttons["officeEssential"].firstMatch.waitForExistence(timeout: 20))
+            let size = large ? "accessibility-xxxl" : "default"
+            var captured: Set<String> = []
+            try app.performAccessibilityAudit(for: [.dynamicType, .textClipped]) { issue in
+                guard let element = issue.element,
+                      let tile = self.essentialTile(for: element, app: app) else { return true }
+                let key = tile.label + "|" + element.label
+                guard captured.insert(key).inserted else { return true }
+                let frame = element.frame
+                let glyph = element.screenshot()
+                let tileImage = XCTAttachment(screenshot: tile.screenshot())
+                tileImage.name = "essential-\(key)-\(size)-tile"
+                tileImage.lifetime = .keepAlways
+                self.add(tileImage)
+                let crop = XCTAttachment(screenshot: glyph)
+                crop.name = "essential-\(key)-\(size)-glyph"
+                crop.lifetime = .keepAlways
+                self.add(crop)
+                guard let ink = EssentialGlyphPixels.inkSize(glyph.image, points: frame.size, badge: Int(element.label) != nil) else {
+                    XCTFail("No rendered glyph pixels for \(key)"); return true
+                }
+                var proven = false
+                if large, let original = normal[key] {
+                    proven = ink.height >= original.height * 1.25 && ink.width >= original.width * 1.25
+                    XCTAssertTrue(proven, "Essentials ink must grow in both dimensions: \(key), \(original) -> \(ink)")
+                    if proven { self.essentialScaleProof.insert(key) }
+                } else if !large { normal[key] = ink }
+                let evidence = "label=\(tile.label); glyph=\(element.label); tile=\(tile.frame); glyphFrame=\(frame); contained=true; ink=\(ink); normal=\(String(describing: normal[key])); size=\(size); growthProven=\(proven)"
+                let record = XCTAttachment(string: evidence)
+                record.name = "essential-\(key)-\(size)-results"
+                record.lifetime = .keepAlways
+                self.add(record)
+                print("AUDIT-ESSENTIAL-SCALE: \(evidence)")
+                return true // Measurement pass; the aggregate audit stays strict.
+            }
+            retainScreen(app, "essential-scaling-\(size)")
+        }
+        XCTAssertFalse(normal.isEmpty, "The staged Essentials must supply glyph evidence")
+        XCTAssertEqual(essentialScaleProof, Set(normal.keys), "Every captured default glyph needs a large-text proof")
+    }
+
+    private func essentialTile(for element: XCUIElement, app: XCUIApplication) -> XCUIElement? {
+        guard element.exists, !element.frame.isEmpty, app.frame.contains(element.frame) else { return nil }
+        let emoji = element.label.count == 1 && element.label.unicodeScalars.contains { $0.properties.isEmojiPresentation }
+        let badge = Int(element.label).map { $0 > 0 } ?? false
+        guard emoji || badge else { return nil }
+        let tiles = app.buttons.matching(identifier: "officeEssential").allElementsBoundByIndex.filter {
+            $0.exists && !$0.label.isEmpty && $0.frame.contains(element.frame)
+                && (!badge || $0.label.contains("\(element.label) waiting"))
+        }
+        guard tiles.count == 1 else { return nil }
+        if emoji {
+            let faces = app.images.matching(identifier: "officeFace").allElementsBoundByIndex.filter {
+                $0.exists && !$0.label.isEmpty && $0.frame.contains(element.frame)
+                    && $0.label.components(separatedBy: ", ").allSatisfy { tiles[0].label.contains($0) }
+            }
+            guard faces.count == 1 else { return nil }
+        }
+        return tiles[0]
+    }
 
     /// Let XCTest retain its native issue attachments for an unidentified finding.
     func testSettingsElementDetectionAtDefaultText() throws {
@@ -92,6 +164,29 @@ final class ReviewQualityUITests: XCTestCase {
             let search = app.descendants(matching: .any)["studioSearch"]
             if !search.waitForExistence(timeout: 3) { app.swipeDown() }
             XCTAssertTrue(search.waitForExistence(timeout: 10))
+            XCTAssertEqual(search.label, "Search Studio")
+            let prompt = app.screenshot()
+            let attachment = XCTAttachment(screenshot: prompt)
+            attachment.name = "studio-search-prompt-" + (large ? "accessibility-xxxl" : "default")
+            attachment.lifetime = .keepAlways
+            add(attachment)
+            // Include the field's padding so glyph-edge antialiasing survives
+            // the crop, while leaving the separate magnifying-glass icon out.
+            let row = app.cells.containing(.textField, identifier: "studioSearch").firstMatch
+            XCTAssertTrue(row.exists)
+            let bounds = search.frame.insetBy(dx: -10, dy: -4).intersection(row.frame)
+            let pixelsImage = try XCTUnwrap(prompt.image.cgImage)
+            let scale = CGFloat(pixelsImage.width) / app.frame.width
+            let pixels = CGRect(x: bounds.minX * scale, y: bounds.minY * scale,
+                                width: bounds.width * scale, height: bounds.height * scale)
+            let image = UIImage(cgImage: try XCTUnwrap(pixelsImage.cropping(to: pixels)))
+            let crop = XCTAttachment(image: image)
+            crop.name = "studio-search-prompt-glyphs-" + (large ? "accessibility-xxxl" : "default")
+            crop.lifetime = .keepAlways
+            add(crop)
+            let lines = try RenderedText.lines(in: image)
+            XCTAssertTrue(RenderedText.proves("Search", lines: lines, inside: CGRect(x: 0, y: 0, width: 1, height: 1)),
+                          "Search must be fully rendered inside its padded row: \(lines)")
             try captureNativeDiagnostic(app, "studio-search-" + (large ? "accessibility-xxxl" : "default"), audit: [.textClipped])
         }
     }
@@ -109,7 +204,7 @@ final class ReviewQualityUITests: XCTestCase {
         app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
-        XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:")).firstMatch.waitForExistence(timeout: 10))
         try captureAndAudit(app, "studio-rows-accessibility-xxxl")
         XCTAssertTrue(auditFindings.isEmpty, auditFindings.joined(separator: "\n"))
     }
@@ -153,7 +248,7 @@ final class ReviewQualityUITests: XCTestCase {
         if app.buttons["captureClose"].exists { app.buttons["captureClose"].tap() }
         app.open(URL(string: "bbstudio://studio")!)
         try verifyLargeContentViewer(app.buttons["studioSelect"], title: "Select", app: app)
-        app.openOfficeScreen("Home")
+        app.showOfficeTabs()
         let space = app.buttons["officeSpaceSwitcher"]
         XCTAssertTrue(space.waitForExistence(timeout: 10))
         let title = space.label.replacingOccurrences(of: "Space: ", with: "").replacingOccurrences(of: ". Switch space", with: "")
@@ -353,7 +448,7 @@ final class ReviewQualityUITests: XCTestCase {
         app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
-        XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:")).firstMatch.waitForExistence(timeout: 10))
         try captureNativeDiagnostic(app, "studio-row-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
 
@@ -364,7 +459,7 @@ final class ReviewQualityUITests: XCTestCase {
         app.open(URL(string: "bbstudio://studio")!)
         XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
         app.swipeUp()
-        XCTAssertTrue(app.descendants(matching: .any)["studioItem"].firstMatch.waitForExistence(timeout: 10))
+        XCTAssertTrue(app.descendants(matching: .any).matching(NSPredicate(format: "identifier BEGINSWITH %@", "studioItem:")).firstMatch.waitForExistence(timeout: 10))
         try captureNativeDiagnostic(app, "studio-row-second-contrast-native-accessibility-xxxl", audit: [.contrast])
     }
 
@@ -516,6 +611,23 @@ final class ReviewQualityUITests: XCTestCase {
 
     private func freshElement(for finding: AuditFinding, app: XCUIApplication) -> XCUIElement? {
         guard finding.element != nil else { return nil }
+        if finding.identifier.hasPrefix("studioMetadata:") {
+            let metadata = app.descendants(matching: .any).matching(NSPredicate(format: "identifier == %@ AND label == %@", finding.identifier, finding.label))
+            if metadata.count == 1 { return metadata.firstMatch }
+            let itemID = String(finding.identifier.dropFirst("studioMetadata:".count))
+            let rows = app.descendants(matching: .any).matching(identifier: "studioItem:" + itemID)
+            if rows.count == 1 { return rows.firstMatch }
+        }
+        if finding.identifier.hasPrefix("officeTabTitle:") {
+            let rows = app.buttons.matching(identifier: "officeTab").matching(NSPredicate(format: "label CONTAINS %@", finding.label))
+            if rows.count == 1 { return rows.firstMatch }
+        }
+        if ["officeEventTime:", "officeEventAction:", "officeTabTitle:", "studioMetadata:"].contains(where: finding.identifier.hasPrefix) {
+            // Native audit elements can be rebuilt by another audit category.
+            // Only a unique, explicit content ID can recover that identity.
+            let matches = app.descendants(matching: .any).matching(identifier: finding.identifier)
+            if matches.count == 1 { return matches.firstMatch }
+        }
         if let original = finding.element, original.exists,
            original.label == finding.label, original.identifier == finding.identifier { return original }
         if let type = finding.elementType {
@@ -540,6 +652,13 @@ final class ReviewQualityUITests: XCTestCase {
     private func resolveFindings(_ collected: [AuditFinding], app: XCUIApplication, name: String) throws -> [AuditFinding] {
         var initial: [AuditFinding] = []
         for finding in collected {
+            if finding.type == .dynamicType || finding.type == .textClipped,
+               let element = finding.element, let tile = essentialTile(for: element, app: app),
+               essentialScaleProof.contains(tile.label + "|" + element.label) {
+                retainScreen(app, name + "-essential-exclusion")
+                print("AUDIT-EXCLUSION: \(name): decorative Essentials glyph inside combined label \(tile.label); exact glyph \(element.label) has both-size contained screenshots and >=1.25x rendered ink growth; original=\(finding.description)")
+                continue
+            }
             if finding.type == .dynamicType, finding.element != nil, settingsScaleProof.contains(finding.label), app.navigationBars["Settings"].exists {
                 print("AUDIT-EXCLUSION: \(name): Settings rendered text \(finding.label) has exact OCR proof, contained bounds, and >=1.25x glyph growth at accessibility XXXL")
                 continue
@@ -550,11 +669,29 @@ final class ReviewQualityUITests: XCTestCase {
         guard initial.contains(where: \.scrollEdgeContrast) else { return initial }
         var remaining = initial.filter { !$0.scrollEdgeContrast }
         for (index, finding) in initial.filter(\.scrollEdgeContrast).enumerated() {
-            guard let element = freshElement(for: finding, app: app) else {
+            var located = freshElement(for: finding, app: app)
+            // Native audits can change a virtualized List's scroll position.
+            // Recover only an originally resolved, uniquely identified item;
+            // it still must clear the bars and pass a second native audit.
+            if located == nil, finding.identifier.hasPrefix("studioMetadata:") {
+                retainScreen(app, "\(name)-material-\(index)-recover-before")
+                for up in [false, true] {
+                    for _ in 0..<8 {
+                        if up { app.collectionViews.firstMatch.swipeUp() }
+                        else { app.collectionViews.firstMatch.swipeDown() }
+                        located = freshElement(for: finding, app: app)
+                        if located != nil { break }
+                    }
+                    if located != nil { break }
+                }
+                retainScreen(app, "\(name)-material-\(index)-recover-after")
+            }
+            guard let element = located else {
                 remaining.append(finding)
                 continue
             }
             let proofIdentity = "\(element.identifier)|\(element.label)"
+            let proofIdentifier = element.identifier
             let originalFrame = finding.originalFrame ?? element.frame
             let proofName = "\(name)-material-\(index)"
             retainScreen(app, proofName + "-before")
@@ -584,9 +721,14 @@ final class ReviewQualityUITests: XCTestCase {
             let retry = try collectAudit(app, name: proofName + "-reaudit", types: [.contrast])
             // This gate covers only the same resolved element after it clears
             // the queried native bar. Unresolved findings are never eligible.
-            let sameElement = element.exists && "\(element.identifier)|\(element.label)" == proofIdentity
+            // Relative time can advance during the drag. Its event-specific ID
+            // still identifies exactly one timestamp, with fresh bounds above.
+            let timestamp = finding.identifier.hasPrefix("officeEventTime:") && element.identifier == finding.identifier
+            let studioRow = proofIdentifier.hasPrefix("studioItem:") && element.identifier == proofIdentifier
+            let sameElement = element.exists && (timestamp || studioRow || "\(element.identifier)|\(element.label)" == proofIdentity)
             let resolved = sameElement && !retry.contains {
-                $0.key == finding.key || "\($0.identifier)|\($0.label)" == proofIdentity || $0.element == nil
+                $0.key == finding.key || "\($0.identifier)|\($0.label)" == proofIdentity
+                    || (timestamp && $0.identifier == finding.identifier) || $0.element == nil
             }
             let evidence = "policy 2: key=\(finding.key); original=\(originalFrame); bars=\(finding.nativeBars); clear=\(element.frame); resolved=\(resolved); initial=\(finding.description); retry=\(retry.map(\.description))"
             print("AUDIT-MATERIAL-RETRY: \(evidence)")
@@ -695,6 +837,7 @@ final class ReviewQualityUITests: XCTestCase {
     }
 
     private func navigation(largeText: Bool) throws {
+        try verifyEssentialScaling()
         try verifySettingsTextScaling()
         try verifyCapturePixelsAtBothSizes()
         try verifyFixedControlViewers()

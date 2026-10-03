@@ -4,6 +4,13 @@ extension XCUIApplication {
     /// Return to the actual Tabs root before opening one of its secondary screens.
     func showOfficeTabs(file: StaticString = #filePath, line: UInt = #line) {
         let tabs = tabBars.buttons["Tabs"]
+        // A thread hides the tab bar while its timeline is open.
+        for _ in 0..<8 {
+            if tabs.exists { break }
+            let back = navigationBars.buttons.firstMatch
+            guard back.exists else { break }
+            back.tap()
+        }
         XCTAssertTrue(tabs.waitForExistence(timeout: 15), file: file, line: line)
         tabs.tap()
         for _ in 0..<8 {
