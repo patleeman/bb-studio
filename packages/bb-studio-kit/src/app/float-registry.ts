@@ -47,11 +47,22 @@ export interface FloatAnchor {
   placement?: "floating" | "workbench" | "main";
 }
 
+/** A nav pane that can lend its existing view to a companion. */
+export interface MainAnchor {
+  id: string;
+  target: Extract<FloatTarget, { kind: "path" }>;
+  element: HTMLElement;
+  setMoved(moved: boolean): void;
+  focusOrder?: number;
+}
+
 interface Registry {
   host: FloatHost | null;
   panels: Map<string, FloatPanelInfo>;
   /** Window bodies by window key. */
   anchors: Map<string, FloatAnchor>;
+  main?: Map<string, MainAnchor>;
+  focusOrder?: number;
   /** Room above each thread window's messages, by window key. */
   leading: Map<string, FloatAnchor>;
   /** The dock's own corner, right of the windows. */
@@ -91,6 +102,23 @@ export function setFloatHost(host: FloatHost | null): void {
 }
 
 export const floatHost = (): FloatHost | null => registry().host;
+
+export function publishMainBody(anchor: MainAnchor): () => void {
+  const state = registry();
+  const main = state.main ??= new Map();
+  const focused = () => { anchor.focusOrder = state.focusOrder = (state.focusOrder ?? 0) + 1; };
+  anchor.element.addEventListener("focusin", focused);
+  main.set(anchor.id, anchor);
+  changed();
+  return () => {
+    anchor.element.removeEventListener("focusin", focused);
+    if (main.get(anchor.id) !== anchor) return;
+    main.delete(anchor.id);
+    changed();
+  };
+}
+
+export const mainBodies = (): MainAnchor[] => [...(registry().main?.values() ?? [])];
 
 /** The attribute on a floating tab's body naming its window key. */
 export const FLOAT_WINDOW_ATTRIBUTE = "data-float-window";

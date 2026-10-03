@@ -18,7 +18,7 @@ import { BotCreateRequests } from "./bot-create-requests";
 import { BotCreationThread } from "./bot-creation-thread";
 import { BotChat } from "./bot-chat";
 import { BOT_KIND, NEW_BOT_EVENT, PLUGIN_ID, botHref } from "./studio-provider";
-import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FloatPanels, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
+import { Badge, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FloatPanels, retainPanel, ICON_BUTTON, Icon as KitIcon, ItemHeader, ItemTile, openAppPath, PageColumn, studioPath, useStudioPresent } from "@bb-studio/kit/app";
 
 import "./styles.css";
 import { botTeamsIcons } from "./icons";
@@ -357,15 +357,15 @@ export default definePluginApp((app) => {
     title: "Teams",
     icon: "Bot",
     path: "bots",
-    component: BotsPage,
+    component: retainPanel("bots", BotsPage),
   });
-  app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: ViewsPage, headerContent: ViewHeader });
-  app.slots.navPanel({ id: "former-views", title: "Channels", icon: "MessageSquare", path: "views", component: LegacyChannelRedirect });
+  app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: retainPanel("channels", ViewsPage), headerContent: ViewHeader });
+  app.slots.navPanel({ id: "former-views", title: "Channels", icon: "MessageSquare", path: "views", component: retainPanel("views", LegacyChannelRedirect) });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });
   app.slots.experimental_appOverlay({ id: "studio-new-bot", component: NewBotListener });
   app.slots.experimental_appOverlay({ id: "companions", component: () => <>
     <FloatPanels path="bots" render={subPath => <BotsPage subPath={subPath} />} />
-    <FloatPanels path="channels" render={subPath => <div className="flex h-full min-h-0 flex-col"><div className="flex shrink-0 items-center px-3 py-2"><ViewHeader subPath={subPath} /></div><div className="min-h-0 flex-1"><ViewsPage subPath={subPath} /></div></div>} />
+    <FloatPanels path="channels" render={(subPath, { companion }) => <div className="flex h-full min-h-0 flex-col">{companion ? <div className="flex shrink-0 items-center px-3 py-2"><ViewHeader subPath={subPath} /></div> : null}<div className="min-h-0 flex-1"><ViewsPage subPath={subPath} /></div></div>} />
     <FloatPanels path="views" render={subPath => <LegacyChannelRedirect subPath={subPath} />} />
   </> });
 });

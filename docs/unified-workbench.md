@@ -325,3 +325,22 @@ The account has `READ` permission on `get-bb/bb`, so host publication remains
 an external requirement. Stable plugins continue to detect the optional
 capability without raising their SDK pins. Initial main-editor retention,
 split/swap flows, and the full completion audit remain required.
+
+
+Main plugin panels now register with their own app overlay through Kit's
+`retainPanel(path, Component)` wrapper. Pages, Talk, Draw, Artifacts, Tasks,
+Tables, Feed, Explore, Studio Chat, Studio, and Teams use it for every content
+route. The overlay owns a stable portal container before Float opens. The
+first companion move carries that container rather than creating another
+editor. Separate main panes retain independent state; the most recently
+focused pane supplies the companion. A main route showing the moved item
+provides a Show companion action. Closing its companion returns the same
+view to an available main pane; ordinary navigation without a companion
+disposes the view. If no renderer is registered, the panel renders inline.
+
+Six regression checks cover original editor/file-input identity, local state,
+focus, selection, scroll, main-route changes, two panes of the same document,
+asynchronous navigation context, and fallback/disposal. All 1,545 suite
+checks, typechecks, builds, stable compatibility, contracts, marketplace,
+documentation, and the refreshed Kit pack pass. Live first-move proof is next;
+native main-thread composer adoption and split/swap still require verification.

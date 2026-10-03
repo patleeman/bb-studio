@@ -48,6 +48,7 @@ export { TagDot } from "./tags";
 export {
   FloatDockPortal,
   FloatPanels,
+  retainPanel,
   FloatThreadLeading,
   openFloat,
   useCanFloat,

@@ -5,7 +5,7 @@
 //     feed/<id>. New stories since you last looked show next to it.
 //   - messageDirective `::post{id="…"}`: the post a reply made, as a
 //     card in its thread or channel.
-import { FloatPanels } from "@bb-studio/kit/app";
+import { FloatPanels, retainPanel } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { DIRECTIVE, FEED_ICON, PANEL_PATH } from "./src/shared";
 import { PostCard } from "./src/ui/card";
@@ -17,7 +17,7 @@ export default definePluginApp((app) => {
     title: "Feed",
     icon: FEED_ICON,
     path: PANEL_PATH,
-    component: ({ subPath }) => <FeedPanel subPath={subPath ?? ""} />,
+    component: retainPanel(PANEL_PATH, FeedPanel),
     experimental_sidebarAccessory: UnreadCount,
   });
   // Shows the panel in Float windows open on its paths.

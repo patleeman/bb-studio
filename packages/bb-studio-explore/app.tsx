@@ -1,5 +1,5 @@
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
-import { FloatPanels, openCompanion } from "@bb-studio/kit/app";
+import { FloatPanels, retainPanel, openCompanion } from "@bb-studio/kit/app";
 import { DIRECTIVE, PANEL_ACTION } from "./src/shared";
 import { EXPLAINERS_PATH, EXPLORE_ICON, threadExplainersPath } from "./src/ui/explore";
 import { ExplainersPage, ExplainerTab } from "./src/ui/panel";
@@ -14,6 +14,6 @@ export default definePluginApp((app) => {
       if (!openCompanion({ kind: "path", path: threadExplainersPath(threadId), title: "Explore" })) openPanel();
     },
   });
-  app.slots.navPanel({ id: EXPLAINERS_PATH, path: EXPLAINERS_PATH, title: "Explore", icon: EXPLORE_ICON, component: ExplainersPage });
+  app.slots.navPanel({ id: EXPLAINERS_PATH, path: EXPLAINERS_PATH, title: "Explore", icon: EXPLORE_ICON, component: retainPanel(EXPLAINERS_PATH, ExplainersPage) });
   app.slots.experimental_appOverlay({ id: "explainer-companions", component: () => <FloatPanels path={EXPLAINERS_PATH} render={subPath => <ExplainersPage subPath={subPath} />} /> });
 });
