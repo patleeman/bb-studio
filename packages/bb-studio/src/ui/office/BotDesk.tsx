@@ -37,6 +37,7 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
   const activity = useLive<{ events: InboxEvent[] }>("inbox_list", { spaceId: space.id }, { pollMs: 60_000 });
   const botEvents = (activity.data?.events ?? []).filter((event) => event.botId === botId).slice(0, 8);
   const [starting, setStarting] = useState(false);
+  const [startError, setStartError] = useState<string | null>(null);
 
   if (desk.error && !desk.data) return <PageColumn><p role="alert" className="text-sm text-destructive">{desk.error}</p></PageColumn>;
   if (!desk.data) return <PageColumn><div className="h-12 w-64 animate-pulse rounded-md bg-muted" /></PageColumn>;
@@ -46,8 +47,10 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
     : { label: "Idle", tone: "text-muted-foreground" };
 
   const startDirect = async () => {
-    setStarting(true);
-    try { await call("talk_dm", { botId }); desk.refresh(); } finally { setStarting(false); }
+    setStarting(true); setStartError(null);
+    try { await call("talk_dm", { botId }); desk.refresh(); }
+    catch (cause) { setStartError(cause instanceof Error ? cause.message : String(cause)); }
+    finally { setStarting(false); }
   };
 
   return (
@@ -92,8 +95,9 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
             : <div className="mx-auto max-w-3xl px-10 py-10 text-sm text-muted-foreground @max-3xl/page:px-4">
                 <div className="flex items-center gap-3">
                   <p className="flex-1">You haven't messaged {bot.name} directly yet.</p>
-                  <button type="button" disabled={starting} onClick={() => void startDirect()} className={OUTLINE_BUTTON}>Message {bot.name}</button>
+                  <button type="button" disabled={starting} onClick={() => void startDirect()} className={OUTLINE_BUTTON}>{starting ? "Opening…" : `Message ${bot.name}`}</button>
                 </div>
+                {startError ? <p role="alert" className="mt-2 text-sm text-destructive">Couldn't start a conversation with {bot.name}: {startError}</p> : null}
                 {botEvents.length
                   ? <section className="mt-8 text-foreground">
                       <h2 className="mb-1 text-sm font-medium text-muted-foreground">Recent from {bot.name}</h2>

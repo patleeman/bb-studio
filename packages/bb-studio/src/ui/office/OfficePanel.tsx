@@ -234,7 +234,8 @@ function NewBotPage({ space }: { space: Space }) {
         mission: mission.trim(),
         description: role.trim(),
         trust,
-        ...(runtime ? { providerId: runtime } : {}),
+        // Outside agents only take reasoning level "none".
+        ...(runtime ? { providerId: runtime, reasoningLevel: "none" } : {}),
         ...(avatar.trim() ? { avatar: avatar.trim() } : {}),
         ...(space.defaultProjectId ? { projectId: space.defaultProjectId } : {}),
       }) as { id?: string; bot?: { id: string } };
