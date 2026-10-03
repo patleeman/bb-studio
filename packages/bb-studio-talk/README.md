@@ -194,13 +194,15 @@ The same message at a 390-pixel viewport, with the source pill in view.
   can still be lost.
 - **Local storage failure.** Capture stops and keeps the full affected segment
   in this window. Retry saving or download it before closing. If the window
-  closes first, that memory-only audio cannot be recovered. A persisted failure
-  marker reports this on return and requires acknowledgement before continuing
-  with saved audio; automatic dictation insertion stays off. If browser storage
-  also refuses the small marker, no persistent loss warning can be guaranteed.
-- **Survives reloads.** After a reload, the page picks the same recording back
-  up in a new session. The transcript starts a new paragraph where the reload
-  happened.
+  closes first, that memory-only audio cannot be recovered. Before capture starts,
+  Talk writes and reads back a small recovery marker; it refuses capture if this
+  fails. The marker remains conservative if later audio and metadata writes both
+  fail. On return, interrupted capture requires acknowledgement of a potentially
+  missing tail before continuing with saved audio; automatic insertion stays off.
+  Clearing browser data can still remove both the audio and its recovery marker.
+- **Survives reloads.** Saved chunks stay available after reload. Review an
+  interrupted capture before resuming it in a new session; the transcript starts
+  a new paragraph. Download uploaded audio remains available before completion.
 - **Offline.** While offline, audio keeps saving locally. It uploads with
   backoff when the connection returns.
 - **One capture at a time.** A Web Lock makes sure only one window captures.

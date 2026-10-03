@@ -137,6 +137,39 @@ it("retains recovery metadata when the network is online but the recording RPC f
   expect(insertDictationIntoComposer).not.toHaveBeenCalled();
 });
 
+it("refuses capture and releases the microphone when its recovery marker cannot be saved", async () => {
+  const recording = { id: "rec_denied", durationMs: 0, status: "recording" };
+  const call = vi.fn(async () => recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage denied"); });
+  await controller.startRecording("dictation");
+  expect(Recorder.instances).toHaveLength(0);
+  expect(stopped).toHaveBeenCalled();
+  expect(controller.getState().phase).toBe("idle");
+});
+
+it("keeps a pre-capture warning when both audio and later marker writes fail", async () => {
+  const recording = { id: "rec_interrupted", durationMs: 0, status: "recording" };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().setAside).not.toBeNull());
+  await controller.startRecording("dictation");
+  expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).captureInProgress).toBe(true);
+  vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Storage denied"); });
+  vi.mocked(Outbox.prototype.appendPart).mockRejectedValueOnce(new Error("Disk full"));
+  Recorder.instances[0]!.emit([1, 2]);
+  await vi.waitFor(() => expect(controller.getState().phase).toBe("storage-error"));
+  expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).localSaveFailed).toBe(false);
+  const reloaded = new TalkController(); reloaded.attach({ call } as never);
+  await vi.waitFor(() => expect(reloaded.getState().localAudioLost).toBe(true));
+  expect(reloaded.getState().localSaveError).toContain("may be missing");
+  await reloaded.stop(true);
+  expect(reloaded.getState().phase).toBe("storage-error");
+  expect(Recorder.instances).toHaveLength(1);
+  expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+});
+
 it("dictates into a retained thread companion while the main thread changes", async () => {
   const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";
   const prompt = document.createElement("div"); prompt.dataset.promptbox = "";

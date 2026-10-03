@@ -122,6 +122,8 @@ interface Persisted {
   insert: boolean;
   composePath?: string | null;
   localSaveFailed?: boolean;
+  /** Written before the recorder starts; cleared only after its audio is durable. */
+  captureInProgress?: boolean;
 }
 
 interface OpenSegment {
@@ -463,10 +465,19 @@ export class TalkController {
     void this.kickUpload();
     const saved = this.readPersisted();
     if (!saved) return;
-    if (saved.localSaveFailed) {
+    if (saved.captureInProgress) {
+      // A second tab must not mistake a live recorder for a crashed one.
+      if (!(await this.acquireLock())) return;
+      this.unlock();
+    }
+    const interrupted = saved.localSaveFailed || saved.captureInProgress;
+    const recoveryMessage = saved.localSaveFailed
+      ? "This window closed after local audio saving failed."
+      : "Capture was interrupted. The last unsaved audio may be missing.";
+    if (interrupted) {
       this.insertOnDone = false;
       this.set({ recordingId: saved.recordingId, kind: saved.kind, threadId: saved.threadId, field: parseField(saved.field),
-        phase: "storage-error", localAudioLost: true, localSaveError: "This window closed after local audio saving failed." });
+        phase: "storage-error", localAudioLost: true, localSaveError: recoveryMessage });
     }
     const epoch = this.startEpoch;
     let recording: Recording;
@@ -477,7 +488,7 @@ export class TalkController {
       // recovery metadata through transient RPC failures, including while online.
       return;
     }
-    this.insertOnDone = saved.insert === true && !saved.localSaveFailed;
+    this.insertOnDone = saved.insert === true && !interrupted;
     this.composePath = typeof saved.composePath === "string" ? saved.composePath : null;
     this.set({
       recordingId: recording.id,
@@ -486,12 +497,12 @@ export class TalkController {
       field: parseField(saved.field),
       recording,
       recordedMs: recording.durationMs,
-      phase: saved.localSaveFailed ? "storage-error" : saved.phase === "recording" ? "starting" : saved.phase,
-      localAudioLost: saved.localSaveFailed === true,
-      localSaveError: saved.localSaveFailed ? "This window closed after local audio saving failed." : null,
+      phase: interrupted ? "storage-error" : saved.phase === "recording" ? "starting" : saved.phase,
+      localAudioLost: interrupted === true,
+      localSaveError: interrupted ? recoveryMessage : null,
     });
     void this.refresh();
-    if (saved.localSaveFailed) return;
+    if (interrupted) return;
     if (saved.phase === "recording") {
       const locked = await this.acquireLock();
       if (this.cancelled(epoch, locked)) return;
@@ -709,6 +720,9 @@ export class TalkController {
     let capture: Capture;
     try {
       if (epoch !== this.startEpoch) throw new StartCancelled();
+      // A later quota failure may prevent recording that failure itself. Keep
+      // a durable, pessimistic marker before there can be memory-only audio.
+      if (!this.persistPhase("recording")) throw new Error("Talk cannot save recovery information. Free browser storage before recording.");
       audio = new AudioContext();
       void audio.resume().catch(() => {});
       const analyser = audio.createAnalyser();
@@ -1460,21 +1474,28 @@ export class TalkController {
     }
   }
 
-  private persist(value: Persisted | null): void {
+  private persist(value: Persisted | null): boolean {
     try {
-      if (value) localStorage.setItem(STORAGE_KEY, JSON.stringify(value));
-      else localStorage.removeItem(STORAGE_KEY);
+      if (value) {
+        const serialized = JSON.stringify(value);
+        localStorage.setItem(STORAGE_KEY, serialized);
+        return localStorage.getItem(STORAGE_KEY) === serialized;
+      }
+      localStorage.removeItem(STORAGE_KEY);
+      return true;
     } catch {
-      // Private mode: the recording still works, it just will not resume.
+      return false;
     }
   }
 
-  private persistPhase(phase: Persisted["phase"]): void {
+  private persistPhase(phase: Persisted["phase"]): boolean {
     const { recordingId, kind, threadId, field } = this.state;
     if (recordingId) {
-      this.persist({ recordingId, kind, phase, threadId, field, insert: this.insertOnDone, composePath: this.composePath,
+      return this.persist({ recordingId, kind, phase, threadId, field, insert: this.insertOnDone, composePath: this.composePath,
+        captureInProgress: phase === "recording" || this.unsaved.size > 0 || this.state.localAudioLost,
         localSaveFailed: this.unsaved.size > 0 || this.state.localAudioLost });
     }
+    return false;
   }
 
   /**
