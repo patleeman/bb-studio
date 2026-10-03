@@ -392,3 +392,19 @@ JavaScript syntax, diff checks, and all seven plugin compatibility checks passed
 the compatibility script currently reports stable BB 0.45.0 / SDK 0.6.15.
 Nine of the Review tests still need their broader accessibility findings
 resolved before the fresh full-suite run.
+
+
+## Approved request-row accessibility follow-up
+
+The coordinator-approved OfficeEventRow change replaces its row-wide tap gesture
+with an explicit title button, preserves swipe Done, and uses regular full-width
+stacked actions at accessibility sizes. Title/body wrapping is unrestricted at
+those sizes; the date moves below the title. A native screenshot exposed SwiftUI
+compressing the title inside the button even without a line limit, so the title
+now keeps its wrapped vertical size.
+
+`/tmp/office-request-wrap/results.xcresult`: four focused Inbox/plan tests passed,
+0 failures and 0 skips, at default and accessibility XXXL sizes. The tests open
+the explicit title button. [Before/after native crops](request-row/README.md)
+show the request title is now fully readable. The broader nine failing Review
+audits and final fresh full-suite run are still outstanding.

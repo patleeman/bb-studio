@@ -106,16 +106,27 @@ struct OfficeEventRow: View {
                     .font(.title3).foregroundStyle(.secondary).frame(width: 32, height: 32)
             }
             VStack(alignment: .leading, spacing: 4) {
-                HStack(alignment: .firstTextBaseline) {
-                    Text(event.title)
-                        .font(.body.weight(event.type == .request || event.readAt == nil ? .semibold : .regular))
-                        .lineLimit(2)
-                    Spacer(minLength: 4)
+                let headingLayout = dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))
+                headingLayout {
+                    Button { open() } label: {
+                        Text(event.title)
+                            .font(.body.weight(event.type == .request || event.readAt == nil ? .semibold : .regular))
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                            .fixedSize(horizontal: false, vertical: true)
+                            .frame(maxWidth: .infinity, minHeight: 44, alignment: .leading)
+                            .contentShape(Rectangle())
+                    }
+                    .buttonStyle(.plain)
+                    .accessibilityAddTraits(.isButton)
+                    .accessibilityIdentifier("officeRequestOpen")
                     Text(Date(timeIntervalSince1970: event.createdAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
                         .font(.caption).foregroundStyle(.secondary)
                 }
                 Text(bot.map { "\($0.name) · \(event.body)" } ?? event.body)
-                    .font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                    .font(.subheadline).foregroundStyle(.secondary)
+                    .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 3)
                 if let space {
                     Label(space.name, systemImage: "building.2").font(.caption).foregroundStyle(.secondary)
                 }
@@ -131,22 +142,25 @@ struct OfficeEventRow: View {
                     layout {
                         ForEach(actions) { action in
                             if action.primary == true {
-                                Button { act(action.id) } label: { Text(action.label).frame(minHeight: 44) }
+                                Button { act(action.id) } label: {
+                                    Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
+                                }
                                     .buttonStyle(.borderedProminent)
                             } else {
-                                Button { act(action.id) } label: { Text(action.label).frame(minHeight: 44) }
+                                Button { act(action.id) } label: {
+                                    Text(action.label).frame(maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil, minHeight: 44)
+                                }
                                     .buttonStyle(.bordered)
                             }
                         }
                     }
+                    .controlSize(.regular)
                     .disabled(busy || event.isPending)
                 }
                 if let error { Text(error).font(.caption).foregroundStyle(.red) }
             }
         }
         .padding(.vertical, 4)
-        .contentShape(Rectangle())
-        .onTapGesture { open() }
         .swipeActions(edge: .trailing) {
             Button { done() } label: { Label(event.type == .request ? "Dismiss" : "Done", systemImage: "checkmark") }
                 .tint(.indigo)
@@ -331,4 +345,3 @@ struct DelegateSheet: View {
         }
     }
 }
-

@@ -168,7 +168,7 @@ final class ReviewQualityUITests: XCTestCase {
             retainScreen(app, "inbox-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-action-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
         }
         let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
-        let open = request.staticTexts.firstMatch
+        let open = request.buttons["officeRequestOpen"]
         for _ in 0..<5 {
             if open.isHittable { break }
             app.swipeDown()
@@ -209,7 +209,7 @@ final class ReviewQualityUITests: XCTestCase {
         defer { app.terminate() }
         XCTAssertTrue(app.navigationBars["Inbox"].waitForExistence(timeout: 20))
         let request = app.cells.containing(.staticText, identifier: "Native approval card QA").firstMatch
-        let open = request.staticTexts.firstMatch
+        let open = request.buttons["officeRequestOpen"]
         XCTAssertTrue(open.waitForExistence(timeout: 20))
         reveal(open, in: app)
         open.tap()
