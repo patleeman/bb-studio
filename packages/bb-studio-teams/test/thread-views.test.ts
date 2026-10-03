@@ -9,6 +9,7 @@ function fixture() {
   const x = setup();
   x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) => makeThreadResponse({ id: threadId, status: "idle" }));
   x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
+  x.harness.inspection.sdk.stub("threads.events.list", async () => []);
   const profiles = new ThreadProfiles(x.bb, x.store, x.runtime, () => true);
   return { ...x, views: new ThreadViews(x.bb, x.store, profiles) };
 }
@@ -128,7 +129,7 @@ test("history follows BB cursors past tool-only pages and keeps equal timestamps
   const x = fixture();
   try {
     const view = await x.views.create("History", [{kind:"thread",id:"thr_history"}]);
-    const reply = (id: string) => ({kind:"turn",id,turnId:id,status:"completed",children:[{kind:"conversation",id,role:"assistant",threadId:"thr_history",text:id,turnId:id,sourceSeqEnd:1,createdAt:100}]});
+    const reply = (id: string) => ({kind:"turn",id,turnId:id,status:"completed",sourceSeqStart:1,children:[{kind:"conversation",id,role:"assistant",threadId:"thr_history",text:id,turnId:id,sourceSeqStart:1,sourceSeqEnd:1,createdAt:100}]});
     x.harness.inspection.sdk.stub("threads.timeline", async ({beforeAnchorId}) => beforeAnchorId ? {rows:[reply("a"),reply("b"),reply("c")],timelinePage:{hasOlderRows:false,olderCursor:null}} : {rows:[],timelinePage:{hasOlderRows:true,olderCursor:{anchorId:"tools",anchorSeq:1}}});
     const first = await x.views.page(view.id, undefined, 2);
     expect(first.entries.map(e=>e.text)).toEqual(["b","c"]);
@@ -154,6 +155,21 @@ test("text-only replies use BB completion events when no turn wrapper exists", a
       { type: "turn/completed", seq: 4, scope: { kind: "turn", turnId: "turn_done" }, data: { status: "completed" } },
     ] as never);
     expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual(["Done"]);
+  } finally { await x.close(); }
+});
+
+test.each([false, true])("empty final output hides earlier progress in saved views (wrapped=%s)", async (wrapped) => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Quiet replies", [{ kind: "thread", id: "thr_quiet" }]);
+    const reply = { id: "progress", kind: "conversation", role: "assistant", threadId: "thr_quiet", text: "Checking", turnId: "turn_quiet", sourceSeqStart: 2, sourceSeqEnd: 3, createdAt: 100 };
+    x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: wrapped ? [{ kind: "turn", id: "turn_quiet", turnId: "turn_quiet", status: "completed", sourceSeqStart: 1, children: [reply] }] : [reply], timelinePage: { olderCursor: null, hasOlderRows: false } }) as never);
+    x.harness.inspection.sdk.stub("threads.events.list", async () => [
+      { type: "item/completed", seq: 3, scope: { kind: "turn", turnId: "turn_quiet" }, data: { item: { type: "agentMessage", text: "Checking", phase: "commentary" } } },
+      { type: "item/completed", seq: 4, scope: { kind: "turn", turnId: "turn_quiet" }, data: { item: { type: "agentMessage", text: " \n", phase: "final_answer" } } },
+      { type: "turn/completed", seq: 5, scope: { kind: "turn", turnId: "turn_quiet" }, data: { status: "completed" } },
+    ] as never);
+    expect((await x.views.page(view.id)).entries).toEqual([]);
   } finally { await x.close(); }
 });
 

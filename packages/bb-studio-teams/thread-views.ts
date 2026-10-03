@@ -15,7 +15,7 @@ const baseName = (path: string) => path.split(/[\\/]/).at(-1) || "Attachment";
 /** The owner's text as the view shows it, with a line per attachment. */
 const withNames = (text: string, names: string[]) => [text, ...names.map(name => `📎 ${name}`)].filter(Boolean).join("\n\n");
 export const withAttachmentNames = (input: Pick<ViewSend, "text" | "attachments">) => withNames(input.text, (input.attachments ?? []).map(a => a.type === "image" ? "Image" : a.type === "localFile" && a.name ? a.name : baseName(a.path)));
-export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set()): ViewEntry[] {
+export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set(), quiet: ReadonlySet<string> = new Set()): ViewEntry[] {
   const entries: ViewEntry[] = [], replies = new Map<string, Row & { kind: "conversation"; role: "assistant" }>();
   const completedTurns = new Set(completed), automationTurns = new Set<string>();
   let unassignedAutomation = false;
@@ -44,7 +44,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
           id: `${row.threadId}:${row.id}`, threadId: row.threadId, role: "user",
           text: withNames(match?.[2] ?? row.text, [...(row.attachments?.localFilePaths ?? []), ...(row.attachments?.localImagePaths ?? [])].map(baseName).concat(Array(row.attachments?.webImages ?? 0).fill("Image"))), groupId: match?.[1] ?? null, createdAt: row.createdAt,
         });
-      } else if (!automationTurns.has(row.turnId ?? "") && (completed || (row.turnId !== null && completedTurns.has(row.turnId)))) {
+      } else if (!quiet.has(row.turnId ?? "") && !automationTurns.has(row.turnId ?? "") && (completed || (row.turnId !== null && completedTurns.has(row.turnId)))) {
         const key = row.turnId ?? row.id;
         const previous = replies.get(key);
         if (!previous || previous.sourceSeqEnd < row.sourceSeqEnd) replies.set(key, row);
@@ -160,24 +160,36 @@ export class ThreadViews {
       const page = await this.bb.sdk.threads.timeline({ threadId, segmentLimit: "60", includeNestedRows: "true", ...(cursor ? { beforeAnchorId: cursor.anchorId, beforeAnchorSeq: String(cursor.anchorSeq) } : {}) });
       // Text-only turns have no summary wrapper. Read their completion events
       // rather than treating an idle thread or a flat message as proof of finality.
-      const flatTurns = new Set(page.rows.filter(row => row.kind === "conversation" && row.role === "assistant" && row.turnId).map(row => row.turnId!));
-      for (const row of page.rows) if (row.kind === "turn") flatTurns.delete(row.turnId ?? row.id);
+      const sourceRows: Row[] = [];
+      const collect = (rows: Row[]) => { for (const row of rows) { sourceRows.push(row); if (row.kind === "turn") collect(row.children ?? []); } };
+      collect(page.rows);
+      const sourceTurns = new Set(sourceRows.filter(row => row.kind === "conversation" && row.role === "assistant" && row.turnId).map(row => row.turnId!));
       const completed = new Set<string>();
-      if (flatTurns.size) {
-        let afterSeq = Math.max(0, Math.min(...page.rows.map(row => row.sourceSeqStart)) - 1);
+      const finals = new Map<string, string | null>();
+      if (sourceTurns.size) {
+        let afterSeq = Math.max(0, Math.min(...sourceRows.map(row => row.sourceSeqStart)) - 1);
         for (;;) {
-          const events = await this.bb.sdk.threads.events.list({ threadId, types: ["turn/completed"], afterSeq: String(afterSeq), order: "asc", limit: "100" });
-          for (const event of events) if (event.type === "turn/completed" && event.scope.kind === "turn" && event.data.status === "completed") {
-            completed.add(event.scope.turnId);
-            flatTurns.delete(event.scope.turnId);
+          const events = await this.bb.sdk.threads.events.list({ threadId, types: ["turn/completed", "item/completed"], afterSeq: String(afterSeq), order: "asc", limit: "100" });
+          for (const event of events) {
+            if (event.scope.kind !== "turn" || !sourceTurns.has(event.scope.turnId)) continue;
+            if (event.type === "item/completed" && event.data.item.type === "agentMessage" && !event.data.item.parentToolCallId) {
+              const item = event.data.item;
+              if (!("phase" in item) || item.phase !== "commentary") finals.set(event.scope.turnId, item.text);
+              else if (!finals.has(event.scope.turnId)) finals.set(event.scope.turnId, null);
+            }
+            if (event.type === "turn/completed" && event.data.status === "completed") {
+              completed.add(event.scope.turnId);
+              sourceTurns.delete(event.scope.turnId);
+            }
           }
-          if (events.length < 100 || !flatTurns.size) break;
+          if (events.length < 100 || !sourceTurns.size) break;
           const next = events.at(-1)!.seq;
           if (next <= afterSeq) throw new Error("BB returned a repeated completion cursor.");
           afterSeq = next;
         }
       }
-      entries.push(...finalEntries(page.rows, completed));
+      const quiet = new Set([...finals].filter(([, text]) => !text?.trim()).map(([turnId]) => turnId));
+      entries.push(...finalEntries(page.rows, completed, quiet));
       cursor = page.timelinePage.olderCursor;
       const key = JSON.stringify(cursor);
       if (cursors.has(key)) throw new Error("BB returned a repeated history cursor.");
