@@ -73,7 +73,7 @@ Set `BB_CAPTURE_COMPANION_REMOTE=1` when the staged CLI also includes
 ![Two original Pages editors retained in separate main panes](assets/native-split-preview.png)
 
 The refreshed split capture uses that isolated host plus Pages and Float
-`85a73fa`. It edits two
+`a36295c`. It edits two
 main pages, pins the first, swaps them twice, and moves the floating page to
 a split. Both original editor nodes, inserted drafts, tab identities, and
 pins survive. It requires two visible outlets in different real BB panes.
@@ -85,7 +85,7 @@ BB_CAPTURE_COMPANION_SPLIT=1 BB_CAPTURE_ONLY=float-native-split \
 
 ![Stable BB retaining an ordinary page beside a companion](assets/legacy-transfer-preview.png)
 
-The stable BB 0.45.0 capture installs Pages and Float from `85a73fa`. It
+The stable BB 0.45.0 capture installs Pages and Float from `a36295c`. It
 records two original main editors, inserts drafts, pins one, and swaps them
 twice. It checks the disabled duplicate-Companions split action, then splits
 beside a third ordinary page. All three editors retain their original nodes;
@@ -106,6 +106,11 @@ input through undo/redo, navigation away, workbench and main placement, and
 closing the companion back into the main thread. It also checks the displayed
 model, one live composer, and that the original editor is inside the final
 screenshot after the sidebar collapses. No agent runs for this fixture.
+
+These four placement captures were rerun with the connected-view transfer
+fix and the ninth native host patch. The [suite transfer matrix](../../docs/workbench-entrypoint-audit.md#cross-plugin-transfer-matrix)
+also verifies seven view types on both hosts, including backward selection,
+an unsaved bot profile and the original embedded HTML document context.
 
 ```sh
 BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \

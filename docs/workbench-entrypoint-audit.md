@@ -44,16 +44,16 @@ another desktop chat panel.
 These captures are workflow evidence, not an assertion that every file format,
 provider, route variant or device has passed every placement permutation.
 
-## Latest transfer checkpoint
+## Split and neighboring-editor checkpoint
 
-Pages and Float `85a73fa` pass on isolated stable BB 0.45.0 and the optimized
+Pages and Float `a36295c` pass on isolated stable BB 0.45.0 and the optimized
 current-core host. The stable check preserves two original edited Pages views
 through two swaps, plus pin/tab identity. It then splits beside a third
 ordinary page and preserves that original neighboring editor and its draft,
 undo and redo. The native check preserves the two original companions in two
 distinct visible BB panes.
 
-Kit has 97 passing tests, Float 53, and the full JavaScript suite has 1,585.
+Kit has 99 passing tests, Float 53, and the full JavaScript suite has 1,599.
 All 18 packages typecheck and pass stable compatibility; the packed Kit and
 all 16 consumer locks match. The [saved host patch](host-support/native-companions/README.md)
 contains nine verified core commits and exact-tree application evidence.

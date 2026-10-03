@@ -54,7 +54,8 @@ All checks use Turbo against that current BB base:
 
 The [live capture](../../../packages/bb-studio-float/assets/native-workbench-preview.png)
 runs the normal optimized BB application in its own data directory, with all
-17 Studio plugins installed from pushed `b241546`, Pages and Float updated to `85a73fa`. UI actions move the real Pages editor and native composer through
+17 Studio plugins installed from pushed `b241546`, with Float and the seven
+tested content plugins updated to `a36295c`. UI actions move the real Pages editor and native composer through
 floating, workbench and main placement. The capture verifies exact editor and
 composer DOM identity, the unsent draft, its file input, and shared pin state.
 SDK-to-server tests verify schema validation, unknown plugins, two-client
@@ -76,6 +77,11 @@ navigation away, docking, main placement, and closing back into a newly
 mounted main anchor. It checks the displayed model and final viewport too.
 The native panel host honors companion visibility even with no persisted
 native tabs; this final-frame check caught a false navigation dismissal.
+
+All three native workflows and the stable neighboring-editor/swap workflow
+were rerun after the ninth host commit. The [suite transfer matrix](../../workbench-entrypoint-audit.md#cross-plugin-transfer-matrix)
+adds original-control checks for seven view types on both hosts, including
+the same embedded HTML frame, loader and in-memory document state.
 
 Run after sourcing the isolated instance's `capture.env`:
 
