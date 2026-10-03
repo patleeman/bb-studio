@@ -1,3 +1,4 @@
+import { permissionForTrust } from "../../office/trust";
 import { OfficeRecurringTasks } from "../../office/recurring";
 import { recurringTaskContract } from "../../office/recurring-contract";
 import { OfficeTaskSchedules } from "../../office/scheduling";
@@ -597,6 +598,12 @@ export default async function plugin(bb: BbPluginApi) {
     return { threadId: thread.id };
   }
 
+  async function botSendOptions(botId: string) {
+    const { bot } = await bb.sdk.plugins.callRpc({ pluginId: "bot-teams", method: "get", input: { id: botId },
+      outputSchema: z.object({ bot: z.object({ trust: z.enum(["ask", "act"]).default("ask"), retired: z.boolean().optional() }) }) });
+    if (bot.retired) throw new Error("Restore this bot before assigning work.");
+    return { permissionMode: permissionForTrust(bot.trust), executionInputSources: { permissionMode: "explicit" as const } };
+  }
   const botHandoffs = new Map<string, Promise<{ threadId: string }>>();
   async function handOffBot(id: string, note: string | null, prepareOnly = false): Promise<{ threadId: string }> {
     // Concurrent clicks/assignments share one send; later explicit handoffs can
@@ -644,7 +651,7 @@ export default async function plugin(bb: BbPluginApi) {
       if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);
       try {
-        await bb.sdk.threads.send({ threadId, input: [input], mode: "auto" });
+        await bb.sdk.threads.send({ threadId, input: [input], mode: "auto", ...await botSendOptions(botId) });
       } catch (error) {
         apply(threadId, { type: "failed", error: errorMessage(error) });
         throw error;
@@ -967,7 +974,8 @@ export default async function plugin(bb: BbPluginApi) {
     async sendBack({ id, message }) {
       const handoff = store.latestHandoff(id);
       if (!handoff || !isOpenHandoff(handoff.state)) throw new Error("This task has no thread to send to. Hand it off again.");
-      await bb.sdk.threads.send({ threadId: handoff.thread_id, input: [{ type: "text", text: message, mentions: [] }], mode: "auto" });
+      const botId = mustGet(id).assignee?.startsWith("bot:") ? mustGet(id).assignee!.slice(4) : null;
+      await bb.sdk.threads.send({ threadId: handoff.thread_id, input: [{ type: "text", text: message, mentions: [] }], mode: "auto", ...(botId ? await botSendOptions(botId) : {}) });
       const task = mustGet(id);
       if (task.status !== "in_progress" && hasColumn(task.board_id, "in_progress")) store.move(id, "in_progress", "user");
       changed(id);

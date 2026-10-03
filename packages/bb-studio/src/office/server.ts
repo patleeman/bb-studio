@@ -1,3 +1,4 @@
+import { officeAuthors } from "./authors";
 import { officeTalk, officeBotDesk } from "./talk";
 import { officeTeamServiceContract } from "./team-service-contract";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
@@ -106,17 +107,18 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
       const listed = (await folders.list(spaceId)).filter(f => !f.archived);
       const { items } = await hub.overview();
       const personal = spaces.office.defaultSpace().defaultProjectId;
+      const authors = await officeAuthors(db, options.moduleServices);
       return { space: spaces.office.get(spaceId), folders: await Promise.all(listed.map(async folder => ({
         ...folder,
         threads: (await bb.sdk.threads.list({ projectId: folder.id, archived: false, limit: 1000 })).map(t => ({
-          id: t.id, title: t.title ?? "Untitled", state: t.status, updatedAt: t.updatedAt, authorBotId: null,
+          id: t.id, title: t.title ?? "Untitled", state: t.status, updatedAt: t.updatedAt, authorBotId: authors.thread(t.id),
         })),
         items: items.filter(i => !i.archived && (i.projectId ?? personal) === folder.id && !["space", "bot", "view"].includes(i.kind)).map(i => ({
           pluginId: i.pluginId, id: i.id, kind: i.kind, title: i.title, href: i.href, projectId: i.projectId,
-          authorBotId: (i as typeof i & { authorBotId?: string }).authorBotId ?? null, updatedAt: i.updatedAt,
+          authorBotId: authors.item(i), updatedAt: i.updatedAt,
         })),
       }))) };
     },
   });
-  return { spaces, folders, home: (spaceId: string) => officeHome(spaceId, inbox, spaces.office, hub, options.moduleServices) };
+  return { spaces, folders, home: async (spaceId: string) => officeHome(spaceId, inbox, spaces.office, hub, options.moduleServices, await officeAuthors(db, options.moduleServices)) };
 }

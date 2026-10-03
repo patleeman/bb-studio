@@ -10,6 +10,7 @@ async function setup() {
     sdk: {
       plugins: {
         callRpc: async ({ pluginId, method }) => {
+          if (pluginId === "bot-teams" && method === "get") return { bot: { trust: "ask" } } as never;
           if (pluginId === "bot-teams" && method === "newConversation") return { threadId: `thr_bot_${++nextThread}` } as never;
           if (pluginId === "bot-teams" && method === "threadProfile") return { botId: "bot_one" } as never;
           throw new Error("Optional Studio service unavailable");
@@ -193,5 +194,19 @@ it("prepares scheduled work without sending immediately and tracks each later ru
     await harness.behavior.callRpc("delete", { id: task.id });
     const controls = harness.inspection.sdk.callsTo("plugins.callRpc").map(call => (call[0] as { method: string }).method).filter(method => ["automations_pause", "automations_resume", "automations_delete"].includes(method));
     expect(controls).toEqual(["automations_resume", "automations_pause", "automations_resume", "automations_delete"]);
+  } finally { await harness.lifecycle.dispose(); }
+});
+
+it("sends review feedback using the bot's current trust", async () => {
+  const { harness, create } = await setup();
+  try {
+    const id = await create();
+    expect(harness.inspection.sdk.callsTo("threads.send")[0]?.[0]).toMatchObject({ permissionMode: "accept-edits" });
+    harness.inspection.sdk.stub("plugins.callRpc", async ({ method }) => {
+      if (method === "get") return { bot: { trust: "act" } } as never;
+      return {} as never;
+    });
+    await harness.behavior.callRpc("sendBack", { id, message: "Review again" });
+    expect(harness.inspection.sdk.callsTo("threads.send").at(-1)?.[0]).toMatchObject({ permissionMode: "auto", executionInputSources: { permissionMode: "explicit" } });
   } finally { await harness.lifecycle.dispose(); }
 });

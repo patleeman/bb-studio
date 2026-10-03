@@ -21,6 +21,7 @@ export function officeTeamHandlers(bb: BbPluginApi, store: Store, profiles: Thre
     return null;
   };
   return {
+    office_authors: () => store.db.prepare("SELECT thread_id AS threadId,bot_id AS botId FROM bot_threads").all() as { threadId: string; botId: string }[],
     office_dm: ({ botId }) => views.locked(`office-dm:${botId}`, async () => {
       const bot = store.get(botId);
       if (bot.retired) throw new Error("Restore this bot before messaging it.");

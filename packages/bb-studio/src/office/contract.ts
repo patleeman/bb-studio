@@ -96,3 +96,5 @@ export type OfficeInput<M extends keyof typeof officeContract> = z.input<(typeof
 export type OfficeOutput<M extends keyof typeof officeContract> = z.output<(typeof officeContract)[M]["output"]>;
 
 export { recurringTaskContract, recurringSource, type RecurringTaskInput } from "./recurring-contract";
+
+export const officeAuthorsRpc = { input: z.object({}), output: z.array(z.object({ threadId: id, botId: id })) };

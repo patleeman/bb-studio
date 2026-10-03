@@ -6,7 +6,7 @@ import type { OfficeSpaceStore } from "./space-store";
 import { taskList } from "./module-sources";
 import { officeTask } from "./task";
 
-export async function officeHome(spaceId: string, inbox: Inbox, spaces: OfficeSpaceStore, hub: StudioHub, modules?: ModuleServices): Promise<OfficeOutput<"home">> {
+export async function officeHome(spaceId: string, inbox: Inbox, spaces: OfficeSpaceStore, hub: StudioHub, modules?: ModuleServices, authors?: { item(ref: { pluginId: string; id: string }): string | null }): Promise<OfficeOutput<"home">> {
   if (spaceId !== "all") spaces.get(spaceId);
   const belongs = (projectId: string | null) => spaceId === "all" || spaces.forProject(projectId).id === spaceId;
   const [events, { items, providers }, taskData] = await Promise.all([
@@ -20,7 +20,7 @@ export async function officeHome(spaceId: string, inbox: Inbox, spaces: OfficeSp
     recent: items.filter(i => !i.archived && belongs(i.projectId) && !["space", "bot", "view"].includes(i.kind) && !hidden.has(`${i.pluginId}:${i.kind}`))
       .sort((a,b) => b.updatedAt - a.updatedAt).slice(0, 20).map(i => ({
         id: i.id, pluginId: i.pluginId, kind: i.kind, title: i.title, href: i.href, projectId: i.projectId, updatedAt: i.updatedAt,
-        authorBotId: (i as typeof i & { authorBotId?: string }).authorBotId ?? null,
+        authorBotId: authors?.item(i) ?? null,
       })),
     working: (taskData?.tasks ?? []).filter(t => !t.archived && t.status !== "done" && t.assignee?.startsWith("bot:") && belongs(t.projectId)).map(officeTask),
   };

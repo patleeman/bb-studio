@@ -19669,6 +19669,37 @@
         "additionalProperties": false
       }
     },
+    "teams_office_authors": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {}
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "threadId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            },
+            "botId": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 200
+            }
+          },
+          "required": [
+            "threadId",
+            "botId"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
     "teams_office_dm": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
