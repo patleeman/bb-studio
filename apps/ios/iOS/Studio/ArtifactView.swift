@@ -140,7 +140,6 @@ struct ArtifactView: View {
             .id("\(version.id):\(imageAttempt)")
             .safeAreaInset(edge: .top) { header(artifact, version) }
         case "html", "pdf":
-            // Served with a sandboxing CSP, so the page can't reach BB.
             if webErrorVersion == version.id, let webError {
                 previewFailure("Couldn't load the preview", symbol: version.symbol, message: webError) {
                     self.webError = nil
@@ -148,10 +147,18 @@ struct ArtifactView: View {
                     webAttempt += 1
                 }
             } else {
-                ArtifactWebPreview(url: url) { message in
+                let failure: (String) -> Void = { message in
                     guard self.version?.id == version.id else { return }
                     webError = message
                     webErrorVersion = version.id
+                }
+                Group {
+                    if version.type == "pdf" {
+                        ArtifactPDFPreview(url: url, onFailure: failure)
+                    } else {
+                        // HTML is served with a sandboxing CSP, so it can't reach BB.
+                        ArtifactWebPreview(url: url, onFailure: failure)
+                    }
                 }
                 .ignoresSafeArea(edges: .bottom)
                 .id("\(url.absoluteString):\(webAttempt)")
