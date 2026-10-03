@@ -47,6 +47,7 @@ export function ExplainerTab({ threadId, params }: PluginThreadPanelProps) {
 }
 
 export function ExplainersPage({ subPath }: PluginNavPanelProps) {
+  if (subPath?.startsWith("thread/")) return <ThreadExplainers key={subPath} threadId={subPath.slice("thread/".length)} />;
   if (subPath) return <ExplainerPanel key={subPath} explainerId={subPath} />;
   return <ThreadExplainers />;
 }

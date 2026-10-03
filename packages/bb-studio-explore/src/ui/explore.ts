@@ -14,6 +14,7 @@ export const EXPLORE_ICON = "explore/explore";
 export const EXPLAINERS_PATH = "explainers";
 
 export const explainerPath = (id: string): string => `/plugins/${PLUGIN_ID}/${EXPLAINERS_PATH}/${encodeURIComponent(id)}`;
+export const threadExplainersPath = (threadId: string): string => `/plugins/${PLUGIN_ID}/${EXPLAINERS_PATH}/thread/${encodeURIComponent(threadId)}`;
 
 /** What a finding's row shows. */
 export type RowState = "idle" | "running" | "ready" | "error";
