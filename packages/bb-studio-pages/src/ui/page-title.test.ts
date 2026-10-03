@@ -238,6 +238,22 @@ it("reports malformed recovery and preserves the raw data for download", () => {
   expect(localStorage.getItem(key)).toContain("A title in damaged recovery");
 });
 
+it.each([{ label: "self-link", selfLink: true }, { label: "two-node cycle", selfLink: false }])("reports a $label without discarding its raw data", ({ selfLink }) => {
+  const state = setup();
+  const prefix = `bb-studio-pages:title:${JSON.stringify([origin, "page_one"])}:`;
+  localStorage.setItem(prefix + "one", JSON.stringify({ id: "one", title: "First title", base: "Original", at: 1, supersedes: selfLink ? "one" : "two" }));
+  if (!selfLink) localStorage.setItem(prefix + "two", JSON.stringify({ id: "two", title: "Second title", base: "Original", at: 2, supersedes: "one" }));
+  const restored = state.mount();
+  expect(restored.snapshot.localError).toContain("Could not read");
+  expect(state.recovery.exportRecords().records[prefix + "one"]).toContain("First title");
+  restored.retryLocal(); expect(restored.snapshot.localError).toContain("Could not read");
+  // A predecessor already removed by successful cleanup is a valid endpoint.
+  localStorage.removeItem(prefix + "two");
+  localStorage.setItem(prefix + "one", JSON.stringify({ id: "one", title: "First title", base: "Original", at: 1, supersedes: "cleaned-up" }));
+  restored.retryLocal();
+  expect(restored.snapshot).toMatchObject({ title: "First title", status: "recovered", localError: null });
+});
+
 it("retains a deleted page's title and does not recreate the page", async () => {
   const state = setup(); const controller = state.mount(); controller.edit("Keep this title"); state.remove(); await flush();
   expect(controller.snapshot.status).toBe("failed");

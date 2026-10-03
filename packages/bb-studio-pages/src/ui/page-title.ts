@@ -73,6 +73,17 @@ export class TitleRecovery {
         persisted.add(key);
       } catch { throw new Error("Could not read a saved title draft. Keep this browser's recovery data and retry."); }
     }
+    const checked = new Set<string>();
+    for (const draft of drafts.values()) {
+      const chain = new Set<string>();
+      let id: string | undefined = draft.id;
+      while (id && drafts.has(id) && !checked.has(id)) {
+        if (chain.has(id)) throw new Error("Could not read a saved title draft. Keep this browser's recovery data and retry.");
+        chain.add(id);
+        id = drafts.get(id)!.supersedes;
+      }
+      for (const key of chain) checked.add(key);
+    }
     const superseded = new Set([...drafts.values()].map(draft => draft.supersedes));
     return [...drafts.values()].filter(draft => !superseded.has(draft.id)).sort((a, b) => b.at - a.at);
   }
