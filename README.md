@@ -14,11 +14,10 @@ agent.
 | [Studio Explore](packages/bb-studio-explore/) | `explore` | Experimental. Agents end answers with things they noticed along the way; click one for a page explaining it. Needs Studio Pages. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Float](packages/bb-studio-float/) | `float` | A panel of tabs for any thread, channel, Studio item or view, docked at the bottom or dragged anywhere. Keep several open while you work. |
-| [Studio Sidebar](packages/bb-studio-sidebar/) | `thread-list-plus` | Replaces BB's thread list with one that keeps a tab for each Studio item you open, above your threads. |
 | [Studio Reactions](packages/bb-studio-reactions/) | `emoji-react` | Emoji reactions on replies that draft your answer, plus optional smart reactions the assistant suggests for each reply. |
 | [Studio Mobile](packages/bb-studio-mobile/) | `mobile` | The server side of the iOS app: push notifications, muted threads and the status Live Activity. |
 
-Tables, Chat, Feed, Tasks and Teams are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
+Tables, Chat, Feed, Tasks, Teams, Artifacts, Recordings, Decisions, Navigation and Sidebar are built into Studio. Every remaining add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
 all. Studio Teams needs Studio Decisions to choose recipients in views, and Studio
 Explore needs Studio Pages.
@@ -53,7 +52,6 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    - artifacts: keeps files your agents make
    - float: a panel of tabs for threads, views and Studio items, docked
      or dragged anywhere
-   - thread-list-plus: Studio Sidebar; it replaces BB's thread list
    - studio-navigation: Studio Navigation; it replaces BB's sidebar navigation
      without the Studio rows that Studio and Studio Sidebar already open
    - emoji-react: Studio Reactions; emoji reactions that draft quick replies

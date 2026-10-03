@@ -1,6 +1,6 @@
 # Studio Navigation
 
-> **Studio Navigation** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../../../../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio/src/modules/talk), [Studio Draw](../../../../bb-studio-draw), [Studio Artifacts](../../../../bb-studio/src/modules/artifacts), [Studio Tasks](../../../../bb-studio/src/modules/tasks), [Studio Chat](../../../../bb-studio/src/modules/chat), [Studio Teams](../../../../bb-studio/src/modules/teams), and [Studio Sidebar](../../../../bb-studio-sidebar).
+> **Studio Navigation** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../../../../bb-studio), [Studio Pages](../../../../bb-studio-pages), [Studio Talk](../../../../bb-studio/src/modules/talk), [Studio Draw](../../../../bb-studio-draw), [Studio Artifacts](../../../../bb-studio/src/modules/artifacts), [Studio Tasks](../../../../bb-studio/src/modules/tasks), [Studio Chat](../../../../bb-studio/src/modules/chat), [Studio Teams](../../../../bb-studio/src/modules/teams), and [Studio Sidebar](../../../../bb-studio/src/modules/sidebar).
 
 Studio Navigation replaces BB's sidebar navigation, the rows above the thread
 list. It draws the same rows as BB's bundled Navigation plugin, and leaves out
@@ -9,7 +9,7 @@ the Studio rows that another surface already opens:
 | Row | Left out while |
 | --- | --- |
 | Pages, Drawings, Artifacts, Recordings, Tasks, Tables | Studio's row is there, since the Studio hub lists and opens every add-on. |
-| New channel | [Studio Sidebar](../../../../bb-studio-sidebar) shows sections, since the Channels section has its own New channel. |
+| New channel | [Studio Sidebar](../../../../bb-studio/src/modules/sidebar) shows sections, since the Channels section has its own New channel. |
 
 Everything else stays: BB's own rows (New thread, Search threads, Plugins,
 Skills, Automations), Studio, Teams, and every panel from a plugin outside

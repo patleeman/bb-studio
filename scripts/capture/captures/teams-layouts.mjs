@@ -182,8 +182,8 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
   }) },
   { id: "bots-thread-drop", packageDir: "bb-studio/src/modules/teams", fileName: "channel-thread-drop.png", showSidebar: true, setup: guard(async client => {
    const data = await seed();
-   const { preferences } = await pluginRpc("thread-list-plus", "listPreferences", null);
-   await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: "chronological" });
+   const { preferences } = await pluginRpc("studio", "sidebar_listPreferences", null);
+   await pluginRpc("studio", "sidebar_setPreference", { key: "organizationMode", value: "chronological" });
    await client.navigate(`/projects/${projectId}/threads/${data.threadId}`);
    await client.waitForSelector(`[data-sidebar-thread-id="${data.threadId}"]`);
    const projectThreads = JSON.parse(await bbCli(["thread", "list", "--project", projectId, "--json"]));
@@ -215,7 +215,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
     if (JSON.stringify(ids) !== JSON.stringify([target, data.threadId].sort()) || page.view.members.some(member=>member.kind!=="thread")) throw new Error("Drop did not create a channel of both ordinary threads");
     const after = JSON.parse(await bbCli(["thread", "list", "--project", projectId, "--json"])).filter(thread => [data.threadId, target].includes(thread.id)).map(thread => ({ id: thread.id, projectId: thread.projectId, parentThreadId: thread.parentThreadId }));
     if (JSON.stringify(before.sort((a,b)=>a.id.localeCompare(b.id))) !== JSON.stringify(after.sort((a,b)=>a.id.localeCompare(b.id)))) throw new Error("Creating the channel moved or nested its member threads");
-    await pluginRpc("thread-list-plus", "setPreference", { key: "organizationMode", value: preferences.organizationMode });
+    await pluginRpc("studio", "sidebar_setPreference", { key: "organizationMode", value: preferences.organizationMode });
    };
   }) },
  ];

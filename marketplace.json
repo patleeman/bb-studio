@@ -132,29 +132,6 @@
       }
     },
     {
-      "id": "thread-list-plus",
-      "displayName": "Studio Sidebar",
-      "description": "BB's thread list with a section for each Studio app above your threads, and New project in its menu.",
-      "icon": "ListView",
-      "tags": [
-        "sidebar",
-        "threads",
-        "projects",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-sidebar",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "mobile",
       "displayName": "Studio Mobile",
       "description": "Part of BB Studio. The server side of the BB Studio iOS app: push notifications with lock-screen actions and muted threads.",

@@ -133,6 +133,8 @@ public enum Studio {
     public static let feed_remove = "feed_remove"
     public static let feed_seen = "feed_seen"
     public static let feed_unread = "feed_unread"
+    public static let tasks_office_recurringLookup = "tasks_office_recurringLookup"
+    public static let tasks_office_syncRecurring = "tasks_office_syncRecurring"
     public static let tasks_trackFinding = "tasks_trackFinding"
     public static let tasks_boards = "tasks_boards"
     public static let tasks_board = "tasks_board"
@@ -231,6 +233,9 @@ public enum Studio {
     public static let talk_recording_cleanup = "talk_recording_cleanup"
     public static let talk_recording_keep = "talk_recording_keep"
     public static let talk_recording_delete = "talk_recording_delete"
+    public static let sidebar_listPreferences = "sidebar_listPreferences"
+    public static let sidebar_setPreference = "sidebar_setPreference"
+    public static let sidebar_resetPreference = "sidebar_resetPreference"
   }
 
   public typealias Home = HomeOutput
@@ -523,6 +528,10 @@ public enum Studio {
 
   public typealias FeedUnread = FeedUnreadOutput
 
+  public typealias TasksOfficeRecurringLookup = TasksOfficeRecurringLookupOutput
+
+  public typealias TasksOfficeSyncRecurring = TasksOfficeSyncRecurringOutput
+
   public typealias TasksTrackFinding = TasksTrackFindingOutput
 
   public typealias TasksBoards = TasksBoardsOutput
@@ -762,6 +771,14 @@ public enum Studio {
   public typealias TalkRecordingKeep = TalkRecordingKeepOutput
 
   public typealias TalkRecordingDelete = TalkRecordingDeleteOutput
+
+  public typealias SidebarListPreferencesInput = StudioJSONValue
+
+  public typealias SidebarListPreferences = SidebarListPreferencesOutput
+
+  public typealias SidebarSetPreference = SidebarSetPreferenceOutput
+
+  public typealias SidebarResetPreference = SidebarResetPreferenceOutput
 
   public struct HomeInput: Sendable, Hashable, Codable {
     public var spaceId: String?
@@ -11783,6 +11800,56 @@ public enum Studio {
     }
   }
 
+  public struct TasksOfficeRecurringLookupInput: Sendable, Hashable, Codable {
+    public var automationId: String?
+
+    public init(automationId: String? = nil) {
+      self.automationId = automationId
+    }
+  }
+
+  public struct TasksOfficeRecurringLookupOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+    public var threadId: String?
+    public var managed: Bool?
+    public var suppressed: Bool?
+
+    public init(taskId: String? = nil, threadId: String? = nil, managed: Bool? = nil, suppressed: Bool? = nil) {
+      self.taskId = taskId
+      self.threadId = threadId
+      self.managed = managed
+      self.suppressed = suppressed
+    }
+  }
+
+  public struct TasksOfficeSyncRecurringInput: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var title: String?
+    public var description: String?
+    public var botId: String?
+    public var threadId: String?
+    public var enabled: Bool?
+    public var source: StudioJSONValue?
+
+    public init(projectId: String? = nil, title: String? = nil, description: String? = nil, botId: String? = nil, threadId: String? = nil, enabled: Bool? = nil, source: StudioJSONValue? = nil) {
+      self.projectId = projectId
+      self.title = title
+      self.description = description
+      self.botId = botId
+      self.threadId = threadId
+      self.enabled = enabled
+      self.source = source
+    }
+  }
+
+  public struct TasksOfficeSyncRecurringOutput: Sendable, Hashable, Codable {
+    public var taskId: String?
+
+    public init(taskId: String? = nil) {
+      self.taskId = taskId
+    }
+  }
+
   public struct TasksTrackFindingInput: Sendable, Hashable, Codable {
     public var key: String?
     public var threadId: String?
@@ -20816,6 +20883,572 @@ public enum Studio {
 
     public init(deleted: Bool? = nil) {
       self.deleted = deleted
+    }
+  }
+
+  public enum SidebarListPreferencesOutputPreferencesBackgroundThreads: Sendable, Hashable, Codable {
+    case grouped
+    case updates
+    case hidden
+    case all
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "grouped": self = .grouped
+      case "updates": self = .updates
+      case "hidden": self = .hidden
+      case "all": self = .all
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .grouped: try container.encode("grouped")
+      case .updates: try container.encode("updates")
+      case .hidden: try container.encode("hidden")
+      case .all: try container.encode("all")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SidebarListPreferencesOutputPreferencesThreadLifecyclesItem: Sendable, Hashable, Codable {
+    case active
+    case archived
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "active": self = .active
+      case "archived": self = .archived
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .active: try container.encode("active")
+      case .archived: try container.encode("archived")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SidebarListPreferencesOutputPreferencesOrganizationMode: Sendable, Hashable, Codable {
+    case project
+    case chronological
+    case machine
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "project": self = .project
+      case "chronological": self = .chronological
+      case "machine": self = .machine
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .project: try container.encode("project")
+      case .chronological: try container.encode("chronological")
+      case .machine: try container.encode("machine")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SidebarListPreferencesOutputPreferencesChronologicalSort: Sendable, Hashable, Codable {
+    case updated
+    case created
+    case alpha
+    case none
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "updated": self = .updated
+      case "created": self = .created
+      case "alpha": self = .alpha
+      case "none": self = .none
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .updated: try container.encode("updated")
+      case .created: try container.encode("created")
+      case .alpha: try container.encode("alpha")
+      case .none: try container.encode("none")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SidebarListPreferencesOutputPreferencesSortDirection: Sendable, Hashable, Codable {
+    case `default`
+    case ascending
+    case descending
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "ascending": self = .ascending
+      case "descending": self = .descending
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .ascending: try container.encode("ascending")
+      case .descending: try container.encode("descending")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SidebarListPreferencesOutputPreferencesCollapsedSectionsItem: Sendable, Hashable, Codable {
+    case pinned
+    case threads
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "pinned": self = .pinned
+      case "threads": self = .threads
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .pinned: try container.encode("pinned")
+      case .threads: try container.encode("threads")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SidebarListPreferencesOutputPreferences: Sendable, Hashable, Codable {
+    public var backgroundThreads: SidebarListPreferencesOutputPreferencesBackgroundThreads?
+    public var backgroundCollapsed: Bool?
+    public var showProviderIcons: Bool?
+    public var hideEmptyProjects: Bool?
+    public var threadLifecycles: [SidebarListPreferencesOutputPreferencesThreadLifecyclesItem]?
+    public var organizationMode: SidebarListPreferencesOutputPreferencesOrganizationMode?
+    public var environmentGrouping: StudioJSONValue?
+    public var chronologicalSort: SidebarListPreferencesOutputPreferencesChronologicalSort?
+    public var sortDirection: SidebarListPreferencesOutputPreferencesSortDirection?
+    public var sectionOrder: [String]?
+    public var manualSectionOrder: [String]?
+    public var machineSectionOrder: [String]?
+    public var hiddenGroups: StudioJSONValue?
+    public var rowActions: StudioJSONValue?
+    public var collapsedSections: [SidebarListPreferencesOutputPreferencesCollapsedSectionsItem]?
+    public var collapsedProjects: [String]?
+    public var collapsedThreads: [String]?
+    public var collapsedEnvironments: [String]?
+    public var collapsedThreadSections: [String]?
+    public var collapsedMachines: [String]?
+
+    public init(backgroundThreads: SidebarListPreferencesOutputPreferencesBackgroundThreads? = nil, backgroundCollapsed: Bool? = nil, showProviderIcons: Bool? = nil, hideEmptyProjects: Bool? = nil, threadLifecycles: [SidebarListPreferencesOutputPreferencesThreadLifecyclesItem]? = nil, organizationMode: SidebarListPreferencesOutputPreferencesOrganizationMode? = nil, environmentGrouping: StudioJSONValue? = nil, chronologicalSort: SidebarListPreferencesOutputPreferencesChronologicalSort? = nil, sortDirection: SidebarListPreferencesOutputPreferencesSortDirection? = nil, sectionOrder: [String]? = nil, manualSectionOrder: [String]? = nil, machineSectionOrder: [String]? = nil, hiddenGroups: StudioJSONValue? = nil, rowActions: StudioJSONValue? = nil, collapsedSections: [SidebarListPreferencesOutputPreferencesCollapsedSectionsItem]? = nil, collapsedProjects: [String]? = nil, collapsedThreads: [String]? = nil, collapsedEnvironments: [String]? = nil, collapsedThreadSections: [String]? = nil, collapsedMachines: [String]? = nil) {
+      self.backgroundThreads = backgroundThreads
+      self.backgroundCollapsed = backgroundCollapsed
+      self.showProviderIcons = showProviderIcons
+      self.hideEmptyProjects = hideEmptyProjects
+      self.threadLifecycles = threadLifecycles
+      self.organizationMode = organizationMode
+      self.environmentGrouping = environmentGrouping
+      self.chronologicalSort = chronologicalSort
+      self.sortDirection = sortDirection
+      self.sectionOrder = sectionOrder
+      self.manualSectionOrder = manualSectionOrder
+      self.machineSectionOrder = machineSectionOrder
+      self.hiddenGroups = hiddenGroups
+      self.rowActions = rowActions
+      self.collapsedSections = collapsedSections
+      self.collapsedProjects = collapsedProjects
+      self.collapsedThreads = collapsedThreads
+      self.collapsedEnvironments = collapsedEnvironments
+      self.collapsedThreadSections = collapsedThreadSections
+      self.collapsedMachines = collapsedMachines
+    }
+  }
+
+  public struct SidebarListPreferencesOutput: Sendable, Hashable, Codable {
+    public var preferences: SidebarListPreferencesOutputPreferences?
+
+    public init(preferences: SidebarListPreferencesOutputPreferences? = nil) {
+      self.preferences = preferences
+    }
+  }
+
+  public enum SidebarSetPreferenceInputKey: Sendable, Hashable, Codable {
+    case backgroundThreads
+    case backgroundCollapsed
+    case showProviderIcons
+    case hideEmptyProjects
+    case threadLifecycles
+    case organizationMode
+    case environmentGrouping
+    case chronologicalSort
+    case sortDirection
+    case sectionOrder
+    case manualSectionOrder
+    case machineSectionOrder
+    case hiddenGroups
+    case rowActions
+    case collapsedSections
+    case collapsedProjects
+    case collapsedThreads
+    case collapsedEnvironments
+    case collapsedThreadSections
+    case collapsedMachines
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "backgroundThreads": self = .backgroundThreads
+      case "backgroundCollapsed": self = .backgroundCollapsed
+      case "showProviderIcons": self = .showProviderIcons
+      case "hideEmptyProjects": self = .hideEmptyProjects
+      case "threadLifecycles": self = .threadLifecycles
+      case "organizationMode": self = .organizationMode
+      case "environmentGrouping": self = .environmentGrouping
+      case "chronologicalSort": self = .chronologicalSort
+      case "sortDirection": self = .sortDirection
+      case "sectionOrder": self = .sectionOrder
+      case "manualSectionOrder": self = .manualSectionOrder
+      case "machineSectionOrder": self = .machineSectionOrder
+      case "hiddenGroups": self = .hiddenGroups
+      case "rowActions": self = .rowActions
+      case "collapsedSections": self = .collapsedSections
+      case "collapsedProjects": self = .collapsedProjects
+      case "collapsedThreads": self = .collapsedThreads
+      case "collapsedEnvironments": self = .collapsedEnvironments
+      case "collapsedThreadSections": self = .collapsedThreadSections
+      case "collapsedMachines": self = .collapsedMachines
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .backgroundThreads: try container.encode("backgroundThreads")
+      case .backgroundCollapsed: try container.encode("backgroundCollapsed")
+      case .showProviderIcons: try container.encode("showProviderIcons")
+      case .hideEmptyProjects: try container.encode("hideEmptyProjects")
+      case .threadLifecycles: try container.encode("threadLifecycles")
+      case .organizationMode: try container.encode("organizationMode")
+      case .environmentGrouping: try container.encode("environmentGrouping")
+      case .chronologicalSort: try container.encode("chronologicalSort")
+      case .sortDirection: try container.encode("sortDirection")
+      case .sectionOrder: try container.encode("sectionOrder")
+      case .manualSectionOrder: try container.encode("manualSectionOrder")
+      case .machineSectionOrder: try container.encode("machineSectionOrder")
+      case .hiddenGroups: try container.encode("hiddenGroups")
+      case .rowActions: try container.encode("rowActions")
+      case .collapsedSections: try container.encode("collapsedSections")
+      case .collapsedProjects: try container.encode("collapsedProjects")
+      case .collapsedThreads: try container.encode("collapsedThreads")
+      case .collapsedEnvironments: try container.encode("collapsedEnvironments")
+      case .collapsedThreadSections: try container.encode("collapsedThreadSections")
+      case .collapsedMachines: try container.encode("collapsedMachines")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SidebarSetPreferenceInput: Sendable, Hashable, Codable {
+    public var key: SidebarSetPreferenceInputKey?
+    public var value: StudioJSONValue?
+
+    public init(key: SidebarSetPreferenceInputKey? = nil, value: StudioJSONValue? = nil) {
+      self.key = key
+      self.value = value
+    }
+  }
+
+  public enum SidebarSetPreferenceOutputKey: Sendable, Hashable, Codable {
+    case backgroundThreads
+    case backgroundCollapsed
+    case showProviderIcons
+    case hideEmptyProjects
+    case threadLifecycles
+    case organizationMode
+    case environmentGrouping
+    case chronologicalSort
+    case sortDirection
+    case sectionOrder
+    case manualSectionOrder
+    case machineSectionOrder
+    case hiddenGroups
+    case rowActions
+    case collapsedSections
+    case collapsedProjects
+    case collapsedThreads
+    case collapsedEnvironments
+    case collapsedThreadSections
+    case collapsedMachines
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "backgroundThreads": self = .backgroundThreads
+      case "backgroundCollapsed": self = .backgroundCollapsed
+      case "showProviderIcons": self = .showProviderIcons
+      case "hideEmptyProjects": self = .hideEmptyProjects
+      case "threadLifecycles": self = .threadLifecycles
+      case "organizationMode": self = .organizationMode
+      case "environmentGrouping": self = .environmentGrouping
+      case "chronologicalSort": self = .chronologicalSort
+      case "sortDirection": self = .sortDirection
+      case "sectionOrder": self = .sectionOrder
+      case "manualSectionOrder": self = .manualSectionOrder
+      case "machineSectionOrder": self = .machineSectionOrder
+      case "hiddenGroups": self = .hiddenGroups
+      case "rowActions": self = .rowActions
+      case "collapsedSections": self = .collapsedSections
+      case "collapsedProjects": self = .collapsedProjects
+      case "collapsedThreads": self = .collapsedThreads
+      case "collapsedEnvironments": self = .collapsedEnvironments
+      case "collapsedThreadSections": self = .collapsedThreadSections
+      case "collapsedMachines": self = .collapsedMachines
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .backgroundThreads: try container.encode("backgroundThreads")
+      case .backgroundCollapsed: try container.encode("backgroundCollapsed")
+      case .showProviderIcons: try container.encode("showProviderIcons")
+      case .hideEmptyProjects: try container.encode("hideEmptyProjects")
+      case .threadLifecycles: try container.encode("threadLifecycles")
+      case .organizationMode: try container.encode("organizationMode")
+      case .environmentGrouping: try container.encode("environmentGrouping")
+      case .chronologicalSort: try container.encode("chronologicalSort")
+      case .sortDirection: try container.encode("sortDirection")
+      case .sectionOrder: try container.encode("sectionOrder")
+      case .manualSectionOrder: try container.encode("manualSectionOrder")
+      case .machineSectionOrder: try container.encode("machineSectionOrder")
+      case .hiddenGroups: try container.encode("hiddenGroups")
+      case .rowActions: try container.encode("rowActions")
+      case .collapsedSections: try container.encode("collapsedSections")
+      case .collapsedProjects: try container.encode("collapsedProjects")
+      case .collapsedThreads: try container.encode("collapsedThreads")
+      case .collapsedEnvironments: try container.encode("collapsedEnvironments")
+      case .collapsedThreadSections: try container.encode("collapsedThreadSections")
+      case .collapsedMachines: try container.encode("collapsedMachines")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SidebarSetPreferenceOutput: Sendable, Hashable, Codable {
+    public var key: SidebarSetPreferenceOutputKey?
+    public var value: StudioJSONValue?
+
+    public init(key: SidebarSetPreferenceOutputKey? = nil, value: StudioJSONValue? = nil) {
+      self.key = key
+      self.value = value
+    }
+  }
+
+  public enum SidebarResetPreferenceInputKey: Sendable, Hashable, Codable {
+    case backgroundThreads
+    case backgroundCollapsed
+    case showProviderIcons
+    case hideEmptyProjects
+    case threadLifecycles
+    case organizationMode
+    case environmentGrouping
+    case chronologicalSort
+    case sortDirection
+    case sectionOrder
+    case manualSectionOrder
+    case machineSectionOrder
+    case hiddenGroups
+    case rowActions
+    case collapsedSections
+    case collapsedProjects
+    case collapsedThreads
+    case collapsedEnvironments
+    case collapsedThreadSections
+    case collapsedMachines
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "backgroundThreads": self = .backgroundThreads
+      case "backgroundCollapsed": self = .backgroundCollapsed
+      case "showProviderIcons": self = .showProviderIcons
+      case "hideEmptyProjects": self = .hideEmptyProjects
+      case "threadLifecycles": self = .threadLifecycles
+      case "organizationMode": self = .organizationMode
+      case "environmentGrouping": self = .environmentGrouping
+      case "chronologicalSort": self = .chronologicalSort
+      case "sortDirection": self = .sortDirection
+      case "sectionOrder": self = .sectionOrder
+      case "manualSectionOrder": self = .manualSectionOrder
+      case "machineSectionOrder": self = .machineSectionOrder
+      case "hiddenGroups": self = .hiddenGroups
+      case "rowActions": self = .rowActions
+      case "collapsedSections": self = .collapsedSections
+      case "collapsedProjects": self = .collapsedProjects
+      case "collapsedThreads": self = .collapsedThreads
+      case "collapsedEnvironments": self = .collapsedEnvironments
+      case "collapsedThreadSections": self = .collapsedThreadSections
+      case "collapsedMachines": self = .collapsedMachines
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .backgroundThreads: try container.encode("backgroundThreads")
+      case .backgroundCollapsed: try container.encode("backgroundCollapsed")
+      case .showProviderIcons: try container.encode("showProviderIcons")
+      case .hideEmptyProjects: try container.encode("hideEmptyProjects")
+      case .threadLifecycles: try container.encode("threadLifecycles")
+      case .organizationMode: try container.encode("organizationMode")
+      case .environmentGrouping: try container.encode("environmentGrouping")
+      case .chronologicalSort: try container.encode("chronologicalSort")
+      case .sortDirection: try container.encode("sortDirection")
+      case .sectionOrder: try container.encode("sectionOrder")
+      case .manualSectionOrder: try container.encode("manualSectionOrder")
+      case .machineSectionOrder: try container.encode("machineSectionOrder")
+      case .hiddenGroups: try container.encode("hiddenGroups")
+      case .rowActions: try container.encode("rowActions")
+      case .collapsedSections: try container.encode("collapsedSections")
+      case .collapsedProjects: try container.encode("collapsedProjects")
+      case .collapsedThreads: try container.encode("collapsedThreads")
+      case .collapsedEnvironments: try container.encode("collapsedEnvironments")
+      case .collapsedThreadSections: try container.encode("collapsedThreadSections")
+      case .collapsedMachines: try container.encode("collapsedMachines")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SidebarResetPreferenceInput: Sendable, Hashable, Codable {
+    public var key: SidebarResetPreferenceInputKey?
+
+    public init(key: SidebarResetPreferenceInputKey? = nil) {
+      self.key = key
+    }
+  }
+
+  public enum SidebarResetPreferenceOutputKey: Sendable, Hashable, Codable {
+    case backgroundThreads
+    case backgroundCollapsed
+    case showProviderIcons
+    case hideEmptyProjects
+    case threadLifecycles
+    case organizationMode
+    case environmentGrouping
+    case chronologicalSort
+    case sortDirection
+    case sectionOrder
+    case manualSectionOrder
+    case machineSectionOrder
+    case hiddenGroups
+    case rowActions
+    case collapsedSections
+    case collapsedProjects
+    case collapsedThreads
+    case collapsedEnvironments
+    case collapsedThreadSections
+    case collapsedMachines
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "backgroundThreads": self = .backgroundThreads
+      case "backgroundCollapsed": self = .backgroundCollapsed
+      case "showProviderIcons": self = .showProviderIcons
+      case "hideEmptyProjects": self = .hideEmptyProjects
+      case "threadLifecycles": self = .threadLifecycles
+      case "organizationMode": self = .organizationMode
+      case "environmentGrouping": self = .environmentGrouping
+      case "chronologicalSort": self = .chronologicalSort
+      case "sortDirection": self = .sortDirection
+      case "sectionOrder": self = .sectionOrder
+      case "manualSectionOrder": self = .manualSectionOrder
+      case "machineSectionOrder": self = .machineSectionOrder
+      case "hiddenGroups": self = .hiddenGroups
+      case "rowActions": self = .rowActions
+      case "collapsedSections": self = .collapsedSections
+      case "collapsedProjects": self = .collapsedProjects
+      case "collapsedThreads": self = .collapsedThreads
+      case "collapsedEnvironments": self = .collapsedEnvironments
+      case "collapsedThreadSections": self = .collapsedThreadSections
+      case "collapsedMachines": self = .collapsedMachines
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .backgroundThreads: try container.encode("backgroundThreads")
+      case .backgroundCollapsed: try container.encode("backgroundCollapsed")
+      case .showProviderIcons: try container.encode("showProviderIcons")
+      case .hideEmptyProjects: try container.encode("hideEmptyProjects")
+      case .threadLifecycles: try container.encode("threadLifecycles")
+      case .organizationMode: try container.encode("organizationMode")
+      case .environmentGrouping: try container.encode("environmentGrouping")
+      case .chronologicalSort: try container.encode("chronologicalSort")
+      case .sortDirection: try container.encode("sortDirection")
+      case .sectionOrder: try container.encode("sectionOrder")
+      case .manualSectionOrder: try container.encode("manualSectionOrder")
+      case .machineSectionOrder: try container.encode("machineSectionOrder")
+      case .hiddenGroups: try container.encode("hiddenGroups")
+      case .rowActions: try container.encode("rowActions")
+      case .collapsedSections: try container.encode("collapsedSections")
+      case .collapsedProjects: try container.encode("collapsedProjects")
+      case .collapsedThreads: try container.encode("collapsedThreads")
+      case .collapsedEnvironments: try container.encode("collapsedEnvironments")
+      case .collapsedThreadSections: try container.encode("collapsedThreadSections")
+      case .collapsedMachines: try container.encode("collapsedMachines")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SidebarResetPreferenceOutput: Sendable, Hashable, Codable {
+    public var key: SidebarResetPreferenceOutputKey?
+    public var value: StudioJSONValue?
+
+    public init(key: SidebarResetPreferenceOutputKey? = nil, value: StudioJSONValue? = nil) {
+      self.key = key
+      self.value = value
     }
   }
 

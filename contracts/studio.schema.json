@@ -28449,6 +28449,351 @@
         ],
         "additionalProperties": false
       }
+    },
+    "sidebar_listPreferences": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "null"
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "preferences": {
+            "type": "object",
+            "properties": {
+              "backgroundThreads": {
+                "type": "string",
+                "enum": [
+                  "grouped",
+                  "updates",
+                  "hidden",
+                  "all"
+                ]
+              },
+              "backgroundCollapsed": {
+                "type": "boolean"
+              },
+              "showProviderIcons": {
+                "type": "boolean"
+              },
+              "hideEmptyProjects": {
+                "type": "boolean"
+              },
+              "threadLifecycles": {
+                "minItems": 1,
+                "maxItems": 2,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "active",
+                    "archived"
+                  ]
+                }
+              },
+              "organizationMode": {
+                "type": "string",
+                "enum": [
+                  "project",
+                  "chronological",
+                  "machine"
+                ]
+              },
+              "environmentGrouping": {
+                "anyOf": [
+                  {
+                    "type": "string",
+                    "const": "auto"
+                  },
+                  {
+                    "type": "boolean"
+                  }
+                ]
+              },
+              "chronologicalSort": {
+                "type": "string",
+                "enum": [
+                  "updated",
+                  "created",
+                  "alpha",
+                  "none"
+                ]
+              },
+              "sortDirection": {
+                "type": "string",
+                "enum": [
+                  "default",
+                  "ascending",
+                  "descending"
+                ]
+              },
+              "sectionOrder": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "manualSectionOrder": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "machineSectionOrder": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "hiddenGroups": {},
+              "rowActions": {},
+              "collapsedSections": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "enum": [
+                    "pinned",
+                    "threads"
+                  ]
+                }
+              },
+              "collapsedProjects": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "collapsedThreads": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "collapsedEnvironments": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "collapsedThreadSections": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              },
+              "collapsedMachines": {
+                "maxItems": 10000,
+                "type": "array",
+                "items": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 1024
+                }
+              }
+            },
+            "required": [
+              "backgroundThreads",
+              "backgroundCollapsed",
+              "showProviderIcons",
+              "hideEmptyProjects",
+              "threadLifecycles",
+              "organizationMode",
+              "environmentGrouping",
+              "chronologicalSort",
+              "sortDirection",
+              "sectionOrder",
+              "manualSectionOrder",
+              "machineSectionOrder",
+              "hiddenGroups",
+              "rowActions",
+              "collapsedSections",
+              "collapsedProjects",
+              "collapsedThreads",
+              "collapsedEnvironments",
+              "collapsedThreadSections",
+              "collapsedMachines"
+            ],
+            "additionalProperties": false
+          }
+        },
+        "required": [
+          "preferences"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "sidebar_setPreference": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "backgroundThreads",
+              "backgroundCollapsed",
+              "showProviderIcons",
+              "hideEmptyProjects",
+              "threadLifecycles",
+              "organizationMode",
+              "environmentGrouping",
+              "chronologicalSort",
+              "sortDirection",
+              "sectionOrder",
+              "manualSectionOrder",
+              "machineSectionOrder",
+              "hiddenGroups",
+              "rowActions",
+              "collapsedSections",
+              "collapsedProjects",
+              "collapsedThreads",
+              "collapsedEnvironments",
+              "collapsedThreadSections",
+              "collapsedMachines"
+            ]
+          },
+          "value": {}
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "backgroundThreads",
+              "backgroundCollapsed",
+              "showProviderIcons",
+              "hideEmptyProjects",
+              "threadLifecycles",
+              "organizationMode",
+              "environmentGrouping",
+              "chronologicalSort",
+              "sortDirection",
+              "sectionOrder",
+              "manualSectionOrder",
+              "machineSectionOrder",
+              "hiddenGroups",
+              "rowActions",
+              "collapsedSections",
+              "collapsedProjects",
+              "collapsedThreads",
+              "collapsedEnvironments",
+              "collapsedThreadSections",
+              "collapsedMachines"
+            ]
+          },
+          "value": {}
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "sidebar_resetPreference": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "backgroundThreads",
+              "backgroundCollapsed",
+              "showProviderIcons",
+              "hideEmptyProjects",
+              "threadLifecycles",
+              "organizationMode",
+              "environmentGrouping",
+              "chronologicalSort",
+              "sortDirection",
+              "sectionOrder",
+              "manualSectionOrder",
+              "machineSectionOrder",
+              "hiddenGroups",
+              "rowActions",
+              "collapsedSections",
+              "collapsedProjects",
+              "collapsedThreads",
+              "collapsedEnvironments",
+              "collapsedThreadSections",
+              "collapsedMachines"
+            ]
+          }
+        },
+        "required": [
+          "key"
+        ],
+        "additionalProperties": false
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "enum": [
+              "backgroundThreads",
+              "backgroundCollapsed",
+              "showProviderIcons",
+              "hideEmptyProjects",
+              "threadLifecycles",
+              "organizationMode",
+              "environmentGrouping",
+              "chronologicalSort",
+              "sortDirection",
+              "sectionOrder",
+              "manualSectionOrder",
+              "machineSectionOrder",
+              "hiddenGroups",
+              "rowActions",
+              "collapsedSections",
+              "collapsedProjects",
+              "collapsedThreads",
+              "collapsedEnvironments",
+              "collapsedThreadSections",
+              "collapsedMachines"
+            ]
+          },
+          "value": {}
+        },
+        "required": [
+          "key",
+          "value"
+        ],
+        "additionalProperties": false
+      }
     }
   },
   "StudioItem": {

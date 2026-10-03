@@ -1,17 +1,17 @@
 export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, seedTalkRecording, pluginRpc, talkRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep }) => [
   {
     id: "thread-list-plus-background",
-    packageDir: "bb-studio-sidebar",
+    packageDir: "bb-studio/src/modules/sidebar",
     fileName: "background-threads.png",
     showSidebar: true,
     setup: async (client) => {
-      const { preferences } = await pluginRpc("thread-list-plus", "listPreferences", null);
+      const { preferences } = await pluginRpc("studio", "sidebar_listPreferences", null);
       const threads = [];
       const automations = [];
       const cleanup = async () => {
         for (const automationId of automations) await pluginRpc("automations", "automations_delete", { projectId, automationId });
         for (const id of threads) await bbCli(["thread", "delete", id, "--yes"]);
-        for (const key of ["backgroundThreads", "backgroundCollapsed"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: preferences[key] });
+        for (const key of ["backgroundThreads", "backgroundCollapsed"]) await pluginRpc("studio", "sidebar_setPreference", { key, value: preferences[key] });
       };
       try {
         for (const title of ["Release digest", "Build health watch"]) {
@@ -24,8 +24,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           });
           automations.push(automation.id);
         }
-        await pluginRpc("thread-list-plus", "setPreference", { key: "backgroundThreads", value: "grouped" });
-        await pluginRpc("thread-list-plus", "setPreference", { key: "backgroundCollapsed", value: true });
+        await pluginRpc("studio", "sidebar_setPreference", { key: "backgroundThreads", value: "grouped" });
+        await pluginRpc("studio", "sidebar_setPreference", { key: "backgroundCollapsed", value: true });
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         await client.waitForAriaButton("Expand Background section");
         const collapsed = await client.evaluate(`document.querySelector('[data-sidebar-background-threads] [data-sidebar-thread-id]') === null`);
@@ -47,7 +47,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.clickElementWithTextAndPointer('[role="menuitemradio"]', "Hide background threads");
         await sleep(350);
         if (await client.evaluate(`Boolean(document.querySelector('[data-sidebar-background-threads]'))`)) throw new Error("Hide background threads left the section visible");
-        await pluginRpc("thread-list-plus", "setPreference", { key: "backgroundThreads", value: "grouped" });
+        await pluginRpc("studio", "sidebar_setPreference", { key: "backgroundThreads", value: "grouped" });
         await client.waitForSelector('[data-sidebar-background-threads]');
         await client.evaluate(`document.querySelector('[data-sidebar-background-threads]')?.scrollIntoView({ block: 'center' })`);
         await sleep(350);
@@ -61,7 +61,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
   },
   {
     id: "thread-list-plus",
-    packageDir: "bb-studio-sidebar",
+    packageDir: "bb-studio/src/modules/sidebar",
     showSidebar: true,
     setup: async (client) => {
       // Two Studio items opened become tabs in the Studio section, above the
@@ -108,7 +108,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
   },
   {
     id: "thread-list-plus-dialog",
-    packageDir: "bb-studio-sidebar",
+    packageDir: "bb-studio/src/modules/sidebar",
     fileName: "project-dialog.png",
     showSidebar: true,
     setup: async (client) => {

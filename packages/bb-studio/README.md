@@ -115,7 +115,7 @@ cleanup. It runs only against the matching isolated capture environment.
   **New thread** that mentions them, move them to a project, archive, or
   delete. Actions an add-on defines, like Talk's "Copy transcripts" or Draw's
   "Copy text", appear when the selection is all that kind.
-- **Tabs in the sidebar.** With [Studio Sidebar](../bb-studio-sidebar)
+- **Tabs in the sidebar.** With [Studio Sidebar](../bb-studio/src/modules/sidebar)
   as the thread list, each Studio item you open gets a tab in a Studio section
   above your threads. × or middle-click closes a tab; closing the one on
   screen opens the next. The section's ⋯ menu groups tabs by app, sorts them,
