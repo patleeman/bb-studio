@@ -470,6 +470,7 @@ export default async function plugin(bb: BbPluginApi) {
       "Save a finished deliverable to the user's Studio, where they keep what agents make: a generated image, an HTML page, a report, a document, a data file. " +
       "Pass `path` to a file in this thread's workspace or thread storage (relative paths are from the workspace root), or `content` plus a file `name` for short text. " +
       "Saving the same path again from this thread adds a new version. Save final outputs the user would want to keep, not scratch or intermediate files. " +
+      "For repository coding tasks, keep changes in Git. Do not create or save patches, source copies, logs, or implementation summaries to Studio unless the user explicitly requests that export. Local or unpushed commits do not justify an artifact save. " +
       "The result includes a line to put in your reply so the artifact shows as a card.",
     parameters: z.object({
       path: z.string().min(1).max(4096).optional(),

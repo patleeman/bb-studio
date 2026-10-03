@@ -72,7 +72,9 @@ Studio Chat's New in Float and Open in Float.
 - **Agents save too.** The `artifacts_save`, `artifacts_list` and
   `artifacts_read` tools, and the `artifacts` skill, cover when to save
   something. When the agent puts `::artifact{id="art_…"}` in a reply, it shows
-  a card that opens the viewer.
+  a card that opens the viewer. For repository coding tasks, agents keep changes
+  in Git and save patches, source copies, logs or implementation summaries only
+  when you explicitly request that export.
 - **`@artifact` mentions.** The agent receives the artifact's details and,
   for text types, its contents.
 - **`bb artifacts` CLI**: `save <path> [--title] [--description]`,

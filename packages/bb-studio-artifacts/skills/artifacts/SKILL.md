@@ -1,6 +1,6 @@
 ---
 name: artifacts
-description: Use when you finish a deliverable the user will want to keep (a generated image, an HTML page, a report, a document, a data file), when the user asks to save something "to Studio" or "as an artifact", or when they refer to a Studio artifact: a /plugins/artifacts/artifacts/<id> link or an @artifact mention.
+description: Use when you finish a deliverable the user will want to keep (a generated image, an HTML page, a report, a document, a data file), when the user asks to save something "to Studio" or "as an artifact", or when they refer to a Studio artifact: a /plugins/artifacts/artifacts/<id> link or an @artifact mention. For repository coding tasks, use only when the user explicitly requests an artifact export.
 ---
 
 # Studio Artifacts
@@ -17,8 +17,14 @@ Artifacts belong to the thread's project, or are global. Link to one as
 
 Save finished outputs the user asked for or will obviously want: the final
 image, the report, the page you built, an exported dataset. Don't save
-scratch files, intermediate drafts, logs or source code the repo already
-tracks. If unsure, finish the work and offer to save it.
+scratch files or intermediate drafts.
+
+For repository coding tasks, keep changes in Git. Do not create or save patches,
+source copies, logs, or implementation summaries to Studio unless the user
+explicitly requests that export. Local or unpushed commits do not justify an
+artifact save.
+
+If unsure whether an output belongs in Studio, finish the work and offer to save it.
 
 Give each artifact a short, human title ("Q3 revenue chart", not
 `chart_v2_final.png`) and, when useful, a one-line description.
