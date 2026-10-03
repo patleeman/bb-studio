@@ -1,3 +1,4 @@
+import { registerApp as registerNavigation } from "./src/modules/navigation/app";
 import { registerApp as registerTalk } from "./src/modules/talk/app";
 import { registerApp as registerDecisions } from "./src/modules/decisions/app";
 import { registerApp as registerArtifacts } from "./src/modules/artifacts/app";
@@ -31,6 +32,7 @@ function StudioRoot({ subPath }: { subPath: string }) {
 
 export default definePluginApp((app) => {
   app.slots.experimental_appOverlay({ id: "module-import-notice", component: ModuleNotice });
+  registerNavigation(app);
   registerTalk(app);
   registerDecisions(app);
   registerArtifacts(app);

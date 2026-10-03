@@ -7,7 +7,7 @@ const OUTSIDE_PLUGIN = "staged-forecast";
 export default ({ projectId, threadId, bbCli, sleep }) => [
   {
     id: "studio-navigation",
-    packageDir: "bb-studio-navigation",
+    packageDir: "bb-studio/src/modules/navigation",
     showSidebar: true,
     setup: async (client) => {
       // Every Studio plugin with a sidebar row is running, so the rows missing
@@ -17,7 +17,7 @@ export default ({ projectId, threadId, bbCli, sleep }) => [
         if (!new RegExp(`^${id}@\\S+\\s+running`, "m").test(plugins)) throw new Error(`Install and enable ${id} before capturing`);
       }
       await client.navigate(`/projects/${projectId}/threads/${threadId}`);
-      await client.waitForSelector('[data-bb-plugin="studio-navigation"] [data-testid="plugin-nav-sidebar-items"]');
+      await client.waitForSelector('[data-bb-plugin="studio"] [data-testid="plugin-nav-sidebar-items"]');
       await client.waitForSelector('[data-sidebar-navigation-item="studio/studio"]');
       await client.waitForSelector("[data-studio-sidebar-sections]");
       await client.clickAriaButtonWithPointer("More sidebar navigation");

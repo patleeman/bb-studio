@@ -1,3 +1,4 @@
+import { registerServer as registerNavigation } from "./src/modules/navigation/server";
 import { registerServer as registerTalk } from "./src/modules/talk/server";
 import { registerServer as registerDecisions } from "./src/modules/decisions/server";
 import { registerServer as registerArtifacts } from "./src/modules/artifacts/server";
@@ -69,6 +70,7 @@ export default async function plugin(host: BbPluginApi) {
   const runtime = new ModuleRuntime(host);
   await registerCore(runtime.coreApi(), runtime.provider, runtime.services);
   await runtime.register([
+    { name: "navigation", legacyPluginId: "studio-navigation", registerServer: registerNavigation },
     { name: "talk", legacyPluginId: "talk", registerServer: registerTalk },
     { name: "decisions", legacyPluginId: "smart-decisions", skills: ["smart-decisions"], registerServer: registerDecisions },
     { name: "artifacts", legacyPluginId: "artifacts", skills: ["artifacts"], registerServer: registerArtifacts },

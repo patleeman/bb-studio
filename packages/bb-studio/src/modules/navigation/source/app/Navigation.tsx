@@ -17,25 +17,25 @@ import {
   arrayMove,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { Button } from "@/components/ui/button";
-import { Icon } from "@/components/ui/icon";
+import { Button } from "../../components/ui/button";
+import { Icon } from "../../components/ui/icon";
 import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
   ContextMenuSeparator,
   ContextMenuTrigger,
-} from "@/components/ui/context-menu";
+} from "../../components/ui/context-menu";
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { COARSE_POINTER_ICON_SIZE_CLASS } from "@/components/ui/coarse-pointer-sizing";
-import { CompactViewportOverrideProvider } from "@/components/ui/hooks/use-compact-viewport";
-import { cn } from "@/lib/utils";
+} from "../../components/ui/dropdown-menu";
+import { COARSE_POINTER_ICON_SIZE_CLASS } from "../../components/ui/coarse-pointer-sizing";
+import { CompactViewportOverrideProvider } from "../../components/ui/hooks/use-compact-viewport";
+import { cn } from "../../lib/utils";
 import { AppCommandShortcutPill } from "./ui/AppCommandShortcutPill.js";
 import {
   SIDEBAR_HOVER_ACTIONS_CLASS,
