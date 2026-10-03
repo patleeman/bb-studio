@@ -25,6 +25,7 @@ describe("Studio search index", () => {
     let items = [item("a", "Offline sync", 2), item("b", "Notes", 3)];
     const content: Record<string, string> = { a: "The launch plan", b: "Discuss offline sync tomorrow" };
     const hub = {
+    inventoryChanges: async () => new Set<string>(),
       overview: async () => ({ providers: [{ pluginId: "pages", state: "ready" }], items, truncated: new Set() }),
       providers: async () => [{ pluginId: "pages", state: "ready" }],
       version: () => 2,
@@ -53,6 +54,7 @@ function fixture() {
   for (const sql of MIGRATIONS) db.exec(sql);
   const state = { items: [item("a", "First")], online: true, truncated: false, failRead: false };
   const hub = {
+    inventoryChanges: async () => new Set<string>(),
     providers: async () => [{ pluginId: "pages", state: state.online ? "ready" : "offline" }],
     overview: async () => ({ providers: await hub.providers(), items: state.online ? [...state.items] : [], truncated: new Set(state.truncated ? ["pages"] : []) }),
     version: () => 2,
@@ -239,4 +241,45 @@ it("reports partial, unavailable, recovering and current snapshots without clear
   expect(index.status()).toMatchObject({ state: "current", pendingProviders: [], unavailableProviders: [] });
   expect(index.status().revision).toBeGreaterThan(revision);
   await index.dispose(); db.close();
+});
+
+it("detects plugin disable and re-enable from inventory without a content-change event or whole-suite reads", async () => {
+  const db = new Database(":memory:");
+  for (const sql of MIGRATIONS) db.exec(sql);
+  let enabled = true;
+  let inventoryFails = false;
+  const list = vi.fn(async () => {
+    if (inventoryFails) throw new Error("Inventory unavailable");
+    return { plugins: ["pages", "talk"].map(id => ({ id, name: id, enabled: id !== "pages" || enabled, status: "running", statusDetail: null, version: "1" })) };
+  });
+  const read = vi.fn(async ({ pluginId, method, outputSchema }: Parameters<HubSdk["plugins"]["callRpc"]>[0]) => outputSchema.parse(method === "studio_describe"
+    ? { pluginId, version: 1, panel: null, kinds: [] }
+    : { items: [{ ...item("a", `Lifecycle ${pluginId}`), pluginId }] }));
+  const sdk: HubSdk = { plugins: { list, experimental_discoverRpc: async () => [{ pluginId: "pages" }, { pluginId: "talk" }], callRpc: read as HubSdk["plugins"]["callRpc"] } };
+  const index = new SearchIndex(db, new StudioHub(sdk));
+  try {
+    await index.ensure(); await vi.advanceTimersByTimeAsync(0);
+    const talkReads = () => read.mock.calls.filter(([args]) => args.pluginId === "talk").length;
+    const before = talkReads();
+    enabled = false;
+    await vi.advanceTimersByTimeAsync(3_000);
+    for (let i = 0; i < 20; i++) index.status();
+    // Interactive results remain immediately available during the check.
+    expect(index.search("Lifecycle")).toHaveLength(2);
+    await vi.advanceTimersByTimeAsync(0);
+    expect(index.search("pages")).toEqual([]);
+    expect(index.search("talk")).toHaveLength(1);
+    expect(talkReads()).toBe(before);
+    const checks = list.mock.calls.length;
+    await Promise.all(Array.from({ length: 20 }, () => index.ensure()));
+    expect(list).toHaveBeenCalledTimes(checks);
+    enabled = true;
+    await vi.advanceTimersByTimeAsync(3_000); index.status(); await vi.advanceTimersByTimeAsync(0);
+    expect(index.search("pages")).toHaveLength(1);
+    expect(talkReads()).toBe(before);
+    inventoryFails = true;
+    await vi.advanceTimersByTimeAsync(3_000); index.status(); await vi.advanceTimersByTimeAsync(0);
+    expect(index.search("Lifecycle")).toHaveLength(2);
+    expect(index.status()).toMatchObject({ state: "stale", discoveryIncomplete: true });
+  } finally { await index.dispose(); db.close(); }
 });

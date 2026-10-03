@@ -59,6 +59,8 @@ export class SearchIndex {
   private recoveryTimer: ReturnType<typeof setTimeout> | null = null;
   private recovering = false;
   private disposed = false;
+  private inventoryCheck: Promise<void> | null = null;
+  private inventoryCheckedAt = 0;
 
   constructor(private readonly db: Database.Database, private readonly hub: StudioHub, private readonly recovered: () => void = () => {}) {}
 
@@ -66,15 +68,36 @@ export class SearchIndex {
     this.disposed = true;
     if (this.recoveryTimer) clearTimeout(this.recoveryTimer);
     this.recoveryTimer = null;
+    await this.inventoryCheck;
     await this.syncing.catch(() => {});
   }
 
   status(): SearchStatus {
+    this.checkInventory();
     return {
       state: !this.ready ? "initializing" : this.recovering || this.queued > 0 ? "recovering" : this.pending.size || this.discoveryIncomplete ? "stale" : "current",
       pendingProviders: [...this.pending].sort(), unavailableProviders: [...this.unavailable].sort(),
       discoveryIncomplete: this.discoveryIncomplete, revision: this.revision,
     };
+  }
+
+  /** Coalesced while search is in use; never blocks an interactive query. */
+  private checkInventory(): void {
+    if (!this.ready || this.disposed || this.inventoryCheck || Date.now() - this.inventoryCheckedAt < 3_000) return;
+    this.inventoryCheckedAt = Date.now();
+    let timer: ReturnType<typeof setTimeout>;
+    const timeout = new Promise<never>((_, reject) => { timer = setTimeout(() => reject(new Error("Plugin inventory timed out")), 2_500); });
+    this.inventoryCheck = Promise.race([this.hub.inventoryChanges(), timeout]).then(async changed => {
+      if (this.disposed || !changed.size) return;
+      for (const id of changed) this.pending.add(id);
+      await this.queue(() => this.reconcile(changed).then(() => {}));
+      if (!this.disposed) this.recovered();
+    }).catch(() => {
+      if (this.disposed) return;
+      this.discoveryIncomplete = true;
+      this.scheduleRecovery();
+      this.recovered();
+    }).finally(() => { clearTimeout(timer); this.inventoryCheck = null; });
   }
 
   retry(): SearchStatus {
@@ -176,6 +199,7 @@ export class SearchIndex {
     }
     // Once initialized, serve the saved snapshot while recovery runs in the background.
     this.scheduleRecovery();
+    this.checkInventory();
   }
 
   private queue(work: () => Promise<void>): Promise<void> {

@@ -44,6 +44,7 @@ export interface LocalProvider {
 
 export class StudioHub {
   private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
+  private inventory: Map<string, string> | null = null;
 
   constructor(
     private readonly sdk: HubSdk,
@@ -55,6 +56,19 @@ export class StudioHub {
   }
 
   version(pluginId: string): 1 | 2 | null { return this.described.get(pluginId)?.info.version ?? null; }
+
+  private inventoryMap(plugins: readonly PluginEntry[]): Map<string, string> {
+    return new Map(plugins.filter(plugin => plugin.enabled && plugin.id !== STUDIO_PLUGIN_ID)
+      .map(plugin => [plugin.id, JSON.stringify([plugin.status, plugin.version, plugin.updatedAt ?? ""])]));
+  }
+
+  /** Cheap lifecycle detection on stable hosts, which expose no plugin event hook. */
+  async inventoryChanges(): Promise<Set<string>> {
+    const next = this.inventoryMap((await this.sdk.plugins.list()).plugins);
+    const previous = this.inventory;
+    this.inventory = next;
+    return new Set(previous ? [...new Set([...previous.keys(), ...next.keys()])].filter(id => previous.get(id) !== next.get(id)) : []);
+  }
 
   call<M extends keyof ProviderMethods>(
     pluginId: string,
@@ -78,6 +92,7 @@ export class StudioHub {
 
   private async providerSnapshot(only?: ReadonlySet<string>): Promise<{ providers: ProviderView[]; discoveryComplete: boolean; installed: Set<string> }> {
     const snapshot = await discoverProviderSnapshot(this.sdk, { method: "studio_describe", known: SUITE, exclude: [STUDIO_PLUGIN_ID] });
+    this.inventory ??= this.inventoryMap(snapshot.installed);
     const installed = new Set(snapshot.installed.map((entry) => entry.id));
     for (const id of this.described.keys()) if (!installed.has(id)) this.described.delete(id);
     const candidates = snapshot.providers.filter((entry) => !only || only.has(entry.id));
