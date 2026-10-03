@@ -82,10 +82,11 @@ export {
   type StudioItemLink,
 } from "./studio-item";
 export { useOpenTarget, type OpenPlace } from "./move";
-export { CompanionView, CompanionOutlet, companionWorkbenchAvailable, openCompanion, type CompanionPlacement, type CompanionViewProps } from "./companion";
+export { CompanionView, CompanionOutlet, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionPlacement, type CompanionViewProps } from "./companion";
 export { COMPOSER_MORE_ITEM, ComposerMore, useComposerMoreSide } from "./composer-more";
 export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";
+export { NewConversationComposer, type NewConversationProps, type ConversationSubmit } from "./new-conversation";
 export {
   SIDEBAR_ROW,
   SIDEBAR_ROW_SELECTED,

@@ -20,6 +20,7 @@ const state = vi.hoisted(() => ({
 }));
 
 vi.mock("@get-bb/plugin-sdk/app", () => ({
+  experimental_Icon: () => null,
   useRpc: () => state.rpc,
   useBbNavigate: () => state.navigate,
   useComposer: () => ({ scope: { kind: "none" } }),
@@ -28,7 +29,8 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
     return <textarea aria-label="New conversation" defaultValue={props.initialPrompt} />;
   },
 }));
-vi.mock("@bb-studio/kit/app", () => ({
+vi.mock("@bb-studio/kit/app", async () => ({
+  NewConversationComposer: (await import("../../../bb-studio-kit/src/app/new-conversation")).NewConversationComposer,
   cn: (...classes: string[]) => classes.join(" "),
   usePathname: () => state.path,
   useFloatAvailable: () => state.available,

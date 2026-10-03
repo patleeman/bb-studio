@@ -1,4 +1,5 @@
-import { defineRpcContract, type NewThreadRequest } from "@get-bb/plugin-sdk";
+import { conversationRequestSchema } from "@bb-studio/kit/contract";
+import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { columnSchema, rowPatchSchema, tableSchema, tableUpdateSchema, valuesSchema } from "@bb-studio/kit/tables";
 
@@ -142,27 +143,7 @@ export const commentThreadSchema = z.object({
 
 // What BB's new-thread composer submits, whitelisted like Studio Teams does. Core
 // threads.spawn validates the host-owned environment and prompt input.
-export const chatRequestSchema = z.object({
-  projectId: z.string().min(1),
-  providerId: z.string().min(1),
-  model: z.string(),
-  reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]),
-  permissionMode: z.enum(["accept-edits", "auto", "full"]),
-  serviceTier: z.enum(["default", "fast"]).optional(),
-  executionInputSources: z.object({
-    model: z.enum(["client-preference", "explicit"]).optional(),
-    permissionMode: z.enum(["client-preference", "explicit"]).optional(),
-    providerId: z.enum(["client-preference", "explicit"]).optional(),
-    reasoningLevel: z.enum(["client-preference", "explicit"]).optional(),
-    serviceTier: z.enum(["client-preference", "explicit"]).optional(),
-  }),
-  environment: z.record(z.string(), z.json()).transform((value) => value as NewThreadRequest["environment"]),
-  input: z
-    .array(z.record(z.string(), z.json()))
-    .min(1)
-    .transform((value) => value as NewThreadRequest["input"]),
-  sendAt: z.number().int().positive().optional(),
-});
+export const chatRequestSchema = conversationRequestSchema(z);
 
 const spaceThreadSchema = z.object({
   id: z.string(),

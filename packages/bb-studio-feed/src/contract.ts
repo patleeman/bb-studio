@@ -1,6 +1,7 @@
 // Studio Feed's RPC surface for its app. Zod only, so the app can import the
 // types without server code.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
+import { conversationRequestSchema } from "@bb-studio/kit/contract";
 import { z } from "zod";
 import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES } from "./shared";
 
@@ -88,6 +89,10 @@ export const rpcContract = defineRpcContract({
   post: {
     input: z.object({ postId }),
     output: z.object({ post: postSchema.nullable() }),
+  },
+  discussion: {
+    input: z.object({ postId, request: conversationRequestSchema(z) }),
+    output: z.object({ threadId: z.string() }),
   },
   /** A story's posts, oldest first. */
   story: {

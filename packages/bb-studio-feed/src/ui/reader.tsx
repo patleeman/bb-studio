@@ -5,7 +5,7 @@
 // or starts a new thread. A rail lists what needs you and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, cn, openAppPath, studioItemProps } from "@bb-studio/kit/app";
+import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -13,11 +13,13 @@ import { useCallback, useEffect, useRef, useState, type ReactNode } from "react"
 import type { rpcContract } from "../contract";
 import { FEED_ICON, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
 import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
+import { PostDiscussion } from "./discussion";
 
 const PAGE = 40;
 
 export function FeedPanel({ subPath }: { subPath: string }) {
   const id = decodeURIComponent(subPath.split("/")[0] ?? "");
+  if (id && subPath.split("/")[1] === "discussion") return <PostDiscussion key={id} postId={id} />;
   return id ? <PostPage postId={id} /> : <FeedReader />;
 }
 
@@ -410,12 +412,13 @@ function PostActions({ post, onRead, onRemoved, className }: { post: PostView; o
 /** A finding Studio Explore saved: write the page explaining it. The post links the page when it's done. */
 function ExploreButton({ post }: { post: PostView }) {
   const rpc = useRpc<typeof rpcContract>();
+  const open = useOpenCompanion();
   const [state, setState] = useState<"idle" | "working" | "unavailable">("idle");
   const explore = () => {
     setState("working");
     rpc.call("explore", { postId: post.id }).then(
       (result) => {
-        if (result.status === "ready" && result.href) openAppPath(result.href);
+        if (result.status === "ready" && result.href) open({ kind: "path", path: result.href, title: post.title });
         setState(result.status === "unavailable" ? "unavailable" : result.status === "ready" ? "idle" : "working");
       },
       () => setState("unavailable"),
@@ -454,6 +457,7 @@ function PostContent({ post }: { post: PostView }) {
 
 /** A page, artifact or other Studio item the post links to, shown in the post. */
 function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
+  const open = useOpenCompanion();
   const { content } = embed;
   // Long text is cut to a few paragraphs until asked for.
   const long = content?.type === "markdown" && (content.text?.length ?? 0) > 900;
@@ -470,7 +474,7 @@ function ItemPreview({ embed }: { embed: PostView["embeds"][number] }) {
         <span className="shrink-0 text-xs text-muted-foreground">
           {embed.kind} · {relativeTime(embed.updatedAt)}
         </span>
-        <button type="button" className={cn(GHOST_BUTTON, "ml-auto shrink-0")} onClick={() => openAppPath(embed.href)}>
+        <button type="button" className={cn(GHOST_BUTTON, "ml-auto shrink-0")} onClick={() => open({ kind: "path", path: embed.href, title: embed.title })}>
           Open <Icon name="ArrowUpRight" />
         </button>
       </header>

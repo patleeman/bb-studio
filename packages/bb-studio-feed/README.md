@@ -81,8 +81,10 @@ longer publishes anything; cards in older replies still find their posts.
   earlier updates. Press <kbd>j</kbd> and <kbd>k</kbd> to move between posts,
   and <kbd>m</kbd> to mark the open one read or unread.
 - **The thread button** is named after the thread or channel the post came
-  from and opens it. **New thread** starts a thread with the post's title and
-  id, so the agent can read it with `feed_read`. **Remove** deletes a post.
+  from and opens its companion tab. **New thread** opens a retained discussion
+  draft with BB's project, model and attachment controls. Opening it again
+  focuses the same draft. On send, the agent receives the post's current title
+  and id so it can read it with `feed_read`. **Remove** deletes a post.
 - **Pictures**: a post's picture is the first image in its body. If it has
   none, it's the preview image of the first page it links to. The prompt asks
   agents to lead with a picture and link their source.
@@ -90,7 +92,7 @@ longer publishes anything; cards in older replies still find their posts.
   artifact, a drawing…), by its `/plugins/…` link or an `@` mention, shows a
   preview of it when opened. Pages and text show their first paragraphs, with
   **Show more**. Images show as pictures, and HTML artifacts and PDFs run in a
-  frame. **Open** goes to the item. An image artifact also stands in for a
+  frame. **Open** goes to the item's companion tab. An image artifact also stands in for a
   post's picture. Agents are told the feed previews what they link.
 - **Explore findings**: [Studio Explore](../bb-studio-explore) can save what
   an agent noticed to the feed, under **Follow-ups**. Those posts have an

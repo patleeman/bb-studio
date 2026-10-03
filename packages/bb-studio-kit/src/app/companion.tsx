@@ -1,6 +1,8 @@
 import type { ComponentType, ReactNode } from "react";
-import { openFloat } from "./float";
-import type { FloatOpenOptions, FloatTarget } from "./float-registry";
+import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { openFloat, useCompanionNavigate } from "./float";
+import { floatPanelFor, type FloatOpenOptions, type FloatTarget } from "./float-registry";
+import { openAppPath } from "./nav";
 
 export type CompanionPlacement = "floating" | "workbench" | "main";
 
@@ -44,4 +46,14 @@ export function CompanionOutlet({ id }: { id: string }) {
 /** Chat and companion actions prefer the native workbench when the host supports it. */
 export function openCompanion(target: FloatTarget, options: FloatOpenOptions = {}): boolean {
   return openFloat(target, { ...options, placement: options.placement ?? (companionWorkbenchAvailable() ? "workbench" : "floating") });
+}
+
+export function useOpenCompanion(): (target: FloatTarget) => void {
+  const navigate = useBbNavigate();
+  const within = useCompanionNavigate();
+  return target => {
+    if ((target.kind === "thread" || floatPanelFor(target.path)) && (within(target) || openCompanion(target))) return;
+    if (target.kind === "thread") navigate.toThread(target.threadId);
+    else openAppPath(target.path, { main: true });
+  };
 }

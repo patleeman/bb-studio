@@ -1,8 +1,8 @@
 // Pieces the reader and the card share.
-import { useBbNavigate } from "@get-bb/plugin-sdk/app";
+import { useOpenCompanion } from "@bb-studio/kit/app";
 import { useEffect, useState } from "react";
 import type { PostView } from "../contract";
-import { PANEL_PATH, type RealtimeEvent } from "../shared";
+import { discussionHref, FEED_ICON, postHref, type RealtimeEvent } from "../shared";
 
 export type { PostView };
 
@@ -26,16 +26,12 @@ export const from = (post: Pick<PostView, "author" | "channelName">) => (post.ch
 
 /** Where Discuss goes: the thread or channel it came from, or a new thread about it. */
 export function useDiscuss() {
-  const navigate = useBbNavigate();
+  const open = useOpenCompanion();
   return {
-    openPost: (post: Pick<PostView, "id">) => navigate.toPluginPanel(PANEL_PATH, { subPath: post.id }),
+    openPost: (post: Pick<PostView, "id" | "title">) => open({ kind: "path", path: postHref(post.id), title: post.title, icon: FEED_ICON }),
     openSource: (post: Pick<PostView, "threadId">) => {
-      if (post.threadId) navigate.toThread(post.threadId);
+      if (post.threadId) open({ kind: "thread", threadId: post.threadId });
     },
-    newThread: (post: Pick<PostView, "id" | "title" | "author" | "channelName">) =>
-      navigate.toCompose({
-        initialPrompt: `Let's discuss this feed post: "${post.title}" (${from(post)}). Read it first with feed_read id ${post.id}.\n\n`,
-        focusPrompt: true,
-      }),
+    newThread: (post: Pick<PostView, "id" | "title">) => open({ kind: "path", path: discussionHref(post.id), title: `Chat: ${post.title}`, icon: "MessageSquare" }),
   };
 }

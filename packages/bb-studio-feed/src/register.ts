@@ -10,7 +10,7 @@
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import { STUDIO_PLUGIN_ID, studioSchemas } from "@bb-studio/kit/contract";
 import { relativeTime } from "@bb-studio/kit/format";
-import type { BbPluginApi, JsonValue, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
+import type { BbPluginApi, JsonValue, NewThreadRequest, PluginCliContext, PluginCliResult } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import type { PostView } from "./contract";
 import { feedInstructions } from "./prompt";
@@ -18,6 +18,7 @@ import { FeedService, type NotifyMode, type Origin } from "./service";
 import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES, REALTIME_CHANNEL, EXPLORE_PLUGIN_ID, cardLine, firstLink, parseAttributes, studioRefs, postDirective, postHref, priority, storyKey, type RealtimeEvent } from "./shared";
 import { FeedStore, MIGRATIONS, type PostRow } from "./store";
 import { fetchPreview } from "./unfurl";
+import { startDiscussion } from "./discussion";
 
 export const FEED_TOOLS = ["feed_post", "feed_list", "feed_read", "feed_edit", "feed_remove"];
 
@@ -232,6 +233,7 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       return { posts: await views(page.rows), nextCursor: page.nextCursor, lastSeenAt: store.lastSeenAt() };
     },
     post: async ({ postId }: { postId: string }) => ({ post: await one(store.get(postId)) }),
+    discussion: ({ postId, request }: { postId: string; request: NewThreadRequest }) => startDiscussion(postId, request, id => store.get(id), input => bb.sdk.threads.spawn(input)),
     story: async ({ story }: { story: string }) => ({ posts: await views(store.story(story)) }),
     // A card's post: `::post{id="…"}` names it; an older `::post{title="…"}` line published it.
     forDirective: async ({ source }: { source: string }) => {

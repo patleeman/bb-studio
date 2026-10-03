@@ -5,7 +5,29 @@
 // plugin's directory, where the plugin's own zod isn't resolvable, so callers
 // pass their `z` in.
 import type { z as Zod } from "zod";
+import type { NewThreadRequest } from "@get-bb/plugin-sdk";
 import { untitled } from "./format";
+
+export function conversationRequestSchema(z: typeof Zod) {
+  return z.object({
+    projectId: z.string().min(1),
+    providerId: z.string().min(1),
+    model: z.string(),
+    reasoningLevel: z.enum(["none", "low", "medium", "high", "xhigh", "max", "ultra", "ultracode"]),
+    permissionMode: z.enum(["accept-edits", "auto", "full"]),
+    serviceTier: z.enum(["default", "fast"]).optional(),
+    executionInputSources: z.object({
+      model: z.enum(["client-preference", "explicit"]).optional(),
+      permissionMode: z.enum(["client-preference", "explicit"]).optional(),
+      providerId: z.enum(["client-preference", "explicit"]).optional(),
+      reasoningLevel: z.enum(["client-preference", "explicit"]).optional(),
+      serviceTier: z.enum(["client-preference", "explicit"]).optional(),
+    }),
+    environment: z.record(z.string(), z.json()).transform(value => value as NewThreadRequest["environment"]),
+    input: z.array(z.record(z.string(), z.json())).min(1).transform(value => value as NewThreadRequest["input"]),
+    sendAt: z.number().int().positive().optional(),
+  });
+}
 
 export const STUDIO_PLUGIN_ID = "studio";
 /** Studio's nav panel path: the collection lives at /plugins/studio/studio. */

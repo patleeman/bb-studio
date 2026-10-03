@@ -1,6 +1,6 @@
-import { experimental_NewThreadComposer as NewThreadComposer, useBbNavigate, useRpc, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
-import { Icon, openCompanion, useCompanionNavigate } from "@bb-studio/kit/app";
-import { errorMessage, quoteMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
+import { useBbNavigate, useRpc, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
+import { NewConversationComposer, openCompanion, useCompanionNavigate, type ConversationSubmit } from "@bb-studio/kit/app";
+import { errorMessage, untitled, type ItemQuote } from "@bb-studio/kit/format";
 import { useCallback, useEffect, useState } from "react";
 import type { rpcContract, Viewed } from "../contract";
 import { itemKey } from "../context";
@@ -11,43 +11,24 @@ export function ConversationComposer({ item, quote, draftKey, focusRequest, onSu
   quote?: ItemQuote;
   draftKey: string;
   focusRequest?: number;
-  onSubmit: NonNullable<React.ComponentProps<typeof NewThreadComposer>["onSubmit"]>;
+  onSubmit: ConversationSubmit;
   onClose?: () => void;
 }) {
-  const [error, setError] = useState<string | null>(null);
   const kind = item?.kindLabel.toLowerCase() ?? "conversation";
-  return (
-    <section aria-label={item ? `Work with this ${kind}` : "New conversation"} className="studio-chat flex h-full min-h-0 flex-col bg-background text-foreground">
-      <header className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-xs text-muted-foreground">
-        <Icon name={item?.kindIcon ?? CHAT_ICON} className="size-3.5 shrink-0" />
-        <span className="min-w-0 flex-1 truncate">{item ? `Chat about "${untitled(item.title)}"` : "New conversation"}</span>
-        {onClose ? <button type="button" aria-label="Close composer" onClick={onClose} className="rounded p-1 hover:bg-state-hover"><Icon name="X" className="size-4" /></button> : null}
-      </header>
-      <p className="shrink-0 px-3 pt-2 text-xs text-muted-foreground">@mention a bot to hand it off.</p>
-      {quote?.image ? <div className="flex shrink-0 items-center gap-3 px-3 pt-2">
-        <img src={quote.image} alt="Selected image area" className="max-h-24 max-w-40 rounded border border-border object-contain" />
-      </div> : null}
-      {error ? <p role="alert" className="shrink-0 px-3 pt-2 text-xs text-destructive">{error}</p> : null}
-      <NewThreadComposer
-        className="studio-chat-composer min-h-0 flex-1 overflow-auto"
-        layout="document"
-        placeholder={item ? `Work with this ${kind}…` : "What would you like to work on?"}
-        draftKey={draftKey}
-        {...(quote ? { initialPrompt: quoteMessage(quote) } : {})}
-        {...(focusRequest !== undefined ? { focusRequest } : {})}
-        {...(item?.projectId ? { defaultProjectId: item.projectId } : {})}
-        onSubmit={async request => {
-          setError(null);
-          try {
-            await onSubmit(quote?.image ? { ...request, input: [...request.input, { type: "image", url: quote.image }] } : request);
-          } catch (cause) {
-            setError(errorMessage(cause));
-            throw cause;
-          }
-        }}
-      />
-    </section>
-  );
+  return <NewConversationComposer
+    title={item ? `Chat about "${untitled(item.title)}"` : "New conversation"}
+    ariaLabel={item ? `Work with this ${kind}` : "New conversation"}
+    icon={item?.kindIcon ?? CHAT_ICON}
+    placeholder={item ? `Work with this ${kind}…` : "What would you like to work on?"}
+    className="studio-chat"
+    composerClassName="studio-chat-composer"
+    draftKey={draftKey}
+    {...(quote ? { quote } : {})}
+    {...(focusRequest !== undefined ? { focusRequest } : {})}
+    {...(item?.projectId ? { defaultProjectId: item.projectId } : {})}
+    {...(onClose ? { onClose } : {})}
+    onSubmit={onSubmit}
+  />;
 }
 
 export function ConversationPage({ subPath }: PluginNavPanelProps) {

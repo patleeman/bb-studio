@@ -2,17 +2,19 @@
 import React, { act, useState } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
-import { CompanionView, companionWorkbenchAvailable, openCompanion, type CompanionViewProps } from "./companion";
+import { CompanionView, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionViewProps } from "./companion";
 import { FloatPanels, useCompanionNavigate, useInFloat } from "./float";
 import { publishFloatBody, setFloatHost } from "./float-registry";
 
-vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages" }));
+const sdkNavigate = vi.hoisted(() => ({ toThread: vi.fn() }));
+vi.mock("@get-bb/plugin-sdk/app", () => ({ experimental_usePluginId: () => "pages", useBbNavigate: () => sdkNavigate }));
 
 let root: Root;
 let container: HTMLDivElement;
 let body: HTMLDivElement;
 beforeEach(() => {
   vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true);
+  sdkNavigate.toThread.mockClear();
   container = document.createElement("div");
   body = document.createElement("div");
   document.body.append(container, body);
@@ -28,6 +30,36 @@ afterEach(() => {
 });
 
 describe("optional native companion host", () => {
+  it("keeps asynchronous navigation in its originating tab and uses the main router for unsupported paths", async () => {
+    const navigate = vi.fn();
+    const open = vi.fn();
+    setFloatHost({ open, navigate });
+    let go: ReturnType<typeof useOpenCompanion>;
+    function Editor() { go = useOpenCompanion(); return <textarea />; }
+    act(() => root.render(<FloatPanels path="pages" render={() => <Editor />} />));
+    act(() => publishFloatBody({ windowKey: "page", target: { kind: "path", path: "/plugins/pages/pages/one" }, element: body, placement: "floating" }));
+    await Promise.resolve();
+    go!({ kind: "thread", threadId: "created" });
+    expect(navigate).toHaveBeenCalledWith("page", { kind: "thread", threadId: "created" });
+    expect(open).not.toHaveBeenCalled();
+    expect(sdkNavigate.toThread).not.toHaveBeenCalled();
+    const push = vi.spyOn(window.history, "pushState").mockImplementation(() => {});
+    go!({ kind: "path", path: "/plugins/unsupported/view/one" });
+    expect(push).toHaveBeenCalledWith(expect.objectContaining({ idx: 1, usr: null }), "", "/plugins/unsupported/view/one");
+    expect(navigate).toHaveBeenCalledTimes(1);
+    expect(open).not.toHaveBeenCalled();
+    push.mockRestore();
+  });
+
+  it("falls back to BB's thread navigation when the companion host is unavailable", () => {
+    let go: ReturnType<typeof useOpenCompanion>;
+    function Action() { go = useOpenCompanion(); return null; }
+    setFloatHost(null);
+    act(() => root.render(<Action />));
+    go!({ kind: "thread", threadId: "source" });
+    expect(sdkNavigate.toThread).toHaveBeenCalledWith("source");
+  });
+
   it("navigates the originating companion after a request completes without a current click event", async () => {
     const navigate = vi.fn();
     setFloatHost({ open: () => {}, navigate });
