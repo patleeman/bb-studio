@@ -45,6 +45,21 @@ it("does not undo host visibility changes it did not make", () => {
   expect(button.querySelector("[data-plugin-icon-asset]")).not.toBeNull();
 });
 
+it("recognizes stable BB message wrappers without confusing unrelated layout classes", () => {
+  document.body.innerHTML = `<div class="group/message ml-auto rounded-lg"><button id="user" aria-label="👍">${icon}</button></div><div class="group/message w-full"><button id="assistant" aria-label="👍">${icon}</button></div><div class="ml-auto"><button id="unknown" aria-label="👍">${icon}</button></div>`;
+  const controller = new AbortController();
+  mountActionDecoration(menuSettings({ showInUserBar: false }), controller.signal);
+  expect((document.querySelector("#user") as HTMLButtonElement).hidden).toBe(true);
+  expect((document.querySelector("#assistant") as HTMLButtonElement).hidden).toBe(false);
+  expect((document.querySelector("#unknown") as HTMLButtonElement).hidden).toBe(false);
+  controller.abort();
+  const next = new AbortController();
+  mountActionDecoration(menuSettings({ showInAssistantBar: false }), next.signal);
+  expect((document.querySelector("#user") as HTMLButtonElement).hidden).toBe(false);
+  expect((document.querySelector("#assistant") as HTMLButtonElement).hidden).toBe(true);
+  next.abort();
+});
+
 it("never mounts after its generation has been aborted", () => {
   document.body.innerHTML = `<button aria-label="👍">${icon}</button>`;
   const before = document.body.innerHTML;

@@ -19,6 +19,11 @@ export function mountActionDecoration(settings: MenuSettings, signal: AbortSigna
         if (role === "assistant" || role === "assistant-message" || role === "message-assistant") return "assistant";
         if (role === "user" || role === "user-message" || role === "message-user") return "user";
       }
+      // Stable BB 0.45 uses this exact message wrapper without role attributes.
+      if (node.classList.contains("group/message")) {
+        if (node.classList.contains("ml-auto")) return "user";
+        if (node.classList.contains("w-full")) return "assistant";
+      }
     }
     return null;
   };
