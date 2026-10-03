@@ -1,0 +1,45 @@
+[
+  {
+    "command": [
+      "codesign",
+      "--verify",
+      "--deep",
+      "--strict",
+      "--verbose=2",
+      "/Applications/bb.app"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "--prepared:/Applications/bb.app/Contents/Frameworks/Mantle.framework/Versions/Current/.\n--prepared:/Applications/bb.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.\n--validated:/Applications/bb.app/Contents/Frameworks/Mantle.framework/Versions/Current/.\n--validated:/Applications/bb.app/Contents/Frameworks/ReactiveObjC.framework/Versions/Current/.\n--prepared:/Applications/bb.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.\n--validated:/Applications/bb.app/Contents/Frameworks/Squirrel.framework/Versions/Current/.\n--prepared:/Applications/bb.app/Contents/Frameworks/bb Helper (GPU).app\n--prepared:/Applications/bb.app/Contents/Frameworks/bb Helper (Plugin).app\n--prepared:/Applications/bb.app/Contents/Frameworks/bb Helper (Renderer).app\n--validated:/Applications/bb.app/Contents/Frameworks/bb Helper (GPU).app\n--prepared:/Applications/bb.app/Contents/Frameworks/bb Helper.app\n--validated:/Applications/bb.app/Contents/Frameworks/bb Helper (Plugin).app\n--validated:/Applications/bb.app/Contents/Frameworks/bb Helper (Renderer).app\n--validated:/Applications/bb.app/Contents/Frameworks/bb Helper.app\n--prepared:/Applications/bb.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.\n--prepared:/Applications/bb.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler\n--validated:/Applications/bb.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/Helpers/chrome_crashpad_handler\n--validated:/Applications/bb.app/Contents/Frameworks/Electron Framework.framework/Versions/Current/.\n/Applications/bb.app: valid on disk\n/Applications/bb.app: satisfies its Designated Requirement\n"
+  },
+  {
+    "command": [
+      "codesign",
+      "-dv",
+      "--verbose=2",
+      "/Applications/bb.app"
+    ],
+    "exitCode": 0,
+    "stdout": "",
+    "stderr": "Executable=/Applications/bb.app/Contents/MacOS/bb\nIdentifier=dev.bb.desktop\nFormat=app bundle with Mach-O thin (arm64)\nCodeDirectory v=20500 size=634 flags=0x10000(runtime) hashes=9+7 location=embedded\nSignature size=9042\nAuthority=Developer ID Application: Sawyer Hood (9QCU24SXK5)\nAuthority=Developer ID Certification Authority\nAuthority=Apple Root CA\nTimestamp=Oct 2, 2026 at 6:06:09\u202fPM\nNotarization Ticket=stapled\nInfo.plist entries=32\nTeamIdentifier=9QCU24SXK5\nRuntime Version=26.5.0\nSealed Resources version=2 rules=13 files=11065\nInternal requirements count=1 size=176\n"
+  },
+  {
+    "command": [
+      "launchctl",
+      "list",
+      "dev.bb.desktop.ShipIt"
+    ],
+    "exitCode": 0,
+    "stdout": "{\n\t\"StandardOutPath\" = \"/Users/patrick/Library/Caches/dev.bb.desktop.ShipIt/ShipIt_stdout.log\";\n\t\"LimitLoadToSessionType\" = \"Aqua\";\n\t\"StandardErrorPath\" = \"/Users/patrick/Library/Caches/dev.bb.desktop.ShipIt/ShipIt_stderr.log\";\n\t\"MachServices\" = {\n\t\t\"dev.bb.desktop.ShipIt\" = mach-port-object;\n\t};\n\t\"Label\" = \"dev.bb.desktop.ShipIt\";\n\t\"OnDemand\" = true;\n\t\"LastExitStatus\" = 0;\n\t\"Program\" = \"/Applications/bb.app/Contents/Frameworks/Squirrel.framework/Resources/ShipIt\";\n\t\"ProgramArguments\" = (\n\t\t\"/Applications/bb.app/Contents/Frameworks/Squirrel.framework/Resources/ShipIt\";\n\t\t\"dev.bb.desktop.ShipIt\";\n\t\t\"/Users/patrick/Library/Caches/dev.bb.desktop.ShipIt/ShipItState.plist\";\n\t);\n};\n",
+    "stderr": ""
+  },
+  {
+    "oldBundleBackup": "/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/dev.bb.desktop.ShipIt.EosXzujD/bb.app",
+    "exists": false
+  },
+  {
+    "shipItProcesses": [
+      "73262     1 /Applications/bb Nightly.app/Contents/Frameworks/Squirrel.framework/Resources/ShipIt dev.bb.desktop.nightly.ShipIt /Users/patrick/Library/Caches/dev.bb.desktop.nightly.ShipIt/ShipItState.plist"
+    ]
+  }
+]

@@ -65,6 +65,11 @@ BB application in a staged environment before handoff.
   on its own data directory and ports, installs every plugin from GitHub at a
   pushed commit, seeds a demo project, and writes a `capture.env` to source
   before capturing. `node scripts/staged-bb.mjs stop` removes it.
+- For Electron-native checks, follow [native desktop staging](docs/native-desktop-staging.md).
+  Never launch the installed `/Applications` app as a test fixture. A separate
+  data directory and `--user-data-dir` do not isolate its updater. Use an owned
+  app build only after updater execution is demonstrably disabled and its
+  installer cannot target the user's app or shared updater state.
 - Add the plugin to the capture definitions in
   `scripts/capture/captures/<plugin>.mjs`, including an assertion for the
   live surface and the data that must be visible. Run it with a seeded thread:

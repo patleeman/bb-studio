@@ -1,0 +1,46 @@
+
+DevTools listening on ws://127.0.0.1:49592/devtools/browser/bca9c846-62c6-44d8-b146-b824fde46843
+Checking for update
+Generated new staging user ID: 5c755f30-9d95-5bdf-b8dd-cb8794458a93
+[desktop] could not watch /var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-reactions-z_p6mr17/data for a server move: ENOENT: no such file or directory, watch '/var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-reactions-z_p6mr17/data'; checking /var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/bb-native-reactions-z_p6mr17/data/server-moved.json every 2000ms instead
+[desktop] connect server sync skipped (unavailable)
+Found version 0.45.0 (url: bb-0.45.0-arm64.zip, bb-0.45.0-arm64.dmg)
+Desktop auto-update available: 0.45.0; downloading in background.
+Downloading update from bb-0.45.0-arm64.zip, bb-0.45.0-arm64.dmg
+Checked for macOS Rosetta environment (isRosetta=false)
+Checked 'uname -a': arm64=true
+Cached update sha512 checksum doesn't match the latest available update. New update must be downloaded. Cached: eAdbgxK1RrbhCcxD5H/aboCkc2cMyky4xCfE/JBPul5KjnhHhrKpaqTUtjSe8iSrQd4gFn9TxQ/N91xY8atQTg==, expected: Qxo/ldtTRBgr7EAacIlOKhWim4WlfPrQ3A96cG8/iWKKFeB0kPwjVyXprMzpALjZQdGIB6oGhHCdj+c40IpZbg==. Directory for cached update will be cleaned
+Download block maps (old: "https://github.com/get-bb/bb/releases/download/desktop-latest/bb-0.44.0-arm64.zip.blockmap", new: https://github.com/get-bb/bb/releases/download/desktop-latest/bb-0.45.0-arm64.zip.blockmap)
+File has 2294 changed blocks
+Full: 187,815.98 KB, To download: 48,043.04 KB (26%)
+Cannot download differentially, fallback to full download: HttpError: 501 
+Headers: {
+  "accept-ranges": "bytes",
+  "content-disposition": "attachment; filename=bb-0.45.0-arm64.zip",
+  "content-length": "470",
+  "content-type": "application/octet-stream",
+  "date": "Sat, 03 Oct 2026 06:09:58 GMT",
+  "retry-after": "0",
+  "server": "Varnish",
+  "via": "1.1 varnish",
+  "x-cache": "MISS",
+  "x-cache-hits": "0",
+  "x-served-by": "cache-ewr-kewr1740027-EWR",
+  "x-timer": "S1791007799.887560,VS0,VE0"
+}
+    at createHttpError (/Applications/bb.app/Contents/Resources/app.asar/dist/main.js:3486:14)
+    at checkIsRangesSupported (/Applications/bb.app/Contents/Resources/app.asar/dist/main.js:13237:59)
+    at ClientRequest.<anonymous> (/Applications/bb.app/Contents/Resources/app.asar/dist/main.js:13213:14)
+    at ClientRequest.emit (node:events:514:28)
+    at SimpleURLLoaderWrapper.<anonymous> (node:electron/js2c/browser_init:2:143490)
+    at SimpleURLLoaderWrapper.emit (node:events:514:28)
+New version 0.45.0 has been downloaded to /Users/patrick/Library/Caches/@bbdesktop-updater/pending/bb-0.45.0-arm64.zip
+Desktop auto-update downloaded: 0.45.0; it will install on restart or quit.
+/ requested
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+ERROR: Unrecognized attribute string flag '?' in attribute string "T@"NSString",?,R,C" for property debugDescription
+/1c4414648cae71cacf4ff874da18b7c14d195511359d7c24d2098b2285252c8a767d8eab2a2132ed976d948164f8b235d6e68fcaeac2dae800449d3c30409a4e.zip requested
+/1c4414648cae71cacf4ff874da18b7c14d195511359d7c24d2098b2285252c8a767d8eab2a2132ed976d948164f8b235d6e68fcaeac2dae800449d3c30409a4e.zip requested by Squirrel.Mac, pipe /Users/patrick/Library/Caches/@bbdesktop-updater/pending/bb-0.45.0-arm64.zip
+2026-10-03 02:10:00.861 bb[78371:89339658] Download completed to: file:///Users/patrick/Library/Caches/dev.bb.desktop.ShipIt/update.AzNGX4a/1c4414648cae71cacf4ff874da18b7c14d195511359d7c24d2098b2285252c8a767d8eab2a2132ed976d948164f8b235d6e68fcaeac2dae800449d3c30409a4e.zip

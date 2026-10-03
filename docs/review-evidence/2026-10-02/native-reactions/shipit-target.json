@@ -1,0 +1,7 @@
+{
+  "launchAfterInstallation": false,
+  "updateBundleURL": "file:///Users/patrick/Library/Caches/dev.bb.desktop.ShipIt/update.AzNGX4a/bb.app/",
+  "useUpdateBundleName": true,
+  "bundleIdentifier": "dev.bb.desktop",
+  "targetBundleURL": "file:///Applications/bb.app/"
+}

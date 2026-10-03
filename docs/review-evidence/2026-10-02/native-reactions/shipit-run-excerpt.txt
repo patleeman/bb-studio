@@ -1,0 +1,10 @@
+2026-10-03 02:10:05.053 ShipIt[79093:89342215] Detected this as an install request
+2026-10-03 02:10:05.068 ShipIt[79093:89342215] Beginning installation
+2026-10-03 02:10:11.609 ShipIt[79093:89342218] Moving bundle from file:///Applications/bb.app/ to file:///var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/dev.bb.desktop.ShipIt.EosXzujD/bb.app
+2026-10-03 02:10:11.610 ShipIt[79093:89342218] Moving bundles directly as SquirrelMacEnableDirectContentsWrite is disabled for app: dev.bb.desktop.ShipIt
+2026-10-03 02:10:11.610 ShipIt[79093:89342218] Moved bundle contents from file:///Applications/bb.app/ to file:///var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/dev.bb.desktop.ShipIt.EosXzujD/bb.app
+2026-10-03 02:10:11.610 ShipIt[79093:89342218] Moving bundle from file:///var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/dev.bb.desktop.ShipIt.hO7JUReV/bb.app to file:///Applications/bb.app/
+2026-10-03 02:10:11.610 ShipIt[79093:89342218] Moving bundles directly as SquirrelMacEnableDirectContentsWrite is disabled for app: dev.bb.desktop.ShipIt
+2026-10-03 02:10:11.610 ShipIt[79093:89342218] Moved bundle contents from file:///var/folders/cv/q6nc4gqx0kddgybjp7s817zr0000gn/T/dev.bb.desktop.ShipIt.hO7JUReV/bb.app to file:///Applications/bb.app/
+2026-10-03 02:10:13.690 ShipIt[79093:89342218] Installation completed successfully
+2026-10-03 02:10:13.691 ShipIt[79093:89342218] ShipIt quitting
