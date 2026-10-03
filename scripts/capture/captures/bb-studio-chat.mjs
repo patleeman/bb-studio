@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 
 const composerKey = ref => `path:/plugins/studio-chat/chats/item/${encodeURIComponent(JSON.stringify({ pluginId: ref.pluginId, id: ref.id }))}`;
 
-export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
+export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
   {
     id: "studio-chat",
     packageDir: "bb-studio-chat",
@@ -17,6 +17,8 @@ export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
       const directory = await mkdtemp(join(tmpdir(), "bb-chat-draft-capture-"));
       const attachment = join(directory, "release-review.txt");
       await writeFile(attachment, "A deterministic attachment for the new-conversation draft.\n");
+      let artifactId;
+      let quoteId;
       const drawingChat = `[data-studio-chat-item="excalidraw:${drawing.id}"]`;
       const pageChat = `[data-float-window="path:/plugins/pages/pages/${page.id}"] [data-studio-chat-item="pages:${page.id}"]`;
       const forget = async () => {
@@ -24,6 +26,17 @@ export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
         await pluginRpc("studio-chat", "unlink", drawingRef).catch(() => {});
         await cleanupDrawing();
         await cleanupPages();
+        if (artifactId) await pluginRpc("artifacts", "delete", { id: artifactId });
+        if (quoteId) await client.evaluate(`new Promise((resolve, reject) => {
+          const request = indexedDB.open('bb-studio-chat:drafts', 1);
+          request.onerror = () => reject(request.error);
+          request.onsuccess = () => {
+            const transaction = request.result.transaction('quotes', 'readwrite');
+            transaction.objectStore('quotes').delete(${JSON.stringify(quoteId)});
+            transaction.oncomplete = () => { request.result.close(); resolve(true); };
+            transaction.onerror = () => reject(transaction.error);
+          };
+        })`).catch(() => {});
         await rm(directory, { recursive: true, force: true });
         await client.evaluate("delete window.bbChatDraft").catch(() => {});
       };
@@ -119,6 +132,52 @@ export default ({ threadId, seedPages, seedDrawing, pluginRpc, sleep }) => [
         await client.dragBy(`[data-float-tab=${JSON.stringify(composerKey(drawingRef))}]`, 0, 0);
         await retained(true);
         await client.dragBy('[data-float-resize="nw"]', -220, 0);
+
+        const bytes = await client.evaluate(`(() => {
+          const canvas = document.createElement('canvas'); canvas.width = 640; canvas.height = 320;
+          const ctx = canvas.getContext('2d');
+          ctx.fillStyle = '#f3f8f7'; ctx.fillRect(0,0,640,320);
+          ctx.fillStyle = '#183d42'; ctx.font = '24px sans-serif'; ctx.fillText('Release upload queue', 32, 48);
+          for (const [x,label] of [[32,'Pending'],[252,'Uploading'],[472,'Saved']]) {
+            ctx.fillStyle = '#d3e6e2'; ctx.fillRect(x,110,136,90);
+            ctx.fillStyle = '#183d42'; ctx.font = '18px sans-serif'; ctx.fillText(label,x+18,162);
+          }
+          ctx.strokeStyle = '#183d42'; ctx.lineWidth = 3;
+          for (const x of [174,394]) { ctx.beginPath(); ctx.moveTo(x,155); ctx.lineTo(x+62,155); ctx.lineTo(x+52,145); ctx.moveTo(x+62,155); ctx.lineTo(x+52,165); ctx.stroke(); }
+          ctx.font = '16px sans-serif'; ctx.fillText('Review the retry arrow before release.',32,260);
+          return canvas.toDataURL('image/png').split(',')[1];
+        })()`);
+        ({ id: artifactId } = await pluginRpc("artifacts", "importFile", { name: "release-diagram.png", mime: "image/png", bytes, projectId }));
+        await pluginRpc("artifacts", "update", { id: artifactId, title: "Release diagram", description: "A deterministic diagram for cropped-image chat context." });
+        await client.navigate(`/plugins/artifacts/artifacts/${artifactId}`);
+        await client.waitForSelector('img[alt="release-diagram.png"]');
+        await client.dragBy('img[alt="release-diagram.png"]', 90, 50, { atX: 130 });
+        await client.clickElementWithTextAndPointer("button", "Send to thread");
+        await client.waitForSelector('section[aria-label="Send to thread"]');
+        await client.dragBy('textarea[aria-label="Note"]', 0, 0);
+        await client.command("Input.insertText", { text: "Clarify this retry arrow before release." });
+        await client.clickElementWithTextAndPointer('section[aria-label="Send to thread"] button', "Send");
+        await client.waitForSelector('img[alt="Selected image area"]');
+        const quotePath = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.target.kind === 'path' && tab.target.path.startsWith('/plugins/studio-chat/chats/quote/'))?.target.path`);
+        if (!quotePath) throw new Error("The image selection did not open a retained quote composer");
+        quoteId = quotePath.split('/').at(-1);
+        const quoteRoot = `[data-float-window=${JSON.stringify(`path:${quotePath}`)}]`;
+        const quotePrompt = `${quoteRoot} [data-promptbox] [contenteditable="true"]`;
+        await client.waitForSelector(quotePrompt);
+        const expectQuote = async () => {
+          const state = await client.evaluate(`(() => {
+            const root = document.querySelector(${JSON.stringify(quoteRoot)});
+            return { text: root?.textContent, image: root?.querySelector('img[alt="Selected image area"]')?.src,
+              visible: root?.checkVisibility(), count: document.querySelectorAll(${JSON.stringify(quoteRoot)}).length };
+          })()`);
+          if (!state.visible || state.count !== 1 || !state.text.includes('Chat about "Release diagram"') || !state.text.includes('Clarify this retry arrow before release.') || !state.image?.startsWith('data:image/png;base64,')) throw new Error(`Image quote context lost: ${JSON.stringify(state)}`);
+        };
+        await expectQuote();
+        await client.command("Page.reload", {});
+        await client.waitForSelector(quotePrompt, 90000);
+        await expectQuote();
+        await client.clickAriaButtonWithPointer("Floating tab actions");
+        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Pin tab");
         await sleep(1000);
       } catch (error) {
         await forget();
