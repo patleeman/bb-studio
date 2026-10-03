@@ -1,0 +1,162 @@
+{
+  "utc": "2026-10-03T08:06:27.030875+00:00",
+  "origin": "http://127.0.0.1:49486",
+  "method": "POST",
+  "path": "/api/v1/threads/thr_yh9925ram6/interactions/pint_7bjp22w22e/resolve",
+  "body": {
+    "decision": "deny"
+  },
+  "status": 409,
+  "response": {
+    "code": "invalid_request",
+    "message": "Pending interaction pint_7bjp22w22e is already resolved"
+  },
+  "secondBefore": [
+    {
+      "id": "pint_7ffsz5e9wj",
+      "threadId": "thr_yh9925ram6",
+      "status": "pending",
+      "statusReason": null,
+      "createdAt": 1791014733150,
+      "expiresAt": null,
+      "resolvedAt": null,
+      "turnId": "da4bcc150e-t3",
+      "providerId": "claude-code",
+      "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+      "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-2",
+      "origin": {
+        "kind": "provider",
+        "providerId": "claude-code",
+        "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+        "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-2"
+      },
+      "payload": {
+        "kind": "approval",
+        "subject": {
+          "kind": "plan",
+          "itemId": "da4bcc150e-i16",
+          "plan": "# Plan: Watch Approval QA Fixture\n\n## Context\nThis is a bounded, harmless native Watch plan-approval QA fixture for testing the approval workflow.\n\n## Plan\nAfter approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.\n\n## Verification\nN/A - this is a test fixture with no implementation phase.\n\n## Status\nRe-entry test: Same plan approved and ready for re-confirmation.\n",
+          "planFilePath": "/Users/patrick/.claude/plans/this-is-a-bounded-serialized-ocean.md"
+        },
+        "reason": null,
+        "availableDecisions": [
+          "allow_once",
+          "deny"
+        ]
+      },
+      "resolution": null
+    }
+  ],
+  "secondAfter": [
+    {
+      "id": "pint_7ffsz5e9wj",
+      "threadId": "thr_yh9925ram6",
+      "status": "pending",
+      "statusReason": null,
+      "createdAt": 1791014733150,
+      "expiresAt": null,
+      "resolvedAt": null,
+      "turnId": "da4bcc150e-t3",
+      "providerId": "claude-code",
+      "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+      "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-2",
+      "origin": {
+        "kind": "provider",
+        "providerId": "claude-code",
+        "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+        "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-2"
+      },
+      "payload": {
+        "kind": "approval",
+        "subject": {
+          "kind": "plan",
+          "itemId": "da4bcc150e-i16",
+          "plan": "# Plan: Watch Approval QA Fixture\n\n## Context\nThis is a bounded, harmless native Watch plan-approval QA fixture for testing the approval workflow.\n\n## Plan\nAfter approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.\n\n## Verification\nN/A - this is a test fixture with no implementation phase.\n\n## Status\nRe-entry test: Same plan approved and ready for re-confirmation.\n",
+          "planFilePath": "/Users/patrick/.claude/plans/this-is-a-bounded-serialized-ocean.md"
+        },
+        "reason": null,
+        "availableDecisions": [
+          "allow_once",
+          "deny"
+        ]
+      },
+      "resolution": null
+    }
+  ],
+  "firstBefore": {
+    "id": "pint_7bjp22w22e",
+    "threadId": "thr_yh9925ram6",
+    "status": "resolved",
+    "statusReason": null,
+    "createdAt": 1791013875660,
+    "expiresAt": null,
+    "resolvedAt": 1791014568869,
+    "turnId": "da4bcc150e-t1",
+    "providerId": "claude-code",
+    "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+    "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-1",
+    "origin": {
+      "kind": "provider",
+      "providerId": "claude-code",
+      "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+      "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-1"
+    },
+    "payload": {
+      "kind": "approval",
+      "subject": {
+        "kind": "plan",
+        "itemId": "da4bcc150e-i7",
+        "plan": "# Plan: Watch Approval QA Fixture\n\n## Context\nThis is a bounded, harmless native Watch plan-approval QA fixture for testing the approval workflow.\n\n## Plan\nAfter approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.\n\n## Verification\nN/A - this is a test fixture with no implementation phase.\n",
+        "planFilePath": "/Users/patrick/.claude/plans/this-is-a-bounded-serialized-ocean.md"
+      },
+      "reason": null,
+      "availableDecisions": [
+        "allow_once",
+        "deny"
+      ]
+    },
+    "resolution": {
+      "decision": "allow_once",
+      "grantedPermissions": null
+    }
+  },
+  "firstAfter": {
+    "id": "pint_7bjp22w22e",
+    "threadId": "thr_yh9925ram6",
+    "status": "resolved",
+    "statusReason": null,
+    "createdAt": 1791013875660,
+    "expiresAt": null,
+    "resolvedAt": 1791014568869,
+    "turnId": "da4bcc150e-t1",
+    "providerId": "claude-code",
+    "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+    "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-1",
+    "origin": {
+      "kind": "provider",
+      "providerId": "claude-code",
+      "providerThreadId": "3a4add6d-d150-4bf5-b2f7-6afbd681e687",
+      "providerRequestId": "c82be6ea-be47-42d8-9cfc-f5514f57c8df:interaction-1"
+    },
+    "payload": {
+      "kind": "approval",
+      "subject": {
+        "kind": "plan",
+        "itemId": "da4bcc150e-i7",
+        "plan": "# Plan: Watch Approval QA Fixture\n\n## Context\nThis is a bounded, harmless native Watch plan-approval QA fixture for testing the approval workflow.\n\n## Plan\nAfter approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.\n\n## Verification\nN/A - this is a test fixture with no implementation phase.\n",
+        "planFilePath": "/Users/patrick/.claude/plans/this-is-a-bounded-serialized-ocean.md"
+      },
+      "reason": null,
+      "availableDecisions": [
+        "allow_once",
+        "deny"
+      ]
+    },
+    "resolution": {
+      "decision": "allow_once",
+      "grantedPermissions": null
+    }
+  },
+  "secondUnchanged": true,
+  "firstUnchanged": true
+}

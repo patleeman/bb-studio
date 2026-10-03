@@ -1,0 +1,19 @@
+{
+  "utc": "2026-10-03T08:16:49.425467+00:00",
+  "origin": "http://127.0.0.1:49486",
+  "thread": "thr_yh9925ram6",
+  "threadDeleteStatus": 200,
+  "threadAfterStatus": 404,
+  "planFile": {
+    "path": "/Users/patrick/.claude/plans/this-is-a-bounded-serialized-ocean.md",
+    "removed": true,
+    "matchesOwnedFixture": true,
+    "sha256": "f6e8cda783d65dc13f71f07f5afb0c3b4f236ddfba4c9be1f9831de94959e185"
+  },
+  "phone": "04583940-7A31-4E17-8C5F-128EB6FEFCFC",
+  "watch": "A51630E3-BF50-42CD-9749-D2265819F873",
+  "pair": "DEDB6138-DD73-48A2-9FC5-603E2316C227",
+  "devicesAbsent": true,
+  "pairAbsent": true,
+  "scope": "Only owned staged fixture, exact matching provider plan file, and owned simulator pair"
+}

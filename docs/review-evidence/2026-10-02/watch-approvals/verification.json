@@ -1,0 +1,24 @@
+{
+  "build": "BUILD SUCCEEDED",
+  "signedBuild": "BUILD SUCCEEDED",
+  "privateSourceCommit": "ea82c0fb72a5ce05ae06ce5f00e991f5893d631e",
+  "signatureChange": "Private simulator rebuild with CODE_SIGNING_ALLOWED=YES CODE_SIGN_IDENTITY=-; real app-group containers verified before launch",
+  "firstApproval": {
+    "interaction": "pint_7bjp22w22e",
+    "device": "watch",
+    "action": "Approve plan",
+    "resolution": "allow_once",
+    "providerResponse": "WATCH_APPROVAL_OK"
+  },
+  "notes": "Production source unchanged; only private AppGroup.swift/BBClient.swift origin substitutions and initializer guard.",
+  "secondDenial": {
+    "interaction": "pint_7ffsz5e9wj",
+    "device": "watch",
+    "action": "Keep planning",
+    "resolution": "deny",
+    "providerOutcome": "Asked plan-revision question; fixed denial label not returned",
+    "followupQuestion": "pint_q662gufb73",
+    "followupDisposition": "Interrupted by stopping owned fixture; not answered"
+  },
+  "cleanup": "Owned thread deleted (404), matching provider plan removed, owned pair and devices absent"
+}
