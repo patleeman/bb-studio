@@ -4,6 +4,7 @@ import { ComposerMore, DropdownMenu, DropdownMenuContent, DropdownMenuItem, Drop
 import type { Bot } from "./contract";
 import type { rpcContract } from "./client-contract";
 import { PLUGIN_ID } from "./studio-provider";
+import { ComposerLeading } from "./composer-leading";
 import { message } from "./bot-ui";
 
 const pendingKey = (projectId: string) => `bb:bots:new-thread-profile:${projectId}`;
@@ -19,8 +20,8 @@ const savePick = (projectId: string, botId: string | null) =>
  * the bot's model and permissions, which can still be changed before sending,
  * and attaches when the first message is sent.
  *
- * A new thread's pick, and the bot a thread works as, show in the composer's
- * action row; otherwise the control waits in the ⋯ menu under it.
+ * A new thread's pick, and the bot a thread works as, show after the model
+ * picker; otherwise the control waits in the ⋯ menu under the composer.
  */
 export function ProfilePicker() {
   const [triggerRef, side] = useComposerMoreSide();
@@ -176,7 +177,7 @@ export function ProfilePicker() {
       </DropdownMenuContent>
     </DropdownMenu>
   );
-  return projectId || current ? picker : <ComposerMore pluginId={PLUGIN_ID} order={20}>{picker}</ComposerMore>;
+  return projectId || current ? <ComposerLeading pluginId={PLUGIN_ID}>{picker}</ComposerLeading> : <ComposerMore pluginId={PLUGIN_ID} order={20}>{picker}</ComposerMore>;
 }
 
 function BotItem({ bot, description, disabled, onSelect }: {
