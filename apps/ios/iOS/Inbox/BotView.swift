@@ -4,6 +4,8 @@ import SwiftUI
 /// it, and the channels it's in.
 struct BotView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     let id: String
     @State private var teams: BotTeamsList?
     @State private var threads: [ProfileThread] = []
@@ -82,12 +84,12 @@ struct BotView: View {
 
     private func load() async {
         do {
-            async let list = app.client.botTeams()
-            async let profileThreads = app.client.profileThreads(id)
+            async let list = client.botTeams()
+            async let profileThreads = client.profileThreads(id)
             (teams, threads) = try await (list, profileThreads)
             error = nil
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -96,9 +98,10 @@ struct BotView: View {
         starting = true
         defer { starting = false }
         do {
-            app.push(.thread(id: try await app.client.newProfileThread(id)))
+            let threadId = try await client.newProfileThread(id)
+            operation.complete(on: app) { app.push(.thread(id: threadId)) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

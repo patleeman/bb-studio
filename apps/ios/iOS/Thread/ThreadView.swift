@@ -2,6 +2,8 @@ import SwiftUI
 
 struct ThreadView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @StateObject private var model: ThreadModel
     @StateObject private var spaces = ThreadSpacesModel()
     @State private var draft = ""
@@ -64,7 +66,7 @@ struct ThreadView: View {
         .sheet(isPresented: $showingWeb) {
             if let thread = model.thread {
                 NavigationStack {
-                    WebView(url: app.client.webURL(forThread: thread))
+                    WebView(url: client.webURL(forThread: thread))
                         .ignoresSafeArea(edges: .bottom)
                         .toolbar { Button("Done") { showingWeb = false } }
                 }
@@ -185,16 +187,16 @@ struct ThreadView: View {
             }
             model.attach(app)
             Task { await muted.refresh() }
-            Task { reactionSettings = (try? await app.client.reactionSettings()) ?? .defaults }
+            Task { reactionSettings = (try? await client.reactionSettings()) ?? .defaults }
             if runningPlugins.split(separator: ",").contains("pages") {
-                Task { sourcePage = try? await app.client.chatPage(model.threadId) }
+                Task { sourcePage = try? await client.chatPage(model.threadId) }
             }
             if runningPlugins.split(separator: ",").contains("studio") {
-                Task { await spaces.load(model.threadId, client: app.client) }
+                Task { await spaces.load(model.threadId, client: client) }
             }
             if runningPlugins.split(separator: ",").contains("bot-teams") {
                 Task {
-                    profile = try? await app.client.threadProfile(model.threadId)
+                    profile = try? await client.threadProfile(model.threadId)
                     await loadProfileBot()
                 }
             }
@@ -219,7 +221,7 @@ struct ThreadView: View {
         .userActivity(Spotlight.threadActivityType, isActive: model.thread != nil) { activity in
             guard let thread = model.thread else { return }
             activity.title = thread.displayTitle
-            activity.webpageURL = app.client.webURL(forThread: thread).absoluteURL
+            activity.webpageURL = client.webURL(forThread: thread).absoluteURL
             activity.targetContentIdentifier = thread.id
         }
     }
@@ -251,7 +253,7 @@ struct ThreadView: View {
         .environment(\.threadId, model.threadId)
         .environment(\.openURL, OpenURLAction { url in
             // Agents link Studio items by their BB web path, which reads like a file path.
-            if let path = FilePathLink.path(from: url) ?? (url.host() == app.client.baseURL.host() ? url.path() : nil),
+            if let path = FilePathLink.path(from: url) ?? (url.host() == client.baseURL.host() ? url.path() : nil),
                 let route = Route(href: path)
             {
                 app.path.append(route)
@@ -332,7 +334,7 @@ struct ThreadView: View {
                             do {
                                 try await muted.set(model.threadId, muted: !isMuted)
                             } catch {
-                                model.error = BBClient.describe(error, server: app.client.baseURL)
+                                model.error = BBClient.describe(error, server: client.baseURL)
                             }
                         }
                     } label: {
@@ -340,7 +342,7 @@ struct ThreadView: View {
                     }
                     Button { showingWeb = true } label: { Label("Open in BB web", systemImage: "safari") }
                     if let thread = model.thread {
-                        ShareLink(item: app.client.webURL(forThread: thread).absoluteURL) {
+                        ShareLink(item: client.webURL(forThread: thread).absoluteURL) {
                             Label("Share link", systemImage: "square.and.arrow.up")
                         }
                     }
@@ -678,7 +680,7 @@ struct ThreadView: View {
     /// The attached bot, for its avatar and name.
     private func loadProfileBot() async {
         guard case .some(.some(let id)) = profile else { return profileBot = nil }
-        profileBot = try? await app.client.profiles().first { $0.id == id }
+        profileBot = try? await client.profiles().first { $0.id == id }
     }
 
     private var composer: some View {

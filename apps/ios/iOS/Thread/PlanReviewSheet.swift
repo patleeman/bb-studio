@@ -4,6 +4,8 @@ import SwiftUI
 /// changes there answers the agent; cancelling tells it the review was dropped.
 struct PlanReviewSheet: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.openURL) private var openURL
     let review: PlanReview
@@ -13,15 +15,15 @@ struct PlanReviewSheet: View {
 
     var body: some View {
         NavigationStack {
-            WebView(url: app.client.planReviewURL(review))
+            WebView(url: client.planReviewURL(review))
                 .ignoresSafeArea(edges: .bottom)
                 .navigationTitle(review.title ?? "Plan review")
                 .navigationBarTitleDisplayMode(.inline)
                 .toolbar {
-                    ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } }
+                    ToolbarItem(placement: .confirmationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } }
                     ToolbarItem(placement: .topBarLeading) {
                         Menu {
-                            Button { openURL(app.client.planReviewURL(review)) } label: {
+                            Button { openURL(client.planReviewURL(review)) } label: {
                                 Label("Open in Safari", systemImage: "safari")
                             }
                             Button(role: .destructive) { confirmingCancel = true } label: {
@@ -42,11 +44,12 @@ struct PlanReviewSheet: View {
                     Button("Cancel Review", role: .destructive) {
                         Task {
                             do {
-                                try await app.client.cancelPlanReview(review)
+                                try await client.cancelPlanReview(review)
+                                guard client.baseURL == app.serverURL else { return }
                                 await changed()
-                                dismiss()
+                                operation.complete(on: app) { dismiss() }
                             } catch {
-                                self.error = BBClient.describe(error, server: app.client.baseURL)
+                                self.error = BBClient.describe(error, server: client.baseURL)
                             }
                         }
                     }

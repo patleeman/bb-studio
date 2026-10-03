@@ -5,7 +5,8 @@ import SwiftUI
 /// elsewhere in the meantime is never overwritten; the text stays on screen.
 struct PageEditor: View {
     @EnvironmentObject private var app: AppModel
-    private let client = BBClient()
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let pageId: String
     var onSaved: () async -> Void
@@ -60,7 +61,7 @@ struct PageEditor: View {
                 Task { await save() }
             }
             .confirmationDialog("Your latest changes aren't saved.", isPresented: $confirmingDiscard, titleVisibility: .visible) {
-                Button("Discard changes", role: .destructive) { dismiss() }
+                Button("Discard changes", role: .destructive) { operation.complete(on: app) { dismiss() } }
                 Button("Keep editing", role: .cancel) {}
             }
             .sheet(isPresented: $dictating) {
@@ -149,8 +150,9 @@ struct PageEditor: View {
         while saving { try? await Task.sleep(for: .milliseconds(100)) }
         if error == nil { await save() }
         guard text == saved else { confirmingDiscard = true; return }
+        guard client.baseURL == app.serverURL else { return }
         await onSaved()
-        dismiss()
+        operation.complete(on: app) { dismiss() }
     }
 
     /// The editable Markdown without its `<!-- ^id -->` block markers.

@@ -2,6 +2,8 @@ import SwiftUI
 
 struct AutomationEditor: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let automation: Automation?
     let saved: (Automation) async -> Void
@@ -83,31 +85,31 @@ struct AutomationEditor: View {
             .navigationTitle(automation == nil ? "New automation" : "Edit automation")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }.disabled(!valid || saving)
                         .accessibilityIdentifier("workflowAutomationSave")
                 }
             }
             .task {
-                projects = (try? await app.client.projects()) ?? []
+                projects = (try? await client.projects()) ?? []
                 projectId = automation?.projectId ?? projects.first?.id ?? ""
                 fill()
             }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
-                defaults = try? await app.client.projectDefaults(projectId)
+                defaults = try? await client.projectDefaults(projectId)
                 providerId = defaults?.providerId ?? ""
                 modelId = defaults?.model ?? ""
                 reasoning = defaults?.reasoningLevel ?? "medium"
                 permissionMode = defaults?.permissionMode ?? "auto"
-                options = try? await app.client.executionOptions(providerId: providerId.isEmpty ? nil : providerId)
+                options = try? await client.executionOptions(providerId: providerId.isEmpty ? nil : providerId)
                 if providerId.isEmpty { providerId = options?.providers.first { $0.available != false }?.id ?? "" }
                 if modelId.isEmpty { modelId = options?.models.first { $0.isDefault == true }?.id ?? options?.models.first?.id ?? "" }
             }
             .task(id: providerId) {
                 guard !providerId.isEmpty else { return }
-                options = try? await app.client.executionOptions(providerId: providerId)
+                options = try? await client.executionOptions(providerId: providerId)
                 if options?.models.contains(where: { $0.id == modelId || $0.model == modelId }) != true {
                     modelId = options?.models.first { $0.isDefault == true }?.id ?? options?.models.first?.id ?? ""
                 }
@@ -165,17 +167,18 @@ struct AutomationEditor: View {
         do {
             let updated: Automation
             if let automation {
-                updated = try await app.client.updateAutomation(automation, name: name, prompt: automation.execution.mode == "agent" ? prompt : nil, trigger: trigger)
+                updated = try await client.updateAutomation(automation, name: name, prompt: automation.execution.mode == "agent" ? prompt : nil, trigger: trigger)
             } else {
-                updated = try await app.client.createAutomation(projectId: projectId, name: name, prompt: prompt,
+                updated = try await client.createAutomation(projectId: projectId, name: name, prompt: prompt,
                                                                 trigger: trigger, execution: ExecutionChoice(
                                                                     providerId: providerId, model: modelId,
                                                                     reasoningLevel: reasoning, permissionMode: permissionMode))
             }
+            guard client.baseURL == app.serverURL else { return }
             await saved(updated)
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

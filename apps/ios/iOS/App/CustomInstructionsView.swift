@@ -4,6 +4,8 @@ import SwiftUI
 /// agent's system prompt.
 struct CustomInstructionsView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var text = ""
     @State private var saved = ""
@@ -53,11 +55,11 @@ struct CustomInstructionsView: View {
         }
         .task {
             do {
-                text = try await app.client.customInstructions()
+                text = try await client.customInstructions()
                 saved = text
                 loaded = true
             } catch {
-                self.error = BBClient.describe(error, server: app.client.baseURL)
+                self.error = BBClient.describe(error, server: client.baseURL)
             }
         }
     }
@@ -66,12 +68,12 @@ struct CustomInstructionsView: View {
         saving = true
         defer { saving = false }
         do {
-            try await app.client.setCustomInstructions(text)
+            try await client.setCustomInstructions(text)
             saved = text
             error = nil
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

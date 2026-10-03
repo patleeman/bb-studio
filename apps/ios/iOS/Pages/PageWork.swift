@@ -8,6 +8,8 @@ struct PageWorkBar: View {
     @Binding var notice: String?
     var started: () async -> Void
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @ObservedObject private var store = PagesStore.shared
     @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var lastProjectId = ""
     @State private var text = ""
@@ -57,16 +59,17 @@ struct PageWorkBar: View {
         sending = true
         defer { sending = false }
         do {
-            let defaults = (try? await app.client.projectDefaults(projectId)) ?? nil
-            let result = try await app.client.workWithPage(
+            let defaults = (try? await client.projectDefaults(projectId)) ?? nil
+            let result = try await client.workWithPage(
                 pageId, projectId: projectId, text: message, choice: defaults ?? ExecutionChoice())
             text = ""
             focused = false
             if let bot = result.botName { notice = "\(bot) is on it" }
+            guard client.baseURL == app.serverURL else { return }
             await started()
-            app.push(.thread(id: result.threadId))
+            operation.complete(on: app) { app.push(.thread(id: result.threadId)) }
         } catch {
-            notice = BBClient.describe(error, server: app.client.baseURL)
+            notice = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -75,6 +78,8 @@ struct PageWorkBar: View {
 struct PageHistorySheet: View {
     let pageId: String
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var snapshots: [PageSnapshot]?
     @State private var error: String?
@@ -113,7 +118,7 @@ struct PageHistorySheet: View {
             }
             .navigationTitle("Version History")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } } }
             .task { await load() }
             .confirmationDialog(
                 "Restore this version?", isPresented: .init(get: { restoring != nil }, set: { if !$0 { restoring = nil } }),
@@ -133,29 +138,29 @@ struct PageHistorySheet: View {
 
     private func load() async {
         do {
-            snapshots = try await app.client.pageSnapshots(pageId).sorted { $0.createdAt > $1.createdAt }
+            snapshots = try await client.pageSnapshots(pageId).sorted { $0.createdAt > $1.createdAt }
             error = nil
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func snapshot() async {
         do {
-            try await app.client.snapshotPage(pageId, label: label)
+            try await client.snapshotPage(pageId, label: label)
             label = ""
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func restore(_ snapshot: PageSnapshot) async {
         do {
-            try await app.client.restorePage(snapshotId: snapshot.id)
-            dismiss()
+            try await client.restorePage(snapshotId: snapshot.id)
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

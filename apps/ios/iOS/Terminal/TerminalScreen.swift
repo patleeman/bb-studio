@@ -209,6 +209,8 @@ private struct TerminalPane: View {
     let terminalId: String
     let restarted: (String) -> Void
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @Environment(\.scenePhase) private var scenePhase
     @StateObject private var connection: TerminalConnection
@@ -320,23 +322,23 @@ private struct TerminalPane: View {
     private func rename() async {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
-        do { try await app.client.renameTerminal(terminalId, title: title) } catch {
-            connection.error = BBClient.describe(error, server: app.client.baseURL)
+        do { try await client.renameTerminal(terminalId, title: title) } catch {
+            connection.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func restart() async {
-        do { restarted(try await app.client.restartTerminal(terminalId).id) } catch {
-            connection.error = BBClient.describe(error, server: app.client.baseURL)
+        do { let id = try await client.restartTerminal(terminalId).id; operation.complete(on: app) { restarted(id) } } catch {
+            connection.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func close() async {
         do {
-            try await app.client.closeTerminal(terminalId)
-            dismiss()
+            try await client.closeTerminal(terminalId)
+            operation.complete(on: app) { dismiss() }
         } catch {
-            connection.error = BBClient.describe(error, server: app.client.baseURL)
+            connection.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

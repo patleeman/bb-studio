@@ -43,7 +43,8 @@ enum CaptureNote {
 
 struct CaptureSheet: View {
     @EnvironmentObject private var app: AppModel
-    private let client = BBClient()
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @AppStorage("captureLastOption") private var lastOption = ""
     @State private var writingNote = false
@@ -72,7 +73,7 @@ struct CaptureSheet: View {
                     Button(writingNote || choosingFile ? "Back" : "Close") {
                         if writingNote { writingNote = false }
                         else if choosingFile { choosingFile = false }
-                        else { dismiss() }
+                        else { operation.complete(on: app) { dismiss() } }
                     }
                 }
             }
@@ -145,8 +146,8 @@ struct CaptureSheet: View {
                     Label("Saved", systemImage: "checkmark.circle.fill")
                     Spacer()
                     Button("Open") {
-                        dismiss()
-                        app.openPage(savedPageId)
+                        operation.complete(on: app) { dismiss() }
+                        operation.complete(on: app) { app.openPage(savedPageId) }
                     }
                 }
                 .foregroundStyle(.green)
@@ -183,8 +184,8 @@ struct CaptureSheet: View {
                     Label("Saved", systemImage: "checkmark.circle.fill")
                     Spacer()
                     Button("Open") {
-                        dismiss()
-                        app.openStudio(kind: nil, .artifact(id: savedArtifactId))
+                        operation.complete(on: app) { dismiss() }
+                        operation.complete(on: app) { app.openStudio(kind: nil, .artifact(id: savedArtifactId)) }
                     }
                 }
                 .foregroundStyle(.green)
@@ -204,8 +205,8 @@ struct CaptureSheet: View {
         case .task: destination = .newTasks
         case .file: choosingFile = true
         case .thread:
-            dismiss()
-            DispatchQueue.main.async { app.newThread() }
+            operation.complete(on: app) { dismiss() }
+            DispatchQueue.main.async { operation.complete(on: app) { app.newThread() } }
         }
     }
 

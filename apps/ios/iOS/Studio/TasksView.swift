@@ -4,6 +4,8 @@ import SwiftUI
 /// with its due day, who it's for, and where its agent stands.
 struct TasksView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @AppStorage(ServerScope.key("tasksColumn")) private var column = "todo"
     @State private var tasks: [StudioTask] = []
     @State private var columns: [Tasks.StatusesOutputColumnsItem] = []
@@ -77,7 +79,7 @@ struct TasksView: View {
         .refreshable { await load() }
         .sheet(isPresented: $creating) {
             TaskEditor(task: nil, status: column) { created in
-                if let created { app.path.append(.task(id: created.id)) }
+                if let created { operation.complete(on: app) { app.path.append(.task(id: created.id)) } }
             }
         }
         .task(id: showArchived) { await load() }
@@ -120,33 +122,33 @@ struct TasksView: View {
 
     private func load() async {
         do {
-            tasks = try await app.client.tasksBoard(includeArchived: showArchived)
-            let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject"))
-            columns = (try? await app.client.taskStatuses(projectId: project == "none" || project == "" ? nil : project)) ?? []
+            tasks = try await client.tasksBoard(includeArchived: showArchived)
+            let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject", serverURL: client.baseURL))
+            columns = (try? await client.taskStatuses(projectId: project == "none" || project == "" ? nil : project)) ?? []
             if columns.isEmpty { columns = StudioTask.statuses.map { .init(id: $0, label: StudioTask.statusLabel($0)) } }
             if !columns.contains(where: { $0.id == column }) { column = columns.first?.id ?? "todo" }
             error = nil
         } catch where !BBClient.isCancellation(error) {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         } catch {}
         loaded = true
     }
 
     private func move(_ task: StudioTask, to status: String) async {
         do {
-            try await app.client.moveTask(task.id, to: status)
+            try await client.moveTask(task.id, to: status)
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func archive(_ task: StudioTask) async {
         do {
-            try await app.client.archiveTask(task.id, archived: !task.archived)
+            try await client.archiveTask(task.id, archived: !task.archived)
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -208,6 +210,8 @@ struct TaskHandoffBadge: View {
 /// One task: its description, links and handoffs, with the board's actions.
 struct TaskView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let id: String
     @State private var detail: TaskDetail?
@@ -269,14 +273,14 @@ struct TaskView: View {
             if let task = detail?.task {
                 HandOffSheet(task: task) { threadId in
                     Task { await load() }
-                    app.path.append(.thread(id: threadId))
+                    operation.complete(on: app) { app.path.append(.thread(id: threadId)) }
                 }
             }
         }
         .sheet(isPresented: $addingLink) {
             if let task = detail?.task {
                 TaskLinkPicker(projectId: task.projectId, linked: Set((detail?.links ?? []).map { "\($0.target):\($0.pluginId ?? ""):\($0.itemId)" })) { link in
-                    await run("Linked") { try await app.client.linkTask(id, link: link) }
+                    await run("Linked") { try await client.linkTask(id, link: link) }
                 }
             }
         }
@@ -410,7 +414,7 @@ struct TaskView: View {
             NavigationLink(value: Route.thread(id: link.itemId)) { label }
         } else if let route = link.href.flatMap(Route.init(href:)) {
             NavigationLink(value: route) { label }
-        } else if let href = link.href, let url = URL(string: href, relativeTo: app.client.baseURL) {
+        } else if let href = link.href, let url = URL(string: href, relativeTo: client.baseURL) {
             Link(destination: url) { label }
         } else {
             label
@@ -433,7 +437,7 @@ struct TaskView: View {
             Button { editing = true } label: { Label("Edit", systemImage: "pencil") }
             Button { editingFields = true } label: { Label("Priority, labels and reminders", systemImage: "slider.horizontal.3") }
             StudioChatMenuButton(isPresented: $chatting)
-            ShareLink(item: app.client.baseURL.appending(path: "plugins/studio-tasks/tasks/\(task.id)")) {
+            ShareLink(item: client.baseURL.appending(path: "plugins/studio-tasks/tasks/\(task.id)")) {
                 Label("Share Link", systemImage: "square.and.arrow.up")
             }
             Button { Task { await archive(task) } } label: {
@@ -447,13 +451,13 @@ struct TaskView: View {
 
     private func load() async {
         do {
-            detail = try await app.client.task(id)
-            generatedTask = try? await app.client.taskGenerated(id).task
-            columns = (try? await app.client.taskStatuses(projectId: detail?.task?.projectId)) ?? []
+            detail = try await client.task(id)
+            generatedTask = try? await client.taskGenerated(id).task
+            columns = (try? await client.taskStatuses(projectId: detail?.task?.projectId)) ?? []
             if columns.isEmpty { columns = StudioTask.statuses.map { .init(id: $0, label: StudioTask.statusLabel($0)) } }
             error = nil
         } catch where !BBClient.isCancellation(error) {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         } catch {}
     }
 
@@ -463,7 +467,7 @@ struct TaskView: View {
             await load()
             if let message { flash(message) }
         } catch {
-            flash((error as? BBError)?.message ?? BBClient.describe(error, server: app.client.baseURL))
+            flash((error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL))
         }
     }
 
@@ -477,47 +481,47 @@ struct TaskView: View {
 
     private func move(to status: String) async {
         await run {
-            let archived = try await app.client.moveTask(id, to: status)
+            let archived = try await client.moveTask(id, to: status)
             if archived > 0 { flash(archived == 1 ? "Archived its thread" : "Archived \(archived) threads") }
         }
     }
 
     private func archive(_ task: StudioTask) async {
-        await run(task.archived ? "Restored" : "Archived") { try await app.client.archiveTask(id, archived: !task.archived) }
+        await run(task.archived ? "Restored" : "Archived") { try await client.archiveTask(id, archived: !task.archived) }
     }
 
     private func archiveThreads() async {
         await run {
-            let result = try await app.client.archiveTaskThreads(id)
+            let result = try await client.archiveTaskThreads(id)
             flash(result.failed > 0 ? "Archived \(result.archived), \(result.failed) failed" : "Archived \(result.archived)")
         }
     }
 
     private func unlink(_ link: TaskLink) async {
-        await run { try await app.client.unlinkTask(id, link: link) }
+        await run { try await client.unlinkTask(id, link: link) }
     }
 
     private func sendBack() async {
         let message = feedback.trimmingCharacters(in: .whitespacesAndNewlines)
         feedback = ""
         guard !message.isEmpty else { return }
-        await run("Sent to the agent") { _ = try await app.client.sendBackTask(id, message: message) }
+        await run("Sent to the agent") { _ = try await client.sendBackTask(id, message: message) }
     }
 
     private func sendToBot() async {
         do {
-            _ = try await app.client.sendTaskToBot(id)
+            _ = try await client.sendTaskToBot(id)
             await load()
             flash("Sent to bot")
-        } catch { flash(BBClient.describe(error, server: app.client.baseURL)) }
+        } catch { flash(BBClient.describe(error, server: client.baseURL)) }
     }
 
     private func delete() async {
         do {
-            try await app.client.deleteTask(id)
-            dismiss()
+            try await client.deleteTask(id)
+            operation.complete(on: app) { dismiss() }
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 }
@@ -525,6 +529,8 @@ struct TaskView: View {
 /// A new task, or an existing one's fields.
 struct TaskEditor: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let task: StudioTask?
     let status: String
@@ -565,7 +571,7 @@ struct TaskEditor: View {
             .navigationTitle(task == nil ? "New Task" : "Edit Task")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(task == nil ? "Add" : "Save") { Task { await save() } }
                         .disabled(saving || title.trimmingCharacters(in: .whitespaces).isEmpty)
@@ -583,7 +589,7 @@ struct TaskEditor: View {
 
     private func fill() {
         guard let task else {
-            projectId = UserDefaults.standard.string(forKey: ServerScope.key("studioProject")) ?? ""
+            projectId = UserDefaults.standard.string(forKey: ServerScope.key("studioProject", serverURL: client.baseURL)) ?? ""
             return
         }
         title = task.title
@@ -602,19 +608,19 @@ struct TaskEditor: View {
         let day = hasDue ? StudioTask.day(due) : nil
         do {
             if let task {
-                try await app.client.updateTask(
+                try await client.updateTask(
                     task.id, title: title.trimmingCharacters(in: .whitespaces), description: description,
                     projectId: projectId.isEmpty ? nil : projectId, due: day, assignee: assignee.isEmpty ? nil : assignee)
-                done(nil)
+                operation.complete(on: app) { done(nil) }
             } else {
-                let created = try await app.client.createTask(
+                let created = try await client.createTask(
                     title: title.trimmingCharacters(in: .whitespaces), description: description, status: status,
                     projectId: projectId.isEmpty ? nil : projectId, due: day, assignee: assignee.isEmpty ? nil : assignee)
-                done(created)
+                operation.complete(on: app) { done(created) }
             }
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: app.client.baseURL)
+            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -626,6 +632,8 @@ private struct TaskLinkPicker: View {
     let linked: Set<String>
     let pick: (TaskLink) async -> Void
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var items: [TaskLinkable]?
     @State private var query = ""
@@ -643,7 +651,7 @@ private struct TaskLinkPicker: View {
                             Button {
                                 Task {
                                     await pick(item.link)
-                                    dismiss()
+                                    operation.complete(on: app) { dismiss() }
                                 }
                             } label: {
                                 HStack {
@@ -664,12 +672,12 @@ private struct TaskLinkPicker: View {
             .searchable(text: $query, placement: .navigationBarDrawer(displayMode: .always))
             .navigationTitle("Add Link")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } } }
             .task {
                 do {
-                    items = try await app.client.taskLinkables(projectId: projectId)
+                    items = try await client.taskLinkables(projectId: projectId)
                 } catch {
-                    self.error = BBClient.describe(error, server: app.client.baseURL)
+                    self.error = BBClient.describe(error, server: client.baseURL)
                 }
             }
         }
@@ -689,6 +697,8 @@ private struct TaskLinkPicker: View {
 
 private struct HandOffSheet: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let task: StudioTask
     var started: (String) -> Void
@@ -746,7 +756,7 @@ private struct HandOffSheet: View {
             .navigationTitle("Hand to an Agent")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") { Task { await start() } }.disabled(starting || projectId.isEmpty)
                 }
@@ -754,7 +764,7 @@ private struct HandOffSheet: View {
             .onAppear { projectId = task.projectId ?? "" }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
-                defaults = (try? await app.client.projectDefaults(projectId)) ?? nil
+                defaults = (try? await client.projectDefaults(projectId)) ?? nil
                 if providerId.isEmpty { await loadOptions() }
             }
             .task(id: providerId) {
@@ -766,7 +776,7 @@ private struct HandOffSheet: View {
     }
 
     private func loadOptions() async {
-        options = try? await app.client.executionOptions(providerId: providerId.isEmpty ? defaults?.providerId : providerId)
+        options = try? await client.executionOptions(providerId: providerId.isEmpty ? defaults?.providerId : providerId)
     }
 
     private var selectedModel: ExecutionOptions.Model? {
@@ -794,14 +804,14 @@ private struct HandOffSheet: View {
         defer { starting = false }
         let trimmed = note.trimmingCharacters(in: .whitespacesAndNewlines)
         do {
-            let threadId = try await app.client.handOffTask(
+            let threadId = try await client.handOffTask(
                 task.id, projectId: projectId, providerId: providerId.isEmpty ? nil : providerId,
                 model: modelId.isEmpty ? nil : modelId, reasoningLevel: reasoning.isEmpty ? nil : reasoning,
                 note: trimmed.isEmpty ? nil : trimmed, workspace: workspace)
-            dismiss()
-            started(threadId)
+            operation.complete(on: app) { dismiss() }
+            operation.complete(on: app) { started(threadId) }
         } catch {
-            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: app.client.baseURL)
+            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -809,6 +819,8 @@ private struct HandOffSheet: View {
 /// `::task{id="tsk_…"}` in a reply: the task's title, column and agent state.
 struct TaskCard: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     let id: String
     @State private var task: StudioTask?
     @State private var missing = false
@@ -849,7 +861,7 @@ struct TaskCard: View {
         .disabled(missing)
         .accessibilityIdentifier("taskCard")
         .task(id: id) {
-            guard let detail = try? await app.client.task(id) else { return }
+            guard let detail = try? await client.task(id) else { return }
             task = detail.task
             missing = detail.task == nil
         }

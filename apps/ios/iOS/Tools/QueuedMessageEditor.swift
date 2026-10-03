@@ -71,6 +71,7 @@ struct QueuedMessageEditor: View {
         defer { saving = false }
         do {
             try await client.editQueued(thread, message.id, from: message.text, to: text)
+            guard client.baseURL == ServerScope.selectedURL else { return }
             onSaved()
             dismiss()
         } catch {

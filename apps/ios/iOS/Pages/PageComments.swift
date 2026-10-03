@@ -5,6 +5,8 @@ import SwiftUI
 struct PageCommentsSheet: View {
     @ObservedObject var model: PageModel
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var drafts: [String: String] = [:]
     @State private var sending: String?
@@ -57,7 +59,7 @@ struct PageCommentsSheet: View {
             .navigationTitle("Comments")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItemGroup(placement: .primaryAction) {
                     Menu {
                         Toggle("Show Resolved", isOn: $showResolved)
@@ -69,9 +71,9 @@ struct PageCommentsSheet: View {
                         .accessibilityLabel("New Comment")
                 }
             }
-            .refreshable { await model.loadComments(app.client) }
+            .refreshable { await model.loadComments(client) }
             .sheet(isPresented: $composing) { NewPageCommentSheet(model: model) }
-            .task { await model.loadComments(app.client) }
+            .task { await model.loadComments(client) }
         }
     }
 
@@ -103,11 +105,11 @@ struct PageCommentsSheet: View {
 
     private func perform(_ action: (BBClient) async throws -> Void) async {
         do {
-            try await action(app.client)
+            try await action(client)
             error = nil
-            await model.loadComments(app.client)
+            await model.loadComments(client)
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -134,6 +136,8 @@ private struct CommentRow: View {
 private struct NewPageCommentSheet: View {
     @ObservedObject var model: PageModel
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var blocks: [PageTextBlock]?
     @State private var block: String?
@@ -180,7 +184,7 @@ private struct NewPageCommentSheet: View {
             .navigationTitle("New Comment")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Post") { Task { await post() } }.disabled(!canPost)
                 }
@@ -188,9 +192,9 @@ private struct NewPageCommentSheet: View {
             .task {
                 focused = true
                 do {
-                    blocks = try await app.client.pageCommentBlocks(model.pageId)
+                    blocks = try await client.pageCommentBlocks(model.pageId)
                 } catch {
-                    self.error = BBClient.describe(error, server: app.client.baseURL)
+                    self.error = BBClient.describe(error, server: client.baseURL)
                 }
             }
         }
@@ -202,11 +206,11 @@ private struct NewPageCommentSheet: View {
         posting = true
         defer { posting = false }
         do {
-            try await app.client.commentOnPage(model.pageId, block: block, text: text.trimmingCharacters(in: .whitespacesAndNewlines))
-            await model.loadComments(app.client)
-            dismiss()
+            try await client.commentOnPage(model.pageId, block: block, text: text.trimmingCharacters(in: .whitespacesAndNewlines))
+            await model.loadComments(client)
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

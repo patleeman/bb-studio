@@ -11,6 +11,8 @@ struct SaveToStudioRequest: Identifiable, Hashable {
 struct SaveToStudioSheet: View {
     let request: SaveToStudioRequest
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var candidates: ArtifactCandidates?
     @State private var saved: [Artifact] = []
@@ -42,8 +44,8 @@ struct SaveToStudioSheet: View {
                     Section("In Studio from this thread") {
                         ForEach(saved) { artifact in
                             Button {
-                                dismiss()
-                                app.push(.artifact(id: artifact.id))
+                                operation.complete(on: app) { dismiss() }
+                                operation.complete(on: app) { app.push(.artifact(id: artifact.id)) }
                             } label: {
                                 Label(artifact.displayTitle, systemImage: artifact.version.symbol)
                             }
@@ -54,7 +56,7 @@ struct SaveToStudioSheet: View {
             .navigationTitle("Save to Studio")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(selected.count > 1 ? "Save \(selected.count)" : "Save") { Task { await save() } }
                         .disabled(selected.isEmpty || saving)
@@ -95,15 +97,15 @@ struct SaveToStudioSheet: View {
 
     private func load() async {
         do {
-            async let candidates = app.client.artifactCandidates(threadId: request.threadId, seq: request.seq)
-            async let saved = app.client.threadArtifacts(request.threadId)
+            async let candidates = client.artifactCandidates(threadId: request.threadId, seq: request.seq)
+            async let saved = client.threadArtifacts(request.threadId)
             let loaded = try await candidates
             self.candidates = loaded
             // A reply's new files are what you most likely want.
             selected = Set(loaded.reply.filter { $0.artifactId == nil }.map(\.path))
             self.saved = (try? await saved) ?? []
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -111,7 +113,7 @@ struct SaveToStudioSheet: View {
         saving = true
         defer { saving = false }
         do {
-            let result = try await app.client.saveFilesToStudio(threadId: request.threadId, paths: Array(selected))
+            let result = try await client.saveFilesToStudio(threadId: request.threadId, paths: Array(selected))
             let created = result.saved.filter { $0.outcome == "created" }.count
             let versioned = result.saved.filter { $0.outcome == "versioned" }.count
             var parts: [String] = []
@@ -123,7 +125,7 @@ struct SaveToStudioSheet: View {
             selected = []
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

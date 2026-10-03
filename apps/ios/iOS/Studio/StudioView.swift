@@ -354,6 +354,8 @@ struct StudioKind: Identifiable, Hashable {
 
 struct StudioView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @ObservedObject private var store = StudioStore.shared
     @AppStorage(ServerScope.key("studioProject")) private var project = ""
     @State private var query = ""
@@ -383,7 +385,7 @@ struct StudioView: View {
     var body: some View {
         List(selection: $selection) {
             if let error = store.error {
-                Section { PagesErrorRow(message: error) { await store.load(app.client) } }
+                Section { PagesErrorRow(message: error) { await store.load(client) } }
             }
             if !query.isEmpty {
                 ForEach(["thread", "channel"], id: \.self) { kind in
@@ -395,7 +397,7 @@ struct StudioView: View {
                                     NavigationLink(value: Route.thread(id: id)) {
                                         Label(match.title ?? "Thread", systemImage: "bubble.left")
                                     }
-                                } else if let href = match.href, let url = URL(string: href, relativeTo: app.client.baseURL) {
+                                } else if let href = match.href, let url = URL(string: href, relativeTo: client.baseURL) {
                                     Link(destination: url) {
                                         VStack(alignment: .leading) {
                                             Text(match.title ?? "Channel")
@@ -484,15 +486,15 @@ struct StudioView: View {
             }
         }
         .task(id: query) { await search() }
-        .refreshable { await store.load(app.client) }
+        .refreshable { await store.load(client) }
         .task(id: app.serverURL) {
             store.restore()
             store.attach(app)
-            await store.load(app.client)
+            await store.load(client)
         }
         .sheet(item: $spaceSheet) { sheet in
             SpaceSettingsSheet(space: sheet.space) { saved in
-                if let saved, sheet.space == nil { app.studioPath.append(.space(id: saved.id)) }
+                if let saved, sheet.space == nil { operation.complete(on: app) { app.studioPath.append(.space(id: saved.id)) } }
             }
         }
         .onChange(of: store.spaces) {
@@ -500,7 +502,7 @@ struct StudioView: View {
         }
         .sheet(item: $recordingKind) { kind in
             DictationView(threadId: nil, autoStart: true, kind: kind)
-                .onDisappear { Task { await store.load(app.client) } }
+                .onDisappear { Task { await store.load(client) } }
         }
         .sheet(isPresented: $dictatingPage) {
             DictationView(threadId: nil, autoStart: true, insertLabel: ("Create Page", "doc.richtext")) { text in
@@ -540,7 +542,7 @@ struct StudioView: View {
                 let name = newTag.trimmingCharacters(in: .whitespacesAndNewlines)
                 newTag = ""
                 guard !name.isEmpty, name != tag.name else { return }
-                Task { await attempt { try await store.renameTag(tag, to: name, client: app.client) } }
+                Task { await attempt { try await store.renameTag(tag, to: name, client: client) } }
             }
         }
         .confirmationDialog(
@@ -551,7 +553,7 @@ struct StudioView: View {
             Button("Delete Tag", role: .destructive) {
                 guard let tag = deletingTag else { return }
                 if tagFilter == tag.id { tagFilter = nil }
-                Task { await attempt { try await store.deleteTag(tag, client: app.client) } }
+                Task { await attempt { try await store.deleteTag(tag, client: client) } }
             }
         } message: {
             Text("It comes off every item. The items stay.")
@@ -559,7 +561,7 @@ struct StudioView: View {
         .confirmationDialog(
             "Delete \(selection.count) items?", isPresented: $deletingSelected, titleVisibility: .visible
         ) {
-            Button("Delete", role: .destructive) { Task { await bulk("Deleted") { await store.delete(selected, client: app.client) } } }
+            Button("Delete", role: .destructive) { Task { await bulk("Deleted") { await store.delete(selected, client: client) } } }
         } message: {
             Text(selected.contains { $0.kind == "page" } ? "Sub-pages of any pages go too. This can't be undone." : "This can't be undone.")
         }
@@ -599,7 +601,7 @@ struct StudioView: View {
             }
             if store.plugins.contains("studio-tasks") {
                 tile("Task", "checklist", .green) { app.sheet = .newTasks } menu: {
-                    Button("Open Board", systemImage: "rectangle.split.3x1") { app.push(.tasks) }
+                    Button("Open Board", systemImage: "rectangle.split.3x1") { operation.complete(on: app) { app.push(.tasks) } }
                 }
             }
             if store.plugins.contains("talk") {
@@ -642,7 +644,7 @@ struct StudioView: View {
                         app.studioSpace = app.studioSpace == space.id ? nil : space.id
                     }
                     .contextMenu {
-                        Button { app.studioPath.append(.space(id: space.id)) } label: { Label("Open Space", systemImage: "arrow.up.right") }
+                        Button { operation.complete(on: app) { app.studioPath.append(.space(id: space.id)) } } label: { Label("Open Space", systemImage: "arrow.up.right") }
                         Button { spaceSheet = SpaceSheet(space: space) } label: { Label("Space Settings…", systemImage: "gearshape") }
                     }
                 }
@@ -764,7 +766,7 @@ struct StudioView: View {
     private func menu(_ item: StudioItem) -> some View {
         if let href = item.href {
             Button {
-                app.newThread(text: "[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ")
+                operation.complete(on: app) { app.newThread(text: "[\(item.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(href)) ") }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
         }
         ForEach(store.info(item)?.actions ?? [], id: \.id) { action in
@@ -924,7 +926,7 @@ struct StudioView: View {
         }
         try? await Task.sleep(for: .milliseconds(300))
         guard !Task.isCancelled else { return }
-        if let results = try? await app.client.studioSearchAll(trimmed) {
+        if let results = try? await client.studioSearchAll(trimmed) {
             if !Task.isCancelled {
                 externalMatches = results.filter { $0.kind == "thread" || $0.kind == "channel" }
                 contentMatches = Dictionary(results.compactMap { result in
@@ -933,89 +935,89 @@ struct StudioView: View {
                 }, uniquingKeysWith: { first, _ in first })
             }
         } else {
-            let matches = await store.search(trimmed, client: app.client)
+            let matches = await store.search(trimmed, client: client)
             if !Task.isCancelled { contentMatches = matches; externalMatches = [] }
         }
     }
 
     private func createPage(_ text: String) async {
         do {
-            let page = try await app.client.createPage(title: PageTitle.from(text), markdown: text)
-            app.studioPath.append(.page(id: page.id))
-            await store.load(app.client)
+            let page = try await client.createPage(title: PageTitle.from(text), markdown: text)
+            operation.complete(on: app) { app.studioPath.append(.page(id: page.id)) }
+            await store.load(client)
         } catch {
-            store.error = BBClient.describe(error, server: app.client.baseURL)
+            store.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func create(_ kind: StudioKindInfo) async {
         let projectId = project.isEmpty || project == "none" ? nil : project
         do {
-            let item = try await store.create(kind, projectId: projectId, client: app.client)
-            if let route = route(item) { app.studioPath.append(route) }
+            let item = try await store.create(kind, projectId: projectId, client: client)
+            if let route = route(item) { operation.complete(on: app) { app.studioPath.append(route) } }
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func toggle(_ space: StudioSpace, on item: StudioItem) async {
         do {
             let had = item.spaces?.contains(space.id) == true
-            try await store.toggle(space, on: item, client: app.client)
+            try await store.toggle(space, on: item, client: client)
             flash(had ? "Removed from \(space.name)" : "Added to \(space.name)")
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func toggle(_ tag: StudioTag, on item: StudioItem) async {
         do {
-            try await store.toggle(tag, on: item, client: app.client)
+            try await store.toggle(tag, on: item, client: client)
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func addTag(_ name: String, to item: StudioItem) async {
         do {
-            try await store.addTag(named: name, to: item, client: app.client)
+            try await store.addTag(named: name, to: item, client: client)
             flash("Tagged \(name)")
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func delete(_ item: StudioItem) async {
         do {
-            try await store.delete(item, client: app.client)
+            try await store.delete(item, client: client)
         } catch {
-            store.error = BBClient.describe(error, server: app.client.baseURL)
+            store.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func archive(_ item: StudioItem) async {
         do {
-            try await store.archive(item, !item.archived, client: app.client)
+            try await store.archive(item, !item.archived, client: client)
             flash(item.archived ? "Restored" : "Archived")
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func move(_ item: StudioItem, to projectId: String?) async {
         guard projectId != item.projectId else { return }
         do {
-            try await store.move(item, to: projectId, client: app.client)
+            try await store.move(item, to: projectId, client: client)
             flash(projectId.flatMap { store.projectNames[$0] }.map { "Moved to \($0)" } ?? "Moved out of its project")
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     /// An add-on's own action, like Copy Transcript: copies what it returns, or says what it did.
     private func run(_ action: StudioKindInfo.Action, on item: StudioItem) async {
         do {
-            let result = try await app.client.studioAction(pluginId: item.pluginId, action: action.id, ids: [item.itemId])
+            let result = try await client.studioAction(pluginId: item.pluginId, action: action.id, ids: [item.itemId])
             if action.result == "copy" {
                 guard let text = result.text, !text.isEmpty else {
                     flash(result.message ?? "Nothing to copy")
@@ -1027,7 +1029,7 @@ struct StudioView: View {
                 flash(result.message ?? "Done")
             }
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
@@ -1043,7 +1045,7 @@ struct StudioView: View {
         return HStack(spacing: 0) {
             if archivable {
                 barButton(restoring ? "Restore" : "Archive", restoring ? "tray.and.arrow.up" : "archivebox") {
-                    Task { await bulk(restoring ? "Restored" : "Archived") { await store.archive(items, !restoring, client: app.client) } }
+                    Task { await bulk(restoring ? "Restored" : "Archived") { await store.archive(items, !restoring, client: client) } }
                 }
             }
             Menu {
@@ -1051,7 +1053,7 @@ struct StudioView: View {
                     Button(choice.name) {
                         Task {
                             await bulk(choice.id.flatMap { store.projectNames[$0] }.map { "Moved to \($0)" } ?? "Moved out of projects") {
-                                await store.move(items, to: choice.id, client: app.client)
+                                await store.move(items, to: choice.id, client: client)
                             }
                         }
                     }
@@ -1060,7 +1062,7 @@ struct StudioView: View {
             if store.supportsTags {
                 Menu {
                     ForEach(store.tags) { tag in
-                        Button { Task { await attempt { try await store.toggle(tag, on: items, client: app.client) } } } label: {
+                        Button { Task { await attempt { try await store.toggle(tag, on: items, client: client) } } } label: {
                             if items.allSatisfy({ $0.tags?.contains(tag.id) == true }) { Label(tag.name, systemImage: "checkmark") } else { Text(tag.name) }
                         }
                     }
@@ -1121,16 +1123,16 @@ struct StudioView: View {
     }
 
     private func attempt(_ change: () async throws -> Void) async {
-        do { try await change() } catch { flash(BBClient.describe(error, server: app.client.baseURL)) }
+        do { try await change() } catch { flash(BBClient.describe(error, server: client.baseURL)) }
     }
 
     private func addTag(_ name: String, toSelected items: [StudioItem]) async {
         await attempt {
-            let tag = try await app.client.createStudioTag(name)
-            await store.load(app.client)
+            let tag = try await client.createStudioTag(name)
+            await store.load(client)
             let fresh = store.items.filter { item in items.contains { $0.id == item.id } }
             if !fresh.allSatisfy({ $0.tags?.contains(tag.id) == true }) {
-                try await store.toggle(tag, on: fresh, client: app.client)
+                try await store.toggle(tag, on: fresh, client: client)
             }
             flash("Tagged \(name)")
         }
@@ -1139,7 +1141,7 @@ struct StudioView: View {
     private func run(_ action: StudioKindInfo.Action, on items: [StudioItem]) async {
         guard let pluginId = items.first?.pluginId else { return }
         do {
-            let result = try await app.client.studioAction(pluginId: pluginId, action: action.id, ids: items.map(\.itemId))
+            let result = try await client.studioAction(pluginId: pluginId, action: action.id, ids: items.map(\.itemId))
             if action.result == "copy", let text = result.text, !text.isEmpty {
                 UIPasteboard.general.string = text
                 flash(result.message ?? "Copied")
@@ -1148,7 +1150,7 @@ struct StudioView: View {
             }
             endSelecting()
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
@@ -1262,6 +1264,8 @@ struct StudioRow: View {
 /// can't show, so they're drawn from the scene instead and kept per revision.
 struct StudioThumbnail: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     let item: StudioItem
     let path: String
     let kind: StudioKind
@@ -1283,7 +1287,7 @@ struct StudioThumbnail: View {
             }
             .task(id: key) { await draw() }
         } else {
-            AsyncImage(url: URL(string: path, relativeTo: app.client.baseURL)) { image in
+            AsyncImage(url: URL(string: path, relativeTo: client.baseURL)) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 Image(systemName: kind.symbol).font(.body.weight(.medium)).foregroundStyle(kind.tint)
@@ -1293,7 +1297,7 @@ struct StudioThumbnail: View {
 
     private func draw() async {
         guard Self.drawings.object(forKey: key) == nil,
-            let drawing = try? await app.client.drawing(item.itemId), !drawing.scene.elements.isEmpty
+            let drawing = try? await client.drawing(item.itemId), !drawing.scene.elements.isEmpty
         else { return }
         let renderer = ImageRenderer(content: ExcalidrawCanvas(scene: drawing.scene)
             .frame(width: 160, height: 160)

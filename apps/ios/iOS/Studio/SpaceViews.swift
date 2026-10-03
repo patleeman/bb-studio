@@ -6,6 +6,8 @@ import SwiftUI
 struct SpaceRouteView: View {
     let id: String
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @State private var pageId: String?
     @State private var error: String?
     @State private var noPage = false
@@ -26,13 +28,13 @@ struct SpaceRouteView: View {
         }
         .task {
             do {
-                if case .page(let id)? = try await app.client.spacePage(id).flatMap(Route.init(href:)) {
+                if case .page(let id)? = try await client.spacePage(id).flatMap(Route.init(href:)) {
                     pageId = id
                 } else {
                     noPage = true
                 }
             } catch {
-                self.error = BBClient.describe(error, server: app.client.baseURL)
+                self.error = BBClient.describe(error, server: client.baseURL)
             }
         }
     }
@@ -108,6 +110,8 @@ struct SpaceWidgetCard: View {
     let target: SpaceWidgetTarget
     var title: String?
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @ObservedObject private var widgets = SpaceWidgets.shared
     @ObservedObject private var studio = StudioStore.shared
     @State private var sheet: SpaceWidgetSheet?
@@ -142,7 +146,7 @@ struct SpaceWidgetCard: View {
             widgets.attach(app)
             // Threads change without a Studio signal; check now and then while it shows.
             while !Task.isCancelled {
-                await widgets.load(target.spaceId, client: app.client)
+                await widgets.load(target.spaceId, client: client)
                 try? await Task.sleep(for: .seconds(30))
             }
         }
@@ -161,7 +165,7 @@ struct SpaceWidgetCard: View {
     }
 
     private func refresh() {
-        Task { await widgets.load(target.spaceId, client: app.client, fresh: true) }
+        Task { await widgets.load(target.spaceId, client: client, fresh: true) }
     }
 
     @ViewBuilder
@@ -180,7 +184,7 @@ struct SpaceWidgetCard: View {
     private func actions(_ view: Studio.SpaceWidgetOutput) -> some View {
         VStack(alignment: .leading, spacing: 0) {
             LazyVGrid(columns: [GridItem(.adaptive(minimum: 130), spacing: 8)], spacing: 8) {
-                tile("Thread", "square.and.pencil", key: "thread") { app.newThread(text: view.threadPrompt ?? "") }
+                tile("Thread", "square.and.pencil", key: "thread") { operation.complete(on: app) { app.newThread(text: view.threadPrompt ?? "") } }
                 ForEach(Array((view.kinds ?? []).enumerated()), id: \.offset) { _, kind in
                     let key = "\(kind.pluginId ?? ""):\(kind.id ?? "")"
                     tile(kind.label ?? "Item", StudioKind.of(kind.id ?? "").symbol, key: key) {
@@ -213,7 +217,7 @@ struct SpaceWidgetCard: View {
             footer {
                 footerButton("Add items", "plus") { sheet = .items }
                 if count > items.count {
-                    footerButton("Show all \(count) in Studio", "arrow.up.right") { app.openStudio(space: target.spaceId) }
+                    footerButton("Show all \(count) in Studio", "arrow.up.right") { operation.complete(on: app) { app.openStudio(space: target.spaceId) } }
                 }
             }
         }
@@ -234,7 +238,7 @@ struct SpaceWidgetCard: View {
                 if conversations {
                     footerButton("Add channel or message", "plus") { sheet = .threads(conversations: true) }
                 } else {
-                    footerButton("New thread", "square.and.pencil") { app.newThread(text: view.threadPrompt ?? "") }
+                    footerButton("New thread", "square.and.pencil") { operation.complete(on: app) { app.newThread(text: view.threadPrompt ?? "") } }
                     footerButton("Add threads", "plus") { sheet = .threads(conversations: false) }
                 }
                 if threads.count > Self.shownThreads {
@@ -374,37 +378,39 @@ struct SpaceWidgetCard: View {
         busy = "\(pluginId):\(id)"
         defer { busy = nil }
         do {
-            open(try await app.client.createInSpace(target.spaceId, pluginId: pluginId, kind: id))
-            await widgets.load(target.spaceId, client: app.client, fresh: true)
+            open(try await client.createInSpace(target.spaceId, pluginId: pluginId, kind: id))
+            await widgets.load(target.spaceId, client: client, fresh: true)
         } catch {
-            notice = "Couldn't make a \((kind.label ?? "item").lowercased()): \(BBClient.describe(error, server: app.client.baseURL))"
+            notice = "Couldn't make a \((kind.label ?? "item").lowercased()): \(BBClient.describe(error, server: client.baseURL))"
         }
     }
 
     private func open(_ href: String?) {
         guard let href else { return }
         if let route = Route(href: href) {
-            app.push(route)
+            operation.complete(on: app) { app.push(route) }
         } else {
             openWeb(href)
         }
     }
 
     private func openWeb(_ path: String) {
-        guard let url = URL(string: path, relativeTo: app.client.baseURL) else { return }
+        guard client.baseURL == app.serverURL else { return }
+        guard let url = URL(string: path, relativeTo: client.baseURL) else { return }
         UIApplication.shared.open(url)
     }
 
     /// A channel opens as its channel when Bot Teams knows it, and as a thread otherwise.
     private func openThread(_ id: String, channel: Bool) async {
-        app.push(.thread(id: id))
+        operation.complete(on: app) { app.push(.thread(id: id)) }
     }
 
     /// The phone has no project view; Studio shows what the project holds.
     private func openProject(_ id: String) {
-        UserDefaults.standard.set(id, forKey: ServerScope.key("studioProject"))
+        guard client.baseURL == app.serverURL else { return }
+        UserDefaults.standard.set(id, forKey: ServerScope.key("studioProject", serverURL: client.baseURL))
         app.studioSpace = nil
-        app.openStudio(kind: nil)
+        operation.complete(on: app) { app.openStudio(kind: nil) }
     }
 }
 
@@ -439,6 +445,8 @@ struct SpaceSettingsSheet: View {
     /// Called with the saved space, or nil when it was deleted.
     var done: (StudioSpace?) -> Void = { _ in }
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var studio = StudioStore.shared
     @State private var loaded: StudioSpace?
@@ -511,7 +519,7 @@ struct SpaceSettingsSheet: View {
             .navigationTitle(isNew ? "New Space" : "Space Settings")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(isNew ? "Create" : "Save") { Task { await save() } }
                         .disabled(busy || name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || (!isNew && current == nil))
@@ -526,7 +534,7 @@ struct SpaceSettingsSheet: View {
         .task {
             if studio.projectNames.isEmpty { studio.restore() }
             if space == nil, let spaceId {
-                if studio.space(spaceId) == nil { await studio.reloadSpaces(app.client) }
+                if studio.space(spaceId) == nil { await studio.reloadSpaces(client) }
                 loaded = studio.space(spaceId)
             }
             if let current = current {
@@ -554,18 +562,18 @@ struct SpaceSettingsSheet: View {
         do {
             let saved: StudioSpace
             if let current, !isNew {
-                saved = try await app.client.updateSpace(
+                saved = try await client.updateSpace(
                     current.id, name: name, icon: icon.isEmpty ? nil : icon, description: description, defaultProjectId: project)
             } else {
-                saved = try await app.client.createSpace(
+                saved = try await client.createSpace(
                     name: name, icon: icon.isEmpty ? nil : icon, description: description, defaultProjectId: project)
             }
             studio.saved(saved)
-            await studio.load(app.client)
-            dismiss()
-            done(saved)
+            await studio.load(client)
+            operation.complete(on: app) { dismiss() }
+            operation.complete(on: app) { done(saved) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -573,10 +581,10 @@ struct SpaceSettingsSheet: View {
         busy = true
         defer { busy = false }
         do {
-            let added = try await app.client.restoreSpaceWidgets(space.id)
+            let added = try await client.restoreSpaceWidgets(space.id)
             message = added == 0 ? "The page has every widget." : "Added \(added) widget\(added == 1 ? "" : "s") to the page."
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -585,12 +593,13 @@ struct SpaceSettingsSheet: View {
         busy = true
         defer { busy = false }
         do {
-            try await studio.deleteSpace(current, client: app.client)
+            try await studio.deleteSpace(current, client: client)
+            guard client.baseURL == app.serverURL else { return }
             if app.studioSpace == current.id { app.studioSpace = nil }
-            dismiss()
-            done(nil)
+            operation.complete(on: app) { dismiss() }
+            operation.complete(on: app) { done(nil) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -601,6 +610,8 @@ struct SpaceSettingsSheet: View {
 struct SpaceItemsSheet: View {
     let spaceId: String
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var studio = StudioStore.shared
     @State private var query = ""
@@ -630,11 +641,11 @@ struct SpaceItemsSheet: View {
             .searchable(text: $query, prompt: "Search Studio")
             .navigationTitle("Add Items")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } } }
         }
         .task {
             if studio.items.isEmpty { studio.restore() }
-            await studio.load(app.client)
+            await studio.load(client)
         }
     }
 
@@ -649,12 +660,12 @@ struct SpaceItemsSheet: View {
     }
 
     private func toggle(_ item: StudioItem) async {
-        if studio.space(spaceId) == nil { await studio.reloadSpaces(app.client) }
+        if studio.space(spaceId) == nil { await studio.reloadSpaces(client) }
         guard let space = studio.space(spaceId) else { return }
         do {
-            try await studio.toggle(space, on: item, client: app.client)
+            try await studio.toggle(space, on: item, client: client)
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -664,6 +675,8 @@ struct SpaceThreadsSheet: View {
     let spaceId: String
     let conversations: Bool
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var studio = StudioStore.shared
     @State private var recent: [Studio.RecentThreadsOutputThreadsItem] = []
@@ -708,14 +721,14 @@ struct SpaceThreadsSheet: View {
             }
             .navigationTitle(conversations ? "Add Channels and Messages" : "Add Threads")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } } }
         }
         .task {
-            if studio.space(spaceId) == nil { await studio.reloadSpaces(app.client) }
+            if studio.space(spaceId) == nil { await studio.reloadSpaces(client) }
             do {
-                recent = try await app.client.recentSpaceThreads()
+                recent = try await client.recentSpaceThreads()
             } catch {
-                self.error = BBClient.describe(error, server: app.client.baseURL)
+                self.error = BBClient.describe(error, server: client.baseURL)
             }
             loading = false
         }
@@ -760,9 +773,9 @@ struct SpaceThreadsSheet: View {
     private func toggle(_ id: String, held: Bool) async {
         let ref = (pluginId: StudioSpace.threadRef, id: id)
         do {
-            studio.saved(try await app.client.spaceMembers(spaceId, add: held ? [] : [ref], remove: held ? [ref] : []))
+            studio.saved(try await client.spaceMembers(spaceId, add: held ? [] : [ref], remove: held ? [ref] : []))
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -771,6 +784,8 @@ struct SpaceThreadsSheet: View {
 struct SpaceProjectsSheet: View {
     let spaceId: String
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var studio = StudioStore.shared
     @State private var error: String?
@@ -802,11 +817,11 @@ struct SpaceProjectsSheet: View {
             }
             .navigationTitle("Projects")
             .navigationBarTitleDisplayMode(.inline)
-            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { dismiss() } } }
+            .toolbar { ToolbarItem(placement: .confirmationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } } }
         }
         .task {
-            if studio.space(spaceId) == nil { await studio.reloadSpaces(app.client) }
-            if studio.projectNames.isEmpty { await studio.load(app.client) }
+            if studio.space(spaceId) == nil { await studio.reloadSpaces(client) }
+            if studio.projectNames.isEmpty { await studio.load(client) }
         }
     }
 
@@ -817,9 +832,9 @@ struct SpaceProjectsSheet: View {
     private func toggle(_ id: String, held: Bool) async {
         let ref = (pluginId: StudioSpace.projectRef, id: id)
         do {
-            studio.saved(try await app.client.spaceMembers(spaceId, add: held ? [] : [ref], remove: held ? [ref] : []))
+            studio.saved(try await client.spaceMembers(spaceId, add: held ? [] : [ref], remove: held ? [ref] : []))
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -854,6 +869,8 @@ struct ThreadSpacesMenu: View {
     let threadId: String
     var failed: (String) -> Void
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
 
     var body: some View {
         if model.available, let held = model.held {
@@ -861,7 +878,7 @@ struct ThreadSpacesMenu: View {
                 if !held.spaces.isEmpty {
                     Section("In spaces") {
                         ForEach(held.spaces) { space in
-                            Button { app.push(.space(id: space.id)) } label: {
+                            Button { operation.complete(on: app) { app.push(.space(id: space.id)) } } label: {
                                 Label(held.inherited.contains(space.id) ? "\(name(space)) · Project" : name(space), systemImage: "arrow.up.right")
                             }
                         }
@@ -895,9 +912,9 @@ struct ThreadSpacesMenu: View {
     private func change(_ space: StudioSpace, add: Bool) {
         Task {
             do {
-                try await model.change(space, add: add, threadId: threadId, client: app.client)
+                try await model.change(space, add: add, threadId: threadId, client: client)
             } catch {
-                failed(BBClient.describe(error, server: app.client.baseURL))
+                failed(BBClient.describe(error, server: client.baseURL))
             }
         }
     }

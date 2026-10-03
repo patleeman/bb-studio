@@ -7,6 +7,8 @@ extension String: @retroactive Identifiable {
 /// One Talk recording or dictation: its transcript, to share or start a thread with.
 struct RecordingDetailView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let id: String
     @State private var recording: Recording?
@@ -122,28 +124,28 @@ struct RecordingDetailView: View {
 
     private func perform(_ action: (BBClient) async throws -> Void) async {
         do {
-            try await action(app.client)
+            try await action(client)
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func load() async {
         do {
-            let detail = try await app.client.recording(id)
+            let detail = try await client.recording(id)
             recording = detail.recording
             segments = detail.segments
             transcript = detail.transcript
-            meetingNotes = try? await app.client.recordingNotes(id)
+            meetingNotes = try? await client.recordingNotes(id)
             // Expired dictation audio: no segments, so nothing to play.
             player.configure(
-                client: app.client, recordingId: id, title: detail.recording.title,
+                client: client, recordingId: id, title: detail.recording.title,
                 segments: detail.recording.audioRemoved == true ? [] : detail.segments)
             error = nil
         } catch where BBClient.isCancellation(error) {
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
         loaded = true
     }
@@ -152,30 +154,31 @@ struct RecordingDetailView: View {
         generatingNotes = true
         defer { generatingNotes = false }
         do {
-            try await app.client.regenerateRecordingNotes(id)
+            try await client.regenerateRecordingNotes(id)
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func createTask(_ index: Int) async {
         do {
-            let taskId = try await app.client.createTaskFromRecording(id, index: index)
-            app.studioPath.append(.task(id: taskId))
+            let taskId = try await client.createTaskFromRecording(id, index: index)
+            operation.complete(on: app) { app.studioPath.append(.task(id: taskId)) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func delete() async {
         do {
             player.stop()
-            try await app.client.deleteRecording(id)
+            try await client.deleteRecording(id)
+            guard client.baseURL == app.serverURL else { return }
             StudioStore.shared.removed(pluginId: "talk", id: id)
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

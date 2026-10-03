@@ -9,6 +9,8 @@ struct ThreadProfileSheet: View {
     let botId: String?
     let onChange: (String?) -> Void
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var bots: [Bot] = []
     @State private var loaded = false
@@ -70,7 +72,7 @@ struct ThreadProfileSheet: View {
             .navigationTitle("Work as bot")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Done") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Done") { operation.complete(on: app) { dismiss() } } }
             }
             .task { await load() }
         }
@@ -81,9 +83,9 @@ struct ThreadProfileSheet: View {
 
     private func load() async {
         do {
-            bots = try await app.client.profiles()
+            bots = try await client.profiles()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
         loaded = true
     }
@@ -92,11 +94,11 @@ struct ThreadProfileSheet: View {
         saving = true
         defer { saving = false }
         do {
-            try await app.client.setThreadProfile(thread.id, botId: id)
-            onChange(id)
-            dismiss()
+            try await client.setThreadProfile(thread.id, botId: id)
+            operation.complete(on: app) { onChange(id) }
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -104,11 +106,11 @@ struct ThreadProfileSheet: View {
         saving = true
         defer { saving = false }
         do {
-            let view = try await app.client.createSavedView(name: thread.displayTitle, members: [SavedViewMember(kind: "thread", id: thread.id), SavedViewMember(kind: "bot", id: other.id)])
-            dismiss()
-            app.push(.savedView(id: view.id))
+            let view = try await client.createSavedView(name: thread.displayTitle, members: [SavedViewMember(kind: "thread", id: thread.id), SavedViewMember(kind: "bot", id: other.id)])
+            operation.complete(on: app) { dismiss() }
+            operation.complete(on: app) { app.push(.savedView(id: view.id)) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

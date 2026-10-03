@@ -25,6 +25,8 @@ extension View {
 /// Picks up the item's last chat, or starts one that knows the item.
 private struct StudioChatSheet: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store = StudioStore.shared
     @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var lastProjectId = ""
@@ -76,7 +78,7 @@ private struct StudioChatSheet: View {
             .navigationTitle("Chat About This")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") { Task { await start() } }
                         .disabled(starting || project == nil || text.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
@@ -84,15 +86,15 @@ private struct StudioChatSheet: View {
             }
             .task {
                 if chosenProjectId.isEmpty, store.projectNames[lastProjectId] != nil { chosenProjectId = lastProjectId }
-                lastThread = try? await app.client.lastStudioChat(pluginId: pluginId, itemId: itemId)
+                lastThread = try? await client.lastStudioChat(pluginId: pluginId, itemId: itemId)
             }
             .onAppear { focused = true }
         }
     }
 
     private func open(_ threadId: String) {
-        dismiss()
-        app.push(.thread(id: threadId))
+        operation.complete(on: app) { dismiss() }
+        operation.complete(on: app) { app.push(.thread(id: threadId)) }
     }
 
     private func start() async {
@@ -100,11 +102,11 @@ private struct StudioChatSheet: View {
         starting = true
         defer { starting = false }
         do {
-            let threadId = try await app.client.startStudioChat(
+            let threadId = try await client.startStudioChat(
                 pluginId: pluginId, itemId: itemId, projectId: project, text: text.trimmingCharacters(in: .whitespacesAndNewlines))
             open(threadId)
         } catch {
-            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: app.client.baseURL)
+            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }
     }
 }

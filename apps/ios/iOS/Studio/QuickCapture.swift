@@ -4,7 +4,8 @@ import SwiftUI
 /// the sheet, so a half-written thought is still there next time.
 struct QuickWriteView: View {
     @EnvironmentObject private var app: AppModel
-    private let client = BBClient()
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @AppStorage(ServerScope.key("quickWriteDraft")) private var text = ""
     @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
@@ -56,7 +57,7 @@ struct QuickWriteView: View {
             .navigationTitle("Write")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Close") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Close") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) { saveMenu }
             }
             .sheet(isPresented: $dictating) {
@@ -83,7 +84,7 @@ struct QuickWriteView: View {
             Button("Copy", systemImage: "doc.on.doc") {
                 UIPasteboard.general.string = trimmed
                 text = ""
-                dismiss()
+                operation.complete(on: app) { dismiss() }
             }
         } label: {
             if saving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
@@ -97,7 +98,7 @@ struct QuickWriteView: View {
     private func savePage() async {
         await attempt {
             let page = try await client.createPage(title: PageTitle.from(trimmed), markdown: trimmed)
-            app.openPage(page.id)
+            operation.complete(on: app) { app.openPage(page.id) }
         }
     }
 
@@ -113,7 +114,7 @@ struct QuickWriteView: View {
             let task = try await client.createTask(
                 title: title, description: description, projectId: project.isEmpty || project == "none" ? nil : project,
                 due: nil, assignee: nil)
-            app.openStudio(kind: nil, .task(id: task.id))
+            operation.complete(on: app) { app.openStudio(kind: nil, .task(id: task.id)) }
         }
     }
 
@@ -122,8 +123,9 @@ struct QuickWriteView: View {
         defer { saving = false }
         do {
             try await work()
+            guard client.baseURL == app.serverURL else { return }
             text = ""
-            dismiss()
+            operation.complete(on: app) { dismiss() }
             Task { await StudioStore.shared.load(client) }
         } catch {
             self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
@@ -134,7 +136,8 @@ struct QuickWriteView: View {
 /// Add tasks one after another: return adds and clears the field for the next.
 struct QuickTaskView: View {
     @EnvironmentObject private var app: AppModel
-    private let client = BBClient()
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focused: Bool
     @State private var title = ""
@@ -193,8 +196,8 @@ struct QuickTaskView: View {
                     Section("Added") {
                         ForEach(added.reversed()) { task in
                             Button {
-                                dismiss()
-                                app.openStudio(kind: nil, .task(id: task.id))
+                                operation.complete(on: app) { dismiss() }
+                                operation.complete(on: app) { app.openStudio(kind: nil, .task(id: task.id)) }
                             } label: {
                                 Label {
                                     Text(task.title).foregroundStyle(.primary)
@@ -212,13 +215,13 @@ struct QuickTaskView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Board") {
-                        dismiss()
-                        app.openStudio(kind: nil, .tasks)
+                        operation.complete(on: app) { dismiss() }
+                        operation.complete(on: app) { app.openStudio(kind: nil, .tasks) }
                     }
                 }
                 ToolbarItem(placement: .confirmationAction) {
                     Button(title.trimmingCharacters(in: .whitespaces).isEmpty ? "Done" : "Add") {
-                        if title.trimmingCharacters(in: .whitespaces).isEmpty { dismiss() } else { Task { await add() } }
+                        if title.trimmingCharacters(in: .whitespaces).isEmpty { operation.complete(on: app) { dismiss() } } else { Task { await add() } }
                     }
                     .fontWeight(.semibold)
                     .accessibilityIdentifier("quickTaskAdd")

@@ -3,6 +3,8 @@ import SwiftUI
 /// Studio Feed: what agents post, newest first, each story once by its newest post.
 struct FeedView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @State private var posts: [FeedPost] = []
     @State private var topics: [String] = []
     @State private var topic: String?
@@ -117,11 +119,11 @@ struct FeedView: View {
         }
         .contextMenu {
             if let threadId = post.threadId {
-                Button { app.push(.thread(id: threadId)) } label: {
+                Button { operation.complete(on: app) { app.push(.thread(id: threadId)) } } label: {
                     Label(post.openThreadLabel, systemImage: "bubble.left")
                 }
             }
-            Button { app.newThread(text: post.discussPrompt) } label: {
+            Button { operation.complete(on: app) { app.newThread(text: post.discussPrompt) } } label: {
                 Label("New thread about this", systemImage: "plus.bubble")
             }
         }
@@ -130,15 +132,15 @@ struct FeedView: View {
     /// Loading leaves read state alone; opening a post or Mark all read changes it.
     private func load() async {
         do {
-            async let names = try? app.client.feedTopics()
-            let page = try await app.client.feed(topic: topic, query: query)
+            async let names = try? client.feedTopics()
+            let page = try await client.feed(topic: topic, query: query)
             posts = page.posts
             nextCursor = page.nextCursor
             topics = await names ?? topics
             error = nil
             loaded = true
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
             loaded = true
         }
     }
@@ -147,7 +149,7 @@ struct FeedView: View {
         guard let cursor = nextCursor, !loadingMore else { return }
         loadingMore = true
         defer { loadingMore = false }
-        guard let page = try? await app.client.feed(cursor: cursor, topic: topic, query: query) else { return }
+        guard let page = try? await client.feed(cursor: cursor, topic: topic, query: query) else { return }
         let ids = Set(posts.map(\.id))
         posts += page.posts.filter { !ids.contains($0.id) }
         nextCursor = page.nextCursor
@@ -156,30 +158,30 @@ struct FeedView: View {
     /// The whole story, as the server marks it.
     private func markRead(_ post: FeedPost, _ read: Bool) async {
         do {
-            try await app.client.markFeedPost(post.id, read: read)
+            try await client.markFeedPost(post.id, read: read)
             for index in posts.indices where posts[index].id == post.id || (post.story != nil && posts[index].story == post.story) {
                 posts[index].read = read
             }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func markAllRead() async {
         do {
-            try await app.client.markFeedSeen()
+            try await client.markFeedSeen()
             for index in posts.indices { posts[index].read = true }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func remove(_ post: FeedPost) async {
         do {
-            try await app.client.removeFeedPost(post.id)
+            try await client.removeFeedPost(post.id)
             posts.removeAll { $0.id == post.id }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -252,6 +254,8 @@ private struct FeedBadge: View {
 /// One post, with Discuss and the story's earlier updates. Agents resolve posts; it shows a badge.
 struct FeedPostView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let id: String
     @State private var post: FeedPost?
@@ -342,11 +346,11 @@ struct FeedPostView: View {
         HStack(spacing: 10) {
             Menu {
                 if let threadId = post.threadId {
-                    Button { app.push(.thread(id: threadId)) } label: {
+                    Button { operation.complete(on: app) { app.push(.thread(id: threadId)) } } label: {
                         Label(post.openThreadLabel, systemImage: "bubble.left")
                     }
                 }
-                Button { app.newThread(text: post.discussPrompt) } label: {
+                Button { operation.complete(on: app) { app.newThread(text: post.discussPrompt) } } label: {
                     Label("New thread about this", systemImage: "plus.bubble")
                 }
             } label: {
@@ -360,41 +364,41 @@ struct FeedPostView: View {
 
     private func load() async {
         do {
-            guard let post = try await app.client.feedPost(id) else {
+            guard let post = try await client.feedPost(id) else {
                 missing = true
                 return
             }
             self.post = post
             if !post.read, !markedRead {
                 markedRead = true
-                if let updated = try? await app.client.markFeedPost(id, read: true) { self.post = updated }
+                if let updated = try? await client.markFeedPost(id, read: true) { self.post = updated }
             }
             if let key = post.story, post.storyPosts > 1 {
-                story = (try? await app.client.feedStory(key)) ?? []
+                story = (try? await client.feedStory(key)) ?? []
             } else {
                 story = []
             }
             error = nil
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func markRead(_ post: FeedPost, _ read: Bool) async {
         markedRead = true
         do {
-            if let updated = try await app.client.markFeedPost(post.id, read: read) { self.post = updated }
+            if let updated = try await client.markFeedPost(post.id, read: read) { self.post = updated }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     private func remove() async {
         do {
-            try await app.client.removeFeedPost(id)
-            dismiss()
+            try await client.removeFeedPost(id)
+            operation.complete(on: app) { dismiss() }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -402,6 +406,8 @@ struct FeedPostView: View {
 /// `::post{id="…"}` in a reply (older replies: `::post{title="…"}`): the feed post it made.
 struct FeedPostCard: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     /// The directive line.
     let source: String
     let title: String
@@ -409,7 +415,7 @@ struct FeedPostCard: View {
 
     var body: some View {
         Button {
-            if let post { app.push(.feedPost(id: post.id)) }
+            if let post { operation.complete(on: app) { app.push(.feedPost(id: post.id)) } }
         } label: {
             HStack(spacing: 12) {
                 Image(systemName: "newspaper")
@@ -439,7 +445,7 @@ struct FeedPostCard: View {
         .task(id: source) {
             // The post is published when the thread goes idle, a moment after the reply shows.
             for _ in 0..<8 {
-                if let found = try? await app.client.feedPost(directive: source) {
+                if let found = try? await client.feedPost(directive: source) {
                     post = found
                     return
                 }

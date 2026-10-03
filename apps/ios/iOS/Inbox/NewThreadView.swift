@@ -2,6 +2,8 @@ import SwiftUI
 
 struct NewThreadView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var projectId = ""
     @State private var projects: [Project] = []
@@ -102,7 +104,7 @@ struct NewThreadView: View {
             .navigationTitle("New thread")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Start") { Task { await create() } }
                         .disabled(
@@ -114,15 +116,15 @@ struct NewThreadView: View {
                 DictationView(threadId: nil, autoStart: true) { text += (text.isEmpty ? "" : " ") + $0 }
             }
             .task {
-                bots = (try? await app.client.profiles()) ?? []
-                projects = (try? await app.client.projects()) ?? []
+                bots = (try? await client.profiles()) ?? []
+                projects = (try? await client.projects()) ?? []
                 if !projects.contains(where: { $0.id == projectId }) { projectId = projects.first?.id ?? "" }
             }
             .task(id: projectId) {
                 guard !projectId.isEmpty else { return }
                 workspace = "default"
-                environments = (try? await app.client.threadEnvironments(projectId: projectId)) ?? []
-                defaults = (try? await app.client.projectDefaults(projectId)) ?? nil
+                environments = (try? await client.threadEnvironments(projectId: projectId)) ?? []
+                defaults = (try? await client.projectDefaults(projectId)) ?? nil
                 if providerId.isEmpty { await loadOptions() }
             }
             .task(id: providerId) {
@@ -153,7 +155,7 @@ struct NewThreadView: View {
 
     private func loadOptions() async {
         let provider = providerId.isEmpty ? defaults?.providerId : providerId
-        options = try? await app.client.executionOptions(providerId: provider)
+        options = try? await client.executionOptions(providerId: provider)
     }
 
     /// A bot names its model by model id; the picker tags options by option id.
@@ -199,30 +201,39 @@ struct NewThreadView: View {
         creating = true
         defer { creating = false }
         do {
-            let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: app.client)
-            let choice = ExecutionChoice(
-                providerId: providerId.isEmpty ? nil : providerId,
-                model: modelId.isEmpty ? nil : modelId,
-                reasoningLevel: reasoning.isEmpty ? nil : reasoning,
-                permissionMode: permissionMode.isEmpty ? nil : permissionMode)
-            // The server attaches the profile when this project's next new thread
-            // dispatches its first message, then forgets it.
-            if !profileBotId.isEmpty {
-                try await app.client.pendingThreadProfile(projectId: projectId, botId: profileBotId)
-            }
-            let thread: ThreadEntry
-            do {
-                thread = try await app.client.createThread(
-                    projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
-                    options: choice, workspace: selectedWorkspace)
-            } catch {
-                if !profileBotId.isEmpty { try? await app.client.pendingThreadProfile(projectId: projectId, botId: nil) }
-                throw error
-            }
-            dismiss()
-            app.openThread(thread.id)
+            try await operation.run(currentServer: { app.serverURL }, work: { client in
+                let projectId = self.projectId
+                let profileBotId = self.profileBotId
+                let text = self.text
+                let attachments = self.attachments
+                let selectedWorkspace = self.selectedWorkspace
+                let choice = ExecutionChoice(
+                    providerId: providerId.isEmpty ? nil : providerId,
+                    model: modelId.isEmpty ? nil : modelId,
+                    reasoningLevel: reasoning.isEmpty ? nil : reasoning,
+                    permissionMode: permissionMode.isEmpty ? nil : permissionMode)
+                let inputs = try await PendingAttachment.upload(attachments, projectId: projectId, client: client)
+                // The server attaches the profile when this project's next new thread
+                // dispatches its first message, then forgets it.
+                if !profileBotId.isEmpty {
+                    try await client.pendingThreadProfile(projectId: projectId, botId: profileBotId)
+                }
+                let thread: ThreadEntry
+                do {
+                    thread = try await client.createThread(
+                        projectId: projectId, text: text.trimmingCharacters(in: .whitespacesAndNewlines), attachments: inputs,
+                        options: choice, workspace: selectedWorkspace)
+                } catch {
+                    if !profileBotId.isEmpty { try? await client.pendingThreadProfile(projectId: projectId, botId: nil) }
+                    throw error
+                }
+                return thread
+            }, completion: { thread in
+                dismiss()
+                app.openThread(thread.id)
+            })
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 

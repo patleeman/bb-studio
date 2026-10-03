@@ -5,7 +5,8 @@ import SwiftUI
 /// sent, turned into a thread, or copied. The recording stays in Talk either way.
 struct DictationView: View {
     @EnvironmentObject private var app: AppModel
-    private let client = BBClient()
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recorder = TalkRecorder(client: AppModel.shared.client)
     @ObservedObject private var outbox = TalkOutbox.shared
@@ -57,7 +58,7 @@ struct DictationView: View {
                     Spacer()
                     HStack(spacing: 40) {
                         Button(role: .cancel) {
-                            Task { if await recorder.cancel() { dismiss() } }
+                            Task { if await recorder.cancel() { operation.complete(on: app) { dismiss() } } }
                         } label: { circle("xmark", .gray) }
                         Button { Task { await finish() } } label: { circle("checkmark", .green) }
                     }
@@ -90,7 +91,7 @@ struct DictationView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        Task { if await recorder.cancel() { dismiss() } }
+                        Task { if await recorder.cancel() { operation.complete(on: app) { dismiss() } } }
                     }
                 }
             }
@@ -106,9 +107,10 @@ struct DictationView: View {
     /// it gets edited, so only standalone dictation stops to review.
     private func finish() async {
         let spoken = (await recorder.finish() ?? "").trimmingCharacters(in: .whitespacesAndNewlines)
+        guard client.baseURL == app.serverURL else { return }
         if let onInsert, !spoken.isEmpty {
             onInsert(spoken)
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } else {
             text = spoken
         }
@@ -125,14 +127,14 @@ struct DictationView: View {
             if let onInsert {
                 Button {
                     onInsert(trimmed)
-                    dismiss()
+                    operation.complete(on: app) { dismiss() }
                 } label: { wide(insertLabel.0, insertLabel.1) }
                 .buttonStyle(.borderedProminent)
             } else if let threadId {
                 Button {
                     Task {
                         _ = try? await client.send(threadId, text: trimmed)
-                        dismiss()
+                        operation.complete(on: app) { dismiss() }
                     }
                 } label: { wide("Send to thread", "paperplane.fill") }
                 .buttonStyle(.borderedProminent)
@@ -148,7 +150,7 @@ struct DictationView: View {
                 Button { creatingThread = true } label: { wide("New thread", "square.and.pencil") }
                 Button {
                     UIPasteboard.general.string = trimmed
-                    dismiss()
+                    operation.complete(on: app) { dismiss() }
                 } label: { wide("Copy", "doc.on.doc") }
             }
             .buttonStyle(.bordered)
@@ -161,8 +163,8 @@ struct DictationView: View {
         defer { savingPage = false }
         do {
             let page = try await client.createPage(title: PageTitle.from(markdown), markdown: markdown)
-            dismiss()
-            app.openPage(page.id)
+            operation.complete(on: app) { dismiss() }
+            operation.complete(on: app) { app.openPage(page.id) }
         } catch {
             saveError = BBClient.describe(error, server: client.baseURL)
         }

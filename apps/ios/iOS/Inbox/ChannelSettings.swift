@@ -2,6 +2,8 @@ import SwiftUI
 
 struct SavedViewEditor: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let initial: SavedThreadView?
     let changed: (SavedThreadView) -> Void
@@ -33,12 +35,12 @@ struct SavedViewEditor: View {
             .disabled(saving)
             .navigationTitle(initial == nil ? "New Channel" : "Edit Channel")
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) { Button("Save") { Task { await save() } }.disabled(name.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty || members.count > 32) }
             }
             .task {
-                do { bots = try await app.client.profiles(); threads = try await app.client.threads(limit: 100) }
-                catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+                do { bots = try await client.profiles(); threads = try await client.threads(limit: 100) }
+                catch { self.error = BBClient.describe(error, server: client.baseURL) }
             }
         }
     }
@@ -53,13 +55,13 @@ struct SavedViewEditor: View {
         do {
             let chosen = members.sorted { ($0.kind + $0.id) < ($1.kind + $1.id) }
             let view: SavedThreadView
-            if let initial { view = try await app.client.updateSavedView(initial, name: name, members: chosen) }
-            else { view = try await app.client.createSavedView(name: name, members: chosen, requestId: requestId) }
-            changed(view); dismiss()
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+            if let initial { view = try await client.updateSavedView(initial, name: name, members: chosen) }
+            else { view = try await client.createSavedView(name: name, members: chosen, requestId: requestId) }
+            operation.complete(on: app) { changed(view) }; operation.complete(on: app) { dismiss() }
+        } catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
     private func archive(_ view: SavedThreadView) async {
-        do { changed(try await app.client.updateSavedView(view, archived: !view.archived)); dismiss() }
-        catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        do { let updated = try await client.updateSavedView(view, archived: !view.archived); operation.complete(on: app) { changed(updated) }; operation.complete(on: app) { dismiss() } }
+        catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
 }

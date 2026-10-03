@@ -7,7 +7,8 @@ struct ExecutionSheet: View {
     let threadId: String
     let providerId: String?
     @EnvironmentObject private var app: AppModel
-    private let client = BBClient()
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     @State private var models: [ExecutionOptions.Model] = []
     @State private var model = ""
@@ -56,7 +57,7 @@ struct ExecutionSheet: View {
             .navigationTitle("Model & Permissions")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     if saving {
                         ProgressView()
@@ -114,7 +115,7 @@ struct ExecutionSheet: View {
                 // Back to what the thread already has: nothing to send.
                 PermissionMode.setPending(permission == original?.permissionMode ? nil : permission, for: threadId, serverURL: client.baseURL)
             }
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }

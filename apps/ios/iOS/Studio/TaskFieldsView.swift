@@ -2,6 +2,8 @@ import SwiftUI
 
 struct TaskFieldsView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let id: String
     let projectId: String?
@@ -53,7 +55,7 @@ struct TaskFieldsView: View {
             .navigationTitle("Task details")
             .navigationBarTitleDisplayMode(.inline)
             .toolbar {
-                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { operation.complete(on: app) { dismiss() } } }
                 ToolbarItem(placement: .confirmationAction) {
                     Button("Save") { Task { await save() } }.disabled(saving || detail == nil)
                 }
@@ -64,9 +66,9 @@ struct TaskFieldsView: View {
 
     private func load() async {
         do {
-            detail = try await app.client.taskGenerated(id).task
-            subtasks = (try? await app.client.taskSubtasks(id)) ?? []
-            firstStatus = (try? await app.client.taskStatuses(projectId: projectId))?.first(where: { $0.id != "done" })?.id ?? "todo"
+            detail = try await client.taskGenerated(id).task
+            subtasks = (try? await client.taskSubtasks(id)) ?? []
+            firstStatus = (try? await client.taskStatuses(projectId: projectId))?.first(where: { $0.id != "done" })?.id ?? "todo"
             if let detail {
                 priority = detail.priority.map { String(describing: $0) } ?? "none"
                 labels = (detail.labels ?? []).joined(separator: ", ")
@@ -74,37 +76,37 @@ struct TaskFieldsView: View {
                 reminder = detail.reminderAt != nil
                 if let at = detail.reminderAt { reminderDate = Date(timeIntervalSince1970: at / 1000) }
             }
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        } catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
 
     private func save() async {
         saving = true
         defer { saving = false }
         do {
-            try await app.client.updateTaskFields(id, priority: priority,
+            try await client.updateTaskFields(id, priority: priority,
                 labels: labels.split(separator: ",").map { $0.trimmingCharacters(in: .whitespaces) }.filter { !$0.isEmpty },
                 recurrence: recurrence.isEmpty ? nil : recurrence, reminderAt: reminder ? reminderDate : nil)
-            changed()
-            dismiss()
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+            operation.complete(on: app) { changed() }
+            operation.complete(on: app) { dismiss() }
+        } catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
 
     private func addSubtask() async {
         let title = subtaskTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty else { return }
         do {
-            try await app.client.createSubtask(title, parentId: id, projectId: projectId)
+            try await client.createSubtask(title, parentId: id, projectId: projectId)
             subtaskTitle = ""
-            changed()
+            operation.complete(on: app) { changed() }
             await load()
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        } catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
 
     private func toggleSubtask(_ id: String, done: Bool) async {
         do {
-            _ = try await app.client.moveTask(id, to: done ? firstStatus : "done")
-            changed()
+            _ = try await client.moveTask(id, to: done ? firstStatus : "done")
+            operation.complete(on: app) { changed() }
             await load()
-        } catch { self.error = BBClient.describe(error, server: app.client.baseURL) }
+        } catch { self.error = BBClient.describe(error, server: client.baseURL) }
     }
 }

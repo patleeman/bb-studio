@@ -3,6 +3,8 @@ import SwiftUI
 /// Excalidraw drawings on the server, newest first.
 struct DrawingsView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @State private var drawings: [DrawingSummary] = []
     @State private var loaded = false
     @State private var error: String?
@@ -67,21 +69,21 @@ struct DrawingsView: View {
 
     private func load() async {
         do {
-            drawings = try await app.client.drawings()
+            drawings = try await client.drawings()
             error = nil
         } catch where BBClient.isCancellation(error) {
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
         loaded = true
     }
 
     private func delete(_ drawing: DrawingSummary) async {
         do {
-            try await app.client.deleteDrawing(drawing.id)
+            try await client.deleteDrawing(drawing.id)
             drawings.removeAll { $0.id == drawing.id }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -89,11 +91,11 @@ struct DrawingsView: View {
         creating = true
         defer { creating = false }
         do {
-            let drawing = try await app.client.createDrawing()
-            app.push(.drawing(id: drawing.id))
+            let drawing = try await client.createDrawing()
+            operation.complete(on: app) { app.push(.drawing(id: drawing.id)) }
             await load()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -102,6 +104,8 @@ struct DrawingsView: View {
 /// fit. Follows along while an agent draws.
 struct DrawingView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     let id: String
     @State private var name = ""
     @State private var scene: DrawingScene?
@@ -179,7 +183,7 @@ struct DrawingView: View {
         .sheet(isPresented: $showingRelated) { RelatedView(pluginId: "excalidraw", itemId: id) }
         .sheet(isPresented: $editing, onDismiss: { Task { await refresh() } }) {
             NavigationStack {
-                WebView(url: app.client.webURL(forDrawing: id))
+                WebView(url: client.webURL(forDrawing: id))
                     .ignoresSafeArea(edges: .bottom)
                     .navigationTitle("Edit drawing")
                     .navigationBarTitleDisplayMode(.inline)
@@ -194,10 +198,10 @@ struct DrawingView: View {
                 guard !newName.isEmpty else { return }
                 Task {
                     do {
-                        try await app.client.renameDrawing(id, name: newName)
+                        try await client.renameDrawing(id, name: newName)
                         name = newName
                     } catch {
-                        self.error = BBClient.describe(error, server: app.client.baseURL)
+                        self.error = BBClient.describe(error, server: client.baseURL)
                     }
                 }
             }
@@ -212,8 +216,8 @@ struct DrawingView: View {
 
     private func refresh() async {
         do {
-            if scene != nil, try await app.client.drawingUpdatedAt(id) == updatedAt { return }
-            guard let drawing = try await app.client.drawing(id) else {
+            if scene != nil, try await client.drawingUpdatedAt(id) == updatedAt { return }
+            guard let drawing = try await client.drawing(id) else {
                 error = "It was deleted."
                 scene = nil
                 return
@@ -229,7 +233,7 @@ struct DrawingView: View {
             snapshot = render(drawing.scene)
         } catch where BBClient.isCancellation(error) {
         } catch {
-            if scene == nil { self.error = BBClient.describe(error, server: app.client.baseURL) }
+            if scene == nil { self.error = BBClient.describe(error, server: client.baseURL) }
         }
     }
 

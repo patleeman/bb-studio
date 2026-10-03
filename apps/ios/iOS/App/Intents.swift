@@ -10,6 +10,19 @@ struct ThreadEntity: AppEntity {
     var id: String
     var title: String
 
+    init(threadId: String, title: String, serverURL: URL) {
+        id = ServerScope.namespace(serverURL) + "|" + threadId
+        self.title = title
+    }
+
+    func threadId(on serverURL: URL) throws -> String {
+        let parts = id.split(separator: "|", maxSplits: 1)
+        guard parts.count == 2, parts[0] == ServerScope.namespace(serverURL) else {
+            throw BBError(status: 409, message: "This shortcut belongs to another server. Choose its thread again.")
+        }
+        return String(parts[1])
+    }
+
     var displayRepresentation: DisplayRepresentation { DisplayRepresentation(title: "\(title)") }
 }
 
@@ -27,10 +40,13 @@ struct ThreadQuery: EntityStringQuery {
     }
 
     private func recent() async throws -> [ThreadEntity] {
-        try await BBClient().threads()
+        let client = BBClient()
+        let threads = try await client.threads()
+        guard client.baseURL == ServerScope.selectedURL else { return [] }
+        return threads
             .filter { $0.parentThreadId == nil && $0.visibility != "hidden" }
             .sorted { ($0.latestAttentionAt ?? $0.updatedAt) > ($1.latestAttentionAt ?? $1.updatedAt) }
-            .map { ThreadEntity(id: $0.id, title: $0.displayTitle) }
+            .map { ThreadEntity(threadId: $0.id, title: $0.displayTitle, serverURL: client.baseURL) }
     }
 }
 
@@ -56,7 +72,7 @@ struct VoiceChatIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.startVoiceChat(threadId: thread?.id)
+        AppModel.shared.startVoiceChat(threadId: try thread?.threadId(on: AppModel.shared.serverURL))
         return .result()
     }
 }
@@ -70,7 +86,7 @@ struct OpenThreadIntent: AppIntent {
 
     @MainActor
     func perform() async throws -> some IntentResult {
-        AppModel.shared.openThread(thread.id)
+        AppModel.shared.openThread(try thread.threadId(on: AppModel.shared.serverURL))
         return .result()
     }
 }
@@ -93,7 +109,7 @@ struct AskBBIntent: AppIntent {
         let threadId: String
         var baseline: String?
         if let thread {
-            threadId = thread.id
+            threadId = try thread.threadId(on: client.baseURL)
             baseline = try await client.latestReply(threadId)?.id
             try await client.send(threadId, text: message)
         } else {
@@ -106,6 +122,9 @@ struct AskBBIntent: AppIntent {
         guard let reply = try await client.waitForReply(threadId, after: baseline, timeout: .seconds(25)) else {
             return .result(value: "", dialog: "Sent. BB is still working, and you'll get a notification when it's done.")
         }
+        guard client.baseURL == ServerScope.selectedURL else {
+            return .result(value: "", dialog: "The server changed. Your message was sent to the original server.")
+        }
         let spoken = VoiceChatEngine.speakable(reply)
         let dialog = spoken.count > 700 ? String(spoken.prefix(700)) + "… The rest is in the app." : spoken
         return .result(value: reply, dialog: IntentDialog(stringLiteral: dialog))
@@ -113,7 +132,7 @@ struct AskBBIntent: AppIntent {
 
     private func defaultProjectId(_ client: BBClient) async throws -> String? {
         let projects = try await client.projects()
-        let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId"))
+        let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId", serverURL: client.baseURL))
         return projects.first { $0.id == saved }?.id ?? projects.first?.id
     }
 }

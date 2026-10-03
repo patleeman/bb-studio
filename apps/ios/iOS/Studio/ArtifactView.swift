@@ -5,6 +5,8 @@ import UIKit
 /// versions, and the web viewer's actions.
 struct ArtifactView: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     @Environment(\.dismiss) private var dismiss
     let id: String
     @State private var chatting = false
@@ -94,7 +96,7 @@ struct ArtifactView: View {
 
     @ViewBuilder
     private func content(_ artifact: Artifact, _ version: ArtifactVersion) -> some View {
-        let url = app.client.artifactContentURL(artifact.id, versionId: version.id)
+        let url = client.artifactContentURL(artifact.id, versionId: version.id)
         switch version.type {
         case "image":
             ScrollView([.horizontal, .vertical]) {
@@ -209,7 +211,7 @@ struct ArtifactView: View {
     private func menu(_ artifact: Artifact) -> some View {
         Menu {
             Button {
-                app.newThread(text: "[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ")
+                operation.complete(on: app) { app.newThread(text: "[\(artifact.displayTitle.replacingOccurrences(of: "[", with: "").replacingOccurrences(of: "]", with: ""))](\(artifact.href)) ") }
             } label: { Label("New Thread with This", systemImage: "square.and.pencil") }
             StudioChatMenuButton(isPresented: $chatting)
             if let text, version?.isText == true {
@@ -228,7 +230,7 @@ struct ArtifactView: View {
                 .pickerStyle(.menu)
             }
             if let thread = artifact.sourceThreadId {
-                Button { app.push(.thread(id: thread)) } label: { Label("Open Source Thread", systemImage: "bubble.left.and.bubble.right") }
+                Button { operation.complete(on: app) { app.push(.thread(id: thread)) } } label: { Label("Open Source Thread", systemImage: "bubble.left.and.bubble.right") }
             }
             if ["markdown", "text"].contains(artifact.version.type) {
                 Button { Task { await saveAsPage() } } label: { Label("Save as Page", systemImage: "doc.badge.plus") }
@@ -263,7 +265,7 @@ struct ArtifactView: View {
 
     private func load() async {
         do {
-            let result = try await app.client.artifact(id)
+            let result = try await client.artifact(id)
             guard let found = result.artifact else {
                 error = "It was deleted."
                 artifact = nil
@@ -275,14 +277,14 @@ struct ArtifactView: View {
             error = nil
         } catch where BBClient.isCancellation(error) {
         } catch {
-            if artifact == nil { self.error = BBClient.describe(error, server: app.client.baseURL) }
+            if artifact == nil { self.error = BBClient.describe(error, server: client.baseURL) }
         }
     }
 
     private func loadText() async {
         guard let artifact, let version, version.isText, textVersion != version.id else { return }
         do {
-            let result = try await app.client.artifactText(artifact.id, versionId: version.id)
+            let result = try await client.artifactText(artifact.id, versionId: version.id)
             text = result.text
             truncated = result.truncated
             textVersion = version.id
@@ -299,7 +301,6 @@ struct ArtifactView: View {
         working = true
         defer { working = false }
         do {
-            let client = app.client
             let url = client.artifactContentURL(artifact.id, versionId: version.id, download: true)
             let (data, response) = try await URLSession.shared.data(from: url)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw BBError(status: 0, message: "The server didn't send the file.") }
@@ -310,7 +311,7 @@ struct ArtifactView: View {
             try data.write(to: file, options: .atomic)
             sharing = SharedFile(url: file)
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
@@ -318,40 +319,41 @@ struct ArtifactView: View {
         let title = newTitle.trimmingCharacters(in: .whitespacesAndNewlines)
         guard !title.isEmpty, title != artifact?.title else { return }
         do {
-            try await app.client.renameArtifact(id, title: title)
+            try await client.renameArtifact(id, title: title)
             artifact?.title = title
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func move(_ projectId: String?) async {
         guard projectId != artifact?.projectId else { return }
         do {
-            try await app.client.moveArtifact(id, projectId: projectId)
+            try await client.moveArtifact(id, projectId: projectId)
             artifact?.projectId = projectId
             flash(projectId.flatMap { StudioStore.shared.projectNames[$0] }.map { "Moved to \($0)" } ?? "Moved out of its project")
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func saveAsPage() async {
         do {
-            let href = try await app.client.saveArtifactAsPage(id)
-            if let route = Route(href: href) { app.push(route) } else { flash("Saved as a page") }
+            let href = try await client.saveArtifactAsPage(id)
+            if let route = Route(href: href) { operation.complete(on: app) { app.push(route) } } else { flash("Saved as a page") }
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
     private func delete() async {
         do {
-            try await app.client.deleteArtifact(id)
+            try await client.deleteArtifact(id)
+            guard client.baseURL == app.serverURL else { return }
             StudioStore.shared.removed(pluginId: "artifacts", id: id)
-            dismiss()
+            operation.complete(on: app) { dismiss() }
         } catch {
-            flash(BBClient.describe(error, server: app.client.baseURL))
+            flash(BBClient.describe(error, server: client.baseURL))
         }
     }
 
@@ -384,6 +386,8 @@ struct ActivitySheet: UIViewControllerRepresentable {
 /// `::artifact{id="art_…"}` in a reply: the artifact's title and type, opening the viewer.
 struct ArtifactCard: View {
     @EnvironmentObject private var app: AppModel
+    private let operation = ServerOperation()
+    private var client: BBClient { operation.client }
     let id: String
     @State private var artifact: Artifact?
     @State private var missing = false
@@ -422,7 +426,6 @@ struct ArtifactCard: View {
         .disabled(missing)
         .accessibilityIdentifier("artifactCard")
         .task(id: id) {
-            let client = app.client
             let cacheKey = ServerScope.key(id, serverURL: client.baseURL)
             if let cached = Self.cache[cacheKey] { artifact = cached }
             guard let result = try? await client.artifact(id) else { return }
@@ -438,7 +441,7 @@ struct ArtifactCard: View {
     @ViewBuilder
     private var thumbnail: some View {
         if let artifact, artifact.version.type == "image" {
-            AsyncImage(url: app.client.artifactContentURL(artifact.id, versionId: artifact.version.id)) { image in
+            AsyncImage(url: client.artifactContentURL(artifact.id, versionId: artifact.version.id)) { image in
                 image.resizable().scaledToFill()
             } placeholder: {
                 Image(systemName: "photo").foregroundStyle(.teal)
