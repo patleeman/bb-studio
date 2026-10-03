@@ -28,6 +28,7 @@ import {
   type ExpoTicket,
 } from "./apns.js";
 import { CLEAR_BATCH, clearPayload, noteNotified, partition, type Notified, type ThreadReadState } from "./clear.js";
+import { officeInboxPoller } from "./office-inbox.js";
 import { isQuietCompletion } from "./notifications.js";
 
 const messageSchema = z.object({ to: z.string().min(1), body: z.string().optional(), data: z.record(z.string(), z.unknown()).optional() }).passthrough();
@@ -189,6 +190,9 @@ export default async function plugin(bb: BbPluginApi) {
         const choices = question && !question.multiSelect ? (question.options ?? []).slice(0, MAX_CHOICES) : [];
         return {
           interactionId: pending.id,
+          inboxChanged: true,
+          ...((payload.kind !== "user_question" || (question?.allowFreeText && choices.length === 0))
+            ? { inboxKey: `interaction:${pending.id}` } : {}),
           interactionKind: payload.kind,
           ...(payload.subject?.kind ? { subjectKind: payload.subject.kind } : {}),
           ...(payload.availableDecisions ? { decisions: payload.availableDecisions } : {}),
@@ -360,6 +364,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.active", () => scheduleClear());
   bb.events.on("thread.archived", () => scheduleClear());
   bb.events.on("thread.deleted", () => scheduleClear());
+  const pollOfficeInbox = officeInboxPoller(bb,
+    async () => Object.keys((await bb.storage.kv.get<Record<string, number>>(DEVICES_KEY)) ?? {}), deliver);
+  const inboxEvery = setInterval(() => { void pollOfficeInbox().catch(error => bb.log.warn(`office inbox push: ${String(error)}`)); }, CLEAR_INTERVAL_MS);
+  bb.onDispose(() => clearInterval(inboxEvery));
   const clearEvery = setInterval(() => void clearReadNotifications(), CLEAR_INTERVAL_MS);
   bb.onDispose(() => {
     clearInterval(clearEvery);
