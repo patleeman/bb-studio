@@ -10,6 +10,12 @@ can link to and @-mention.
 
 ## Staged preview
 
+![Talk settings with a cleanup model selected](assets/model-settings.png)
+
+The **Models** section in stable BB shows Codex's 6-Luna for cleanup and Studio
+Decisions for titles and summaries. The staged capture chooses a model source
+through the real settings controls and verifies the saved choice after reloading.
+
 ![The compact Talk header](assets/compact-header.png)
 
 The live 390-pixel recording page shows the paused, synthetic Weekly product
