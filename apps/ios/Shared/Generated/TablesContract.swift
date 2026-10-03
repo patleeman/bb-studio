@@ -1797,13 +1797,17 @@ public enum Tables {
     public var filters: [QueryInputFiltersItem]?
     public var sorts: [QueryInputSortsItem]?
     public var limit: Int?
+    public var offset: Int?
+    public var expectedRevision: String?
 
-    public init(id: String? = nil, viewId: String? = nil, filters: [QueryInputFiltersItem]? = nil, sorts: [QueryInputSortsItem]? = nil, limit: Int? = nil) {
+    public init(id: String? = nil, viewId: String? = nil, filters: [QueryInputFiltersItem]? = nil, sorts: [QueryInputSortsItem]? = nil, limit: Int? = nil, offset: Int? = nil, expectedRevision: String? = nil) {
       self.id = id
       self.viewId = viewId
       self.filters = filters
       self.sorts = sorts
       self.limit = limit
+      self.offset = offset
+      self.expectedRevision = expectedRevision
     }
   }
 
@@ -1824,10 +1828,16 @@ public enum Tables {
   public struct QueryOutput: Sendable, Hashable, Codable {
     public var rows: [QueryOutputRowsItem]?
     public var total: Double?
+    public var offset: Double?
+    public var nextOffset: Double?
+    public var revision: String?
 
-    public init(rows: [QueryOutputRowsItem]? = nil, total: Double? = nil) {
+    public init(rows: [QueryOutputRowsItem]? = nil, total: Double? = nil, offset: Double? = nil, nextOffset: Double? = nil, revision: String? = nil) {
       self.rows = rows
       self.total = total
+      self.offset = offset
+      self.nextOffset = nextOffset
+      self.revision = revision
     }
   }
 

@@ -61,6 +61,9 @@ export const tableQuerySchema = z.object({
   filters: z.array(filterSchema).optional(),
   sorts: z.array(sortSchema).optional(),
   limit: z.number().int().min(1).max(500).default(100),
+  offset: z.number().int().min(0).max(Number.MAX_SAFE_INTEGER).default(0),
+  /** Pass the previous page's revision to reject edits during a scan. */
+  expectedRevision: z.string().regex(/^[a-f0-9]{64}$/).optional(),
 });
 
 /** A Studio item a relation cell can point at. */
@@ -87,7 +90,11 @@ export const tablesContract = defineRpcContract({
   deleteRow: { input: z.object({ id, rowId: id }), output: z.object({ ok: z.boolean() }) },
   /** Edits, inserts and deletes rows in one save, as a paste or a multi-row delete does. */
   patchRows: { input: rowPatchSchema.extend({ id }), output: z.object({ table: tableSchema }) },
-  query: { input: tableQuerySchema, output: z.object({ rows: z.array(rowSchema), total: z.number() }) },
+  query: { input: tableQuerySchema, output: z.object({
+    rows: z.array(rowSchema), total: z.number(),
+    // Optional for clients connecting to an older Tables installation.
+    offset: z.number().optional(), nextOffset: z.number().nullable().optional(), revision: z.string().optional(),
+  }) },
   exportCsv: { input: z.object({ id, viewId: id.optional() }), output: z.object({ csv: z.string() }) },
   importCsv: { input: z.object({ id, csv: z.string().max(2_000_000) }), output: z.object({ imported: z.number() }) },
   /** Studio items relation cells can link to. */

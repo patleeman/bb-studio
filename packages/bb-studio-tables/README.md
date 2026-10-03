@@ -10,6 +10,12 @@ In a thread's side panel, the **Tables** tab lists the tables made in that threa
 
 `bb tables list`, `create <title>`, `schema <id>`, `query <id>`, `insert <id> <json>`, `update <id> <row-id> <json>`, `export <id>`, and `import <id> --csv <text>` (headers match columns by name).
 
+Queries return `{ rows, total, offset, nextOffset, revision }`. Agent and RPC
+queries accept `limit` (100 by default, up to 500) and `offset`. Continue with
+`offset: nextOffset` and `expectedRevision: revision` until `nextOffset` is null.
+Keep the same view, filters and sorts. If the table changes, the revision check
+asks you to restart the scan. The CLI uses `--limit`, `--offset`, and `--revision`.
+
 ## Staged preview
 
 ![The compact Tables header](assets/compact-header.png)

@@ -4,15 +4,14 @@ import { createChangeBus, createStoreProvider, defineItemMention, studioIndex, s
 import {
   columnSchema,
   csv,
-  filterSchema,
   markdown,
   queryRows,
-  sortSchema,
   TABLES_CHANNEL,
   TABLES_PANEL,
   TABLES_PLUGIN_ID,
   tableHref,
   tablesContract,
+  tableQuerySchema,
   valuesSchema,
   type Filter,
   type Sort,
@@ -22,6 +21,7 @@ import {
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { MIGRATIONS, TableStore } from "./src/store";
+import { queryPage } from "./src/query";
 
 const id = z.string().min(1).max(100);
 
@@ -137,10 +137,7 @@ export default function plugin(bb: BbPluginApi) {
       changed(id);
       return { table };
     },
-    query: ({ id, viewId, filters, sorts, limit }) => {
-      const rows = query(store.require(id), viewId, filters, sorts);
-      return { rows: rows.slice(0, limit), total: rows.length };
-    },
+    query: (input) => queryPage(store.require(input.id), input),
     exportCsv: ({ id, viewId }) => {
       const table = store.require(id);
       return { csv: csv(table, query(table, viewId)) };
@@ -270,17 +267,9 @@ export default function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "tables_query",
     description:
-      "Query table rows with optional filters and sorts. Returns up to 100 rows.",
-    parameters: z.object({
-      id,
-      viewId: id.optional(),
-      filters: z.array(filterSchema).optional(),
-      sorts: z.array(sortSchema).optional(),
-    }),
-    execute: ({ id, viewId, filters, sorts }) =>
-      JSON.stringify(
-        query(store.require(id), viewId, filters, sorts).slice(0, 100),
-      ),
+      "Query table rows with filters and sorts. Returns rows, total, nextOffset and revision. Default limit 100, maximum 500. Continue with offset=nextOffset and expectedRevision=revision until nextOffset is null; keep filters/sorts unchanged. If the table changes, restart at offset 0.",
+    parameters: tableQuerySchema,
+    execute: (input) => JSON.stringify(queryPage(store.require(input.id), input)),
   });
   bb.agents.registerTool({
     name: "tables_create",
@@ -376,7 +365,7 @@ export default function plugin(bb: BbPluginApi) {
       {
         name: "query",
         summary: "Query rows",
-        usage: "bb tables query <id> [--view <id>]",
+        usage: "bb tables query <id> [--view <id>] [--limit 100] [--offset 0] [--revision <revision>]",
       },
       {
         name: "insert",
@@ -428,10 +417,12 @@ export default function plugin(bb: BbPluginApi) {
             };
             break;
           case "query":
-            output = query(store.require(tableId!), flags.values.view).slice(
-              0,
-              100,
-            );
+            output = queryPage(store.require(tableId!), tableQuerySchema.parse({
+              id: tableId, viewId: flags.values.view,
+              limit: flags.values.limit === undefined ? undefined : Number(flags.values.limit),
+              offset: flags.values.offset === undefined ? undefined : Number(flags.values.offset),
+              expectedRevision: flags.values.revision,
+            }));
             break;
           case "insert": {
             const row = store.insert(

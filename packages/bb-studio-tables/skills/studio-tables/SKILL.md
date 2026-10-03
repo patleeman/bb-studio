@@ -10,3 +10,10 @@ Use `tables_list` to find a table, or `tables_create` to make one with typed col
 From a terminal, `bb tables list`, `bb tables schema <id>`, and `bb tables query <id>` read data. `bb tables insert <id> '<json>'` and `bb tables update <id> <row-id> '<json>'` write rows. `bb tables export <id>` returns CSV; `bb tables import <id> --csv '<text>'` adds CSV rows, matching headers to columns by name and adding a text column for any header the table lacks.
 
 Link to a table, view, or row as `/plugins/studio-tables/tables/<table-id>`, with `/view/<view-id>` and `/row/<row-id>` appended as needed.
+
+`tables_query` returns `{ rows, total, offset, nextOffset, revision }`. The default
+page has up to 100 rows; `limit` can be 1–500. To read the rest, keep the same
+view/filters/sorts and pass `offset: nextOffset` and `expectedRevision: revision`.
+Stop when `nextOffset` is null. If the table changes during the scan, restart at
+offset 0 without an expected revision. The CLI equivalents are `--limit`,
+`--offset`, and `--revision`.
