@@ -68,6 +68,8 @@ struct Face: View {
     var avatar: String?
     var state: OfficeBotState = .idle
     var size: CGFloat = 36
+    /// Runs on an outside agent (Hermes, OpenClaw): a small globe at the corner.
+    var external: String? = nil
 
     var body: some View {
         ZStack(alignment: .topTrailing) {
@@ -85,6 +87,17 @@ struct Face: View {
                             .padding(-3)
                     }
                 }
+            if let external, size >= 28 {
+                Image(systemName: "globe")
+                    .font(.system(size: size * 0.22, weight: .semibold))
+                    .foregroundStyle(.secondary)
+                    .frame(width: size * 0.36, height: size * 0.36)
+                    .background(Circle().fill(Color(.secondarySystemBackground)))
+                    .overlay(Circle().stroke(Color(.systemBackground), lineWidth: 1.5))
+                    .offset(x: 2, y: size - size * 0.36 + 2)
+                    .accessibilityHidden(true)
+                    .help("\(external) agent")
+            }
             if state == .needsYou, size >= 28 {
                 Circle()
                     .fill(Color.orange)
@@ -94,13 +107,14 @@ struct Face: View {
             }
         }
         .accessibilityElement(children: .ignore)
-        .accessibilityLabel(state == .needsYou ? "\(name), needs you" : state == .working ? "\(name), working" : name)
+        .accessibilityLabel([name, external.map { "\($0) agent" }, state == .needsYou ? "needs you" : state == .working ? "working" : nil]
+            .compactMap { $0 }.joined(separator: ", "))
     }
 }
 
 extension Face {
     init(_ bot: OfficeTeamBot, size: CGFloat = 36) {
-        self.init(name: bot.name, avatar: bot.avatar, state: bot.state, size: size)
+        self.init(name: bot.name, avatar: bot.avatar, state: bot.state, size: size, external: bot.externalAgent)
     }
 }
 

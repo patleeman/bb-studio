@@ -82,6 +82,16 @@ public struct OfficeTeamBot: Codable, Identifiable, Hashable, Sendable {
     public var model: String?
     public var trust: OfficeTrust?
     public var spaceId: String?
+    /// codex, claude-code, or an outside agent such as hermes or openclaw.
+    public var providerId: String?
+    /// The outside agent's name when this bot runs on one.
+    public var externalAgent: String? {
+        switch providerId {
+        case "hermes": "Hermes"
+        case "openclaw": "OpenClaw"
+        default: nil
+        }
+    }
 }
 
 public struct OfficeConversation: Codable, Identifiable, Hashable, Sendable {
