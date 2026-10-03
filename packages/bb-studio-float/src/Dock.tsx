@@ -1,7 +1,7 @@
 // The panel of floated tabs, docked at the bottom right or wherever it was
 // dragged, and a corner at the bottom right for other plugins (Studio Chat's
 // "Work with this…" bar), and the gestures that move Studio items around.
-import { companionWorkbenchAvailable, floatWindowKey, publishFloatDock, setFloatHost } from "@bb-studio/kit/app";
+import { floatWindowKey, publishFloatDock, setFloatHost } from "@bb-studio/kit/app";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { FLOAT_RIGHT_VAR, STUDIO_CHAT_FLOAT_EVENT } from "@bb-studio/kit/contract";
 import { useEffect, useState } from "react";
@@ -18,7 +18,7 @@ function useHost() {
       open: (target, options) => {
         update((state) => openTab(state, target, options));
         const key = floatWindowKey(target);
-        if (!options?.minimized && companionWorkbenchAvailable() && getFloat().tabs.some((tab) => tab.key === key && tab.placement === "main")) {
+        if (!options?.minimized && getFloat().tabs.some((tab) => tab.key === key && tab.placement === "main")) {
           navigate.toPluginPanel("companions", { subPath: key });
         }
       },

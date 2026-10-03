@@ -138,7 +138,8 @@ BB_CAPTURE_MAIN_THREAD=1 BB_CAPTURE_ONLY=float-native-main-thread \
 - **Fold it** to its tab strip with the − button or a double-click on the
   header.
 - **Move a tab.** The ⋯ menu has **Move to main view**, **Move to split**,
-  and **Swap with main view**, which trades the tab and the main view.
+  and **Swap with main view**, which trades their placements while each keeps
+  its original live contents, pin, identity and history on stable BB too.
   The companion-host integration adds **Move to workbench**, placing the
   same live tab beside BB's Browser and Terminal. Its **Float** and **Main
   view** actions move that portal again. The **Companions** page lists open
@@ -160,7 +161,9 @@ survive a reload.
 
 The native companion host is being implemented in BB as part of the
 [full-suite delivery](../../docs/unified-workbench.md). Until that host ships,
-stable BB keeps the Float and ordinary main-view flows. Plugin SDK pins remain
+stable BB retains the same live view through Float, main placement, split,
+and swap. Its companion outlet lives in the main area; the native right
+workbench still requires the host capability. Plugin SDK pins remain
 compatible with stable; the suite detects native hosting when it is present.
 
 ## How it works

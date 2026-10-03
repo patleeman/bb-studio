@@ -24,9 +24,10 @@ import {
   useOpenTarget,
   type FloatTarget,
 } from "@bb-studio/kit/app";
-import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject, type ComponentProps } from "react";
 import { update } from "./store";
 import { RetainedView } from "./RetainedView";
+import { LegacyCompanionView } from "./LegacyCompanion";
 import { focusCompanion } from "./focus";
 import { mainCompanionPath, mainTarget, swapCompanions } from "./placements";
 import {
@@ -47,7 +48,6 @@ import {
   panelSize,
   pinTab,
   placeAt,
-  replaceTab,
   resizeRect,
   resizeTo,
   selectTab,
@@ -300,27 +300,16 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
   const { open, anchor } = useOpenTarget();
   const navigate = useBbNavigate();
   const move = (place: "main" | "split") => {
-    if (companionWorkbenchAvailable()) {
-      update((next) => moveCompanion(next, active.key, "main"));
-      if (place === "split") open({ kind: "path", path: mainCompanionPath(active.key) }, "split");
-      else navigate.toPluginPanel("companions", { subPath: active.key });
-      return;
-    }
-    // BB's own view takes over; the tab would only repeat it.
-    update((next) => closeTab(next, active.key));
-    open(active.target, place);
+    update((next) => moveCompanion(next, active.key, "main"));
+    if (place === "split") open({ kind: "path", path: mainCompanionPath(active.key) }, "split");
+    else navigate.toPluginPanel("companions", { subPath: active.key });
   };
   const main = mainTarget(state, `${window.location.pathname}${window.location.search}`);
   const swap = () => {
     if (!main) return;
-    if (companionWorkbenchAvailable()) {
-      openFloat(main, { placement: active.placement === "workbench" ? "workbench" : "floating" });
-      update((next) => swapCompanions(next, active.key, main));
-      navigate.toPluginPanel("companions", { subPath: active.key });
-      return;
-    }
-    update((next) => replaceTab(next, active.key, main));
-    open(active.target, "main");
+    openFloat(main, { placement: active.placement === "workbench" ? "workbench" : "floating" });
+    update((next) => swapCompanions(next, active.key, main));
+    navigate.toPluginPanel("companions", { subPath: active.key });
   };
   return (
     <>
@@ -357,7 +346,7 @@ function TabMenu({ state, active }: { state: FloatState; active: FloatTab }) {
           ) : null}
           <DropdownMenuSeparator />
           {state.tabs.map((tab) => (
-            <DropdownMenuItem key={tab.key} onSelect={() => update((next) => selectTab(next, tab.key))}>
+            <DropdownMenuItem key={tab.key} onSelect={() => focusCompanion(tab.key, navigate)}>
               <Icon name={tabIcon(tab.target)} className="size-4" />
               <span className={cn("min-w-0 flex-1 truncate", tab.key === active.key && "font-medium")}>
                 <TabLabel target={tab.target} />
@@ -477,7 +466,7 @@ function ResizeHandles({ docked, panel, screen, onResize }: {
 export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: number }) {
   const navigate = useBbNavigate();
   const native = companionWorkbenchAvailable();
-  const floatingTabs = native ? state.tabs.filter((tab) => !tab.placement || tab.placement === "floating") : state.tabs;
+  const floatingTabs = state.tabs.filter((tab) => !tab.placement || tab.placement === "floating" || (!native && tab.placement === "workbench"));
   const floatingActive = floatingTabs.find((tab) => tab.key === state.active) ?? floatingTabs.at(-1);
   const floatingState = { ...state, tabs: floatingTabs, active: floatingActive?.key ?? null };
   const screen = useScreen();
@@ -599,17 +588,22 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           <TabMenu state={state} active={active} />
         </header>
         {state.tabs.map((tab) => (
-          <RetainedView key={tab.key} visible={(native && tab.placement !== undefined && tab.placement !== "floating") || (tab.key === floatingActive?.key && !state.collapsed && !floatHidden)}>
-            <CompanionView id={tab.key} title={tab.target.title ?? (tab.target.kind === "thread" ? "Conversation" : pathTitle(tab.target.path))}
+          <RetainedView key={tab.key} visible={(tab.placement === "main" || (native && tab.placement === "workbench")) || (tab.key === floatingActive?.key && !state.collapsed && !floatHidden)}>
+            <TransferView native={native} id={tab.key} title={tab.target.title ?? (tab.target.kind === "thread" ? "Conversation" : pathTitle(tab.target.path))}
               icon={tabIcon(tab.target)} placement={tab.placement ?? "floating"} activation={tab.key === state.active ? (tab.activation ?? 0) : 0} pinned={tab.pinned}
               onPinnedChange={(pinned) => update((next) => pinTab(next, tab.key, pinned))} onSelect={() => focusCompanion(tab.key, navigate)}
               onClose={() => update((next) => closeTab(next, tab.key))} onPlacementChange={(placement) => move(tab.key, placement)}
               onBack={tab.back?.length ? () => update((next) => goBack(next, tab.key)) : undefined}>
-              {tab.opened ? <TabWindow tab={native ? tab : { ...tab, placement: "floating" }} /> : null}
-            </CompanionView>
+              {tab.opened ? <TabWindow tab={tab} /> : null}
+            </TransferView>
           </RetainedView>
         ))}
       </section>
     </>
   );
+}
+
+
+function TransferView({ native, ...props }: ComponentProps<typeof CompanionView> & { native: boolean }) {
+  return native ? <CompanionView {...props} /> : <LegacyCompanionView id={props.id} placement={props.placement}>{props.children}</LegacyCompanionView>;
 }
