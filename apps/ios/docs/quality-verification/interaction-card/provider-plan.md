@@ -1,0 +1,1 @@
+After approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.

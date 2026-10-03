@@ -1,0 +1,17 @@
+{
+  "threadId": "thr_wzkbakpfrk",
+  "threadAfterStatus": 404,
+  "providerStopped": {
+    "ok": true,
+    "threadId": "thr_wzkbakpfrk"
+  },
+  "threadDeleted": {
+    "ok": true,
+    "threadId": "thr_wzkbakpfrk"
+  },
+  "ownedPlanFile": "/Users/patrick/.claude/plans/this-is-a-bounded-resilient-aurora.md",
+  "planHashMatched": true,
+  "planFileRemoved": true,
+  "deviceId": "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+  "deviceRemoved": true
+}

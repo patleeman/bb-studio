@@ -1,0 +1,36 @@
+[
+  {
+    "id": "pint_yhixjdyhfe",
+    "threadId": "thr_wzkbakpfrk",
+    "status": "pending",
+    "statusReason": null,
+    "createdAt": 1791015729655,
+    "expiresAt": null,
+    "resolvedAt": null,
+    "turnId": "da540dad20-t1",
+    "providerId": "claude-code",
+    "providerThreadId": "cad89d81-1000-49cb-857e-44d48389b1f7",
+    "providerRequestId": "d1ba1216-dd18-4e48-baef-180447c2ff64:interaction-1",
+    "origin": {
+      "kind": "provider",
+      "providerId": "claude-code",
+      "providerThreadId": "cad89d81-1000-49cb-857e-44d48389b1f7",
+      "providerRequestId": "d1ba1216-dd18-4e48-baef-180447c2ff64:interaction-1"
+    },
+    "payload": {
+      "kind": "approval",
+      "subject": {
+        "kind": "plan",
+        "itemId": "da540dad20-i6",
+        "plan": "After approval, return only WATCH_APPROVAL_OK. Do not use any tools, change files, execute commands, access the network, or send messages.",
+        "planFilePath": "/Users/patrick/.claude/plans/this-is-a-bounded-resilient-aurora.md"
+      },
+      "reason": null,
+      "availableDecisions": [
+        "allow_once",
+        "deny"
+      ]
+    },
+    "resolution": null
+  }
+]

@@ -1,0 +1,7 @@
+Build: DEVELOPER_DIR=/Applications/Xcode.app/Contents/Developer xcodebuild build-for-testing -project /tmp/bb-current-diagnostic.6v09KU/project/BBStudio.xcodeproj -scheme BBStudio -destination id=5634A73A-B10C-4FB2-A4F1-E8294ADBA75D -derivedDataPath /tmp/bb-current-diagnostic.6v09KU/build
+Runner: /tmp/bb-interaction-card-run.sh (retained locally)
+Only tests: ReviewQualityUITests/testPlanApprovalActionsAtDefaultText and ReviewQualityUITests/testPlanApprovalActionsAtAccessibilityText
+Runner env: BB_QA_SERVER_URL=http://127.0.0.1:49486 and BB_QA_PLAN_THREAD_TITLE=Native approval card QA
+Readback: GET http://127.0.0.1:49486/api/v1/threads/thr_wzkbakpfrk/interactions (before and after identical)
+Contrast: measured screenshot solid RGB fill values, white foreground, standard sRGB relative luminance formula; values in run-summary.json
+Copied build log removes trailing whitespace; raw local log remains unchanged.

@@ -8,6 +8,9 @@ struct InteractionCard: View {
     var cancel: () async -> Void = {}
     let openWeb: () -> Void
 
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
+    @Environment(\.colorScheme) private var colorScheme
+
     @State private var answers: [String: InteractionAnswer] = [:]
     @State private var working = false
     @State private var showingPlan = false
@@ -75,16 +78,31 @@ struct InteractionCard: View {
         if let reason = interaction.payload.reason, !reason.isEmpty {
             Text(reason).font(.footnote).foregroundStyle(.secondary)
         }
-        HStack {
+        approvalActionLayout {
             ForEach(interaction.decisions, id: \.self) { decision in
-                Button(approvalLabel(decision, subjectKind: subject?.kind)) {
+                Button {
                     submit(interaction.approvalResolution(decision))
+                } label: {
+                    Text(approvalLabel(decision, subjectKind: subject?.kind))
+                        .fixedSize(horizontal: false, vertical: true)
+                        .frame(minWidth: 44,
+                               maxWidth: dynamicTypeSize.isAccessibilitySize ? .infinity : nil,
+                               minHeight: 44)
+                        .contentShape(Rectangle())
                 }
                 .buttonStyle(.borderedProminent)
-                .tint(decision == "deny" ? .red : decision == "allow_once" ? .green : .blue)
+                .tint(.accentColor)
+                .foregroundStyle(colorScheme == .dark ? Color.black : Color.white)
             }
         }
         .controlSize(.small)
+    }
+
+    private var approvalActionLayout: AnyLayout {
+        if dynamicTypeSize.isAccessibilitySize {
+            return AnyLayout(VStackLayout(alignment: .leading, spacing: 8))
+        }
+        return AnyLayout(HStackLayout())
     }
 
     // MARK: Questions

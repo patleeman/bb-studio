@@ -197,6 +197,42 @@ final class ReviewQualityUITests: XCTestCase {
         add(tree)
     }
 
+    func testPlanApprovalActionsAtAccessibilityText() throws {
+        try planApprovalActions(largeText: true)
+    }
+
+    func testPlanApprovalActionsAtDefaultText() throws {
+        try planApprovalActions(largeText: false)
+    }
+
+    private func planApprovalActions(largeText: Bool) throws {
+        guard let title = ProcessInfo.processInfo.environment["BB_QA_PLAN_THREAD_TITLE"],
+              title == "Native approval card QA" else {
+            throw XCTSkip("Requires the isolated held inert plan fixture")
+        }
+        let app = try diagnosticApplication(largeText: largeText)
+        defer { app.terminate() }
+        app.tabBars.buttons["Studio"].tap()
+        XCTAssertTrue(app.navigationBars["Studio"].waitForExistence(timeout: 20))
+        app.buttons["studioToday"].tap()
+        XCTAssertTrue(app.navigationBars["Today"].waitForExistence(timeout: 10))
+        let open = app.buttons["Open thread"].firstMatch
+        XCTAssertTrue(open.waitForExistence(timeout: 20))
+        reveal(open, in: app)
+        open.tap()
+        XCTAssertTrue(app.navigationBars[title].waitForExistence(timeout: 10))
+        for label in ["Approve plan", "Keep planning"] {
+            let action = app.buttons[label].firstMatch
+            XCTAssertTrue(action.waitForExistence(timeout: 15))
+            reveal(action, in: app)
+            XCTAssertTrue(action.isHittable)
+            XCTAssertGreaterThanOrEqual(action.frame.width, 44 - 0.001)
+            XCTAssertGreaterThanOrEqual(action.frame.height, 44 - 0.001)
+            retainScreen(app, "plan-approval-" + (largeText ? "accessibility-xxxl" : "default") + "-" + label.lowercased().replacingOccurrences(of: " ", with: "-"))
+        }
+        try app.performAccessibilityAudit(for: [.hitRegion])
+    }
+
     private func diagnosticApplication(largeText: Bool) throws -> XCUIApplication {
         let app = application(largeText: largeText)
         app.launch()

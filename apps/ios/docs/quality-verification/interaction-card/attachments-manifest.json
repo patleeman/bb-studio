@@ -1,0 +1,157 @@
+[
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "90A2BE41-339A-4467-811F-418DCC6A9421.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-accessibility-xxxl-keep-planning-accessibility-tree_0_ADB31B2D-2A06-44F1-91C3-40100E19A7F1.txt",
+        "timestamp" : 1791015878.289
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "DFA2D483-166D-4FC1-8638-CC95E3232633.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-accessibility-xxxl-keep-planning_0_DAF7B132-1715-419D-94CD-F158198A68C8.png",
+        "timestamp" : 1791015878.166
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "32790EE7-E0CB-475E-A006-F04E1F45F647.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-accessibility-xxxl-approve-plan-accessibility-tree_0_D9A24FC8-03F5-4B99-BEF6-29E04F52444E.txt",
+        "timestamp" : 1791015876.71
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "35468F40-DF9F-4137-9362-3A7553D59FC5.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-accessibility-xxxl-approve-plan_0_171A38DC-1A3F-49D9-A426-0603F37A4E97.png",
+        "timestamp" : 1791015876.582
+      }
+    ],
+    "testIdentifier" : "ReviewQualityUITests/testPlanApprovalActionsAtAccessibilityText()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testPlanApprovalActionsAtAccessibilityText"
+  },
+  {
+    "attachments" : [
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "36F1E00C-5A04-42E7-895E-F03DEE04368C.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-default-keep-planning-accessibility-tree_0_50716C38-6CC0-4D1E-ABE5-50A152A1EB48.txt",
+        "timestamp" : 1791015899.262
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "25255078-58B3-4CD3-836E-EBF0DB23DD4F.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-default-keep-planning_0_545B734B-BB4D-4ED8-BD8E-B264ABCAE93F.png",
+        "timestamp" : 1791015899.105
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "D6EFCCCF-15E2-4EA1-BD16-7A5450A4E632.txt",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-default-approve-plan-accessibility-tree_0_AB147661-47DA-4074-9270-24AEC7805B1E.txt",
+        "timestamp" : 1791015897.662
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "FC25A415-982F-4399-A9DB-C9FF0429A1D9.png",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "plan-approval-default-approve-plan_0_D026FA0C-5F01-4935-BFFA-D1000537BF74.png",
+        "timestamp" : 1791015897.539
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "0EA7AB60-C224-4898-8FC1-4CBA33555F58",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.24.54 AM",
+        "timestamp" : 1791015894.818
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "DC6C8048-863B-4474-90DB-AD75B54DDD57",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.24.52 AM",
+        "timestamp" : 1791015892.068
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "CEB05C26-8EF2-4405-8207-2BC49DB1DA9C",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.24.48 AM",
+        "timestamp" : 1791015888.8
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "E700085F-B0FD-44A4-8637-8DA65B1266F9",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Synthesized Event 2026-10-03 at 04.24.45 AM",
+        "timestamp" : 1791015885.463
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "9AE7799B-8F25-4A95-852A-6F2822047B0A.mp4",
+        "isAssociatedWithFailure" : false,
+        "suggestedHumanReadableName" : "Screen Recording 2026-10-03 at 04.24.39 AM.mp4",
+        "timestamp" : 1791015879.645
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "A25A442C-FAD0-4159-A88F-F6B3CCFAA483.txt",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Complete Issue Description.txt"
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "D2FA4DFF-D813-492A-8A17-36014D907EA0.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "App Screenshot_0_30E1F650-C9B1-47F8-ABEF-ACE7CCF972E5.png",
+        "timestamp" : 1791015899.5
+      },
+      {
+        "configurationName" : "Test Scheme Action",
+        "deviceId" : "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+        "deviceName" : "BB isolated approval card QA",
+        "exportedFileName" : "834EABE7-1FFD-476D-8D51-F4DF0D0B218C.png",
+        "isAssociatedWithFailure" : true,
+        "suggestedHumanReadableName" : "Element Screenshot_1_0DA3D21A-681E-4072-83EB-131A47FE129A.png",
+        "timestamp" : 1791015899.5
+      }
+    ],
+    "testIdentifier" : "ReviewQualityUITests/testPlanApprovalActionsAtDefaultText()",
+    "testIdentifierURL" : "test://com.apple.xcode/BBStudio/BBStudioUITests/ReviewQualityUITests/testPlanApprovalActionsAtDefaultText"
+  }
+]

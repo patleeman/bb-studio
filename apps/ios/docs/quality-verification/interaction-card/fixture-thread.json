@@ -1,0 +1,30 @@
+{
+  "id": "thr_wzkbakpfrk",
+  "projectId": "proj_su3dznrbpw",
+  "environmentId": "env_raywi7urmc",
+  "providerId": "claude-code",
+  "title": "Native approval card QA",
+  "titleFallback": "/plan This is a bounded, harmless native Watch plan-approval QA fixture. Budg...",
+  "sectionId": null,
+  "status": "starting",
+  "parentThreadId": null,
+  "sourceThreadId": null,
+  "lifecycleOwnerThreadId": null,
+  "originKind": null,
+  "originPluginId": null,
+  "visibility": "visible",
+  "archivedAt": null,
+  "pinnedAt": null,
+  "deletedAt": null,
+  "lastReadAt": 1791015721510,
+  "latestAttentionAt": 1791015721504,
+  "createdAt": 1791015721504,
+  "updatedAt": 1791015721517,
+  "runtime": {
+    "displayStatus": "starting"
+  },
+  "activeBackgroundAgentCount": 0,
+  "canRestoreEnvironment": false,
+  "canSpawnChild": true,
+  "queuedMessageCount": 0
+}

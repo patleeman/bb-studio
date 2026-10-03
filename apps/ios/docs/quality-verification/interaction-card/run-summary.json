@@ -1,0 +1,115 @@
+{
+  "build": "passed",
+  "testExitCode": 65,
+  "tests": [
+    {
+      "name": "testPlanApprovalActionsAtAccessibilityText",
+      "result": "passed",
+      "seconds": 22.21
+    },
+    {
+      "name": "testPlanApprovalActionsAtDefaultText",
+      "result": "failed",
+      "seconds": 20.352,
+      "approvalSpecificAssertions": "passed",
+      "remainingNativeIssue": "Show more message truncation control hitRegion, outside InteractionCard"
+    }
+  ],
+  "approvalTargetBounds": {
+    "default": [
+      [
+        110.3,
+        54
+      ],
+      [
+        117.3,
+        54
+      ]
+    ],
+    "accessibilityXXXL": [
+      [
+        346,
+        68.7
+      ],
+      [
+        346,
+        68.7
+      ]
+    ]
+  },
+  "contrast": [
+    {
+      "image": "baseline-accessibility-xxxl.png",
+      "backgroundRGB": [
+        52,
+        199,
+        89
+      ],
+      "foregroundRGB": [
+        255,
+        255,
+        255
+      ],
+      "matchingBackgroundPixels": 192686,
+      "contrastRatio": 2.219958526330265
+    },
+    {
+      "image": "baseline-accessibility-xxxl.png",
+      "backgroundRGB": [
+        255,
+        56,
+        60
+      ],
+      "foregroundRGB": [
+        255,
+        255,
+        255
+      ],
+      "matchingBackgroundPixels": 181237,
+      "contrastRatio": 3.569656960070096
+    },
+    {
+      "image": "plan-approval-default-keep-planning.png",
+      "backgroundRGB": [
+        199,
+        67,
+        26
+      ],
+      "foregroundRGB": [
+        255,
+        255,
+        255
+      ],
+      "matchingBackgroundPixels": 94464,
+      "contrastRatio": 4.94559729811054
+    },
+    {
+      "image": "plan-approval-accessibility-xxxl-keep-planning.png",
+      "backgroundRGB": [
+        199,
+        67,
+        26
+      ],
+      "foregroundRGB": [
+        255,
+        255,
+        255
+      ],
+      "matchingBackgroundPixels": 388454,
+      "contrastRatio": 4.94559729811054
+    }
+  ],
+  "onlyActionTapped": "Open thread",
+  "pendingRecordUnchanged": true,
+  "threadId": "thr_wzkbakpfrk",
+  "interactionId": "pint_yhixjdyhfe",
+  "permissionMode": "accept-edits",
+  "serverURL": "http://127.0.0.1:49486",
+  "deviceId": "5634A73A-B10C-4FB2-A4F1-E8294ADBA75D",
+  "resultBundle": "/tmp/bb-current-diagnostic.6v09KU/interaction-results.xcresult",
+  "scope": "Approval row layout, label hit area and existing accent tint; decisions/approvalResolution unchanged",
+  "sourceSHA256": {
+    "iOS/Thread/InteractionCard.swift": "8d78ad98eda689854e17fa95204c8e3dba6b381c4da42476c0051f79d76f3b9b",
+    "UITests/ReviewQualityUITests.swift": "10a68fcefbd02d5ad7e2d545830458b59a6ebe78aeb9d0ecfaaddc5655b3c4a0"
+  }
+}

@@ -1,0 +1,203 @@
+Command line invocation:
+    /Applications/Xcode.app/Contents/Developer/usr/bin/xcodebuild test-without-building -xctestrun /tmp/bb-current-diagnostic.6v09KU/build/Build/Products/ReviewQuality.xctestrun -destination id=5634A73A-B10C-4FB2-A4F1-E8294ADBA75D -parallel-testing-enabled NO "-only-testing:BBStudioUITests/ReviewQualityUITests/testPlanApprovalActionsAtDefaultText" "-only-testing:BBStudioUITests/ReviewQualityUITests/testPlanApprovalActionsAtAccessibilityText" -resultBundlePath /tmp/bb-current-diagnostic.6v09KU/interaction-results.xcresult
+
+Writing result bundle at path:
+	/tmp/bb-current-diagnostic.6v09KU/interaction-results.xcresult
+
+2026-10-03 04:24:13.898740-0400 BBStudioUITests-Runner[19031:90575643] [Default] Running tests...
+    t =      nans Interface orientation changed to Portrait
+Test Suite 'Selected tests' started at 2026-10-03 04:24:17.410.
+Test Suite 'BBStudioUITests.xctest' started at 2026-10-03 04:24:17.411.
+Test Suite 'ReviewQualityUITests' started at 2026-10-03 04:24:17.411.
+Test Case '-[BBStudioUITests.ReviewQualityUITests testPlanApprovalActionsAtAccessibilityText]' started.
+    t =     0.01s Start Test at 2026-10-03 04:24:17.422
+    t =     0.09s Set Up
+    t =     0.10s Open nyc.plee.bbgo
+    t =     0.10s     Launch nyc.plee.bbgo
+2026-10-03 04:24:17.545 xcodebuild[19017:90575447] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:24:17.545 xcodebuild[19017:90575447] [MT] IDELaunchParametersSnapshot: no debugger version
+objc[19031]: Class UIAccessibilityLoaderWebShared is implemented in both /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebKit.axbundle/WebKit (0x10454c398) and /private/var/run/com.apple.security.cryptexd/mnt/com.apple.iPhoneOS.SimulatorRuntime-v24.1.434.0.69EhJr/Library/Developer/CoreSimulator/Profiles/Runtimes/iOS 27.0.simruntime/Contents/Resources/RuntimeRoot/System/Library/AccessibilityBundles/WebCore.axbundle/WebCore (0x108240310). This may cause spurious casting failures and mysterious crashes. One of the duplicates must be removed or renamed.
+    t =     0.75s         Setting up automation session
+    t =     3.45s         Wait for nyc.plee.bbgo to idle
+    t =     5.47s Waiting 20.0s for "Settings" Button to exist
+    t =     6.51s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     6.51s         Checking existence of `"Settings" Button`
+    t =     6.62s Tap "Settings" Button
+    t =     6.62s     Wait for nyc.plee.bbgo to idle
+    t =     6.62s     Find the "Settings" Button
+    t =     6.65s     Check for interrupting elements affecting "Settings" Button
+    t =     6.67s     Synthesize event
+    t =     7.07s     Wait for nyc.plee.bbgo to idle
+    t =     8.88s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     9.91s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     9.91s         Checking existence of `"settingsServerURL" Any`
+    t =     9.95s Find the "settingsServerURL" Any
+    t =     9.97s Tap "Studio" Button
+    t =     9.97s     Wait for nyc.plee.bbgo to idle
+    t =     9.97s     Find the "Studio" Button
+    t =     9.99s     Check for interrupting elements affecting "square.stack" Button
+    t =    10.01s     Synthesize event
+    t =    10.31s     Wait for nyc.plee.bbgo to idle
+    t =    12.11s Waiting 20.0s for "Studio" NavigationBar to exist
+    t =    13.15s     Checking `Expect predicate `existsNoRetry == 1` for object "Studio" NavigationBar`
+    t =    13.15s         Checking existence of `"Studio" NavigationBar`
+    t =    13.19s Tap "studioToday" Button
+    t =    13.19s     Wait for nyc.plee.bbgo to idle
+    t =    13.19s     Find the "studioToday" Button
+    t =    13.22s     Check for interrupting elements affecting "studioToday" Button
+    t =    13.25s     Synthesize event
+    t =    13.54s     Wait for nyc.plee.bbgo to idle
+    t =    13.55s Waiting 10.0s for "Today" NavigationBar to exist
+    t =    14.58s     Checking `Expect predicate `existsNoRetry == 1` for object "Today" NavigationBar`
+    t =    14.59s         Checking existence of `"Today" NavigationBar`
+    t =    14.61s Waiting 20.0s for "Open thread" Button to exist
+    t =    15.65s     Checking `Expect predicate `existsNoRetry == 1` for object "Open thread" Button`
+    t =    15.65s         Checking existence of `"Open thread" Button`
+    t =    15.71s Checking existence of `"Open thread" Button`
+    t =    15.76s Find the "Open thread" Button
+    t =    15.82s Tap "studioNeed" Button
+    t =    15.82s     Wait for nyc.plee.bbgo to idle
+    t =    15.82s     Find the "studioNeed" Button
+    t =    15.87s     Check for interrupting elements affecting "studioNeed" Button
+    t =    15.89s     Synthesize event
+    t =    16.19s     Wait for nyc.plee.bbgo to idle
+    t =    16.64s Waiting 10.0s for "Native approval card QA" NavigationBar to exist
+    t =    17.68s     Checking `Expect predicate `existsNoRetry == 1` for object "Native approval card QA" NavigationBar`
+    t =    17.68s         Checking existence of `"Native approval card QA" NavigationBar`
+    t =    17.71s Waiting 15.0s for "Approve plan" Button to exist
+    t =    18.75s     Checking `Expect predicate `existsNoRetry == 1` for object "Approve plan" Button`
+    t =    18.75s         Checking existence of `"Approve plan" Button`
+    t =    18.80s Checking existence of `"Approve plan" Button`
+    t =    18.85s Find the "Approve plan" Button
+    t =    18.92s Find the "Approve plan" Button
+    t =    18.97s Find the "Approve plan" Button
+    t =    19.02s Find the "Approve plan" Button
+    t =    19.07s Find the Target Application 'nyc.plee.bbgo'
+    t =    19.17s Added attachment named 'plan-approval-accessibility-xxxl-approve-plan'
+    t =    19.17s Requesting snapshot of accessibility hierarchy for app with pid 19630
+    t =    19.27s Requesting snapshot of accessibility hierarchy for app with pid 19630
+    t =    19.30s Added attachment named 'plan-approval-accessibility-xxxl-approve-plan-accessibility-tree'
+    t =    19.30s Waiting 15.0s for "Keep planning" Button to exist
+    t =    20.33s     Checking `Expect predicate `existsNoRetry == 1` for object "Keep planning" Button`
+    t =    20.34s         Checking existence of `"Keep planning" Button`
+    t =    20.39s Checking existence of `"Keep planning" Button`
+    t =    20.43s Find the "Keep planning" Button
+    t =    20.49s Find the "Keep planning" Button
+    t =    20.54s Find the "Keep planning" Button
+    t =    20.59s Find the "Keep planning" Button
+    t =    20.66s Find the Target Application 'nyc.plee.bbgo'
+    t =    20.76s Added attachment named 'plan-approval-accessibility-xxxl-keep-planning'
+    t =    20.76s Requesting snapshot of accessibility hierarchy for app with pid 19630
+    t =    20.84s Requesting snapshot of accessibility hierarchy for app with pid 19630
+    t =    20.88s Added attachment named 'plan-approval-accessibility-xxxl-keep-planning-accessibility-tree'
+    t =    21.13s Terminate nyc.plee.bbgo:19630
+    t =    22.19s Tear Down
+Test Case '-[BBStudioUITests.ReviewQualityUITests testPlanApprovalActionsAtAccessibilityText]' passed (22.210 seconds).
+Test Case '-[BBStudioUITests.ReviewQualityUITests testPlanApprovalActionsAtDefaultText]' started.
+    t =     0.00s Start Test at 2026-10-03 04:24:39.633
+    t =     0.01s Set Up
+    t =     0.02s Open nyc.plee.bbgo
+    t =     0.02s     Launch nyc.plee.bbgo
+2026-10-03 04:24:39.649 xcodebuild[19017:90575447] [MT] IDELaunchParametersSnapshot: debugger version lookup failed for path '<nil>': noURL
+2026-10-03 04:24:39.649 xcodebuild[19017:90575447] [MT] IDELaunchParametersSnapshot: no debugger version
+    t =     0.22s         Setting up automation session
+    t =     2.49s         Wait for nyc.plee.bbgo to idle
+    t =     4.34s Waiting 20.0s for "Settings" Button to exist
+    t =     5.37s     Checking `Expect predicate `existsNoRetry == 1` for object "Settings" Button`
+    t =     5.37s         Checking existence of `"Settings" Button`
+    t =     5.48s Tap "Settings" Button
+    t =     5.48s     Wait for nyc.plee.bbgo to idle
+    t =     5.48s     Find the "Settings" Button
+    t =     5.51s     Check for interrupting elements affecting "Settings" Button
+    t =     5.54s     Synthesize event
+    t =     5.83s     Wait for nyc.plee.bbgo to idle
+    t =     7.70s Waiting 10.0s for "settingsServerURL" Any to exist
+    t =     8.73s     Checking `Expect predicate `existsNoRetry == 1` for object "settingsServerURL" Any`
+    t =     8.73s         Checking existence of `"settingsServerURL" Any`
+    t =     8.79s Find the "settingsServerURL" Any
+    t =     8.82s Tap "Studio" Button
+    t =     8.82s     Wait for nyc.plee.bbgo to idle
+    t =     8.82s     Find the "Studio" Button
+    t =     8.85s     Check for interrupting elements affecting "square.stack" Button
+    t =     8.88s     Synthesize event
+    t =     9.17s     Wait for nyc.plee.bbgo to idle
+    t =    11.00s Waiting 20.0s for "Studio" NavigationBar to exist
+    t =    12.03s     Checking `Expect predicate `existsNoRetry == 1` for object "Studio" NavigationBar`
+    t =    12.03s         Checking existence of `"Studio" NavigationBar`
+    t =    12.08s Tap "studioToday" Button
+    t =    12.08s     Wait for nyc.plee.bbgo to idle
+    t =    12.08s     Find the "studioToday" Button
+    t =    12.11s     Check for interrupting elements affecting "studioToday" Button
+    t =    12.14s     Synthesize event
+    t =    12.44s     Wait for nyc.plee.bbgo to idle
+    t =    12.44s Waiting 10.0s for "Today" NavigationBar to exist
+    t =    13.48s     Checking `Expect predicate `existsNoRetry == 1` for object "Today" NavigationBar`
+    t =    13.48s         Checking existence of `"Today" NavigationBar`
+    t =    13.53s Waiting 20.0s for "Open thread" Button to exist
+    t =    14.57s     Checking `Expect predicate `existsNoRetry == 1` for object "Open thread" Button`
+    t =    14.57s         Checking existence of `"Open thread" Button`
+    t =    14.64s Checking existence of `"Open thread" Button`
+    t =    14.71s Find the "Open thread" Button
+    t =    14.79s Tap "studioNeed" Button
+    t =    14.79s     Wait for nyc.plee.bbgo to idle
+    t =    14.79s     Find the "studioNeed" Button
+    t =    14.86s     Check for interrupting elements affecting "studioNeed" Button
+    t =    14.89s     Synthesize event
+    t =    15.19s     Wait for nyc.plee.bbgo to idle
+    t =    15.43s Waiting 10.0s for "Native approval card QA" NavigationBar to exist
+    t =    16.46s     Checking `Expect predicate `existsNoRetry == 1` for object "Native approval card QA" NavigationBar`
+    t =    16.46s         Checking existence of `"Native approval card QA" NavigationBar`
+    t =    16.50s Waiting 15.0s for "Approve plan" Button to exist
+    t =    17.53s     Checking `Expect predicate `existsNoRetry == 1` for object "Approve plan" Button`
+    t =    17.53s         Checking existence of `"Approve plan" Button`
+    t =    17.59s Checking existence of `"Approve plan" Button`
+    t =    17.63s Find the "Approve plan" Button
+    t =    17.68s Find the "Approve plan" Button
+    t =    17.73s Find the "Approve plan" Button
+    t =    17.78s Find the "Approve plan" Button
+    t =    17.82s Find the Target Application 'nyc.plee.bbgo'
+    t =    17.91s Added attachment named 'plan-approval-default-approve-plan'
+    t =    17.91s Requesting snapshot of accessibility hierarchy for app with pid 19884
+    t =    18.00s Requesting snapshot of accessibility hierarchy for app with pid 19884
+    t =    18.03s Added attachment named 'plan-approval-default-approve-plan-accessibility-tree'
+    t =    18.03s Waiting 15.0s for "Keep planning" Button to exist
+    t =    19.06s     Checking `Expect predicate `existsNoRetry == 1` for object "Keep planning" Button`
+    t =    19.06s         Checking existence of `"Keep planning" Button`
+    t =    19.12s Checking existence of `"Keep planning" Button`
+    t =    19.16s Find the "Keep planning" Button
+    t =    19.22s Find the "Keep planning" Button
+    t =    19.28s Find the "Keep planning" Button
+    t =    19.33s Find the "Keep planning" Button
+    t =    19.38s Find the Target Application 'nyc.plee.bbgo'
+    t =    19.47s Added attachment named 'plan-approval-default-keep-planning'
+    t =    19.47s Requesting snapshot of accessibility hierarchy for app with pid 19884
+    t =    19.60s Requesting snapshot of accessibility hierarchy for app with pid 19884
+    t =    19.63s Added attachment named 'plan-approval-default-keep-planning-accessibility-tree'
+    t =    19.87s Find the Any (Descendant with identity binding to AX element pid: 19884, elementOrHash.elementID: 4746176992.556)
+    t =    19.89s Checking existence of `"Show more" Button`
+    t =    19.91s Find the "Show more" Button
+/tmp/bb-current-diagnostic.6v09KU/project/UITests/ReviewQualityUITests.swift:233: error: -[BBStudioUITests.ReviewQualityUITests testPlanApprovalActionsAtDefaultText] : Hit area is too small
+    t =    20.11s Tear Down
+Test Case '-[BBStudioUITests.ReviewQualityUITests testPlanApprovalActionsAtDefaultText]' failed (20.352 seconds).
+Test Suite 'ReviewQualityUITests' failed at 2026-10-03 04:24:59.984.
+	 Executed 2 tests, with 1 failure (0 unexpected) in 42.562 (42.574) seconds
+Test Suite 'BBStudioUITests.xctest' failed at 2026-10-03 04:24:59.985.
+	 Executed 2 tests, with 1 failure (0 unexpected) in 42.562 (42.574) seconds
+Test Suite 'Selected tests' failed at 2026-10-03 04:24:59.985.
+	 Executed 2 tests, with 1 failure (0 unexpected) in 42.562 (42.575) seconds
+2026-10-03 04:25:00.296 xcodebuild[19017:90575512]  IDETestOperationsObserverDebug: Failure collecting diagnostics from simulator: Process exited with error 72:
+ xcrun: error: unable to find utility "simctl", not a developer tool or in PATH
+
+2026-10-03 04:25:00.301 xcodebuild[19017:90575447] [MT] IDETestOperationsObserverDebug: 48.368 elapsed -- Testing started completed.
+2026-10-03 04:25:00.301 xcodebuild[19017:90575447] [MT] IDETestOperationsObserverDebug: 0.000 sec, +0.000 sec -- start
+2026-10-03 04:25:00.301 xcodebuild[19017:90575447] [MT] IDETestOperationsObserverDebug: 48.368 sec, +48.368 sec -- end
+
+Test session results, code coverage, and logs:
+	/tmp/bb-current-diagnostic.6v09KU/interaction-results.xcresult
+
+Failing tests:
+	ReviewQualityUITests.testPlanApprovalActionsAtDefaultText()
+
+** TEST EXECUTE FAILED **
+
+Testing started
