@@ -168,8 +168,8 @@ struct PageView: View {
         .environment(\.openURL, OpenURLAction { url in
             guard AppLink.handles(url), let id = url.pathComponents.dropFirst().first else { return .systemAction }
             switch url.host() {
-            case "page": app.path.append(.page(id: id))
-            case "thread": app.path.append(.thread(id: id))
+            case "page": app.push(.page(id: id))
+            case "thread": app.push(.thread(id: id))
             default: return .systemAction
             }
             return .handled
