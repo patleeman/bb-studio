@@ -591,10 +591,9 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.staticTexts["QA artifact"].waitForExistence(timeout: 10), "card opens the viewer")
     }
 
-    /// A scratch page named by `TEST_RUNNER_BBGO_QA_PAGE`: the work bar, a saved
-    /// version, and rename. Nothing is sent, so no thread starts.
+    /// The work bar, saved version and rename on an owned scratch page.
     func testPageTools() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
+        let id = try scratchPage()
         app.open(URL(string: "bbstudio://page/\(id)")!)
         XCTAssertTrue(app.descendants(matching: .any)["pageWorkField"].waitForExistence(timeout: 10), "work bar")
         sleep(1)
@@ -621,17 +620,12 @@ final class ThreadUITests: XCTestCase {
         shot("page-renamed")
     }
 
-    /// Comments on a scratch page named by `TEST_RUNNER_BBGO_QA_PAGE` that has one
-    /// open thread: reply, resolve, then start a new thread on "Ship it".
+    /// Replies, resolves, and starts comments on an owned scratch page.
     func testPageComments() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_PAGE"] else { throw XCTSkip("no scratch page") }
-        // Reopen the first thread and drop what earlier runs added.
-        let threads = (rpc("pages", "comments", ["id": id, "includeResolved": true])?["threads"] as? [[String: Any]]) ?? []
-        let first = try XCTUnwrap(threads.min { ($0["updatedAt"] as? Double ?? 0) < ($1["updatedAt"] as? Double ?? 0) }?["id"] as? String)
-        _ = rpc("pages", "commentResolve", ["id": id, "thread": first, "resolved": false])
-        for thread in threads where thread["id"] as? String != first {
-            _ = rpc("pages", "commentResolve", ["id": id, "thread": thread["id"] as? String ?? "", "resolved": true])
-        }
+        let id = try scratchPage()
+        let blocks = try XCTUnwrap(rpc("pages", "commentBlocks", ["id": id])?["blocks"] as? [[String: Any]])
+        let blockId = try XCTUnwrap(blocks.first?["id"] as? String)
+        XCTAssertNotNil(rpc("pages", "commentCreate", ["id": id, "block": blockId, "text": "Is this final?"])?["threadId"])
         app.open(URL(string: "bbstudio://page/\(id)")!)
         let comments = app.buttons["Comments"].firstMatch
         XCTAssertTrue(comments.waitForExistence(timeout: 10), "comments button")
@@ -1342,6 +1336,15 @@ final class ThreadUITests: XCTestCase {
         XCTAssertTrue(app.buttons.matching(NSPredicate(format: "label CONTAINS 'Default ('")).firstMatch.waitForExistence(timeout: 10), "project default shown")
         shot("task-handoff-agent")
         app.buttons["Cancel"].tap()
+    }
+
+    private func scratchPage() throws -> String {
+        let created = rpc("pages", "create", ["projectId": StagedFixture.projectId,
+            "parentId": NSNull(), "title": "QA page \(UUID().uuidString.prefix(8))",
+            "markdown": "Ship it\n\nThe release checklist is ready for review."])
+        let id = try XCTUnwrap((created?["page"] as? [String: Any])?["id"] as? String)
+        addTeardownBlock { _ = self.rpc("pages", "remove", ["id": id]) }
+        return id
     }
 
     private func queuedScratchThread(_ text: String) throws -> String {

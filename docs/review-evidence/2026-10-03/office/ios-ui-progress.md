@@ -231,3 +231,14 @@ mutation state cannot leak between tests or repeated runs.
 
 `/tmp/office-queue-skips/results.xcresult`: 3 passed, 0 failures, on the private
 simulator against staged server 52786. `git diff --check` passed.
+
+## Page fixture skips resolved
+
+`testPageTools` and `testPageComments` now each create an owned scratch page
+through Pages RPC and remove it in teardown. The comments test seeds an anchored
+`Is this final?` thread on a real page block, then exercises reply, resolve and
+new-comment creation. The tools test retains work-bar, saved-version and rename
+coverage. Neither depends on `BBGO_QA_PAGE` or prior test state.
+
+`/tmp/office-page-skips/results.xcresult`: 2 passed, 0 failures against staged
+server 52786 on the private simulator. `git diff --check` passed.
