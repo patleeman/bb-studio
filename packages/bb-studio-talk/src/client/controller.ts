@@ -23,7 +23,9 @@ import type {
 } from "@get-bb/plugin-sdk/app";
 import type { Recording, RecordingKind, TalkRpcContract } from "../shared/contract";
 import { PANEL_PATH, UNSENT_PATH, isEmptyRecording, isLongDictation, joinTranscript, transcriptionError } from "../shared/format";
-import { findComposer, insertDictationIntoComposer, type MicState } from "./composer-dom";
+import { insertDictationIntoComposer, type MicState } from "./composer-dom";
+import { COMPOSE_PENDING_PREFIX, composerPendingKey, composerSource, visibleComposers } from "./composer-source";
+import type { FloatTarget } from "@bb-studio/kit/app";
 import { textWithRecordings, type RecordingReference } from "./recording-reference";
 import {
   Outbox,
@@ -238,7 +240,8 @@ export class TalkController {
   private viewing: string | null = null;
   private navigate: BbNavigate | null = null;
   private pendingTimer: number | null = null;
-  private pendingComposer: HTMLElement | null = null;
+  private pendingComposers = new Map<HTMLElement, string>();
+  private openTarget: ((target: FloatTarget) => void) | null = null;
   private fieldsOnScreen = new Set<string>();
   /** Finished captures still transcribing, to report ones discarded as empty. */
   private readonly settling = new Map<string, RecordingKind>();
@@ -322,8 +325,19 @@ export class TalkController {
     this.onPendingChanged();
   }
 
-  setNavigator(navigate: BbNavigate): void {
+  setNavigator(navigate: BbNavigate, openTarget?: (target: FloatTarget) => void): void {
     this.navigate = navigate;
+    this.openTarget = openTarget ?? null;
+  }
+
+  private openThread(threadId: string): void {
+    if (this.openTarget) this.openTarget({ kind: "thread", threadId });
+    else this.navigate?.toThread(threadId);
+  }
+
+  private openPath(path: string): void {
+    if (this.openTarget) this.openTarget({ kind: "path", path });
+    else this.navigate?.toPluginPanel(PANEL_PATH, { subPath: path.split(`/plugins/talk/${PANEL_PATH}/`)[1] });
   }
 
   /** The recording page on screen, or null when it closes. */
@@ -357,11 +371,15 @@ export class TalkController {
    */
   private sourceComposer(): HTMLElement | null {
     const { kind, phase, threadId, field } = this.state;
-    if (field || kind !== "dictation" || phase === "idle" || this.context.threadId !== threadId) return null;
+    if (field || kind !== "dictation" || phase === "idle") return null;
+    const matches = (element: HTMLElement) => {
+      const source = composerSource(element, this.context);
+      return source.threadId === threadId && (threadId !== null || source.path === this.composePath);
+    };
+    const visible = visibleComposers();
     const target = this.target?.deref();
-    if (target?.isConnected) return target;
-    if (threadId === null && location.pathname !== this.composePath) return null;
-    const found = findComposer();
+    if (target && visible.includes(target) && matches(target)) return target;
+    const found = visible.find(matches) ?? null;
     if (found) this.target = new WeakRef(found);
     return found;
   }
@@ -375,7 +393,6 @@ export class TalkController {
     if (phase === "idle") return true;
     if (kind === "recording") return this.viewing === recordingId;
     if (this.state.field) return findField(this.state.field.key) !== null;
-    if (threadId !== null) return this.context.threadId === threadId;
     return this.sourceComposer() !== null;
   }
 
@@ -388,9 +405,11 @@ export class TalkController {
     const navigate = this.navigate;
     if (!navigate) return;
     if (kind === "recording") {
-      if (recordingId) navigate.toPluginPanel(PANEL_PATH, { subPath: recordingId });
+      if (recordingId) this.openPath(`/plugins/talk/${PANEL_PATH}/${recordingId}`);
     } else if (threadId !== null) {
-      navigate.toThread(threadId);
+      this.openThread(threadId);
+    } else if (this.composePath?.startsWith("/plugins/") && this.openTarget) {
+      this.openTarget({ kind: "path", path: this.composePath });
     } else {
       navigate.toCompose({ focusPrompt: true });
     }
@@ -493,15 +512,16 @@ export class TalkController {
       this.showBusy();
       return;
     }
+    const source = composerSource(promptbox, this.context);
     if (!(await this.acquireLock())) {
       toast.info("Talk is recording in another window.");
       return;
     }
     this.target = promptbox ? new WeakRef(promptbox) : null;
-    this.composePath = this.context.threadId === null ? location.pathname : null;
+    this.composePath = source.path;
     this.insertOnDone = kind === "dictation";
     // A field dictation belongs to the field, not to the open thread.
-    const threadId = field ? null : this.context.threadId;
+    const threadId = field ? null : source.threadId;
     this.set({ ...INITIAL, phase: "starting", kind, threadId, field });
     const epoch = this.startEpoch;
     let stream: MediaStream;
@@ -520,7 +540,7 @@ export class TalkController {
       if (epoch !== this.startEpoch) throw new StartCancelled();
       const recording = await this.rpc.call("recording_create", {
         kind,
-        projectId: options.projectId !== undefined ? options.projectId : this.context.projectId,
+        projectId: options.projectId !== undefined ? options.projectId : source.projectId,
         threadId,
       });
       created = recording.id;
@@ -1024,7 +1044,14 @@ export class TalkController {
     } else if (threadId !== null) {
       writePending(addPending(readPending(), threadId, text, references));
       toast.success("Dictation ready. It goes into the thread's composer when you go back.", {
-        action: this.navigate ? { label: "Go back", onClick: () => this.navigate?.toThread(threadId) } : undefined,
+        action: this.navigate ? { label: "Go back", onClick: () => this.openThread(threadId) } : undefined,
+      });
+      this.onPendingChanged();
+    } else if (this.composePath?.startsWith("/plugins/") && this.openTarget) {
+      const path = this.composePath;
+      writePending(addPending(readPending(), `${COMPOSE_PENDING_PREFIX}${path}`, text, references));
+      toast.success("Dictation ready. It goes into its conversation draft when you go back.", {
+        action: { label: "Go back", onClick: () => this.openTarget?.({ kind: "path", path }) },
       });
       this.onPendingChanged();
     } else {
@@ -1051,7 +1078,7 @@ export class TalkController {
     try {
       await this.rpc.call("recording_keep", { id });
       toast.success("Kept as a recording.", {
-        action: this.navigate ? { label: "Open", onClick: () => this.navigate?.toPluginPanel(PANEL_PATH, { subPath: id }) } : undefined,
+        action: this.navigate ? { label: "Open", onClick: () => this.openPath(`/plugins/talk/${PANEL_PATH}/${id}`) } : undefined,
       });
     } catch (error) {
       toast.error(`Talk could not keep it: ${message(error)}`);
@@ -1117,22 +1144,26 @@ export class TalkController {
    */
   private async flushPending(): Promise<void> {
     this.flushPendingFields();
-    const threadId = this.context.threadId;
-    const composer = threadId && document.visibilityState === "visible" ? findComposer() : null;
-    const settled = composer !== null && composer === this.pendingComposer;
-    this.pendingComposer = composer;
-    if (!threadId || !settled) return;
-    const pending = readPending();
-    const insertion = pending[threadId];
-    if (!insertion) return;
-    const text = pendingText(insertion);
-    const references = pendingRecordings(insertion);
-    // Claim it before typing, so a second window on this thread skips it.
-    writePending(withoutPending(pending, threadId));
-    if (await insertDictationIntoComposer(composer, text, references)) {
-      toast.success("Added your dictation to the composer.");
-    } else {
-      writePending(addPending(readPending(), threadId, text, references));
+    const candidates = new Map<HTMLElement, string>();
+    if (document.visibilityState === "visible") for (const composer of visibleComposers()) {
+      const key = composerPendingKey(composerSource(composer, this.context));
+      if (key) candidates.set(composer, key);
+    }
+    const previous = this.pendingComposers;
+    this.pendingComposers = candidates;
+    for (const [composer, key] of candidates) {
+      if (previous.get(composer) !== key) continue;
+      const pending = readPending();
+      const insertion = pending[key];
+      if (!insertion) continue;
+      const text = pendingText(insertion);
+      const references = pendingRecordings(insertion);
+      writePending(withoutPending(pending, key));
+      if (await insertDictationIntoComposer(composer, text, references)) {
+        toast.success("Added your dictation to the composer.");
+      } else {
+        writePending(addPending(readPending(), key, text, references));
+      }
     }
     this.onPendingChanged();
   }
@@ -1182,7 +1213,7 @@ export class TalkController {
   threadRowStatuses(): Map<string, PluginComposerThreadRowStatus> {
     const statuses = new Map<string, PluginComposerThreadRowStatus>();
     for (const threadId of Object.keys(readPending())) {
-      if (threadId.startsWith(FIELD_PENDING_PREFIX)) continue;
+      if (threadId.startsWith(FIELD_PENDING_PREFIX) || threadId.startsWith(COMPOSE_PENDING_PREFIX)) continue;
       statuses.set(threadId, { icon: "Mic", label: "Talk dictation ready to insert", tone: "success" });
     }
     const { phase, threadId } = this.state;

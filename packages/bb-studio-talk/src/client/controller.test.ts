@@ -3,8 +3,12 @@ import { Blob as NodeBlob } from "node:buffer";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { TalkController } from "./controller";
 import { Outbox, type OutboxSegment } from "./outbox";
+import { registerComposerSource } from "./composer-source";
+import { insertDictationIntoComposer } from "./composer-dom";
+import { addPending, readPending, writePending } from "./pending-inserts";
 
-vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn() } }));
+vi.mock("sonner", () => ({ toast: { error: vi.fn(), info: vi.fn(), success: vi.fn() } }));
+vi.mock("./composer-dom", async importOriginal => ({ ...await importOriginal<typeof import("./composer-dom")>(), insertDictationIntoComposer: vi.fn(async () => true) }));
 
 class Recorder extends EventTarget {
   static instances: Recorder[] = [];
@@ -28,9 +32,11 @@ class Recorder extends EventTarget {
 const stopped = vi.fn();
 beforeEach(() => {
   vi.useFakeTimers();
+  document.body.innerHTML = "";
   localStorage.clear();
   Recorder.instances = [];
   stopped.mockClear();
+  vi.mocked(insertDictationIntoComposer).mockClear();
   vi.stubGlobal("MediaRecorder", Recorder);
   vi.stubGlobal("Blob", NodeBlob);
   vi.stubGlobal("AudioContext", class {
@@ -96,4 +102,83 @@ it.each(["begin", "appendPart", "complete"] as const)("stops capture and retains
   expect(controller.getState().localSaveError).toBeNull();
   expect(controller.getState().phase).toBe("paused");
   expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).insert).toBe(false);
+});
+
+
+it("dictates into a retained thread companion while the main thread changes", async () => {
+  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  Object.defineProperty(prompt, "offsetParent", { get: () => wrapper.hidden ? null : document.body });
+  wrapper.append(prompt); document.body.append(wrapper);
+  const unregister = registerComposerSource(prompt, () => ({ kind: "thread", threadId: "thr_main" }));
+  const recording = { id: "rec_source", durationMs: 0, status: "recording" };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  controller.setContext({ projectId: "proj_main", threadId: "thr_main" });
+  const navigate = { toThread: vi.fn(), toPluginPanel: vi.fn(), toCompose: vi.fn() };
+  const open = vi.fn(); controller.setNavigator(navigate as never, open);
+  await controller.startRecording("dictation", prompt);
+  expect(controller.getState().threadId).toBe("thr_side");
+  expect(call).toHaveBeenCalledWith("recording_create", { kind: "dictation", threadId: "thr_side", projectId: null });
+  controller.setContext({ projectId: "proj_other", threadId: "thr_other" });
+  expect(controller.dictationComposer()).toBe(prompt);
+  expect(controller.isAtSource()).toBe(true);
+  wrapper.hidden = true; expect(controller.isAtSource()).toBe(false);
+  expect(controller.dictationComposer()).toBeNull();
+  controller.goToSource(); expect(open).toHaveBeenCalledWith({ kind: "thread", threadId: "thr_side" });
+  expect(navigate.toThread).not.toHaveBeenCalled();
+  unregister(); await controller.stop(false);
+});
+
+it("returns to the exact new-conversation route and selected project", async () => {
+  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "path:/plugins/pages/pages/pg_source/compose";
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = ""; wrapper.append(prompt); document.body.append(wrapper);
+  Object.defineProperty(prompt, "offsetParent", { value: document.body });
+  const unregister = registerComposerSource(prompt, () => ({ kind: "new-thread", projectId: "proj_selected" }));
+  const recording = { id: "rec_compose", durationMs: 0, status: "recording" };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController(); controller.attach({ call } as never);
+  controller.setContext({ projectId: "proj_main", threadId: "thr_main" });
+  const navigate = { toThread: vi.fn(), toPluginPanel: vi.fn(), toCompose: vi.fn() };
+  const open = vi.fn(); controller.setNavigator(navigate as never, open);
+  await controller.startRecording("dictation", prompt);
+  expect(controller.getState().threadId).toBeNull();
+  expect(call).toHaveBeenCalledWith("recording_create", { kind: "dictation", threadId: null, projectId: "proj_selected" });
+  controller.goToSource(); expect(open).toHaveBeenCalledWith({ kind: "path", path: "/plugins/pages/pages/pg_source/compose" });
+  expect(navigate.toCompose).not.toHaveBeenCalled();
+  unregister(); await controller.stop(false);
+});
+
+
+it("delivers waiting dictation to the visible companion rather than the main thread", async () => {
+  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  Object.defineProperty(prompt, "offsetParent", { value: document.body });
+  wrapper.append(prompt); document.body.append(wrapper);
+  writePending(addPending({}, "thr_side", "The side conversation's dictation."));
+  const controller = new TalkController();
+  controller.setContext({ threadId: "thr_main", projectId: "proj_main" });
+  controller.attach({ call: vi.fn() } as never);
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(insertDictationIntoComposer).toHaveBeenCalledWith(prompt, "The side conversation's dictation.", []);
+  expect(readPending()).toEqual({});
+});
+
+it("holds a new draft's pending dictation until that exact companion is visible", async () => {
+  const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "path:/plugins/pages/pages/pg_source/compose"; wrapper.hidden = true;
+  const prompt = document.createElement("div"); prompt.dataset.promptbox = "";
+  Object.defineProperty(prompt, "offsetParent", { get: () => wrapper.hidden ? null : document.body });
+  wrapper.append(prompt); document.body.append(wrapper);
+  const key = "compose:/plugins/pages/pages/pg_source/compose";
+  writePending(addPending({}, key, "Return to the original draft."));
+  const controller = new TalkController();
+  controller.setContext({ threadId: "thr_main", projectId: "proj_main" });
+  controller.attach({ call: vi.fn() } as never);
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+  expect(controller.threadRowStatuses().size).toBe(0);
+  wrapper.hidden = false;
+  await vi.advanceTimersByTimeAsync(1500);
+  expect(insertDictationIntoComposer).toHaveBeenCalledWith(prompt, "Return to the original draft.", []);
+  expect(readPending()).toEqual({});
 });

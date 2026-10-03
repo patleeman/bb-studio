@@ -240,7 +240,8 @@ export default async function plugin(bb: BbPluginApi) {
     ...models.handlers,
     recordings_list: ({ query, limit }) => ({ recordings: store.list({ query, limit }) }),
     recording_get: ({ id }) => ({ recording: mustGet(id), segments: store.segments(id) }),
-    recording_create: ({ kind, projectId, threadId }) => {
+    recording_create: async ({ kind, projectId, threadId }) => {
+      if (threadId) projectId = (await bb.sdk.threads.get({ threadId })).projectId;
       const recording = store.create({ id: newId("rec_"), kind, projectId, threadId });
       changed(recording.id);
       return recording;

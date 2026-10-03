@@ -13,6 +13,7 @@ import {
 import type { TalkRpcContract } from "../shared/contract";
 import { NEW_RECORDING_EVENT, PANEL_PATH, RECORDING_CHANGED, formatClock, holdKeyCode, tail } from "../shared/format";
 import { Icon } from "@bb-studio/kit/ui";
+import { useOpenCompanion } from "@bb-studio/kit/app";
 import { cn } from "@bb-studio/kit/ui";
 import { talk, useTalkState, type TalkState } from "./controller";
 import { useDraggable } from "./draggable";
@@ -28,8 +29,9 @@ function useControllerWiring(): void {
   const { values } = useSettings();
   const { projectId, threadId } = useBbContext();
   const navigate = useBbNavigate();
+  const open = useOpenCompanion();
   useEffect(() => talk.attach(rpc), [rpc]);
-  useEffect(() => talk.setNavigator(navigate), [navigate]);
+  useEffect(() => talk.setNavigator(navigate, open), [navigate, open]);
   useEffect(() => {
     talk.configure({
       segmentSeconds: typeof values?.segmentSeconds === "number" ? values.segmentSeconds : 25,
@@ -46,12 +48,12 @@ function useControllerWiring(): void {
       const projectId = typeof detail?.projectId === "string" ? detail.projectId : null;
       void talk.startRecording("recording", null, null, { projectId }).then(() => {
         const { recordingId, phase } = talk.getState();
-        if (recordingId && phase !== "idle") navigate.toPluginPanel(PANEL_PATH, { subPath: recordingId });
+        if (recordingId && phase !== "idle") open({ kind: "path", path: `/plugins/talk/${PANEL_PATH}/${recordingId}` });
       });
     };
     window.addEventListener(NEW_RECORDING_EVENT, onNew);
     return () => window.removeEventListener(NEW_RECORDING_EVENT, onNew);
-  }, [navigate]);
+  }, [open]);
   useRealtime(RECORDING_CHANGED, (payload) => {
     const id = (payload as { id?: unknown } | null)?.id;
     if (typeof id === "string") void talk.refresh(id);
@@ -202,7 +204,7 @@ function statusLabel(state: TalkState, online: boolean): string {
 export function TalkOverlay() {
   useControllerWiring();
   const state = useTalkState();
-  const navigate = useBbNavigate();
+  const open = useOpenCompanion();
   const online = useOnline();
   const [expanded, toggleExpanded] = useExpanded(state);
   const dock = useInlineDictation(state.kind === "dictation" && state.phase !== "idle" && !expanded && !state.transcribeError && !state.localSaveError);
@@ -230,7 +232,7 @@ export function TalkOverlay() {
   const canResume = state.phase === "paused" || state.phase === "needs-resume";
   const canStop = canPause || canResume || state.phase === "starting";
   const openRecording = () => {
-    if (state.recordingId) navigate.toPluginPanel(PANEL_PATH, { subPath: state.recordingId });
+    if (state.recordingId) open({ kind: "path", path: `/plugins/talk/${PANEL_PATH}/${state.recordingId}` });
   };
   const title = state.recording?.titleSource === "pending" ? null : state.recording?.title;
   const away = !talk.isAtSource();
