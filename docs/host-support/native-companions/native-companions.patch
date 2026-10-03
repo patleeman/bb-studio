@@ -1,0 +1,2099 @@
+From bda6f61ef39120067f248c095f495d4d37bebf39 Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Fri, 2 Oct 2026 18:09:15 -0400
+Subject: [PATCH 1/3] feat(plugin): retain companion views across native panel
+ and main outlets
+
+---
+ .../plugin/PluginCompanionView.test.tsx       | 418 ++++++++++++++++++
+ .../components/plugin/PluginCompanionView.tsx | 103 +++++
+ .../components/plugin/companion-view-store.ts | 223 ++++++++++
+ .../components/plugin/useCompanionPanel.tsx   | 190 ++++++++
+ .../secondary-panel/SecondaryPanelLayout.tsx  |  12 +-
+ .../secondary-panel/ThreadSecondaryPanel.tsx  |  10 +-
+ .../secondary-panel/secondaryPanelTab.ts      |  10 +-
+ apps/app/src/lib/plugin-sdk-app-impl.tsx      |   6 +
+ docs/api_to_audit.md                          |  29 ++
+ packages/plugin-sdk/src/app-contract.ts       |  41 ++
+ packages/plugin-sdk/src/app.ts                |   6 +
+ packages/plugin-sdk/src/testing/app.tsx       |   8 +
+ plugins/plugin-api-docs/src/surfaces.ts       |   6 +
+ 13 files changed, 1058 insertions(+), 4 deletions(-)
+ create mode 100644 apps/app/src/components/plugin/PluginCompanionView.test.tsx
+ create mode 100644 apps/app/src/components/plugin/PluginCompanionView.tsx
+ create mode 100644 apps/app/src/components/plugin/companion-view-store.ts
+ create mode 100644 apps/app/src/components/plugin/useCompanionPanel.tsx
+
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.test.tsx b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+new file mode 100644
+index 000000000..78048e6ef
+--- /dev/null
++++ b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+@@ -0,0 +1,418 @@
++// @vitest-environment jsdom
++
++import { StrictMode, useState } from "react";
++import {
++  act,
++  cleanup,
++  fireEvent,
++  render,
++  screen,
++} from "@testing-library/react";
++import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
++import type {
++  ExperimentalCompanionPlacement,
++  ExperimentalCompanionViewProps,
++} from "@get-bb/plugin-sdk";
++import { TooltipProvider } from "@bb/shared-ui/tooltip";
++import { PanelGroup } from "react-resizable-panels";
++import { PluginContext } from "./plugin-context";
++import {
++  companionViewStore,
++  createCompanionViewStore,
++  parseCompanionSession,
++} from "./companion-view-store";
++import { useCompanionPanelVisibility } from "./useCompanionPanel";
++import {
++  PluginCompanionView,
++  PluginCompanionOutlet,
++} from "./PluginCompanionView";
++import { ThreadSecondaryPanel } from "@/components/secondary-panel/ThreadSecondaryPanel";
++import {
++  createBrowserFixedPanelTab,
++  createTerminalFixedPanelTab,
++} from "@/lib/fixed-panel-tabs-state";
++import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
++
++const noop = () => {};
++const browser = createBrowserFixedPanelTab({
++  environmentId: null,
++  url: "https://example.com",
++});
++const terminal = createTerminalFixedPanelTab({ terminalId: "terminal-demo" });
++
++beforeEach(() => {
++  vi.spyOn(HTMLElement.prototype, "clientWidth", "get").mockReturnValue(1000);
++});
++
++afterEach(() => {
++  cleanup();
++  companionViewStore
++    .getSnapshot()
++    .entries.forEach((entry) =>
++      companionViewStore.remove(entry.key, entry.element),
++    );
++  companionViewStore.reorder([]);
++  window.localStorage.clear();
++  vi.restoreAllMocks();
++});
++
++function Editor() {
++  const [draft, setDraft] = useState("");
++  const [count, setCount] = useState(0);
++  return (
++    <div data-testid="scroll" style={{ overflow: "auto", height: 100 }}>
++      <textarea
++        aria-label="Draft"
++        value={draft}
++        onChange={(event) => setDraft(event.target.value)}
++      />
++      <input type="file" aria-label="Attachment" />
++      <button onClick={() => setCount(count + 1)}>Edits: {count}</button>
++      <div style={{ height: 1000 }} />
++    </div>
++  );
++}
++
++function Experience({ route }: { route: string }) {
++  const [placement, setPlacement] =
++    useState<ExperimentalCompanionPlacement>("floating");
++  const [activation, setActivation] = useState(1);
++  const [pinned, setPinned] = useState(false);
++  const [closed, setClosed] = useState(false);
++  const [nativeActive, setNativeActive] = useState(browser);
++  const move = (next: ExperimentalCompanionPlacement) => {
++    setPlacement(next);
++    setActivation((value) => value + 1);
++  };
++  return (
++    <PluginContext.Provider value="studio-demo">
++      <button onClick={() => move("workbench")}>Dock editor</button>
++      <button onClick={() => move("floating")}>Float editor</button>
++      <button
++        onClick={() => {
++          companionViewStore.show(true);
++        }}
++      >
++        Reveal panel
++      </button>
++      {!closed ? (
++        <PluginCompanionView
++          id="editor"
++          title="Demo editor"
++          activation={activation}
++          placement={placement}
++          pinned={pinned}
++          onPinnedChange={setPinned}
++          onSelect={() => setActivation((value) => value + 1)}
++          onClose={() => setClosed(true)}
++          onPlacementChange={move}
++        >
++          <Editor />
++        </PluginCompanionView>
++      ) : null}
++      <PanelGroup direction="horizontal" key={route}>
++        <ThreadSecondaryPanel
++          activeTab={nativeActive}
++          canUseGitUi={false}
++          fixedTabs={[]}
++          tabs={[
++            {
++              tab: browser,
++              label: "Browser",
++              leadingVisual: null,
++              statusLabel: null,
++              onClose: noop,
++              onSelect: () => setNativeActive(browser),
++              renderContent: () => <div>Browser content</div>,
++            },
++            {
++              tab: terminal,
++              label: "Terminal",
++              leadingVisual: null,
++              statusLabel: null,
++              onClose: noop,
++              onSelect: noop,
++              renderContent: () => <div>Terminal content</div>,
++            },
++          ]}
++          isOpen={false}
++          metadataContent={null}
++          onClose={noop}
++          onCollapse={noop}
++          onTabReorder={noop}
++          onOpenNewTab={noop}
++          onPanelFocus={noop}
++          isConversationCollapsed={false}
++          onToggleConversationCollapse={noop}
++          renderAsDrawer
++        />
++      </PanelGroup>
++      <div data-testid="main-outlet">
++        <PluginCompanionOutlet id="editor" />
++      </div>
++    </PluginContext.Provider>
++  );
++}
++
++function renderExperience(route = "page-a") {
++  const { wrapper: Wrapper } = createQueryClientTestHarness();
++  const view = (current: string) => (
++    <StrictMode>
++      <Wrapper>
++        <TooltipProvider>
++          <Experience route={current} />
++        </TooltipProvider>
++      </Wrapper>
++    </StrictMode>
++  );
++  const result = render(view(route));
++  return {
++    ...result,
++    route: (current: string) => result.rerender(view(current)),
++  };
++}
++
++describe("retained native companion views", () => {
++  it("keeps equal companion ids isolated by plugin ownership and preserves the CSS root after transfer", () => {
++    const props: ExperimentalCompanionViewProps = {
++      id: "same",
++      title: "View",
++      placement: "main",
++      activation: 1,
++      onSelect: noop,
++      onClose: noop,
++      onPlacementChange: noop,
++      children: null,
++    };
++    render(
++      <>
++        <PluginContext.Provider value="pages">
++          <PluginCompanionView {...props}>
++            <textarea aria-label="Page editor" />
++          </PluginCompanionView>
++          <PluginCompanionOutlet id="same" />
++        </PluginContext.Provider>
++        <PluginContext.Provider value="draw">
++          <PluginCompanionView {...props}>
++            <textarea aria-label="Drawing editor" />
++          </PluginCompanionView>
++          <PluginCompanionOutlet id="same" />
++        </PluginContext.Provider>
++      </>,
++    );
++    const page = screen.getByRole("textbox", { name: "Page editor" });
++    const drawing = screen.getByRole("textbox", { name: "Drawing editor" });
++    expect(
++      page.closest("[data-bb-plugin-root]")?.getAttribute("data-bb-plugin"),
++    ).toBe("pages");
++    expect(
++      drawing.closest("[data-bb-plugin-root]")?.getAttribute("data-bb-plugin"),
++    ).toBe("draw");
++    expect(page.closest("[data-bb-companion-outlet]")).not.toBe(
++      drawing.closest("[data-bb-companion-outlet]"),
++    );
++    expect(companionViewStore.getSnapshot().entries).toHaveLength(2);
++  });
++  it("moves the same editor, attachment, and scroll state through floating, native workbench, routes, and main", () => {
++    const result = renderExperience();
++    const input = screen.getByRole("textbox", { name: "Draft" });
++    const attachment = screen.getByLabelText("Attachment");
++    const scroll = screen.getByTestId("scroll");
++    const files = [new File(["demo"], "notes.txt")];
++    fireEvent.change(input, { target: { value: "Keep this draft" } });
++    fireEvent.change(attachment, { target: { files } });
++    fireEvent.click(screen.getByText("Edits: 0"));
++    scroll.scrollTop = 57;
++    fireEvent.click(screen.getByText("Dock editor"));
++    expect(screen.getByRole("button", { name: "Browser" })).toBeTruthy();
++    expect(screen.getByRole("button", { name: "Terminal" })).toBeTruthy();
++    expect(screen.getByRole("button", { name: "Demo editor" })).toBeTruthy();
++    expect(input.closest("[data-bb-companion-outlet]")).toBeTruthy();
++    result.route("drawing-b");
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(input);
++    expect(scroll.scrollTop).toBe(57);
++    fireEvent.click(screen.getByRole("button", { name: "Main view" }));
++    expect(screen.getByTestId("main-outlet").contains(input)).toBe(true);
++    fireEvent.click(screen.getByText("Float editor"));
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(input);
++    expect((input as HTMLTextAreaElement).value).toBe("Keep this draft");
++    expect((attachment as HTMLInputElement).files).toBe(files);
++    expect(screen.getByText("Edits: 1")).toBeTruthy();
++    expect(scroll.scrollTop).toBe(57);
++  });
++
++  it("retains the companion while Browser is selected and a hidden panel is dismissed, then refocuses on an explicit request", () => {
++    renderExperience();
++    const input = screen.getByRole("textbox", { name: "Draft" });
++    fireEvent.change(input, { target: { value: "Unsent" } });
++    fireEvent.click(screen.getByText("Dock editor"));
++    fireEvent.click(screen.getByRole("button", { name: "Browser" }));
++    expect(companionViewStore.getSnapshot().selected).toBeNull();
++    expect((input as HTMLTextAreaElement).value).toBe("Unsent");
++    fireEvent.click(screen.getByText("Dock editor"));
++    expect(input.closest("[data-bb-companion-outlet]")).toBeTruthy();
++    fireEvent.click(screen.getByRole("button", { name: "Hide right panel" }));
++    expect(companionViewStore.getSnapshot().visible).toBe(false);
++    act(() => {
++      companionViewStore.put({
++        ...companionViewStore.getSnapshot().entries[0]!,
++      });
++    });
++    expect(companionViewStore.getSnapshot().visible).toBe(false);
++    fireEvent.click(screen.getByText("Dock editor"));
++    expect(companionViewStore.getSnapshot().visible).toBe(true);
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(input);
++  });
++
++  it("protects a pinned native tab from bulk close and disposes it only when explicitly closed", () => {
++    renderExperience();
++    fireEvent.click(screen.getByText("Dock editor"));
++    fireEvent.click(screen.getByRole("button", { name: "Pin companion" }));
++    expect(companionViewStore.getSnapshot().entries[0]?.props.pinned).toBe(
++      true,
++    );
++    expect(
++      screen.queryByRole("button", { name: "Close Demo editor" }),
++    ).toBeNull();
++    fireEvent.click(screen.getByRole("button", { name: "Unpin companion" }));
++    const entry = companionViewStore.getSnapshot().entries[0]!;
++    act(entry.props.onClose);
++    expect(companionViewStore.getSnapshot().entries).toHaveLength(0);
++    expect(screen.queryByRole("textbox", { name: "Draft" })).toBeNull();
++  });
++});
++
++describe("companion selection policy", () => {
++  it("keeps native header and keyboard toggles consistent with companion requests and dismissal", () => {
++    function Owner({
++      activation,
++      title,
++    }: {
++      activation: number;
++      title: string;
++    }) {
++      const [open, setOpen] = useState(false);
++      const toggle = () => setOpen((value) => !value);
++      const visibility = useCompanionPanelVisibility(open, toggle, () =>
++        setOpen(false),
++      );
++      return (
++        <PluginContext.Provider value="owner">
++          <button onClick={toggle}>Native toggle</button>
++          <output>
++            {visibility.open ? "Visible" : "Hidden"}:
++            {open ? "Native open" : "Native closed"}
++          </output>
++          <PluginCompanionView
++            id="one"
++            title={title}
++            placement="workbench"
++            activation={activation}
++            onSelect={noop}
++            onClose={noop}
++            onPlacementChange={noop}
++          >
++            <textarea />
++          </PluginCompanionView>
++        </PluginContext.Provider>
++      );
++    }
++    const result = render(<Owner activation={1} title="One" />);
++    expect(screen.getByText("Visible:Native open")).toBeTruthy();
++    fireEvent.click(screen.getByText("Native toggle"));
++    expect(screen.getByText("Hidden:Native closed")).toBeTruthy();
++    result.rerender(<Owner activation={1} title="Updated" />);
++    expect(screen.getByText("Hidden:Native closed")).toBeTruthy();
++    result.rerender(<Owner activation={2} title="Updated" />);
++    expect(screen.getByText("Visible:Native open")).toBeTruthy();
++  });
++
++  it("restores dismissal, active identity, and native order without treating restored views as new focus requests", () => {
++    let saved: Parameters<typeof createCompanionViewStore>[0] = null;
++    const store = createCompanionViewStore(null, (session) => {
++      saved = session;
++    });
++    const make = (key: string, activation: number) => ({
++      key,
++      props: {
++        id: key,
++        title: key,
++        placement: "workbench" as const,
++        activation,
++        onSelect: noop,
++        onClose: noop,
++        onPlacementChange: noop,
++        children: null,
++      },
++      element: document.createElement("div"),
++      home: document.createElement("div"),
++    });
++    store.put(make("one", 1));
++    store.put(make("two", 1));
++    store.reorder(["native-browser", "two", "one"]);
++    store.show(false);
++    const restored = createCompanionViewStore(
++      parseCompanionSession(JSON.parse(JSON.stringify(saved))),
++    );
++    restored.put(make("one", 1));
++    restored.put(make("two", 1));
++    expect(restored.getSnapshot()).toMatchObject({
++      selected: "two",
++      visible: false,
++      order: ["native-browser", "two", "one"],
++    });
++    restored.put(make("two", 2));
++    expect(restored.getSnapshot().visible).toBe(true);
++    expect(restored.getSnapshot().selected).toBe("two");
++    expect(
++      parseCompanionSession({
++        entries: [{ key: "bad", placement: "other", activation: "one" }],
++        order: [5, "native-browser"],
++        selected: false,
++        visible: "yes",
++      }),
++    ).toEqual({
++      entries: [],
++      order: ["native-browser"],
++      selected: null,
++      visible: false,
++    });
++  });
++  it("background registration does not override dismissal or steal a selected native tab", () => {
++    const store = createCompanionViewStore();
++    const props: ExperimentalCompanionViewProps = {
++      id: "one",
++      title: "One",
++      placement: "workbench",
++      activation: 0,
++      onSelect: noop,
++      onClose: noop,
++      onPlacementChange: noop,
++      children: null,
++    };
++    const entry = {
++      key: "one",
++      props,
++      element: document.createElement("div"),
++      home: document.createElement("div"),
++    };
++    store.put(entry);
++    expect(store.getSnapshot().visible).toBe(false);
++    store.put({ ...entry, props: { ...props, activation: 1 } });
++    expect(store.getSnapshot().selected).toBe("one");
++    store.show(false);
++    store.put({
++      ...entry,
++      props: { ...props, activation: 1, title: "Updated" },
++    });
++    expect(store.getSnapshot().visible).toBe(false);
++    store.put({ ...entry, props: { ...props, activation: 2 } });
++    expect(store.getSnapshot().visible).toBe(true);
++    store.put({
++      ...entry,
++      props: { ...props, placement: "floating", activation: 3 },
++    });
++    expect(store.getSnapshot().visible).toBe(false);
++    expect(store.getSnapshot().selected).toBeNull();
++  });
++});
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.tsx b/apps/app/src/components/plugin/PluginCompanionView.tsx
+new file mode 100644
+index 000000000..fd08a18ed
+--- /dev/null
++++ b/apps/app/src/components/plugin/PluginCompanionView.tsx
+@@ -0,0 +1,103 @@
++import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
++import { createPortal } from "react-dom";
++import type {
++  ExperimentalCompanionOutletProps,
++  ExperimentalCompanionViewProps,
++} from "@get-bb/plugin-sdk";
++import { usePluginId } from "./plugin-context";
++import { useOptionalPaneContext } from "@/views/thread-detail/PaneContext";
++import {
++  companionViewStore,
++  type CompanionViewEntry,
++} from "./companion-view-store";
++
++export const useCompanionViews = () =>
++  useSyncExternalStore(
++    companionViewStore.subscribe,
++    companionViewStore.getSnapshot,
++    companionViewStore.getSnapshot,
++  );
++
++export function PluginCompanionView(props: ExperimentalCompanionViewProps) {
++  const pluginId = usePluginId();
++  const key = JSON.stringify([pluginId, props.id]);
++  const [element] = useState(() => document.createElement("div"));
++  const home = useRef<HTMLDivElement>(null);
++  useLayoutEffect(() => {
++    const host = home.current;
++    if (host === null) return;
++    element.className = "flex h-full min-h-0 min-w-0 flex-col";
++    element.dataset.bbCompanionView = key;
++    element.dataset.bbPlugin = pluginId;
++    element.dataset.bbPluginRoot = "";
++    element.dataset.bbPortaledOverlay = "";
++    if (props.placement === "floating" || element.parentElement === null)
++      host.append(element);
++    companionViewStore.put({ key, props, element, home: host });
++  }, [element, key, pluginId, props]);
++  useLayoutEffect(
++    () => () => {
++      companionViewStore.remove(key, element);
++      element.remove();
++    },
++    [element, key],
++  );
++  return (
++    <div
++      ref={home}
++      className={
++        props.placement === "floating"
++          ? "flex min-h-0 flex-1 flex-col"
++          : "hidden"
++      }
++    >
++      {createPortal(props.children, element, key)}
++    </div>
++  );
++}
++
++export function CompanionViewOutlet({ entry }: { entry: CompanionViewEntry }) {
++  const host = useRef<HTMLDivElement>(null);
++  useLayoutEffect(() => {
++    const destination = host.current;
++    if (destination === null) return;
++    const focused = entry.element.contains(document.activeElement)
++      ? document.activeElement
++      : null;
++    const scroll = [...entry.element.querySelectorAll<HTMLElement>("*")]
++      .filter((node) => node.scrollTop !== 0 || node.scrollLeft !== 0)
++      .map((node) => ({ node, top: node.scrollTop, left: node.scrollLeft }));
++    destination.append(entry.element);
++    scroll.forEach(({ node, top, left }) => {
++      node.scrollTop = top;
++      node.scrollLeft = left;
++    });
++    if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
++    return () => {
++      if (entry.element.parentElement === destination)
++        entry.home.append(entry.element);
++    };
++  }, [entry.element, entry.home]);
++  return (
++    <div
++      ref={host}
++      className="flex h-full min-h-0 min-w-0 flex-col"
++      data-bb-companion-outlet={entry.key}
++    />
++  );
++}
++
++export function PluginCompanionOutlet({
++  id,
++}: ExperimentalCompanionOutletProps) {
++  const pluginId = usePluginId();
++  const pane = useOptionalPaneContext();
++  const key = JSON.stringify([pluginId, id]);
++  const entry = useCompanionViews().entries.find(
++    (candidate) =>
++      candidate.key === key && candidate.props.placement === "main",
++  );
++  return entry && (pane === null || pane.isFocused) ? (
++    <CompanionViewOutlet entry={entry} />
++  ) : null;
++}
+diff --git a/apps/app/src/components/plugin/companion-view-store.ts b/apps/app/src/components/plugin/companion-view-store.ts
+new file mode 100644
+index 000000000..21bf6b76d
+--- /dev/null
++++ b/apps/app/src/components/plugin/companion-view-store.ts
+@@ -0,0 +1,223 @@
++import type { ExperimentalCompanionViewProps } from "@get-bb/plugin-sdk";
++
++interface CompanionSession {
++  selected: string | null;
++  visible: boolean;
++  order: readonly string[];
++  entries: readonly {
++    key: string;
++    placement: ExperimentalCompanionViewProps["placement"];
++    activation: number;
++  }[];
++}
++
++export interface CompanionViewEntry {
++  key: string;
++  props: ExperimentalCompanionViewProps;
++  element: HTMLDivElement;
++  home: HTMLDivElement;
++}
++
++interface CompanionSnapshot {
++  entries: readonly CompanionViewEntry[];
++  selected: string | null;
++  visible: boolean;
++  order: readonly string[];
++  focusRequest: number;
++}
++
++export function createCompanionViewStore(
++  restored: CompanionSession | null = null,
++  save?: (session: CompanionSession) => void,
++) {
++  const baseline = new Map(
++    restored?.entries.map((entry) => [entry.key, entry]),
++  );
++  let state: CompanionSnapshot = {
++    entries: [],
++    selected: restored?.selected ?? null,
++    visible: restored?.visible ?? false,
++    order: restored?.order ?? [],
++    focusRequest: 0,
++  };
++  const listeners = new Set<() => void>();
++  const publish = (next: CompanionSnapshot) => {
++    state = next;
++    save?.({
++      selected: next.selected,
++      visible: next.visible,
++      order: next.order,
++      entries: next.entries.map((entry) => ({
++        key: entry.key,
++        placement: entry.props.placement,
++        activation: entry.props.activation,
++      })),
++    });
++    listeners.forEach((listener) => listener());
++  };
++  return {
++    getSnapshot: () => state,
++    subscribe: (listener: () => void) => {
++      listeners.add(listener);
++      return () => {
++        listeners.delete(listener);
++      };
++    },
++    put: (entry: CompanionViewEntry) => {
++      const previous = state.entries.find(
++        (candidate) => candidate.key === entry.key,
++      );
++      const saved = baseline.get(entry.key);
++      if (
++        previous &&
++        previous.element === entry.element &&
++        previous.home === entry.home &&
++        previous.props.title === entry.props.title &&
++        previous.props.icon === entry.props.icon &&
++        previous.props.placement === entry.props.placement &&
++        previous.props.activation === entry.props.activation &&
++        previous.props.pinned === entry.props.pinned &&
++        Boolean(previous.props.onBack) === Boolean(entry.props.onBack) &&
++        Boolean(previous.props.onPinnedChange) ===
++          Boolean(entry.props.onPinnedChange)
++      ) {
++        previous.props = entry.props;
++        return;
++      }
++      const requested =
++        entry.props.activation > 0 &&
++        entry.props.placement === "workbench" &&
++        ((previous?.props.placement ?? saved?.placement) !== "workbench" ||
++          (previous?.props.activation ?? saved?.activation) !==
++            entry.props.activation);
++      const entries = previous
++        ? state.entries.map((candidate) =>
++            candidate.key === entry.key ? entry : candidate,
++          )
++        : [...state.entries, entry];
++      const workbench = entries.filter(
++        (candidate) => candidate.props.placement === "workbench",
++      );
++      const selected = requested
++        ? entry.key
++        : workbench.some((candidate) => candidate.key === state.selected)
++          ? state.selected
++          : baseline.has(state.selected ?? "") &&
++              !entries.some((candidate) => candidate.key === state.selected)
++            ? state.selected
++            : null;
++      baseline.delete(entry.key);
++      publish({
++        ...state,
++        entries,
++        selected,
++        visible:
++          (workbench.length > 0 ||
++            [...baseline.values()].some(
++              (entry) => entry.placement === "workbench",
++            )) &&
++          (requested || state.visible),
++        focusRequest: state.focusRequest + (requested ? 1 : 0),
++      });
++    },
++    remove: (key: string, element: HTMLDivElement) => {
++      if (
++        !state.entries.some(
++          (entry) => entry.key === key && entry.element === element,
++        )
++      )
++        return;
++      const entries = state.entries.filter((entry) => entry.key !== key);
++      const workbench = entries.filter(
++        (entry) => entry.props.placement === "workbench",
++      );
++      publish({
++        ...state,
++        entries,
++        selected:
++          state.selected === key
++            ? (workbench.at(-1)?.key ?? null)
++            : state.selected,
++        visible: state.visible && workbench.length > 0,
++      });
++    },
++    select: (key: string | null) => {
++      if (
++        key !== null &&
++        !state.entries.some(
++          (entry) => entry.key === key && entry.props.placement === "workbench",
++        )
++      )
++        return;
++      if (state.selected === key) return;
++      publish({ ...state, selected: key });
++    },
++    show: (visible: boolean) => {
++      if (state.visible !== visible)
++        publish({
++          ...state,
++          visible,
++          focusRequest: state.focusRequest + (visible ? 1 : 0),
++        });
++    },
++    reorder: (order: readonly string[]) => publish({ ...state, order }),
++  };
++}
++
++const SESSION_KEY = "bb:companion-views:v1";
++
++export function parseCompanionSession(value: unknown): CompanionSession | null {
++  if (value === null || typeof value !== "object") return null;
++  const saved = value as Record<string, unknown>;
++  if (!Array.isArray(saved.entries) || !Array.isArray(saved.order)) return null;
++  const entries: CompanionSession["entries"][number][] = [];
++  for (const raw of saved.entries) {
++    if (raw === null || typeof raw !== "object") continue;
++    const entry = raw as Record<string, unknown>;
++    if (
++      typeof entry.key !== "string" ||
++      typeof entry.activation !== "number" ||
++      !Number.isSafeInteger(entry.activation) ||
++      entry.activation < 0
++    )
++      continue;
++    if (
++      entry.placement !== "workbench" &&
++      entry.placement !== "main" &&
++      entry.placement !== "floating"
++    )
++      continue;
++    entries.push({
++      key: entry.key,
++      placement: entry.placement,
++      activation: entry.activation,
++    });
++  }
++  return {
++    entries,
++    order: saved.order.filter((id): id is string => typeof id === "string"),
++    selected: typeof saved.selected === "string" ? saved.selected : null,
++    visible: saved.visible === true,
++  };
++}
++
++function readSession(): CompanionSession | null {
++  try {
++    return parseCompanionSession(
++      JSON.parse(sessionStorage.getItem(SESSION_KEY) ?? "null"),
++    );
++  } catch {
++    return null;
++  }
++}
++
++export const companionViewStore = createCompanionViewStore(
++  readSession(),
++  (session) => {
++    try {
++      sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
++    } catch {
++      return;
++    }
++  },
++);
+diff --git a/apps/app/src/components/plugin/useCompanionPanel.tsx b/apps/app/src/components/plugin/useCompanionPanel.tsx
+new file mode 100644
+index 000000000..3f3a42971
+--- /dev/null
++++ b/apps/app/src/components/plugin/useCompanionPanel.tsx
+@@ -0,0 +1,190 @@
++import { useCallback, useLayoutEffect, useRef } from "react";
++import { Icon } from "@bb/shared-ui/icon";
++import { Button } from "@bb/shared-ui/button";
++import type { ThreadSecondaryPanelProps } from "@/components/secondary-panel/ThreadSecondaryPanel";
++import type { SecondaryPanelRenderableTab } from "@/components/secondary-panel/secondaryPanelTab";
++import { useOptionalPaneContext } from "@/views/thread-detail/PaneContext";
++import { CompanionViewOutlet, useCompanionViews } from "./PluginCompanionView";
++import {
++  companionViewStore,
++  type CompanionViewEntry,
++} from "./companion-view-store";
++
++export function useCompanionPanelVisibility(
++  open: boolean,
++  onToggle: () => void,
++  onClose: () => void,
++  syncNative = true,
++) {
++  const pane = useOptionalPaneContext();
++  const state = useCompanionViews();
++  const ownsCompanions = pane === null || pane.isFocused;
++  const hasCompanions =
++    ownsCompanions &&
++    state.entries.some((entry) => entry.props.placement === "workbench");
++  const isOpen = open || (hasCompanions && state.visible);
++  const previous = useRef({ open, hasCompanions: false, focusRequest: 0 });
++  useLayoutEffect(() => {
++    const before = previous.current;
++    previous.current = {
++      open,
++      hasCompanions,
++      focusRequest: state.focusRequest,
++    };
++    if (!syncNative || !hasCompanions) return;
++    const requested =
++      state.visible &&
++      (!before.hasCompanions || before.focusRequest !== state.focusRequest);
++    if (requested && !open) onToggle();
++    else if (before.open && !open) companionViewStore.show(false);
++  }, [
++    hasCompanions,
++    onToggle,
++    open,
++    state.focusRequest,
++    state.visible,
++    syncNative,
++  ]);
++  const close = useCallback(() => {
++    if (ownsCompanions) companionViewStore.show(false);
++    onClose();
++  }, [onClose, ownsCompanions]);
++  const toggle = useCallback(() => {
++    if (isOpen) {
++      if (ownsCompanions) companionViewStore.show(false);
++      onClose();
++    } else {
++      if (hasCompanions) companionViewStore.show(true);
++      onToggle();
++    }
++  }, [hasCompanions, isOpen, onClose, onToggle, ownsCompanions]);
++  return hasCompanions
++    ? { open: isOpen, onClose: close, onToggle: toggle }
++    : { open, onClose, onToggle };
++}
++
++function CompanionPanelContent({ entry }: { entry: CompanionViewEntry }) {
++  const { props } = entry;
++  return (
++    <div className="flex h-full min-h-0 flex-col">
++      <div className="flex shrink-0 items-center gap-1 border-b border-border-seam px-2 py-1">
++        {props.onBack ? (
++          <Button
++            variant="ghost"
++            size="sm"
++            aria-label="Back"
++            onClick={() => entry.props.onBack?.()}
++          >
++            <Icon name="ChevronLeft" />
++          </Button>
++        ) : null}
++        {props.onPinnedChange ? (
++          <Button
++            variant="ghost"
++            size="sm"
++            aria-label={props.pinned ? "Unpin companion" : "Pin companion"}
++            onClick={() => entry.props.onPinnedChange?.(!entry.props.pinned)}
++          >
++            <Icon name={props.pinned ? "PinOff" : "Pin"} />
++          </Button>
++        ) : null}
++        <span className="flex-1" />
++        <Button
++          variant="ghost"
++          size="sm"
++          onClick={() => entry.props.onPlacementChange("floating")}
++        >
++          <Icon name="PictureInPicture2" /> Float
++        </Button>
++        <Button
++          variant="ghost"
++          size="sm"
++          onClick={() => entry.props.onPlacementChange("main")}
++        >
++          <Icon name="Maximize2" /> Main view
++        </Button>
++      </div>
++      <CompanionViewOutlet entry={entry} />
++    </div>
++  );
++}
++
++export function useCompanionPanelProps(
++  props: ThreadSecondaryPanelProps,
++): ThreadSecondaryPanelProps {
++  const pane = useOptionalPaneContext();
++  const state = useCompanionViews();
++  const ownsCompanions = pane === null || pane.isFocused;
++  const visibility = useCompanionPanelVisibility(
++    props.isOpen,
++    props.onClose,
++    props.onClose,
++    false,
++  );
++  const companions = ownsCompanions
++    ? state.entries.filter((entry) => entry.props.placement === "workbench")
++    : [];
++  if (companions.length === 0) return props;
++  const selectExisting = (select: () => void) => () => {
++    companionViewStore.select(null);
++    select();
++  };
++  const tabs: SecondaryPanelRenderableTab[] = [
++    ...props.tabs.map((tab) => ({
++      ...tab,
++      onSelect: selectExisting(tab.onSelect),
++    })),
++    ...companions.map((entry): SecondaryPanelRenderableTab => ({
++      tab: { id: `companion:${entry.key}`, kind: "companion" },
++      label: entry.props.title,
++      isPinned: entry.props.pinned === true,
++      leadingVisual: <Icon name={entry.props.icon ?? "LayoutPanelLeft"} />,
++      contentFillsRegion: true,
++      statusLabel: null,
++      onClose: () => entry.props.onClose(),
++      onSelect: () => {
++        companionViewStore.select(entry.key);
++        entry.props.onSelect();
++      },
++      renderContent: () => <CompanionPanelContent entry={entry} />,
++    })),
++  ];
++  const order = new Map(state.order.map((id, index) => [id, index]));
++  tabs.sort(
++    (a, b) =>
++      (order.get(a.tab.id) ?? Infinity) - (order.get(b.tab.id) ?? Infinity),
++  );
++  const selected = companions.find((entry) => entry.key === state.selected);
++  return {
++    ...props,
++    isOpen: visibility.open,
++    activeTab: selected
++      ? { id: `companion:${selected.key}`, kind: "companion" }
++      : props.activeTab,
++    onClose: visibility.onClose,
++    onCollapse: () => {
++      companionViewStore.show(false);
++      props.onCollapse();
++    },
++    onOpenNewTab: selectExisting(props.onOpenNewTab),
++    fixedTabs: props.fixedTabs.map((tab) => ({
++      ...tab,
++      onSelect: selectExisting(tab.onSelect),
++    })),
++    tabs,
++    onTabReorder: (request) => {
++      const ids = tabs.map((tab) => tab.tab.id);
++      const from = ids.indexOf(request.activeTabId);
++      const to = ids.indexOf(request.overTabId);
++      if (from < 0 || to < 0 || from === to) return;
++      const moved = ids.splice(from, 1)[0]!;
++      ids.splice(to, 0, moved);
++      companionViewStore.reorder(ids);
++      if (
++        props.tabs.some((tab) => tab.tab.id === request.activeTabId) &&
++        props.tabs.some((tab) => tab.tab.id === request.overTabId)
++      )
++        props.onTabReorder(request);
++    },
++  };
++}
+diff --git a/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx b/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx
+index 8bd24cf6a..0b3ddaee0 100644
+--- a/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx
++++ b/apps/app/src/components/secondary-panel/SecondaryPanelLayout.tsx
+@@ -42,6 +42,7 @@ import {
+   SecondaryPanelMinimumContext,
+   useSecondaryPanelSizing,
+ } from "./secondaryPanelSizing";
++import { useCompanionPanelVisibility } from "@/components/plugin/useCompanionPanel";
+ 
+ const FULL_PANEL_SIZE_PERCENT = 100;
+ 
+@@ -76,7 +77,16 @@ interface SecondaryPanelLayoutProps {
+   composerHost: PluginComposerHost | null;
+ }
+ 
+-export function SecondaryPanelLayout({
++export function SecondaryPanelLayout(props: SecondaryPanelLayoutProps) {
++  const visibility = useCompanionPanelVisibility(
++    props.open,
++    props.onToggle,
++    props.onClose,
++  );
++  return <SecondaryPanelLayoutContent {...props} {...visibility} />;
++}
++
++function SecondaryPanelLayoutContent({
+   open,
+   onToggle,
+   onClose,
+diff --git a/apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx b/apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx
+index e35ed2aa8..e6cd8e150 100644
+--- a/apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx
++++ b/apps/app/src/components/secondary-panel/ThreadSecondaryPanel.tsx
+@@ -1,4 +1,5 @@
+ import { usePluginDetailPanelProps } from "@/components/plugin/plugin-detail-navigation";
++import { useCompanionPanelProps } from "@/components/plugin/useCompanionPanel";
+ import {
+   type CSSProperties,
+   type FocusEvent,
+@@ -50,6 +51,7 @@ import { SecondaryPanelTabStrip } from "./SecondaryPanelTabStrip";
+ import { ImageTabLightboxProvider } from "./ImageTabLightboxContext";
+ import type {
+   MarketplacePluginDetailPanelTab,
++  CompanionPanelTab,
+   SecondaryPanelPaneRenderContext,
+   SecondaryPanelRenderableTab,
+   SecondaryPanelTabReorderHandler,
+@@ -163,7 +165,11 @@ export interface SecondaryPanelFixedTab {
+ }
+ 
+ export interface ThreadSecondaryPanelProps {
+-  activeTab: SecondaryFixedPanelTab | MarketplacePluginDetailPanelTab | null;
++  activeTab:
++    | SecondaryFixedPanelTab
++    | MarketplacePluginDetailPanelTab
++    | CompanionPanelTab
++    | null;
+   canUseGitUi: boolean;
+   canNavigateTabs?: boolean;
+   gitDiffTabStatus?: GitDiffTabStatus;
+@@ -202,7 +208,7 @@ export interface ThreadSecondaryPanelProps {
+ }
+ 
+ export function ThreadSecondaryPanel(props: ThreadSecondaryPanelProps) {
+-  const panelProps = usePluginDetailPanelProps(props);
++  const panelProps = usePluginDetailPanelProps(useCompanionPanelProps(props));
+   return <ThreadSecondaryPanelContent {...panelProps} />;
+ }
+ 
+diff --git a/apps/app/src/components/secondary-panel/secondaryPanelTab.ts b/apps/app/src/components/secondary-panel/secondaryPanelTab.ts
+index 1743fd5e7..fcc656037 100644
+--- a/apps/app/src/components/secondary-panel/secondaryPanelTab.ts
++++ b/apps/app/src/components/secondary-panel/secondaryPanelTab.ts
+@@ -6,6 +6,11 @@ export interface MarketplacePluginDetailPanelTab {
+   kind: "marketplace-plugin-detail";
+ }
+ 
++export interface CompanionPanelTab {
++  id: string;
++  kind: "companion";
++}
++
+ export interface SecondaryPanelTabReorderRequest {
+   activeTabId: string;
+   overTabId: string;
+@@ -30,5 +35,8 @@ export interface SecondaryPanelRenderableTab {
+   onSelect: () => void;
+   renderContent: (pane: SecondaryPanelPaneRenderContext) => ReactNode;
+   statusLabel: string | null;
+-  tab: SecondaryFileFixedPanelTab | MarketplacePluginDetailPanelTab;
++  tab:
++    | SecondaryFileFixedPanelTab
++    | MarketplacePluginDetailPanelTab
++    | CompanionPanelTab;
+ }
+diff --git a/apps/app/src/lib/plugin-sdk-app-impl.tsx b/apps/app/src/lib/plugin-sdk-app-impl.tsx
+index d45a71369..96e210e91 100644
+--- a/apps/app/src/lib/plugin-sdk-app-impl.tsx
++++ b/apps/app/src/lib/plugin-sdk-app-impl.tsx
+@@ -1,4 +1,8 @@
+ import { ProviderIcon } from "@/components/plugin/ProviderIcon";
++import {
++  PluginCompanionView,
++  PluginCompanionOutlet,
++} from "@/components/plugin/PluginCompanionView";
+ import { Icon } from "@bb/shared-ui/icon";
+ import { useCallback, useMemo } from "react";
+ import type { MarkdownProps, PluginSdkApp } from "@get-bb/plugin-sdk";
+@@ -81,6 +85,8 @@ export const pluginSdkAppImplementation = {
+   useRpc,
+   useSettings,
+   ThreadChat: LazyPluginThreadChat,
++  experimental_CompanionView: PluginCompanionView,
++  experimental_CompanionOutlet: PluginCompanionOutlet,
+   Markdown: PluginMarkdown,
+   experimental_FileLink: ExperimentalFileLink,
+   UrlLink: PluginUrlLink,
+diff --git a/docs/api_to_audit.md b/docs/api_to_audit.md
+index b4f126392..3a85b6011 100644
+--- a/docs/api_to_audit.md
++++ b/docs/api_to_audit.md
+@@ -51,6 +51,35 @@ composer contributions, and whether commands need an availability callback.
+ 
+ `experimental_page: "mobile"` mounts a plugin settings section exclusively on Settings → Mobile when that plugin owns the selected access provider, retaining plugin context, lifecycle, and error boundaries. Omission keeps the section on its plugin configuration page. Stabilization requires verifying placement isolation, plugin disable/uninstall, loading and failure states, and pairing lifecycle on Mobile.
+ 
++## `experimental_CompanionView` and `experimental_CompanionOutlet`
++
++An app-overlay owner keeps a companion component mounted while BB moves one
++persistent DOM container between its floating placeholder, a dynamic tab in
++the native right panel, and a matching main nav-panel outlet. Identity is
++scoped by plugin ID and companion ID. The portal keeps its React ownership,
++plugin CSS root, draft and attachment inputs, editor state, and scroll during
++placement and route changes. Increment `activation` for explicit focus;
++zero registers in the background. Metadata updates do not reverse dismissal
++or steal selection from native Browser/Terminal tabs. Pins participate in the
++native tab strip's close policy. Only the focused main pane hosts companions.
++The owner persists identities and placement; the host keeps native selection,
++tab order, dismissal, and activation baselines in per-window session storage.
++Removing the owner disposes its live view. The test runtime renders
++View children inline and has no native panel or main outlet implementation.
++
++Before stabilization:
++
++1. Verify real plugin views and SDK composers across floating, native panel,
++   main, route changes, native browser/terminal selection, and split panes.
++2. Exercise duplicate IDs, plugin unload/reload, explicit close, retained
++   attachments, focus, scroll, and editor state without portal remounts.
++3. Verify compact drawers and host resizing in Safari and desktop Chromium.
++4. Ship the suite's command/CLI placement controller and a released host
++   capability. Maintain stable SDK fallback until that host reaches stable.
++5. Confirm owner persistence, background activation, pinned tabs, tab reorder,
++   and dismissal restoration with real suite captures.
++
++
+ ## `app.commands.register`
+ 
+ `app.commands.register` requires SDK 0.4.91; `defaultShortcut` and keyboard
+diff --git a/packages/plugin-sdk/src/app-contract.ts b/packages/plugin-sdk/src/app-contract.ts
+index 22860e618..eb10314e2 100644
+--- a/packages/plugin-sdk/src/app-contract.ts
++++ b/packages/plugin-sdk/src/app-contract.ts
+@@ -3290,6 +3290,43 @@ export interface ExperimentalAppPanel {
+   ): boolean;
+ }
+ 
++/** The destination of a retained companion view within this app window. */
++export type ExperimentalCompanionPlacement = "floating" | "workbench" | "main";
++
++/**
++ * A live view owned by an app overlay. BB moves one persistent portal between
++ * the owner's floating placeholder, the native right-panel tab strip, and a
++ * matching main outlet. Keep this component mounted while changing placement
++ * to retain React state, composer attachments, and editor DOM. Ownership and
++ * identity are scoped to the calling plugin and `id` in the current window.
++ * The plugin persists its own tab identities and placement across reloads.
++ * BB keeps native tab selection, order, and dismissal in per-window session storage.
++ */
++export interface ExperimentalCompanionViewProps {
++  id: string;
++  title: string;
++  icon?: string;
++  placement: ExperimentalCompanionPlacement;
++  /** Increment on each explicit focus request, even for an already open tab. Zero opens in the background. */
++  activation: number;
++  pinned?: boolean;
++  onSelect(): void;
++  onClose(): void;
++  onPlacementChange(placement: ExperimentalCompanionPlacement): void;
++  onPinnedChange?(pinned: boolean): void;
++  onBack?: () => void;
++  children: ReactNode;
++}
++
++/**
++ * Place in a nav panel to host the same plugin's companion `id` in the main
++ * view. It realizes only when that companion's placement is `main`. One
++ * outlet may own the view at a time; unmounting parks it with its overlay.
++ */
++export interface ExperimentalCompanionOutletProps {
++  id: string;
++}
++
+ /** Current app selection, derived from the route. */
+ export interface BbContext {
+   projectId: string | null;
+@@ -3400,6 +3437,10 @@ export interface PluginSdkApp {
+   useBbNavigate(): BbNavigate;
+   /** Select one of this plugin's eligible fixed tabs on the current surface. */
+   experimental_useAppPanel(): ExperimentalAppPanel;
++  /** Retain one overlay-owned view across floating, workbench, and main destinations. */
++  experimental_CompanionView: ComponentType<ExperimentalCompanionViewProps>;
++  /** Receive a retained companion in the owning plugin's main nav panel. */
++  experimental_CompanionOutlet: ComponentType<ExperimentalCompanionOutletProps>;
+   /** Read or clear the owning tab's validated, session-scoped target. */
+   experimental_useFixedTabTarget<Target extends JsonValue>(
+     tab: ExperimentalPluginFixedTabReference<Target>,
+diff --git a/packages/plugin-sdk/src/app.ts b/packages/plugin-sdk/src/app.ts
+index 68224dc19..fde6c21b7 100644
+--- a/packages/plugin-sdk/src/app.ts
++++ b/packages/plugin-sdk/src/app.ts
+@@ -116,6 +116,12 @@ export const definePluginApp: PluginSdkApp["definePluginApp"] = (setup) => {
+   return Object.freeze({ __bbPluginApp: true as const, setup });
+ };
+ export const ThreadChat = runtimeComponent("ThreadChat");
++export const experimental_CompanionView = runtimeComponent(
++  "experimental_CompanionView",
++);
++export const experimental_CompanionOutlet = runtimeComponent(
++  "experimental_CompanionOutlet",
++);
+ export const Markdown = runtimeComponent("Markdown");
+ export const experimental_FileLink = runtimeComponent("experimental_FileLink");
+ export const UrlLink = runtimeComponent("UrlLink");
+diff --git a/packages/plugin-sdk/src/testing/app.tsx b/packages/plugin-sdk/src/testing/app.tsx
+index d7984ebb4..13e9e9e48 100644
+--- a/packages/plugin-sdk/src/testing/app.tsx
++++ b/packages/plugin-sdk/src/testing/app.tsx
+@@ -946,6 +946,14 @@ function TestDiff({
+ }
+ 
+ const testPluginSdkApp = {
++  experimental_CompanionView: ({
++    children,
++  }: import("../app-contract.js").ExperimentalCompanionViewProps) => (
++    <>{children}</>
++  ),
++  experimental_CompanionOutlet: (
++    _props: import("../app-contract.js").ExperimentalCompanionOutletProps,
++  ) => null,
+   definePluginApp,
+   useRpc<
+     Contract extends PluginRpcContract = PluginRpcContract,
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index 4af7e39f6..f6e0c3a49 100644
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -91,6 +91,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "Get its own URL, so the page can be linked to and bb's back and forward buttons work",
+           "Register ordered, non-closable fixed tabs beside Browser and Terminal; bb persists selection and mounts each component only while its tab is visible in an open pane",
+           "Open an owned fixed tab with experimental_useAppPanel and read its validated JSON target with experimental_useFixedTabTarget; targets survive route changes in the current session, but not a refresh",
++          "Keep an experimental_CompanionView mounted in an app overlay to move one live portal between Float, the native workbench tab strip, and an experimental_CompanionOutlet in the same plugin's main nav panel; activation requests focus while title updates preserve dismissal",
+           "Add headerContent to the page title bar, or a non-interactive experimental_sidebarAccessory to the desktop sidebar row",
+         ],
+         apiSymbols: [
+@@ -105,6 +106,11 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "ExperimentalOpenFixedTabOptions",
+           "experimental_useFixedTabTarget",
+           "ExperimentalFixedTabTargetState",
++          "experimental_CompanionView",
++          "ExperimentalCompanionViewProps",
++          "ExperimentalCompanionPlacement",
++          "experimental_CompanionOutlet",
++          "ExperimentalCompanionOutletProps",
+           "useBbContext",
+           "useBbNavigate",
+           "BbNavigate.toPluginPanel",
+-- 
+2.50.1 (Apple Git-155)
+
+
+From 24d2201fc7094bddbc31ad5bd15287d8e04dcebf Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Fri, 2 Oct 2026 23:41:48 -0400
+Subject: [PATCH 2/3] Control existing companion placement through SDK and CLI
+
+---
+ .../plugin/PluginCompanionView.test.tsx       | 46 +++++++++
+ .../components/plugin/PluginCompanionView.tsx | 29 +++++-
+ .../components/plugin/companion-view-store.ts | 34 +++++++
+ .../command-output/plugin-companions.test.ts  | 42 ++++++++
+ apps/cli/src/commands/plugin.ts               | 34 +++++++
+ apps/server/src/routes/plugin-companions.ts   | 32 ++++++
+ apps/server/src/server.ts                     |  2 +
+ .../public/public-plugin-companions.test.ts   | 99 +++++++++++++++++++
+ docs/api_to_audit.md                          | 12 +++
+ packages/sdk/src/areas/plugins.ts             | 18 ++++
+ packages/server-contract/src/api/plugins.ts   | 28 ++++++
+ .../src/templates/bb-guide-plugins.md         |  8 ++
+ plugins/bb-guide/skills/bb-cli/SKILL.md       |  7 ++
+ plugins/plugin-api-docs/src/surfaces.ts       |  2 +
+ 14 files changed, 392 insertions(+), 1 deletion(-)
+ create mode 100644 apps/cli/src/__tests__/command-output/plugin-companions.test.ts
+ create mode 100644 apps/server/src/routes/plugin-companions.ts
+ create mode 100644 apps/server/test/public/public-plugin-companions.test.ts
+
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.test.tsx b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+index 78048e6ef..6d3328ade 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.test.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.test.tsx
+@@ -32,6 +32,8 @@ import {
+   createTerminalFixedPanelTab,
+ } from "@/lib/fixed-panel-tabs-state";
+ import { createQueryClientTestHarness } from "@/test/queryClientTestHarness";
++import { wsManager } from "@/lib/ws";
++import { PLUGIN_COMPANION_ACTION_CHANNEL } from "@bb/server-contract";
+ 
+ const noop = () => {};
+ const browser = createBrowserFixedPanelTab({
+@@ -173,6 +175,50 @@ function renderExperience(route = "page-a") {
+ }
+ 
+ describe("retained native companion views", () => {
++  it("routes remote controls to their owner, retains the live draft through placement, and protects pins", () => {
++    renderExperience();
++    const editor = screen.getByRole("textbox", { name: "Draft" });
++    fireEvent.change(editor, {
++      target: { value: "Keep the remotely moved draft" },
++    });
++    const signal = (action: string, pluginId = "studio-demo", id = "editor") =>
++      act(() =>
++        wsManager.handleIncomingMessage(
++          JSON.stringify({
++            type: "plugin-signal",
++            pluginId,
++            channel: PLUGIN_COMPANION_ACTION_CHANNEL,
++            payload: { id, action },
++          }),
++        ),
++      );
++    const owner = companionViewStore.getSnapshot().entries[0]!;
++    signal("dock", "other-plugin");
++    signal("dock", "studio-demo", "absent");
++    signal("reset");
++    expect(owner.props.placement).toBe("floating");
++    signal("dock");
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(editor);
++    expect(editor.closest("[data-bb-companion-outlet]")).toBeTruthy();
++    act(() => companionViewStore.show(false));
++    signal("focus");
++    expect(companionViewStore.getSnapshot().visible).toBe(true);
++    signal("pin");
++    signal("close");
++    expect(companionViewStore.getSnapshot().entries).toHaveLength(1);
++    signal("main");
++    expect(screen.getByTestId("main-outlet").contains(editor)).toBe(true);
++    signal("float");
++    expect(screen.getByRole("textbox", { name: "Draft" })).toBe(editor);
++    expect((editor as HTMLTextAreaElement).value).toBe(
++      "Keep the remotely moved draft",
++    );
++    signal("unpin");
++    signal("close");
++    expect(companionViewStore.getSnapshot().entries).toHaveLength(0);
++    signal("focus");
++    expect(companionViewStore.getSnapshot().entries).toHaveLength(0);
++  });
+   it("keeps equal companion ids isolated by plugin ownership and preserves the CSS root after transfer", () => {
+     const props: ExperimentalCompanionViewProps = {
+       id: "same",
+diff --git a/apps/app/src/components/plugin/PluginCompanionView.tsx b/apps/app/src/components/plugin/PluginCompanionView.tsx
+index fd08a18ed..6a27bf82f 100644
+--- a/apps/app/src/components/plugin/PluginCompanionView.tsx
++++ b/apps/app/src/components/plugin/PluginCompanionView.tsx
+@@ -1,4 +1,15 @@
+-import { useLayoutEffect, useRef, useState, useSyncExternalStore } from "react";
++import {
++  useEffect,
++  useLayoutEffect,
++  useRef,
++  useState,
++  useSyncExternalStore,
++} from "react";
++import {
++  PLUGIN_COMPANION_ACTION_CHANNEL,
++  pluginCompanionActionRequestSchema,
++} from "@bb/server-contract";
++import { wsManager } from "@/lib/ws";
+ import { createPortal } from "react-dom";
+ import type {
+   ExperimentalCompanionOutletProps,
+@@ -23,6 +34,22 @@ export function PluginCompanionView(props: ExperimentalCompanionViewProps) {
+   const key = JSON.stringify([pluginId, props.id]);
+   const [element] = useState(() => document.createElement("div"));
+   const home = useRef<HTMLDivElement>(null);
++  useEffect(
++    () =>
++      wsManager.onPluginSignal((signal) => {
++        if (
++          signal.pluginId !== pluginId ||
++          signal.channel !== PLUGIN_COMPANION_ACTION_CHANNEL
++        )
++          return;
++        const request = pluginCompanionActionRequestSchema.safeParse(
++          signal.payload,
++        );
++        if (request.success && request.data.id === props.id)
++          companionViewStore.control(key, request.data.action);
++      }),
++    [key, pluginId, props.id],
++  );
+   useLayoutEffect(() => {
+     const host = home.current;
+     if (host === null) return;
+diff --git a/apps/app/src/components/plugin/companion-view-store.ts b/apps/app/src/components/plugin/companion-view-store.ts
+index 21bf6b76d..8d028ad93 100644
+--- a/apps/app/src/components/plugin/companion-view-store.ts
++++ b/apps/app/src/components/plugin/companion-view-store.ts
+@@ -1,4 +1,5 @@
+ import type { ExperimentalCompanionViewProps } from "@get-bb/plugin-sdk";
++import type { PluginCompanionAction } from "@bb/server-contract";
+ 
+ interface CompanionSession {
+   selected: string | null;
+@@ -57,6 +58,39 @@ export function createCompanionViewStore(
+   };
+   return {
+     getSnapshot: () => state,
++    control: (key: string, action: PluginCompanionAction): boolean => {
++      const entry = state.entries.find((candidate) => candidate.key === key);
++      if (!entry) return false;
++      const props = entry.props;
++      if (action === "focus") {
++        if (props.placement === "workbench")
++          publish({
++            ...state,
++            selected: key,
++            visible: true,
++            focusRequest: state.focusRequest + 1,
++          });
++        props.onSelect();
++      } else if (action === "close") {
++        if (props.pinned) return false;
++        props.onClose();
++      } else if (action === "pin" || action === "unpin") {
++        if (!props.onPinnedChange) return false;
++        props.onPinnedChange(action === "pin");
++      } else if (action === "back") {
++        if (!props.onBack) return false;
++        props.onBack();
++      } else {
++        props.onPlacementChange(
++          action === "dock"
++            ? "workbench"
++            : action === "float"
++              ? "floating"
++              : "main",
++        );
++      }
++      return true;
++    },
+     subscribe: (listener: () => void) => {
+       listeners.add(listener);
+       return () => {
+diff --git a/apps/cli/src/__tests__/command-output/plugin-companions.test.ts b/apps/cli/src/__tests__/command-output/plugin-companions.test.ts
+new file mode 100644
+index 000000000..f9146622f
+--- /dev/null
++++ b/apps/cli/src/__tests__/command-output/plugin-companions.test.ts
+@@ -0,0 +1,42 @@
++import { expect, it, vi, describe } from "vitest";
++import {
++  runCommand,
++  setupCommandOutputTestEnvironment,
++} from "../helpers/command-output-harness.js";
++import { registerPluginCommands } from "../../commands/plugin.js";
++
++describe("bb plugin companion", () => {
++  setupCommandOutputTestEnvironment();
++  const register = (program: Parameters<typeof registerPluginCommands>[0]) =>
++    registerPluginCommands(program, () => "http://server");
++  it("forwards the exact owner and view identity and reports delivery", async () => {
++    vi.mocked(fetch).mockResolvedValueOnce(Response.json({ delivered: 0 }));
++    await runCommand(
++      ["plugin", "companion", "float", "thread:123", "dock", "--json"],
++      register,
++    );
++    expect(fetch).toHaveBeenCalledWith(
++      "http://server/api/v1/plugins/float/companion-action",
++      expect.objectContaining({
++        method: "POST",
++        body: JSON.stringify({ id: "thread:123", action: "dock" }),
++      }),
++    );
++    expect(console.log).toHaveBeenCalledWith(
++      JSON.stringify(
++        { pluginId: "float", id: "thread:123", action: "dock", delivered: 0 },
++        null,
++        2,
++      ),
++    );
++  });
++  it("rejects an unsupported action before sending", async () => {
++    await expect(
++      runCommand(
++        ["plugin", "companion", "float", "thread:123", "reset"],
++        register,
++      ),
++    ).rejects.toThrow("process.exit:1");
++    expect(fetch).not.toHaveBeenCalled();
++  });
++});
+diff --git a/apps/cli/src/commands/plugin.ts b/apps/cli/src/commands/plugin.ts
+index 26cd74c72..f65ae8ec7 100644
+--- a/apps/cli/src/commands/plugin.ts
++++ b/apps/cli/src/commands/plugin.ts
+@@ -17,6 +17,7 @@ import type {
+   PluginUpdateCheckEntry as PluginUpdateResult,
+ } from "@bb/server-contract";
+ import { PLUGIN_SDK_VERSION } from "@bb/domain";
++import { pluginCompanionActionSchema } from "@bb/server-contract";
+ import { BbHttpError, pluginMutationResponseSchema } from "@bb/sdk";
+ import { parseDataDirEnvValue, resolveProdDataDir } from "@bb/config/runtime";
+ import {
+@@ -777,6 +778,39 @@ export function registerPluginCommands(
+   const rpc = plugin
+     .command("rpc")
+     .description("Inspect discoverable plugin RPC methods");
++  plugin
++    .command("companion <plugin-id> <view-id> <action>")
++    .description("Control an existing companion in connected BB apps")
++    .option("--json", "Output JSON")
++    .action(
++      action(
++        async (
++          pluginId: string,
++          id: string,
++          actionInput: string,
++          opts: JsonOutputOptions,
++        ) => {
++          const companionAction =
++            pluginCompanionActionSchema.parse(actionInput);
++          const result = await createCliBbSdk(
++            getUrl(),
++          ).plugins.experimental_companionAction({
++            pluginId,
++            id,
++            action: companionAction,
++          });
++          if (
++            !outputJson(opts, {
++              pluginId,
++              id,
++              action: companionAction,
++              delivered: result.delivered,
++            })
++          )
++            console.log(`Delivered to ${result.delivered} connected app(s).`);
++        },
++      ),
++    );
+   rpc
+     .command("list [plugin-id]")
+     .option("--method <name>", "Filter by exact method name")
+diff --git a/apps/server/src/routes/plugin-companions.ts b/apps/server/src/routes/plugin-companions.ts
+new file mode 100644
+index 000000000..4e83d86c6
+--- /dev/null
++++ b/apps/server/src/routes/plugin-companions.ts
+@@ -0,0 +1,32 @@
++import { getInstalledPlugin, type DbConnection } from "@bb/db";
++import {
++  PLUGIN_COMPANION_ACTION_CHANNEL,
++  pluginCompanionActionRequestSchema,
++} from "@bb/server-contract";
++import type { Hono } from "hono";
++import type { NotificationHub } from "../ws/hub.js";
++
++export function registerPluginCompanionRoutes(
++  app: Hono,
++  deps: { db: DbConnection; hub: Pick<NotificationHub, "notifyPluginSignal"> },
++): void {
++  app.post("/plugins/:id/companion-action", async (context) => {
++    const pluginId = context.req.param("id");
++    if (!getInstalledPlugin(deps.db, pluginId))
++      return context.json({ error: "unknown plugin" }, 404);
++    const body = pluginCompanionActionRequestSchema.safeParse(
++      await context.req.json().catch(() => null),
++    );
++    if (!body.success)
++      return context.json(
++        { error: "expected a companion id and supported action" },
++        400,
++      );
++    const delivered = deps.hub.notifyPluginSignal(
++      pluginId,
++      PLUGIN_COMPANION_ACTION_CHANNEL,
++      body.data,
++    );
++    return context.json({ delivered });
++  });
++}
+diff --git a/apps/server/src/server.ts b/apps/server/src/server.ts
+index 7f9ea110b..90426baeb 100644
+--- a/apps/server/src/server.ts
++++ b/apps/server/src/server.ts
+@@ -34,6 +34,7 @@ import { registerTerminalRoutes } from "./routes/terminals.js";
+ import { registerThreadRoutes } from "./routes/threads/index.js";
+ import { registerQueueRoutes } from "./routes/queue.js";
+ import { registerPluginRoutes } from "./routes/plugins.js";
++import { registerPluginCompanionRoutes } from "./routes/plugin-companions.js";
+ import { registerPluginCatalogRoutes } from "./routes/plugin-catalog.js";
+ import { registerPromptHistoryRoutes } from "./routes/prompt-history.js";
+ import { registerSkillsRegistryRoutes } from "./routes/skills-registry.js";
+@@ -878,6 +879,7 @@ export function createApp(
+   registerUiPreferenceRoutes(publicApi, deps);
+   registerPluginCatalogRoutes(publicApi, pluginCatalogService);
+   registerPluginRoutes(publicApi, deps, pluginService, upgradeWebSocket);
++  registerPluginCompanionRoutes(publicApi, deps);
+   registerSkillsRegistryRoutes(publicApi, deps);
+   registerServerMoveRoutes(publicApi, deps, serverMove);
+   app.route("/api/v1", publicApi);
+diff --git a/apps/server/test/public/public-plugin-companions.test.ts b/apps/server/test/public/public-plugin-companions.test.ts
+new file mode 100644
+index 000000000..957900801
+--- /dev/null
++++ b/apps/server/test/public/public-plugin-companions.test.ts
+@@ -0,0 +1,99 @@
++import { mkdir, writeFile } from "node:fs/promises";
++import { join } from "node:path";
++import { expect, it } from "vitest";
++import { createBbSdk } from "@bb/sdk/core";
++import { createHttpTransport } from "@bb/sdk/node";
++import {
++  PLUGIN_COMPANION_ACTION_CHANNEL,
++  pluginCompanionActionSchema,
++} from "@bb/server-contract";
++import { withTestHarness } from "../helpers/test-app.js";
++import { createMockHubSocket } from "../helpers/mock-hub-socket.js";
++
++it("validates remote companion requests and delivers owner-scoped SDK actions without an app acknowledgement", async () => {
++  await withTestHarness(async (harness) => {
++    const root = join(harness.config.dataDir, "companion-fixture");
++    await mkdir(root);
++    await writeFile(
++      join(root, "package.json"),
++      JSON.stringify({
++        name: "bb-plugin-companion-fixture",
++        version: "1.0.0",
++        bb: {
++          name: "Fixture",
++          description: "Companion controls",
++          branding: { icon: "Zap" },
++          server: "./server.ts",
++        },
++      }),
++    );
++    await writeFile(
++      join(root, "server.ts"),
++      "export default function plugin() {}\n",
++    );
++    const plugin = await harness.pluginService.installPath(root);
++    const sdk = createBbSdk({
++      transport: createHttpTransport({
++        baseUrl: "http://127.0.0.1:3334",
++        runtime: "node",
++        fetch: async (input, init) => harness.app.request(String(input), init),
++      }),
++    });
++    await expect(
++      sdk.plugins.experimental_companionAction({
++        pluginId: plugin.id,
++        id: "page:1",
++        action: "dock",
++      }),
++    ).resolves.toEqual({ delivered: 0 });
++    const sockets = [createMockHubSocket(), createMockHubSocket()];
++    sockets.forEach((socket) => harness.hub.registerClient(socket));
++    for (const action of pluginCompanionActionSchema.options)
++      await expect(
++        sdk.plugins.experimental_companionAction({
++          pluginId: plugin.id,
++          id: "page:1",
++          action,
++        }),
++      ).resolves.toEqual({ delivered: 2 });
++    const signals = sockets.map((socket) =>
++      socket.messages.map((message) => JSON.parse(message)),
++    );
++    expect(signals[0]).toEqual(
++      pluginCompanionActionSchema.options.map((action) => ({
++        type: "plugin-signal",
++        pluginId: plugin.id,
++        channel: PLUGIN_COMPANION_ACTION_CHANNEL,
++        payload: { id: "page:1", action },
++      })),
++    );
++    expect(signals[1]).toEqual(signals[0]);
++    for (const body of [
++      { id: "", action: "dock" },
++      { id: "page:1", action: "reset" },
++      { id: "page:1", action: "dock", pluginId: "other" },
++    ]) {
++      const response = await harness.app.request(
++        `/api/v1/plugins/${plugin.id}/companion-action`,
++        {
++          method: "POST",
++          headers: { "content-type": "application/json" },
++          body: JSON.stringify(body),
++        },
++      );
++      expect(response.status).toBe(400);
++    }
++    const unknown = await harness.app.request(
++      "/api/v1/plugins/missing/companion-action",
++      {
++        method: "POST",
++        headers: { "content-type": "application/json" },
++        body: JSON.stringify({ id: "page:1", action: "close" }),
++      },
++    );
++    expect(unknown.status).toBe(404);
++    expect(sockets[0]?.messages).toHaveLength(
++      pluginCompanionActionSchema.options.length,
++    );
++  });
++});
+diff --git a/docs/api_to_audit.md b/docs/api_to_audit.md
+index 3a85b6011..e2a2c60ca 100644
+--- a/docs/api_to_audit.md
++++ b/docs/api_to_audit.md
+@@ -67,6 +67,18 @@ tab order, dismissal, and activation baselines in per-window session storage.
+ Removing the owner disposes its live view. The test runtime renders
+ View children inline and has no native panel or main outlet implementation.
+ 
++`bb.sdk.plugins.experimental_companionAction({ pluginId, id, action })` and
++`bb plugin companion <plugin-id> <view-id> <action>` send dock, float, main,
++focus, close, pin, unpin or back to existing views in connected apps. The
++server validates the request and installed plugin before delivering an
++owner-scoped signal. The host validates its payload and uses the current
++owner callbacks. Closing a pinned view is ignored until it is unpinned;
++unsupported optional actions and absent views are ignored. `delivered` counts
++connected app clients, not successful actions. Commands are transient and
++never replayed after reconnect. Stabilization requires testing multiple
++windows, unload races, malformed signals and state retention through remote
++placement changes, and deciding whether per-view acknowledgements are needed.
++
+ Before stabilization:
+ 
+ 1. Verify real plugin views and SDK composers across floating, native panel,
+diff --git a/packages/sdk/src/areas/plugins.ts b/packages/sdk/src/areas/plugins.ts
+index 1a217ae4b..7721e3666 100644
+--- a/packages/sdk/src/areas/plugins.ts
++++ b/packages/sdk/src/areas/plugins.ts
+@@ -1,6 +1,10 @@
+ import { jsonValueSchema, type JsonValue } from "@bb/domain";
+ import {
+   installedPluginSchema,
++  pluginCompanionActionRequestSchema,
++  pluginCompanionActionResponseSchema,
++  type PluginCompanionActionRequest,
++  type PluginCompanionActionResponse,
+   pluginRpcDiscoveryQuerySchema,
+   pluginRpcDiscoveryResponseSchema,
+   type PluginRpcDiscoveryQuery,
+@@ -238,6 +242,9 @@ export interface PluginMarketplacesArea {
+ }
+ 
+ export interface PluginsArea {
++  experimental_companionAction(
++    args: PluginIdArgs & PluginCompanionActionRequest,
++  ): Promise<PluginCompanionActionResponse>;
+   experimental_discoverRpc(
+     args?: PluginRpcDiscoveryQuery,
+   ): Promise<PublishedPluginRpcMethod[]>;
+@@ -397,6 +404,17 @@ export function createPluginsArea(args: CreateSdkAreaArgs): PluginsArea {
+   };
+ 
+   return {
++    async experimental_companionAction(input) {
++      const body = pluginCompanionActionRequestSchema.parse({
++        id: input.id,
++        action: input.action,
++      });
++      return requestParsed(
++        pluginPath(input.pluginId, "/companion-action"),
++        pluginCompanionActionResponseSchema,
++        jsonInit("POST", body),
++      );
++    },
+     async applyUpdate(input) {
+       const body = pluginApplyUpdateRequestSchema.parse({});
+       return requestParsed(
+diff --git a/packages/server-contract/src/api/plugins.ts b/packages/server-contract/src/api/plugins.ts
+index 25e84731b..de4f804a6 100644
+--- a/packages/server-contract/src/api/plugins.ts
++++ b/packages/server-contract/src/api/plugins.ts
+@@ -6,6 +6,34 @@ import {
+ } from "@bb/domain";
+ import { z } from "zod";
+ 
++export const pluginCompanionActionSchema = z.enum([
++  "dock",
++  "float",
++  "main",
++  "focus",
++  "close",
++  "pin",
++  "unpin",
++  "back",
++]);
++export type PluginCompanionAction = z.infer<typeof pluginCompanionActionSchema>;
++export const pluginCompanionActionRequestSchema = z
++  .object({
++    id: z.string().min(1).max(1024),
++    action: pluginCompanionActionSchema,
++  })
++  .strict();
++export type PluginCompanionActionRequest = z.infer<
++  typeof pluginCompanionActionRequestSchema
++>;
++export const pluginCompanionActionResponseSchema = z.object({
++  delivered: z.number().int().nonnegative(),
++});
++export type PluginCompanionActionResponse = z.infer<
++  typeof pluginCompanionActionResponseSchema
++>;
++export const PLUGIN_COMPANION_ACTION_CHANNEL = "bb:companion-action";
++
+ export const pluginRuntimeStatusSchema = z.enum([
+   "starting",
+   "running",
+diff --git a/packages/templates/src/templates/bb-guide-plugins.md b/packages/templates/src/templates/bb-guide-plugins.md
+index 4f03b0477..e2e888b77 100644
+--- a/packages/templates/src/templates/bb-guide-plugins.md
++++ b/packages/templates/src/templates/bb-guide-plugins.md
+@@ -334,6 +334,14 @@ added/updated/unchanged counts.
+                                  install (--yes skips; non-TTY refuses without
+                                  --yes). Use outdated to preview; pinned
+                                  installs stay put
++  bb plugin companion <plugin-id> <view-id> <action> [--json]
++                                Control an existing companion in connected apps.
++                                Actions: dock, float, main, focus, close, pin,
++                                unpin, back. IDs are scoped to the owning plugin.
++                                Pinned tabs must be unpinned before closing.
++                                Delivered counts connected apps, not applied
++                                actions; absent views and unsupported optional
++                                actions are ignored. This never creates a view.
+   bb plugin list                 Status, services, schedules, handler timings.
+                                  `bb status` also names enabled plugins that
+                                  are incompatible, failed, or missing
+diff --git a/plugins/bb-guide/skills/bb-cli/SKILL.md b/plugins/bb-guide/skills/bb-cli/SKILL.md
+index c8823eb32..8a81c177b 100644
+--- a/plugins/bb-guide/skills/bb-cli/SKILL.md
++++ b/plugins/bb-guide/skills/bb-cli/SKILL.md
+@@ -168,6 +168,13 @@ remote service. Report the stable ID or URL that the user needs next.
+ Use `bb plugin config <id>` to inspect the plugin’s configuration and
+ `bb plugin config <id> set <key> <value>` to change it. Read the plugin’s own
+ skill for its commands, configuration meanings, and operating constraints.
++
++`bb plugin companion <plugin-id> <view-id> <action> --json` to control an
++existing companion in connected apps. Actions are dock, float, main, focus,
++close, pin, unpin and back. Unpin before close. The returned delivered count
++reports connected clients, not which clients had the view; this cannot open
++an absent companion. The SDK equivalent is
++`sdk.plugins.experimental_companionAction({ pluginId, id, action })`.
+ Discover contributed command paths through `bb plugin list`, the generated
+ `plugin-commands` skill, or `bb plugin run <id> --help`.
+ 
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index f6e0c3a49..1539eb79a 100644
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -92,6 +92,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "Register ordered, non-closable fixed tabs beside Browser and Terminal; bb persists selection and mounts each component only while its tab is visible in an open pane",
+           "Open an owned fixed tab with experimental_useAppPanel and read its validated JSON target with experimental_useFixedTabTarget; targets survive route changes in the current session, but not a refresh",
+           "Keep an experimental_CompanionView mounted in an app overlay to move one live portal between Float, the native workbench tab strip, and an experimental_CompanionOutlet in the same plugin's main nav panel; activation requests focus while title updates preserve dismissal",
++          "Control an existing owner-scoped companion with bb.sdk.plugins.experimental_companionAction or bb plugin companion: dock, float, main, focus, close, pin, unpin and back; delivery counts connected apps, pinned tabs resist close, and absent views are not created",
+           "Add headerContent to the page title bar, or a non-interactive experimental_sidebarAccessory to the desktop sidebar row",
+         ],
+         apiSymbols: [
+@@ -111,6 +112,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "ExperimentalCompanionPlacement",
+           "experimental_CompanionOutlet",
+           "ExperimentalCompanionOutletProps",
++          "bb.sdk.plugins.experimental_companionAction",
+           "useBbContext",
+           "useBbNavigate",
+           "BbNavigate.toPluginPanel",
+-- 
+2.50.1 (Apple Git-155)
+
+
+From 1050e72f34e7c98c54152f79bc88c7bebfe682ec Mon Sep 17 00:00:00 2001
+From: Patrick Lee <me@patricklee.nyc>
+Date: Fri, 2 Oct 2026 23:47:50 -0400
+Subject: [PATCH 3/3] Scope embedded leading context to its own composer
+
+---
+ .../embedded-chat/EmbeddedThreadChat.test.tsx | 80 ++++++++++++++++++-
+ .../embedded-chat/EmbeddedThreadChat.tsx      | 24 +++++-
+ packages/plugin-sdk/src/app-contract.ts       |  7 +-
+ plugins/plugin-api-docs/src/surfaces.ts       |  1 +
+ 4 files changed, 109 insertions(+), 3 deletions(-)
+
+diff --git a/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.test.tsx b/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.test.tsx
+index ee0779253..f40a49322 100644
+--- a/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.test.tsx
++++ b/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.test.tsx
+@@ -13,7 +13,13 @@ import {
+ } from "vitest";
+ import { LazyQueuedMessagesList } from "@/components/promptbox/banner/LazyQueuedMessagesList";
+ import type { FollowUpComposerProps } from "@/components/promptbox/FollowUpPromptBox";
+-import type { PluginComposerHost } from "@/components/plugin/plugin-composer-host";
++import {
++  PluginComposerHostProvider,
++  PluginComposerViewProvider,
++  useOptionalPluginComposerView,
++  usePluginComposerHost,
++  type PluginComposerHost,
++} from "@/components/plugin/plugin-composer-host";
+ import { getPromptDraftAccessor } from "@/hooks/usePromptDraftStorage";
+ import { EmbeddedThreadChat } from "./EmbeddedThreadChat";
+ 
+@@ -170,6 +176,7 @@ vi.mock("@/components/thread/timeline", () => ({
+     mocks.timelineProjectIds.push(props.projectId as string | undefined);
+     return (
+       <div>
++        {props.leadingContent as ReactNode}
+         {mocks.timelineRows.map((row, index) => (
+           <div key={index} data-testid="embedded-chat-timeline-row">
+             {row.text}
+@@ -354,10 +361,12 @@ function buildEmbeddedChat({
+   threadId = "thr_child",
+   surfaceTone = "background",
+   pluginComposerBottomScope,
++  leadingContent,
+ }: {
+   threadId?: string;
+   surfaceTone?: "background" | "sidebar";
+   pluginComposerBottomScope?: PluginComposerHost["scope"];
++  leadingContent?: ReactNode;
+ } = {}) {
+   return (
+     <EmbeddedThreadChat
+@@ -371,6 +380,7 @@ function buildEmbeddedChat({
+       onOpenLocalFileLink={mocks.onOpenLocalFileLink}
+       resolveMentionLink={mocks.resolveMentionLink}
+       workspaceRootPath="/workspace"
++      leadingContent={leadingContent}
+       composer={{
+         draftScope: {
+           kind: "thread",
+@@ -709,6 +719,74 @@ describe("EmbeddedThreadChat", () => {
+     );
+   });
+ 
++  it("binds leading context actions to the embedded composer instead of an outer draft", () => {
++    const parentDraft = { text: "Parent draft", mentions: [], attachments: [] };
++    const parentHost: PluginComposerHost = {
++      scope: { kind: "thread", threadId: "thr_parent" },
++      textEffectKey: "parent",
++      getCurrent: () => parentDraft,
++      subscribeDraft: () => () => {},
++      setDraft: vi.fn(),
++      focus: vi.fn(),
++    };
++    function LeadingContext() {
++      const host = usePluginComposerHost();
++      const view = useOptionalPluginComposerView();
++      return (
++        <button
++          type="button"
++          data-testid="leading-context"
++          data-scope={host?.scope.kind}
++          data-thread={host?.scope.kind === "thread" ? host.scope.threadId : ""}
++          data-view-thread={
++            view?.scope.kind === "thread" ? view.scope.threadId : ""
++          }
++          onClick={() => {
++            if (host)
++              host.setDraft({
++                ...host.getCurrent(),
++                text: "Context from the companion",
++              });
++          }}
++        >
++          Add context
++        </button>
++      );
++    }
++    render(
++      <PluginComposerViewProvider
++        value={{
++          scope: parentHost.scope,
++          layout: "expanded",
++          draft: { text: parentDraft.text, isEmpty: false, attachmentCount: 0 },
++          run: { isRunning: false, isSubmitting: false },
++        }}
++      >
++        <PluginComposerHostProvider value={parentHost}>
++          {buildEmbeddedChat({
++            threadId: "thr_child",
++            pluginComposerBottomScope: {
++              kind: "thread",
++              threadId: "thr_child",
++            },
++            leadingContent: <LeadingContext />,
++          })}
++        </PluginComposerHostProvider>
++      </PluginComposerViewProvider>,
++    );
++    const action = screen.getByTestId("leading-context");
++    expect(action.dataset.scope).toBe("thread");
++    expect(action.dataset.thread).toBe("thr_child");
++    expect(action.dataset.viewThread).toBe("thr_child");
++    fireEvent.click(action);
++    const editor = screen.getByTestId("embedded-chat-composer");
++    if (!(editor instanceof HTMLInputElement))
++      throw new Error("Expected the embedded input");
++    expect(editor.value).toBe("Context from the companion");
++    expect(parentHost.setDraft).not.toHaveBeenCalled();
++    expect(parentDraft.text).toBe("Parent draft");
++  });
++
+   it("delivers the new thread's draft to host subscribers immediately on a thread switch", () => {
+     getPromptDraftAccessor({
+       kind: "thread",
+diff --git a/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.tsx b/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.tsx
+index 853983b67..af6ed8e90 100644
+--- a/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.tsx
++++ b/apps/app/src/components/thread/embedded-chat/EmbeddedThreadChat.tsx
+@@ -30,8 +30,11 @@ import {
+   type FollowUpComposerProps,
+ } from "@/components/promptbox/FollowUpPromptBox";
+ import {
++  PluginComposerHostProvider,
++  PluginComposerViewProvider,
+   useComposerHostDraftNotifier,
+   useComposerHostSelection,
++  usePluginComposerViewModel,
+   type PluginComposerHost,
+ } from "@/components/plugin/plugin-composer-host";
+ import { ThreadPendingInteractionBanner } from "@/components/thread/pending-interactions/ThreadPendingInteractionBanner";
+@@ -45,6 +48,7 @@ import type {
+ } from "@/components/promptbox/ExecutionControls";
+ import { OverflowFade } from "@/components/ui/overflow-fade";
+ import {
++  isRunningThreadRuntimeDisplayStatus,
+   ThreadTimelinePanelContent,
+   ThreadTimelineSurface,
+   type ThreadTimelineAddToChatHandler,
+@@ -1251,10 +1255,28 @@ function EmbeddedThreadChatWithComposer({
+   );
+ 
+   const maxWidthClassName = measure === "page" ? "max-w-[760px]" : "max-w-none";
++  const leadingComposerView = usePluginComposerViewModel({
++    scope: bottomScope ?? { kind: "thread", threadId },
++    layout: "expanded",
++    text: currentPromptDraft.text,
++    attachmentCount: currentPromptDraft.attachments.length,
++    isRunning: isRunningThreadRuntimeDisplayStatus(displayStatus),
++    isSubmitting: isTurnSubmitting,
++  });
++  const scopedLeadingContent =
++    bottomPluginComposerHost === null ? (
++      leadingContent
++    ) : (
++      <PluginComposerViewProvider value={leadingComposerView}>
++        <PluginComposerHostProvider value={bottomPluginComposerHost}>
++          {leadingContent}
++        </PluginComposerHostProvider>
++      </PluginComposerViewProvider>
++    );
+   const timelineBody = (
+     <ThreadTimelinePanelContent
+       isTurnSubmitting={isTurnSubmitting}
+-      leadingContent={leadingContent}
++      leadingContent={scopedLeadingContent}
+       consumerMessageActions={consumerMessageActions}
+       includePluginMessageActions={includePluginMessageActions}
+       onOpenLink={onOpenLink}
+diff --git a/packages/plugin-sdk/src/app-contract.ts b/packages/plugin-sdk/src/app-contract.ts
+index eb10314e2..63f6d94dc 100644
+--- a/packages/plugin-sdk/src/app-contract.ts
++++ b/packages/plugin-sdk/src/app-contract.ts
+@@ -2902,7 +2902,12 @@ export interface ThreadChatProps {
+    */
+   permissionPolicy?: "inherit" | "editable";
+   className?: string;
+-  /** Rendered above the conversation, scrolling with it. */
++  /**
++   * Rendered above the conversation, scrolling with it. In chat variants
++   * with a composer, its descendants receive this chat's bottom composer
++   * host and view context, so scoped composer actions target its draft.
++   * Timeline-only variants have no composer context of their own.
++   */
+   leadingContent?: ReactNode;
+   /**
+    * Actions rendered in this instance's per-message action bar (see
+diff --git a/plugins/plugin-api-docs/src/surfaces.ts b/plugins/plugin-api-docs/src/surfaces.ts
+index 1539eb79a..61e95605a 100644
+--- a/plugins/plugin-api-docs/src/surfaces.ts
++++ b/plugins/plugin-api-docs/src/surfaces.ts
+@@ -1305,6 +1305,7 @@ export const SURFACE_GROUPS: SurfaceGroup[] = [
+           "Open the same live-file targets in bb's preview or the preferred external editor with experimental_openFilePreview and experimental_openFileExternally",
+           "Resolve document links and images beside a workspace or thread-storage file with Markdown.experimental_document",
+           "Inherit bb's styling, so embedded UI matches the rest of the app",
++          "ThreadChat leadingContent receives that embedded chat's bottom composer host and view context, so scoped context actions edit its draft even when another thread surrounds it",
+           "Register inline React artwork with app.experimental_icons.register({ name, component }); namespacing is recommended, but any plugin can use any name",
+           "Add names or override built-in app icons; conflicts between plugins use the first plugin id in lexical order and warn, while duplicate names within one plugin reject setup",
+           "Render experimental_ProviderIcon with required providerKind (agent, machine, environment), provider={provider}, and optional fallback (Code by default). Pass an existing provider record: it reads id, logoUrl, icon, and strings.iconTint, resolving the matching kind/id slot override, then legacy unscoped overrides, then declared artwork. It fetches no metadata. Marks are decorative by default; pass aria-label for a meaningful standalone image",
+-- 
+2.50.1 (Apple Git-155)
+

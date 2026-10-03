@@ -2,7 +2,7 @@ import { mkdtemp, rm, writeFile } from "node:fs/promises";
 import { join } from "node:path";
 import { tmpdir } from "node:os";
 
-export default ({ threadId, seedPages, sleep }) => ({
+export default ({ threadId, seedPages, sleep, bbCli }) => ({
   id: "float-native",
   packageDir: "bb-studio-float",
   fileName: "native-workbench-preview.png",
@@ -104,6 +104,35 @@ export default ({ threadId, seedPages, sleep }) => ({
       await sleep(500);
       await expectRetained("composer", composer, true, "Keep this roadmap draft");
       await expectRetained("page", editor, true, "Launch checklist");
+      if (process.env.BB_CAPTURE_COMPANION_REMOTE === "1") {
+        const control = async (action, key = threadKey) => {
+          const reply = JSON.parse(await bbCli(["plugin", "companion", "float", key, action, "--json"]));
+          if (reply.pluginId !== "float" || reply.id !== key || reply.action !== action || reply.delivered < 1) throw new Error(`Companion command was not delivered: ${JSON.stringify(reply)}`);
+          await sleep(300);
+          const tab = await client.evaluate(`JSON.parse(sessionStorage.getItem('bb-studio-float:windows')).tabs.find(tab => tab.key === ${JSON.stringify(key)})`);
+          const placement = { dock: "workbench", float: "floating", main: "main" }[action];
+          if (!tab || (placement && tab.placement !== placement) || (action === "pin" && !tab.pinned)) throw new Error(`Companion command was not applied: ${JSON.stringify({ action, tab })}`);
+        };
+        await control("dock");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+        await control("pin");
+        await control("close");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+        await control("main");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+        await control("main", pageKey);
+        await expectRetained("composer", composer, false, "Keep this roadmap draft");
+        await control("focus");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+        await control("float");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+        await control("dock");
+        await control("focus");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+        await control("main", pageKey);
+        await expectRetained("page", editor, true, "Launch checklist");
+        await expectRetained("composer", composer, true, "Keep this roadmap draft");
+      }
       await sleep(500);
     } catch (error) {
       console.error(await client.evaluate(`JSON.stringify({ text: document.body.innerText.slice(-4000), editors: [...document.querySelectorAll('[contenteditable]')].map(node => ({className: node.className, editable: node.getAttribute('contenteditable'), window: node.closest('[data-float-window]')?.getAttribute('data-float-window')})) })`).catch(() => "Capture context unavailable"));

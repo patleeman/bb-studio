@@ -98,11 +98,11 @@ stable capture verifies every visible page-header button stays within the
 BB core commit f865c4e38 locally scopes embedded chat leading content to its
 own bottom composer and composer view. Its 18 embedded-chat tests and app
 typecheck pass, including a regression that writes to the child draft while
-leaving an outer parent draft untouched. Publishing that core commit awaits
-resolution of an older uncommitted channel-workbench change in the shared
-BB checkout; its owner's thread is archived. Stable plugin floors stay
-unchanged, and stable BB still uses the guarded Viewing chip until that host
-fix ships.
+leaving an outer parent draft untouched. That fix is now adapted to current
+BB source in `1050e72f3`; its 19 embedded chat tests and app/SDK typechecks
+pass. The isolated checkout preserves the older shared checkout's unrelated
+edits. Stable plugin floors stay unchanged, and stable BB still uses the
+guarded Viewing chip until that host fix ships.
 
 The next host implementation adds `experimental_CompanionView` and
 `experimental_CompanionOutlet`. An overlay owns one persistent portal;
@@ -298,8 +298,8 @@ floating pill. All staged recordings, threads and pages are removed without
 running an agent. Recovery links also follow their originating companion;
 live recovery-list and interrupted-recording checks remain required.
 
-Remaining delivery includes publishing the native host changes, the SDK/CLI
-placement controller, embedded composer targeting, and the remaining suite
+Remaining delivery includes publishing the native host, its SDK/CLI
+placement controller and embedded composer fix, and the remaining suite
 entry points: Talk recovery navigation and playback
 continuity, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
@@ -307,3 +307,21 @@ existing native capture verifies transfers after the companion is realized.
 The requirement-by-requirement completion audit and final release checks
 remain required. This goal stays active until those workflows are implemented
 and verified.
+
+The host implementation is now adapted to authoritative BB `32efd2e3f` in an
+isolated checkout. Its SDK/CLI placement controller is implemented in
+`24d2201fc`. App, server, CLI and SDK types pass; native panel checks have 77
+passing tests, embedded chat 19, CLI/guide 5, server/SDK delivery 1, core SDK
+109, Plugin SDK 362 and Plugin Guide 75. The normal optimized BB build passes
+50 tasks and runs in a fresh data directory with all 17 plugins installed
+from pushed `ba0ae10`, then Float `f962c2c`. The updated
+[native capture](../packages/bb-studio-float/assets/native-workbench-preview.png)
+verifies exact editor/composer DOM, draft and attachment retention through
+UI and actual CLI placement changes, pin-protected close, saved placement,
+and focusing a retained main conversation after another main view opens.
+The [reviewable core patch](host-support/native-companions/README.md) includes
+the native host, SDK/CLI controller, and current embedded-composer fix.
+The account has `READ` permission on `get-bb/bb`, so host publication remains
+an external requirement. Stable plugins continue to detect the optional
+capability without raising their SDK pins. Initial main-editor retention,
+split/swap flows, and the full completion audit remain required.

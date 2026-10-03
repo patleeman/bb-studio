@@ -33,11 +33,16 @@ BB_CAPTURE_FLOAT_DRAG=1 BB_CAPTURE_ONLY=float-drag-cleanup \
 
 ![Live integration capture of a page beside its workbench conversation](assets/native-workbench-preview.png)
 
-The native-host integration capture runs the local BB frontend against an
-isolated staged server with the suite installed from GitHub. It moves the
+The native-host integration capture runs an optimized local BB build based
+on current core `32efd2e3f`, in its own data directory with all 17 suite
+plugins installed from GitHub `ba0ae10` and Float updated to `f962c2c`. It moves the
 real Pages editor and SDK composer through Float, workbench, and main while
 asserting DOM identity, the unsent draft, its file attachment, and the shared
-pin. This is implementation evidence for the pending BB host capability.
+pin. Its optional CLI check also verifies saved placement, pin-protected
+close, and returning to an existing main companion after another main view
+opens. This is implementation evidence for the pending BB host capability;
+the [core patch and verification](../../docs/host-support/native-companions/README.md)
+are saved with the suite.
 
 ```sh
 BB_CAPTURE_NATIVE_COMPANION=1 BB_CAPTURE_ONLY=float-native \
@@ -48,6 +53,8 @@ BB_CAPTURE_NATIVE_COMPANION=1 BB_CAPTURE_ONLY=float-native \
 Source the staged server's `capture.env` first. Omit the frontend URL once
 the staged BB release includes the native host. The check fails if that
 capability is absent; ordinary stable captures keep using `float`.
+Set `BB_CAPTURE_COMPANION_REMOTE=1` when the staged CLI also includes
+`bb plugin companion` to verify its controls in the same live workflow.
 
 ## What you get
 
