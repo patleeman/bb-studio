@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
+import { flushSync } from "react-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 import { useItemDrag } from "./useItemDrag";
 
@@ -30,7 +31,9 @@ afterEach(async () => { await act(() => root.unmount()); container.remove(); sou
 it.each(["drop", "dragend"])("clears the drop zone when a child stops %s propagation", async type => {
   await drag("dragstart"); expect(dragging()).toBe(true);
   source.addEventListener(type, event => event.stopPropagation());
-  await drag(type); expect(dragging()).toBe(false);
+  await drag(type);
+  await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+  expect(dragging()).toBe(false);
 });
 
 it("recovers after a removed source loses dragend and ordinary pointer movement resumes", async () => {
@@ -51,7 +54,9 @@ it("clears a drag when the window loses focus and can accept a returning drag", 
   await drag("dragstart"); await act(() => window.dispatchEvent(new Event("blur")));
   expect(dragging()).toBe(false);
   await drag("dragover"); expect(dragging()).toBe(true);
-  await drag("drop"); expect(dragging()).toBe(false);
+  await drag("drop");
+  await act(() => new Promise(resolve => setTimeout(resolve, 0)));
+  expect(dragging()).toBe(false);
 });
 
 it("clears a drag that leaves the document without hiding it when a child changes", async () => {
@@ -76,7 +81,10 @@ it("lets the React drop handler run before the drop zone disappears", async () =
   const zone = container.querySelector("div")!;
   await act(() => zone.dispatchEvent(new MouseEvent("mouseup", { bubbles: true })));
   expect(container.querySelector("div")).toBe(zone);
-  await drag("drop", zone);
-  expect(accept).toHaveBeenCalledOnce();
+  const flushCapture = () => flushSync(() => {});
+  window.addEventListener("drop", flushCapture, true);
+  try { await drag("drop", zone); expect(accept).toHaveBeenCalledOnce(); }
+  finally { window.removeEventListener("drop", flushCapture, true); }
+  await act(() => new Promise(resolve => setTimeout(resolve, 0)));
   expect(container.querySelector("div")).toBeNull();
 });
