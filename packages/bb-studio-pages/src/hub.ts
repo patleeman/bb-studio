@@ -4,6 +4,7 @@ import * as awarenessProtocol from "y-protocols/awareness";
 import * as syncProtocol from "y-protocols/sync";
 import * as Y from "yjs";
 import { blockTextType } from "./doc";
+import { MESSAGE_PERSIST, MESSAGE_PERSIST_RESULT } from "./protocol";
 
 // Live documents. Each open page has one in-memory Y.Doc; editors connect over
 // a plugin WebSocket and speak the standard y-protocols sync + awareness
@@ -40,6 +41,7 @@ export interface LivePage {
   /** Actor keys that changed the doc since the last save. */
   dirtyBy: Set<string>;
   saveFailures: number;
+  barriers: Map<Socket, string>;
   presences: Map<string, { awareness: awarenessProtocol.Awareness; clear: ReturnType<typeof setTimeout> }>;
 }
 
@@ -83,6 +85,7 @@ export class PageHub {
       unloadTimer: null,
       dirtyBy: new Set(),
       saveFailures: 0,
+      barriers: new Map(),
       presences: new Map(),
     };
     doc.on("update", (update: Uint8Array, origin: unknown) => {
@@ -149,6 +152,13 @@ export class PageHub {
       if (encoding.length(encoder) > 1) socket.send(encoding.toUint8Array(encoder));
     } else if (type === MESSAGE_AWARENESS) {
       awarenessProtocol.applyAwarenessUpdate(page.awareness, decoding.readVarUint8Array(decoder), socket);
+    } else if (type === MESSAGE_PERSIST) {
+      const token = decoding.readVarString(decoder);
+      const snapshot = decoding.readVarUint8Array(decoder);
+      Y.applyUpdate(page.doc, snapshot, socket);
+      page.barriers.set(socket, token);
+      if (!page.dirtyBy.size) this.answerBarriers(page, true);
+      else this.scheduleSave(page);
     }
   }
 
@@ -157,6 +167,7 @@ export class PageHub {
     if (!page) return;
     const clients = page.sockets.get(socket);
     page.sockets.delete(socket);
+    page.barriers.delete(socket);
     if (clients?.size) awarenessProtocol.removeAwarenessStates(page.awareness, [...clients], null);
     this.scheduleUnload(page);
   }
@@ -205,9 +216,11 @@ export class PageHub {
     try {
       this.options.save(page.id, page.doc, actors);
       page.saveFailures = 0;
+      this.answerBarriers(page, true);
     } catch (error) {
       for (const actor of actors) page.dirtyBy.add(actor);
       page.saveFailures++;
+      this.answerBarriers(page, false);
       this.scheduleSave(page);
       this.options.saveError?.(page.id, error);
       throw error;
@@ -258,6 +271,18 @@ export class PageHub {
         // A closing socket is cleaned up by its close handler.
       }
     }
+  }
+
+  private answerBarriers(page: LivePage, saved: boolean): void {
+    for (const [socket, token] of page.barriers) {
+      const message = encoding.createEncoder();
+      encoding.writeVarUint(message, MESSAGE_PERSIST_RESULT);
+      encoding.writeVarString(message, token);
+      encoding.writeVarUint(message, saved ? 1 : 0);
+      encoding.writeVarString(message, saved ? "" : "BB could not save this page. Your edits are pending; retrying.");
+      try { socket.send(encoding.toUint8Array(message)); } catch { /* Closing editor. */ }
+    }
+    if (saved) page.barriers.clear();
   }
 
   private scheduleSave(page: LivePage): void {

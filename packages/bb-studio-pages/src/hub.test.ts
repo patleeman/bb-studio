@@ -41,6 +41,68 @@ function client(hub: PageHub, pageId: string) {
 }
 
 describe("PageHub", () => {
+  it("tells the editor a durability barrier failed when server storage fails", () => {
+    vi.useFakeTimers();
+    let failing = true;
+    const hub = new PageHub({ load: () => null, saveDelayMs: 10, save: () => { if (failing) throw new Error("disk full"); } });
+    const messages: Uint8Array[] = [];
+    const socket = { send: (data: Uint8Array) => messages.push(data) };
+    hub.connect("pg_barrier", socket);
+    const editor = new Y.Doc();
+    editor.getText("body").insert(0, "Keep me");
+    const request = encoding.createEncoder();
+    encoding.writeVarUint(request, 2);
+    encoding.writeVarString(request, "edit-one");
+    encoding.writeVarUint8Array(request, Y.encodeStateAsUpdate(editor));
+    hub.receive("pg_barrier", socket, encoding.toUint8Array(request));
+    vi.advanceTimersByTime(10);
+    const responses = messages.filter(message => decoding.readVarUint(decoding.createDecoder(message)) === 3);
+    expect(responses).toHaveLength(1);
+    const response = decoding.createDecoder(responses[0]!);
+    decoding.readVarUint(response);
+    expect(decoding.readVarString(response)).toBe("edit-one");
+    expect(decoding.readVarUint(response)).toBe(0);
+    failing = false;
+    vi.advanceTimersByTime(1000);
+    const success = decoding.createDecoder(messages.at(-1)!);
+    expect(decoding.readVarUint(success)).toBe(3);
+    expect(decoding.readVarString(success)).toBe("edit-one");
+    expect(decoding.readVarUint(success)).toBe(1);
+    hub.disposeAll();
+    editor.destroy();
+    vi.useRealTimers();
+  });
+
+  it("saves a deletion-only barrier before acknowledging it", () => {
+    vi.useFakeTimers();
+    const seed = new Y.Doc();
+    seed.getText("body").insert(0, "ABC");
+    let persisted = Y.encodeStateAsUpdate(seed);
+    const order: string[] = [];
+    const hub = new PageHub({ load: () => persisted, saveDelayMs: 10, save: (_id, doc) => { persisted = Y.encodeStateAsUpdate(doc); order.push("saved"); } });
+    const socket = { send(data: Uint8Array) { if (decoding.readVarUint(decoding.createDecoder(data)) === 3) order.push("acknowledged"); } };
+    hub.connect("pg_delete_barrier", socket);
+    const editor = new Y.Doc();
+    Y.applyUpdate(editor, persisted);
+    const clocks = Y.encodeStateVector(editor);
+    editor.getText("body").delete(1, 1);
+    expect(Y.encodeStateVector(editor)).toEqual(clocks);
+    const request = encoding.createEncoder();
+    encoding.writeVarUint(request, 2);
+    encoding.writeVarString(request, "delete-one");
+    encoding.writeVarUint8Array(request, Y.encodeStateAsUpdate(editor));
+    hub.receive("pg_delete_barrier", socket, encoding.toUint8Array(request));
+    expect(order).toEqual([]);
+    vi.advanceTimersByTime(10);
+    expect(order).toEqual(["saved", "acknowledged"]);
+    const reopened = new Y.Doc();
+    Y.applyUpdate(reopened, persisted);
+    expect(reopened.getText("body").toString()).toBe("AC");
+    hub.disposeAll();
+    for (const doc of [seed, editor, reopened]) doc.destroy();
+    vi.useRealTimers();
+  });
+
   it("keeps dirty changes and their actors after a failed explicit save", () => {
     vi.useFakeTimers();
     const save = vi.fn().mockImplementationOnce(() => { throw new Error("disk busy"); });

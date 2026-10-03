@@ -32,12 +32,12 @@ export function useConnection(pageId: string) {
     setConnection(next);
     return () => next.destroy();
   }, [pageId]);
-  const status = useSyncExternalStore(
-    useCallback((listener) => connection?.subscribe(listener) ?? (() => {}), [connection]),
-    () => (connection ? `${connection.status}:${connection.synced}` : "connecting:false"),
+  const current = connection?.pageId === pageId ? connection : null;
+  useSyncExternalStore(
+    useCallback((listener) => current?.subscribe(listener) ?? (() => {}), [current]),
+    () => current?.snapshot ?? "connecting",
   );
-  const [state, synced] = status.split(":");
-  return { connection, status: state as PageConnection["status"], synced: synced === "true" };
+  return { connection: current, status: current?.status ?? "connecting", synced: current?.synced ?? false, ready: current?.ready ?? false };
 }
 
 type Presence = { clientId: number; name: string; color: string; agent: boolean };
@@ -204,22 +204,32 @@ function PresenceStack({ presence }: { presence: Presence[] }) {
   );
 }
 
-/** How long a dropped connection waits to say so; a plugin reload reconnects sooner. */
-const CONNECTION_GRACE_MS = 2500;
-
-function ConnectionBadge({ status }: { status: PageConnection["status"] }) {
-  const [shown, setShown] = useState(false);
-  useEffect(() => {
-    if (status === "connected") return setShown(false);
-    if (status === "missing") return setShown(true);
-    const timer = setTimeout(() => setShown(true), CONNECTION_GRACE_MS);
-    return () => clearTimeout(timer);
-  }, [status]);
-  if (status === "connected" || !shown) return null;
+export function PersistenceBadge({ connection }: { connection: PageConnection | null }) {
+  if (!connection) return null;
+  const local = connection.localSave === "saved";
+  const failed = connection.localSave === "failed" || connection.serverSave === "failed";
+  const missing = connection.status === "missing";
+  const text = missing ? "Page deleted"
+    : connection.localSave === "failed" ? "Local recovery failed"
+    : connection.serverSave === "failed" ? "BB save failed"
+    : connection.serverSave === "confirmed" ? connection.status === "offline" ? "Offline · content saved to BB" : "Content saved to BB"
+    : connection.status === "offline" ? "Offline"
+    : connection.localSave === "loading" ? "Loading recovery…" : "Saving content to BB…";
+  const detail = connection.serverSave !== "confirmed" && !missing
+    ? connection.localSave === "failed" ? "Keep this page open or download a recovery file"
+      : local ? "Saved on this browser" : "Recovery is not yet saved on this browser"
+    : null;
   return (
-    <span className={cn(FLOATING, "flex h-8 items-center gap-1.5 rounded-md px-3 text-xs text-amber-600 dark:text-amber-300")}>
-      <span className="size-1.5 rounded-full bg-current" />
-      {status === "offline" ? "Offline — changes will sync" : status === "missing" ? "Deleted" : "Connecting"}
+    <span className={cn("flex min-w-0 max-w-full flex-wrap items-center gap-1.5 rounded-md border border-border bg-background px-3 py-1.5 text-xs", failed ? "text-destructive" : "text-muted-foreground")}>
+      <span role="status" aria-live="polite" title={[connection.localError, connection.serverError].filter(Boolean).join("\n") || undefined}>
+        {text}{detail ? ` · ${detail}` : ""}
+      </span>
+      {(failed || connection.status === "offline") ? (
+        <button type="button" className="underline" onClick={() => connection.retrySave()}>{missing ? "Retry local recovery" : "Retry save"}</button>
+      ) : null}
+      {failed || missing || connection.serverSave !== "confirmed" ? (
+        <button type="button" className="underline" title="Downloads a .yjs recovery file preserving blocks and comments. This is not a Markdown document." onClick={() => connection.exportRecovery()}>Download recovery file (.yjs)</button>
+      ) : null}
     </span>
   );
 }
@@ -372,7 +382,7 @@ export function PageView({
   backLabel: string;
   onBack(): void;
 }) {
-  const { connection, status, synced } = useConnection(page.id);
+  const { connection, status, ready } = useConnection(page.id);
   const presence = usePresence(connection);
   const talk = useTalk(pageFieldKey(page.id));
   const [sidePanel, setSidePanel] = useState<SidePanel>(null);
@@ -436,8 +446,9 @@ export function PageView({
   return (
     // Floating chrome, the comments card and the chat are placed against this box.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
+      <div className="shrink-0 px-4 pt-14 pb-2"><PersistenceBadge connection={connection} /></div>
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className={cn("mx-auto w-full max-w-[828px] pt-24 pb-40 max-md:pt-16", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
+        <div className={cn("mx-auto w-full max-w-[828px] pt-4 pb-40", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
           <div className="group/title px-[54px] max-md:px-4">
             {page.icon ? (
               <IconPicker page={page} rpc={rpc}>
@@ -488,7 +499,7 @@ export function PageView({
             ) : null}
           </div>
           <div className="mt-5 flex">
-            {connection && synced ? (
+            {connection && ready && status !== "missing" ? (
               <PageEditor
                 connection={connection}
                 page={page}
@@ -514,7 +525,6 @@ export function PageView({
         chatAction={studioChat === false ? <PageChat page={page} threadId={chatThread ?? chats[0]?.threadId ?? null} /> : undefined}
         trailing={
           <>
-          <ConnectionBadge status={status} />
           <ActivityPill
             page={page}
             refreshBot={refreshBot}
@@ -525,7 +535,7 @@ export function PageView({
             onRefresh={() => void rpc.call("refreshNow", { id: page.id }).catch((error: unknown) => window.alert(String(error)))}
           />
           <PresenceStack presence={presence} />
-          <DictateButton talk={talk} ready={Boolean(connection && synced)} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
+          <DictateButton talk={talk} ready={Boolean(connection && ready && status !== "missing")} onToggle={() => toggleTalk(pageFieldKey(page.id))} />
           <button type="button" aria-label="Version history" title="Version history" className={cn(ICON_BUTTON, "max-md:hidden")} onClick={() => setDialog("history")}>
             <Icon name="RotateCcw" className="size-4" />
           </button>

@@ -8,7 +8,7 @@ import type { BotView, PageMetaView, rpcContract } from "../contract";
 import { PagesUiContext } from "./context";
 import { PageEditor } from "./PageEditor";
 import { usePagesData, usePagesUiValue } from "./PagesPanel";
-import { useConnection } from "./PageView";
+import { PersistenceBadge, useConnection } from "./PageView";
 
 /** A page's metadata, kept current: undefined while loading, null once it's gone. */
 export function usePanelPage(pageId: string | null): PageMetaView | null | undefined {
@@ -75,11 +75,13 @@ export function PanelShell({ page, header, footer }: { page: PageMetaView; heade
 }
 
 function PanelEditor({ page, pages, bots, footer }: { page: PageMetaView; pages: PageMetaView[]; bots: BotView[]; footer?: React.ReactNode }) {
-  const { connection, status, synced } = useConnection(page.id);
+  const { connection, status, ready } = useConnection(page.id);
   return (
+    <>
+    <div className="shrink-0 px-4 py-2"><PersistenceBadge connection={connection} /></div>
     <div className="min-h-0 flex-1 overflow-auto">
       <div className="flex pt-3 pb-6">
-        {connection && synced ? (
+        {connection && ready && status !== "missing" ? (
           <PageEditor connection={connection} page={page} bots={bots} pages={pages} sidePanel={null} onCloseSidePanel={() => {}} />
         ) : (
           <p className="px-4 text-sm text-muted-foreground">{status === "missing" ? "This page no longer exists." : "Connecting…"}</p>
@@ -87,5 +89,6 @@ function PanelEditor({ page, pages, bots, footer }: { page: PageMetaView; pages:
       </div>
       {footer ? <div className="px-4 pb-24">{footer}</div> : <div className="pb-20" />}
     </div>
+    </>
   );
 }
