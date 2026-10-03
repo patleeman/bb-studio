@@ -70,14 +70,14 @@ export function Calendar({
         </button>
         {undated ? <span className="ml-auto text-xs text-muted-foreground">{undated} without a date</span> : null}
       </header>
-      <div className="grid min-w-[42rem] grid-cols-7 text-xs text-muted-foreground">
+      <div className="grid min-w-[42rem] shrink-0 grid-cols-7 text-xs text-muted-foreground">
         {WEEKDAYS.map((day) => (
           <div key={day} className="px-2 py-1">
             {day}
           </div>
         ))}
       </div>
-      <div className="grid min-w-[42rem] grid-cols-7 overflow-hidden rounded-md border-t border-l border-border">
+      <div className="grid min-w-[42rem] shrink-0 grid-cols-7 overflow-hidden rounded-md border-t border-l border-border">
         {Array.from({ length: Math.ceil((offset + days) / 7) * 7 }, (_, index) => {
           const date = index - offset + 1;
           const day = date > 0 && date <= days ? `${month}-${String(date).padStart(2, "0")}` : null;
