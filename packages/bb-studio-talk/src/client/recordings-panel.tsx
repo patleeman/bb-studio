@@ -21,6 +21,8 @@ import {
   openAppPath,
   studioPath,
   useStudioPresent,
+  useOpenCompanion,
+  useCompanionNavigate,
   type ProviderCall,
 } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
@@ -87,7 +89,7 @@ function RecordingList() {
 /** Points at audio this device kept because the server refused it. */
 function UnsentNotice({ recordingId, className }: { recordingId?: string; className?: string }) {
   const setAside = useTalkState().setAside ?? [];
-  const navigate = useBbNavigate();
+  const open = useOpenCompanion();
   const count = setAside.filter((segment) => !recordingId || segment.recordingId === recordingId).length;
   if (count === 0) return null;
   const what = count === 1 ? "A piece of audio" : `${count} pieces of audio`;
@@ -98,7 +100,7 @@ function UnsentNotice({ recordingId, className }: { recordingId?: string; classN
         {what}
         {recordingId ? " from this recording" : ""} couldn't be uploaded and {count === 1 ? "is" : "are"} kept on this device.
       </span>
-      <button type="button" className={OUTLINE_BUTTON} onClick={() => navigate.toPluginPanel(PANEL_PATH, { subPath: UNSENT_PATH })}>
+      <button type="button" className={OUTLINE_BUTTON} onClick={() => open({ kind: "path", path: `/plugins/talk/${PANEL_PATH}/${UNSENT_PATH}` })}>
         Review
       </button>
     </div>
@@ -108,6 +110,8 @@ function UnsentNotice({ recordingId, className }: { recordingId?: string; classN
 function UnsentAudio() {
   const setAside = useTalkState().setAside ?? [];
   const navigate = useBbNavigate();
+  const open = useOpenCompanion();
+  const within = useCompanionNavigate();
   const studio = useStudioPresent();
   const [busy, setBusy] = useState(false);
   const [confirmDiscard, setConfirmDiscard] = useState<readonly SetAsideSegment[] | null>(null);
@@ -117,7 +121,13 @@ function UnsentAudio() {
       .catch((cause: unknown) => toast.error(errorMessage(cause)))
       .finally(() => setBusy(false));
   };
-  const toCollection = () => (studio ? openAppPath(studioPath("recording")) : navigate.toPluginPanel(PANEL_PATH));
+  const toCollection = () => {
+    const path = studio ? studioPath("recording") : `/plugins/talk/${PANEL_PATH}`;
+    if (!within({ kind: "path", path })) {
+      if (studio) openAppPath(path);
+      else navigate.toPluginPanel(PANEL_PATH);
+    }
+  };
   return (
     <div className="relative h-full">
       <ItemHeader backLabel={studio ? "Studio" : "Recordings"} onBack={toCollection} />
@@ -168,7 +178,7 @@ function UnsentAudio() {
                     <button
                       type="button"
                       className="font-medium hover:underline"
-                      onClick={() => navigate.toPluginPanel(PANEL_PATH, { subPath: segment.recordingId })}
+                      onClick={() => open({ kind: "path", path: `/plugins/talk/${PANEL_PATH}/${segment.recordingId}` })}
                     >
                       {shortDateTime(segment.startedAt)}
                     </button>
@@ -243,6 +253,7 @@ function usePlayer(recordingId: string, segments: readonly Segment[]) {
 function RecordingDetail({ id }: { id: string }) {
   const { rpc, data, error, refetch } = useRecording(id);
   const navigate = useBbNavigate();
+  const within = useCompanionNavigate();
   const studio = useStudioPresent();
   const state = useTalkState();
   const segments = data?.segments ?? [];
@@ -288,8 +299,14 @@ function RecordingDetail({ id }: { id: string }) {
   }, [id]);
   // With Studio installed, the collection is Studio's.
   const toCollection = useCallback(
-    (replace = false) => (studio ? openAppPath(studioPath("recording"), { replace }) : navigate.toPluginPanel(PANEL_PATH, { replace })),
-    [navigate, studio],
+    (replace = false) => {
+      const path = studio ? studioPath("recording") : `/plugins/talk/${PANEL_PATH}`;
+      if (!within({ kind: "path", path })) {
+        if (studio) openAppPath(path, { replace });
+        else navigate.toPluginPanel(PANEL_PATH, { replace });
+      }
+    },
+    [navigate, studio, within],
   );
   // The recording went away while open: deleted elsewhere, or discarded
   // because it finished without a word.

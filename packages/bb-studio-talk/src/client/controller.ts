@@ -1366,7 +1366,7 @@ export class TalkController {
   }
 
   private showSetAside(): void {
-    this.navigate?.toPluginPanel(PANEL_PATH, { subPath: UNSENT_PATH });
+    this.openPath(`/plugins/talk/${PANEL_PATH}/${UNSENT_PATH}`);
   }
 
   private async drain(): Promise<void> {
