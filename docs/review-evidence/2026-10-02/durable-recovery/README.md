@@ -68,9 +68,12 @@ acknowledgement set captureInProgress=false and insert=false. This closes the
 reproduced marker-failure defect. The fixed JSON and screenshots are labeled
 35bb73f.
 
-Download uploaded audio's server export route was not counted as passing; its
-separate paused-recording limitation was already being fixed by the source
-owner. Browser reload is tested; hard power loss, OS eviction, Safari and
+A follow-up real HTTP check on `35bb73f` uploaded a synthetic one-second silent
+WAV through segment_put while paused. The recovery link's audio-export route
+returned HTTP 200 with `0001.wav` and all 32,044 original bytes unchanged; the
+direct download also used `.wav`, and the recording remained paused. See
+`talk-paused-export.json`. This verifies the link target, not an additional
+browser anchor click. Browser reload is tested; hard power loss, OS eviction, Safari and
 simultaneous corruption of every durable store are not. In-memory download
 blob creation is verified, not playback of a file written by the OS.
 
