@@ -1,0 +1,50 @@
+{
+  "origin": "http://127.0.0.1:49486",
+  "threadId": "thr_6m3rpejbdv",
+  "threadDeleteHTTP": 200,
+  "threadAfterDeleteHTTP": 404,
+  "ownedDevicesAbsent": true,
+  "completedUTC": "2026-10-03T06:09:27Z",
+  "simulators": [
+    {
+      "args": [
+        "shutdown",
+        "5B0C9D57-DF2B-499A-A5F4-93354B4E74B8"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "shutdown",
+        "EFB0C18F-D10C-4B67-AB27-51196BF562F0"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "unpair",
+        "F7FE2E69-337B-4607-9FB7-AD8092634E76"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "delete",
+        "5B0C9D57-DF2B-499A-A5F4-93354B4E74B8"
+      ],
+      "exit": 0,
+      "output": ""
+    },
+    {
+      "args": [
+        "delete",
+        "EFB0C18F-D10C-4B67-AB27-51196BF562F0"
+      ],
+      "exit": 0,
+      "output": ""
+    }
+  ]
+}

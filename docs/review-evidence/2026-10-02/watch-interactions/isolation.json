@@ -1,0 +1,36 @@
+{
+  "origin": "http://127.0.0.1:49486",
+  "phone": "EFB0C18F-D10C-4B67-AB27-51196BF562F0",
+  "watch": "5B0C9D57-DF2B-499A-A5F4-93354B4E74B8",
+  "pair": "F7FE2E69-337B-4607-9FB7-AD8092634E76",
+  "thread": "thr_6m3rpejbdv",
+  "commit": "21c2c87005847c11077b8486565b2a9db7f2916d",
+  "domains": [
+    {
+      "device": "phone",
+      "domain": "nyc.plee.bbgo",
+      "serverURL": "http://127.0.0.1:49486"
+    },
+    {
+      "device": "phone",
+      "domain": "group.nyc.plee.bbgo",
+      "serverURL": "http://127.0.0.1:49486"
+    },
+    {
+      "device": "watch",
+      "domain": "nyc.plee.bbgo.watchkitapp",
+      "serverURL": "http://127.0.0.1:49486"
+    },
+    {
+      "device": "watch",
+      "domain": "group.nyc.plee.bbgo",
+      "serverURL": "http://127.0.0.1:49486"
+    }
+  ],
+  "verifiedBeforeLaunchUTC": "2026-10-03T06:03:13Z",
+  "privateFallbacks": [
+    "Shared/AppGroup.swift",
+    "Shared/BBClient.swift"
+  ],
+  "guard": "BBClient.init rejects any URL other than http://127.0.0.1:49486"
+}

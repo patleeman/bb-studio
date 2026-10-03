@@ -1,0 +1,16 @@
+[
+  "BB Studio",
+  "Back",
+  "Watch interaction QA 0601",
+  "You, One more harmless Watch QA question. Use AskUserQuestion only: Which second inert label should be recorded? Header Second QA. Exactly two options Cedar (Record Cedar only) and Dune (Record Dune only). No other tools or actions. After the answer reply only with the selected label.",
+  "You",
+  "One more harmless Watch QA question. Use AskUserQuestion only: Which second inert label should be recorded? Header Second QA. Exactly two options Cedar (Record Cedar only) and Dune (Record Dune only). No other tools or actions. After the answer reply only with the selected label.",
+  "Agent, Cedar",
+  "Agent",
+  "Cedar",
+  "Reply",
+  "Yes",
+  "Yes",
+  "No",
+  "No"
+]
