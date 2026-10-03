@@ -4,7 +4,7 @@ import SwiftUI
 /// with its due day, who it's for, and where its agent stands.
 struct TasksView: View {
     @EnvironmentObject private var app: AppModel
-    @AppStorage("tasksColumn") private var column = "todo"
+    @AppStorage(ServerScope.key("tasksColumn")) private var column = "todo"
     @State private var tasks: [StudioTask] = []
     @State private var columns: [Tasks.StatusesOutputColumnsItem] = []
     @State private var loaded = false
@@ -121,7 +121,7 @@ struct TasksView: View {
     private func load() async {
         do {
             tasks = try await app.client.tasksBoard(includeArchived: showArchived)
-            let project = UserDefaults.standard.string(forKey: "studioProject")
+            let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject"))
             columns = (try? await app.client.taskStatuses(projectId: project == "none" || project == "" ? nil : project)) ?? []
             if columns.isEmpty { columns = StudioTask.statuses.map { .init(id: $0, label: StudioTask.statusLabel($0)) } }
             if !columns.contains(where: { $0.id == column }) { column = columns.first?.id ?? "todo" }
@@ -583,7 +583,7 @@ struct TaskEditor: View {
 
     private func fill() {
         guard let task else {
-            projectId = UserDefaults.standard.string(forKey: "studioProject") ?? ""
+            projectId = UserDefaults.standard.string(forKey: ServerScope.key("studioProject")) ?? ""
             return
         }
         title = task.title

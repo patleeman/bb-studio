@@ -3,7 +3,8 @@ import SwiftUI
 /// The page tree, shared by the list and every open page. Read-only.
 @MainActor
 final class PagesStore: ObservableObject {
-    static let shared = PagesStore()
+    let serverURL = ServerScope.selectedURL
+    static var shared = PagesStore()
 
     @Published private(set) var pages: [PageMeta] = []
     @Published private(set) var projectNames: [String: String] = [:]
@@ -18,6 +19,8 @@ final class PagesStore: ObservableObject {
 
     /// Listens for page changes on the app's current socket; once per socket.
     func attach(_ app: AppModel) {
+        guard app.serverURL == serverURL else { return }
+        let client = app.client
         guard realtime !== app.realtime else { return }
         if let listener { realtime?.removeListener(listener) }
         realtime = app.realtime
@@ -30,14 +33,14 @@ final class PagesStore: ObservableObject {
                     let ids = payload["pageIds"]?.arrayValue?.compactMap(\.stringValue) ?? []
                     deleted.formUnion(ids)
                     pages.removeAll { ids.contains($0.id) }
-                    scheduleReload(app.client)
+                    scheduleReload(client)
                 case "tree", "page":
-                    scheduleReload(app.client)
+                    scheduleReload(client)
                 default:
                     break
                 }
             case .connected:
-                scheduleReload(app.client)
+                scheduleReload(client)
             default:
                 break
             }
@@ -56,24 +59,25 @@ final class PagesStore: ObservableObject {
 
     func restore() {
         guard !loaded else { return }
-        if let snapshot = DiskCache.load(PagesSnapshot.self, key: PagesSnapshot.cacheKey) {
+        if let snapshot = DiskCache.load(PagesSnapshot.self, key: PagesSnapshot.cacheKey, serverURL: serverURL) {
             pages = snapshot.pages
             projectNames = snapshot.projectNames
             loaded = true
         }
-        if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) {
+        if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: serverURL) {
             projectNames.merge(inbox.projectNames) { current, _ in current }
         }
     }
 
     func load(_ client: BBClient) async {
+        guard client.baseURL == serverURL else { return }
         do {
             async let projects = try? client.projects()
             let pages = try await client.pages()
             for project in await projects ?? [] { projectNames[project.id] = project.name }
             self.pages = pages
             error = nil
-            DiskCache.save(PagesSnapshot(pages: pages, projectNames: projectNames), as: PagesSnapshot.cacheKey)
+            DiskCache.save(PagesSnapshot(pages: pages, projectNames: projectNames), as: PagesSnapshot.cacheKey, serverURL: serverURL)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)

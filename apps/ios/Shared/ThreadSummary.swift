@@ -40,6 +40,7 @@ public struct InboxSnapshot: Codable, Sendable {
 /// The counts the watch complication shows. The phone sends it over
 /// WatchConnectivity; the watch keeps it in its app group.
 public struct StatusSnapshot: Codable, Equatable, Sendable {
+    public var serverURL: String?
     public var needsYou: Int
     public var running: Int
     public var headline: String?
@@ -48,7 +49,8 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
 
     public static let key = "statusSnapshot"
 
-    public init(_ summary: ThreadSummary, now: Date = .now) {
+    public init(_ summary: ThreadSummary, now: Date = .now, serverURL: URL = ServerScope.selectedURL) {
+        self.serverURL = serverURL.absoluteString
         needsYou = summary.needsYou.count
         running = summary.running.count
         headline = summary.headline?.displayTitle
@@ -68,16 +70,17 @@ public struct StatusSnapshot: Codable, Equatable, Sendable {
     }
 
     public static func load() -> StatusSnapshot? {
-        AppGroup.defaults.data(forKey: key).flatMap { try? JSONDecoder().decode(Self.self, from: $0) }
+        AppGroup.defaults.data(forKey: ServerScope.key(key)).flatMap { try? JSONDecoder().decode(Self.self, from: $0) }
     }
 
     public func save() {
-        AppGroup.defaults.set(try? JSONEncoder().encode(self), forKey: Self.key)
+        guard let serverURL, let origin = URL(string: serverURL) else { return }
+        AppGroup.defaults.set(try? JSONEncoder().encode(self), forKey: ServerScope.key(Self.key, serverURL: origin))
     }
 
     /// Same content, ignoring the timestamp.
     public func sameCounts(_ other: StatusSnapshot?) -> Bool {
         guard let other else { return false }
-        return needsYou == other.needsYou && running == other.running && headlineThreadId == other.headlineThreadId
+        return serverURL == other.serverURL && needsYou == other.needsYou && running == other.running && headlineThreadId == other.headlineThreadId
     }
 }

@@ -358,9 +358,9 @@ extension BBClient {
         -> SendResult
     {
         var body: [String: JSONValue] = ["input": Self.input(text, attachments, mentions), "mode": "queue-if-active"]
-        PermissionMode.apply(threadId, to: &body)
+        PermissionMode.apply(threadId, to: &body, serverURL: baseURL)
         let result: SendResult = try await post("/api/v1/threads/\(threadId)/send", .object(body))
-        PermissionMode.sent(threadId, body)
+        PermissionMode.sent(threadId, body, serverURL: baseURL)
         return result
     }
 
@@ -586,14 +586,14 @@ extension BBClient {
 
 extension PermissionMode {
     /// Adds the pending mode to a send body.
-    static func apply(_ threadId: String, to body: inout [String: JSONValue]) {
-        guard let mode = pending(threadId) else { return }
+    static func apply(_ threadId: String, to body: inout [String: JSONValue], serverURL: URL) {
+        guard let mode = pending(threadId, serverURL: serverURL) else { return }
         body["permissionMode"] = .string(mode)
         body["executionInputSources"] = ["permissionMode": "explicit"]
     }
 
     /// The message carried it; from now on the thread has it.
-    static func sent(_ threadId: String, _ body: [String: JSONValue]) {
-        if case .string(let mode)? = body["permissionMode"], pending(threadId) == mode { setPending(nil, for: threadId) }
+    static func sent(_ threadId: String, _ body: [String: JSONValue], serverURL: URL) {
+        if case .string(let mode)? = body["permissionMode"], pending(threadId, serverURL: serverURL) == mode { setPending(nil, for: threadId, serverURL: serverURL) }
     }
 }

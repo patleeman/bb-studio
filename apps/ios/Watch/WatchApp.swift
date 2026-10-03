@@ -3,9 +3,10 @@ import WatchKit
 
 @main
 struct BBStudioWatchApp: App {
+    @StateObject private var model = WatchModel.shared
     var body: some Scene {
         WindowGroup {
-            NavigationStack { WatchInboxView() }
+            NavigationStack { WatchInboxView() }.id(model.client.baseURL)
         }
     }
 }
@@ -59,7 +60,7 @@ struct WatchThreadView: View {
     @State private var reply = ""
     @State private var status: String?
     @Environment(\.scenePhase) private var scenePhase
-    private var client: BBClient { WatchModel.shared.client }
+    private let client = WatchModel.shared.client
 
     private static let quickReplies = ["Yes", "No", "Continue", "Looks good"]
 

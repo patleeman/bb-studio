@@ -4,9 +4,10 @@ import SwiftUI
 /// the sheet, so a half-written thought is still there next time.
 struct QuickWriteView: View {
     @EnvironmentObject private var app: AppModel
+    private let client = BBClient()
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("quickWriteDraft") private var text = ""
-    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @AppStorage(ServerScope.key("quickWriteDraft")) private var text = ""
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @FocusState private var focused: Bool
     @State private var dictating = false
     @State private var startingThread = false
@@ -95,7 +96,7 @@ struct QuickWriteView: View {
 
     private func savePage() async {
         await attempt {
-            let page = try await app.client.createPage(title: PageTitle.from(trimmed), markdown: trimmed)
+            let page = try await client.createPage(title: PageTitle.from(trimmed), markdown: trimmed)
             app.openPage(page.id)
         }
     }
@@ -107,9 +108,9 @@ struct QuickWriteView: View {
         let title = first.count > 120 ? PageTitle.from(first) : first
         var description = lines.count > 1 ? String(lines[1]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
         if first.count > 120 { description = trimmed }
-        let project = UserDefaults.standard.string(forKey: "studioProject") ?? ""
+        let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject", serverURL: client.baseURL)) ?? ""
         await attempt {
-            let task = try await app.client.createTask(
+            let task = try await client.createTask(
                 title: title, description: description, projectId: project.isEmpty || project == "none" ? nil : project,
                 due: nil, assignee: nil)
             app.openStudio(kind: nil, .task(id: task.id))
@@ -123,9 +124,9 @@ struct QuickWriteView: View {
             try await work()
             text = ""
             dismiss()
-            Task { await StudioStore.shared.load(app.client) }
+            Task { await StudioStore.shared.load(client) }
         } catch {
-            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: app.client.baseURL)
+            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }
     }
 }
@@ -133,6 +134,7 @@ struct QuickWriteView: View {
 /// Add tasks one after another: return adds and clears the field for the next.
 struct QuickTaskView: View {
     @EnvironmentObject private var app: AppModel
+    private let client = BBClient()
     @Environment(\.dismiss) private var dismiss
     @FocusState private var focused: Bool
     @State private var title = ""
@@ -229,7 +231,7 @@ struct QuickTaskView: View {
                 }
             }
             .onAppear { focused = true }
-            .onDisappear { if !added.isEmpty { Task { await StudioStore.shared.load(app.client) } } }
+            .onDisappear { if !added.isEmpty { Task { await StudioStore.shared.load(client) } } }
         }
         .presentationDetents([.medium, .large])
     }
@@ -239,9 +241,9 @@ struct QuickTaskView: View {
         guard !trimmed.isEmpty, !adding else { return }
         adding = true
         defer { adding = false }
-        let project = UserDefaults.standard.string(forKey: "studioProject") ?? ""
+        let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject", serverURL: client.baseURL)) ?? ""
         do {
-            let task = try await app.client.createTask(
+            let task = try await client.createTask(
                 title: trimmed, description: "", projectId: project.isEmpty || project == "none" ? nil : project,
                 due: due.day, assignee: forAgent ? "agent" : nil)
             added.append(task)
@@ -249,7 +251,7 @@ struct QuickTaskView: View {
             error = nil
             focused = true
         } catch {
-            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: app.client.baseURL)
+            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }
     }
 }

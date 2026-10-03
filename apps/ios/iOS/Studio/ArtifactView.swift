@@ -299,10 +299,11 @@ struct ArtifactView: View {
         working = true
         defer { working = false }
         do {
-            let url = app.client.artifactContentURL(artifact.id, versionId: version.id, download: true)
+            let client = app.client
+            let url = client.artifactContentURL(artifact.id, versionId: version.id, download: true)
             let (data, response) = try await URLSession.shared.data(from: url)
             guard (response as? HTTPURLResponse)?.statusCode == 200 else { throw BBError(status: 0, message: "The server didn't send the file.") }
-            let folder = FileManager.default.temporaryDirectory.appending(path: "artifacts/\(version.id)", directoryHint: .isDirectory)
+            let folder = FileManager.default.temporaryDirectory.appending(path: "artifacts/\(ServerScope.namespace(client.baseURL))/\(version.id)", directoryHint: .isDirectory)
             try FileManager.default.createDirectory(at: folder, withIntermediateDirectories: true)
             let name = version.name.replacingOccurrences(of: "/", with: "-")
             let file = folder.appending(path: name.isEmpty ? "artifact" : name)
@@ -421,10 +422,12 @@ struct ArtifactCard: View {
         .disabled(missing)
         .accessibilityIdentifier("artifactCard")
         .task(id: id) {
-            if let cached = Self.cache[id] { artifact = cached }
-            guard let result = try? await app.client.artifact(id) else { return }
+            let client = app.client
+            let cacheKey = ServerScope.key(id, serverURL: client.baseURL)
+            if let cached = Self.cache[cacheKey] { artifact = cached }
+            guard let result = try? await client.artifact(id) else { return }
             if let found = result.artifact {
-                Self.cache[id] = found
+                Self.cache[cacheKey] = found
                 artifact = found
             } else {
                 missing = true

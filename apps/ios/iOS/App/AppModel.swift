@@ -100,7 +100,10 @@ final class AppModel: ObservableObject {
     @Published var replyThreadId: String?
 
     /// The last thread opened, so the action button can resume a voice chat with it.
-    @AppStorage("lastThreadId") var lastThreadId: String = ""
+    var lastThreadId: String {
+        get { UserDefaults.standard.string(forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: ServerScope.key("lastThreadId", serverURL: serverURL)) }
+    }
 
     private init() {
         let client = BBClient()
@@ -115,10 +118,22 @@ final class AppModel: ObservableObject {
     var serverURL: URL { client.baseURL }
 
     func setServerURL(_ url: URL) {
+        guard url != serverURL else { return }
         // Load legacy queues so their unknown origins are quarantined.
         _ = Outbox.shared
         _ = TalkOutbox.shared
         BBClient.storedServerURL = url
+        StudioStore.shared = StudioStore()
+        SpaceWidgets.shared = SpaceWidgets()
+        PagesStore.shared = PagesStore()
+        MutedThreads.shared = MutedThreads()
+        ThreadTitles.store.titles = [:]
+        Spotlight.reset()
+        StatusWidgets.reset()
+        PhoneRelay.shared.pushStatus([])
+        studioKind = nil
+        studioSpace = nil
+        sheet = nil
         realtime.stop()
         client = BBClient(baseURL: url)
         realtime = BBRealtime(client: client)
@@ -158,7 +173,7 @@ final class AppModel: ObservableObject {
     /// `bbstudio://thread/<id>`, `bbstudio://reply/<id>`, `bbstudio://page/<id>`, `bbstudio://automations`, `bbstudio://usage`, `bbstudio://archived`, `bbstudio://drawing[/<id>]`, `bbstudio://artifact/<id>`, `bbstudio://bot/<id>`, `bbstudio://space/<id>`, `bbstudio://feed`, `bbstudio://post/<id>`,
     /// `bbstudio://capture`, `bbstudio://dictate`, `bbstudio://voice[/<id>]`, `bbstudio://studio` (or `talk`), `bbstudio://web`.
     func handle(_ url: URL) {
-        guard AppLink.handles(url) else { return }
+        guard AppLink.handles(url), AppLink.acceptsOrigin(url, serverURL: serverURL) else { return }
         let id = url.pathComponents.dropFirst().first
         switch url.host() {
         case "capture": sheet = .capture

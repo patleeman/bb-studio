@@ -3,7 +3,7 @@ import SwiftUI
 struct NewThreadView: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
-    @AppStorage("newThreadProjectId", store: AppGroup.defaults) private var projectId = ""
+    @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var projectId = ""
     @State private var projects: [Project] = []
     @State private var environments: [ThreadEnvironment] = []
     @State private var workspace = "default"

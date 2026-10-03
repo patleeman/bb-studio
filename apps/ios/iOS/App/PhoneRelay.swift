@@ -18,9 +18,14 @@ final class PhoneRelay: NSObject, WCSessionDelegate {
         let method = message[WatchRelay.method] as? String ?? "GET"
         let path = message[WatchRelay.path] as? String ?? "/"
         let body = message[WatchRelay.body] as? Data
+        let client = BBClient()
+        guard message["serverURL"] as? String == client.baseURL.absoluteString else {
+            replyHandler([WatchRelay.status: 409, WatchRelay.error: "The server changed. Refresh the watch before continuing.", "serverURL": client.baseURL.absoluteString])
+            return
+        }
         Task {
             do {
-                let (status, data) = try await BBClient().raw(method: method, path: path, body: body)
+                let (status, data) = try await client.raw(method: method, path: path, body: body)
                 replyHandler([WatchRelay.status: status, WatchRelay.body: WatchRelay.pack(data)])
             } catch {
                 replyHandler([WatchRelay.status: 0, WatchRelay.error: error.localizedDescription])
@@ -40,9 +45,8 @@ final class PhoneRelay: NSObject, WCSessionDelegate {
         lastStatus = status
         if WCSession.default.isComplicationEnabled, WCSession.default.remainingComplicationUserInfoTransfers > 0 {
             WCSession.default.transferCurrentComplicationUserInfo(status.dictionary)
-        } else {
-            try? WCSession.default.updateApplicationContext(status.dictionary)
         }
+        try? WCSession.default.updateApplicationContext(status.dictionary)
     }
 
     func session(_ session: WCSession, activationDidCompleteWith state: WCSessionActivationState, error: Error?) {}

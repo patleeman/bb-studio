@@ -5,6 +5,7 @@ import SwiftUI
 /// sent, turned into a thread, or copied. The recording stays in Talk either way.
 struct DictationView: View {
     @EnvironmentObject private var app: AppModel
+    private let client = BBClient()
     @Environment(\.dismiss) private var dismiss
     @StateObject private var recorder = TalkRecorder(client: AppModel.shared.client)
     @ObservedObject private var outbox = TalkOutbox.shared
@@ -14,7 +15,7 @@ struct DictationView: View {
     var onInsert: ((String) -> Void)?
     /// Label and symbol for the `onInsert` button.
     var insertLabel = ("Insert", "text.insert")
-    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
 
     @State private var text = ""
     @State private var creatingThread = false
@@ -130,7 +131,7 @@ struct DictationView: View {
             } else if let threadId {
                 Button {
                     Task {
-                        _ = try? await app.client.send(threadId, text: trimmed)
+                        _ = try? await client.send(threadId, text: trimmed)
                         dismiss()
                     }
                 } label: { wide("Send to thread", "paperplane.fill") }
@@ -159,11 +160,11 @@ struct DictationView: View {
         savingPage = true
         defer { savingPage = false }
         do {
-            let page = try await app.client.createPage(title: PageTitle.from(markdown), markdown: markdown)
+            let page = try await client.createPage(title: PageTitle.from(markdown), markdown: markdown)
             dismiss()
             app.openPage(page.id)
         } catch {
-            saveError = BBClient.describe(error, server: app.client.baseURL)
+            saveError = BBClient.describe(error, server: client.baseURL)
         }
     }
 

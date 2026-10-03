@@ -113,7 +113,7 @@ struct AskBBIntent: AppIntent {
 
     private func defaultProjectId(_ client: BBClient) async throws -> String? {
         let projects = try await client.projects()
-        let saved = AppGroup.defaults.string(forKey: "newThreadProjectId")
+        let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId"))
         return projects.first { $0.id == saved }?.id ?? projects.first?.id
     }
 }

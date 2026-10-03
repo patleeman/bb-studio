@@ -27,7 +27,7 @@ private struct StudioChatSheet: View {
     @EnvironmentObject private var app: AppModel
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var store = StudioStore.shared
-    @AppStorage("newThreadProjectId", store: AppGroup.defaults) private var lastProjectId = ""
+    @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var lastProjectId = ""
     let pluginId: String
     let itemId: String
     let title: String

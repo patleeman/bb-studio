@@ -2,6 +2,7 @@ import SwiftUI
 import WidgetKit
 
 struct WorkEntry: TimelineEntry {
+    var serverURL: URL = ServerScope.selectedURL
     var date: Date
     var tasks: [StudioTask]
     var attention: Int
@@ -31,9 +32,11 @@ struct WorkProvider: TimelineProvider {
                 entry.attention = summary.needsYou.count
                 entry.approvals = threadRows.filter { $0.hasPendingInteraction == true }.count
                 entry.stale = false
-                DiskCache.save(WorkCache(tasks: entry.tasks, attention: entry.attention, approvals: entry.approvals, running: entry.running), as: "work-widget")
+                DiskCache.save(WorkCache(tasks: entry.tasks, attention: entry.attention, approvals: entry.approvals, running: entry.running), as: "work-widget", serverURL: client.baseURL)
             } catch { entry.stale = true }
             entry.date = .now
+            entry.serverURL = client.baseURL
+            if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
             completion(Timeline(entries: [entry], policy: .after(.now + 15 * 60)))
         }
     }
@@ -62,7 +65,11 @@ struct WorkWidget: Widget {
 }
 
 private struct WorkWidgetView: View {
-    let entry: WorkEntry
+    private let snapshot: WorkEntry
+    init(entry: WorkEntry) { snapshot = entry }
+    private var entry: WorkEntry {
+        snapshot.serverURL == ServerScope.selectedURL ? snapshot : .placeholder
+    }
     var body: some View {
         VStack(alignment: .leading, spacing: 8) {
             HStack {
@@ -71,27 +78,27 @@ private struct WorkWidgetView: View {
                 if entry.stale { Image(systemName: "wifi.slash").foregroundStyle(.secondary) }
             }
             HStack(spacing: 12) {
-                Link(destination: URL(string: "bbstudio://tasks")!) {
+                Link(destination: AppLink.scoped(URL(string: "bbstudio://tasks")!, serverURL: entry.serverURL)) {
                     Label("\(entry.tasks.count) due", systemImage: "calendar")
                 }
-                Link(destination: URL(string: "bbstudio://inbox")!) {
+                Link(destination: AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)) {
                     Label("\(entry.attention) attention", systemImage: "exclamationmark.bubble")
                 }
                 Label("\(entry.running.count) running", systemImage: "circle.fill")
             }.font(.caption).lineLimit(1)
             if entry.approvals > 0 {
-                Link(destination: URL(string: "bbstudio://inbox")!) {
+                Link(destination: AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)) {
                     Label("Review \(entry.approvals) pending approval\(entry.approvals == 1 ? "" : "s")", systemImage: "hand.raised")
                 }
                 .accessibilityIdentifier("workReviewApprovals")
             }
             ForEach(entry.tasks.prefix(3)) { task in
-                Link(destination: URL(string: "bbstudio://task/\(task.id)")!) {
+                Link(destination: AppLink.scoped(URL(string: "bbstudio://task/\(task.id)")!, serverURL: entry.serverURL)) {
                     Label(task.displayTitle, systemImage: "checkmark.circle").lineLimit(1)
                 }.accessibilityIdentifier("workTask_\(task.id)")
             }
             ForEach(entry.running.prefix(2)) { thread in
-                Link(destination: URL(string: "bbstudio://thread/\(thread.id)")!) {
+                Link(destination: AppLink.scoped(URL(string: "bbstudio://thread/\(thread.id)")!, serverURL: entry.serverURL)) {
                     Label(thread.displayTitle, systemImage: "circle.dotted.circle").lineLimit(1)
                 }
             }

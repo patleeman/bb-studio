@@ -2,6 +2,7 @@ import SwiftUI
 
 @MainActor
 final class InboxModel: ObservableObject {
+    let serverURL = ServerScope.selectedURL
     /// Top-level threads, for the widgets, Spotlight and the watch.
     @Published var threads: [ThreadEntry] = []
     @Published var children: [String: [ThreadEntry]] = [:]
@@ -22,6 +23,8 @@ final class InboxModel: ObservableObject {
     private var savedSignature: Int?
 
     func attach(_ app: AppModel) {
+        guard app.serverURL == serverURL else { return }
+        let client = app.client
         if let listener { app.realtime.removeListener(listener) }
         listener = app.realtime.listen { [weak self] event in
             switch event {
@@ -29,11 +32,11 @@ final class InboxModel: ObservableObject {
                 // A running agent appends events several times a second, and nothing
                 // in the list shows them; its status changes bring the fresh row.
                 let streaming = !changes.isEmpty && changes.allSatisfy { $0 == "events-appended" }
-                self?.scheduleReload(app.client, bots: false, within: streaming ? .seconds(30) : .milliseconds(400))
+                self?.scheduleReload(client, bots: false, within: streaming ? .seconds(30) : .milliseconds(400))
             case .pluginSignal(let pluginId, _, _) where pluginId == "bot-teams":
-                self?.scheduleReload(app.client, bots: true)
+                self?.scheduleReload(client, bots: true)
             case .connected:
-                self?.scheduleReload(app.client, bots: true)
+                self?.scheduleReload(client, bots: true)
             default:
                 break
             }
@@ -67,7 +70,7 @@ final class InboxModel: ObservableObject {
 
     /// Shows the last inbox immediately; the network load replaces it.
     func restore() {
-        guard !loaded, let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) else { return }
+        guard !loaded, let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: serverURL) else { return }
         threads = snapshot.threads
         botTeams = snapshot.botTeams
         projectNames = snapshot.projectNames
@@ -75,6 +78,7 @@ final class InboxModel: ObservableObject {
     }
 
     func load(_ client: BBClient, bots: Bool = true) async {
+        guard client.baseURL == serverURL else { return }
         do {
             async let sidebar = client.sidebar()
             // Every assignment re-renders the inbox, so only on change.
@@ -84,6 +88,7 @@ final class InboxModel: ObservableObject {
                 preferences = prefs
             }
             let bootstrap = try await sidebar
+            guard serverURL == ServerScope.selectedURL else { return }
             if !Self.same(bootstrap, self.sidebar) { self.sidebar = bootstrap }
             let projects = bootstrap.projects + [bootstrap.personalProject]
             let names = Dictionary(projects.map { ($0.id, $0.name) }, uniquingKeysWith: { a, _ in a })
@@ -99,12 +104,13 @@ final class InboxModel: ObservableObject {
             for thread in all { ThreadTitles.set(thread.id, thread.displayTitle) }
             // Titles that mention archived threads: fetch those names too.
             await ThreadTitles.fetchUnknown(in: all.map(\.displayTitle), client: client)
-            Spotlight.index(self.threads, projectNames: projectNames)
+            guard serverURL == ServerScope.selectedURL else { return }
+            Spotlight.index(self.threads, projectNames: projectNames, serverURL: serverURL)
             error = nil
             let snapshot = InboxSnapshot(threads: self.threads, botTeams: botTeams, projectNames: projectNames)
             let signature = Self.encoded(snapshot)?.hashValue
             if signature == nil || signature != savedSignature {
-                DiskCache.save(snapshot, as: InboxSnapshot.cacheKey)
+                DiskCache.save(snapshot, as: InboxSnapshot.cacheKey, serverURL: serverURL)
                 savedSignature = signature
             }
             StatusWidgets.reloadIfChanged(self.threads)
@@ -261,7 +267,7 @@ struct InboxView: View {
     @State private var deleting: ThreadEntry?
     @State private var newTitle = ""
     /// The server's running plugins, comma-separated; remembered so plugin rows show offline.
-    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     /// Feed stories with a post since you last read it.
     @State private var feedUnread = 0
     @State private var feedListener: UUID?
@@ -373,7 +379,7 @@ struct InboxView: View {
     }
 
     /// Section expansion survives relaunches, like the sidebar's collapsed groups.
-    @AppStorage("collapsedHomeGroups") private var collapsedGroups = ""
+    @AppStorage(ServerScope.key("collapsedHomeGroups")) private var collapsedGroups = ""
 
     private func expanded(_ id: String) -> Binding<Bool> {
         Binding(
@@ -565,7 +571,7 @@ struct ThreadRow: View {
         self.thread = thread
         self.project = project
         self.bot = bot
-        _draft = AppStorage("draft.\(thread.id)")
+        _draft = AppStorage(ServerScope.key("draft.\(thread.id)"))
     }
 
     var body: some View {

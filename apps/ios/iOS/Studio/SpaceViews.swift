@@ -44,7 +44,8 @@ struct SpaceRouteView: View {
 /// request serves them all for a moment, and Studio's changes refetch them.
 @MainActor
 final class SpaceWidgets: ObservableObject {
-    static let shared = SpaceWidgets()
+    static var shared = SpaceWidgets()
+    private let serverURL = ServerScope.selectedURL
 
     @Published private(set) var views: [String: Studio.SpaceWidgetOutput] = [:]
     @Published private(set) var failed: Set<String> = []
@@ -55,6 +56,7 @@ final class SpaceWidgets: ObservableObject {
     private var reloadTask: Task<Void, Never>?
 
     func attach(_ app: AppModel) {
+        let client = app.client
         guard realtime !== app.realtime else { return }
         if let listener { realtime?.removeListener(listener) }
         realtime = app.realtime
@@ -62,7 +64,7 @@ final class SpaceWidgets: ObservableObject {
             guard let self else { return }
             switch event {
             case .pluginSignal("studio", "studio-tabs", _): break
-            case .pluginSignal(let pluginId, _, _) where StudioStore.addOns.contains(pluginId): scheduleReload(app.client)
+            case .pluginSignal(let pluginId, _, _) where StudioStore.addOns.contains(pluginId): scheduleReload(client)
             default: break
             }
         }
@@ -78,6 +80,7 @@ final class SpaceWidgets: ObservableObject {
     }
 
     func load(_ id: String, client: BBClient, fresh: Bool = false) async {
+        guard client.baseURL == serverURL else { return }
         if let task = inFlight[id] { return await task.value }
         if !fresh, let at = fetchedAt[id], Date.now.timeIntervalSince(at) < 3 { return }
         let task = Task {
@@ -399,7 +402,7 @@ struct SpaceWidgetCard: View {
 
     /// The phone has no project view; Studio shows what the project holds.
     private func openProject(_ id: String) {
-        UserDefaults.standard.set(id, forKey: "studioProject")
+        UserDefaults.standard.set(id, forKey: ServerScope.key("studioProject"))
         app.studioSpace = nil
         app.openStudio(kind: nil)
     }

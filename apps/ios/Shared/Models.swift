@@ -366,12 +366,12 @@ public enum PermissionMode {
 
     /// A mode picked for a thread on this phone, sent with its next message:
     /// BB takes permissions per message, and the thread keeps the last one.
-    public static func pending(_ threadId: String) -> String? {
-        AppGroup.defaults.string(forKey: "permissionMode.\(threadId)")
+    public static func pending(_ threadId: String, serverURL: URL = ServerScope.selectedURL) -> String? {
+        AppGroup.defaults.string(forKey: ServerScope.key("permissionMode.\(threadId)", serverURL: serverURL))
     }
 
-    public static func setPending(_ mode: String?, for threadId: String) {
-        AppGroup.defaults.set(mode, forKey: "permissionMode.\(threadId)")
+    public static func setPending(_ mode: String?, for threadId: String, serverURL: URL = ServerScope.selectedURL) {
+        AppGroup.defaults.set(mode, forKey: ServerScope.key("permissionMode.\(threadId)", serverURL: serverURL))
     }
 }
 

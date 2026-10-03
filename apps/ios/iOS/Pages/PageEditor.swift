@@ -5,6 +5,7 @@ import SwiftUI
 /// elsewhere in the meantime is never overwritten; the text stays on screen.
 struct PageEditor: View {
     @EnvironmentObject private var app: AppModel
+    private let client = BBClient()
     @Environment(\.dismiss) private var dismiss
     let pageId: String
     var onSaved: () async -> Void
@@ -111,13 +112,13 @@ struct PageEditor: View {
             return
         }
         do {
-            let markdown = try await app.client.editablePageMarkdown(pageId)
+            let markdown = try await client.editablePageMarkdown(pageId)
             expected = markdown
             text = Self.plain(markdown)
             saved = text
             error = nil
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -133,11 +134,11 @@ struct PageEditor: View {
         saving = true
         defer { saving = false }
         do {
-            expected = try await app.client.editPageDocument(pageId, expected: current, markdown: sending)
+            expected = try await client.editPageDocument(pageId, expected: current, markdown: sending)
             saved = sending
             error = nil
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
             return
         }
         saving = false

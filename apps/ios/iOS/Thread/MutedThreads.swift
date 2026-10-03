@@ -4,13 +4,13 @@ import Foundation
 /// BB itself has no per-thread mute, so the relay keeps the list.
 @MainActor
 final class MutedThreads: ObservableObject {
-    static let shared = MutedThreads()
+    static var shared = MutedThreads()
 
     private struct List: Decodable { var threadIds: [String] }
 
-    @Published private(set) var ids: Set<String> = Set(UserDefaults.standard.stringArray(forKey: "mutedThreads") ?? [])
+    @Published private(set) var ids: Set<String> = Set(UserDefaults.standard.stringArray(forKey: ServerScope.key("mutedThreads")) ?? [])
 
-    private var client: BBClient { AppModel.shared.client }
+    private let client = BBClient()
 
     func refresh() async {
         guard let list: List = try? await client.rpc("mobile", "mute_list", [:]) else { return }
@@ -25,6 +25,6 @@ final class MutedThreads: ObservableObject {
 
     private func update(_ threadIds: [String]) {
         ids = Set(threadIds)
-        UserDefaults.standard.set(threadIds, forKey: "mutedThreads")
+        UserDefaults.standard.set(threadIds, forKey: ServerScope.key("mutedThreads", serverURL: client.baseURL))
     }
 }

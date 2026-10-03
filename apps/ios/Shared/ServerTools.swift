@@ -130,9 +130,9 @@ extension BBClient {
             "mode": "queue-if-active",
             "sendAt": .number((date.timeIntervalSince1970 * 1000).rounded()),
         ]
-        PermissionMode.apply(threadId, to: &body)
+        PermissionMode.apply(threadId, to: &body, serverURL: baseURL)
         let result: SendResult = try await post("/api/v1/threads/\(threadId)/send", .object(body))
-        PermissionMode.sent(threadId, body)
+        PermissionMode.sent(threadId, body, serverURL: baseURL)
         return result
     }
 }

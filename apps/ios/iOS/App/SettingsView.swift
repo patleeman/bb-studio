@@ -8,9 +8,10 @@ struct SettingsView: View {
     @AppStorage(VoiceChatEngine.voiceKey) private var voiceId = ""
     @AppStorage(VoiceChatEngine.rateKey) private var rate = 1.08
     @State private var preview = AVSpeechSynthesizer()
-    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @ObservedObject private var audioOutbox = TalkOutbox.shared
     @State private var confirmingLegacyUpload = false
+    @State private var confirmingLegacyDrafts = false
 
     var body: some View {
         Form {
@@ -27,6 +28,12 @@ struct SettingsView: View {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
             }
             ServerControls()
+            if !Drafts.legacyKeys.isEmpty {
+                Section("Older drafts") {
+                    Text("Older drafts are preserved, but their original server is unknown.").font(.footnote)
+                    Button("Recover older drafts…") { confirmingLegacyDrafts = true }
+                }
+            }
             if audioOutbox.legacyPending > 0 {
                 Section("Older recordings") {
                     Text("\(audioOutbox.legacyPending) recording(s) are preserved on this phone, but their original server was not saved.")
@@ -87,6 +94,11 @@ struct SettingsView: View {
         }
         .navigationTitle("Settings")
         .onAppear { serverURL = app.serverURL.absoluteString }
+        .confirmationDialog("Recover drafts onto \(app.serverURL.host() ?? app.serverURL.absoluteString)?", isPresented: $confirmingLegacyDrafts, titleVisibility: .visible) {
+            Button("Recover onto this server") { Drafts.recoverLegacy(to: app.serverURL) }
+        } message: {
+            Text("Only continue if these drafts belong to this server. Existing drafts are kept, and the originals remain preserved.")
+        }
         .confirmationDialog("Resume older uploads to \(app.serverURL.host() ?? app.serverURL.absoluteString)?", isPresented: $confirmingLegacyUpload, titleVisibility: .visible) {
             Button("Upload to this server") {
                 do { try audioOutbox.resumeLegacy(on: app.serverURL) }

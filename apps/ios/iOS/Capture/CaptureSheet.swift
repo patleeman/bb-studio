@@ -43,6 +43,7 @@ enum CaptureNote {
 
 struct CaptureSheet: View {
     @EnvironmentObject private var app: AppModel
+    private let client = BBClient()
     @Environment(\.dismiss) private var dismiss
     @AppStorage("captureLastOption") private var lastOption = ""
     @State private var writingNote = false
@@ -217,19 +218,19 @@ struct CaptureSheet: View {
             savedPageId = try await createNote(content)
             note = ""
             error = nil
-            Task { await StudioStore.shared.load(app.client) }
+            Task { await StudioStore.shared.load(client) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
     /// Keep the destination in one place for a future Inbox quick-capture API.
     private func createNote(_ text: String) async throws -> String {
-        let projects = try await app.client.projects()
-        let saved = AppGroup.defaults.string(forKey: "newThreadProjectId")
+        let projects = try await client.projects()
+        let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId", serverURL: client.baseURL))
         let project = projects.first { $0.id == saved }?.id ?? projects.first?.id
         struct Envelope: Decodable { var page: PageMeta }
-        let result: Envelope = try await app.client.rpc("pages", "create", [
+        let result: Envelope = try await client.rpc("pages", "create", [
             "projectId": project.map { .string($0) } ?? .null,
             "parentId": .null,
             "title": .string(CaptureNote.title(from: text)),
@@ -245,14 +246,14 @@ struct CaptureSheet: View {
         saving = true
         defer { saving = false }
         do {
-            let projects = try await app.client.projects()
-            let saved = AppGroup.defaults.string(forKey: "newThreadProjectId")
+            let projects = try await client.projects()
+            let saved = AppGroup.defaults.string(forKey: ServerScope.key("newThreadProjectId", serverURL: client.baseURL))
             let project = projects.first { $0.id == saved }?.id ?? projects.first?.id
             for file in files {
                 guard file.data.count <= 25 * 1024 * 1024 else {
                     throw BBError(status: 413, message: "\(file.name) is over 25 MB.")
                 }
-                let result: Artifacts.ImportFileOutput = try await app.client.rpc("artifacts", Artifacts.Method.importFile, [
+                let result: Artifacts.ImportFileOutput = try await client.rpc("artifacts", Artifacts.Method.importFile, [
                     "name": .string(file.name),
                     "mime": .string(file.mimeType),
                     "bytes": .string(file.data.base64EncodedString()),
@@ -263,10 +264,10 @@ struct CaptureSheet: View {
                 files.removeAll { $0.id == file.id }
             }
             error = nil
-            Task { await StudioStore.shared.load(app.client) }
+            Task { await StudioStore.shared.load(client) }
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
-            if savedArtifactId != nil { Task { await StudioStore.shared.load(app.client) } }
+            self.error = BBClient.describe(error, server: client.baseURL)
+            if savedArtifactId != nil { Task { await StudioStore.shared.load(client) } }
         }
     }
 }

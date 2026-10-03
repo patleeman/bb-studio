@@ -2,6 +2,7 @@ import SwiftUI
 
 @MainActor
 final class PageModel: ObservableObject {
+    let serverURL = ServerScope.selectedURL
     let pageId: String
     @Published var markdown: String?
     @Published var error: String?
@@ -15,19 +16,21 @@ final class PageModel: ObservableObject {
 
     init(pageId: String) {
         self.pageId = pageId
-        markdown = DiskCache.load(String.self, key: cacheKey)
+        markdown = DiskCache.load(String.self, key: cacheKey, serverURL: serverURL)
     }
 
     private var cacheKey: String { "page-\(pageId)" }
 
     func attach(_ app: AppModel) {
+        guard app.serverURL == serverURL else { return }
+        let client = app.client
         detach()
         realtime = app.realtime
         listener = app.realtime.listen { [weak self] event in
             guard let self, case .pluginSignal(let pluginId, _, let payload) = event, pluginId == "pages" else { return }
             switch payload["type"]?.stringValue {
             case "page" where payload["pageId"]?.stringValue == pageId:
-                scheduleReload(app.client)
+                scheduleReload(client)
             case "deleted":
                 if payload["pageIds"]?.arrayValue?.contains(.string(pageId)) == true { missing = true }
             default:
@@ -51,6 +54,7 @@ final class PageModel: ObservableObject {
     }
 
     func load(_ client: BBClient) async {
+        guard client.baseURL == serverURL else { return }
         if pageId == "qa-demo", ProcessInfo.processInfo.arguments.contains("-qaPageDemo") {
             markdown = Self.demo
             return
@@ -60,7 +64,7 @@ final class PageModel: ObservableObject {
             if self.markdown != markdown { self.markdown = markdown }
             error = nil
             missing = false
-            DiskCache.save(markdown, as: cacheKey)
+            DiskCache.save(markdown, as: cacheKey, serverURL: serverURL)
             await loadComments(client)
         } catch where BBClient.isCancellation(error) {
         } catch let failure as BBError where failure.message.localizedCaseInsensitiveContains("not found") {

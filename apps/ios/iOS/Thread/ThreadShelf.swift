@@ -5,7 +5,7 @@ import SwiftUI
 struct ThreadShelf: View {
     @ObservedObject var model: ThreadModel
     @EnvironmentObject private var app: AppModel
-    @AppStorage("dismissedFallbacks") private var dismissedFallbacks = ""
+    @AppStorage(ServerScope.key("dismissedFallbacks")) private var dismissedFallbacks = ""
     @State private var editing: QueuedMessage?
     @State private var queueExpanded = false
 

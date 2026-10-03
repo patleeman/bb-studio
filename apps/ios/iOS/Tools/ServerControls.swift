@@ -3,7 +3,7 @@ import SwiftUI
 /// Host settings from the keep-awake and concurrency-limit plugins.
 struct ServerControls: View {
     @EnvironmentObject private var app: AppModel
-    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     @State private var keepAwake: KeepAwakeConfig?
     @State private var concurrency: ConcurrencyConfig?
     @State private var error: String?

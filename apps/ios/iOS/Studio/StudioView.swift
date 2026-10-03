@@ -5,7 +5,8 @@ import SwiftUI
 /// and the add-ons directly when it isn't.
 @MainActor
 final class StudioStore: ObservableObject {
-    static let shared = StudioStore()
+    let serverURL = ServerScope.selectedURL
+    static var shared = StudioStore()
     static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks", "studio-tables", "bot-teams"]
 
     /// Archived ones too; the list shows them on request.
@@ -30,6 +31,8 @@ final class StudioStore: ObservableObject {
     private var reloadTask: Task<Void, Never>?
 
     func attach(_ app: AppModel) {
+        guard app.serverURL == serverURL else { return }
+        let client = app.client
         guard realtime !== app.realtime else { return }
         if let listener { realtime?.removeListener(listener) }
         realtime = app.realtime
@@ -38,8 +41,8 @@ final class StudioStore: ObservableObject {
             switch event {
             // Studio's open-tabs channel changes nothing listed here.
             case .pluginSignal("studio", "studio-tabs", _): break
-            case .pluginSignal(let pluginId, _, _) where Self.addOns.contains(pluginId): scheduleReload(app.client)
-            case .connected: scheduleReload(app.client)
+            case .pluginSignal(let pluginId, _, _) where Self.addOns.contains(pluginId): scheduleReload(client)
+            case .connected: scheduleReload(client)
             default: break
             }
         }
@@ -57,7 +60,7 @@ final class StudioStore: ObservableObject {
 
     func restore() {
         guard !loaded else { return }
-        if let snapshot = DiskCache.load(StudioSnapshot.self, key: StudioSnapshot.cacheKey) {
+        if let snapshot = DiskCache.load(StudioSnapshot.self, key: StudioSnapshot.cacheKey, serverURL: serverURL) {
             items = snapshot.items
             kindInfo = snapshot.kinds ?? []
             tags = snapshot.tags ?? []
@@ -66,26 +69,27 @@ final class StudioStore: ObservableObject {
             supportsSpaces = snapshot.spaces != nil
             loaded = true
         }
-        if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) {
+        if let inbox = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: serverURL) {
             projectNames.merge(inbox.projectNames) { current, _ in current }
         }
-        plugins = Set(UserDefaults.standard.string(forKey: "runningPlugins")?.split(separator: ",").map(String.init) ?? [])
+        plugins = Set(UserDefaults.standard.string(forKey: ServerScope.key("runningPlugins", serverURL: serverURL))?.split(separator: ",").map(String.init) ?? [])
     }
 
     func load(_ client: BBClient) async {
+        guard client.baseURL == serverURL else { return }
         async let projects = try? client.projects()
         if let running = try? await client.runningPlugins() {
             plugins = running
-            UserDefaults.standard.set(running.sorted().joined(separator: ","), forKey: "runningPlugins")
+            UserDefaults.standard.set(running.sorted().joined(separator: ","), forKey: ServerScope.key("runningPlugins", serverURL: serverURL))
         }
         do {
             let items = try await fetch(client)
             self.items = items.sorted { $0.updatedAt > $1.updatedAt }
-            Spotlight.indexStudio(self.items)
+            Spotlight.indexStudio(self.items, serverURL: serverURL)
             error = nil
             DiskCache.save(
                 StudioSnapshot(items: self.items, kinds: kindInfo, tags: supportsTags ? tags : nil, spaces: supportsSpaces ? spaces : nil),
-                as: StudioSnapshot.cacheKey)
+                as: StudioSnapshot.cacheKey, serverURL: serverURL)
         } catch where BBClient.isCancellation(error) {
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
@@ -351,7 +355,7 @@ struct StudioKind: Identifiable, Hashable {
 struct StudioView: View {
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var store = StudioStore.shared
-    @AppStorage("studioProject") private var project = ""
+    @AppStorage(ServerScope.key("studioProject")) private var project = ""
     @State private var query = ""
     /// Content matches, keyed like items, with the matching text.
     @State private var contentMatches: [String: String] = [:]
@@ -1265,7 +1269,8 @@ struct StudioThumbnail: View {
 
     @MainActor private static let drawings = NSCache<NSString, UIImage>()
 
-    private var key: NSString { "\(item.itemId):\(item.updatedAt)" as NSString }
+    private let serverURL = ServerScope.selectedURL
+    private var key: NSString { ServerScope.key("\(item.itemId):\(item.updatedAt)", serverURL: serverURL) as NSString }
 
     var body: some View {
         if item.pluginId == "excalidraw" {

@@ -12,11 +12,13 @@ struct BBStudioApp: App {
     var body: some Scene {
         WindowGroup {
             RootView()
+                .id(model.serverURL)
                 .environmentObject(model)
                 .onOpenURL { model.handle($0) }
                 .onChange(of: scenePhase, initial: true) { _, phase in model.scenePhaseChanged(phase) }
                 .onContinueUserActivity(CSSearchableItemActionType) { activity in
-                    if let id = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String {
+                    if let identifier = activity.userInfo?[CSSearchableItemActivityIdentifier] as? String,
+                        let id = Spotlight.currentIdentifier(identifier) {
                         let parts = id.split(separator: ":", maxSplits: 1).map(String.init)
                         if parts.count == 2 {
                             let host = ["pages": "page", "studio-tasks": "task", "talk": "recording", "excalidraw": "drawing", "artifacts": "artifact"][parts[0]]

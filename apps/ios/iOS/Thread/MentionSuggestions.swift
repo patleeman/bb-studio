@@ -8,7 +8,7 @@ struct MentionSuggestions: View {
     let projectId: String?
     let pick: (Mention) -> Void
     @EnvironmentObject private var app: AppModel
-    @State private var threads = Self.recent
+    @State private var threads = Self.recent[ServerScope.selectedURL] ?? []
     @State private var groups: [MentionResults.Group] = []
 
     private struct Suggestion: Identifiable {
@@ -51,8 +51,9 @@ struct MentionSuggestions: View {
         .background(.fill.tertiary, in: .rect(cornerRadius: 14))
         .opacity(suggestions.isEmpty ? 0 : 1)
         .task {
-            guard let fresh = try? await app.client.threads() else { return }
-            Self.recent = fresh
+            let client = app.client
+            guard let fresh = try? await client.threads() else { return }
+            Self.recent[client.baseURL] = fresh
             threads = fresh
         }
         .task(id: query) {
@@ -98,7 +99,7 @@ struct MentionSuggestions: View {
     }
 
     /// The last thread list, so suggestions show at once the next time.
-    @MainActor private static var recent: [ThreadEntry] = []
+    @MainActor private static var recent: [URL: [ThreadEntry]] = [:]
 
     /// The `@word` being typed at the end of `text`, without the `@`.
     static func query(in text: String) -> String? {

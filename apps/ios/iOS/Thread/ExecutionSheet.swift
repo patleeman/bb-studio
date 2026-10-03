@@ -7,6 +7,7 @@ struct ExecutionSheet: View {
     let threadId: String
     let providerId: String?
     @EnvironmentObject private var app: AppModel
+    private let client = BBClient()
     @Environment(\.dismiss) private var dismiss
     @State private var models: [ExecutionOptions.Model] = []
     @State private var model = ""
@@ -84,13 +85,13 @@ struct ExecutionSheet: View {
 
     private func load() async {
         do {
-            async let current = app.client.execution(threadId)
-            let options = try await app.client.executionOptions(providerId: providerId)
+            async let current = client.execution(threadId)
+            let options = try await client.executionOptions(providerId: providerId)
             models = options.models
             original = try await current
             let modes = options.providers.first { $0.id == providerId }?.capabilities?.permissionModes ?? []
             permissionModes = PermissionMode.allowed(modes, ceiling: options.permissionCeiling)
-            currentPermission = PermissionMode.pending(threadId) ?? original?.permissionMode ?? ""
+            currentPermission = PermissionMode.pending(threadId, serverURL: client.baseURL) ?? original?.permissionMode ?? ""
             permission = currentPermission
             // The override may name a model by its `model` rather than its `id`.
             let name = original?.model ?? ""
@@ -98,7 +99,7 @@ struct ExecutionSheet: View {
                 ?? models.first?.id ?? ""
             reasoning = original?.reasoningLevel ?? selected?.defaultReasoningEffort ?? ""
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 
@@ -107,15 +108,15 @@ struct ExecutionSheet: View {
         defer { saving = false }
         do {
             if modelChanged {
-                try await app.client.setExecution(threadId, model: model, reasoningLevel: reasoning.isEmpty ? nil : reasoning)
+                try await client.setExecution(threadId, model: model, reasoningLevel: reasoning.isEmpty ? nil : reasoning)
             }
             if permissionChanged {
                 // Back to what the thread already has: nothing to send.
-                PermissionMode.setPending(permission == original?.permissionMode ? nil : permission, for: threadId)
+                PermissionMode.setPending(permission == original?.permissionMode ? nil : permission, for: threadId, serverURL: client.baseURL)
             }
             dismiss()
         } catch {
-            self.error = BBClient.describe(error, server: app.client.baseURL)
+            self.error = BBClient.describe(error, server: client.baseURL)
         }
     }
 }

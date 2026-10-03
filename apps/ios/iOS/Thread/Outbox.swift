@@ -29,10 +29,10 @@ final class Outbox: ObservableObject {
 
     init(messages: [Message]? = nil,
          currentClient: @escaping @MainActor () -> BBClient = { AppModel.shared.client },
-         persist: @escaping ([Message]) -> Void = { DiskCache.save($0, as: "outbox") }) {
+         persist: @escaping ([Message]) -> Void = { DiskCache.saveUnscoped($0, as: "outbox") }) {
         self.currentClient = currentClient
         self.persist = persist
-        self.messages = (messages ?? DiskCache.load([Message].self, key: "outbox") ?? []).map {
+        self.messages = (messages ?? DiskCache.loadUnscoped([Message].self, key: "outbox") ?? []).map {
             var message = $0
             if message.serverURL == nil {
                 message.failure = "This older message has no saved server. Select its original BB server, then tap Try again to send it there."

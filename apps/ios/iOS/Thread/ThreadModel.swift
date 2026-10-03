@@ -2,6 +2,7 @@ import Foundation
 
 @MainActor
 final class ThreadModel: ObservableObject {
+    let serverURL = ServerScope.selectedURL
     let threadId: String
     @Published var thread: ThreadEntry?
     @Published var rows: [TimelineRow] = []
@@ -78,14 +79,18 @@ final class ThreadModel: ObservableObject {
     /// changed since, and its first row, where that page starts in `rows`.
     private var maxSeq: Int?
     private var windowStart: String?
-    private weak var app: AppModel?
+    private var boundClient: BBClient?
+    private weak var realtime: BBRealtime?
 
     init(threadId: String) {
         self.threadId = threadId
     }
 
     func attach(_ app: AppModel) {
-        self.app = app
+        guard app.serverURL == serverURL else { return }
+        let client = app.client
+        boundClient = client
+        realtime = app.realtime
         app.realtime.subscribeThread(threadId)
         listener = app.realtime.listen { [weak self] event in
             guard let self else { return }
@@ -103,17 +108,16 @@ final class ThreadModel: ObservableObject {
     }
 
     func detach() {
-        guard let app else { return }
+        guard let client = boundClient else { return }
         if loaded { cache() }
         if readPending {
-            let client = app.client
             Task { await markRead(client, force: true) }
         }
-        app.realtime.unsubscribeThread(threadId)
-        if let listener { app.realtime.removeListener(listener) }
+        realtime?.unsubscribeThread(threadId)
+        if let listener { realtime?.removeListener(listener) }
     }
 
-    private var client: BBClient? { app?.client }
+    private var client: BBClient? { boundClient }
 
     private struct Snapshot: Codable {
         var thread: ThreadEntry?
@@ -142,12 +146,12 @@ final class ThreadModel: ObservableObject {
     private func cache(force: Bool = true) {
         guard force || ContinuousClock.now - lastCached > .seconds(10) else { return }
         lastCached = .now
-        DiskCache.save(Snapshot(thread: thread, rows: Array(rows.suffix(200))), as: "thread-\(threadId)")
+        DiskCache.save(Snapshot(thread: thread, rows: Array(rows.suffix(200))), as: "thread-\(threadId)", serverURL: serverURL)
     }
 
     func load() async {
         guard let client else { return }
-        if rows.isEmpty, let snapshot = DiskCache.load(Snapshot.self, key: "thread-\(threadId)") {
+        if rows.isEmpty, let snapshot = DiskCache.load(Snapshot.self, key: "thread-\(threadId)", serverURL: serverURL) {
             thread = snapshot.thread
             rows = snapshot.rows
             loaded = true
@@ -394,7 +398,7 @@ final class ThreadModel: ObservableObject {
 
     func loadPlanReview() async {
         guard let client,
-              (UserDefaults.standard.string(forKey: "runningPlugins") ?? "").split(separator: ",").contains("plannotator")
+              (UserDefaults.standard.string(forKey: ServerScope.key("runningPlugins", serverURL: serverURL)) ?? "").split(separator: ",").contains("plannotator")
         else { return }
         if let review = try? await client.activePlanReview(threadId) {
             planReview = review

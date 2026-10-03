@@ -128,7 +128,7 @@ enum ThreadTitles {
     /// Looks up titles for mentioned threads not seen yet (archived ones, say).
     static func fetchUnknown(in texts: [String], client: BBClient) async {
         for id in unknownMentions(in: texts).prefix(10) {
-            if let thread = try? await client.thread(id) { set(id, thread.displayTitle) }
+            if let thread = try? await client.thread(id), client.baseURL == ServerScope.selectedURL { set(id, thread.displayTitle) }
         }
     }
 

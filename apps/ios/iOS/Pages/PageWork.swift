@@ -9,7 +9,7 @@ struct PageWorkBar: View {
     var started: () async -> Void
     @EnvironmentObject private var app: AppModel
     @ObservedObject private var store = PagesStore.shared
-    @AppStorage("newThreadProjectId", store: AppGroup.defaults) private var lastProjectId = ""
+    @AppStorage(ServerScope.key("newThreadProjectId"), store: AppGroup.defaults) private var lastProjectId = ""
     @State private var text = ""
     @State private var chosenProjectId: String?
     @State private var sending = false

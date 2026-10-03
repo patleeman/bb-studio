@@ -48,7 +48,7 @@ struct ThreadView: View {
     @State private var choosingProfile = false
     /// Set while the composer holds a rewrite of the last message.
     @State private var editing = false
-    @AppStorage("runningPlugins") private var runningPlugins = ""
+    @AppStorage(ServerScope.key("runningPlugins")) private var runningPlugins = ""
     /// Permissions chosen in Model & permissions, waiting for the next message.
     @AppStorage private var pendingPermission: String?
 
@@ -56,7 +56,7 @@ struct ThreadView: View {
 
     init(threadId: String) {
         _model = StateObject(wrappedValue: ThreadModel(threadId: threadId))
-        _pendingPermission = AppStorage("permissionMode.\(threadId)", store: AppGroup.defaults)
+        _pendingPermission = AppStorage(ServerScope.key("permissionMode.\(threadId)"), store: AppGroup.defaults)
     }
 
     var body: some View {
@@ -179,7 +179,7 @@ struct ThreadView: View {
         }
         .task {
             app.lastThreadId = model.threadId
-            if draft.isEmpty, let saved = Drafts.load(model.threadId) {
+            if draft.isEmpty, let saved = Drafts.load(model.threadId, serverURL: model.serverURL) {
                 draft = saved.text
                 mentions = saved.mentions
             }
@@ -202,7 +202,7 @@ struct ThreadView: View {
         }
         .onChange(of: draft) { _, text in
             mentions.removeAll { !text.contains($0.token) }
-            Drafts.save(model.threadId, text: text, mentions: mentions)
+            Drafts.save(model.threadId, text: text, mentions: mentions, serverURL: model.serverURL)
         }
         // Open where the reader left off. Waits a beat for the rows to be laid out.
         .task(id: model.unreadFrom) {

@@ -2,6 +2,7 @@ import SwiftUI
 import WidgetKit
 
 struct StatusEntry: TimelineEntry {
+    var serverURL: URL = ServerScope.selectedURL
     var date: Date
     var needsYou: [ThreadEntry]
     var running: [ThreadEntry]
@@ -20,15 +21,18 @@ struct StatusProvider: TimelineProvider {
 
     func getTimeline(in context: Context, completion: @escaping (Timeline<StatusEntry>) -> Void) {
         Task {
+            let client = BBClient()
             var entry: StatusEntry
             do {
-                let summary = ThreadSummary(try await BBClient().threads(limit: 100))
+                let summary = ThreadSummary(try await client.threads(limit: 100))
                 entry = StatusEntry(date: .now, needsYou: summary.needsYou, running: summary.running, stale: false)
             } catch {
                 entry = cached() ?? .placeholder
                 entry.stale = true
             }
             // The app also reloads widgets whenever the counts change while it's open.
+            entry.serverURL = client.baseURL
+            if client.baseURL != ServerScope.selectedURL { entry = .placeholder }
             completion(Timeline(entries: [entry], policy: .after(.now + 15 * 60)))
         }
     }
@@ -54,12 +58,16 @@ struct StatusWidget: Widget {
 
 struct StatusWidgetView: View {
     @Environment(\.widgetFamily) private var family
-    let entry: StatusEntry
+    private let snapshot: StatusEntry
+    init(entry: StatusEntry) { snapshot = entry }
+    private var entry: StatusEntry {
+        snapshot.serverURL == ServerScope.selectedURL ? snapshot : .placeholder
+    }
 
     private var headline: ThreadEntry? { entry.needsYou.first ?? entry.running.first }
     private var url: URL {
-        if let first = entry.needsYou.first { return URL(string: "bbstudio://thread/\(first.id)")! }
-        return URL(string: "bbstudio://inbox")!
+        if let first = entry.needsYou.first { return AppLink.scoped(URL(string: "bbstudio://thread/\(first.id)")!, serverURL: entry.serverURL) }
+        return AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)
     }
 
     var body: some View {
@@ -89,7 +97,7 @@ struct StatusWidgetView: View {
                 counts
                 VStack(alignment: .leading, spacing: 6) {
                     ForEach((entry.needsYou + entry.running).prefix(4)) { thread in
-                        Link(destination: URL(string: "bbstudio://thread/\(thread.id)")!) {
+                        Link(destination: AppLink.scoped(URL(string: "bbstudio://thread/\(thread.id)")!, serverURL: entry.serverURL)) {
                             HStack(spacing: 6) {
                                 Circle().fill(thread.needsYou ? Color.orange : .green).frame(width: 6, height: 6)
                                 Text(thread.displayTitle).font(.caption).lineLimit(1)
@@ -101,8 +109,8 @@ struct StatusWidgetView: View {
                     }
                     Spacer(minLength: 0)
                     HStack(spacing: 16) {
-                        Link(destination: URL(string: "bbstudio://dictate")!) { Label("Dictate", systemImage: "mic.fill") }
-                        Link(destination: URL(string: "bbstudio://voice")!) { Label("Voice", systemImage: "waveform") }
+                        Link(destination: AppLink.scoped(URL(string: "bbstudio://dictate")!, serverURL: entry.serverURL)) { Label("Dictate", systemImage: "mic.fill") }
+                        Link(destination: AppLink.scoped(URL(string: "bbstudio://voice")!, serverURL: entry.serverURL)) { Label("Voice", systemImage: "waveform") }
                     }
                     .font(.caption.weight(.semibold))
                 }

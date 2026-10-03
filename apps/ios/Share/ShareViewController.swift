@@ -42,7 +42,8 @@ final class ShareModel: ObservableObject {
 
     func load() async {
         await loadShared()
-        if let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey) {
+        guard checkServer() else { return }
+        if let snapshot = DiskCache.load(InboxSnapshot.self, key: InboxSnapshot.cacheKey, serverURL: client.baseURL) {
             threads = snapshot.threads
         }
         do {
@@ -52,20 +53,21 @@ final class ShareModel: ObservableObject {
         } catch {
             self.error = BBClient.describe(error)
         }
-        let last = AppGroup.defaults.string(forKey: Self.lastProjectKey)
+        guard checkServer() else { return }
+        let last = AppGroup.defaults.string(forKey: ServerScope.key(Self.lastProjectKey, serverURL: client.baseURL))
         let projectId = projects.first(where: { $0.id == last })?.id ?? projects.first?.id
         if destination == nil, let projectId { destination = .new(projectId: projectId) }
     }
 
     func send() async {
-        guard let destination else { return }
+        guard checkServer(), let destination else { return }
         sending = true
         defer { sending = false }
         do {
             let message = text.trimmingCharacters(in: .whitespacesAndNewlines)
             switch destination {
             case .new(let projectId):
-                AppGroup.defaults.set(projectId, forKey: Self.lastProjectKey)
+                AppGroup.defaults.set(projectId, forKey: ServerScope.key(Self.lastProjectKey, serverURL: client.baseURL))
                 let inputs = try await upload(to: projectId)
                 _ = try await client.createThread(projectId: projectId, text: message, attachments: inputs)
             case .thread(let id):
@@ -79,6 +81,15 @@ final class ShareModel: ObservableObject {
         } catch {
             self.error = BBClient.describe(error)
         }
+    }
+
+    private func checkServer() -> Bool {
+        guard client.baseURL == ServerScope.selectedURL else {
+            projects = []; threads = []; destination = nil
+            error = "The server changed. Close and reopen Share to choose a destination."
+            return false
+        }
+        return true
     }
 
     func cancel() {

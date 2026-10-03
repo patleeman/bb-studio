@@ -39,9 +39,9 @@ extension BBClient {
             "mode": "queue-if-active",
             "pluginSubmission": ["pluginId": "drafts", "data": ["kind": "draft"]],
         ]
-        PermissionMode.apply(threadId, to: &body)
+        PermissionMode.apply(threadId, to: &body, serverURL: baseURL)
         let _: JSONValue = try await post("/api/v1/threads/\(threadId)/send", .object(body))
-        PermissionMode.sent(threadId, body)
+        PermissionMode.sent(threadId, body, serverURL: baseURL)
     }
 }
 
