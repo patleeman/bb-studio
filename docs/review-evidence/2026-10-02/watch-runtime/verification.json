@@ -1,0 +1,14 @@
+{
+  "runtime": "watchOS 27.0 (24R362), arm64",
+  "phoneRuntime": "iOS 27.0 (24A434)",
+  "server": "http://127.0.0.1:49486",
+  "pairedLaunch": "passed",
+  "stagedInboxViaPhone": "passed",
+  "reachableTransitionRecoveryAfterFix": "passed",
+  "unreachableRetryAccessibility": "passed",
+  "stagedThreadNavigation": "passed",
+  "replyAndApprovalDelivery": "not exercised",
+  "phoneRebootRecovery": "not verified",
+  "physicalWatchAndComplicationDelivery": "not exercised",
+  "delegateTests": {"passed": 2, "failed": 0}
+}

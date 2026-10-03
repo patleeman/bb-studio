@@ -1,0 +1,10 @@
+{
+  "server-switch-finishes-current-load": true,
+  "newer-request-keeps-current-loading": true,
+  "newer-request-ignores-old-error": true,
+  "newer-request-finishes-current-load": true,
+  "old-origin-correction-ignored": true,
+  "server-switch-ignores-old-error": true,
+  "server-switch-keeps-current-loading": true,
+  "current-origin-correction-applied": true
+}

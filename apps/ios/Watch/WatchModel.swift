@@ -26,7 +26,7 @@ final class PhoneTransport: NSObject, WCSessionDelegate, @unchecked Sendable {
                 message,
                 replyHandler: { reply in
                     if let origin = reply["serverURL"] as? String, let url = URL(string: origin) {
-                        Task { @MainActor in WatchModel.shared.selectServer(url) }
+                        Task { @MainActor in Self.reconcileServer(url, requestedFrom: serverURL) }
                     }
                     let status = reply[WatchRelay.status] as? Int ?? 0
                     if let error = reply[WatchRelay.error] as? String {
@@ -38,6 +38,13 @@ final class PhoneTransport: NSObject, WCSessionDelegate, @unchecked Sendable {
                 },
                 errorHandler: { continuation.resume(throwing: $0) })
         }
+    }
+
+    @MainActor
+    static func reconcileServer(_ url: URL, requestedFrom origin: URL) {
+        let model = WatchModel.shared
+        guard model.client.baseURL == origin else { return }
+        model.selectServer(url)
     }
 
     private func waitForActivation() async {
@@ -60,6 +67,11 @@ final class PhoneTransport: NSObject, WCSessionDelegate, @unchecked Sendable {
 
     func session(_ session: WCSession, didReceiveApplicationContext applicationContext: [String: Any]) {
         StatusSnapshot(dictionary: applicationContext).map(Self.store)
+    }
+
+    func sessionReachabilityDidChange(_ session: WCSession) {
+        guard session.isReachable else { return }
+        Task { @MainActor in await WatchModel.shared.load() }
     }
 
     /// Saves the counts for the complication and redraws it if they changed.
@@ -94,6 +106,7 @@ final class WatchModel: ObservableObject {
     @Published var bots: [(bot: Bot, thread: DirectThread)] = []
     @Published var error: String?
     @Published var loading = false
+    private var loadGeneration = 0
 
     private init() {
         PhoneTransport.shared.activate()
@@ -110,16 +123,19 @@ final class WatchModel: ObservableObject {
 
     func selectServer(_ url: URL) {
         guard client.baseURL != url else { return }
+        loadGeneration += 1
         AppGroup.defaults.set(url.absoluteString, forKey: "serverURL")
         client = Self.makeClient(url)
-        threads = []; bots = []; error = nil
+        threads = []; bots = []; error = nil; loading = false
         WidgetCenter.shared.reloadAllTimelines()
     }
 
     func load() async {
         let client = self.client
+        loadGeneration += 1
+        let generation = loadGeneration
         loading = true
-        defer { loading = false }
+        defer { if generation == loadGeneration { loading = false } }
         do {
             async let threadList = client.threads(limit: 60)
             async let teams = try? client.botTeams()
@@ -130,14 +146,16 @@ final class WatchModel: ObservableObject {
                     if a.isRunning != b.isRunning { return a.isRunning }
                     return (a.latestAttentionAt ?? a.updatedAt) > (b.latestAttentionAt ?? b.updatedAt)
                 }
-            guard client.baseURL == self.client.baseURL else { return }
+            guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             threads = loadedThreads
             StatusSnapshot(ThreadSummary(threads), serverURL: client.baseURL).save()
-            if let teams = await teams, client.baseURL == self.client.baseURL {
+            if let teams = await teams, generation == loadGeneration, client.baseURL == self.client.baseURL {
                 bots = teams.bots.compactMap { bot in teams.directThreads[bot.id].map { (bot, $0) } }
             }
+            guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             error = nil
         } catch {
+            guard generation == loadGeneration, client.baseURL == self.client.baseURL else { return }
             self.error = error.localizedDescription
         }
     }

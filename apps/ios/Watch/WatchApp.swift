@@ -18,6 +18,8 @@ struct WatchInboxView: View {
         List {
             if let error = model.error {
                 Text(error).font(.footnote).foregroundStyle(.red)
+                Button("Retry") { Task { await model.load() } }
+                    .disabled(model.loading)
             }
             ForEach(model.threads.prefix(30)) { thread in
                 NavigationLink {
