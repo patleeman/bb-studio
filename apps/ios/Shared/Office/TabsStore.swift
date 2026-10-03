@@ -66,8 +66,10 @@ public final class TabsStore {
     public func open(href: String) async {
         await perform { _ = try await self.client.officeTabOpen(self.spaceId, href: href) }
     }
-    public func move(_ ref: String, to zone: OfficeTabZone, folderId: String? = nil) async {
-        await perform { try await self.client.officeTabMove(self.spaceId, ref: ref, zone: zone, folderId: folderId) }
+    /// `index` is the position among the other tabs there; nil puts it at the
+    /// top of Today or the end of Essentials and Pinned.
+    public func move(_ ref: String, to zone: OfficeTabZone, folderId: String? = nil, index: Int? = nil) async {
+        await perform { try await self.client.officeTabMove(self.spaceId, ref: ref, zone: zone, folderId: folderId, index: index) }
     }
     public func archive(_ ref: String) async { await move(ref, to: .archived) }
     public func clearToday() async {
