@@ -23,14 +23,15 @@ final class TalkRecorder: ObservableObject {
     @Published private(set) var recordingId: String?
     /// Set while recording when the microphone has sent only silence for a few seconds.
     @Published private(set) var silentInput: String?
+    @Published private(set) var needsRecovery = false
 
     private let client: BBClient
     private let outbox = TalkOutbox.shared
     private let capture = SegmentCapture()
     private var heartbeatTask: Task<Void, Never>?
-    /// Segments the capture has handed to the outbox. Finishing waits for all of
-    /// them: Talk deletes a recording that finishes with no audio.
-    private var handedOff = 0
+    private var handoff: TalkHandoff?
+    private var stoppedSegments: Int?
+    private var completing = false
 
     init(client: BBClient) {
         self.client = client
@@ -38,7 +39,7 @@ final class TalkRecorder: ObservableObject {
     }
 
     func start(kind: String = "dictation", threadId: String? = nil, projectId: String? = nil) async {
-        guard phase == .idle || phase == .done || phase.isFailure else { return }
+        guard !needsRecovery, phase == .idle || phase == .done || phase.isFailure else { return }
         transcript = ""
         do {
             guard await AVAudioApplication.requestRecordPermission() else {
@@ -53,14 +54,24 @@ final class TalkRecorder: ObservableObject {
             let recording = try await client.createRecording(kind: kind, threadId: threadId, projectId: projectId)
             recordingId = recording.id
             let sessionId = Self.clientId()
-            handedOff = 0
+            let handoff = TalkHandoff { [outbox, client] segment in
+                try outbox.add(segment, recordingId: recording.id, sessionId: sessionId, serverURL: client.baseURL)
+            }
+            self.handoff = handoff
+            stoppedSegments = nil
             try capture.start(
                 onLevel: { [weak self] level in Task { @MainActor in self?.level = level } },
                 onSegment: { [weak self] segment in
                     Task { @MainActor in
-                        guard let self else { return }
-                        self.outbox.add(segment, recordingId: recording.id, sessionId: sessionId, serverURL: self.client.baseURL)
-                        self.handedOff += 1
+                        guard let self, self.handoff === handoff else { return }
+                        handoff.receive(segment)
+                        if handoff.failedCount > 0 {
+                            // Stop producing more audio when storage fails, but
+                            // retain every failed source file for Retry saving.
+                            self.needsRecovery = true
+                            _ = self.stopCapture()
+                            self.phase = .failed("Couldn't save the audio on this phone. Keep this screen open, free some storage if needed, then retry saving.")
+                        }
                     }
                 })
             startedAt = Date()
@@ -81,13 +92,13 @@ final class TalkRecorder: ObservableObject {
     /// Stops capture and waits for Talk to transcribe every segment.
     @discardableResult
     func finish() async -> String? {
-        guard phase == .recording, let id = recordingId else { return nil }
+        guard !completing, (phase == .recording || needsRecovery), let id = recordingId else { return nil }
+        completing = true
+        defer { completing = false }
         phase = .finishing
-        LiveItems.recordingEnded(id)
-        let segments = capture.stop()
-        heartbeatTask?.cancel()
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
-        await waitForHandoff(segments)
+        needsRecovery = true
+        let segments = stopCapture()
+        guard await saveHandoff(segments) else { return nil }
         let stats = capture.stats()
         outbox.finishWhenSent(id, serverURL: client.baseURL)
         guard await outbox.waitForFinish(id, serverURL: client.baseURL, until: Date().addingTimeInterval(120)) else {
@@ -119,19 +130,31 @@ final class TalkRecorder: ObservableObject {
         }
     }
 
-    /// Stops without waiting; the recording stays in Talk and finishes transcribing on the server.
-    func cancel() {
-        guard phase == .recording, let id = recordingId else { return }
-        let segments = capture.stop()
-        heartbeatTask?.cancel()
-        // An active session with the audio background mode keeps the app awake.
-        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+    /// Waits for local persistence before closing; uploads and transcription
+    /// continue through the outbox after this view leaves.
+    func cancel() async -> Bool {
+        if completing { return !needsRecovery }
+        guard phase == .recording || needsRecovery, let id = recordingId else { return true }
+        completing = true
+        defer { completing = false }
+        phase = .finishing
+        needsRecovery = true
+        let segments = stopCapture()
+        guard await saveHandoff(segments) else { return false }
+        outbox.finishWhenSent(id, serverURL: client.baseURL)
         phase = .idle
-        LiveItems.recordingEnded(id)
-        Task {
-            await waitForHandoff(segments)
-            outbox.finishWhenSent(id, serverURL: client.baseURL)
-        }
+        return true
+    }
+
+    /// Always releases the microphone, including when enqueueing failed.
+    private func stopCapture() -> Int {
+        if let stoppedSegments { return stoppedSegments }
+        let segments = capture.stop()
+        stoppedSegments = segments
+        heartbeatTask?.cancel()
+        try? AVAudioSession.sharedInstance().setActive(false, options: .notifyOthersOnDeactivation)
+        if let recordingId { LiveItems.recordingEnded(recordingId) }
+        return segments
     }
 
     /// The input the microphone audio comes from, like "AirPods Pro".
@@ -144,11 +167,17 @@ final class TalkRecorder: ObservableObject {
         return "The microphone sent only silence\(from). Check that BB Studio has microphone access in Settings and no other app is using the mic, then try again."
     }
 
-    /// The last segment reaches the outbox a hop after capture stops.
-    private func waitForHandoff(_ segments: Int) async {
-        let deadline = Date().addingTimeInterval(5)
-        while handedOff < segments, Date() < deadline {
-            try? await Task.sleep(for: .milliseconds(20))
+    private func saveHandoff(_ segments: Int) async -> Bool {
+        guard let handoff else { return false }
+        handoff.retry()
+        do {
+            try await handoff.waitUntilDurable(segments)
+            needsRecovery = false
+            return true
+        } catch {
+            needsRecovery = true
+            phase = .failed(error.localizedDescription)
+            return false
         }
     }
 

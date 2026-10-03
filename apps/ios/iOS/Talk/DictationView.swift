@@ -56,14 +56,13 @@ struct DictationView: View {
                     Spacer()
                     HStack(spacing: 40) {
                         Button(role: .cancel) {
-                            recorder.cancel()
-                            dismiss()
+                            Task { if await recorder.cancel() { dismiss() } }
                         } label: { circle("xmark", .gray) }
                         Button { Task { await finish() } } label: { circle("checkmark", .green) }
                     }
                 case .finishing:
                     Spacer()
-                    ProgressView("Transcribing…")
+                    ProgressView(recorder.needsRecovery ? "Saving audio…" : "Transcribing…")
                     if !recorder.transcript.isEmpty { Text(recorder.transcript).foregroundStyle(.secondary) }
                     Spacer()
                 case .done:
@@ -75,7 +74,12 @@ struct DictationView: View {
                 case .failed(let message):
                     Spacer()
                     Label(message, systemImage: "exclamationmark.triangle").foregroundStyle(.red)
-                    recordButton
+                    if recorder.needsRecovery {
+                        Button("Retry saving") { Task { await finish() } }
+                            .buttonStyle(.borderedProminent)
+                    } else {
+                        recordButton
+                    }
                     Spacer()
                 }
             }
@@ -85,14 +89,13 @@ struct DictationView: View {
             .toolbar {
                 ToolbarItem(placement: .cancellationAction) {
                     Button("Close") {
-                        recorder.cancel()
-                        dismiss()
+                        Task { if await recorder.cancel() { dismiss() } }
                     }
                 }
             }
             .sheet(isPresented: $creatingThread) { NewThreadView(text: text) }
         }
-        .interactiveDismissDisabled(recorder.phase == .recording)
+        .interactiveDismissDisabled(recorder.phase == .recording || recorder.needsRecovery)
         .task {
             if autoStart { await recorder.start(kind: kind, threadId: threadId) }
         }

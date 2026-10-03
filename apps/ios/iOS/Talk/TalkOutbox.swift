@@ -8,6 +8,11 @@ import os
 final class TalkOutbox: ObservableObject {
     static let shared = TalkOutbox()
 
+    struct Persistence {
+        var move: (URL, URL) throws -> Void = { try FileManager.default.moveItem(at: $0, to: $1) }
+        var writeMetadata: (Data, URL) throws -> Void = { try $0.write(to: $1, options: .atomic) }
+    }
+
     private struct Entry: Codable {
         var recordingId: String
         var sessionId: String
@@ -28,12 +33,14 @@ final class TalkOutbox: ObservableObject {
     private let currentClient: @MainActor () -> BBClient
     private let defaults: UserDefaults
     private let directory: URL
+    private let persistence: Persistence
     private var running: Task<Void, Never>?
 
-    init(directory: URL? = nil, defaults: UserDefaults = .standard,
+    init(directory: URL? = nil, defaults: UserDefaults = .standard, persistence: Persistence = Persistence(),
          currentClient: @escaping @MainActor () -> BBClient = { AppModel.shared.client }) {
         self.currentClient = currentClient
         self.defaults = defaults
+        self.persistence = persistence
         self.directory = directory ?? FileManager.default.urls(for: .applicationSupportDirectory, in: .userDomainMask)[0]
             .appendingPathComponent("TalkOutbox", isDirectory: true)
         try? FileManager.default.createDirectory(at: self.directory, withIntermediateDirectories: true)
@@ -47,18 +54,30 @@ final class TalkOutbox: ObservableObject {
         updateCounts()
     }
 
-    func add(_ segment: CapturedSegment, recordingId: String, sessionId: String, serverURL: URL) {
-        let name = String(format: "%.0f-%@-%06d", Date().timeIntervalSince1970 * 1000, sessionId, segment.index)
+    func add(_ segment: CapturedSegment, recordingId: String, sessionId: String, serverURL: URL) throws {
+        let name = String(format: "%.0f-%@-%06d", Date().timeIntervalSince1970 * 1000, sessionId, segment.index) + "-\(UUID())"
         let audio = directory.appendingPathComponent("\(name).m4a")
+        let metadata = directory.appendingPathComponent("\(name).json")
+        let stagedAudio = directory.appendingPathComponent("\(name).audio.pending")
+        let stagedMetadata = directory.appendingPathComponent("\(name).metadata.pending")
         let entry = Entry(
             recordingId: recordingId, sessionId: sessionId, index: segment.index, startedAt: segment.startedAt,
             durationMs: segment.durationMs, serverURL: serverURL)
         do {
-            try FileManager.default.moveItem(at: segment.url, to: audio)
-            try JSONEncoder().encode(entry).write(to: directory.appendingPathComponent("\(name).json"))
+            // Keep the capture's source until both files are committed. Only
+            // the final .json makes a segment visible to the uploader.
+            try FileManager.default.createDirectory(at: directory, withIntermediateDirectories: true)
+            try FileManager.default.copyItem(at: segment.url, to: stagedAudio)
+            try persistence.writeMetadata(JSONEncoder().encode(entry), stagedMetadata)
+            try persistence.move(stagedAudio, audio)
+            try persistence.move(stagedMetadata, metadata)
         } catch {
-            return
+            for file in [stagedAudio, stagedMetadata, audio, metadata] {
+                try? FileManager.default.removeItem(at: file)
+            }
+            throw error
         }
+        try? FileManager.default.removeItem(at: segment.url)
         updateCounts()
         kick()
     }

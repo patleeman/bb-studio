@@ -111,6 +111,10 @@ have no trustworthy server identity and wait for you to select their original
 server and tap Try again. Older audio stays on the phone until you confirm its
 server with Settings → Older recordings → Resume older uploads.
 
+If saving a new audio segment fails, Talk stops the microphone and keeps the
+source audio for Retry saving. It blocks finishing and closing until every
+segment is durably queued; a late segment timeout is shown as a recoverable error.
+
 Notification actions and links require the matching Studio Mobile relay's server
 identity. Update the relay with the app; notifications received before this
 identity was available must be reviewed manually in the app.
