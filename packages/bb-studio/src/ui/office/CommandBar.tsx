@@ -14,7 +14,7 @@ import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNod
 import { useCall } from "./model";
 import { openOffice } from "./routes";
 import { TabGlyph, openTab } from "./TabRow";
-import { threadRef, type ShownTab, type Tab } from "./tabs";
+import { shownTab, threadRef, type ShownTab, type Tab } from "./tabs";
 import { PORTAL_SCOPE, cn } from "./styles";
 
 const OPEN_EVENT = "bb-studio:office-command-bar";
@@ -37,9 +37,7 @@ interface Row {
   run: () => void;
 }
 
-function asShown(tab: Tab): ShownTab {
-  return { ...tab, title: tab.title || "Untitled", thread: null };
-}
+const asShown = shownTab;
 
 function matches(text: string, query: string): boolean {
   const words = query.toLocaleLowerCase().split(/\s+/).filter(Boolean);

@@ -99,7 +99,7 @@ export function RenameField({ thread, onDone, className = "pl-7" }: { thread: Pl
     onDone();
   };
   return (
-    <div className={cn(ROW, "bg-sidebar-accent", className)}>
+    <div className={cn(ROW, "bg-foreground/[0.08]", className)}>
       <input
         ref={input}
         aria-label="Thread title"
@@ -111,7 +111,7 @@ export function RenameField({ thread, onDone, className = "pl-7" }: { thread: Pl
           if (key.key === "Enter") save();
           if (key.key === "Escape") onDone();
         }}
-        className="h-6 min-w-0 flex-1 rounded-sm bg-background px-1 text-sm outline-none ring-1 ring-ring"
+        className="h-6 min-w-0 flex-1 rounded-sm bg-foreground/[0.06] px-1 text-sm outline-none ring-1 ring-ring"
       />
     </div>
   );

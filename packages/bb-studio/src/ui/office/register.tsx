@@ -5,7 +5,7 @@ import { retainPanel } from "@bb-studio/kit/app";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { openCommandBar } from "./CommandBar";
 import { OfficePanel } from "./OfficePanel";
-import { OfficeTabs } from "./OfficeTabs";
+import { OfficeTabs, reopenClosedTab } from "./OfficeTabs";
 import { OfficeTop } from "./OfficeTop";
 import { OFFICE_PANELS, OFFICE_PANEL_PATH } from "./routes";
 import { TrustRequest } from "./TrustRequest";
@@ -28,5 +28,6 @@ export function registerOfficeApp(app: PluginAppBuilder, options: { sidebar: Plu
   options.sidebar?.slots.experimental_threadList({ id: "office-sidebar", title: "Office", description: "Pinned and Today tabs for the current space.", component: OfficeTabs });
   if (options.navigation) {
     app.commands.register({ id: "office-open", title: "Search or open", defaultShortcut: { key: "t", mod: true }, run: () => openCommandBar() });
+    app.commands.register({ id: "office-reopen", title: "Reopen closed tab", defaultShortcut: { key: "t", mod: true, shift: true }, run: () => reopenClosedTab() });
   }
 }

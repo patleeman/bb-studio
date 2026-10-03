@@ -26,15 +26,15 @@ function AddressBar({ where }: { where: string | null }) {
       type="button"
       onClick={() => openCommandBar()}
       aria-label={where ? `${where}. Search or open` : "Search or open"}
-      className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg bg-sidebar-accent/70 px-2.5 text-left text-sm text-muted-foreground transition-colors hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring"
+      className="flex h-9 w-full min-w-0 items-center gap-2 rounded-lg bg-foreground/[0.06] px-2.5 text-left text-sm text-foreground/60 transition-colors hover:bg-foreground/[0.07] focus-visible:outline-2 focus-visible:outline-ring"
     >
-      <Icon name="Search" aria-hidden className="size-3.5 shrink-0 text-subtle-foreground" />
+      <Icon name="Search" aria-hidden className="size-3.5 shrink-0 text-foreground/45" />
       <span className="min-w-0 flex-1 truncate">
         {where
-          ? <>{current ? <span className="text-subtle-foreground">{current.name} › </span> : null}<span className="text-foreground">{where}</span></>
+          ? <>{current ? <span className="text-foreground/45">{current.name} › </span> : null}<span className="text-foreground">{where}</span></>
           : "Search or start something"}
       </span>
-      <kbd className="shrink-0 font-sans text-xs text-subtle-foreground">⌘T</kbd>
+      <kbd className="shrink-0 font-sans text-xs text-foreground/45">⌘T</kbd>
     </button>
   );
 }
@@ -65,8 +65,8 @@ function EssentialTile({ tab, active, onRemove, onDrop }: { tab: ShownTab; activ
               onPointerDown={startDrag}
               onClick={(event) => openTab(tab, threadActions, { split: event.metaKey || event.ctrlKey })}
               className={cn(
-                "flex h-12 w-full items-center justify-center rounded-lg bg-sidebar-accent/70 transition-colors hover:bg-sidebar-accent focus-visible:outline-2 focus-visible:outline-ring",
-                active && "bg-background shadow-sm ring-1 ring-border/60 hover:bg-background",
+                "flex h-12 w-full items-center justify-center rounded-lg bg-foreground/[0.06] transition-colors hover:bg-foreground/[0.07] focus-visible:outline-2 focus-visible:outline-ring",
+                active && "bg-foreground/[0.11] shadow-sm ring-1 ring-foreground/[0.06] hover:bg-foreground/[0.11]",
               )}
             >
               <TabGlyph tab={tab} size="md" />
@@ -146,7 +146,7 @@ export function OfficeTop(_props: ExperimentalSidebarNavigationProps) {
               data-tab-drop-zone=""
               data-zone="essential"
               data-at="end"
-              className={cn("flex h-12 items-center justify-center rounded-lg border border-dashed border-border text-xs text-muted-foreground", drag.target?.zoneKey === "essential" && "border-ring text-foreground")}
+              className={cn("flex h-12 items-center justify-center rounded-lg border border-dashed border-foreground/20 text-xs text-foreground/60", drag.target?.zoneKey === "essential" && "border-ring text-foreground")}
             >
               Drop here to add to Essentials
             </div>

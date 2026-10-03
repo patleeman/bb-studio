@@ -41,3 +41,22 @@ describe("isTabActive", () => {
     expect(isTabActive(chat!, "t1", "/anything")).toBe(true);
   });
 });
+
+describe("split tabs", () => {
+  const threads = new Map([["t1", thread("t1", "Plan", { isUnread: true })], ["t2", thread("t2", "Notes")]]);
+  const split = tab("split:s1", "split", { members: [tab("thread:t1", "thread"), tab("item:pages:p", "item", { title: "Doc", href: "/p" })] });
+
+  it("titles a split from its members and carries their state", () => {
+    const [shown] = attach([split], threads);
+    expect(shown).toMatchObject({ title: "Plan | Doc", unread: true });
+    expect(shown!.members?.map((member) => member.title)).toEqual(["Plan", "Doc"]);
+  });
+
+  it("drops a split whose members are all gone, and is active when any member shows", () => {
+    expect(attach([tab("split:s2", "split", { members: [tab("thread:gone", "thread")] })], threads)).toEqual([]);
+    const [shown] = attach([split], threads);
+    expect(isTabActive(shown!, "t1", "/x")).toBe(true);
+    expect(isTabActive(shown!, null, "/p")).toBe(true);
+    expect(isTabActive(shown!, "t2", "/x")).toBe(false);
+  });
+});
