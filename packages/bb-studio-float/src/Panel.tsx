@@ -27,6 +27,7 @@ import {
 import { useEffect, useLayoutEffect, useRef, useState, type CSSProperties, type PointerEvent, type ReactNode, type RefObject } from "react";
 import { update } from "./store";
 import { RetainedView } from "./RetainedView";
+import { focusCompanion } from "./focus";
 import {
   clampFree,
   closeAll,
@@ -601,7 +602,7 @@ export function Stack({ state, dockOffset }: { state: FloatState; dockOffset: nu
           <RetainedView key={tab.key} visible={(native && tab.placement !== undefined && tab.placement !== "floating") || (tab.key === floatingActive?.key && !state.collapsed && !floatHidden)}>
             <CompanionView id={tab.key} title={tab.target.title ?? (tab.target.kind === "thread" ? "Conversation" : pathTitle(tab.target.path))}
               icon={tabIcon(tab.target)} placement={tab.placement ?? "floating"} activation={tab.key === state.active ? (tab.activation ?? 0) : 0} pinned={tab.pinned}
-              onPinnedChange={(pinned) => update((next) => pinTab(next, tab.key, pinned))} onSelect={() => update((next) => selectTab(next, tab.key))}
+              onPinnedChange={(pinned) => update((next) => pinTab(next, tab.key, pinned))} onSelect={() => focusCompanion(tab.key, navigate)}
               onClose={() => update((next) => closeTab(next, tab.key))} onPlacementChange={(placement) => move(tab.key, placement)}
               onBack={tab.back?.length ? () => update((next) => goBack(next, tab.key)) : undefined}>
               {tab.opened ? <TabWindow tab={native ? tab : { ...tab, placement: "floating" }} /> : null}

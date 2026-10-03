@@ -96,6 +96,8 @@ capability is absent; ordinary stable captures keep using `float`.
   same live tab beside BB's Browser and Terminal. Its **Float** and **Main
   view** actions move that portal again. The **Companions** page lists open
   tabs and hosts a tab moved to main.
+  Focusing a retained main tab returns to its existing main route without
+  moving the tab or replacing its history and pin.
 - **Pin a companion.** **Pin tab** in ⋯ keeps its conversation or reference
   while you open other items. Links from a pinned tab open another tab.
   Pinned tabs stay through reloads and do not close at the tab limit.
