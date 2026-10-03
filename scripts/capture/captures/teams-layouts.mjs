@@ -29,7 +29,7 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
  };
  const wait = (client, expression) => client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+20000;const tick=()=>(${expression})?resolve():Date.now()>end?reject(new Error('Channel assertion failed: '+${JSON.stringify(expression)})):setTimeout(tick,200);tick();})`, true);
  const mode = async (client, value) => {
-  await client.evaluate(`(()=>{const select=document.querySelector('[aria-label="Channel view"]');if(!select)throw new Error('Missing view selector');select.value=${JSON.stringify(value)};select.dispatchEvent(new Event('change',{bubbles:true}));})()`);
+  await client.evaluate(`(()=>{const button=document.querySelector('[aria-label="Channel view"] button[data-layout=${JSON.stringify(value)}]');if(!button)throw new Error('Missing view switcher button');button.click();if(button.getAttribute('aria-pressed')!=='true')throw new Error('View switcher did not select '+${JSON.stringify(value)});})()`);
   await client.waitForSelector(value === "merged" ? "[data-view-timeline]" : `[data-channel-layout="${value}"]`);
  };
  const open = async (client, value) => {
@@ -96,12 +96,13 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    try {
     await client.waitForSelector(`[data-channel-thread="${data.threadId}"]`);
     await client.waitForText("Working");
-    await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('[aria-label=\"Channel threads\"] button').length!==3)throw new Error('Active view did not retain idle members in its rail');})()");
+    await client.evaluate("(()=>{if(document.querySelectorAll('[data-channel-thread]').length!==1||document.querySelectorAll('[aria-label=\"Channel threads\"] button').length!==3)throw new Error('Active view did not retain idle members in its roster');})()");
    } catch (error) { await bbCli(["thread", "stop", data.threadId]).catch(() => {}); throw error; }
    return async () => {
     await bbCli(["thread", "stop", data.threadId]);
-    await client.waitForText("No threads are working right now.");
-    await client.clickElementWithTextAndPointer('[aria-label="Channel threads"] button span.block.truncate', "Release checklist");
+    await client.waitForText("Nobody is working right now");
+    await client.waitForText("Last reply from");
+    await client.clickElementWithTextAndPointer('[aria-label="Channel threads"] button .channel-rail-name', "Release checklist");
     await client.waitForSelector('[data-channel-layout="focus"]');
    };
   }) },

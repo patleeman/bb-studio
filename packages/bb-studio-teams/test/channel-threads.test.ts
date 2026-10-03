@@ -13,7 +13,7 @@ const view: ThreadView = { id: "channel", name: "Review", members: [{ kind: "thr
 const render = (layout: "active" | "grid" | "focus", threads = [row("idle", "idle"), row("active", "active")], selected: string | null = null) => act(() => root.render(React.createElement(ChannelThreads, { view, initialThreads: threads, bots: [], layout, selected, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
 beforeEach(() => { vi.clearAllMocks(); state.rpc.call.mockImplementation(() => new Promise(() => {})); vi.useFakeTimers(); vi.stubGlobal("IS_REACT_ACT_ENVIRONMENT", true); container = document.createElement("div"); document.body.append(container); root = createRoot(container); });
 afterEach(() => { act(() => root.unmount()); container.remove(); vi.useRealTimers(); vi.unstubAllGlobals(); });
-test("active view keeps idle members in the rail but only mounts working native transcripts", async () => {
+test("active view keeps idle members in the roster but only mounts working native transcripts", async () => {
   state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "active")]);
   render("active");
   await act(async () => {});
@@ -25,7 +25,8 @@ test("active view keeps idle members in the rail but only mounts working native 
   state.rpc.call.mockResolvedValue([row("idle", "idle"), row("active", "idle")]);
   await act(async () => { await vi.advanceTimersByTimeAsync(3000); });
   expect(container.querySelectorAll("[data-native-thread]")).toHaveLength(0);
-  expect(container.textContent).toContain("No threads are working right now.");
+  expect(container.textContent).toContain("Nobody is working right now");
+  expect(container.textContent).toContain("Last reply from");
 });
 test("native message reply actions address their source thread, and grid folds children behind links", () => {
   render("grid", [row("idle", "idle"), row("active", "active"), row("child", "active", { parentThreadId: "active" })]);
@@ -40,4 +41,11 @@ test("focus mounts only the selected native transcript", () => {
   render("focus", undefined, "idle");
   expect(container.querySelectorAll("[data-native-thread]")).toHaveLength(1);
   expect(container.querySelector("[data-native-thread]")?.getAttribute("data-native-thread")).toBe("idle");
+});
+test("grid puts threads that need input first and folds unstarted bots into one row", () => {
+  const withBot: ThreadView = { ...view, members: [...view.members, { kind: "bot", id: "quiet" }] };
+  act(() => root.render(React.createElement(ChannelThreads, { view: withBot, initialThreads: [row("idle", "idle", { updatedAt: 9 }), row("ask", "idle", { hasPendingInteraction: true })], bots: [{ id: "quiet", name: "Quiet bot", avatar: null } as any], layout: "grid", selected: null, onSelect: state.select, onReply: state.reply, onOpen: state.open })));
+  expect([...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"))).toEqual(["ask", "idle"]);
+  expect(container.querySelectorAll(".channel-thread-pane")).toHaveLength(2);
+  expect(container.querySelector(".channel-unstarted")?.textContent).toContain("Quiet bot");
 });

@@ -1,5 +1,5 @@
 import { expect, test } from "vitest";
-import { activeThreads, channelLayout, focusedThread, threadActivity } from "../channel-layout";
+import { activeThreads, byAttention, channelLayout, focusedThread, threadActivity } from "../channel-layout";
 import type { ViewThread } from "../view-contract";
 const thread = (id: string, status: string, extra: Partial<ViewThread> = {}): ViewThread => ({ id, title: id, status, botId: null, parentThreadId: null, updatedAt: 1, error: null, ...extra });
 test("unknown preferences preserve the existing merged view", () => {
@@ -18,4 +18,8 @@ test("focus keeps the selected idle or child thread and recovers if it disappear
   expect(focusedThread(rows, "child")?.id).toBe("child");
   expect(focusedThread(rows, "deleted")?.id).toBe("child");
   expect(focusedThread([], null)).toBeUndefined();
+});
+test("attention order puts input requests and failures ahead of work, then recency", () => {
+  const rows = [thread("old", "idle", { updatedAt: 1 }), thread("new", "idle", { updatedAt: 5 }), thread("run", "active"), thread("fail", "error"), thread("ask", "idle", { hasPendingInteraction: true })];
+  expect(byAttention(rows).map(thread => thread.id)).toEqual(["ask", "fail", "run", "new", "old"]);
 });

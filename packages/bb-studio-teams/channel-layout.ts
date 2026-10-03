@@ -23,3 +23,8 @@ export function activeThreads(threads: ViewThread[]) {
 export function focusedThread(threads: ViewThread[], selected: string | null) {
   return threads.find(thread => thread.id === selected) ?? activeThreads(threads)[0] ?? threads.find(thread => !thread.parentThreadId) ?? threads[0];
 }
+const ATTENTION = ["Needs input", "Failed", "Working", "Idle", "Unavailable"];
+/** Threads that need the owner first, then working ones, then the most recently updated. */
+export function byAttention(threads: ViewThread[]) {
+  return [...threads].sort((a, b) => ATTENTION.indexOf(threadActivity(a)) - ATTENTION.indexOf(threadActivity(b)) || b.updatedAt - a.updatedAt);
+}
