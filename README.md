@@ -16,8 +16,9 @@ DMs and channels. Read their reports and answer requests in one Inbox.
   and outputs together, in the folder where the work belongs.
 - **Inbox** collects requests, reports, and comments. Choose one Space or
   **All spaces**. Home shows what needs you, active work, reports, and recent items.
-- **Trust** is explicit: **Ask first** bots request approval for actions outside
-  their allowed work; **Act freely** bots can proceed with broader permissions.
+- **Trust** is explicit: **Ask first** bots ask in your Inbox before changing
+  anything outside their own work; **Act and report** bots go ahead and tell
+  you what they did.
 
 ## Six plugins
 
@@ -52,7 +53,9 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    and mobile (notifications for the iOS app), then install my choices.
 3. If I have the old separate Studio plugins, disable them first and reload
    Studio and Pages so they import the old data and settings. Verify the import
-   before uninstalling the old plugins. Do not remove their data directories.
+   before uninstalling the old plugins. Do not remove their data directories;
+   once I've checked my data, I can back them up and remove them from
+   Space settings → Old plugin data.
 4. Run bb plugin list, verify the selected plugins are running, and report
    any failures with their errors. Show me Home and Inbox in the Studio sidebar.
 ```
