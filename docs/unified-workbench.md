@@ -221,10 +221,25 @@ in the frontend and a quote card whose controls were behind Float. Artifacts'
 53 tests, typecheck, and build pass; the capture verifies the quote controls'
 actual click targets. No agent runs.
 
+Feed discussions now use the shared new-conversation composer and a canonical
+post-specific companion route. Source threads, post pages, linked items and
+asynchronous Explore results use the same navigation policy, including routing
+back into the companion that initiated a request. The shared kit has 78 tests,
+Feed 18, Studio Chat 38 and Pages 80; their typechecks and affected builds pass.
+The stable BB 0.45.0 capture installs the suite from `96c12b9` and Feed from
+`e02c49a` and Float from `b97c557`. It checks exact native draft/attachment retention through folding,
+tab reuse, linked-page opening and real sidebar navigation, plus compact
+composer bounds at 390 by 844 pixels. Native scheduled send creates a discussion
+in its originating tab, with the post pointer, edited prompt and file retained
+in BB's queued message. The phone check caught docked Float's desktop right
+margin clipping the left edge of a resized companion. Float now bounds that
+margin to the available viewport width. All seeded fixtures are deleted
+without running agents.
+
 Remaining delivery includes publishing the native host changes, the SDK/CLI
 placement controller, embedded composer targeting, migrating standalone
 Pages composers, quote-draft recovery and compact composer checks, and the remaining suite
-entry points: Feed discussions and links, task handoff verification, Talk
+entry points: task handoff verification, Talk
 return navigation, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
 existing native capture verifies transfers after the companion is realized.

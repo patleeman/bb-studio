@@ -29,6 +29,24 @@ with **Open**. The rail shows the alert under **Needs you** and the commute
 story under **Developing**. Every post was made seconds before the capture, so
 each shows "just now".
 
+![A retained Feed discussion draft with a file attachment](assets/discussion-draft.png)
+
+The companion capture uses one local release post, its source thread and a
+checklist page. It checks tab reuse, the same native composer and file attachment
+through folding and sidebar navigation, and opening the linked page beside the
+draft. It also checks the [phone composer](assets/discussion-mobile.png) at
+390 by 844 pixels. BB's **Send later** action creates the discussion in its
+originating tab; the queued message retains the edited draft, file and post
+context. The [scheduled discussion](assets/discussion-preview.png) runs on
+stable BB 0.45.0 with the suite installed from `96c12b9`, Feed from `e02c49a`
+and Float from `b97c557`.
+No agent runs, and the capture deletes its fixtures afterward.
+
+```sh
+BB_CAPTURE_FEED_COMPANIONS=1 BB_CAPTURE_ONLY=feed-companions \
+  node scripts/capture-plugin-screenshots.mjs --plugin feed
+```
+
 ## How agents post
 
 An agent posts with the `feed_post` tool: a title, a Markdown body, and
