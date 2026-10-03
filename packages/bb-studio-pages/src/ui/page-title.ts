@@ -13,13 +13,33 @@ export type TitleSnapshot = {
   alternatives: Draft[];
 };
 const errorText = (error: unknown) => error instanceof Error ? error.message : String(error);
-const memoryDrafts = new Map<string, Draft>();
-const unpersisted = new Set<string>();
-const warnBeforeExit = (event: BeforeUnloadEvent) => { event.preventDefault(); event.returnValue = ""; };
+type TitleRecoveryMemory = {
+  drafts: Map<string, Draft>;
+  unpersisted: Set<string>;
+  listening: boolean;
+  warn(event: BeforeUnloadEvent): void;
+};
+// Plugin reloads replace modules, but drafts and their exit warning must keep
+// the same owner until storage or the server acknowledges them.
+const memoryKey = Symbol.for("bb-studio-pages:pending-title-recovery");
+const memoryHost = globalThis as typeof globalThis & { [key: symbol]: TitleRecoveryMemory | undefined };
+const recoveryMemory = memoryHost[memoryKey] ??= {
+  drafts: new Map(),
+  unpersisted: new Set(),
+  listening: false,
+  warn(event) { event.preventDefault(); event.returnValue = ""; },
+};
+const memoryDrafts = recoveryMemory.drafts;
+const unpersisted = recoveryMemory.unpersisted;
 function markUnpersisted(key: string, failed: boolean) {
   if (failed) unpersisted.add(key); else unpersisted.delete(key);
-  if (unpersisted.size) window.addEventListener("beforeunload", warnBeforeExit);
-  else window.removeEventListener("beforeunload", warnBeforeExit);
+  if (unpersisted.size && !recoveryMemory.listening) {
+    window.addEventListener("beforeunload", recoveryMemory.warn);
+    recoveryMemory.listening = true;
+  } else if (!unpersisted.size && recoveryMemory.listening) {
+    window.removeEventListener("beforeunload", recoveryMemory.warn);
+    recoveryMemory.listening = false;
+  }
 }
 
 /** Immutable, uniquely keyed versions prevent one tab from replacing another

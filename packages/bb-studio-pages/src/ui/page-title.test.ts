@@ -154,6 +154,31 @@ it("retries a failed recovery read without replacing a previously saved title dr
   expect(state.transport.update).not.toHaveBeenCalled();
 });
 
+it("shares memory-only recovery and one removable exit guard across plugin module reloads", async () => {
+  const state = setup(); const first = state.mount();
+  const addListener = vi.spyOn(window, "addEventListener");
+  const write = vi.spyOn(Storage.prototype, "setItem").mockImplementation(() => { throw new Error("Quota exceeded"); });
+  first.edit("Survive plugin reload"); first.dispose();
+  vi.resetModules();
+  const reloaded = await import("./page-title");
+  expect(reloaded.PageTitle).not.toBe(PageTitle);
+  const recovery = new reloaded.TitleRecovery(origin, "page_one"); stores.push(recovery);
+  const restored = new reloaded.PageTitle("page_one", { title: "Original", updatedAt: 1 }, state.transport, recovery);
+  controllers.push(restored);
+  expect(restored.snapshot).toMatchObject({ title: "Survive plugin reload", status: "recovered" });
+  expect(restored.snapshot.localError).toContain("only kept");
+  restored.retryLocal();
+  expect(addListener.mock.calls.filter(([name]) => name === "beforeunload")).toHaveLength(1);
+  const exit = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(exit);
+  expect(exit.defaultPrevented).toBe(true);
+  write.mockRestore(); restored.retryLocal();
+  expect(state.recovery.hasUnpersisted()).toBe(false);
+  const safeExit = new Event("beforeunload", { cancelable: true }); window.dispatchEvent(safeExit);
+  expect(safeExit.defaultPrevented).toBe(false);
+  restored.discard();
+  expect(state.recovery.memory()).toEqual([]);
+});
+
 it("reports malformed recovery and preserves the raw data for download", () => {
   const state = setup();
   const key = `bb-studio-pages:title:${JSON.stringify([origin, "page_one"])}:broken`;
