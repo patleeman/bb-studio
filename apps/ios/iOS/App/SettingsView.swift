@@ -25,11 +25,12 @@ struct SettingsView: View {
                     .autocorrectionDisabled()
                     .keyboardType(.URL)
                 Button("Save and test") { Task { await save() } }
-                if let status { Text(status).font(.footnote).foregroundStyle(.secondary) }
+                if let status { Text(status).font(.footnote).foregroundStyle(Color.primary.opacity(0.75)) }
             } header: {
-                Text("BB server")
+                Text("BB server").foregroundStyle(Color.primary.opacity(0.75))
             } footer: {
                 Text("Reached over Tailscale Serve. BB has no client auth, so the tailnet is the boundary.")
+                    .foregroundStyle(Color.primary.opacity(0.75))
             }
             ServerControls()
             if !Drafts.legacyKeys.isEmpty {
@@ -63,7 +64,7 @@ struct SettingsView: View {
                     Button("Resume older uploads…") { confirmingLegacyUpload = true }
                 }
             }
-            Section("Server") {
+            Section {
                 NavigationLink { PluginStatusView() } label: {
                     Label("Plugins", systemImage: "puzzlepiece.extension")
                 }
@@ -72,11 +73,15 @@ struct SettingsView: View {
                         Label("Usage", systemImage: "gauge.with.dots.needle.33percent")
                     }
                 }
+            } header: {
+                Text("Server").foregroundStyle(Color.primary.opacity(0.75))
             }
-            Section("Threads") {
+            Section {
                 NavigationLink { ArchivedView() } label: {
                     Label("Archived threads", systemImage: "archivebox")
                 }
+            } header: {
+                Text("Threads").foregroundStyle(Color.primary.opacity(0.75))
             }
             if runningPlugins.split(separator: ",").contains("custom-instructions") {
                 Section("Agents") {
@@ -103,9 +108,10 @@ struct SettingsView: View {
                     preview.speak(utterance)
                 }
             } header: {
-                Text("Voice chat")
+                Text("Voice chat").foregroundStyle(Color.primary.opacity(0.75))
             } footer: {
                 Text("Download Premium or Enhanced voices in Settings → Accessibility → Spoken Content → Voices. Talk over BB to interrupt it.")
+                    .foregroundStyle(Color.primary.opacity(0.75))
             }
             Section("Action button") {
                 Text(

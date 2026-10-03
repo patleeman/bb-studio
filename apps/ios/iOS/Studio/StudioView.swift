@@ -422,10 +422,12 @@ struct StudioView: View {
                     .listRowBackground(Color.clear)
             }
             ForEach(sections, id: \.title) { section in
-                Section(section.title) {
+                Section {
                     ForEach(section.items) { item in
                         row(item)
                     }
+                } header: {
+                    Text(section.title).foregroundStyle(Color.primary.opacity(0.75))
                 }
             }
         }
@@ -1201,15 +1203,15 @@ struct StudioRow: View {
                     if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     Text(Date(timeIntervalSince1970: item.updatedAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
                         .font(.caption)
-                        .foregroundStyle(.secondary)
+                        .foregroundStyle(Color.primary.opacity(0.75))
                         .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
                         .fixedSize(horizontal: false, vertical: true)
                 }
                 if let snippet {
-                    Text(Self.highlighted(snippet, highlight)).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
+                    Text(Self.highlighted(snippet, highlight)).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75)).lineLimit(3)
                         .accessibilityIdentifier("studioSnippet")
                 } else if let preview = item.preview, !preview.isEmpty {
-                    Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    Text(preview).font(.subheadline).foregroundStyle(Color.primary.opacity(0.75)).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 }
                 (dynamicTypeSize.isAccessibilitySize
                     ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
@@ -1239,7 +1241,7 @@ struct StudioRow: View {
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.secondary)
+                .foregroundStyle(Color.primary.opacity(0.75))
             }
         }
         .padding(.vertical, 2)

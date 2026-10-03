@@ -1,0 +1,218 @@
+Attributes: Application, 0x111255180, pid: 34093, label: 'BB Studio'
+Element subtree:
+ →Application, 0x111255180, pid: 34093, label: 'BB Studio'
+    Window (Main), 0x111255400, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x111255680, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x1112557c0, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x111255900, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x111255a40, {{-402.0, -874.0}, {1206.0, 2622.0}}, identifier: 'PopoverDismissRegion', label: 'dismiss popup'
+          Other, 0x111255b80, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x111255cc0, {{0.0, 0.0}, {402.0, 874.0}}
+              Other, 0x111255e00, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x111255f40, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x111256080, {{0.0, 0.0}, {402.0, 874.0}}
+                    Other, 0x1112561c0, {{0.0, 0.0}, {402.0, 874.0}}
+                      Other, 0x111256300, {{0.0, 0.0}, {402.0, 874.0}}
+                        Other, 0x1112566c0, {{0.0, 0.0}, {402.0, 874.0}}
+                          Other, 0x111256800, {{0.0, 0.0}, {402.0, 874.0}}
+                            NavigationBar, 0x111256940, {{0.0, 62.0}, {402.0, 106.0}}, identifier: 'Home'
+                              Other, 0x111256a80, {{288.3, 66.0}, {36.7, 36.0}}
+                                Other, 0x111256bc0, {{288.3, 66.0}, {36.7, 36.0}}
+                                  Button, 0x111257c00, {{288.3, 66.0}, {36.7, 36.0}}, identifier: 'mic', label: 'Microphone'
+                              Other, 0x111257d40, {{341.0, 66.0}, {41.0, 36.0}}
+                                Other, 0x111257e80, {{341.0, 66.0}, {41.0, 36.0}}
+                                  Button, 0x111257340, {{341.0, 66.0}, {41.0, 36.0}}, label: 'New Thread'
+                                    Button, 0x111257700, {{341.0, 66.0}, {41.0, 36.0}}
+                                      Image, 0x111257840, {{351.7, 72.7}, {23.0, 23.0}}, identifier: 'square.and.pencil', label: 'Compose'
+                              StaticText, 0x111257980, {{16.0, 119.7}, {94.3, 40.7}}, label: 'Home'
+                            Other, 0x111257ac0, {{0.0, 0.0}, {402.0, 874.0}}
+                              Other, 0x111257480, {{0.0, 0.0}, {402.0, 874.0}}
+                                Other, 0x111257200, {{0.0, 0.0}, {402.0, 874.0}}
+                                  Other, 0x111256e40, {{0.0, 0.0}, {402.0, 874.0}}
+                                    CollectionView, 0x1112570c0, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Other, 0x111256f80, {{-16.0, -1580.0}, {434.0, 1869.7}}
+                                      Other, 0x111256d00, {{0.0, 0.0}, {402.0, 874.0}}
+                                        Other, 0x1112575c0, {{0.0, 0.0}, {402.0, 156.0}}
+                                        Other, 0x111256580, {{0.0, 741.0}, {402.0, 133.0}}
+                                      Other, 0x111256440, {{0.0, 0.0}, {402.0, 874.0}}
+                                      Cell, 0x111255540, {{16.0, 168.0}, {370.0, 52.0}}
+                                        Other, 0x111dc1f40, {{16.0, 168.0}, {370.0, 52.0}}
+                                          Other, 0x111dc2080, {{16.0, 168.0}, {370.0, 52.0}}
+                                        Other, 0x111dc21c0, {{16.0, 168.0}, {370.0, 52.0}}
+                                          Other, 0x111dc2300, {{16.0, 168.0}, {370.0, 52.0}}
+                                            Other, 0x111dc1cc0, {{16.0, 168.0}, {370.0, 52.0}}
+                                              Button, 0x111dc1e00, {{16.0, 168.0}, {370.0, 52.0}}, identifier: 'feedRow', label: 'Feed', value: 1
+                                                Image, 0x111dc0780, {{32.0, 182.7}, {24.0, 23.0}}, identifier: 'newspaper', label: 'Newspaper', value: 1
+                                                StaticText, 0x111dc1b80, {{32.0, 182.7}, {78.0, 23.0}}, label: 'Feed', value: 1
+                                                StaticText, 0x111dc0500, {{340.3, 183.8}, {7.7, 20.3}}, label: '1'
+                                                Image, 0x111dc0640, {{360.7, 188.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Cell, 0x111dc03c0, {{16.0, 220.0}, {370.0, 52.0}}
+                                        Other, 0x111dc2940, {{16.0, 220.0}, {370.0, 52.0}}
+                                          Other, 0x111dc2d00, {{16.0, 220.0}, {370.0, 52.0}}
+                                        Other, 0x111dc26c0, {{16.0, 220.0}, {370.0, 52.0}}
+                                          Other, 0x111dc0b40, {{16.0, 220.0}, {370.0, 52.0}}
+                                            Other, 0x111dc2440, {{16.0, 220.0}, {370.0, 52.0}}
+                                              Button, 0x111dc0280, {{16.0, 220.0}, {370.0, 52.0}}, label: 'Automations'
+                                                StaticText, 0x111dc0140, {{31.0, 235.3}, {137.0, 21.7}}, label: 'Automations'
+                                                Image, 0x111dc0000, {{31.0, 235.3}, {24.0, 21.7}}, identifier: 'clock.arrow.circlepath', label: 'Clock With A Circular Arrow'
+                                                Image, 0x111dc2a80, {{360.7, 240.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                      Other, 0x111dc2bc0, {{72.0, 219.0}, {298.0, 1.0}}
+                                      Other, 0x111dc3840, {{-16.0, 289.7}, {434.0, 2075.0}}
+                                      Cell, 0x111dc3700, {{16.0, 289.7}, {370.0, 40.3}}
+                                        Other, 0x111dc2e40, {{16.0, 289.7}, {370.0, 40.3}}
+                                        Other, 0x111dc2f80, {{16.0, 289.7}, {370.0, 40.3}}
+                                          Other, 0x111dc30c0, {{16.0, 289.7}, {370.0, 40.3}}
+                                            Other, 0x111dc2800, {{16.0, 289.7}, {370.0, 40.3}}
+                                              Button, 0x111dc3340, {{16.0, 289.7}, {370.0, 40.3}}, label: 'Threads'
+                                                StaticText, 0x111dc3200, {{32.0, 299.7}, {338.0, 20.3}}, label: 'Threads'
+                                                Image, 0x111dc3480, {{358.8, 307.5}, {12.0, 7.0}}, identifier: 'expanded'
+                                      Cell, 0x111dc35c0, {{16.0, 330.0}, {370.0, 66.7}}
+                                        Other, 0x111dc3980, {{16.0, 330.0}, {370.0, 66.7}}
+                                          Other, 0x111dc3c00, {{16.0, 330.0}, {370.0, 66.7}}
+                                        Other, 0x111dc3d40, {{16.0, 330.0}, {370.0, 66.7}}
+                                          Other, 0x111dc3e80, {{16.0, 330.0}, {370.0, 66.7}}
+                                            Other, 0x111dc2580, {{16.0, 330.0}, {370.0, 66.7}}
+                                              Button, 0x111dc3ac0, {{16.0, 330.0}, {370.0, 66.7}}, label: 'Plan the Friday release window, Orbit, ·, 2 hr. ago'
+                                                StaticText, 0x111dc1900, {{50.0, 345.0}, {234.3, 20.3}}, label: 'Plan the Friday release window'
+                                                Image, 0x111dc0c80, {{360.7, 357.3}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                                StaticText, 0x111dc1040, {{50.0, 367.3}, {28.7, 14.3}}, label: 'Orbit'
+                                                StaticText, 0x111dc1180, {{82.7, 367.3}, {3.7, 14.3}}, label: '·'
+                                                StaticText, 0x111dc12c0, {{90.3, 367.3}, {49.7, 14.3}}, label: '2 hr. ago'
+                                      Cell, 0x111dc1400, {{16.0, 396.7}, {370.0, 66.7}}
+                                        Other, 0x111dc17c0, {{16.0, 396.7}, {370.0, 66.7}}
+                                          Other, 0x111dc1680, {{16.0, 396.7}, {370.0, 66.7}}
+                                        Other, 0x111dc1540, {{16.0, 396.7}, {370.0, 66.7}}
+                                          Other, 0x111dc0dc0, {{16.0, 396.7}, {370.0, 66.7}}
+                                            Other, 0x111dc0f00, {{16.0, 396.7}, {370.0, 66.7}}
+                                              Button, 0x111dc08c0, {{16.0, 396.7}, {370.0, 66.7}}, label: 'Review the launch checklist, Orbit, ·, 2 hr. ago'
+                                                StaticText, 0x111dc0a00, {{50.0, 411.7}, {210.0, 20.3}}, label: 'Review the launch checklist'
+                                                Image, 0x110304500, {{360.7, 424.0}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                                StaticText, 0x110307700, {{50.0, 434.0}, {28.7, 14.3}}, label: 'Orbit'
+                                                StaticText, 0x110305400, {{82.7, 434.0}, {3.7, 14.3}}, label: '·'
+                                                StaticText, 0x110306300, {{90.3, 434.0}, {49.7, 14.3}}, label: '2 hr. ago'
+                                      Other, 0x110307ac0, {{50.0, 395.7}, {320.0, 1.0}}
+                                      Cell, 0x1103066c0, {{16.0, 463.3}, {370.0, 66.7}}
+                                        Other, 0x1103075c0, {{16.0, 463.3}, {370.0, 66.7}}
+                                          Other, 0x110306580, {{16.0, 463.3}, {370.0, 66.7}}
+                                        Other, 0x110306440, {{16.0, 463.3}, {370.0, 66.7}}
+                                          Other, 0x110306d00, {{16.0, 463.3}, {370.0, 66.7}}
+                                            Other, 0x110306bc0, {{16.0, 463.3}, {370.0, 66.7}}
+                                              Button, 0x110304a00, {{16.0, 463.3}, {370.0, 66.7}}, label: 'Draft the ORBIT-42 release notes, Orbit, ·, 2 hr. ago'
+                                                StaticText, 0x110304640, {{50.0, 478.3}, {253.0, 20.3}}, label: 'Draft the ORBIT-42 release notes'
+                                                Image, 0x110305540, {{360.7, 490.7}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                                StaticText, 0x110305cc0, {{50.0, 500.7}, {28.7, 14.3}}, label: 'Orbit'
+                                                StaticText, 0x110305a40, {{82.7, 500.7}, {3.7, 14.3}}, label: '·'
+                                                StaticText, 0x110307480, {{90.3, 500.7}, {49.7, 14.3}}, label: '2 hr. ago'
+                                      Other, 0x110305040, {{50.0, 462.3}, {320.0, 1.0}}
+                                      Cell, 0x110307840, {{16.0, 530.0}, {370.0, 66.7}}
+                                        Other, 0x110307200, {{16.0, 530.0}, {370.0, 66.7}}
+                                          Other, 0x110306e40, {{16.0, 530.0}, {370.0, 66.7}}
+                                        Other, 0x1103057c0, {{16.0, 530.0}, {370.0, 66.7}}
+                                          Other, 0x1103052c0, {{16.0, 530.0}, {370.0, 66.7}}
+                                            Other, 0x105858780, {{16.0, 530.0}, {370.0, 66.7}}
+                                              Button, 0x10585b5c0, {{16.0, 530.0}, {370.0, 66.7}}, label: 'Pick a database for the todo app, Orbit, ·, 2 hr. ago'
+                                                StaticText, 0x10585b840, {{50.0, 545.0}, {247.0, 20.3}}, label: 'Pick a database for the todo app'
+                                                Image, 0x10585bd40, {{360.7, 557.3}, {7.0, 12.0}}, identifier: 'chevron.forward'
+                                                StaticText, 0x10585ae40, {{50.0, 567.3}, {28.7, 14.3}}, label: 'Orbit'
+                                                StaticText, 0x10585b700, {{82.7, 567.3}, {3.7, 14.3}}, label: '·'
+                                                StaticText, 0x10585b480, {{90.3, 567.3}, {49.7, 14.3}}, label: '2 hr. ago'
+                                      Other, 0x105859180, {{50.0, 529.0}, {320.0, 1.0}}
+                                      Other, 0x10585abc0, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x105859a40, {{396.0, 781.0}, {3.0, 7.0}}
+                                      Other, 0x105858f00, {{369.0, 116.0}, {30.0, 675.0}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                                        Other, 0x111a8da40, {{396.0, 781.0}, {3.0, 7.0}}
+                            Toolbar, 0x111a8db80, {{0.0, 0.0}, {402.0, 874.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                              Other, 0x111a8dcc0, {{0.0, 0.0}, {402.0, 874.0}}
+                Other, 0x111a8e1c0, {{0.0, 0.0}, {402.0, 874.0}}
+                  Other, 0x111a8e300, {{0.0, 791.0}, {402.0, 83.0}}
+                    Other, 0x111a8de00, {{0.0, 0.0}, {402.0, 874.0}}
+                      TabBar, 0x111a8df40, {{0.0, 791.0}, {402.0, 83.0}}, label: 'Tab Bar'
+                        Other, 0x111a8e080, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x111a8c000, {{21.0, 791.0}, {98.0, 54.0}}
+                          Other, 0x111a8cf00, {{21.0, 791.0}, {360.0, 62.0}}
+                            Button, 0x111a8d040, {{25.0, 795.0}, {98.0, 54.0}}, identifier: 'house', label: 'Home', Selected
+                              Image, 0x111a8d2c0, {{57.3, 801.0}, {33.3, 28.0}}, identifier: 'house.fill', label: 'home'
+                            Button, 0x111a8d900, {{109.7, 795.0}, {98.0, 54.0}}, identifier: 'square.stack', label: 'Studio'
+                              Image, 0x111a8d400, {{145.7, 799.7}, {26.0, 32.3}}, identifier: 'square.stack.fill', label: 'Stack of squares, filled'
+                            Button, 0x111a8d7c0, {{194.3, 795.0}, {98.0, 54.0}}, identifier: 'globe', label: 'Web'
+                              Image, 0x111a8d540, {{229.7, 801.3}, {27.3, 27.0}}, identifier: 'globe.fill', label: 'Globe, filled'
+                            Button, 0x111a8d680, {{279.0, 795.0}, {98.0, 54.0}}, identifier: 'gear', label: 'Settings'
+                              Image, 0x111a8d180, {{313.0, 799.7}, {30.3, 30.3}}, identifier: 'gear', label: 'settings'
+                          Other, 0x111a8cdc0, {{21.0, 791.0}, {360.0, 62.0}}
+                          Other, 0x111a8c280, {{25.0, 795.0}, {98.0, 54.0}}
+                            Other, 0x111a8cb40, {{25.0, 795.0}, {98.0, 54.0}}
+                              Other, 0x111a8cc80, {{25.0, 795.0}, {98.0, 54.0}}
+                              Other, 0x111a8c8c0, {{25.0, 795.0}, {98.0, 54.0}}
+                                Other, 0x111a8ca00, {{25.0, 795.0}, {98.0, 54.0}}
+                                  Other, 0x111a8c640, {{25.0, 795.0}, {98.0, 54.0}}
+                                    Other, 0x111a8c780, {{25.0, 795.0}, {98.0, 54.0}}
+                                  Other, 0x111a8c3c0, {{25.0, 795.0}, {98.0, 54.0}}
+                                Other, 0x111a8c500, {{25.0, 795.0}, {98.0, 54.0}}
+                    Other, 0x111a8c140, {{0.0, 791.0}, {402.0, 83.0}}
+                      Other, 0x111a8e580, {{0.0, 791.0}, {402.0, 83.0}}
+                        Other, 0x111a8e800, {{0.0, 791.0}, {402.0, 83.0}}
+                          Other, 0x111a8e940, {{0.0, 791.0}, {402.0, 83.0}}
+                            Other, 0x111a8ea80, {{0.0, 791.0}, {402.0, 83.0}}
+                              Other, 0x111a8ebc0, {{0.0, 791.0}, {402.0, 83.0}}
+      Other, 0x111a8ed00, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x111a8ee40, {{-402.0, -874.0}, {1206.0, 2622.0}}, identifier: 'PopoverDismissRegion', label: 'dismiss popup'
+        Other, 0x111a8ef80, {{8.0, 238.0}, {386.0, 628.0}}
+          Button, 0x111a8f0c0, {{153.0, 234.2}, {96.0, 23.0}}, label: 'Sheet Grabber', value: Expanded
+          Other, 0x111a8f200, {{8.0, 238.0}, {386.0, 628.0}}
+            Other, 0x111a8f340, {{8.0, 238.0}, {386.0, 628.0}}
+              Other, 0x111a8f480, {{8.0, 238.0}, {386.0, 628.0}}
+                Other, 0x111a8f980, {{8.0, 238.0}, {386.0, 628.0}}
+                  NavigationBar, 0x111a8fac0, {{8.0, 253.4}, {386.0, 51.9}}, identifier: 'Capture to BB'
+                    Other, 0x111a8fc00, {{27.2, 257.2}, {64.3, 34.6}}
+                      Other, 0x111a8fd40, {{27.2, 257.2}, {64.3, 34.6}}
+                        Button, 0x111a8fe80, {{27.2, 257.2}, {64.3, 34.6}}, label: 'Close'
+                    StaticText, 0x111a8f5c0, {{147.9, 264.6}, {106.3, 19.8}}, label: 'Capture to BB'
+                  Other, 0x111a8f840, {{8.0, 238.0}, {386.0, 628.0}}
+                    Other, 0x111a8f700, {{8.0, 238.0}, {386.0, 628.0}}
+                      Other, 0x111a8e440, {{8.0, 238.0}, {386.0, 628.0}}
+                        Other, 0x111a84000, {{8.0, 238.0}, {386.0, 628.0}}
+                          ScrollView, 0x111a84140, {{8.0, 238.0}, {386.0, 628.0}}
+                            Other, 0x111a84280, {{8.0, 238.0}, {386.0, 628.0}}
+                              Other, 0x111a843c0, {{8.0, 238.0}, {386.0, 105.6}}
+                            Other, 0x111a84500, {{8.0, 238.0}, {386.0, 628.0}}
+                            Other, 0x111a84640, {{8.0, 305.2}, {386.0, 447.5}}
+                              Button, 0x111a84780, {{23.4, 320.6}, {355.3, 61.5}}, identifier: 'capture-note', label: 'Note'
+                                Image, 0x111a848c0, {{44.5, 340.8}, {22.7, 20.8}}, identifier: 'note.text', label: 'Notes'
+                                StaticText, 0x111a84a00, {{86.7, 339.8}, {42.6, 23.0}}, label: 'Note'
+                                Image, 0x111a84b40, {{344.1, 344.0}, {16.0, 14.4}}, identifier: 'clock.arrow.circlepath', label: 'Clock With A Circular Arrow'
+                              Button, 0x111a84c80, {{23.4, 391.7}, {355.3, 61.5}}, identifier: 'capture-voice', label: 'Record voice'
+                                Image, 0x111a84dc0, {{44.5, 410.9}, {23.0, 23.0}}, identifier: 'record.circle', label: 'Screen Recording'
+                                StaticText, 0x111a84f00, {{86.7, 410.9}, {113.9, 23.0}}, label: 'Record voice'
+                              Button, 0x111a85040, {{23.4, 462.7}, {355.3, 61.5}}, identifier: 'capture-dictate', label: 'Dictate'
+                                Image, 0x111a85180, {{47.7, 481.6}, {16.3, 24.0}}, identifier: 'mic.fill', label: 'Microphone'
+                                StaticText, 0x111a852c0, {{86.7, 481.9}, {63.7, 23.0}}, label: 'Dictate'
+                              Button, 0x111a85400, {{23.4, 533.8}, {355.3, 61.5}}, identifier: 'capture-task', label: 'Task'
+                                Image, 0x111a85540, {{44.5, 553.0}, {23.0, 23.0}}, identifier: 'checkmark.circle', label: 'Selected', Selected
+                                StaticText, 0x111a85680, {{86.7, 553.0}, {40.6, 23.0}}, label: 'Task'
+                              Button, 0x111a857c0, {{23.4, 604.8}, {355.3, 61.5}}, identifier: 'capture-file', label: 'Photo or file'
+                                Image, 0x111a85900, {{41.3, 623.7}, {29.1, 24.0}}, identifier: 'photo.on.rectangle.angled', label: 'Photo On An Angled Rectangle'
+                                StaticText, 0x111a85a40, {{86.7, 624.0}, {105.9, 23.0}}, label: 'Photo or file'
+                              Button, 0x111a85b80, {{23.4, 675.9}, {355.3, 61.5}}, identifier: 'capture-thread', label: 'New thread'
+                                Image, 0x111a85cc0, {{40.0, 693.8}, {32.3, 25.9}}, identifier: 'bubble.left.and.text.bubble.right', label: 'Left Speech Bubble And Right Text Bubble'
+                                StaticText, 0x111a85e00, {{86.7, 695.1}, {101.8, 23.0}}, label: 'New thread'
+                            Other, 0x111a85f40, {{362.3, 305.2}, {28.8, 508.9}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                              Other, 0x111a86080, {{388.2, 388.8}, {2.9, 422.5}}
+                            Other, 0x111a861c0, {{362.3, 305.2}, {28.8, 508.9}}, label: 'Vertical scroll bar, 1 page', value: 0%
+                              Other, 0x111a86300, {{388.2, 388.8}, {2.9, 422.5}}
+                  Toolbar, 0x111a86440, {{8.0, 238.0}, {386.0, 628.0}}, identifier: 'Toolbar', label: 'Toolbar'
+                    Other, 0x111a86580, {{8.0, 238.0}, {386.0, 628.0}}
+          Other, 0x111a866c0, {{8.0, 238.0}, {386.0, 628.0}}
+            Other, 0x111a86800, {{8.0, 238.0}, {386.0, 628.0}}
+              Other, 0x111a86940, {{8.0, 238.0}, {386.0, 628.0}}
+                Other, 0x111a86a80, {{8.0, 238.0}, {386.0, 628.0}}
+                  Other, 0x111a86bc0, {{8.0, 238.0}, {386.0, 628.0}}
+                    Other, 0x111a86d00, {{8.0, 238.0}, {386.0, 628.0}}
+                Other, 0x111a86e40, {{8.0, 238.0}, {386.0, 628.0}}
+                  Other, 0x111a86f80, {{8.0, 238.0}, {386.0, 628.0}}
+Path to element:
+ →Application, 0x111255180, pid: 34093, label: 'BB Studio'
+Query chain:
+ →Find: Target Application 'nyc.plee.bbgo'
+  Output: {
+    Application, 0x111a870c0, pid: 34093, label: 'BB Studio'
+  }

@@ -25,7 +25,10 @@ struct ServerControls: View {
                             await save { self.concurrency = try await app.client.setConcurrency(globalLimit: limit > 0 ? limit : nil, keeping: concurrency) }
                         }
                     }), in: 0...32) {
-                        LabeledContent("Threads at once", value: concurrency.globalLimit.map(String.init) ?? "Automatic")
+                        LabeledContent("Threads at once") {
+                            Text(concurrency.globalLimit.map(String.init) ?? "Automatic")
+                                .foregroundStyle(Color.primary.opacity(0.75))
+                        }
                     }
                     ForEach(concurrency.hosts) { host in
                         LabeledContent(host.name, value: host.effectiveLimit.map { "\($0) at once" } ?? "—")
@@ -35,9 +38,10 @@ struct ServerControls: View {
                 }
                 if let error { Text(error).font(.footnote).foregroundStyle(.red) }
             } header: {
-                Text("Hosts")
+                Text("Hosts").foregroundStyle(Color.primary.opacity(0.75))
             } footer: {
                 Text("Keep awake stops the machines idle-sleeping while BB works. Threads at once caps how many run in parallel; Automatic uses each host's core count.")
+                    .foregroundStyle(Color.primary.opacity(0.75))
             }
             .task(id: app.serverURL) { await load(plugins) }
         }

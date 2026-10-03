@@ -24,7 +24,7 @@ struct StudioHomeView: View {
                     if let error { Text(error).foregroundStyle(.red) }
                     if let home {
                         if let needs = home.needsYou, !needs.isEmpty {
-                            Section("Needs you") {
+                            Section {
                                 ForEach(Array(needs.enumerated()), id: \.offset) { _, need in
                                     VStack(alignment: .leading, spacing: 6) {
                                         Text(need.title ?? "Needs you").font(.subheadline.weight(.semibold))
@@ -46,28 +46,34 @@ struct StudioHomeView: View {
                                     }
                                     .accessibilityIdentifier("studioNeed")
                                 }
+                            } header: {
+                                Text("Needs you").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
                         if home.due?.isEmpty == false {
-                            Section("Due today") {
+                            Section {
                                 ForEach(Array((home.due ?? []).enumerated()), id: \.offset) { _, task in
                                     if let id = task.id {
                                         NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "calendar") }
                                     }
                                 }
+                            } header: {
+                                Text("Due today").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
                         if home.review?.isEmpty == false {
-                            Section("In review") {
+                            Section {
                                 ForEach(Array((home.review ?? []).enumerated()), id: \.offset) { _, task in
                                     if let id = task.id {
                                         NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "checkmark.circle") }
                                     }
                                 }
+                            } header: {
+                                Text("In review").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
                         if home.working?.threads?.isEmpty == false || home.working?.bots?.isEmpty == false {
-                            Section("Agents working now") {
+                            Section {
                                 ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in
                                     if let id = thread.id {
                                         NavigationLink(value: Route.thread(id: id)) { Label(thread.title ?? "Thread", systemImage: "bubble.left") }
@@ -78,10 +84,12 @@ struct StudioHomeView: View {
                                         NavigationLink(value: Route.bot(id: id)) { Label(bot.name ?? "Bot", systemImage: "person.crop.square") }
                                     }
                                 }
+                            } header: {
+                                Text("Agents working now").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
                         if home.recent?.isEmpty == false {
-                            Section("Recent items") {
+                            Section {
                                 ForEach(Array((home.recent ?? []).enumerated()), id: \.offset) { _, item in
                                     if let route = item.href.flatMap(Route.init(href:)) {
                                         NavigationLink(value: route) { Label(item.title ?? "Untitled", systemImage: StudioKind.of(item.kind ?? "").symbol) }
@@ -89,16 +97,18 @@ struct StudioHomeView: View {
                                         Text(item.title ?? "Untitled")
                                     }
                                 }
+                            } header: {
+                                Text("Recent items").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
                         if home.activity?.isEmpty == false {
-                            Section("Activity") {
+                            Section {
                                 ForEach(Array((home.activity ?? []).enumerated()), id: \.offset) { _, event in
                                     let row = VStack(alignment: .leading, spacing: 3) {
                                         Text(event.summary ?? "Untitled")
                                         if let at = event.at {
                                             Text("\(event.verb?.capitalized ?? "Updated") \(Date(timeIntervalSince1970: at / 1000), style: .relative) ago")
-                                                .font(.caption).foregroundStyle(.secondary)
+                                                .font(.caption).foregroundStyle(Color.primary.opacity(0.75))
                                         }
                                     }
                                     if let route = event.href.flatMap(Route.init(href:)) {
@@ -107,6 +117,8 @@ struct StudioHomeView: View {
                                         row
                                     }
                                 }
+                            } header: {
+                                Text("Activity").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
                     } else if error == nil {
