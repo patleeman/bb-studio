@@ -166,13 +166,7 @@ public final class InboxStore {
         self.realtime = realtime
         realtime.subscribeThreadList()
         listener = realtime.listen { [weak self] event in
-            switch event {
-            case .connected, .changed:
-                Task { @MainActor [weak self] in await self?.refresh() }
-            case .pluginSignal(let pluginId, _, _):
-                guard ["studio", "pages", "bot-teams", "feed", "studio-tasks"].contains(pluginId) else { return }
-                Task { @MainActor [weak self] in await self?.refresh() }
-            }
+            Task { @MainActor [weak self] in await self?.receiveRealtime(event) }
         }
         observer = center.addObserver(forName: Self.didReceivePush, object: nil, queue: .main) { [weak self] notification in
             let origin = notification.object as? String
@@ -182,6 +176,16 @@ public final class InboxStore {
             }
         }
     }
+    /// Kept separate from the socket subscription so source routing is testable.
+    func receiveRealtime(_ event: RealtimeEvent) async {
+        switch event {
+        case .connected, .changed: await refresh()
+        case .pluginSignal(let pluginId, _, _):
+            guard ["studio", "pages", "bot-teams", "feed", "studio-tasks"].contains(pluginId) else { return }
+            await refresh()
+        }
+    }
+
     public func stopObserving() {
         if let listener { realtime?.removeListener(listener) }
         if let observer { notificationCenter?.removeObserver(observer) }

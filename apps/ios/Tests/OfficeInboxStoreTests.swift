@@ -121,4 +121,21 @@ import XCTest
         XCTAssertEqual(store.counts.count().requests, 1)
     }
 
+    func testRealtimeReconnectAndInboxSourcesRefreshButUnrelatedSignalsDoNot() async {
+        var fetches = 0
+        let store = InboxStore(fetch: { _ in
+            fetches += 1
+            return OfficeInboxPage(events: [])
+        }, counts: { OfficeInboxCounts(bySpace: [:]) }, mutate: { _, _ in })
+        await store.receiveRealtime(.pluginSignal(pluginId: "unrelated", channel: "changed", payload: .null))
+        XCTAssertEqual(fetches, 0)
+        await store.receiveRealtime(.connected)
+        await store.receiveRealtime(.changed(entity: "thread", id: "thr_one", changes: ["interactions"]))
+        for plugin in ["studio", "pages", "bot-teams", "feed", "studio-tasks"] {
+            await store.receiveRealtime(.pluginSignal(pluginId: plugin, channel: "changed", payload: .null))
+        }
+        XCTAssertEqual(fetches, 7)
+        XCTAssertFalse(store.isLoading)
+    }
+
 }
