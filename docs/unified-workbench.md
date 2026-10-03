@@ -217,8 +217,20 @@ retention after returning and folding. The
 [phone](../packages/bb-studio-tasks/assets/companion-handoffs-mobile.png)
 screenshots are visually checked; all phone composer controls fit at 390 by
 844 pixels. Deterministic handoff rows and scheduled threads seed the workflow;
-all fixtures are deleted without running agents. Live handoff-creation
-confirmation and bot-dispatch navigation remain required.
+all fixtures are deleted without running agents.
+The separate live dispatch check installs Tasks `6bec6a4` on stable BB 0.45.0.
+It creates an agent handoff through the real project-folder picker and edited
+note, then opens its confirmation and returns to the exact native reply draft
+and attachment. A temporary bot receives another task; after its conversation
+and link are renamed, a second Send to bot request returns that same thread.
+Both actual RPC responses succeed, with one handoff and one retained tab.
+The created conversations contain their task context and the agent's edited
+note. This exposed two fixed bugs: a missing host ID during ordinary handoff,
+and bot reuse depending on a mutable human link label. All 60 Tasks tests,
+typecheck and build pass. The
+[dispatch screenshot](../packages/bb-studio-tasks/assets/companion-dispatch.png)
+is visually checked. Brief fixture agent turns run; cleanup deletes their
+tasks, board and threads and retires the temporary bot.
 
 Studio Chat's new-conversation composers now have shared companion routes.
 Ordinary item drafts retain their native draft keys; independent quote drafts
@@ -288,7 +300,7 @@ live recovery-list and interrupted-recording checks remain required.
 
 Remaining delivery includes publishing the native host changes, the SDK/CLI
 placement controller, embedded composer targeting, and the remaining suite
-entry points: task handoff creation and bot dispatch, Talk recovery navigation and playback
+entry points: Talk recovery navigation and playback
 continuity, and split/swap actions. Initial main-view-to-companion transfer
 must also prove retention of an already-open editor's unsaved state; the
 existing native capture verifies transfers after the companion is realized.

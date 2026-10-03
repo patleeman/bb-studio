@@ -41,8 +41,21 @@ The same draft and `handoff-review.txt` attachment remain at 390 by 844 pixels,
 with all composer controls inside the viewport. Handoff rows are deterministic
 staged fixtures; the threads have messages scheduled 30 days ahead and are
 deleted after the check, so no agent runs. This checks navigation and retention;
-handoff creation and bot dispatch have separate backend tests.
+handoff creation and bot dispatch have separate live checks below.
 Run with `BB_CAPTURE_TASKS_COMPANIONS=1 BB_CAPTURE_ONLY=tasks-companions node scripts/capture-plugin-screenshots.mjs --plugin studio-tasks` after sourcing staged BB's `capture.env`.
+
+![A real bot handoff with its retained reply](assets/companion-dispatch.png)
+
+The live dispatch capture on stable BB 0.45.0 installs Tasks from `6bec6a4`.
+It creates an agent handoff using the project folder and an edited note,
+opens its confirmation, and returns to the same native reply draft and file.
+It then sends a task to a temporary bot, renames the conversation and its
+link, and sends again. Both real requests return the same thread, with one
+handoff and the exact retained composer and `dispatch-review.txt` attachment.
+The task and edited note appear in the created conversations. These fixtures
+run brief agent turns; cleanup deletes their tasks, board and threads and
+retires the temporary bot.
+Run with `BB_CAPTURE_TASKS_DISPATCH=1 BB_CAPTURE_ONLY=tasks-dispatch node scripts/capture-plugin-screenshots.mjs --plugin studio-tasks` after sourcing staged BB's `capture.env`.
 
 ## What you get
 
@@ -84,7 +97,9 @@ Run with `BB_CAPTURE_TASKS_COMPANIONS=1 BB_CAPTURE_ONLY=tasks-companions node sc
   Reopening a thread focuses its existing tab. Without Float, they use normal
   thread navigation.
 - **Studio Teams bots.** Assign a task to a bot and use **Send to bot** to
-  create a dedicated channel and post the task there.
+  create a dedicated conversation and post the task there. Sending again
+  reuses that task's conversation while it still belongs to the assigned bot,
+  including after its title or link label changes.
 - **Subtasks and recurrence.** A task includes its parent and flat subtask
   counts. Daily, weekly, monthly and weekday tasks create their next instance
   when completed.
