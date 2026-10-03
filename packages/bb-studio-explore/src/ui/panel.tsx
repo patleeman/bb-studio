@@ -77,7 +77,7 @@ function ThreadExplainers({ threadId }: { threadId?: string }) {
         const state = rowState(explainer);
         return (
           <li key={explainer.id}>
-            <button type="button" onClick={() => openExplainer(navigate, explainer)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-state-hover">
+            <button type="button" data-explainer-open={explainer.id} onClick={() => openExplainer(navigate, explainer)} className="flex w-full items-center gap-3 px-3 py-2 text-left hover:bg-state-hover">
               <span aria-hidden className="w-5 shrink-0 text-center text-base leading-none">
                 {explainer.emoji}
               </span>

@@ -35,11 +35,11 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
       await client.navigate("/plugins/explore/explainers");
       await client.waitForText(label);
       await client.evaluate(`sessionStorage.removeItem('bb-studio-float:windows'); sessionStorage.removeItem('bb:companion-views:v1')`);
-      await client.clickElementWithTextAndPointer("button", label);
+      await client.dragBy(`button[data-explainer-open="${id}"]`, 0, 0);
       await client.waitForSelector(panel);
       await client.waitForText("Investigating the upload queue");
       await client.waitForText("45%");
-      await client.clickElementWithTextAndPointer("button", label);
+      await client.dragBy(`button[data-explainer-open="${id}"]`, 0, 0);
       const count = await client.evaluate(`document.querySelectorAll(${JSON.stringify(panel)}).length`);
       if (count !== 1) throw new Error(`Repeated Explore creates ${count} panels`);
 
@@ -47,15 +47,21 @@ export default ({ projectId, threadId, pluginRpc, sleep }) => ({
       db.prepare("UPDATE explore_explainers SET status='ready',page_id=?,generated_at=?,updated_at=? WHERE id=?").run(page.id, now + 1, now + 1, id);
       await client.waitForSelector(`${panel} iframe`);
       await client.dragBy('[data-float-resize="nw"]', -240, -200);
-      await client.evaluate(`(() => {
+      const scrollReady = `(() => {
         const frame = document.querySelector(${JSON.stringify(`${panel} iframe`)});
-        window.bbExploreFrame = frame;
         let scroller = frame.parentElement;
         while (scroller && getComputedStyle(scroller).overflowY !== 'auto') scroller = scroller.parentElement;
         if (!scroller) throw new Error('Explainer has no scroll container');
+        if (scroller.scrollHeight - scroller.clientHeight < 80) return false;
+        window.bbExploreFrame = frame;
         window.bbExploreScroll = scroller; scroller.scrollTop = 80;
         return true;
-      })()`);
+      })()`;
+      const deadline = Date.now() + 10000;
+      while (!(await client.evaluate(scrollReady))) {
+        if (Date.now() > deadline) throw new Error("Explainer did not load its scrollable document");
+        await sleep(200);
+      }
       await client.clickAriaButtonWithPointer("Floating tab actions");
       await client.clickElementWithTextAndPointer('[role="menuitem"]', "Pin tab");
       await client.clickElementWithTextAndPointer(`${panel} button`, "Open in Pages");
