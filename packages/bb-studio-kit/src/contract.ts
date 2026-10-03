@@ -332,3 +332,5 @@ export function mentionPrompt(items: readonly { title: string; href: string }[])
 }
 
 export { copyTitle, fillTemplate, fillTemplateJson } from "./template";
+
+export { parseStudioItemReference, parseStudioMentionReference, parseStudioItemHref, studioTextReferences, STUDIO_REFERENCE_ROUTES, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";

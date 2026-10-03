@@ -17,7 +17,7 @@ import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { relativeTime, untitled } from "@bb-studio/kit/format";
 import { z } from "zod";
-import { rpcContract, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
+import { rpcContract, schemas, TABS_CHANNEL, type SidebarView, type SpaceThreadView, type TabView } from "./src/contract";
 import { errorText, StudioHub, type HubItem } from "./src/hub";
 import { ChangeLog } from "./src/changes";
 import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
@@ -37,7 +37,7 @@ import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { routeCommentMentions } from "./src/comment-routing";
 import { homeData } from "./src/home";
-import { firstThreadItemRefs, firstThreadSpaceIds } from "./src/thread-item-refs";
+import { firstThreadItemRefs, firstThreadSpaceIds, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { respondToNeed } from "./src/needs-you";
 import { zipFiles } from "./src/export-zip";
 
@@ -102,6 +102,7 @@ export default async function plugin(bb: BbPluginApi) {
   bb.events.on("thread.unarchived", ({ thread }) => updateThread(thread.id, "idle"));
   // The composer does not expose a thread id to add-ons. Its first accepted
   // input still contains the item's link or mention, so link it when saved.
+  const mentionProviders = mentionProviderLookup((pluginId, signal) => bb.sdk.plugins.callRpc({ pluginId, method: "studio_describe", input: null, outputSchema: schemas.provider.studio_describe.output, signal }));
   const checkedThreads = new Set<string>();
   const checkingThreads = new Set<string>();
   const pendingThreads = new Map<string, { id: string; createdAt: number; status: string }>();
@@ -111,7 +112,8 @@ export default async function plugin(bb: BbPluginApi) {
     checkingThreads.add(thread.id);
     try {
       const events = await bb.sdk.threads.events.list({ threadId: thread.id, order: "asc", limit: "50", types: ["client/thread/start", "client/turn/requested", "client/turn/start"] });
-      const refs = firstThreadItemRefs(events);
+      const providers = await mentionProviders(firstThreadMentionPlugins(events));
+      const refs = firstThreadItemRefs(events, { providers });
       if (refs === null) return;
       // A new thread that links a space joins it, as "New thread" in a space does.
       const joined = (firstThreadSpaceIds(events) ?? []).filter((id) => spaces.get(id));
