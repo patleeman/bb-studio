@@ -174,7 +174,8 @@ export default function plugin(bb: BbPluginApi) {
       studio_read: ({ id }) => {
         const table = store.get(id);
         return {
-          content: table ? markdown(table, table.rows.slice(0, 200)) : null,
+          // Studio indexes this response as complete; previews are bounded separately.
+          content: table ? markdown(table) : null,
         };
       },
       studio_list: () => ({ items: store.list().map(item) }),

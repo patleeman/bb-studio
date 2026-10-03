@@ -13,17 +13,17 @@ providerConformance("Draw", () => {
   const { db, store } = drawingStore();
   const { handlers, bb } = registration();
   registerDraw(bb as never, schemas, { store, changed: () => {} });
-  return { pluginId: "excalidraw", kind: "drawing", handlers, close: () => db.close() };
+  return { pluginId: "excalidraw", kind: "drawing", handlers, editTitle: (id, title) => { store.rename(id, title, "app"); }, close: () => db.close() };
 });
 providerConformance("Tasks", () => {
   const { db, store } = taskStore();
   const { handlers, bb } = registration();
   registerTasks(bb as never, schemas, { store, changed: () => {}, move: async (id, status) => { store.move(id, status, "user"); } });
-  return { pluginId: "studio-tasks", kind: "task", handlers, close: () => db.close() };
+  return { pluginId: "studio-tasks", kind: "task", handlers, editTitle: (id, title) => { store.update(id, { title }, "user"); }, close: () => db.close() };
 });
 providerConformance("Task boards", () => {
   const { db, store } = taskStore();
   const { handlers, bb } = registration();
   registerTasks(bb as never, schemas, { store, changed: () => {}, move: async (id, status) => { store.move(id, status, "user"); } });
-  return { pluginId: "studio-tasks", kind: "board", handlers, close: () => db.close() };
+  return { pluginId: "studio-tasks", kind: "board", handlers, editTitle: (id, title) => { store.updateBoard(id, { title }, "user"); }, close: () => db.close() };
 });
