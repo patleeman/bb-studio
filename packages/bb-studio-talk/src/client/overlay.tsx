@@ -325,11 +325,18 @@ export function TalkOverlay() {
       </div>
       {state.localSaveError ? (
         <div role="alert" className="space-y-2 border-t border-border px-3 py-2 text-xs">
-          <p>Recording stopped because audio could not be saved: {state.localSaveError}</p>
-          <p>Keep this window open. Unsaved audio is held here until you retry saving or download it. The dictation will not be inserted automatically.</p>
+          <p>{state.localAudioLost ? state.localSaveError : `Recording stopped because audio could not be saved: ${state.localSaveError}`}</p>
+          <p>{state.localAudioLost
+            ? "Audio that existed only in memory cannot be recovered. Already saved audio is kept, and queued pieces will upload when connected. Review what remains before continuing."
+            : "Keep this window open. Unsaved audio is held here until you retry saving or download it. The dictation will not be inserted automatically."}</p>
           <div className="flex gap-3">
-            <button type="button" className="underline" onClick={() => void talk.retryLocalAudio()}>Retry saving audio</button>
-            <button type="button" className="underline" onClick={() => void talk.downloadLocalAudio()}>Download audio</button>
+            {state.localAudioLost ? <>
+              <button type="button" className="underline" onClick={() => talk.acknowledgeAudioLoss()}>Continue with saved audio</button>
+              <a className="underline" href={`/api/v1/plugins/talk/http/audio-export?recording=${encodeURIComponent(state.recordingId!)}`} target="_blank" rel="noopener">Download uploaded audio</a>
+            </> : <>
+              <button type="button" className="underline" onClick={() => void talk.retryLocalAudio()}>Retry saving audio</button>
+              <button type="button" className="underline" onClick={() => void talk.downloadLocalAudio()}>Download audio</button>
+            </>}
           </div>
         </div>
       ) : null}

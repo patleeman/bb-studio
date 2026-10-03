@@ -100,6 +100,8 @@ export interface TalkState {
   pendingUploads: number;
   uploadError: string | null;
   localSaveError: string | null;
+  /** A prior window closed while some audio existed only in memory. */
+  localAudioLost: boolean;
   /** Segments the server refused for good, kept on this device; null until read. */
   setAside: SetAsideSegment[] | null;
   recording: Recording | null;
@@ -119,6 +121,7 @@ interface Persisted {
   /** Type the transcript into the composer when it is done. */
   insert: boolean;
   composePath?: string | null;
+  localSaveFailed?: boolean;
 }
 
 interface OpenSegment {
@@ -171,6 +174,7 @@ const INITIAL: TalkState = {
   pendingUploads: 0,
   uploadError: null,
   localSaveError: null,
+  localAudioLost: false,
   setAside: null,
   recording: null,
   transcript: "",
@@ -459,17 +463,21 @@ export class TalkController {
     void this.kickUpload();
     const saved = this.readPersisted();
     if (!saved) return;
+    if (saved.localSaveFailed) {
+      this.insertOnDone = false;
+      this.set({ recordingId: saved.recordingId, kind: saved.kind, threadId: saved.threadId, field: parseField(saved.field),
+        phase: "storage-error", localAudioLost: true, localSaveError: "This window closed after local audio saving failed." });
+    }
     const epoch = this.startEpoch;
     let recording: Recording;
     try {
       recording = (await this.rpc!.call("recording_get", { id: saved.recordingId })).recording;
     } catch {
-      // Deleted, or the server is unreachable. The outbox keeps any audio;
-      // an unreachable server leaves the saved state for the next load.
-      if (navigator.onLine) this.persist(null);
+      // navigator.onLine only describes the network, not this server. Retain
+      // recovery metadata through transient RPC failures, including while online.
       return;
     }
-    this.insertOnDone = saved.insert === true;
+    this.insertOnDone = saved.insert === true && !saved.localSaveFailed;
     this.composePath = typeof saved.composePath === "string" ? saved.composePath : null;
     this.set({
       recordingId: recording.id,
@@ -478,9 +486,12 @@ export class TalkController {
       field: parseField(saved.field),
       recording,
       recordedMs: recording.durationMs,
-      phase: saved.phase === "recording" ? "starting" : saved.phase,
+      phase: saved.localSaveFailed ? "storage-error" : saved.phase === "recording" ? "starting" : saved.phase,
+      localAudioLost: saved.localSaveFailed === true,
+      localSaveError: saved.localSaveFailed ? "This window closed after local audio saving failed." : null,
     });
     void this.refresh();
+    if (saved.localSaveFailed) return;
     if (saved.phase === "recording") {
       const locked = await this.acquireLock();
       if (this.cancelled(epoch, locked)) return;
@@ -1246,7 +1257,7 @@ export class TalkController {
   }
 
   private finishIdle(): void {
-    if (this.unsaved.size) return;
+    if (this.unsaved.size || this.state.localAudioLost) return;
     if (this.refreshTimer !== null) clearInterval(this.refreshTimer);
     this.refreshTimer = null;
     this.target = null;
@@ -1297,6 +1308,14 @@ export class TalkController {
     } finally {
       this.recoveringAudio = false;
     }
+  }
+
+  /** Explicitly acknowledge the lost memory-only tail; never auto-insert it. */
+  acknowledgeAudioLoss(): void {
+    if (!this.state.localAudioLost || this.unsaved.size) return;
+    this.insertOnDone = false;
+    this.set({ localAudioLost: false, localSaveError: null, phase: "paused" });
+    this.persistPhase("paused");
   }
 
   /** Download the in-memory copy; leave recovery available until saving succeeds. */
@@ -1453,7 +1472,8 @@ export class TalkController {
   private persistPhase(phase: Persisted["phase"]): void {
     const { recordingId, kind, threadId, field } = this.state;
     if (recordingId) {
-      this.persist({ recordingId, kind, phase, threadId, field, insert: this.insertOnDone, composePath: this.composePath });
+      this.persist({ recordingId, kind, phase, threadId, field, insert: this.insertOnDone, composePath: this.composePath,
+        localSaveFailed: this.unsaved.size > 0 || this.state.localAudioLost });
     }
   }
 

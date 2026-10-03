@@ -76,6 +76,7 @@ it.each(["begin", "appendPart", "complete"] as const)("stops capture and retains
   expect(controller.getState().localSaveError).toBe("Disk full");
   expect(call.mock.calls.some(([method, input]) => method === "recording_state" && (input as { status?: string })?.status === "finishing")).toBe(false);
   expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).insert).toBe(false);
+  expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).localSaveFailed).toBe(true);
 
   // Neither Stop nor a successful uploader pass may dismiss incomplete audio.
   await controller.stop(true);
@@ -102,8 +103,39 @@ it.each(["begin", "appendPart", "complete"] as const)("stops capture and retains
   expect(controller.getState().localSaveError).toBeNull();
   expect(controller.getState().phase).toBe("paused");
   expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).insert).toBe(false);
+  expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!).localSaveFailed).toBe(false);
 });
 
+it("reports a memory-only tail lost on reload and blocks completion until acknowledged", async () => {
+  localStorage.setItem("bb-plugin-talk:active", JSON.stringify({ recordingId: "rec_lost", kind: "dictation", phase: "paused", threadId: "thr_origin", insert: true, localSaveFailed: true }));
+  const recording = { id: "rec_lost", durationMs: 2000, status: "paused" };
+  const call = vi.fn(async (method: string) => method === "recording_get" ? { recording, segments: [] } : recording);
+  const controller = new TalkController();
+  controller.attach({ call } as never);
+  await vi.waitFor(() => expect(controller.getState().localAudioLost).toBe(true));
+  expect(controller.getState()).toMatchObject({ phase: "storage-error", threadId: "thr_origin" });
+  await controller.stop(true);
+  await controller.retryLocalAudio();
+  expect(controller.getState().phase).toBe("storage-error");
+  expect(Recorder.instances).toHaveLength(0);
+  expect(call.mock.calls.some(([method]) => method === "recording_state")).toBe(false);
+  expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+  controller.acknowledgeAudioLoss();
+  expect(controller.getState()).toMatchObject({ phase: "paused", localAudioLost: false, localSaveError: null });
+  expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!)).toMatchObject({ insert: false, localSaveFailed: false });
+});
+
+it("retains recovery metadata when the network is online but the recording RPC fails", async () => {
+  const saved = { recordingId: "rec_offline", kind: "dictation", phase: "paused", threadId: "thr_origin", insert: false, localSaveFailed: true };
+  localStorage.setItem("bb-plugin-talk:active", JSON.stringify(saved));
+  const call = vi.fn(async (method: string) => { if (method === "recording_get") throw new Error("Service unavailable"); return {}; });
+  const controller = new TalkController(); controller.attach({ call } as never);
+  await vi.waitFor(() => expect(call).toHaveBeenCalledWith("recording_get", { id: "rec_offline" }));
+  await Promise.resolve();
+  expect(JSON.parse(localStorage.getItem("bb-plugin-talk:active")!)).toEqual(saved);
+  expect(controller.getState()).toMatchObject({ phase: "storage-error", localAudioLost: true });
+  expect(insertDictationIntoComposer).not.toHaveBeenCalled();
+});
 
 it("dictates into a retained thread companion while the main thread changes", async () => {
   const wrapper = document.createElement("div"); wrapper.dataset.floatWindow = "thread:thr_side";

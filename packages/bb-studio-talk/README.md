@@ -189,8 +189,15 @@ The same message at a 390-pixel viewport, with the source pill in view.
 
 - **Saved on the device.** Every few seconds, audio goes into IndexedDB.
   Audio leaves the device store only after the server confirms it is on disk
-  (written to a temp file, fsynced, then renamed). A reload, crash, or network
-  drop loses at most the last few seconds.
+  (written to a temp file, fsynced, then renamed). While local writes succeed,
+  reload/crash recovery keeps committed chunks; the current few-second chunk
+  can still be lost.
+- **Local storage failure.** Capture stops and keeps the full affected segment
+  in this window. Retry saving or download it before closing. If the window
+  closes first, that memory-only audio cannot be recovered. A persisted failure
+  marker reports this on return and requires acknowledgement before continuing
+  with saved audio; automatic dictation insertion stays off. If browser storage
+  also refuses the small marker, no persistent loss warning can be guaranteed.
 - **Survives reloads.** After a reload, the page picks the same recording back
   up in a new session. The transcript starts a new paragraph where the reload
   happened.

@@ -1,7 +1,8 @@
 // The browser-side outbox: every audio chunk is written to IndexedDB the
 // moment MediaRecorder hands it over (every few seconds), and a segment leaves
 // the outbox only after the server confirms it is on disk. A reload, crash,
-// or network outage therefore loses at most the last few seconds of audio.
+// or network outage keeps committed chunks. This assumes local writes succeed;
+// after a quota/write failure, memory-only audio requires retry or download.
 //
 // Chunks are stored as ArrayBuffers, not Blobs: WebKit web views (the BB
 // mobile app) have a history of losing Blobs stored in IndexedDB.
