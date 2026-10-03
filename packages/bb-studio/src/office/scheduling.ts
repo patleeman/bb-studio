@@ -15,6 +15,9 @@ export class OfficeTaskSchedules {
   constructor(private readonly db: Database.Database, private readonly sdk: BbPluginApi["sdk"]) {
     db.exec("CREATE TABLE IF NOT EXISTS office_task_schedules (task_id TEXT PRIMARY KEY, project_id TEXT NOT NULL, thread_id TEXT NOT NULL, schedule TEXT NOT NULL, automation_id TEXT, timezone TEXT NOT NULL)");
   }
+  forAutomation(automationId: string): { taskId: string; threadId: string } | null {
+    return this.db.prepare("SELECT task_id AS taskId,thread_id AS threadId FROM office_task_schedules WHERE automation_id=?").get(automationId) as { taskId: string; threadId: string } | undefined ?? null;
+  }
   label(taskId: string): string | null {
     return (this.db.prepare("SELECT schedule FROM office_task_schedules WHERE task_id=?").get(taskId) as { schedule: string } | undefined)?.schedule ?? null;
   }

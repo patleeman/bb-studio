@@ -761,6 +761,10 @@ export default async function plugin(bb: BbPluginApi) {
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
+    office_recurringLookup({ automationId }) {
+      const own = schedules.forAutomation(automationId);
+      return own ? { ...own, managed: true, suppressed: !store.get(own.taskId) } : recurring.forAutomation(automationId);
+    },
     async office_syncRecurring(input) {
       const taskId = recurring.sync(input);
       if (taskId && input.threadId) {

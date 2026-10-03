@@ -1,3 +1,4 @@
+import { automationTasks } from "../../office/automation-tasks";
 import { missionTasks } from "../../office/missions";
 import { officeTeamHandlers } from "../../office/team-runtime";
 import type Database from "better-sqlite3";
@@ -50,6 +51,7 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
   runtime.onMissionThread = async (bot, threadId) => { await syncMission(bot, threadId); };
   const profiles = new ThreadProfiles(bb, store, runtime, id => !store.routingSession(id));
   const views = new Conversations(bb, store, profiles);
+  const syncAutomations = automationTasks(bb, store, profiles);
   const project = () => personalProjectId(bb);
   const activeConversations = (id: string) => store.conversations(id).filter(c => c.kind === "mission" && !c.archivedAt);
   const assertConversationIdle = async (c: Conversation) => {
@@ -493,6 +495,8 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
             try { await syncMission(bot); }
             catch (cause) { bb.log.warn(`Standing duty will retry for ${bot.id}: ${String(cause)}`); }
           }
+          try { await syncAutomations(); }
+          catch (cause) { bb.log.warn(`Recurring automation tasks will retry: ${String(cause)}`); }
           missionSyncAt = Date.now() + 30_000;
         }
         await recoverApprovedBotCreates(signal); await runtime.tickMissions();

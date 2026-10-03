@@ -14,6 +14,11 @@ export class OfficeRecurringTasks {
       project_id TEXT NOT NULL, source_json TEXT NOT NULL, enabled INTEGER NOT NULL
     )`);
   }
+  forAutomation(automationId: string) {
+    const row = this.db.prepare("SELECT task_id FROM office_recurring_tasks WHERE source_key=?").get(`automation:${automationId}`) as { task_id: string } | undefined;
+    return { taskId: row?.task_id ?? null, threadId: row ? this.store.latestHandoff(row.task_id)?.thread_id ?? null : null,
+      managed: false, suppressed: !!row && !this.store.get(row.task_id) };
+  }
   label(taskId: string): string | null {
     const row = this.row(taskId);
     if (!row) return null;

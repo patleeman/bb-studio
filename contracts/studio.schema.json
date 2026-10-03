@@ -16965,6 +16965,52 @@
         "additionalProperties": false
       }
     },
+    "tasks_office_recurringLookup": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "automationId": {
+            "type": "string",
+            "minLength": 1
+          }
+        },
+        "required": [
+          "automationId"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "managed": {
+            "type": "boolean"
+          },
+          "suppressed": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "taskId",
+          "threadId",
+          "managed",
+          "suppressed"
+        ],
+        "additionalProperties": false
+      }
+    },
     "tasks_office_syncRecurring": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
