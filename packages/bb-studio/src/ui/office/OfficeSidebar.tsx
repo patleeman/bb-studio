@@ -14,6 +14,7 @@ import { useMemo, useState, type ReactNode } from "react";
 import { Face, FaceStack } from "./Face";
 import { externalAgentName, useExternalHealth } from "./external";
 import { ThreadMenu } from "./ThreadMenu";
+import { RowMenu, useItemActions } from "./RowMenus";
 import { usePathname } from "./location";
 import { itemRef, useLive, useSpaces, useSpaceTree, useTeam, type Conversation, type TeamBot, type TreeFolder, type TreeItem } from "./model";
 import { currentOfficeSubPath, openOffice } from "./routes";
@@ -47,11 +48,14 @@ type Row =
   | { type: "thread"; at: number; thread: PluginSidebarThread }
   | { type: "item"; at: number; item: TreeItem };
 
+/** Kinds kept out of folders: tasks live on their boards and Home, dictations in All items. */
+const HIDDEN_KINDS = new Set(["task", "dictation", "bot", "view", "space"]);
+
 export function folderRows(folder: TreeFolder, threads: readonly PluginSidebarThread[]): Row[] {
   const rows: Row[] = [
     ...threads.filter((thread) => thread.projectId === folder.id && isMyThread(thread))
       .map((thread) => ({ type: "thread" as const, at: Math.max(thread.updatedAt, thread.latestAttentionAt), thread })),
-    ...folder.items.map((item) => ({ type: "item" as const, at: item.updatedAt, item })),
+    ...folder.items.filter((item) => !HIDDEN_KINDS.has(item.kind)).map((item) => ({ type: "item" as const, at: item.updatedAt, item })),
   ];
   return rows.sort((a, b) => b.at - a.at);
 }
@@ -98,7 +102,16 @@ function ThreadButton({ thread, active, indent, onOpen }: { thread: PluginSideba
   );
 }
 
-function ItemRow({ item, author, active, indent }: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean }) {
+function ItemRow(props: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean; onChanged: () => void }) {
+  const groups = useItemActions(props.item, props.onChanged);
+  return (
+    <RowMenu label={props.item.title || "Untitled"} groups={groups}>
+      <ItemButton {...props} />
+    </RowMenu>
+  );
+}
+
+function ItemButton({ item, author, active, indent }: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean }) {
   return (
     <button type="button" onClick={() => openAppPath(item.href)} aria-current={active ? "page" : undefined} className={cn(ROW, indent && "pl-7", active && ROW_ACTIVE)}>
       <span className={ROW_GLYPH}>{item.icon ? <span aria-hidden className="text-sm leading-none">{item.icon}</span> : <Icon name={KIND_ICONS[item.kind] ?? "File"} aria-hidden />}</span>
@@ -176,7 +189,7 @@ export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListPr
       {favoriteThreads.length || favoriteItems.length
         ? <Section title="Favorites">
             {favoriteThreads.map((thread) => <ThreadRow key={thread.id} thread={thread} active={thread.id === activeThreadId} onOpen={openThread} />)}
-            {favoriteItems.map((item) => <ItemRow key={itemRef(item)} item={item} author={item.authorBotId ? bots.get(item.authorBotId) : undefined} active={pathname === item.href} />)}
+            {favoriteItems.map((item) => <ItemRow key={itemRef(item)} item={item} author={item.authorBotId ? bots.get(item.authorBotId) : undefined} active={pathname === item.href} onChanged={tree.refresh} />)}
           </Section>
         : null}
 
@@ -190,28 +203,30 @@ export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListPr
           const shown = expanded[folder.id] ? rows : rows.slice(0, FOLDER_PREVIEW);
           return (
             <div key={folder.id}>
-              <div className="group/folder relative">
-                <button type="button" onClick={() => toggle(folder.id)} aria-expanded={isOpen} className={ROW}>
+              <RowMenu
+                label={folder.name}
+                groups={[
+                  [{ id: "new", label: "New thread here", icon: "Plus", run: () => { threadActions.openNewThread({ projectId: folder.id, focusPrompt: true }); onNavigate(); } }],
+                  [
+                    { id: "toggle", label: isOpen ? "Collapse" : "Expand", icon: isOpen ? "ChevronUp" : "ChevronDown", run: () => toggle(folder.id) },
+                    ...(rows.length > FOLDER_PREVIEW ? [{ id: "all", label: expanded[folder.id] ? "Show recent only" : `Show all ${rows.length}`, icon: "ListView", run: () => setExpanded({ ...expanded, [folder.id]: !expanded[folder.id] }) }] : []),
+                  ],
+                  [{ id: "settings", label: "Folder settings", icon: "SlidersHorizontal", run: () => { openOffice("settings"); onNavigate(); } }],
+                ]}
+              >
+                <button type="button" onClick={() => toggle(folder.id)} aria-expanded={isOpen} className={cn(ROW, "group-hover/rowmenu:pr-8")}>
                   <span className={ROW_GLYPH}><Icon name={isOpen ? "ChevronDown" : "ChevronRight"} aria-hidden className="!size-3.5" /></span>
                   <span className={cn(ROW_LABEL, "font-medium")}>{folder.name}</span>
                   {folder.hasRepo && folder.branch
-                    ? <span className="max-w-24 shrink-0 truncate font-mono text-[11px] text-subtle-foreground group-hover/folder:hidden" title={`Branch ${folder.branch}`}>⎇ {folder.branch}</span>
+                    ? <span className="max-w-24 shrink-0 truncate font-mono text-[11px] text-subtle-foreground group-hover/rowmenu:hidden" title={`Branch ${folder.branch}`}>⎇ {folder.branch}</span>
                     : null}
                 </button>
-                <button
-                  type="button"
-                  aria-label={`New thread in ${folder.name}`}
-                  onClick={() => { threadActions.openNewThread({ projectId: folder.id, focusPrompt: true }); onNavigate(); }}
-                  className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground group-hover/folder:flex focus-visible:flex"
-                >
-                  <Icon name="Plus" className="size-3.5" />
-                </button>
-              </div>
+              </RowMenu>
               {isOpen
                 ? <div className="space-y-px">
                     {shown.map((row) => row.type === "thread"
                       ? <ThreadRow key={row.thread.id} thread={row.thread} indent active={row.thread.id === activeThreadId} onOpen={openThread} />
-                      : <ItemRow key={itemRef(row.item)} item={row.item} indent author={row.item.authorBotId ? bots.get(row.item.authorBotId) : undefined} active={pathname === row.item.href} />)}
+                      : <ItemRow key={itemRef(row.item)} item={row.item} indent author={row.item.authorBotId ? bots.get(row.item.authorBotId) : undefined} active={pathname === row.item.href} onChanged={tree.refresh} />)}
                     {rows.length > FOLDER_PREVIEW
                       ? <button type="button" onClick={() => setExpanded({ ...expanded, [folder.id]: !expanded[folder.id] })} className={cn(ROW, "pl-7 text-muted-foreground")}>
                           {expanded[folder.id] ? "Show less" : `Show ${rows.length - FOLDER_PREVIEW} more`}
