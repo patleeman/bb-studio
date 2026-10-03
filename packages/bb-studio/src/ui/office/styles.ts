@@ -41,6 +41,9 @@ export const ROW_HOVER_BUTTON =
 
 export const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border";
 
+/** A heading over a group of menu choices, such as "Group by". */
+export const MENU_LABEL = "px-2 pt-1 pb-0.5 text-xs font-medium text-muted-foreground";
+
 /**
  * Spread on anything rendered through a portal (menus, dialogs, tooltips).
  * Studio's CSS is scoped to its plugin root, and a portal leaves that root, so

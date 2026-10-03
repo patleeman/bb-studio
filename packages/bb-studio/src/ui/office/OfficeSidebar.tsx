@@ -1,10 +1,11 @@
 // The sidebar below the navigation shows what's active, not everything: who
 // you work with (Team faces and conversations), what you return to
-// (Favorites), and recent work by folder. A thread is active while it runs,
-// waits on you, is unread, or was touched this week; an item, while it was
-// touched this week. Everything else lives in the Library. Closing a row hides
-// it until it changes again. Threads a bot or automation started never show
-// here; they live under the bot's task and reach you through the Inbox.
+// (Favorites), and recent work, by folder unless the section's ⋯ menu says
+// otherwise (see activeWork.ts). Everything else lives in the Library. Closing
+// a row hides it until it changes again. Threads a bot or automation started
+// never show here; they live under the bot's task and reach you through the
+// Inbox.
+import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreads as useSidebarThreads,
@@ -21,12 +22,10 @@ import { Hint, ProviderBadge } from "./ProviderBadge";
 import { usePathname } from "./location";
 import { itemRef, useLive, useSpaces, useSpaceTree, useTeam, type Conversation, type TeamBot, type TreeFolder, type TreeItem } from "./model";
 import { currentOfficeSubPath, openOffice } from "./routes";
-import { ROW, ROW_ACTIVE, ROW_GLYPH, ROW_HOVER_BUTTON, ROW_LABEL, SECTION_ACTION, SECTION_HEADER, cn } from "./styles";
+import { activeGroups, readView, rowKey, RUNNING, writeView, type ActiveGroup, type ActiveView, type GroupBy, type SortBy } from "./activeWork";
+import { MENU, MENU_ITEM, MENU_LABEL, MENU_SEPARATOR, PORTAL_SCOPE, ROW, ROW_ACTIVE, ROW_GLYPH, ROW_HOVER_BUTTON, ROW_LABEL, SECTION_ACTION, SECTION_HEADER, cn } from "./styles";
 
 const FOLDER_PREVIEW = 8;
-// "pending" is work queued for later (a scheduled send), not work in progress.
-const RUNNING = new Set(["active", "waiting-for-host", "host-reconnecting"]);
-const BACKGROUND_ORIGINS = new Set(["bot-teams", "automations", "studio"]);
 
 export const KIND_ICONS: Record<string, string> = {
   thread: "MessageSquare",
@@ -39,44 +38,6 @@ export const KIND_ICONS: Record<string, string> = {
   dictation: "Mic",
   artifact: "PackageReceive",
 };
-
-/** True for threads you started yourself, at the top level. */
-export function isMyThread(thread: PluginSidebarThread): boolean {
-  if (thread.isHidden || thread.isArchived) return false;
-  if (thread.parentThreadId || thread.lifecycleOwnerThreadId) return false;
-  return !(thread.originPluginId && BACKGROUND_ORIGINS.has(thread.originPluginId));
-}
-
-type Row =
-  | { type: "thread"; at: number; thread: PluginSidebarThread }
-  | { type: "item"; at: number; item: TreeItem };
-
-/** Kinds kept out of folders: tasks live on their boards and Home, dictations in All items. */
-const HIDDEN_KINDS = new Set(["task", "dictation", "bot", "view", "space"]);
-
-/** How long untouched work stays in the sidebar. */
-export const ACTIVE_WINDOW_MS = 7 * 24 * 60 * 60 * 1000;
-
-function threadIsLive(thread: PluginSidebarThread): boolean {
-  return RUNNING.has(thread.runtimeStatus) || thread.runtimeStatus === "pending" || thread.hasPendingInteraction || thread.isUnread;
-}
-
-export function rowKey(row: Row): string {
-  return row.type === "thread" ? `thread:${row.thread.id}` : `item:${itemRef(row.item)}`;
-}
-
-/** A folder's active rows, newest first: live or recent threads and recent items, minus closed ones. */
-export function folderRows(folder: TreeFolder, threads: readonly PluginSidebarThread[], closed: Record<string, number> = {}, now = Date.now()): Row[] {
-  const rows: Row[] = [
-    ...threads.filter((thread) => thread.projectId === folder.id && isMyThread(thread) && !thread.isPinned)
-      .map((thread) => ({ type: "thread" as const, at: Math.max(thread.updatedAt, thread.latestAttentionAt), thread })),
-    ...folder.items.filter((item) => !HIDDEN_KINDS.has(item.kind) && item.title.trim() && item.title !== "Untitled").map((item) => ({ type: "item" as const, at: item.updatedAt, item })),
-  ];
-  return rows
-    .filter((row) => (row.type === "thread" && threadIsLive(row.thread)) || now - row.at < ACTIVE_WINDOW_MS)
-    .filter((row) => !(closed[rowKey(row)] && closed[rowKey(row)]! >= row.at))
-    .sort((a, b) => b.at - a.at);
-}
 
 // Rows the user closed, with when; a row comes back once it changes after that.
 const CLOSED_KEY = "bb-studio.office.closed-rows";
@@ -113,7 +74,13 @@ function Section({ title, action, children }: { title: string; action?: ReactNod
   );
 }
 
-function ThreadRow(props: { thread: PluginSidebarThread; active: boolean; indent?: boolean; onOpen: (id: string) => void; onClose?: () => void }) {
+/** A row's folder, shown on the right when rows aren't grouped by folder. */
+function RowDetail({ text, hoverGroup }: { text: string | undefined; hoverGroup: "thread" | "rowmenu" }) {
+  if (!text) return null;
+  return <span className={cn("max-w-24 shrink-0 truncate text-xs text-subtle-foreground", hoverGroup === "thread" ? "group-hover/thread:hidden" : "group-hover/rowmenu:hidden")}>{text}</span>;
+}
+
+function ThreadRow(props: { thread: PluginSidebarThread; active: boolean; indent?: boolean; detail?: string; onOpen: (id: string) => void; onClose?: () => void }) {
   return (
     <ThreadMenu thread={props.thread}>
       {(editor) => editor ?? <>
@@ -124,7 +91,7 @@ function ThreadRow(props: { thread: PluginSidebarThread; active: boolean; indent
   );
 }
 
-function ThreadButton({ thread, active, indent, onOpen }: { thread: PluginSidebarThread; active: boolean; indent?: boolean; onOpen: (id: string) => void }) {
+function ThreadButton({ thread, active, indent, detail, onOpen }: { thread: PluginSidebarThread; active: boolean; indent?: boolean; detail?: string; onOpen: (id: string) => void }) {
   const running = RUNNING.has(thread.runtimeStatus);
   return (
     // Threads carry no kind icon, as in BB's own sidebar: the glyph slot shows
@@ -142,11 +109,12 @@ function ThreadButton({ thread, active, indent, onOpen }: { thread: PluginSideba
                 : <span aria-hidden className="size-1 rounded-full bg-muted-foreground/30" />}
       </span>
       <span className={cn(ROW_LABEL, thread.isUnread && "font-medium")}>{thread.displayTitle}</span>
+      <RowDetail text={detail} hoverGroup="thread" />
     </button>
   );
 }
 
-function ItemRow(props: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean; onChanged: () => void; onClose?: () => void }) {
+function ItemRow(props: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean; detail?: string; onChanged: () => void; onClose?: () => void }) {
   const groups = useItemActions(props.item, props.onChanged);
   return (
     <RowMenu label={props.item.title || "Untitled"} groups={groups}>
@@ -156,13 +124,74 @@ function ItemRow(props: { item: TreeItem; author: TeamBot | undefined; active: b
   );
 }
 
-function ItemButton({ item, author, active, indent }: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean }) {
+function ItemButton({ item, author, active, indent, detail }: { item: TreeItem; author: TeamBot | undefined; active: boolean; indent?: boolean; detail?: string }) {
   return (
     <button type="button" onClick={() => openAppPath(item.href)} aria-current={active ? "page" : undefined} className={cn(ROW, indent && "pl-7", active && ROW_ACTIVE, "group-hover/rowmenu:pr-14")}>
       <span className={ROW_GLYPH}>{item.icon ? <span aria-hidden className="text-sm leading-none">{item.icon}</span> : <Icon name={KIND_ICONS[item.kind] ?? "File"} aria-hidden />}</span>
       <span className={ROW_LABEL}>{item.title || "Untitled"}</span>
+      <RowDetail text={detail} hoverGroup="rowmenu" />
       {author ? <span title={`Made by ${author.name}`} className="group-hover/rowmenu:hidden"><Face name={author.name} avatar={author.avatar} size="xs" /></span> : null}
     </button>
+  );
+}
+
+/** A group's collapsible header: a folder (with its branch) or a type (with its icon). */
+function GroupHeader({ group, isOpen, onToggle }: { group: ActiveGroup; isOpen: boolean; onToggle: () => void }) {
+  const { folder } = group;
+  return (
+    <button type="button" onClick={onToggle} aria-expanded={isOpen} className={cn(ROW, "group-hover/rowmenu:pr-8")}>
+      <span className={ROW_GLYPH}><Icon name={isOpen ? "ChevronDown" : "ChevronRight"} aria-hidden className="!size-3.5" /></span>
+      <span className={cn(ROW_LABEL, "font-medium")}>{group.label}</span>
+      {folder?.hasRepo && folder.branch
+        ? <span className="max-w-24 shrink-0 truncate font-mono text-[11px] text-subtle-foreground group-hover/rowmenu:hidden" title={`Branch ${folder.branch}`}>⎇ {folder.branch}</span>
+        : folder ? null : <span className="shrink-0 text-xs tabular-nums text-subtle-foreground group-hover/rowmenu:hidden">{group.rows.length}</span>}
+    </button>
+  );
+}
+
+const GROUP_OPTIONS: { value: GroupBy; label: string }[] = [
+  { value: "folder", label: "Folder" },
+  { value: "type", label: "Type" },
+  { value: "none", label: "None" },
+];
+const SORT_OPTIONS: { value: SortBy; label: string }[] = [
+  { value: "recent", label: "Recent activity" },
+  { value: "name", label: "Name" },
+];
+
+/** The Active work section's ⋯ menu: grouping, sorting, and the folder actions that don't depend on one row. */
+function ActiveWorkMenu({ view, onChange, onNewFolder, onFolderSettings }: { view: ActiveView; onChange: (view: ActiveView) => void; onNewFolder: () => void; onFolderSettings: () => void }) {
+  const radio = (label: string, value: string, options: { value: string; label: string }[], set: (value: string) => void) => (
+    <>
+      <Menu.Label className={MENU_LABEL}>{label}</Menu.Label>
+      <Menu.RadioGroup value={value} onValueChange={set}>
+        {options.map((option) => (
+          <Menu.RadioItem key={option.value} value={option.value} className={MENU_ITEM}>
+            <span className="inline-flex size-3.5 items-center justify-center">
+              <Menu.ItemIndicator><Icon name="Check" aria-hidden /></Menu.ItemIndicator>
+            </span>
+            {option.label}
+          </Menu.RadioItem>
+        ))}
+      </Menu.RadioGroup>
+    </>
+  );
+  return (
+    <Menu.Root>
+      <Menu.Trigger aria-label="Active work options" className={cn(SECTION_ACTION, "data-[state=open]:opacity-100")}>
+        <Icon name="MoreHorizontal" className="size-3.5" />
+      </Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
+          {radio("Group by", view.groupBy, GROUP_OPTIONS, (groupBy) => onChange({ ...view, groupBy: groupBy as GroupBy }))}
+          <Menu.Separator className={MENU_SEPARATOR} />
+          {radio("Sort by", view.sortBy, SORT_OPTIONS, (sortBy) => onChange({ ...view, sortBy: sortBy as SortBy }))}
+          <Menu.Separator className={MENU_SEPARATOR} />
+          <Menu.Item onSelect={onNewFolder} className={MENU_ITEM}><Icon name="Plus" aria-hidden />New folder</Menu.Item>
+          <Menu.Item onSelect={onFolderSettings} className={MENU_ITEM}><Icon name="SlidersHorizontal" aria-hidden />Folder settings</Menu.Item>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
   );
 }
 
@@ -180,6 +209,8 @@ export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }:
   const [open, setOpen] = useState<Record<string, boolean>>(readOpen);
   const [expanded, setExpanded] = useState<Record<string, boolean>>({});
   const [closed, setClosed] = useState<Record<string, number>>(readClosed);
+  const [view, setView] = useState<ActiveView>(readView);
+  const changeView = (next: ActiveView) => { setView(next); writeView(next); };
   const close = (key: string) => {
     const next = { ...closed, [key]: Date.now() };
     setClosed(next);
@@ -192,12 +223,13 @@ export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }:
   const folderIds = useMemo(() => new Set(folders.map((folder) => folder.id)), [folders]);
 
   const openThread = (id: string) => { threadActions.open(id); onNavigate(); };
-  const toggle = (projectId: string) => {
-    const next = { ...open, [projectId]: !(open[projectId] ?? true) };
+  const toggle = (key: string) => {
+    const next = { ...open, [key]: !(open[key] ?? true) };
     setOpen(next);
     try { globalThis.localStorage?.setItem(OPEN_KEY, JSON.stringify(next)); } catch { /* private mode */ }
   };
 
+  const groups = activeGroups(folders, threads, closed, view);
   const favoriteThreads = threads.filter((thread) => thread.isPinned && folderIds.has(thread.projectId) && !thread.isArchived);
   const favoriteRefs = new Set(tree.data?.favorites ?? []);
   const favoriteItems = folders.flatMap((folder) => folder.items).filter((item) => favoriteRefs.has(itemRef(item)));
@@ -276,40 +308,53 @@ export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }:
 
       <Section
         title="Active work"
-        action={<button type="button" aria-label="New folder" className={SECTION_ACTION} onClick={() => { openOffice("settings/folders/new"); onNavigate(); }}><Icon name="Plus" className="size-3.5" /></button>}
+        action={<span className="ml-auto flex items-center">
+          <ActiveWorkMenu
+            view={view}
+            onChange={changeView}
+            onNewFolder={() => { openOffice("settings/folders/new"); onNavigate(); }}
+            onFolderSettings={() => { openOffice("settings"); onNavigate(); }}
+          />
+          <button type="button" aria-label="New folder" className={SECTION_ACTION} onClick={() => { openOffice("settings/folders/new"); onNavigate(); }}><Icon name="Plus" className="size-3.5" /></button>
+        </span>}
       >
-        {folders.map((folder) => ({ folder, rows: folderRows(folder, threads, closed) })).filter(({ rows }) => rows.length).map(({ folder, rows }) => {
-          const isOpen = open[folder.id] ?? true;
-          const shown = expanded[folder.id] ? rows : rows.slice(0, FOLDER_PREVIEW);
+        {groups.map((group) => {
+          // Ungrouped rows sit flush, with no header to collapse.
+          const flat = view.groupBy === "none";
+          const isOpen = flat || (open[group.key] ?? true);
+          const isExpanded = expanded[group.key] ?? false;
+          const { rows, folder } = group;
+          const shown = isExpanded ? rows : rows.slice(0, FOLDER_PREVIEW);
+          const showMore = () => setExpanded({ ...expanded, [group.key]: !isExpanded });
           return (
-            <div key={folder.id}>
-              <RowMenu
-                label={folder.name}
-                groups={[
-                  [{ id: "new", label: "New thread here", icon: "Plus", run: () => { threadActions.openNewThread({ projectId: folder.id, focusPrompt: true }); onNavigate(); } }],
-                  [
-                    { id: "toggle", label: isOpen ? "Collapse" : "Expand", icon: isOpen ? "ChevronUp" : "ChevronDown", run: () => toggle(folder.id) },
-                    ...(rows.length > FOLDER_PREVIEW ? [{ id: "all", label: expanded[folder.id] ? "Show recent only" : `Show all ${rows.length}`, icon: "ListView", run: () => setExpanded({ ...expanded, [folder.id]: !expanded[folder.id] }) }] : []),
-                  ],
-                  [{ id: "settings", label: "Folder settings", icon: "SlidersHorizontal", run: () => { openOffice("settings"); onNavigate(); } }],
-                ]}
-              >
-                <button type="button" onClick={() => toggle(folder.id)} aria-expanded={isOpen} className={cn(ROW, "group-hover/rowmenu:pr-8")}>
-                  <span className={ROW_GLYPH}><Icon name={isOpen ? "ChevronDown" : "ChevronRight"} aria-hidden className="!size-3.5" /></span>
-                  <span className={cn(ROW_LABEL, "font-medium")}>{folder.name}</span>
-                  {folder.hasRepo && folder.branch
-                    ? <span className="max-w-24 shrink-0 truncate font-mono text-[11px] text-subtle-foreground group-hover/rowmenu:hidden" title={`Branch ${folder.branch}`}>⎇ {folder.branch}</span>
-                    : null}
-                </button>
-              </RowMenu>
+            <div key={group.key}>
+              {flat ? null : (
+                <RowMenu
+                  label={group.label}
+                  groups={[
+                    folder ? [{ id: "new", label: "New thread here", icon: "Plus", run: () => { threadActions.openNewThread({ projectId: folder.id, focusPrompt: true }); onNavigate(); } }] : [],
+                    [
+                      { id: "toggle", label: isOpen ? "Collapse" : "Expand", icon: isOpen ? "ChevronUp" : "ChevronDown", run: () => toggle(group.key) },
+                      ...(rows.length > FOLDER_PREVIEW ? [{ id: "all", label: isExpanded ? "Show recent only" : `Show all ${rows.length}`, icon: "ListView", run: showMore }] : []),
+                    ],
+                    folder ? [{ id: "settings", label: "Folder settings", icon: "SlidersHorizontal", run: () => { openOffice("settings"); onNavigate(); } }] : [],
+                  ]}
+                >
+                  <GroupHeader group={group} isOpen={isOpen} onToggle={() => toggle(group.key)} />
+                </RowMenu>
+              )}
               {isOpen
                 ? <div className="space-y-px">
-                    {shown.map((row) => row.type === "thread"
-                      ? <ThreadRow key={row.thread.id} thread={row.thread} indent active={row.thread.id === activeThreadId} onOpen={openThread} onClose={() => close(rowKey(row))} />
-                      : <ItemRow key={itemRef(row.item)} item={row.item} indent author={row.item.authorBotId ? bots.get(row.item.authorBotId) : undefined} active={pathname === row.item.href} onChanged={tree.refresh} onClose={() => close(rowKey(row))} />)}
+                    {shown.map((row) => {
+                      // Outside folder grouping, each row names its folder.
+                      const detail = view.groupBy === "folder" ? undefined : row.folder.name;
+                      return row.type === "thread"
+                        ? <ThreadRow key={row.thread.id} thread={row.thread} indent={!flat} detail={detail} active={row.thread.id === activeThreadId} onOpen={openThread} onClose={() => close(rowKey(row))} />
+                        : <ItemRow key={itemRef(row.item)} item={row.item} indent={!flat} detail={detail} author={row.item.authorBotId ? bots.get(row.item.authorBotId) : undefined} active={pathname === row.item.href} onChanged={tree.refresh} onClose={() => close(rowKey(row))} />;
+                    })}
                     {rows.length > FOLDER_PREVIEW
-                      ? <button type="button" onClick={() => setExpanded({ ...expanded, [folder.id]: !expanded[folder.id] })} className={cn(ROW, "pl-7 text-muted-foreground")}>
-                          {expanded[folder.id] ? "Show less" : `Show ${rows.length - FOLDER_PREVIEW} more`}
+                      ? <button type="button" onClick={showMore} className={cn(ROW, !flat && "pl-7", "text-muted-foreground")}>
+                          {isExpanded ? "Show less" : `Show ${rows.length - FOLDER_PREVIEW} more`}
                         </button>
                       : null}
                   </div>
@@ -317,7 +362,7 @@ export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }:
             </div>
           );
         })}
-        {tree.data && !folders.some((folder) => folderRows(folder, threads, closed).length)
+        {tree.data && !groups.length
           ? <p className="px-2 py-1 text-xs text-muted-foreground">Nothing active this week.</p>
           : null}
         <button type="button" onClick={() => { openAppPath(studioPath()); onNavigate(); }} className={cn(ROW, "mt-1 text-muted-foreground")}>
