@@ -49,3 +49,27 @@ test("grid puts threads that need input first and folds unstarted bots into one 
   expect(container.querySelectorAll(".channel-thread-pane")).toHaveLength(2);
   expect(container.querySelector(".channel-unstarted")?.textContent).toContain("Quiet bot");
 });
+test("grid panes rearrange by drag or arrow keys, persist per channel, and reset to attention order", () => {
+  localStorage.clear();
+  const threads = [row("one", "idle", { updatedAt: 3 }), row("two", "idle", { updatedAt: 2 }), row("three", "idle", { updatedAt: 1 })];
+  render("grid", threads);
+  const order = () => [...container.querySelectorAll("[data-channel-thread]")].map(pane => pane.getAttribute("data-channel-thread"));
+  expect(order()).toEqual(["one", "two", "three"]);
+  const pane = (id: string) => container.querySelector(`[data-channel-thread="${id}"]`) as HTMLElement;
+  const types: string[] = [];
+  const dataTransfer = { types, setData: (type: string) => types.push(type), setDragImage: () => {}, effectAllowed: "", dropEffect: "" };
+  const fire = (target: Element, type: string, init: Record<string, unknown> = {}) => act(() => { const event = new Event(type, { bubbles: true, cancelable: true }); Object.assign(event, { dataTransfer, clientX: 0, clientY: 0, ...init }); target.dispatchEvent(event); });
+  vi.spyOn(pane("one"), "getBoundingClientRect").mockReturnValue({ left: 0, top: 0, width: 100, height: 100 } as DOMRect);
+  fire(pane("three").querySelector("header")!, "dragstart");
+  fire(pane("one"), "dragover", { clientX: 10 });
+  expect(pane("one").getAttribute("data-drop")).toBe("before");
+  fire(pane("one"), "drop");
+  expect(order()).toEqual(["three", "one", "two"]);
+  expect(JSON.parse(localStorage.getItem("bot-teams:grid-order:channel")!)).toEqual(["three", "one", "two"]);
+  act(() => (container.querySelector('[aria-label="Move three"]') as HTMLElement).dispatchEvent(new KeyboardEvent("keydown", { key: "ArrowRight", bubbles: true })));
+  expect(order()).toEqual(["one", "three", "two"]);
+  expect(container.textContent).toContain("Moved three to position 2 of 3.");
+  act(() => (([...container.querySelectorAll("button")].find(button => button.textContent === "Reset order")) as HTMLButtonElement).click());
+  expect(order()).toEqual(["one", "two", "three"]);
+  expect(localStorage.getItem("bot-teams:grid-order:channel")).toBeNull();
+});

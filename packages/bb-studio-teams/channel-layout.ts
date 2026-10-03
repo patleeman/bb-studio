@@ -28,3 +28,15 @@ const ATTENTION = ["Needs input", "Failed", "Working", "Idle", "Unavailable"];
 export function byAttention(threads: ViewThread[]) {
   return [...threads].sort((a, b) => ATTENTION.indexOf(threadActivity(a)) - ATTENTION.indexOf(threadActivity(b)) || b.updatedAt - a.updatedAt);
 }
+/** Grid order: panes the owner arranged keep their places; the rest follow in attention order. */
+export function arrangeGrid(threads: ViewThread[], order: string[]) {
+  const placed = order.flatMap(id => threads.filter(thread => thread.id === id));
+  return [...placed, ...byAttention(threads.filter(thread => !order.includes(thread.id)))];
+}
+/** Moves `id` to just before or after `target` in the visible ids. */
+export function movePane(ids: string[], id: string, target: string, place: "before" | "after") {
+  if (id === target || !ids.includes(id) || !ids.includes(target)) return ids;
+  const rest = ids.filter(other => other !== id);
+  const at = rest.indexOf(target) + (place === "after" ? 1 : 0);
+  return [...rest.slice(0, at), id, ...rest.slice(at)];
+}

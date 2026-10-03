@@ -1421,6 +1421,53 @@
 }
 .channel-thread-pane > footer > button:hover { color: var(--foreground); background: var(--state-hover); }
 
+/* Grid: drag a pane by its header to rearrange. */
+.channel-thread-pane { position: relative; }
+.channel-thread-pane > header[data-arrangeable] { cursor: grab; padding-left: 4px; }
+.channel-thread-pane > header[data-arrangeable]:active { cursor: grabbing; }
+.channel-pane-grip {
+  display: inline-flex;
+  width: 20px;
+  height: 28px;
+  flex: 0 0 auto;
+  align-items: center;
+  justify-content: center;
+  border-radius: 4px;
+  color: var(--subtle-foreground, var(--muted-foreground));
+  cursor: grab;
+}
+.channel-pane-grip:hover { color: var(--foreground); }
+.channel-pane-grip:focus-visible { outline: 2px solid var(--ring); outline-offset: 1px; }
+@media (hover: hover) {
+  .channel-pane-grip { opacity: 0; transition: opacity 120ms; }
+  .channel-thread-pane:hover .channel-pane-grip,
+  .channel-pane-grip:focus-visible { opacity: 1; }
+}
+.channel-thread-pane[data-dragging] { opacity: 0.45; }
+.channel-thread-pane[data-drop]::after {
+  content: "";
+  position: absolute;
+  z-index: 2;
+  border-radius: 2px;
+  background: var(--channel-working);
+  pointer-events: none;
+}
+.channel-thread-pane[data-drop="before"]::after,
+.channel-thread-pane[data-drop="after"]::after { top: 0; bottom: 0; width: 3px; }
+.channel-thread-pane[data-drop="before"]::after { left: 0; }
+.channel-thread-pane[data-drop="after"]::after { right: 0; }
+.channel-thread-pane[data-drop-axis="y"]::after { left: 0; right: 0; width: auto; height: 3px; }
+.channel-thread-pane[data-drop-axis="y"][data-drop="before"]::after { top: 0; bottom: auto; }
+.channel-thread-pane[data-drop-axis="y"][data-drop="after"]::after { top: auto; bottom: 0; }
+.channel-reset-order {
+  margin-left: auto;
+  border-radius: 6px;
+  padding: 3px 8px;
+  color: var(--muted-foreground);
+  font-size: var(--text-xs);
+}
+.channel-reset-order:hover { color: var(--foreground); background: var(--state-hover); }
+
 /* Grid: members without a thread share one quiet row. */
 .channel-unstarted {
   display: flex;

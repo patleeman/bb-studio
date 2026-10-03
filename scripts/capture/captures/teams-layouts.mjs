@@ -84,6 +84,29 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
    await client.clickAriaButtonWithPointer("Cancel reply");
    await client.evaluate("document.activeElement?.blur()");
   }) },
+  { id: "bots-grid-arrange", packageDir: "bb-studio-teams", fileName: "channel-grid-arrange.png", setup: guard(async client => {
+   const data = await open(client, "grid");
+   await wait(client, "document.querySelectorAll('[data-channel-thread]').length===3");
+   await client.evaluate("(()=>{const reset=Array.from(document.querySelectorAll('button')).find(b=>b.textContent==='Reset order');if(reset)reset.click();})()");
+   const order = "Array.from(document.querySelectorAll('[data-channel-thread]')).map(p=>p.getAttribute('data-channel-thread'))";
+   const before = await client.evaluate(order);
+   const dragged = data.threadId, target = before.find(id => id !== dragged);
+   // Drive the real pane handlers with a browser DataTransfer, holding the drag over the first other pane.
+   await client.evaluate(`(()=>{const pane=id=>document.querySelector('[data-channel-thread="'+id+'"]');const dt=new DataTransfer();window.channelArrangeDrag=dt;const rect=pane(${JSON.stringify(target)}).getBoundingClientRect();pane(${JSON.stringify(dragged)}).querySelector('header').dispatchEvent(new DragEvent('dragstart',{bubbles:true,cancelable:true,dataTransfer:dt}));pane(${JSON.stringify(target)}).dispatchEvent(new DragEvent('dragover',{bubbles:true,cancelable:true,dataTransfer:dt,clientX:rect.left+12,clientY:rect.top+rect.height/2}));})()`);
+   await client.waitForSelector(`[data-channel-thread="${target}"][data-drop="before"]`);
+   await client.waitForSelector(`[data-channel-thread="${dragged}"][data-dragging]`);
+   return async () => {
+    await client.evaluate(`(()=>{const dt=window.channelArrangeDrag;const pane=id=>document.querySelector('[data-channel-thread="'+id+'"]');pane(${JSON.stringify(target)}).dispatchEvent(new DragEvent('drop',{bubbles:true,cancelable:true,dataTransfer:dt}));pane(${JSON.stringify(dragged)}).querySelector('header').dispatchEvent(new DragEvent('dragend',{bubbles:true,dataTransfer:dt}));})()`);
+    const expected = [dragged, ...before.filter(id => id !== dragged)];
+    if (before.indexOf(target) !== 0) expected.splice(0, expected.length, ...before.filter(id => id !== dragged).flatMap(id => id === target ? [dragged, id] : [id]));
+    await wait(client, `JSON.stringify(${order})===${JSON.stringify(JSON.stringify(expected))}`);
+    await client.navigate(`/plugins/bot-teams/channels/${data.id}`);
+    await client.waitForSelector('[data-view-composer] .ProseMirror');
+    await wait(client, `document.querySelectorAll('[data-channel-thread]').length===3&&JSON.stringify(${order})===${JSON.stringify(JSON.stringify(expected))}`);
+    await client.clickElementWithTextAndPointer("button.channel-reset-order", "Reset order");
+    await wait(client, `JSON.stringify(${order})===${JSON.stringify(JSON.stringify(before))}`);
+   };
+  }) },
   { id: "bots-focus", packageDir: "bb-studio-teams", fileName: "channel-focus.png", setup: guard(async client => {
    const data = await open(client, "grid");
    await client.clickAriaButtonWithPointer("Focus Release checklist");
