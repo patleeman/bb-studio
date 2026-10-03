@@ -1,4 +1,5 @@
 import XCTest
+import UIKit
 
 /// Opt-in, read-only UI review. Never inherit BB's production/default server.
 final class ReviewQualityUITests: XCTestCase {
@@ -61,7 +62,8 @@ final class ReviewQualityUITests: XCTestCase {
             add(tree)
             if #available(iOS 17.0, *) {
                 try app.performAccessibilityAudit(for: [.elementDetection]) { issue in
-                    let finding = "\(name): \(issue.auditType) \(issue.compactDescription); \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")]"
+                    if self.excludeVerifiedContrast(issue, in: app, name: name) { return true }
+                let finding = "\(name): \(issue.auditType) \(issue.compactDescription); \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")] frame=\(String(describing: issue.element?.frame)) id=\(issue.element?.identifier ?? "nil")"
                     self.auditFindings.append(finding)
                     print("QUALITY: \(finding)")
                     return true // Collect positions; the final assertion stays strict.
@@ -250,8 +252,60 @@ final class ReviewQualityUITests: XCTestCase {
         if #available(iOS 17.0, *) {
             // These former diagnostic reproducers are now regression checks:
             // no expected finding and no discarded first issue.
-            try app.performAccessibilityAudit(for: audit)
+            try app.performAccessibilityAudit(for: audit) { issue in
+                self.excludeVerifiedContrast(issue, in: app, name: name)
+            }
         }
+    }
+
+    /// Coordinator policy: only identified disabled controls or independently
+    /// sampled, readable Select text may override a native contrast finding.
+    private func excludeVerifiedContrast(_ issue: XCUIAccessibilityAuditIssue, in app: XCUIApplication, name: String) -> Bool {
+        guard issue.auditType == .contrast else { return false }
+        guard let element = issue.element else {
+            print("AUDIT-UNRESOLVED: \(name): contrast issue has no element or queryable frame")
+            return false
+        }
+        let identifier = element.identifier
+        print("AUDIT-CONTRAST: \(name): id=\(identifier) label=\(element.label) enabled=\(element.isEnabled) frame=\(element.frame)")
+        var reason: String?
+        if identifier == "captureNoteSave", !element.isEnabled {
+            reason = "policy 1: captureNoteSave is disabled (inactive control)"
+        } else if identifier == "studioSelect", element.label == "Select", element.isHittable,
+                  app.navigationBars.buttons["studioSelect"].exists {
+            let screenshot = element.screenshot()
+            if let sample = RenderedContrast.sample(screenshot.image), sample.ratio >= 4.5 {
+                reason = "policy 3: studioSelect sRGB foreground=\(sample.foreground), background=\(sample.background), contrast=\(sample.ratio):1"
+                let crop = XCTAttachment(screenshot: screenshot)
+                crop.name = name + "-verified-select-contrast"
+                crop.lifetime = .keepAlways
+                add(crop)
+            }
+        }
+        guard let reason else { return false }
+        let evidence = "\(name): \(reason); element frame=\(element.frame)"
+        print("AUDIT-EXCLUSION: \(evidence)")
+        let record = XCTAttachment(string: evidence)
+        record.name = name + "-contrast-exclusion"
+        record.lifetime = .keepAlways
+        add(record)
+        retainScreen(app, name + "-contrast-exclusion-screen")
+        return true
+    }
+
+    func testContrastSamplerRejectsLowContrastAndSparseDarkPixels() throws {
+        func swatch(_ foreground: CGFloat, sparse: Bool = false) -> UIImage {
+            UIGraphicsImageRenderer(size: CGSize(width: 100, height: 50)).image { context in
+                UIColor.white.setFill()
+                context.fill(CGRect(x: 0, y: 0, width: 100, height: 50))
+                UIColor(white: foreground, alpha: 1).setFill()
+                context.fill(CGRect(x: 30, y: 15, width: sparse ? 1 : 40, height: sparse ? 1 : 20))
+            }
+        }
+        XCTAssertEqual(RenderedContrast.sample(swatch(0))?.ratio ?? 0, 21, accuracy: 0.01)
+        let lowContrast = try XCTUnwrap(RenderedContrast.sample(swatch(120.0 / 255)))
+        XCTAssertLessThan(lowContrast.ratio, 4.5)
+        XCTAssertNil(RenderedContrast.sample(swatch(0, sparse: true)))
     }
 
     func testIsolatedLaunchMeasurement() {
@@ -350,7 +404,8 @@ final class ReviewQualityUITests: XCTestCase {
         add(tree)
         if #available(iOS 17.0, *) {
             try app.performAccessibilityAudit(for: [.contrast, .elementDetection, .hitRegion, .sufficientElementDescription, .dynamicType, .textClipped]) { issue in
-                let finding = "\(name): \(issue.auditType) \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")]"
+                if self.excludeVerifiedContrast(issue, in: app, name: name) { return true }
+                let finding = "\(name): \(issue.auditType) \(issue.detailedDescription) [\(issue.element?.label ?? "unknown element")] frame=\(String(describing: issue.element?.frame)) id=\(issue.element?.identifier ?? "nil")"
                 self.auditFindings.append(finding)
                 print("QUALITY: \(finding)")
                 return true // Collect every screen; the final assertion fails on any finding.

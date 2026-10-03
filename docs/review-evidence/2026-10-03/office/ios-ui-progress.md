@@ -408,3 +408,21 @@ now keeps its wrapped vertical size.
 the explicit title button. [Before/after native crops](request-row/README.md)
 show the request title is now fully readable. The broader nine failing Review
 audits and final fresh full-suite run are still outstanding.
+
+
+## Home clipping fixed; verified contrast exclusions added
+
+Home's New Thread and Hand Off controls now lay out icon and wrapped text
+separately. `testHomeClippingNativeDiagnosticAtAccessibilityText` passes its
+strict native clipping audit in `/tmp/office-audit-policy/results.xcresult`.
+
+Coordinator-approved contrast policy 1 is restricted to the disabled
+`captureNoteSave` identifier. Policy 3 is restricted to `studioSelect`, with
+actual screenshot sampling required to reach 4.5:1. The focused native sample
+measured 19.9461:1; the sampler's positive and negative checks pass. All
+unverified issues still fail. Policy 2 is not yet implemented because nil
+issues expose no queryable frame; clarification on resolved scroll-edge elements
+was requested. [Per-exclusion evidence and native crops](audit-policy/README.md).
+
+Eight broader Review tests still have unresolved findings after the Home
+clipping fix. The fresh latest-main full suite and final report remain pending.

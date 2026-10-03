@@ -32,10 +32,16 @@ private struct HomeList: View {
         List {
             Section {
                 Button { app.newThread() } label: {
-                    Label("New Thread", systemImage: "square.and.pencil")
+                    HStack(alignment: .firstTextBaseline) {
+                        Image(systemName: "square.and.pencil").accessibilityHidden(true)
+                        Text("New Thread").fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 Button { delegating = true } label: {
-                    Label("Hand Off to a Bot", systemImage: "paperplane")
+                    HStack(alignment: .firstTextBaseline) {
+                        Image(systemName: "paperplane").accessibilityHidden(true)
+                        Text("Hand Off to a Bot").fixedSize(horizontal: false, vertical: true)
+                    }
                 }
                 .disabled(office.team?.bots.isEmpty ?? true)
             }
