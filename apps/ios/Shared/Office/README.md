@@ -14,13 +14,18 @@ on failure and ignores superseded responses.
 - `HomeStore(spaceId:client:)`: `home`, `needsYou`, `working`, `reports`, `recent`.
 - `TeamStore(spaceId:client:)`: `bots`, `conversations`.
 
-`BBClient+Office.swift` wraps the live Space/folder and Home contracts.
-Home sends `spaceId` to `home`, which distinguishes it from legacy project Home. The generator merges
-`src/office/contract.ts` into the Studio schema and generated Swift methods.
-`OfficeProvisionalAPI.swift` currently follows the web office model for
-Team, Talk, bot desks, delegation, and the Home composer. These methods are pending backend stages 5–6, are
-explicitly recorded as dynamic calls in the native inventory, and must be
-reconciled with the generated contract when it lands.
+`BBClient+Office.swift` wraps the Space/folder, Home, Team, Talk, bot desk,
+and delegation contracts. Home sends `spaceId` to `home`, which distinguishes
+it from legacy project Home. The generator merges `src/office/contract.ts`
+into the Studio schema and generated Swift methods.
+
+`officeDirectMessage(botId:)` returns `conversationId` and `threadId`.
+`officeDelegate(botId:brief:schedule:context:folderId:)` returns `taskId` and
+`task`. Omit `schedule` for one-time work; `OfficeSchedule` supports hourly,
+daily, weekdays, and weekly. Context strings are item references.
+
+Only `officeStart` in `OfficeProvisionalAPI.swift` still follows the web model
+pending its server contract. It remains visible as a dynamic inventory call.
 
 `OfficeModels.swift` uses seconds/milliseconds exactly as sent by the server;
 its timestamp fields are raw `Double` values. Do not infer dates without checking

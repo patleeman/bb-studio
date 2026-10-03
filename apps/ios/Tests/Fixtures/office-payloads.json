@@ -134,5 +134,130 @@
         }
       ]
     }
+  },
+  {
+    "id": "office-team_list",
+    "plugin": "studio",
+    "method": "team_list",
+    "input": {
+      "spaceId": "sp_one"
+    },
+    "output": {
+      "bots": [
+        {
+          "id": "bot_one",
+          "name": "Writer",
+          "avatar": null,
+          "role": null,
+          "spaceId": "sp_one",
+          "model": null,
+          "trust": "ask",
+          "state": "needs_you",
+          "activeTaskCount": 2
+        }
+      ]
+    }
+  },
+  {
+    "id": "office-talk_list",
+    "plugin": "studio",
+    "method": "talk_list",
+    "input": {
+      "spaceId": "sp_one"
+    },
+    "output": {
+      "conversations": [
+        {
+          "id": "dm_one",
+          "title": "Writing",
+          "memberBotIds": [
+            "bot_one"
+          ],
+          "isDirect": true,
+          "needsYou": false,
+          "unread": true,
+          "href": "/talk/dm_one"
+        }
+      ]
+    }
+  },
+  {
+    "id": "office-talk_dm",
+    "plugin": "studio",
+    "method": "talk_dm",
+    "input": {
+      "botId": "bot_one"
+    },
+    "output": {
+      "conversationId": "dm_one",
+      "threadId": "thr_one"
+    }
+  },
+  {
+    "id": "office-bot_desk",
+    "plugin": "studio",
+    "method": "bot_desk",
+    "input": {
+      "botId": "bot_one"
+    },
+    "output": {
+      "bot": {
+        "id": "bot_one",
+        "name": "Writer",
+        "avatar": null,
+        "role": null,
+        "spaceId": "sp_one",
+        "model": null,
+        "trust": "ask",
+        "state": "needs_you",
+        "activeTaskCount": 2
+      },
+      "tasks": [
+        {
+          "id": "tsk_one",
+          "botId": "bot_one",
+          "title": "Review",
+          "status": "working",
+          "note": null,
+          "recurring": "daily",
+          "href": "/tasks/tsk_one",
+          "updatedAt": 1700000000000
+        }
+      ],
+      "directConversationId": "dm_one",
+      "directThreadId": "thr_one",
+      "profileHref": "/bots/bot_one",
+      "memory": {
+        "mission": "Write",
+        "memory": "Keep it short"
+      }
+    }
+  },
+  {
+    "id": "office-delegate",
+    "plugin": "studio",
+    "method": "delegate",
+    "input": {
+      "botId": "bot_one",
+      "brief": "Review",
+      "schedule": "daily",
+      "context": [
+        "pages:pg_one"
+      ],
+      "folderId": "proj_one"
+    },
+    "output": {
+      "taskId": "tsk_one",
+      "task": {
+        "id": "tsk_one",
+        "botId": "bot_one",
+        "title": "Review",
+        "status": "working",
+        "note": null,
+        "recurring": "daily",
+        "href": "/tasks/tsk_one",
+        "updatedAt": 1700000000000
+      }
+    }
   }
 ]

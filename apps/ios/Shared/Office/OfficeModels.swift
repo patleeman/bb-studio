@@ -70,8 +70,6 @@ public struct OfficeSpaceTree: Codable, Sendable {
     public var favorites: [String]?
 }
 
-// Stage 4–6 types currently mirror src/ui/office/model.ts. Reconcile with
-// src/office/contract.ts when those server contracts land.
 public enum OfficeBotState: String, Codable, Sendable { case idle, working, needsYou = "needs_you" }
 
 public struct OfficeTeamBot: Codable, Identifiable, Hashable, Sendable {
@@ -177,4 +175,18 @@ public struct OfficeBotDesk: Codable, Sendable {
     public var directThreadId: String?
     public var profileHref: String
     public var memory: Memory?
+}
+
+public enum OfficeSchedule: String, Codable, Sendable, CaseIterable {
+    case hourly, daily, weekdays, weekly
+}
+
+public struct OfficeDirectMessageResult: Codable, Sendable {
+    public var conversationId: String
+    public var threadId: String
+}
+
+public struct OfficeDelegationResult: Codable, Sendable {
+    public var taskId: String
+    public var task: OfficeWorkingTask
 }
