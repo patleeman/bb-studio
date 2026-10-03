@@ -5,6 +5,7 @@ import SwiftUI
 struct TeamTab: View {
     @EnvironmentObject private var app: AppModel
     @Environment(OfficeContext.self) private var office
+    @State private var adding = false
 
     var body: some View {
         NavigationStack(path: $app.teamPath) {
@@ -15,10 +16,96 @@ struct TeamTab: View {
                     ProgressView()
                 }
             }
-            .toolbar { ToolbarItem(placement: .principal) { SpaceSwitcher() } }
+            .toolbar {
+                ToolbarItem(placement: .principal) { SpaceSwitcher() }
+                ToolbarItem(placement: .topBarTrailing) {
+                    Button { adding = true } label: { Label("Add a Bot", systemImage: "person.badge.plus") }
+                        .disabled(office.currentSpace == nil)
+                }
+            }
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
             .navigationDestination(for: BotDeskRoute.self) { BotDeskView(botId: $0.botId) }
+            .sheet(isPresented: $adding) {
+                if let space = office.currentSpace { AddBotSheet(space: space) }
+            }
+        }
+    }
+}
+
+/// Hire a bot into the current Space: who it is, its mission, how much it may do.
+struct AddBotSheet: View {
+    @EnvironmentObject private var app: AppModel
+    @Environment(OfficeContext.self) private var office
+    @Environment(\.dismiss) private var dismiss
+    let space: OfficeSpace
+    @State private var name = ""
+    @State private var avatar = ""
+    @State private var role = ""
+    @State private var mission = ""
+    @State private var trust = "ask"
+    @State private var error: String?
+    @State private var saving = false
+
+    var body: some View {
+        NavigationStack {
+            Form {
+                Section {
+                    TextField("Name", text: $name)
+                    TextField("Face (emoji)", text: $avatar)
+                    TextField("Role", text: $role)
+                }
+                Section {
+                    TextField("What this bot is responsible for, and how it should work", text: $mission, axis: .vertical)
+                        .lineLimit(4...10)
+                } header: { Text("Mission") }
+                Section {
+                    Picker("Trust", selection: $trust) {
+                        Text("Ask first").tag("ask")
+                        Text("Act and report").tag("act")
+                    }
+                    .pickerStyle(.inline)
+                    .labelsHidden()
+                } header: { Text("Trust") } footer: {
+                    Text(trust == "ask"
+                        ? "Asks in your Inbox before changing anything outside its own files."
+                        : "Acts on its own and tells you what it did.")
+                }
+                if let error { Section { Text(error).foregroundStyle(.red) } }
+            }
+            .navigationTitle("Add a Bot")
+            .navigationBarTitleDisplayMode(.inline)
+            .toolbar {
+                ToolbarItem(placement: .cancellationAction) { Button("Cancel") { dismiss() } }
+                ToolbarItem(placement: .confirmationAction) {
+                    Button("Add") { save() }
+                        .disabled(saving || name.trimmingCharacters(in: .whitespaces).isEmpty
+                            || mission.trimmingCharacters(in: .whitespacesAndNewlines).isEmpty)
+                }
+            }
+        }
+    }
+
+    private func save() {
+        saving = true
+        var input: [String: JSONValue] = [
+            "name": .string(name.trimmingCharacters(in: .whitespaces)),
+            "mission": .string(mission.trimmingCharacters(in: .whitespacesAndNewlines)),
+            "description": .string(role.trimmingCharacters(in: .whitespaces)),
+            "trust": .string(trust),
+        ]
+        let face = avatar.trimmingCharacters(in: .whitespaces)
+        if !face.isEmpty { input["avatar"] = .string(face) }
+        if let project = space.defaultProjectId { input["projectId"] = .string(project) }
+        Task {
+            defer { saving = false }
+            do {
+                let _: JSONValue = try await app.client.rpc("studio", Studio.Method.teams_create, .object(input))
+                await office.team?.refresh()
+                dismiss()
+            } catch {
+                self.error = BBClient.describe(error)
+            }
         }
     }
 }
