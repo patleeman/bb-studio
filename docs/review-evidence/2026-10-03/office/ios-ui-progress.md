@@ -220,3 +220,14 @@ ID and checks the exact summary, replacing its missing-recording skip.
 exercised the automatic Office seed invocation; its generated xctestrun contains
 the capture directory and meeting recording ID. Node/shell syntax checks and
 `git diff --check` pass.
+
+## Three thread fixture skips resolved
+
+`testQueueEdit`, `testQueueReorder`, and `testRenameThread` now create their own
+scheduled scratch threads and delete them in teardown. Queue edit seeds its
+expected message; reorder seeds three messages. None dispatches an agent.
+They no longer skip for a missing shared `BBGO_QA_QUEUE_THREAD`, and their
+mutation state cannot leak between tests or repeated runs.
+
+`/tmp/office-queue-skips/results.xcresult`: 3 passed, 0 failures, on the private
+simulator against staged server 52786. `git diff --check` passed.

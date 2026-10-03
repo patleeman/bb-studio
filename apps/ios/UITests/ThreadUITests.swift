@@ -380,10 +380,9 @@ final class ThreadUITests: XCTestCase {
         shot("queue-removed")
     }
 
-    /// Rewrites the first queued message. Only runs against a scratch thread
-    /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, never a real one.
+    /// Rewrites a future-scheduled message on its own scratch thread.
     func testQueueEdit() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        let id = try queuedScratchThread("Hello this")
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let card = app.buttons.matching(NSPredicate(format: "label BEGINSWITH 'Hello'")).firstMatch
         XCTAssertTrue(card.waitForExistence(timeout: 10), "queued card")
@@ -398,10 +397,15 @@ final class ThreadUITests: XCTestCase {
         shot("queue-edited")
     }
 
-    /// Collapses, expands and drags queued messages. Scratch thread only,
-    /// named by `TEST_RUNNER_BBGO_QA_QUEUE_THREAD`, with three or more queued.
+    /// Collapses, expands and drags three future-scheduled scratch messages.
     func testQueueReorder() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        let id = try queuedScratchThread("scratch message 1")
+        for number in 2...3 {
+            XCTAssertNotNil(api("POST", "/threads/\(id)/send", [
+                "input": [["type": "text", "text": "scratch message \(number)", "mentions": [String]()]],
+                "mode": "queue-if-active", "sendAt": 1_924_992_000_000,
+            ]))
+        }
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let summary = app.buttons["queueSummary"]
         XCTAssertTrue(summary.waitForExistence(timeout: 10), "collapsed queue")
@@ -425,7 +429,7 @@ final class ThreadUITests: XCTestCase {
 
     /// Renames the scratch thread from the ⋯ menu.
     func testRenameThread() throws {
-        guard let id = ProcessInfo.processInfo.environment["BBGO_QA_QUEUE_THREAD"] else { throw XCTSkip("no scratch thread") }
+        let id = try queuedScratchThread("Scratch rename fixture")
         app.open(URL(string: "bbstudio://thread/\(id)")!)
         let more = app.buttons["More"].firstMatch
         XCTAssertTrue(more.waitForExistence(timeout: 10))
@@ -1340,11 +1344,17 @@ final class ThreadUITests: XCTestCase {
         app.buttons["Cancel"].tap()
     }
 
-    private func scratchThread(_ title: String) -> String? {
+    private func queuedScratchThread(_ text: String) throws -> String {
+        let id = try XCTUnwrap(scratchThread("QA queue \(UUID().uuidString.prefix(8))", text: text))
+        addTeardownBlock { _ = self.api("DELETE", "/threads/\(id)", ["childThreadsConfirmed": false]) }
+        return id
+    }
+
+    private func scratchThread(_ title: String, text: String = "Scratch thread for a UI test. Do nothing.") -> String? {
         let json = api("POST", "/threads", [
             "projectId": StagedFixture.projectId, "origin": "app", "title": title,
             "environment": ["type": "project-default"], "sendAt": 1_924_992_000_000,
-            "input": [["type": "text", "text": "Scratch thread for a UI test. Do nothing.", "mentions": [String]()]],
+            "input": [["type": "text", "text": text, "mentions": [String]()]],
         ])
         return json?["id"] as? String ?? (json?["thread"] as? [String: Any])?["id"] as? String
     }
