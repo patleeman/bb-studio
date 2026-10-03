@@ -85,6 +85,12 @@ plugins.** Keep what the SDK allows, migrate what we own, and accept the rest:
   (`parseItemReference`, quick open, search) still accepts old prefixes so a
   pasted old ref works inside Studio.
 
+- **Approved schema changes** (backward compatible, required by the office
+  model): `tasks_create`/`tasks_update` description limit 20000 → 64000;
+  `bots_create` gains optional `projectId` and `trust`; new bots default to
+  `accept-edits` (trust `ask`) instead of `auto`. Every other absorbed tool
+  schema stays byte-identical.
+
 The rules below apply with these exceptions.
 
 ### Compatibility rules (must hold for every merge step)
