@@ -29,7 +29,8 @@ export default ({ pluginRpc, launchRoomThread, getLaunchRoomId, bbCli, projectId
  };
  const wait = (client, expression) => client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+20000;const tick=()=>(${expression})?resolve():Date.now()>end?reject(new Error('Channel assertion failed: '+${JSON.stringify(expression)})):setTimeout(tick,200);tick();})`, true);
  const mode = async (client, value) => {
-  await client.evaluate(`(()=>{const button=document.querySelector('[aria-label="Channel view"] button[data-layout=${JSON.stringify(value)}]');if(!button)throw new Error('Missing view switcher button');button.click();if(button.getAttribute('aria-pressed')!=='true')throw new Error('View switcher did not select '+${JSON.stringify(value)});})()`);
+  await client.evaluate(`(()=>{const button=document.querySelector('[aria-label="Channel view"] button[data-layout=${JSON.stringify(value)}]');if(!button)throw new Error('Missing view switcher button');button.click();})()`);
+  await client.waitForSelector(`[aria-label="Channel view"] button[data-layout="${value}"][aria-pressed="true"]`);
   await client.waitForSelector(value === "merged" ? "[data-view-timeline]" : `[data-channel-layout="${value}"]`);
  };
  const open = async (client, value) => {

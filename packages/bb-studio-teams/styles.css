@@ -1283,7 +1283,7 @@
 .channel-layout-picker > button:hover { color: var(--foreground); }
 .channel-layout-picker > button[aria-pressed="true"] {
   color: var(--foreground);
-  background: var(--background);
+  background: var(--state-active, var(--background));
   box-shadow: 0 0 0 1px var(--border), 0 1px 2px rgb(0 0 0 / 0.12);
 }
 .channel-layout-picker > button:focus-visible,
@@ -1295,6 +1295,8 @@
 }
 
 /* Status: a dot and a word. Only states that matter get color. */
+.channel-thread-layout,
+.channel-layout-picker { --channel-working: #4f8ff7; }
 .channel-status {
   display: inline-flex;
   flex: 0 0 auto;
@@ -1314,7 +1316,7 @@
 }
 [data-activity="Working"] > .channel-status-dot,
 [data-activity="Working"] .channel-status-dot {
-  background: var(--primary);
+  background: var(--channel-working);
   opacity: 1;
   animation: bot-presence 1.3s ease-in-out infinite;
 }
@@ -1360,7 +1362,7 @@
   border-radius: 8px;
   background: var(--background);
 }
-.channel-thread-pane[data-activity="Working"] { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); }
+.channel-thread-pane[data-activity="Working"] { border-color: color-mix(in srgb, var(--channel-working) 60%, var(--border)); }
 .channel-thread-pane[data-activity="Needs input"] { border-color: color-mix(in srgb, var(--warning, #bf973f) 65%, var(--border)); }
 .channel-thread-pane[data-activity="Failed"] { border-color: color-mix(in srgb, var(--destructive) 55%, var(--border)); }
 .channel-thread-pane > header {
@@ -1461,7 +1463,7 @@
   font-size: var(--text-sm);
 }
 .channel-roster > button:hover { background: var(--state-hover); }
-.channel-roster > button[data-activity="Working"] { border-color: color-mix(in srgb, var(--primary) 55%, var(--border)); }
+.channel-roster > button[data-activity="Working"] { border-color: color-mix(in srgb, var(--channel-working) 60%, var(--border)); }
 .channel-roster > button[data-activity="Needs input"] { border-color: color-mix(in srgb, var(--warning, #bf973f) 65%, var(--border)); }
 .channel-roster > .channel-member-unstarted { border-style: dashed; color: var(--muted-foreground); }
 .channel-thread-layout[data-channel-layout="active"] .channel-thread-stage {
@@ -1511,6 +1513,7 @@
   color: var(--foreground);
   font-weight: 500;
 }
+.channel-member-rail > button[data-activity="Idle"] .channel-status-dot { visibility: hidden; }
 .channel-member-rail > .channel-member-unstarted { color: var(--muted-foreground); opacity: 0.7; }
 .channel-member-rail > .channel-member-unstarted:first-of-type { margin-top: 8px; }
 .channel-thread-layout[data-channel-layout="focus"] .channel-thread-stage {
