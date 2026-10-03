@@ -223,8 +223,13 @@ export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }:
   const folderIds = useMemo(() => new Set(folders.map((folder) => folder.id)), [folders]);
 
   const openThread = (id: string) => { threadActions.open(id); onNavigate(); };
+  // Groups start collapsed; the one holding what's open now starts expanded.
+  // Whatever the user opens or closes is remembered over that default.
+  const holdsCurrent = (group: ActiveGroup) => group.rows.some((row) => row.type === "thread" ? row.thread.id === activeThreadId : row.item.href === pathname);
+  const isGroupOpen = (group: ActiveGroup) => open[group.key] ?? holdsCurrent(group);
   const toggle = (key: string) => {
-    const next = { ...open, [key]: !(open[key] ?? true) };
+    const group = groups.find((entry) => entry.key === key);
+    const next = { ...open, [key]: !(group ? isGroupOpen(group) : open[key] ?? false) };
     setOpen(next);
     try { globalThis.localStorage?.setItem(OPEN_KEY, JSON.stringify(next)); } catch { /* private mode */ }
   };
@@ -321,7 +326,7 @@ export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }:
         {groups.map((group) => {
           // Ungrouped rows sit flush, with no header to collapse.
           const flat = view.groupBy === "none";
-          const isOpen = flat || (open[group.key] ?? true);
+          const isOpen = flat || isGroupOpen(group);
           const isExpanded = expanded[group.key] ?? false;
           const { rows, folder } = group;
           const shown = isExpanded ? rows : rows.slice(0, FOLDER_PREVIEW);
