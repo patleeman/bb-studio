@@ -118,8 +118,11 @@ export function publishMainBody(anchor: MainAnchor): () => void {
   return () => {
     anchor.element.removeEventListener("focusin", focused);
     if (main.get(anchor.id) !== anchor) return;
-    main.delete(anchor.id);
-    changed();
+    queueMicrotask(() => {
+      if (main.get(anchor.id) !== anchor) return;
+      main.delete(anchor.id);
+      changed();
+    });
   };
 }
 

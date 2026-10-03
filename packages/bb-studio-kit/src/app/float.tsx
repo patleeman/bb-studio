@@ -137,7 +137,8 @@ function placePanels(previous: PanelView[], mains: MainAnchor[], floats: FloatAn
     if (next.some(view => view.mainId === main.id && viewPath(view.target.path) === viewPath(main.target.path))) continue;
     const same = (view: PanelView) => !used.has(view.id) && viewPath(view.target.path) === viewPath(main.target.path);
     const existing = previous.find(view => same(view) && view.mainId === main.id)
-      ?? previous.find(view => same(view) && view.windowKey !== undefined);
+      ?? previous.find(view => same(view) && view.windowKey !== undefined)
+      ?? previous.find(view => same(view) && !mains.some(anchor => anchor.id === view.mainId));
     take({ id: existing?.id ?? `main:${main.id}:${viewPath(main.target.path)}`, mainId: main.id, target: main.target, element: main.element, placement: "main" });
   }
   return next;
@@ -177,7 +178,7 @@ export function FloatPanels({ path, render }: { path: string; render(subPath: st
     const panel = floatPanelFor(viewPath(target.path));
     return panel?.pluginId === pluginId && panel.path === path;
   };
-  const mains = mainBodies().filter(anchor => matches(anchor.target));
+  const mains = mainBodies().filter(anchor => anchor.element.isConnected && matches(anchor.target));
   const [snapshot, setSnapshot] = useState<{ revision: number; pluginId: string; path: string; views: PanelView[] }>({ revision: -1, pluginId, path, views: [] });
   const views = snapshot.revision === revision && snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views
     : placePanels(snapshot.pluginId === pluginId && snapshot.path === path ? snapshot.views : [], mains, floatBodies().filter(anchor => matches(anchor.target)), floatTransfers().filter(matches));

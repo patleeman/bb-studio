@@ -176,3 +176,28 @@ it("keeps the original editor alive when Float this leaves the main route before
   act(() => publishFloatBody({ windowKey: "one", element: null }));
   expect(document.querySelector("textarea")).toBeNull();
 });
+
+
+it("keeps the neighboring ordinary editor when splitting remounts its main pane", async () => {
+  const disposed = vi.fn();
+  function Editor() {
+    const [edits, setEdits] = useState(0);
+    useEffect(() => disposed, []);
+    return <div><textarea defaultValue="Neighbor draft" /><input type="file" /><button onClick={() => setEdits(value => value + 1)}>Edit</button><output>{edits}</output></div>;
+  }
+  const Main = retainPanel("pages", Editor);
+  mount(<FloatPanels path="pages" render={() => <Editor />} />);
+  const main = mount(<Main key="single" subPath="one" />);
+  const editor = main.host.querySelector("textarea")!;
+  const file = main.host.querySelector("input")!;
+  editor.value = "Keep the ordinary main draft too";
+  act(() => main.host.querySelector("button")!.click());
+  await act(() => main.root.render(<Main key="split" subPath="one" />));
+  expect(main.host.querySelector("textarea")).toBe(editor);
+  expect(main.host.querySelector("input")).toBe(file);
+  expect(editor.value).toBe("Keep the ordinary main draft too");
+  expect(main.host.querySelector("output")!.textContent).toBe("1");
+  expect(disposed).not.toHaveBeenCalled();
+  await act(() => main.root.render(null));
+  expect(disposed).toHaveBeenCalledTimes(1);
+});
