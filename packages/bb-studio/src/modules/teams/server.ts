@@ -1,3 +1,4 @@
+import { missionTasks } from "../../office/missions";
 import { officeTeamHandlers } from "../../office/team-runtime";
 import type Database from "better-sqlite3";
 import { importLegacyAttention, legacyAttentionImported } from "../../office/legacy-attention";
@@ -45,6 +46,8 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
   }
   migrateTeamOffice(db, id => threadProjects.get(id));
   const store = new Store(db), runtime = new Runtime(bb, store);
+  const syncMission = missionTasks(bb, store);
+  runtime.onMissionThread = async (bot, threadId) => { await syncMission(bot, threadId); };
   const profiles = new ThreadProfiles(bb, store, runtime, id => !store.routingSession(id));
   const views = new Conversations(bb, store, profiles);
   const project = () => personalProjectId(bb);
@@ -469,6 +472,7 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
       catch (cause) { bb.log.warn(`Could not update ${bot.handle}'s AGENTS.md: ${String(cause)}`); }
     }
     let migrationRetryAt = 0;
+    let missionSyncAt = 0;
     while (!signal.aborted) {
       if (Date.now() >= migrationRetryAt) {
         try {
@@ -483,7 +487,16 @@ export default async function plugin(bb: BbPluginApi, coreDatabase?: Database.Da
         }
         catch (cause) { migrationRetryAt = Date.now() + 60_000; bb.log.warn(`View migration will retry: ${String(cause)}`); }
       }
-      try { await recoverApprovedBotCreates(signal); await runtime.tickMissions(); }
+      try {
+        if (Date.now() >= missionSyncAt) {
+          for (const bot of store.all()) {
+            try { await syncMission(bot); }
+            catch (cause) { bb.log.warn(`Standing duty will retry for ${bot.id}: ${String(cause)}`); }
+          }
+          missionSyncAt = Date.now() + 30_000;
+        }
+        await recoverApprovedBotCreates(signal); await runtime.tickMissions();
+      }
       catch (cause) { bb.log.warn(`Bot maintenance failed: ${String(cause)}`); }
       try { await delay(1500, undefined, { signal }); } catch { break; }
     }

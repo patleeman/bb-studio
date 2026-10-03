@@ -24,6 +24,7 @@ readonly busy = new Map<string, {threadId:string;at:number}>();
 readonly progressChecks = new Map<string, {at:number;progress:boolean}>();
 readonly onChanged = new Set<() => void>();
 readonly data: ChannelData;
+onMissionThread?: (bot: Bot, threadId: string) => Promise<void>;
 constructor(readonly bb: BbPluginApi, readonly store: Store) { this.data = new ChannelData(store); }
 changed(scope: "all"|"bots"|"channel"="all", id?:string) { publishChange(this.bb,scope,id); for(const fn of this.onChanged) fn(); }
 permissionMode(bot: Bot, _roomId?: string | null): Promise<PermissionMode> { return Promise.resolve(permissionForTrust(bot.trust ?? "ask")); }
@@ -148,6 +149,7 @@ async conversation(
       model: bot.model,
     };
     this.store.putConversation(c);
+    if (kind === "mission") await this.onMissionThread?.(bot, c.threadId);
     if (bot.error) this.store.put({ ...this.store.get(bot.id), error: null });
     this.changed("bots", bot.id);
     return c;
@@ -703,6 +705,7 @@ async driveJob( bot: Bot, job: Job, forkJob: boolean) {
         if (pending.status === "cancelled") return;
         pending.threadId = c.threadId;
         this.store.putJob(pending);
+        await this.onMissionThread?.(bot, c.threadId);
         await this.bb.sdk.threads.send({
           threadId: c.threadId,
           mode: "queue-if-active",

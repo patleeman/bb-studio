@@ -94,3 +94,5 @@ export type OfficeItem = z.infer<typeof officeItemSchema>;
 export type OfficeThread = z.infer<typeof officeThreadSchema>;
 export type OfficeInput<M extends keyof typeof officeContract> = z.input<(typeof officeContract)[M]["input"]>;
 export type OfficeOutput<M extends keyof typeof officeContract> = z.output<(typeof officeContract)[M]["output"]>;
+
+export { recurringTaskContract, recurringSource, type RecurringTaskInput } from "./recurring-contract";

@@ -16965,6 +16965,114 @@
         "additionalProperties": false
       }
     },
+    "tasks_office_syncRecurring": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "projectId": {
+            "type": "string",
+            "minLength": 1
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1
+          },
+          "description": {
+            "type": "string"
+          },
+          "botId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "threadId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          },
+          "enabled": {
+            "type": "boolean"
+          },
+          "source": {
+            "oneOf": [
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "mission"
+                  },
+                  "botId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "intervalMinutes": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 9007199254740991
+                  }
+                },
+                "required": [
+                  "kind",
+                  "botId",
+                  "intervalMinutes"
+                ]
+              },
+              {
+                "type": "object",
+                "properties": {
+                  "kind": {
+                    "type": "string",
+                    "const": "automation"
+                  },
+                  "automationId": {
+                    "type": "string",
+                    "minLength": 1
+                  },
+                  "schedule": {
+                    "type": "string",
+                    "minLength": 1
+                  }
+                },
+                "required": [
+                  "kind",
+                  "automationId",
+                  "schedule"
+                ]
+              }
+            ]
+          }
+        },
+        "required": [
+          "projectId",
+          "title",
+          "description",
+          "botId",
+          "threadId",
+          "enabled",
+          "source"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "taskId": {
+            "type": [
+              "string",
+              "null"
+            ]
+          }
+        },
+        "required": [
+          "taskId"
+        ],
+        "additionalProperties": false
+      }
+    },
     "tasks_trackFinding": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

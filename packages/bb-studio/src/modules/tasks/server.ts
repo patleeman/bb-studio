@@ -1,3 +1,5 @@
+import { OfficeRecurringTasks } from "../../office/recurring";
+import { recurringTaskContract } from "../../office/recurring-contract";
 import { OfficeTaskSchedules } from "../../office/scheduling";
 import { TaskReportOutbox } from "../../office/report-outbox";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
@@ -132,6 +134,7 @@ const boardSchema = z.object({
 });
 
 export const rpcContract = defineRpcContract({
+  ...recurringTaskContract,
   /** Explicitly tracks an Explore finding; lookup never creates work. */
   trackFinding: {
     input: z.object({ key: z.string().min(1).max(200), threadId: threadIdSchema, messageId: z.string().min(1).max(200), title: z.string().trim().min(1).max(300), pageId: idSchema.nullable().optional(), create: z.boolean().default(false) }),
@@ -281,6 +284,12 @@ export default async function plugin(bb: BbPluginApi) {
   bb.storage.migrate(db, MIGRATIONS);
   const store = new TaskStore(db);
   const schedules = new OfficeTaskSchedules(db, bb.sdk);
+  const recurring = new OfficeRecurringTasks(db, store, bb.sdk);
+  const scheduleLabel = (id: string) => schedules.label(id) ?? recurring.label(id);
+  const controlSchedule = async (id: string, action: "pause" | "resume" | "delete") => {
+    await schedules.control(id, action);
+    await recurring.control(id, action);
+  };
   const reports = new TaskReportOutbox(db, async report => {
     await bb.sdk.plugins.callRpc({ pluginId: "feed", method: "publish", input: {
       title: report.title.slice(0, 200), body: report.body, author: `Bot ${report.botId}`.slice(0, 80),
@@ -406,7 +415,7 @@ export default async function plugin(bb: BbPluginApi) {
       parentId: task.parent_id,
       subtasks: store.subtasks(task.id),
       recurrence: task.recurrence,
-      schedule: schedules.label(task.id),
+      schedule: scheduleLabel(task.id),
       reminderAt: task.reminder_at,
       createdAt: task.created_at,
       updatedAt: task.updated_at,
@@ -431,7 +440,7 @@ export default async function plugin(bb: BbPluginApi) {
     const latest = store.latestHandoff(task.id)?.thread_id === threadId;
     const next = nextHandoff(handoff, task, latest, signal);
     if (!next) return;
-    if (latest && schedules.label(task.id) && ["todo", "done"].includes(task.status)) {
+    if (latest && scheduleLabel(task.id) && ["todo", "done"].includes(task.status)) {
       if (signal.type === "active") next.status = "in_progress";
       else if (["ready", "replied"].includes(next.state)) next.status = "review";
     }
@@ -693,7 +702,7 @@ export default async function plugin(bb: BbPluginApi) {
       const next = store.completeRecurring(before, by);
       if (next) changed(next.id);
     }
-    if (status !== "done" || before.status === "done" || schedules.label(id) || !(await settings.get()).archiveThreadsOnDone) return { archivedThreads: 0 };
+    if (status !== "done" || before.status === "done" || scheduleLabel(id) || !(await settings.get()).archiveThreadsOnDone) return { archivedThreads: 0 };
     return { archivedThreads: (await archiveThreads(id)).archived };
   }
 
@@ -752,6 +761,17 @@ export default async function plugin(bb: BbPluginApi) {
   bb.log.info("loaded");
 
   bb.rpc.register(rpcContract, {
+    async office_syncRecurring(input) {
+      const taskId = recurring.sync(input);
+      if (taskId && input.threadId) {
+        const handoff = recordHandoff(taskId, input.threadId, input.botId ? `Bot ${input.botId}` : "Automation");
+        store.link(taskId, { target: "thread", plugin_id: null, item_id: input.threadId, label: input.title, href: `/threads/${input.threadId}` });
+        await bb.sdk.threads.update({ threadId: input.threadId, visibility: "hidden" });
+        await catchUp(handoff, true);
+      }
+      if (taskId) changed(taskId);
+      return { taskId };
+    },
     async trackFinding({ key, threadId, messageId, title, pageId, create }) {
       let task = store.sourceTask(key);
       if (!create) return { task: task ? toDto(task) : null };
@@ -790,14 +810,14 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true };
     },
     async boardArchive({ id, archived }) {
-      for (const task of store.list({ boardId: id, includeArchived: true })) if (!task.archived_at) await schedules.control(task.id, archived ? "pause" : "resume");
+      for (const task of store.list({ boardId: id, includeArchived: true })) if (!task.archived_at) await controlSchedule(task.id, archived ? "pause" : "resume");
       store.setBoardArchived(id, archived);
       changed(id);
       return { ok: true };
     },
     async boardDelete({ id }) {
       mustGetBoard(id);
-      for (const task of store.list({ boardId: id, includeArchived: true })) await schedules.control(task.id, "delete");
+      for (const task of store.list({ boardId: id, includeArchived: true })) await controlSchedule(task.id, "delete");
       for (const task of store.deleteBoard(id)) changeBus.changed(task);
       changeBus.changed(id);
       return { ok: true };
@@ -836,14 +856,14 @@ export default async function plugin(bb: BbPluginApi) {
       return { ok: true, archivedThreads };
     },
     async archive({ id, archived }) {
-      await schedules.control(id, archived ? "pause" : "resume");
+      await controlSchedule(id, archived ? "pause" : "resume");
       store.setArchived(id, archived);
       changed(id);
       return { ok: true };
     },
     async delete({ id }) {
       const task = store.get(id);
-      await schedules.control(id, "delete");
+      await controlSchedule(id, "delete");
       if (store.delete(id)) {
         changeBus.changed(id);
         if (task) changed(task.board_id);
