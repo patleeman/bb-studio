@@ -28,10 +28,10 @@ Delegate a brief, choose a folder, and attach any relevant items. One-off and
 recurring tasks track the work. Outputs return to that folder, with the bot
 recorded as author. A finished task can produce a report in your Inbox.
 
-**Ask first** is the default trust level. Bots can work within their workspace;
-actions beyond that allowance ask for approval. **Act freely** allows broader
-actions without those prompts. Requests appear in the Inbox so you can approve
-or decline them.
+**Ask first** is the default trust level. A bot works freely in its own
+workspace and asks before changing anything else. Those asks appear in your
+Inbox, where you approve or deny them. **Act and report** lets a bot go ahead
+and tell you what it did.
 
 ## Keep up through Home and Inbox
 
