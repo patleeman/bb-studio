@@ -6,6 +6,42 @@ export default context => {
  return [
  ...(process.env.BB_CAPTURE_TEAMS_COMPANIONS === "1" ? [teamsCompanions(context)] : []),
  {
+  id:"bots-broadcasts",packageDir:"bb-studio-teams",fileName:"channel-broadcasts.png",
+  setup:async client=>{
+   await launchRoomThread();
+   const launch=await pluginRpc("bot-teams","view",{id:getLaunchRoomId()});
+   const view=await pluginRpc("bot-teams","viewCreate",{name:"Release review",members:launch.view.members,requestId:crypto.randomUUID()});
+   const id=view.id;
+   await client.navigate(`/plugins/bot-teams/channels/${id}`);
+   await client.waitForSelector('[data-view-composer] .ProseMirror');
+   const key=async(k,code,vk)=>{for(const type of ["keyDown","keyUp"])await client.command("Input.dispatchKeyEvent",{type,key:k,code,windowsVirtualKeyCode:vk});};
+   for(const handle of ["all","channel"]){
+    await client.evaluate(`document.querySelector('[data-view-composer] .ProseMirror').focus()`);
+    await client.command("Input.insertText",{text:`@${handle}`});
+    await client.waitForText("Channel mentions");
+    await client.evaluate(`(()=>{const row=document.querySelector('button[title="Channel mentions: @${handle}"]');if(!row?.textContent.includes("Everyone in this channel"))throw new Error("Missing @${handle} completion");row.click();})()`);
+    await client.evaluate(`(()=>{const editor=document.querySelector('[data-view-composer] .ProseMirror');if(!editor.textContent.includes("@${handle}"))throw new Error("Missing broadcast mention pill");editor.focus();})()`);
+    const text=`Broadcast ${handle} check: reply with one short acknowledgement.`;
+    await client.command("Input.insertText",{text:` ${text}`});
+    await key("Enter","Enter",13);
+    // The owner receipt appears only after the send succeeds. It must keep @.
+    await client.evaluate(`new Promise((resolve,reject)=>{const end=Date.now()+20000;const tick=()=>[...document.querySelectorAll('[data-view-entry="user"]')].some(e=>e.textContent.includes(${JSON.stringify(text)}))?resolve():Date.now()>end?reject(new Error("Broadcast send did not produce an owner receipt")):setTimeout(tick,200);tick();})`,true);
+    const page=await pluginRpc("bot-teams","view",{id});
+    if(!page.entries.some(e=>e.role==="user"&&e.text.includes(`@${handle}`)&&e.text.includes(text)))throw new Error("Broadcast lost its @ on submit");
+    for(const thread of page.threads.filter(t=>!t.parentThreadId)){
+     await context.bbCli(["thread","wait",thread.id,"--timeout","1m"]);
+     const messages=JSON.parse(await context.bbCli(["thread","messages",thread.id,"--json"]));
+     if(!JSON.stringify(messages).includes(text))throw new Error(`@${handle} didn't reach ${thread.id}`);
+    }
+   }
+   await client.evaluate(`document.querySelector('[data-view-composer] .ProseMirror').focus()`);
+   await client.command("Input.insertText",{text:"@ch"});
+   await client.waitForText("Channel mentions");
+   await client.evaluate(`(()=>{const row=document.querySelector('button[title="Channel mentions: @channel"]');if(!row?.textContent.includes("Everyone in this channel"))throw new Error("Missing @channel broadcast suggestion");})()`);
+   return async()=>{await key("Escape","Escape",27);for(let i=0;i<3;i++)await key("Backspace","Backspace",8);};
+  }
+ },
+ {
   id:"bots",packageDir:"bb-studio-teams",fileName:"staged-preview.png",
   setup:async client=>{
    await launchRoomThread(); const id=getLaunchRoomId();

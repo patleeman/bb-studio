@@ -41,6 +41,10 @@ Captured from an isolated stable BB installed from the pushed Git revision. The 
 
 The [compact preview](assets/staged-preview-mobile.png) shows the same live channel at 390 pixels wide, with its latest reply and composer visible. The [bot profile](assets/bot-profile.png) and [sidebar](assets/studio-sidebar.png) show profile settings and a channel open under Studio.
 
+![The @channel broadcast suggestion in BB's mention menu](assets/channel-broadcasts.png)
+
+Captured on stable BB 0.45.0 in an isolated staged app. The Release review channel offers `@all` and `@channel` in BB's mention menu. The live check selects and sends both tags, then verifies that Atlas and Scribe each received the messages in their ordinary threads.
+
 ![A channel, bot profile, and conversation in shared companion tabs](assets/companion-preview.png)
 
 Captured on stable BB 0.45.0 with the full suite installed from pushed commit adc6638. The live check retains the channel’s exact composer DOM, an unsent draft, and `release-review.txt` through switching and folding. Atlas’s Chat action reuses its existing direct conversation, and the channel keeps its own title and member controls without an extra Studio Chat action.
