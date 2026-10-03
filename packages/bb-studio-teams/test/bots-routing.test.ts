@@ -18,6 +18,22 @@ import { jobPrompt } from "../mission-runtime";
 
 import { setup, deferred } from "./bots-fixture";
 
+test("successful empty missions finish quietly instead of failing or synthesizing a reply", async () => {
+  const x = setup();
+  try {
+    for (const [index, text] of [null, "", " \n\t"].entries()) {
+      const id = `quiet-${index}`;
+      x.runtime.enqueue(x.a, { id, text: "Check for changes", conversationKey: id });
+      await x.runtime.drive(x.a);
+      const job = x.store.job(id)!;
+      x.runtime.complete(job.threadId!, text);
+      assert.equal(x.store.job(id)?.status, "done");
+      assert.equal(x.store.job(id)?.reply, null);
+      assert.equal(x.store.job(id)?.error, null);
+    }
+  } finally { await x.close(); }
+});
+
 test("uncertain dispatch is visible after restart and is never replayed", async () => {
   const x = setup();
   try {
@@ -426,4 +442,3 @@ test("idle recovery settles a running no-output job as an error", async () => {
     await x.close();
   }
 });
-

@@ -32,8 +32,8 @@ describe("push relay", () => {
     const host = await setup();
     try {
       expect(await host.push([
-        { to: "apns:quiet", body: "[PASS]", data: { kind: "turn-finished", threadId: "thr_quiet" } },
-        { to: "ExponentPushToken[quiet]", body: "**[pass]**", data: { kind: "turn-finished" } },
+        { to: "apns:quiet", body: "", data: { kind: "turn-finished", threadId: "thr_quiet" } },
+        { to: "ExponentPushToken[quiet]", body: " \n", data: { kind: "turn-finished" } },
       ])).toEqual({ data: [{ status: "ok" }, { status: "ok" }] });
       expect(host.forwarded).toEqual([]);
       expect(await host.bb.storage.kv.get("devices")).toEqual({});
@@ -46,11 +46,11 @@ describe("push relay", () => {
     const host = await setup();
     try {
       const messages: ExpoMessage[] = [
-        { to: "ExponentPushToken[quiet]", body: "[PASS]", data: { kind: "turn-finished" } },
+        { to: "ExponentPushToken[quiet]", body: "", data: { kind: "turn-finished" } },
         { to: "ExponentPushToken[result]", body: "Found a regression.", data: { kind: "turn-finished" } },
-        { to: "apns:quiet", body: "[pass]", data: { kind: "turn-finished" } },
-        { to: "ExponentPushToken[question]", body: "[PASS]", data: { kind: "pending-interaction" } },
-        { to: "ExponentPushToken[error]", body: "[PASS]", data: { kind: "thread-error" } },
+        { to: "apns:quiet", body: "\t", data: { kind: "turn-finished" } },
+        { to: "ExponentPushToken[question]", body: "", data: { kind: "pending-interaction" } },
+        { to: "ExponentPushToken[error]", body: "", data: { kind: "thread-error" } },
         { to: "apns:result", body: "Found a regression.", data: { kind: "turn-finished" } },
       ];
       expect(await host.push(messages)).toEqual({ data: [
@@ -67,7 +67,7 @@ describe("push relay", () => {
     try {
       await host.bb.storage.kv.set("devices", { "apns:phone": Date.now() });
       expect(await host.harness.behavior.callRpc("notify", {
-        title: "Check complete", body: "[pass]", kind: "turn-finished", threadId: "thr_quiet", projectId: "proj_demo",
+        title: "Check complete", body: "\t", kind: "turn-finished", threadId: "thr_quiet", projectId: "proj_demo",
       })).toEqual({ ok: true, sent: 0 });
       expect(host.forwarded).toEqual([]);
       expect(await host.bb.storage.kv.get("last-delivery")).toBeUndefined();

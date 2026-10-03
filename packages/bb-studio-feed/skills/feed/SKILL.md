@@ -12,7 +12,7 @@ results, automation runs. The user reads it on desktop and phone.
 
 Post when your task, your automation's prompt, or the user asks you to, or
 when a scheduled or automated run has a result worth reading later. Never post
-chat, status, "nothing new" or a `[PASS]` run.
+chat, status, or "nothing new". When there is nothing new, finish without a final assistant message.
 
 Call `feed_post`:
 

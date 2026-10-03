@@ -41,7 +41,7 @@ export async function migrateViews(bb: BbPluginApi, store: Store, runtime: Runti
         await bb.sdk.plugins.callRpc({ pluginId: "automations", method: "automations_update", input: { projectId, automationId: result.data.id, execution: {
           mode: "agent", providerId: bot.providerId, model: bot.model || (await bb.sdk.threads.defaultExecutionOptions({ threadId: thread!.id }))?.model || "", reasoningLevel: bot.reasoningLevel, permissionMode: bot.permissionMode,
           targetThreadId: thread!.id, environment: { type: "host", hostId: bot.hostId, workspace: { type: "personal" } },
-          prompt: [meta.prompt, "Report useful findings with feed_post. Use a stable story key and update existing stories. Post nothing when there is nothing new or your result is [PASS]. This is scheduled work; do not create or run more automations. If the owner must answer, ask in this normal thread."].join("\n\n"),
+          prompt: [meta.prompt, "Report useful findings with feed_post. Use a stable story key and update existing stories. When there is nothing new, post nothing and finish without a final assistant message. This is scheduled work; do not create or run more automations. If the owner must answer, ask in this normal thread."].join("\n\n"),
         } } as never, outputSchema: z.unknown() });
       }
     }

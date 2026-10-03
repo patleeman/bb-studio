@@ -29,7 +29,7 @@ import {
 import { CLEAR_BATCH, clearPayload, noteNotified, partition, type Notified, type ThreadReadState } from "./clear.js";
 import { isQuietCompletion } from "./notifications.js";
 
-const messageSchema = z.object({ to: z.string().min(1) }).passthrough();
+const messageSchema = z.object({ to: z.string().min(1), body: z.string().optional(), data: z.record(z.string(), z.unknown()).optional() }).passthrough();
 const batchSchema = z.union([z.array(messageSchema).max(100), messageSchema.transform((message) => [message])]);
 
 type LastDelivery = { at: string; apns: number; expo: number; errors: string[]; categories?: string[] };

@@ -349,15 +349,14 @@ complete( threadId: string, text: string | null, error?: string, providerFailure
       this.changed();
       return;
     }
-    if (error || (!text?.trim() && !job.outputAttachments.length)) {
+    if (error) {
       if (providerFailure && job.fallbackAttempted && c.key === job.conversationKey)
         this.store.archiveConversation(c);
       job.status = "error";
-      job.error =
-        error ||
-        "The turn finished without an answer. Inspect the conversation.";
+      job.error = error;
     } else {
-      job.reply = text?.trim() || "[PASS]";
+      job.reply = text?.trim() || null;
+      job.error = null;
       job.status = "done";
     }
     this.store.putJob(job);

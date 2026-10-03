@@ -17,7 +17,7 @@ export const normalizeActivity = (value: unknown): string | null => {
     .replace(/[\\`*_~#]/gu, "")
     .replace(/\s+/gu, " ")
     .trim();
-  if (!text || /^\[PASS\]$/iu.test(text)) return null;
+  if (!text) return null;
   const limit = 240;
   return text.length > limit ? `${text.slice(0, limit - 1).trimEnd()}…` : text;
 };

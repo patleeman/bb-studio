@@ -89,7 +89,7 @@ test("uncertain addressing and out-of-view targets don't dispatch anything", asy
     expect(x.harness.inspection.sdk.callsTo("threads.send")).toHaveLength(0);
   } finally { await x.close(); }
 });
-test("timeline excludes tools, inter-agent messages, interim replies, and PASS", () => {
+test("timeline excludes tools, inter-agent messages, interim replies, and empty replies", () => {
   const base = { threadId: "thr_work", startedAt: 1, createdAt: 1, sourceSeqStart: 1, sourceSeqEnd: 1, turnId: "turn1", attachments: null };
   const message = (id: string, text: string, sourceSeqEnd: number) => ({ ...base, id, kind: "conversation", role: "assistant", text, sourceSeqEnd, turnRequest: null });
   const rows = [
@@ -97,7 +97,7 @@ test("timeline excludes tools, inter-agent messages, interim replies, and PASS",
     { ...base, id: "agent", kind: "conversation", role: "user", text: "Coordinate", initiator: "agent", senderThreadId: "thr_other", turnRequest: { status: "accepted" } },
     { ...base, id: "turn", kind: "turn", status: "completed", children: [message("interim", "Working", 2), message("final", "Done", 3)] },
     { ...base, id: "turn2", kind: "turn", status: "pending", children: [{ ...message("streaming", "Still working", 4), turnId: "turn2" }] },
-    { ...message("pass", "[PASS]", 5), turnId: "turn3" },
+    { ...message("quiet", " \n", 5), turnId: "turn3" },
   ];
   expect(finalEntries(rows as never).map(e => e.text)).toEqual(["Help", "Done"]);
   const withFile = { ...rows[0], id: "owner2", attachments: { imageUrls: [], localFilePaths: ["/tmp/a/brief.pdf"], localFiles: 1, localImagePaths: [], localImages: 0, webImages: 1 } };

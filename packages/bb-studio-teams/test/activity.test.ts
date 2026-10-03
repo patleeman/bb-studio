@@ -90,8 +90,8 @@ test("nested work rows are reduced to their latest visible detail", () => {
   );
 });
 
-test("silence markers never become visible channel activity", () => {
-  for (const text of ["[PASS]", " **[PASS]** "])
+test("empty replies never become visible channel activity", () => {
+  for (const text of ["", " \n "])
     assert.equal(
       activitySnippetFromTimeline({
         rows: [{ kind: "conversation", role: "assistant", text }],
@@ -99,7 +99,7 @@ test("silence markers never become visible channel activity", () => {
       null,
     );
   assert.equal(
-    channelWorkActivity({ status: "running", activitySnippet: "[PASS]" }),
+    channelWorkActivity({ status: "running", activitySnippet: "" }),
     "Working…",
   );
   assert.equal(
