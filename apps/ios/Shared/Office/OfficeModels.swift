@@ -89,6 +89,7 @@ public struct OfficeTeamBot: Codable, Identifiable, Hashable, Sendable {
         switch providerId {
         case "hermes": "Hermes"
         case "openclaw": "OpenClaw"
+        case "dot": "Dot"
         default: nil
         }
     }

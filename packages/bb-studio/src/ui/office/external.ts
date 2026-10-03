@@ -6,6 +6,7 @@ import { useEffect, useState } from "react";
 export const EXTERNAL_PROVIDERS: Record<string, string> = {
   hermes: "Hermes",
   openclaw: "OpenClaw",
+  dot: "Dot",
 };
 
 export function externalAgentName(providerId: string | undefined | null): string | null {
