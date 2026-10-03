@@ -56,7 +56,7 @@ export async function cleanupLegacyModules(options: {
       if (registered.has(pluginId)) throw new Error("Uninstall the legacy plugin after importing it before cleanup");
       const files = inventory(path);
       entry.files = Object.keys(files).length; entry.bytes = Object.values(files).reduce((n, file) => n + file.bytes, 0);
-      const allowed = new Set(["data.db", "data.db-wal", "data.db-shm", "secrets", ...(module === "talk" ? ["audio"] : [])]);
+      const allowed = new Set(["data.db", "data.db-wal", "data.db-shm", "secrets", "logs", ...(module === "talk" ? ["audio"] : [])]);
       if (readdirSync(path).some(name => !allowed.has(name))) throw new Error(module === "teams" ? "Bot homes or other live files remain in this directory" : "Unrecognized files remain; preserve them for review");
       const target = join(dataDir, "plugins", module === "explore" ? "pages" : "studio", `${module}.db`);
       const db = open(target, { readonly: true, fileMustExist: true });

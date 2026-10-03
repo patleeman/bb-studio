@@ -19,6 +19,7 @@ async function fixture(module = "tables", pluginId = "studio-tables") {
 it("dry run reads without writing; execution archives exact bytes and imported settings before removal", async () => {
   const { path, target, options } = await fixture();
   const imported = new Database(target); imported.prepare("INSERT INTO studio_module_state VALUES ('settings', 'theme', ?, 123)").run('"dark"'); imported.close();
+  mkdirSync(join(path, "logs")); writeFileSync(join(path, "logs", "plugin.log"), "legacy diagnostic");
   const original = readFileSync(join(path, "data.db"));
   const preview = await cleanupLegacyModules(options);
   expect(preview.entries[0].status).toBe("ready"); expect(preview.archivePath).toBeNull();
@@ -30,6 +31,7 @@ it("dry run reads without writing; execution archives exact bytes and imported s
   expect(JSON.parse(readFileSync(join(result.archivePath!, "studio-tables-settings.json"), "utf8"))).toContainEqual({ kind: "settings", key: "theme", value: '"dark"', updated_at: 123 });
   expect(lstatSync(result.archivePath!).mode & 0o777).toBe(0o700);
   expect(lstatSync(join(result.archivePath!, "studio-tables/data.db")).mode & 0o777).toBe(0o600);
+  expect(readFileSync(join(result.archivePath!, "studio-tables/logs/plugin.log"), "utf8")).toBe("legacy diagnostic");
   expect(existsSync(target)).toBe(true);
   expect((await cleanupLegacyModules({ ...options, dryRun: false })).entries).toEqual([]);
 });
