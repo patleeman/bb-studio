@@ -287,3 +287,23 @@ index 9e138f7..77e538a 100644
 +    expect(defaultPreferences().hideEmptyProjects).toBe(false);
 +    expect(parsePreferenceValue("hideEmptyProjects", true)).toEqual({ success: true, value: true });
 +    expect(parsePreferenceValue("hideEmptyProjects", "true").success).toBe(false);
+diff --git a/source/app/dnd/useSectionThreadDnd.projection.test.tsx b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
+index 073f1d4..231d3b4 100644
+--- a/source/app/dnd/useSectionThreadDnd.projection.test.tsx
++++ b/source/app/dnd/useSectionThreadDnd.projection.test.tsx
+@@ -3 +3 @@
+-import { act, cleanup } from "@testing-library/react";
++import { act, cleanup, fireEvent, screen } from "@testing-library/react";
+@@ -138 +138 @@ function renderSectionThreadDnd(
+-    return null;
++    return result.current!.dropDialog;
+@@ -143 +143 @@ function renderSectionThreadDnd(
+-    { sdk: { threads: { update: updateThreadFake } } },
++    { sdk: { threads: { update: updateThreadFake }, plugins: { callRpc: async <TOutput,>() => [] as TOutput } } },
+@@ -617,0 +618,6 @@ describe("useSectionThreadDnd settled drop cleanup", () => {
++    expect(updateThreadDeferred).toBeNull();
++    view.result.current!.consumeClickSuppression();
++    fireEvent.click(screen.getByRole("button", { name: "Nest threads" }));
++    await flushTasks();
++    expect(screen.queryByRole("alert")?.textContent ?? null).toBeNull();
++    expect(view.inspection.sdkCalls.filter(call => call.method === "threads.update")).toHaveLength(1);

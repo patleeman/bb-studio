@@ -1,6 +1,75 @@
 {
   "pluginId": "bot-teams",
   "methods": {
+    "viewThreads": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "format": "uuid",
+            "pattern": "^([0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[1-8][0-9a-fA-F]{3}-[89abAB][0-9a-fA-F]{3}-[0-9a-fA-F]{12}|00000000-0000-0000-0000-000000000000|ffffffff-ffff-ffff-ffff-ffffffffffff)$"
+          }
+        },
+        "required": [
+          "id"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "array",
+        "items": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string"
+            },
+            "title": {
+              "type": "string"
+            },
+            "botId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "parentThreadId": {
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "status": {
+              "type": "string"
+            },
+            "updatedAt": {
+              "type": "number"
+            },
+            "error": {
+              "default": null,
+              "type": [
+                "string",
+                "null"
+              ]
+            },
+            "hasPendingInteraction": {
+              "type": "boolean"
+            }
+          },
+          "required": [
+            "id",
+            "title",
+            "botId",
+            "parentThreadId",
+            "status",
+            "updatedAt",
+            "error"
+          ],
+          "additionalProperties": false
+        }
+      }
+    },
     "views": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -559,6 +628,9 @@
                     "string",
                     "null"
                   ]
+                },
+                "hasPendingInteraction": {
+                  "type": "boolean"
                 }
               },
               "required": [

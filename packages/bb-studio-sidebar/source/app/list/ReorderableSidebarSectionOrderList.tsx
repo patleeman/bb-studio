@@ -30,6 +30,7 @@ export function ReorderableSidebarSectionOrderList({
 
   return (
     <SectionThreadDndProvider value={threadDnd}>
+      {threadDnd.dropDialog}
       <SidebarSectionOrderList
         order={order}
         dndContextProps={threadDnd.dndContextProps}

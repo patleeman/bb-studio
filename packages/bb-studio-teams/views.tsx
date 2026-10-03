@@ -12,6 +12,8 @@ import type { rpcContract } from "./client-contract";
 import type { ThreadView, ViewAttachment, ViewEntry, ViewMember, ViewPermissionMode, ViewThread } from "./view-contract";
 import type { NewThreadRequest } from "@get-bb/plugin-sdk/app";
 import { broadcastMentionText } from "./mentions";
+import { ChannelThreads } from "./channel-threads";
+import { CHANNEL_LAYOUTS, channelLayout, type ChannelLayout } from "./channel-layout";
 
 type Contract = typeof rpcContract;
 type Page = { view: ThreadView; threads: ViewThread[]; entries: ViewEntry[]; hasOlder: boolean };
@@ -25,7 +27,16 @@ function ViewEditor({ initial, open, onClose, onSaved }: { initial?: ThreadView;
   useEffect(() => {
     if (!open) return;
     let alive = true;
-    void Promise.all([rpc.call("profiles", {}), sdk.threads.list({ limit: 100 })]).then(([bots, rows]) => {
+    const listThreads = async () => {
+      const rows: Awaited<ReturnType<typeof sdk.threads.list>> = [];
+      for (let offset = 0; alive; offset += 100) {
+        const page = await sdk.threads.list({ limit: 100, offset });
+        rows.push(...page);
+        if (page.length < 100) break;
+      }
+      return rows;
+    };
+    void Promise.all([rpc.call("profiles", {}), listThreads()]).then(([bots, rows]) => {
       if (!alive) return;
       setBots(bots); setThreads(rows.filter(t => t.visibility !== "hidden").map(t => ({ id: t.id, title: t.title || t.titleFallback || "New thread" })));
     }, e => { if (alive) setError(message(e)); });
@@ -71,7 +82,7 @@ const EDIT_VIEW_EVENT = "bot-teams:edit-view";
 const MESSAGE_ACTION = "inline-flex size-5 items-center justify-center text-muted-foreground opacity-0 transition-opacity hover:text-foreground focus-visible:opacity-100 group-hover/message:opacity-100 group-focus-within/message:opacity-100 max-md:pointer-coarse:opacity-100";
 /** BB's own approval-mode names, plus leaving each thread as it is. */
 const MODE_CHOICES: { id: ViewPermissionMode | undefined; label: string; detail: string }[] = [
-  { id: undefined, label: "Each bot's own", detail: "Every thread keeps the approval mode it already has." },
+  { id: undefined, label: "Each thread’s own", detail: "Every thread keeps the approval mode it already has." },
   { id: "accept-edits", label: "Accept Edits", detail: "Applies edits inside the workspace automatically. Anything beyond it asks you first." },
   { id: "auto", label: "Approve for me", detail: "Same workspace sandbox, with requests reviewed automatically." },
   { id: "full", label: "Full Access", detail: "No sandbox and no approvals. The agent can run anything on your machine." },
@@ -116,6 +127,9 @@ function ViewDetail({ id }: { id: string }) {
   const openThread = (threadId: string) => { if (!openCompanion({ kind: "thread", threadId })) navigate.toThread(threadId); };
   const [page, setPage] = useState<Page | null>(null), [bots, setBots] = useState<Bot[]>([]), [error, setError] = useState<string | null>(null);
   const [reply, setReply] = useState<string | null>(null);
+  const [layout, setLayout] = useState<ChannelLayout>(() => { try { return channelLayout(localStorage.getItem(`bot-teams:view-layout:${id}`)); } catch { return "merged"; } });
+  const [selectedThread, setSelectedThread] = useState<string | null>(null);
+  useEffect(() => { try { localStorage.setItem(`bot-teams:view-layout:${id}`, layout); } catch {} }, [id, layout]);
   const [editing, setEditing] = useState(false), [focus, setFocus] = useState(0);
   const [permissions, setPermissions] = useStoredPermissions(id);
   useEffect(() => {
@@ -212,11 +226,12 @@ function ViewDetail({ id }: { id: string }) {
   const memberAvatar = (m: ViewMember) => m.kind === "bot" ? bots.find(b => b.id === m.id)?.avatar || null : null;
   const working = page.threads.filter(t => !t.parentThreadId && ["starting", "active"].includes(t.status)).map(t => botFor(t.id)?.name || t.title);
   const overrides = page.view.members.filter(m => permissions.members[memberKey(m)]);
-  const approvals = { label: `${permissions.all ? modeLabel(permissions.all) : "Each bot's own"}${overrides.length ? ` · ${overrides.length} custom` : ""}`, anyFull: permissions.all === "full" || overrides.some(m => permissions.members[memberKey(m)] === "full") };
+  const approvals = { label: `${permissions.all ? modeLabel(permissions.all) : "Each thread’s own"}${overrides.length ? ` · ${overrides.length} custom` : ""}`, anyFull: permissions.all === "full" || overrides.some(m => permissions.members[memberKey(m)] === "full") };
   const approvalTitle = `Approval mode: ${permissions.all ? modeLabel(permissions.all) : "each thread keeps its own"}${overrides.map(m => `\n${memberLabel(m)}: ${modeLabel(permissions.members[memberKey(m)]!)}`).join("")}`;
   const avatars = (members: ViewMember[]) => <span className="flex -space-x-1.5">{members.slice(0, 4).map(m => <span key={memberKey(m)} className="rounded-lg bg-background ring-2 ring-background"><ItemTile icon={memberAvatar(m)} kindIcon={m.kind === "bot" ? "Bot" : "MessageSquare"} size="sm" /></span>)}</span>;
   return <div className="relative flex h-full min-h-0 flex-col" data-thread-view>
-    <div data-view-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
+    <div className="channel-layout-toolbar"><label className="flex items-center gap-2 text-xs text-muted-foreground"><Icon name="Layout" className="size-3.5" /><span className="sr-only">Channel view</span><select aria-label="Channel view" value={layout} onChange={event => setLayout(channelLayout(event.target.value))}>{CHANNEL_LAYOUTS.map(choice => <option value={choice.id} key={choice.id}>{choice.label}</option>)}</select></label></div>
+    {layout === "merged" ? <div data-view-timeline ref={timeline} onScroll={event => { const node = event.currentTarget; followLatest.current = node.scrollHeight - node.scrollTop - node.clientHeight < 80; }} className="min-h-0 flex-1 overflow-auto"><div className="mx-auto flex min-h-full w-full max-w-[760px] flex-col px-4 pt-6 pb-8">
       {page.hasOlder && <Button className="mb-4 self-center" variant="ghost" size="sm" onClick={() => void rpc.call("view", { id, before: page.entries[0]?.createdAt, beforeId: page.entries[0]?.id }).then(older => setPage(current => current ? { ...current, entries: [...older.entries, ...current.entries], hasOlder: older.hasOlder } : older), e => setError(message(e)))}>Earlier replies</Button>}
       {!page.entries.length && <div className="flex flex-1 flex-col items-center justify-center pb-16 text-center">
         {page.view.members.length ? <div className="mb-4 scale-125">{avatars(page.view.members)}</div> : null}
@@ -225,7 +240,7 @@ function ViewDetail({ id }: { id: string }) {
       </div>}
       <ol className="flex flex-col gap-3">{rootEntries.map((entry, i) => <React.Fragment key={entry.id}>{renderEntry(entry, rootEntries[i - 1])}{lastEntry.get(entry.threadId) === entry.id ? children(entry.threadId) : null}</React.Fragment>)}{page.threads.filter(t => roots.has(t.id) && !lastEntry.has(t.id)).flatMap(t=>children(t.id))}</ol>
       {working.length > 0 && <p className="mt-6 px-2 text-sm text-subtle-foreground" role="status"><span className="animate-pulse motion-reduce:animate-none">{working.join(", ")} {working.length === 1 ? "is" : "are"} working…</span></p>}
-    </div></div>
+    </div></div> : <ChannelThreads view={page.view} initialThreads={page.threads} bots={bots} layout={layout} selected={selectedThread} onSelect={threadId => { setSelectedThread(threadId); setLayout("focus"); }} onReply={(threadId, focusComposer) => { setReply(threadId); if (focusComposer) setFocus(value => value + 1); }} onOpen={openThread} />}
     <div className="mx-auto w-full max-w-[760px] shrink-0 px-4 pb-4">
     {page.view.archived ? <p className="rounded-xl border border-border px-4 py-3 text-sm text-muted-foreground">This channel is archived. Restore it from the ··· menu to send messages.</p>
       : <div data-view-composer><NewThreadComposer layout="contained" className="view-composer" placeholder={`Message ${page.view.name}. @all to ping everyone.`} draftKey={`bot-teams:view:${id}`} focusRequest={focus} onSubmit={send} /></div>}

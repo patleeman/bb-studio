@@ -19,6 +19,7 @@ list and its organization controls, and adds:
 - **Float** in each thread's menu, after **Open in split**, while
   [Float](../bb-studio-float) is installed. It opens the thread in a window
   along the bottom of the screen.
+- **Create channel** when dropping a thread onto another. The dialog names a channel containing both ordinary threads, keeping their projects and history intact. Studio Teams supplies the channel. **Nest threads** preserves parent/child organization, and Cancel leaves both threads alone.
 
 The bundled Thread List plugin remains installed; selecting Studio Sidebar as
 the thread list provider switches the visible list. Install this package in

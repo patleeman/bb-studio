@@ -13,6 +13,7 @@ export const viewThreadSchema = z.object({
   id: z.string(), title: z.string(), botId: z.string().nullable(),
   parentThreadId: z.string().nullable(), status: z.string(), updatedAt: z.number(),
   error: z.string().nullable().default(null),
+  hasPendingInteraction: z.boolean().optional(),
 });
 export const viewEntrySchema = z.object({
   id: z.string(), threadId: z.string(), role: z.enum(["user", "assistant"]),
@@ -40,6 +41,7 @@ export const viewDeliverySchema = z.object({
   threadId: z.string(), status: z.enum(["sent", "queued", "error"]), error: z.string().nullable(),
 });
 export const viewContract = {
+  viewThreads: { input: z.object({ id: z.string().uuid() }), output: z.array(viewThreadSchema) },
   views: { input: z.object({}), output: z.array(threadViewSchema) },
   viewCreate: {
     input: threadViewSchema.pick({ name: true, members: true }).extend({ requestId: z.string().uuid() }),

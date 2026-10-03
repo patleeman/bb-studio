@@ -31,6 +31,9 @@ Studio-only files live in `source/app/studio/`. Test fixtures live in
 | `source/server.test.ts` | Check the new preference default and parsing. |
 | `source/app/rows/ThreadActionsMenu.tsx` | Insert Float after Open in split. |
 | `source/app/rows/ThreadRow.tsx` | Show a Studio app's badge, such as a bot's avatar, before the title. |
+| `source/app/dnd/useSectionThreadDnd.ts` | Offer channel creation beside nesting when threads are dropped together. |
+| `source/app/list/ReorderableSidebarSectionOrderList.tsx` and `ProjectRow.tsx` | Mount the drop-choice dialog in grouped and chronological lists. |
+| `source/app/dnd/useSectionThreadDnd.projection.test.tsx` | Choose nesting explicitly before checking settled mutation cleanup. |
 
 The restored upstream tests have import path changes for the relocated
 fixture and expectations for Studio menu items, preferences, and presence calls. Studio's own

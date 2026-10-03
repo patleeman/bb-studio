@@ -1,6 +1,6 @@
 // @vitest-environment jsdom
 
-import { act, cleanup } from "@testing-library/react";
+import { act, cleanup, fireEvent, screen } from "@testing-library/react";
 import type {
   CollisionDetection,
   DragCancelEvent,
@@ -135,12 +135,12 @@ function renderSectionThreadDnd(
       pinnedRootNodes: pinnedState.rootNodes,
       onReorderPinnedThread: vi.fn(),
     });
-    return null;
+    return result.current!.dropDialog;
   }
   const slot = renderSlot(
     { component: Harness },
     { rootItems: initialRootItems },
-    { sdk: { threads: { update: updateThreadFake } } },
+    { sdk: { threads: { update: updateThreadFake }, plugins: { callRpc: async <TOutput,>() => [] as TOutput } } },
   );
   return {
     inspection: slot.inspection,
@@ -615,6 +615,12 @@ describe("useSectionThreadDnd settled drop cleanup", () => {
       ),
     );
     await flushTasks();
+    expect(updateThreadDeferred).toBeNull();
+    view.result.current!.consumeClickSuppression();
+    fireEvent.click(screen.getByRole("button", { name: "Nest threads" }));
+    await flushTasks();
+    expect(screen.queryByRole("alert")?.textContent ?? null).toBeNull();
+    expect(view.inspection.sdkCalls.filter(call => call.method === "threads.update")).toHaveLength(1);
     expect(updateThreadDeferred).not.toBeNull();
     settle();
     await flushTasks();

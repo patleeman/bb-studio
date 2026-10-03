@@ -15,6 +15,16 @@ function fixture() {
   return { ...x, views: new ThreadViews(x.bb, x.store, profiles) };
 }
 
+test("explicit ordinary members stay independent when one is the other's child", async () => {
+  const x = fixture();
+  try {
+    x.harness.inspection.sdk.stub("threads.get", async ({ threadId }) => ({ ...makeThreadResponse({ id: threadId, parentThreadId: threadId === "child" ? "parent" : null, status: "idle" }), hasPendingInteraction: threadId === "child" }));
+    x.harness.inspection.sdk.stub("threads.list", async ({ parentThreadId }) => parentThreadId === "parent" ? [makeThreadResponse({ id: "child", parentThreadId: "parent" })] : []);
+    const view = await x.views.create("Related threads", [{ kind: "thread", id: "parent" }, { kind: "thread", id: "child" }]);
+    expect((await x.views.threads(view)).map(thread => [thread.id, thread.parentThreadId, thread.hasPendingInteraction])).toEqual([["parent", null, false], ["child", null, true]]);
+  } finally { await x.close(); }
+});
+
 test("BB's mention menu offers both channel broadcasts and resolves picked items", async () => {
   const x = fixture();
   try {

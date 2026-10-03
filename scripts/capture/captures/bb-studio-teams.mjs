@@ -57,7 +57,7 @@ export default context => {
     const header=document.querySelector('[data-view-header]');
     if(!header?.textContent.includes("Launch work"))throw new Error("Title bar lacks the view name");
     if(document.querySelector('[data-testid="app-page-header-content-row"] p')?.textContent==="Views"&&getComputedStyle(document.querySelector('[data-testid="app-page-header-content-row"] > div')).display!=="none")throw new Error("Title bar still shows the panel label");
-    if(!document.querySelector('button[aria-label="Approval mode"]')?.textContent.includes("Each bot's own"))throw new Error("Missing approval mode control");
+    if(!document.querySelector('button[aria-label="Approval mode"]')?.textContent.includes("Each thread’s own"))throw new Error("Missing approval mode control");
     if(document.body.innerText.includes("New in Float"))throw new Error("Studio Chat's Float bar covers the view");
     if(document.querySelectorAll('[data-view-entry="assistant"]').length<3)throw new Error("Missing final thread replies");
     if(!document.querySelector('[data-view-entry="user"]'))throw new Error("Missing owner messages");

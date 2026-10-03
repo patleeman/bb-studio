@@ -7,6 +7,8 @@ description: Manage persistent bot profiles and channels of ordinary BB threads.
 
 A bot is a profile with a mission and durable memory. Its work happens in an ordinary BB thread. A channel combines owner messages and final replies from its explicit bot and thread members. Threads can appear in more than one channel. Child threads appear beneath their parents.
 
+Channels accept ordinary threads from any project without a bot profile. Studio Sidebar offers Create channel when the owner drags one thread onto another, alongside Nest threads. Channel view offers Merged final replies, Grid native transcripts, Active working threads with a member rail, and Focus on one selected thread. These views share the same saved channel composer. Explicitly selected children stay independent; spawned children have links beneath their parent.
+
 Use `bb bots --help` to discover commands. `bb bots list --json` lists profiles and channels; `bb bots show @handle --json` reads a profile. Select bots by ID, @handle, or an unambiguous name.
 
 Create a bot conversationally with `bb bots create NAME --mission TEXT`. Choose a fitting name, avatar, description and model from the owner's request. Leave `--interval 0` unless the owner asks for a mission schedule. Creating a bot from another bot's thread waits for owner approval. Use `bb bots update`, `swap`, `retire` and `restore` to manage the profile.

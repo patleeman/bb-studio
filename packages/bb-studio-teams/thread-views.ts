@@ -125,7 +125,7 @@ export class ThreadViews {
       try {
         const t = await this.bb.sdk.threads.get({ threadId: id });
         const botId = this.store.byThread(id)?.botId ?? null;
-        result.push({ id, title: t.title || t.titleFallback || "New thread", botId, parentThreadId, status: t.status, updatedAt: t.updatedAt, error: null });
+        result.push({ id, title: t.title || t.titleFallback || "New thread", botId, parentThreadId: explicit.has(id) ? null : parentThreadId, status: t.status, updatedAt: t.updatedAt, error: null, hasPendingInteraction: "hasPendingInteraction" in t && t.hasPendingInteraction === true });
         // BB's thread list is paged. Children are references, never owned by a view.
         for (let offset = 0;; offset += 100) {
           const children = await this.bb.sdk.threads.list({ parentThreadId: id, includeHidden: true, limit: 100, offset });
@@ -133,7 +133,7 @@ export class ThreadViews {
           if (children.length < 100) break;
         }
       } catch (cause) {
-        result.push({ id, title: "Unavailable thread", botId: null, parentThreadId, status: "error", updatedAt: 0, error: missingThread(cause) ? "This thread was deleted." : String(cause) });
+        result.push({ id, title: "Unavailable thread", botId: null, parentThreadId, status: "error", updatedAt: 0, error: missingThread(cause) ? "This thread was deleted." : String(cause), hasPendingInteraction: false });
       }
     };
     for (const id of new Set([...explicit, ...links.map(l => l.thread_id)])) {
@@ -142,7 +142,7 @@ export class ThreadViews {
     }
     const included = new Set(result.map(t => t.id));
     for (const thread of result) {
-      try { const source = await this.bb.sdk.threads.get({ threadId: thread.id }); if (source.parentThreadId && included.has(source.parentThreadId)) thread.parentThreadId = source.parentThreadId; } catch {}
+      try { const source = await this.bb.sdk.threads.get({ threadId: thread.id }); if (!explicit.has(thread.id) && source.parentThreadId && included.has(source.parentThreadId)) thread.parentThreadId = source.parentThreadId; } catch {}
     }
     return result;
   }
@@ -323,6 +323,14 @@ export class ThreadViews {
     return {
       views: () => this.all(),
       viewCreate: ({ name, members, requestId }) => this.create(name, members, requestId),
+      viewThreads: async ({ id }) => {
+        const threads = await this.threads(this.get(id));
+        return Promise.all(threads.map(async thread => {
+          if (thread.error) return thread;
+          const pending = await this.bb.sdk.threads.interactions.list({ threadId: thread.id });
+          return { ...thread, hasPendingInteraction: pending.length > 0 };
+        }));
+      },
       viewUpdate: input => this.locked(input.id, async () => {
         const view = this.get(input.id);
         if (input.expectedUpdatedAt !== view.updatedAt) throw new Error("This channel changed elsewhere. Reload before saving.");

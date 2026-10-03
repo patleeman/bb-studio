@@ -234,3 +234,40 @@ index 98a5200..638a06b 100644
 +    "Hide projects with no visible threads from the sidebar.",
 +    null,
 +  ),
+diff --git a/source/app/dnd/useSectionThreadDnd.ts b/source/app/dnd/useSectionThreadDnd.ts
+index 39258e5..2209c5a 100644
+--- a/source/app/dnd/useSectionThreadDnd.ts
++++ b/source/app/dnd/useSectionThreadDnd.ts
+@@ -7,0 +8 @@ import {
++  type ReactNode,
+@@ -22,0 +24 @@ import type { SidebarThread } from "../model/sidebar-thread.js";
++import { channelDropThreads, useThreadChannelDrop } from "../studio/useThreadChannelDrop.js";
+@@ -88,0 +91 @@ export interface SectionThreadDndState {
++  dropDialog?: ReactNode;
+@@ -1059,0 +1063 @@ export function useSectionThreadDnd({
++  const channelDrop = useThreadChannelDrop();
+@@ -1323,0 +1328,8 @@ export function useSectionThreadDnd({
++      const targetId = rowDrop?.threadId ?? (overId ? parseSidebarThreadRowDroppableId(overId) : null);
++      const sources = (lookup.rootThreadIdsByItemId.get(activeId) ?? [activeId]).flatMap(id => { const thread = lookup.threadByItemId.get(id); return thread ? [thread] : []; });
++      const channelThreads = channelDropThreads(sources, targetId ? lookup.threadByItemId.get(targetId) : undefined);
++      if (channelThreads.length) {
++        channelDrop.offer(channelThreads, decision?.kind === "nest" ? () => commitDropChanges(decision, "Failed to nest threads.") : undefined);
++        clearProjectedDrag();
++        return;
++      }
+@@ -1370,0 +1383 @@ export function useSectionThreadDnd({
++      channelDrop.offer,
+@@ -1408,0 +1422 @@ export function useSectionThreadDnd({
++    dropDialog: channelDrop.dialog,
+diff --git a/source/app/list/ProjectRow.tsx b/source/app/list/ProjectRow.tsx
+index 11c1c06..636f525 100644
+--- a/source/app/list/ProjectRow.tsx
++++ b/source/app/list/ProjectRow.tsx
+@@ -2293,0 +2294 @@ export const ChronologicalSectionThreadSections = memo(
++              {sectionDnd.dropDialog}
+diff --git a/source/app/list/ReorderableSidebarSectionOrderList.tsx b/source/app/list/ReorderableSidebarSectionOrderList.tsx
+index 5fed8b5..041d9e4 100644
+--- a/source/app/list/ReorderableSidebarSectionOrderList.tsx
++++ b/source/app/list/ReorderableSidebarSectionOrderList.tsx
+@@ -32,0 +33 @@ export function ReorderableSidebarSectionOrderList({
++      {threadDnd.dropDialog}

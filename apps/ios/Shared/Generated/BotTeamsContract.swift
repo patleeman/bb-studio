@@ -3,6 +3,7 @@ import Foundation
 
 public enum BotTeams {
   public enum Method {
+    public static let viewThreads = "viewThreads"
     public static let views = "views"
     public static let viewCreate = "viewCreate"
     public static let viewUpdate = "viewUpdate"
@@ -36,6 +37,10 @@ public enum BotTeams {
     public static let usage = "usage"
     public static let saveLimits = "saveLimits"
   }
+
+  public typealias ViewThreadsOutput = [ViewThreadsOutputItem]
+
+  public typealias ViewThreads = ViewThreadsOutput
 
   public typealias ViewsOutput = [ViewsOutputItem]
 
@@ -114,6 +119,36 @@ public enum BotTeams {
   public typealias Usage = UsageOutput
 
   public typealias SaveLimits = SaveLimitsOutput
+
+  public struct ViewThreadsInput: Sendable, Hashable, Codable {
+    public var id: String?
+
+    public init(id: String? = nil) {
+      self.id = id
+    }
+  }
+
+  public struct ViewThreadsOutputItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var botId: String?
+    public var parentThreadId: String?
+    public var status: String?
+    public var updatedAt: Double?
+    public var error: String?
+    public var hasPendingInteraction: Bool?
+
+    public init(id: String? = nil, title: String? = nil, botId: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.botId = botId
+      self.parentThreadId = parentThreadId
+      self.status = status
+      self.updatedAt = updatedAt
+      self.error = error
+      self.hasPendingInteraction = hasPendingInteraction
+    }
+  }
 
   public struct ViewsInput: Sendable, Hashable, Codable {
 
@@ -259,8 +294,9 @@ public enum BotTeams {
     public var status: String?
     public var updatedAt: Double?
     public var error: String?
+    public var hasPendingInteraction: Bool?
 
-    public init(id: String? = nil, title: String? = nil, botId: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, botId: String? = nil, parentThreadId: String? = nil, status: String? = nil, updatedAt: Double? = nil, error: String? = nil, hasPendingInteraction: Bool? = nil) {
       self.id = id
       self.title = title
       self.botId = botId
@@ -268,6 +304,7 @@ public enum BotTeams {
       self.status = status
       self.updatedAt = updatedAt
       self.error = error
+      self.hasPendingInteraction = hasPendingInteraction
     }
   }
 
