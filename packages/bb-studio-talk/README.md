@@ -52,6 +52,20 @@ compact input clips the inline toolbar, Talk uses its floating controls so
 Pause and Stop stay reachable. Run this capture in staged BB with
 `BB_CAPTURE_TALK_COMPANION=1 BB_CAPTURE_ONLY=talk-companion-return node scripts/capture-plugin-screenshots.mjs --plugin talk`.
 
+![Talk playback returned to its original main view](assets/companion-playback.png)
+
+The playback transfer capture starts real seeded audio in the main recording,
+then checks the exact original audio object and playback controls through
+Float, native workbench/main placement, navigation away, and closing back to
+the recording. Playback advances throughout and keeps its speed and volume.
+The returned player pauses at its retained position. This runs in the isolated
+optimized host; no Talk source change was needed.
+
+```sh
+BB_CAPTURE_TALK_PLAYBACK=1 BB_CAPTURE_ONLY=talk-playback-transfer \
+  node scripts/capture-plugin-screenshots.mjs --plugin talk
+```
+
 ![Talk recording page with cleanup and audio playback](assets/staged-preview.png)
 
 This is the real BB Recordings page in a staged BB (`node scripts/staged-bb.mjs start`), opened from the nav panel. It shows a

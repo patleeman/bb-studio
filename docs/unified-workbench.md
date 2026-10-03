@@ -402,3 +402,12 @@ The host now counts visible companions even without persisted native tabs;
 explicit Hide/Show remain effective. The saved core patch contains eight
 verified commits. Legacy-host transfers, playback continuity, native desktop
 Reactions menu QA, and the final suite audit remain open.
+
+
+Talk playback continuity now has [live proof](../packages/bb-studio-talk/assets/companion-playback.png)
+on the same isolated current host. Real seeded audio retains its exact audio
+object and control nodes through Float, workbench/main moves, navigation
+away, and returning after close. Position advances without restart; speed and
+volume remain set, and Pause stops the returned player at that position.
+The existing retained panel owner already delivers this behavior. No Talk
+controller, playback, outbox or recovery source changes were needed.

@@ -95,5 +95,7 @@ publish a BB host release. The patch and live evidence make the required
 changes reviewable. Stable BB continues to use the suite's floating fallback.
 
 Initial main plugin-editor transfers, original main-thread composer adoption,
-and native split/swap now have live proof. Legacy-host transfers, Talk playback
-continuity, and the final suite entry-point audit remain part of the delivery goal.
+and native split/swap now have live proof. Talk playback continuity also has live proof: the original audio/control
+objects retain advancing position, speed and volume through transfers and
+return after close. Legacy-host transfers and the final suite entry-point
+audit remain part of the delivery goal.
