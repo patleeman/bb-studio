@@ -17,6 +17,11 @@ Choose a **Channel view** above the conversation. The choice is saved for each c
 
 The shared composer stays in place when views change. **Reply in channel**, or interacting inside a transcript, addresses that thread; `@all` still broadcasts to everyone.
 
+Channel sends display the owner's text and attachments in native transcripts.
+The channel roster, recent replies, and coordination instructions travel as
+agent-only context. Older sends that stored the envelope as visible text keep
+that historical text; the current SDK has no transcript message override.
+
 The composer is BB's own prompt box, so it has the same editor, file attachments, voice dictation, and saved drafts as a thread. @-mention the bots or threads that should get a message, use `@all` or `@channel` to ping every member, or choose **Reply** on a message. The mention menu offers both broadcast tags; typing either directly also works. Attachments go to every recipient. The approval menu under the box sets the approval mode for everyone or per member; **Each thread’s own** leaves every thread's mode as it is. A bot continues its latest thread in this channel. Add `+new` after its mention (`@atlas +new`) to start a fresh one. All recipients receive the same addressed thread roster and recent context, with real thread IDs allocated before delivery. A message with no mention goes to the channel's only member, or asks Studio Decisions to choose recipients; if it is uncertain, the draft stays in the composer for you to address. Retry preserves successful deliveries when another recipient failed.
 
 Busy messages use your global Smart Queue settings. Prefix a message with `/steer`, `/followup` or `/fork` to choose explicitly. Open a member thread for tools, approvals, queues, stopping work and model controls. The iOS app uses the same channels and composer behavior.

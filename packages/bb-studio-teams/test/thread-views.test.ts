@@ -76,8 +76,10 @@ test("fanout creates all normal threads before sending the shared roster; retrie
     const view = await x.views.create("Campout", [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }]);
     let failed = true;
     x.harness.inspection.sdk.stub("threads.send", async ({ threadId, input }) => {
-      const content = input as { type: string; text?: string }[];
-      const text = content[0]?.type === "text" ? content[0].text ?? "" : "";
+      const content = input as { type: string; text?: string; visibility?: string }[];
+      expect(content[0]).toEqual({ type: "text", text: "@atlas collaborate with @scribe", mentions: [] });
+      expect(content[1]?.visibility).toBe("agent-only");
+      const text = content[1]?.type === "text" ? content[1].text ?? "" : "";
       expect(x.store.threadBots()).toHaveLength(2);
       expect(text).toContain('"threadId":"thr_bot_1"');
       expect(text).toContain('"threadId":"thr_bot_2"');
@@ -88,6 +90,8 @@ test("fanout creates all normal threads before sending the shared roster; retrie
     expect((await x.views.send(input)).deliveries.map(d => d.status)).toEqual(["sent", "error"]);
     expect((await x.views.send(input)).deliveries.map(d => d.status)).toEqual(["sent", "sent"]);
     expect(x.harness.inspection.sdk.callsTo("threads.send")).toHaveLength(3);
+    const sends = x.harness.inspection.sdk.callsTo("threads.send") as [{ input: unknown[] }][];
+    expect(sends[1]![0].input).toEqual(sends[2]![0].input);
     const page = await x.views.page(view.id);
     expect(page.entries).toHaveLength(1);
     expect(page.entries[0]?.text).toBe(input.text);
@@ -104,7 +108,7 @@ test("attachments from the composer reach every recipient and show by name in th
     const image = { type: "localImage" as const, path: "/tmp/uploads/screen.png" };
     const input = viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: "", attachments: [file, image], targets: [{ kind: "bot", id: x.a.id }, { kind: "bot", id: x.b.id }] });
     expect((await x.views.send(input)).deliveries.map(d => d.status)).toEqual(["sent", "sent"]);
-    for (const call of x.harness.inspection.sdk.callsTo("threads.send")) expect((call as [{ input: unknown[] }])[0].input.slice(1)).toEqual([file, image]);
+    for (const call of x.harness.inspection.sdk.callsTo("threads.send")) expect((call as [{ input: unknown[] }])[0].input.slice(2)).toEqual([file, image]);
     expect((await x.views.page(view.id)).entries[0]?.text).toBe("📎 brief.pdf\n\n📎 screen.png");
     expect(() => viewSendInput.parse({ id: view.id, requestId: crypto.randomUUID(), text: " " })).toThrow("Write a message or attach a file.");
   } finally { await x.close(); }
@@ -244,6 +248,44 @@ test("source owner messages replace send receipts and reflect edits and deletion
     expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual(["Edited in the thread"]);
     x.harness.inspection.sdk.stub("threads.timeline", async () => ({ rows: [], timelinePage: { olderCursor: null, hasOlderRows: false } }));
     expect((await x.views.page(view.id)).entries).toEqual([]);
+  } finally { await x.close(); }
+});
+
+test.each([false, true])("hidden channel context retains merged fanout grouping and source edits (steer=%s)", async steer => {
+  const x = fixture();
+  try {
+    const view = await x.views.create("Concise input", [{ kind: "thread", id: "one" }, { kind: "thread", id: "two" }]);
+    const requestId = crypto.randomUUID();
+    await x.views.send(viewSendInput.parse({ id: view.id, requestId, text: "Check the brief", targets: view.members }));
+    const sent = (x.harness.inspection.sdk.callsTo("threads.send")[0] as [{ input: unknown[] }])[0].input;
+    let text = "Check the brief", deleted = false;
+    x.harness.inspection.sdk.stub("threads.timeline", async ({ threadId }) => ({ rows: deleted ? [] : [{
+      id: "owner", threadId, kind: "conversation", role: "user", initiator: "user", senderThreadId: null,
+      turnId: null, createdAt: 100, sourceSeqStart: steer ? 11 : 5, sourceSeqEnd: steer ? 11 : 5,
+      turnRequest: { status: "accepted" }, text,
+    }], timelinePage: { olderCursor: null, hasOlderRows: false } }) as never);
+    x.harness.inspection.sdk.stub("threads.events.list", async ({ types, beforeSeq }: { types?: readonly string[]; beforeSeq?: string }) => {
+      const request = { type: "client/turn/requested", seq: 5, data: { requestId: "source_request", input: sent } };
+      if (types?.length === 1) return [request] as never;
+      return (steer && Number(beforeSeq) > 11 ? [{ type: "turn/input/accepted", seq: 11, data: { clientRequestId: "source_request" } }] : [request]) as never;
+    });
+    expect((await x.views.page(view.id)).entries.map(entry => [entry.text, entry.groupId])).toEqual([["Check the brief", requestId]]);
+    expect(x.store.db.prepare("SELECT id FROM view_entries WHERE id LIKE 'view:%'").all()).toEqual([]);
+    text = "Edited in the source";
+    expect((await x.views.page(view.id)).entries.map(entry => entry.text)).toEqual([text]);
+    deleted = true;
+    expect((await x.views.page(view.id)).entries).toEqual([]);
+  } finally { await x.close(); }
+});
+
+test("grouped queued inputs with identical text retain separate channel identities", async () => {
+  const x = fixture();
+  try {
+    const ids = [crypto.randomUUID(), crypto.randomUUID()];
+    const input = ids.map(id => [{ type: "text", text: "Check", mentions: [] }, { type: "text", visibility: "agent-only", text: `[Studio view message ${id}]\nCheck\n[End owner message]`, mentions: [] }]);
+    x.harness.inspection.sdk.stub("threads.events.list", async () => [{ type: "client/turn/requested", seq: 5, data: { requestId: "queued", input: [], inputGroups: input } }] as never);
+    const rows = ["a", "b"].map(id => ({ id, threadId: "one", kind: "conversation", role: "user", initiator: "user", senderThreadId: null, sourceSeqStart: 5, sourceSeqEnd: 5, text: "Check" }));
+    expect([...await x.views.ownerGroups("one", rows as never)]).toEqual([["a", ids[0]], ["b", ids[1]]]);
   } finally { await x.close(); }
 });
 

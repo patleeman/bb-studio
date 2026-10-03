@@ -16,7 +16,7 @@ const baseName = (path: string) => path.split(/[\\/]/).at(-1) || "Attachment";
 /** The owner's text as the view shows it, with a line per attachment. */
 const withNames = (text: string, names: string[]) => [text, ...names.map(name => `📎 ${name}`)].filter(Boolean).join("\n\n");
 export const withAttachmentNames = (input: Pick<ViewSend, "text" | "attachments">) => withNames(input.text, (input.attachments ?? []).map(a => a.type === "image" ? "Image" : a.type === "localFile" && a.name ? a.name : baseName(a.path)));
-export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set(), quiet: ReadonlySet<string> = new Set()): ViewEntry[] {
+export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new Set(), quiet: ReadonlySet<string> = new Set(), ownerGroups: ReadonlyMap<string, string> = new Map()): ViewEntry[] {
   const entries: ViewEntry[] = [], replies = new Map<string, Row & { kind: "conversation"; role: "assistant" }>();
   const completedTurns = new Set(completed), automationTurns = new Set<string>();
   let unassignedAutomation = false;
@@ -43,7 +43,7 @@ export function finalEntries(rows: Row[], completed: ReadonlySet<string> = new S
         const match = envelope.exec(row.text);
         if (row.text.trim()) entries.push({
           id: `${row.threadId}:${row.id}`, threadId: row.threadId, role: "user",
-          text: withNames(match?.[2] ?? row.text, [...(row.attachments?.localFilePaths ?? []), ...(row.attachments?.localImagePaths ?? [])].map(baseName).concat(Array(row.attachments?.webImages ?? 0).fill("Image"))), groupId: match?.[1] ?? null, createdAt: row.createdAt,
+          text: withNames(match?.[2] ?? row.text, [...(row.attachments?.localFilePaths ?? []), ...(row.attachments?.localImagePaths ?? [])].map(baseName).concat(Array(row.attachments?.webImages ?? 0).fill("Image"))), groupId: match?.[1] ?? ownerGroups.get(row.id) ?? null, createdAt: row.createdAt,
         });
       } else if (!quiet.has(row.turnId ?? "") && !automationTurns.has(row.turnId ?? "") && (completed || (row.turnId !== null && completedTurns.has(row.turnId)))) {
         const key = row.turnId ?? row.id;
@@ -152,6 +152,58 @@ export class ThreadViews {
     if (entry.role === "user" && entry.groupId && !entry.id.startsWith("view:"))
       this.store.db.prepare("DELETE FROM view_entries WHERE id=?").run(`view:${entry.groupId}:${entry.threadId}`);
   }
+  /** Recover fanout identities from hidden inputs, using only public event data. */
+  async ownerGroups(threadId: string, rows: Row[]) {
+    const owners = rows.filter(row => row.kind === "conversation" && row.role === "user" && row.initiator === "user" && !row.senderThreadId && !envelope.test(row.text));
+    const result = new Map<string, string>();
+    if (!owners.length) return result;
+    const ownerSeqs = new Set(owners.map(row => row.sourceSeqStart));
+    type Event = Awaited<ReturnType<BbPluginApi["sdk"]["threads"]["events"]["list"]>>[number];
+    type Request = Extract<Event, { type: "client/turn/requested" }>;
+    const requests = new Map<string, Request>(), bySeq = new Map<number, Request>();
+    const accepted: Extract<Event, { type: "turn/input/accepted" }>[] = [];
+    let afterSeq = Math.max(0, Math.min(...owners.map(row => row.sourceSeqStart)) - 1);
+    const beforeSeq = String(Math.max(...owners.map(row => row.sourceSeqEnd)) + 1);
+    for (;;) {
+      const events = await this.bb.sdk.threads.events.list({ threadId, types: ["client/turn/requested", "turn/input/accepted"], afterSeq: String(afterSeq), beforeSeq, order: "asc", limit: "100" });
+      for (const event of events) {
+        if (event.type === "client/turn/requested") { requests.set(event.data.requestId, event); bySeq.set(event.seq, event); }
+        else if (event.type === "turn/input/accepted" && ownerSeqs.has(event.seq)) accepted.push(event);
+      }
+      if (events.length < 100) break;
+      const next = events.at(-1)!.seq;
+      if (next <= afterSeq) throw new Error("BB returned a repeated input cursor.");
+      afterSeq = next;
+    }
+    for (const event of accepted) {
+      // Accepted steers use the acceptance event's sequence, even when the
+      // original request is on an older timeline page.
+      let request = requests.get(event.data.clientRequestId), cursor = event.seq;
+      while (!request) {
+        const older = await this.bb.sdk.threads.events.list({ threadId, types: ["client/turn/requested"], beforeSeq: String(cursor), order: "desc", limit: "100" });
+        request = older.find((row): row is Request => row.type === "client/turn/requested" && row.data.requestId === event.data.clientRequestId);
+        if (request || older.length < 100) break;
+        const next = older.at(-1)!.seq;
+        if (next >= cursor) throw new Error("BB returned a repeated input cursor.");
+        cursor = next;
+      }
+      if (request) bySeq.set(event.seq, request);
+    }
+    const remaining = new Map<number, { text: string; id: string | null }[]>();
+    for (const row of owners) {
+      const request = bySeq.get(row.sourceSeqStart);
+      if (!request) continue;
+      if (!remaining.has(row.sourceSeqStart)) remaining.set(row.sourceSeqStart, (request.data.inputGroups ?? [request.data.input]).map(input => ({
+        text: input.flatMap(part => part.type === "text" && part.visibility !== "agent-only" ? [part.text] : []).join(""),
+        id: input.flatMap(part => part.type === "text" && part.visibility === "agent-only" ? [envelope.exec(part.text)?.[1]] : []).find(Boolean) ?? null,
+      })));
+      const groups = remaining.get(row.sourceSeqStart)!;
+      const index = groups.findIndex(group => group.text === (row as Row & { text: string }).text);
+      const group = groups.splice(index < 0 ? 0 : index, 1)[0];
+      if (group?.id) result.set(row.id, group.id);
+    }
+    return result;
+  }
   async indexThread(threadId: string, before = Number.MAX_SAFE_INTEGER, limit = 60, beforeId?: string) {
     // Refresh source rows on every read; edited/deleted replies must disappear.
     const entries: ViewEntry[] = [];
@@ -190,7 +242,7 @@ export class ThreadViews {
         }
       }
       const quiet = new Set([...finals].filter(([, text]) => !text?.trim()).map(([turnId]) => turnId));
-      entries.push(...finalEntries(page.rows, completed, quiet));
+      entries.push(...finalEntries(page.rows, completed, quiet, await this.ownerGroups(threadId, sourceRows)));
       cursor = page.timelinePage.olderCursor;
       const key = JSON.stringify(cursor);
       if (cursors.has(key)) throw new Error("BB returned a repeated history cursor.");
@@ -308,7 +360,7 @@ export class ThreadViews {
         if (record.deliveries.some(d => d.threadId === threadId && d.status !== "error")) continue;
         let delivery: ViewDelivery;
         try {
-          const sent = await this.bb.sdk.threads.send({ threadId, input: [{ type: "text", text: record.prompt, mentions: [] }, ...(record.input.attachments ?? [])], mode: input.mode === "followup" ? "queue-if-active" : input.mode === "steer" ? "steer-if-active" : "auto", ...(record.modes?.[threadId] ? { permissionMode: record.modes[threadId], executionInputSources: { permissionMode: "explicit" as const } } : {}) });
+          const sent = await this.bb.sdk.threads.send({ threadId, input: [{ type: "text", text: record.input.text, mentions: [] }, { type: "text", text: record.prompt, mentions: [], visibility: "agent-only" }, ...(record.input.attachments ?? [])], mode: input.mode === "followup" ? "queue-if-active" : input.mode === "steer" ? "steer-if-active" : "auto", ...(record.modes?.[threadId] ? { permissionMode: record.modes[threadId], executionInputSources: { permissionMode: "explicit" as const } } : {}) });
           delivery = { threadId, status: sent.delivery, error: null };
           this.saveEntry({ id: `view:${input.requestId}:${threadId}`, threadId, role: "user", text: withAttachmentNames(input), groupId: input.requestId, createdAt: Date.now() });
         } catch (cause) { delivery = { threadId, status: "error", error: String(cause) }; }
