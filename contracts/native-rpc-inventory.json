@@ -536,12 +536,6 @@
       "coverage": "generated method"
     },
     {
-      "file": "apps/ios/Shared/Office/OfficeProvisionalAPI.swift",
-      "plugin": "studio",
-      "method": "method",
-      "coverage": "dynamic dispatch; runtime validation required"
-    },
-    {
       "file": "apps/ios/Shared/Pages.swift",
       "plugin": "pages",
       "method": "tree",

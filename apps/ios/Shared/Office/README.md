@@ -24,8 +24,9 @@ into the Studio schema and generated Swift methods.
 `task`. Omit `schedule` for one-time work; `OfficeSchedule` supports hourly,
 daily, weekdays, and weekly. Context strings are item references.
 
-Only `officeStart` in `OfficeProvisionalAPI.swift` still follows the web model
-pending its server contract. It remains visible as a dynamic inventory call.
+iOS starts threads through `NewThreadView`, so there is no `officeStart` wrapper.
+Its published request and response remain available in the generated Studio contract.
+All office client wrappers use published generated method names.
 
 `OfficeModels.swift` uses seconds/milliseconds exactly as sent by the server;
 its timestamp fields are raw `Double` values. Do not infer dates without checking
