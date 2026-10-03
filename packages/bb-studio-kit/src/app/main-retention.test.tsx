@@ -148,6 +148,28 @@ it("preserves a contenteditable selection while moving into a different companio
   expect(document.activeElement).toBe(editor);
 });
 
+it("preserves a backward selection across first main adoption and later placement changes", () => {
+  function Editor() { return <div contentEditable suppressContentEditableWarning>Retain selection</div>; }
+  const Main = retainPanel("pages", Editor);
+  mount(<FloatPanels path="pages" render={() => <Editor />} />);
+  const main = mount(<Main subPath="one" />);
+  const editor = main.host.querySelector<HTMLElement>("[contenteditable]")!;
+  const text = editor.firstChild!;
+  editor.focus();
+  const selection = window.getSelection()!;
+  selection.setBaseAndExtent(text, 8, text, 2);
+  const body = floatBody();
+  const other = document.createElement("div"); elements.push(other); document.body.append(other);
+  for (const anchor of [body, other, main.host]) {
+    act(() => publishFloatBody({ windowKey: "one", target, element: anchor, placement: "workbench" }));
+    expect(anchor.querySelector("[contenteditable]")).toBe(editor);
+    expect(selection.anchorNode).toBe(text);
+    expect(selection.focusNode).toBe(text);
+    expect([selection.anchorOffset, selection.focusOffset]).toEqual([8, 2]);
+    expect(document.activeElement).toBe(editor);
+  }
+});
+
 it("renders usable main content when there is no overlay, and disposes it after ordinary navigation", () => {
   const dispose = vi.fn();
   function Editor() { useEffect(() => dispose, []); return <textarea defaultValue="Available without Float" />; }

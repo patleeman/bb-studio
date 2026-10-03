@@ -154,13 +154,14 @@ function RetainedPanel({ view, pluginId, children }: { view: PanelView; pluginId
     if (element.parentElement === view.element) return;
     const focused = element.contains(document.activeElement) ? document.activeElement : null;
     const selection = window.getSelection();
-    const range = selection?.rangeCount && element.contains(selection.anchorNode) ? (() => { const current = selection.getRangeAt(0); return { start: current.startContainer, startOffset: current.startOffset, end: current.endContainer, endOffset: current.endOffset }; })() : null;
+    const range = selection?.rangeCount && element.contains(selection.anchorNode) && element.contains(selection.focusNode)
+      ? { anchor: selection.anchorNode!, anchorOffset: selection.anchorOffset, focus: selection.focusNode!, focusOffset: selection.focusOffset } : null;
     const scroll = [element, ...element.querySelectorAll<HTMLElement>("*")].filter(node => node.scrollTop || node.scrollLeft)
       .map(node => ({ node, top: node.scrollTop, left: node.scrollLeft }));
     view.element.append(element);
     scroll.forEach(({ node, top, left }) => { node.scrollTop = top; node.scrollLeft = left; });
     if (focused instanceof HTMLElement) focused.focus({ preventScroll: true });
-    if (range && selection) { const restored = document.createRange(); restored.setStart(range.start, range.startOffset); restored.setEnd(range.end, range.endOffset); selection.removeAllRanges(); selection.addRange(restored); }
+    if (range && selection) selection.setBaseAndExtent(range.anchor, range.anchorOffset, range.focus, range.focusOffset);
   }, [element, pluginId, view.element]);
   useLayoutEffect(() => () => element.remove(), [element]);
   return createPortal(<CompanionKeyContext.Provider value={view.windowKey ?? null}>
