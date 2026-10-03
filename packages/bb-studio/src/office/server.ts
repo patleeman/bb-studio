@@ -26,7 +26,7 @@ import { Inbox } from "./inbox";
 import { interactionSource } from "./interaction-source";
 import { officeContract } from "./contract";
 import { FolderService } from "./folders";
-import { migrateOfficeSpaces } from "./migration";
+import { migrateOfficeSpaces, spreadSpaceColors } from "./migration";
 import { ProjectSpaceStore } from "./legacy-spaces";
 
 export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; moduleServices?: ModuleServices; searchIndex?: SearchIndex } = {}) {
@@ -44,6 +44,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     migrateOfficeSpaces(db, { projectIds: projects.map(p => p.id),
       projectForMember: m => projectByRef.get(`${m.pluginId}:${m.id}`), logConflict: m => bb.log.warn(m) });
   }
+  spreadSpaceColors(db);
   const spaces = new ProjectSpaceStore(db);
   spaces.office.reconcileProjects(projects.map(p => p.id));
   const folders = new FolderService(db, spaces.office, {

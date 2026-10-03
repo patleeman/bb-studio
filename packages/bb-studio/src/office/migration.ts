@@ -88,9 +88,11 @@ export function migrateOfficeSpaces(db: Database.Database, options: SpaceMigrati
 
 /**
  * Spaces were made with one stock blue. Once, give each Space still on it its
- * own color from the palette, in the footer's order, so they read apart.
+ * own color from the palette, in the footer's order, so they read apart. Runs
+ * on every start (it is a no-op after the first), since installs that
+ * migrated before it existed skip migrateOfficeSpaces.
  */
-function spreadSpaceColors(db: Database.Database, now: number): void {
+export function spreadSpaceColors(db: Database.Database, now = Date.now()): void {
   db.transaction(() => {
     if (db.prepare("SELECT 1 FROM office_migrations WHERE id = 'space-colors-v1'").get()) return;
     const spaces = db.prepare("SELECT id, color FROM spaces ORDER BY is_default DESC, name COLLATE NOCASE, id").all() as { id: string; color: string }[];
