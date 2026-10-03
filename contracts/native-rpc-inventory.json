@@ -1,0 +1,887 @@
+{
+  "scope": "Native Swift RPC call sites; method parity only. Handwritten payloads require decoder/transport tests. Dynamic dispatch and external plugins are listed separately.",
+  "calls": [
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "get",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "text",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "update",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "move",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "delete",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "saveAsPage",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "threadArtifacts",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "candidates",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Artifacts.swift",
+      "plugin": "artifacts",
+      "method": "saveFiles",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_overview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_runs",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_run",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "enabled",
+      "coverage": "dynamic dispatch; runtime validation required"
+    },
+    {
+      "file": "apps/ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_create",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/Automations.swift",
+      "plugin": "automations",
+      "method": "automations_update",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+DrawingEditing.swift",
+      "plugin": "excalidraw",
+      "method": "createDrawing",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "home",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "homeRespond",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "searchAll",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tasks",
+      "method": "statuses",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tasks",
+      "method": "get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tasks",
+      "method": "board",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tasks",
+      "method": "update",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tasks",
+      "method": "create",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tasks",
+      "method": "handOffBot",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "talk",
+      "method": "recording_get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "talk",
+      "method": "meeting_regenerate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "talk",
+      "method": "meeting_create_task",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio-tables",
+      "method": "get",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "links",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "itemThreads",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "comments",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "commentCreate",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
+      "plugin": "studio",
+      "method": "commentResolve",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "pages",
+      "method": "editableMarkdown",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "pages",
+      "method": "editDocument",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+PageEditing.swift",
+      "plugin": "pages",
+      "method": "requests",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Push.swift",
+      "plugin": "push-notifications",
+      "method": "pushSubscriptions.add",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient+Push.swift",
+      "plugin": "push-notifications",
+      "method": "pushSubscriptions.remove",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "thread-list",
+      "method": "listPreferences",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "list",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "document",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "saveDocument",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "profiles",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "threadProfile",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "setThreadProfile",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "pendingThreadProfile",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "threadBots",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "profileThreads",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "bot-teams",
+      "method": "newConversation",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "talk",
+      "method": "recording_create",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "talk",
+      "method": "segment_put",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "talk",
+      "method": "recording_state",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "talk",
+      "method": "recording_heartbeat",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "talk",
+      "method": "recording_get",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/BBClient.swift",
+      "plugin": "talk",
+      "method": "recordings_list",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "excalidraw",
+      "method": "listDrawings",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "excalidraw",
+      "method": "getDrawing",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "excalidraw",
+      "method": "getDrawingUpdatedAt",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "excalidraw",
+      "method": "renameDrawing",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Drawings.swift",
+      "plugin": "excalidraw",
+      "method": "deleteDrawing",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "list",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "post",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "story",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "forDirective",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "topics",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "remove",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "read",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "seen",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Feed.swift",
+      "plugin": "feed",
+      "method": "unread",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "tree",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "get",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "markdown",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "search",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "work",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "chats",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "chatPage",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "update",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "snapshots",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "snapshot",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "restore",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "comments",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "commentBlocks",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "commentCreate",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "commentReply",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Pages.swift",
+      "plugin": "pages",
+      "method": "commentResolve",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/PluginExtras.swift",
+      "plugin": "plannotator",
+      "method": "getActiveReview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/PluginExtras.swift",
+      "plugin": "plannotator",
+      "method": "cancelReview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/SavedViews.swift",
+      "plugin": "bot-teams",
+      "method": "view",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/SavedViews.swift",
+      "plugin": "bot-teams",
+      "method": "viewCreate",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/SavedViews.swift",
+      "plugin": "bot-teams",
+      "method": "viewUpdate",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/SavedViews.swift",
+      "plugin": "bot-teams",
+      "method": "viewDelete",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/SavedViews.swift",
+      "plugin": "bot-teams",
+      "method": "viewSend",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/ServerTools.swift",
+      "plugin": "account-pool",
+      "method": "account.list",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/ServerTools.swift",
+      "plugin": "keep-awake",
+      "method": "getConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/ServerTools.swift",
+      "plugin": "keep-awake",
+      "method": "setConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/ServerTools.swift",
+      "plugin": "concurrency-limit",
+      "method": "getConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/ServerTools.swift",
+      "plugin": "concurrency-limit",
+      "method": "setConfiguration",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/ServerTools.swift",
+      "plugin": "side-chat",
+      "method": "createSideChat",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "spaces",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "createSpace",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "updateSpace",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "deleteSpace",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "spaceMembers",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "spacesForThread",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "spacePage",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "spaceWidget",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "restoreSpaceWidgets",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "createInSpace",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Spaces.swift",
+      "plugin": "studio",
+      "method": "recentThreads",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "overview",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "create",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "createTag",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "renameTag",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "deleteTag",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "tagItems",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "archive",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "move",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "action",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "search",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "studio",
+      "method": "remove",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "talk",
+      "method": "recording_rename",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "talk",
+      "method": "recording_retry",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "talk",
+      "method": "recording_delete",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "pages",
+      "method": "remove",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Studio.swift",
+      "plugin": "pages",
+      "method": "create",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/StudioChat.swift",
+      "plugin": "studio-chat",
+      "method": "start",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/StudioChat.swift",
+      "plugin": "studio-chat",
+      "method": "home",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "board",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "get",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "create",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "update",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "move",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "archive",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "delete",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "unlink",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "linkables",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "link",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "handOff",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "sendBack",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "archiveThreads",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/Shared/Tasks.swift",
+      "plugin": "studio-tasks",
+      "method": "settings",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
+      "plugin": "pages",
+      "method": "create",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/iOS/Capture/CaptureSheet.swift",
+      "plugin": "artifacts",
+      "method": "importFile",
+      "coverage": "generated method"
+    },
+    {
+      "file": "apps/ios/iOS/Thread/InlineVis.swift",
+      "plugin": "inline-vis",
+      "method": "preparePreview",
+      "coverage": "external host plugin; contract maintained outside this repository"
+    },
+    {
+      "file": "apps/ios/iOS/Thread/MutedThreads.swift",
+      "plugin": "mobile",
+      "method": "mute_list",
+      "coverage": "literal method checked against contract"
+    },
+    {
+      "file": "apps/ios/iOS/Thread/MutedThreads.swift",
+      "plugin": "mobile",
+      "method": "mute_set",
+      "coverage": "literal method checked against contract"
+    }
+  ]
+}

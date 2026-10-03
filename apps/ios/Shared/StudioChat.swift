@@ -19,17 +19,16 @@ extension BBClient {
             "environment": ["type": "project-default"],
             "input": [["type": "text", "text": .string(text), "mentions": []]],
         ]
-        let result: Result = try await rpc("studio-chat", "start", [
+        let result: Result = try await rpc("studio-chat", Chat.Method.start, [
             "item": ["pluginId": .string(pluginId), "id": .string(itemId)],
             "request": request,
         ])
         return result.threadId
     }
 
-    /// The thread last used on the item, if it's still around.
+    /// The item's current home thread, if one is still linked.
     public func lastStudioChat(pluginId: String, itemId: String) async throws -> String? {
-        struct Result: Decodable { var threadId: String? }
-        let result: Result = try await rpc("studio-chat", "lastThread", ["pluginId": .string(pluginId), "id": .string(itemId)])
-        return result.threadId
+        let result: Chat.HomeOutput = try await rpc("studio-chat", Chat.Method.home, ["pluginId": .string(pluginId), "id": .string(itemId)])
+        return result.thread?.threadId
     }
 }

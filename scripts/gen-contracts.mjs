@@ -2,6 +2,7 @@ import { readFile, mkdir, writeFile } from "node:fs/promises";
 import { resolve } from "node:path";
 import { z } from "zod";
 import { studioSchemas } from "../packages/bb-studio-kit/src/contract.ts";
+import { nativeRpcInventory } from "./native-rpc-inventory.mjs";
 
 const root = resolve(import.meta.dirname, "..");
 const check = process.argv.includes("--check");
@@ -21,6 +22,7 @@ const plugins = [
   ["mobile", "Mobile", "../packages/bb-studio-mobile/server.ts", "mobileContract"],
   ["smart-decisions", "Decisions", "../packages/bb-studio-decisions/contract.ts", "rpcContract"],
   ["studio-tables", "Tables", "../packages/bb-studio-kit/src/tables/contract.ts", "tablesContract"],
+  ["feed", "Feed", "../packages/bb-studio-feed/src/contract.ts", "rpcContract"],
 ];
 
 const swiftKeywords = new Set("associatedtype class deinit enum extension fileprivate func import init inout internal let open operator private protocol public rethrows static struct subscript typealias var break case catch continue default defer do else fallthrough for guard if in repeat return switch throw try while as Any false is nil self Self super throws true where await async actor some".split(" "));
@@ -136,6 +138,7 @@ function swiftSource(namespace, methods, itemSchema) {
 const jsonValueSource = `\n/// A JSON value used when a contract accepts arbitrary data or a union of shapes.\npublic indirect enum StudioJSONValue: Sendable, Hashable, Codable {\n  case null\n  case bool(Bool)\n  case number(Double)\n  case string(String)\n  case array([StudioJSONValue])\n  case object([String: StudioJSONValue])\n\n  public init(from decoder: Decoder) throws {\n    let value = try decoder.singleValueContainer()\n    if value.decodeNil() { self = .null }\n    else if let bool = try? value.decode(Bool.self) { self = .bool(bool) }\n    else if let number = try? value.decode(Double.self) { self = .number(number) }\n    else if let string = try? value.decode(String.self) { self = .string(string) }\n    else if let array = try? value.decode([StudioJSONValue].self) { self = .array(array) }\n    else { self = .object(try value.decode([String: StudioJSONValue].self)) }\n  }\n\n  public func encode(to encoder: Encoder) throws {\n    var value = encoder.singleValueContainer()\n    switch self {\n    case .null: try value.encodeNil()\n    case .bool(let item): try value.encode(item)\n    case .number(let item): try value.encode(item)\n    case .string(let item): try value.encode(item)\n    case .array(let item): try value.encode(item)\n    case .object(let item): try value.encode(item)\n    }\n  }\n}\n`;
 
 const item = schemaOf(studioSchemas(z).item, "output");
+const documents = new Map();
 for (const [pluginId, namespace, path, exportName] of plugins) {
   const mod = await import(new URL(path, import.meta.url));
   const contract = mod[exportName];
@@ -144,7 +147,11 @@ for (const [pluginId, namespace, path, exportName] of plugins) {
     input: schemaOf(value.input, "input"), output: schemaOf(value.output, "output"),
   }]));
   const document = { pluginId, methods, ...(pluginId === "studio" ? { StudioItem: item } : {}) };
+  documents.set(pluginId, { namespace, ...document });
   await output(`contracts/${pluginId}.schema.json`, `${JSON.stringify(document, null, 2)}\n`);
   await output(`apps/ios/Shared/Generated/${namespace}Contract.swift`, swiftSource(namespace, document.methods, document.StudioItem));
   console.log(`${check ? "Checked" : "Generated"} ${pluginId}: ${Object.keys(document.methods).length} methods`);
 }
+const native = await nativeRpcInventory(root, documents);
+await output("contracts/native-rpc-inventory.json", `${JSON.stringify(native, null, 2)}\n`);
+console.log(`${check ? "Checked" : "Generated"} native RPC inventory: ${native.calls.length} call sites`);
