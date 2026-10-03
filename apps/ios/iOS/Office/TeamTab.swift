@@ -111,6 +111,7 @@ struct AddBotSheet: View {
 
 
 private struct TeamList: View {
+    @EnvironmentObject private var app: AppModel
     @Environment(OfficeContext.self) private var office
     let store: TeamStore
 
@@ -129,14 +130,22 @@ private struct TeamList: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(store.bots) { bot in
-                            NavigationLink(value: Route.botDesk(id: bot.id)) {
+                            // Several links in one List row would all fire on a tap, so each
+                            // face is its own borderless button that pushes its desk.
+                            Button {
+                                app.teamPath.append(.botDesk(id: bot.id))
+                            } label: {
                                 VStack(spacing: 6) {
                                     Face(bot, size: 52)
                                     Text(bot.name).font(.caption).lineLimit(1)
                                 }
                                 .frame(maxWidth: .infinity)
+                                .contentShape(Rectangle())
                             }
-                            .buttonStyle(.plain)
+                            .buttonStyle(.borderless)
+                            .foregroundStyle(.primary)
+                            .accessibilityLabel(bot.name)
+                            .accessibilityHint("Opens \(bot.name)'s desk")
                         }
                     }
                     .padding(.vertical, 8)
