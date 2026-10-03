@@ -15,6 +15,12 @@ collection as cards, with the query bar above it and the filter rail beside it.
 The rail counts the seeded items by kind, project and tag. The cards show a
 paused Talk recording, a drawing, three Orbit pages and the staged bots.
 
+![Live BB screenshot of the New menu with a Pages filter](assets/new-menu.png)
+
+The New menu stays open to every available kind with a Pages filter active.
+The capture checks that Bots and Pages filters offer the same menu as the
+unfiltered collection.
+
 ![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
 
 The Studio landing page with two seeded tasks: one in review and one due today
@@ -84,7 +90,7 @@ the matching text with the match in bold.
   the space holds under it, sub-pages under their pages, then its threads;
   its icon turns into a chevron on hover to fold it.
 - **New ▾** creates any kind an installed add-on offers, in the current
-  project.
+  project. It always opens the full menu, even with a kind filter active.
 - **Takes over from the add-ons.** With Studio installed, each add-on's own
   collection hands over to Studio filtered to its kind, and item pages lead
   back to Studio. Studio's ⋯ menu can hide the add-ons' sidebar rows, so

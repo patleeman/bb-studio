@@ -3,7 +3,7 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
     id: "studio-new-menu",
     packageDir: "bb-studio",
     fileName: "new-menu.png",
-    privateSidebar: true,
+    showSidebar: true,
     setup: async (client) => {
       const pages = await seedPages();
       try {
@@ -31,7 +31,7 @@ export default ({ projectId, seedPages, seedDrawing, seedArtifact, seedTalkRecor
           await client.navigate("/plugins/studio/studio/collection");
           await client.evaluate(`localStorage.setItem('studio:query:all', ${JSON.stringify(`kind:${kind}`)})`);
           await client.navigate("/plugins/studio/studio/collection");
-          await client.waitForText(kind === "bot" ? "Kind: Bots" : "Kind: Pages");
+          await client.waitForAriaButton(kind === "bot" ? "Remove Kind Bots" : "Remove Kind Pages");
           const filtered = await openNew();
           if (JSON.stringify(filtered) !== JSON.stringify(unfiltered)) throw new Error(`The ${kind} filter changed the New menu`);
         }
