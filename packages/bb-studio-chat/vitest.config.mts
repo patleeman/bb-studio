@@ -1,6 +1,6 @@
 export default {
   test: {
-    include: ["src/**/*.test.{ts,tsx}"],
+    include: ["../bb-studio/src/modules/chat/src/**/*.test.{ts,tsx}"],
     passWithNoTests: false,
   },
 };

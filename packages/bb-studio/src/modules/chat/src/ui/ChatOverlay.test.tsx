@@ -30,7 +30,7 @@ vi.mock("@get-bb/plugin-sdk/app", () => ({
   },
 }));
 vi.mock("@bb-studio/kit/app", async () => ({
-  NewConversationComposer: (await import("../../../bb-studio-kit/src/app/new-conversation")).NewConversationComposer,
+  NewConversationComposer: (await import("../../../../../../bb-studio-kit/src/app/new-conversation")).NewConversationComposer,
   cn: (...classes: string[]) => classes.join(" "),
   usePathname: () => state.path,
   useFloatAvailable: () => state.available,

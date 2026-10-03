@@ -1,6 +1,6 @@
 export default {
   test: {
-    include: ["**/*.test.ts"],
+    include: ["../bb-studio/src/modules/tables/src/**/*.test.ts"],
     passWithNoTests: false,
   },
 };
