@@ -1,8 +1,8 @@
 import Database from "better-sqlite3";
-import { describe, expect, it } from "vitest";
+import { describe, expect, it, vi } from "vitest";
 import { MIGRATIONS } from "./migrations";
 import { SearchIndex, excerpt, tokens } from "./search-index";
-import type { StudioHub, HubItem } from "./hub";
+import { StudioHub, type HubItem, type HubSdk } from "./hub";
 
 const item = (id: string, title: string, updatedAt = 1): HubItem => ({
   pluginId: "pages", id, kind: "page", title, updatedAt, createdAt: 1, projectId: "one", href: `/pages/${id}`,
@@ -127,4 +127,53 @@ it("preserves indexed text on failed reads and retries without another change ev
   await index.ensure();
   expect(index.search("New title").map((hit) => hit.ref.id)).toEqual(["a"]);
   db.close();
+});
+
+it("keeps undiscovered providers through discovery failure, retries once due, and removes successful uninstalls", async () => {
+  vi.useFakeTimers();
+  const db = new Database(":memory:");
+  try {
+    for (const sql of MIGRATIONS) db.exec(sql);
+    let failDiscovery = false;
+    let installed = true;
+    let pageTitle = "Original";
+    let customTitle = "Extension";
+    const discover = vi.fn(async () => {
+      if (failDiscovery) throw new Error("Discovery temporarily unavailable");
+      return installed ? [{ pluginId: "custom" }] : [];
+    });
+    const sdk: HubSdk = { plugins: {
+      list: async () => ({ plugins: ["pages", ...(installed ? ["custom"] : [])].map((id) => ({ id, name: id, enabled: true, status: "running", statusDetail: null, version: "1" })) }),
+      experimental_discoverRpc: discover,
+      callRpc: async ({ pluginId, method, outputSchema }) => outputSchema.parse(method === "studio_describe"
+        ? { pluginId, version: 1, panel: null, kinds: [] }
+        : { items: [{ ...item("a", pluginId === "pages" ? pageTitle : customTitle), pluginId }] }),
+    } };
+    await new SearchIndex(db, new StudioHub(sdk)).ensure();
+    failDiscovery = true;
+    pageTitle = "Updated built-in";
+    // A fresh hub has no in-memory provider history, only the saved index.
+    const restarted = new SearchIndex(db, new StudioHub(sdk));
+    await restarted.ensure();
+    expect(restarted.search("Extension").map((hit) => hit.ref.pluginId)).toEqual(["custom"]);
+    expect(restarted.search("Updated").map((hit) => hit.ref.pluginId)).toEqual(["pages"]);
+    const attempted = discover.mock.calls.length;
+    await restarted.ensure();
+    await restarted.ensure();
+    expect(discover).toHaveBeenCalledTimes(attempted);
+    await vi.advanceTimersByTimeAsync(5_000);
+    await Promise.all([restarted.ensure(), restarted.ensure(), restarted.ensure()]);
+    expect(discover).toHaveBeenCalledTimes(attempted + 1);
+    failDiscovery = false;
+    customTitle = "Recovered extension";
+    await vi.advanceTimersByTimeAsync(5_000);
+    await restarted.ensure();
+    expect(restarted.search("Recovered").map((hit) => hit.ref.pluginId)).toEqual(["custom"]);
+    installed = false;
+    await restarted.changed("pages");
+    expect(restarted.search("Recovered")).toEqual([]);
+  } finally {
+    db.close();
+    vi.useRealTimers();
+  }
 });

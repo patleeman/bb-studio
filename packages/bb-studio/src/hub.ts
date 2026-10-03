@@ -72,12 +72,25 @@ export class StudioHub {
 
   /** Every installed, enabled provider, ready or not. */
   async providers(): Promise<ProviderView[]> {
-    const candidates = await discoverProviders(this.sdk, {
+    return (await this.providerSnapshot()).providers;
+  }
+
+  private async providerSnapshot(): Promise<{ providers: ProviderView[]; discoveryComplete: boolean }> {
+    let discoveryComplete = true;
+    // The shared discovery helper falls back to known providers on failure.
+    // Keep that availability, but do not mistake an omitted add-on for an uninstall.
+    const candidates = await discoverProviders({ plugins: {
+      list: () => this.sdk.plugins.list(),
+      experimental_discoverRpc: async (args) => {
+        try { return await this.sdk.plugins.experimental_discoverRpc(args); }
+        catch (error) { discoveryComplete = false; throw error; }
+      },
+    } }, {
       method: "studio_describe",
       known: SUITE,
       exclude: [STUDIO_PLUGIN_ID],
     });
-    return [...(await Promise.all(candidates.map((entry) => this.describe(entry)))), ...this.localView()];
+    return { providers: [...(await Promise.all(candidates.map((entry) => this.describe(entry)))), ...this.localView()], discoveryComplete };
   }
 
   private async describe(entry: PluginEntry): Promise<ProviderView> {
@@ -106,8 +119,8 @@ export class StudioHub {
    * Providers and every ready provider's items; a provider that fails to list
    * goes offline. `truncated` names the providers that listed only some.
    */
-  async overview(): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string> }> {
-    const providers = await this.providers();
+  async overview(): Promise<{ providers: ProviderView[]; items: HubItem[]; truncated: Set<string>; discoveryComplete: boolean }> {
+    const { providers, discoveryComplete } = await this.providerSnapshot();
     const lists = await fanOutProviders(
       providers,
       async (provider) => {
@@ -122,6 +135,7 @@ export class StudioHub {
       providers: lists.map((list) => list.provider),
       items: lists.flatMap((list) => list.items),
       truncated: new Set(lists.filter((list) => list.truncated).map((list) => list.provider.pluginId)),
+      discoveryComplete,
     };
   }
 

@@ -46,6 +46,17 @@ function fakeSdk(options: {
 }
 
 describe("StudioHub", () => {
+  it("marks failed discovery incomplete while still loading known providers", async () => {
+    const sdk = fakeSdk({ plugins: [plugin("pages"), plugin("custom")], rpc: {
+      "pages.studio_describe": () => ({ pluginId: "pages", version: 1, panel: null, kinds: [kind] }),
+      "pages.studio_list": () => ({ items: [item("pg_1")] }),
+    } });
+    sdk.plugins.experimental_discoverRpc = async () => { throw new Error("Discovery down"); };
+    const overview = await new StudioHub(sdk).overview();
+    expect(overview).toMatchObject({ discoveryComplete: false });
+    expect(overview.items.map((entry) => entry.id)).toEqual(["pg_1"]);
+  });
+
   it("lists suite plugins first, then discovered ones, skipping disabled plugins and itself", async () => {
     const sdk = fakeSdk({
       plugins: [plugin("zeta"), plugin("pages"), plugin("talk", { enabled: false }), plugin("studio")],
