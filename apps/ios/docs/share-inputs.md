@@ -30,3 +30,10 @@ This verifies the Share data path and extension build. It does not establish
 system share-sheet presentation, physical-device extension memory limits,
 provider-specific cloud-file behavior, or a real end-to-end send from another
 app. Those remain separate runtime checks.
+
+The subsequent [Share runtime verification](share-runtime/README.md) exercised
+actual extension registration and presentation through the iOS system share
+sheet in a separate fixture app. Four presentation checks passed, followed by
+one real file Send into a newly created staged QA project. It also added
+accessible descriptions for image and file previews. Physical-device memory
+limits and provider-specific cloud files remain outside that simulator proof.

@@ -135,8 +135,10 @@ struct ShareView: View {
                                     Group {
                                         if let thumbnail = file.thumbnail {
                                             Image(uiImage: thumbnail).resizable().scaledToFill()
+                                                .accessibilityLabel("Shared image: \(file.name)")
                                         } else {
                                             Label(file.name, systemImage: "doc").font(.caption2).padding(4)
+                                                .accessibilityLabel("Shared file: \(file.name)")
                                         }
                                     }
                                     .frame(width: 64, height: 64)

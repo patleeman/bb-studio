@@ -1,0 +1,16 @@
+{
+  "serverURL": "http://127.0.0.1:49486",
+  "projectId": "proj_4a8meviq3r",
+  "projectName": "Share Runtime QA",
+  "threadId": "thr_p4iwdi4iy5",
+  "beforeThreadCount": 0,
+  "afterThreadCount": 1,
+  "userMessage": "QA Share runtime attachment delivery. No actions required.",
+  "attachmentCount": 1,
+  "attachmentName": "bb-share-runtime-fixture.txt",
+  "byteCount": 40,
+  "sha256": "639f2f89a3a6b26977485110687a460fdc15b82cba2a8541d4114c55d90395b3",
+  "serverUploadBytesMatch": true,
+  "threadContextBytesMatch": true,
+  "assistantResponse": "Received the attachment. No actions taken."
+}

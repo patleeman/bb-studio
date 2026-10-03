@@ -1,0 +1,27 @@
+Attributes: Application, 0x10a2157c0, pid: 12398, label: 'ShareRuntimeHost'
+Element subtree:
+ →Application, 0x10a2157c0, pid: 12398, label: 'ShareRuntimeHost'
+    Window (Main), 0x10a215900, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x10a216300, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x10a216440, {{0.0, 0.0}, {402.0, 874.0}}
+          Other, 0x10a215a40, {{0.0, 0.0}, {402.0, 874.0}}
+            Other, 0x10a2161c0, {{24.0, 327.0}, {354.0, 220.3}}
+              StaticText, 0x10a220780, {{24.0, 327.0}, {354.0, 20.3}}, label: 'Private Share runtime fixtures'
+              Button, 0x10a2208c0, {{24.0, 367.3}, {354.0, 30.0}}, label: 'Share URL and text'
+                StaticText, 0x10a221b80, {{135.0, 373.3}, {132.0, 18.0}}, label: 'Share URL and text'
+              Button, 0x10a221e00, {{24.0, 417.3}, {354.0, 30.0}}, label: 'Share image'
+                StaticText, 0x10a221f40, {{158.0, 423.3}, {86.0, 18.0}}, label: 'Share image'
+              Button, 0x10a222080, {{24.0, 467.3}, {354.0, 30.0}}, label: 'Share file'
+                StaticText, 0x10a2221c0, {{168.7, 473.3}, {65.0, 18.0}}, label: 'Share file'
+              Button, 0x10a222300, {{24.0, 517.3}, {354.0, 30.0}}, label: 'Share failed item'
+                StaticText, 0x10a222440, {{143.7, 523.3}, {115.0, 18.0}}, label: 'Share failed item'
+    Window, 0x10a2226c0, {{0.0, 0.0}, {402.0, 874.0}}
+      Other, 0x10a222800, {{0.0, 0.0}, {402.0, 874.0}}
+        Other, 0x10a222940, {{0.0, 0.0}, {402.0, 874.0}}
+Path to element:
+ →Application, 0x10a2157c0, pid: 12398, label: 'ShareRuntimeHost'
+Query chain:
+ →Find: Application 'local.bb.qa.ShareRuntimeHost'
+  Output: {
+    Application, 0x10a222a80, pid: 12398, label: 'ShareRuntimeHost'
+  }
