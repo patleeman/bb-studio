@@ -146,7 +146,7 @@ function SettingsPage({ space }: { space: Space }) {
       <section className="mt-8">
         <h2 className="mb-3 text-sm font-medium">Space</h2>
         <form className="flex items-end gap-2" onSubmit={(event) => { event.preventDefault(); void run("space_update", { spaceId: space.id, name: name.trim(), icon: icon.trim() || null }); }}>
-          <label className="w-16 text-xs text-muted-foreground">Icon<input value={icon} maxLength={4} onChange={(change) => setIcon(change.target.value)} className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-center text-sm text-foreground" /></label>
+          <label className="w-16 text-xs text-muted-foreground">Icon<input value={icon} maxLength={4} placeholder={space.name.slice(0, 1).toUpperCase()} onChange={(change) => setIcon(change.target.value)} className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-center text-sm text-foreground" /></label>
           <label className="flex-1 text-xs text-muted-foreground">Name<input value={name} maxLength={100} onChange={(change) => setName(change.target.value)} className="mt-1.5 h-9 w-full rounded-md border border-border bg-background px-2 text-sm text-foreground" /></label>
           <button type="submit" disabled={!name.trim() || (name === space.name && icon === (space.icon ?? ""))} className={OUTLINE_BUTTON}>Save</button>
         </form>

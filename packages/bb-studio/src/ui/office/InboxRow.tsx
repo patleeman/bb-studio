@@ -6,8 +6,21 @@ import { Face } from "./Face";
 import { SpaceMark } from "./SpaceSwitcher";
 import { useCall, type InboxEvent, type Space, type TeamBot } from "./model";
 import { cn } from "./styles";
+import { plainPreview } from "./text";
 
 const SOURCE_ICONS: Record<string, string> = { comment: "MessageSquarePlus", review: "Eye", report: "FileText", request: "CircleQuestion" };
+
+/** What kind of thing this is, in a word, so cards with the same buttons read apart. */
+export function eventKind(event: InboxEvent): string {
+  const source = event.source.toLowerCase();
+  if (source === "bb-interaction") return event.answerable ? "Question" : "Approval";
+  if (source === "team-attention") return "Bot needs a decision";
+  if (source === "page-requests") return event.type === "request" ? "Page job failed" : "Page job";
+  if (source === "comments" || event.type === "comment") return "Comment";
+  if (source.includes("task")) return event.type === "request" ? "Task to review" : "Task update";
+  if (source.includes("feed") || event.type === "report") return "Report";
+  return event.type === "request" ? "Request" : "Update";
+}
 
 function when(at: number): string {
   const date = new Date(at);
@@ -52,13 +65,15 @@ export function InboxRow({ event, bot, space, onChanged }: {
             onClick={() => { if (open) { void call("inbox_read", { keys: [event.key] }).catch(() => undefined); openAppPath(open); } }}
             className={cn("min-w-0 truncate text-left text-sm enabled:hover:underline", unreadReport || event.type === "request" ? "font-semibold" : "font-medium")}
           >
-            {event.title}
+            {plainPreview(event.title)}
           </button>
           {space ? <span className="flex shrink-0 items-center gap-1 text-xs text-muted-foreground"><SpaceMark space={space} size="sm" />{space.name}</span> : null}
           <span className="ml-auto shrink-0 text-xs tabular-nums text-muted-foreground">{when(event.createdAt)}</span>
         </div>
         <p className="mt-0.5 line-clamp-2 text-sm text-muted-foreground">
-          {bot ? <span className="text-foreground/80">{bot.name} · </span> : null}{event.body}
+          <span className="text-foreground/70">{eventKind(event)}</span>
+          {bot ? <span className="text-foreground/80"> · {bot.name}</span> : null}
+          {event.body ? ` · ${plainPreview(event.body)}` : null}
         </p>
         {error ? <p role="alert" className="mt-1 text-xs text-destructive">{error}</p> : null}
         <div className="mt-2 flex flex-wrap items-center gap-1.5">

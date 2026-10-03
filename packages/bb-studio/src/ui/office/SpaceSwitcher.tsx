@@ -48,7 +48,7 @@ export function SpaceSwitcher({ extras }: { extras: SwitcherExtra[] }) {
         aria-label={current ? `Space: ${current.name}. Switch space` : "Switch space"}
       >
         {current ? <SpaceMark space={current} /> : <span className="size-5 rounded-md bg-muted" />}
-        <span className="min-w-0 flex-1 truncate text-left">{current?.name ?? (loading ? "" : "No space")}</span>
+        <span className="min-w-0 flex-1 truncate text-left">{current?.name ?? (loading ? <span className="text-muted-foreground">Loading…</span> : "No space")}</span>
         {elsewhere > 0
           ? <span className="flex shrink-0 items-center gap-1 text-xs font-medium text-muted-foreground" title={`${elsewhere} waiting in other spaces`}>
               <span aria-hidden className="size-1.5 rounded-full bg-warning-foreground" />{elsewhere}
@@ -85,6 +85,7 @@ export function SpaceSwitcher({ extras }: { extras: SwitcherExtra[] }) {
             <Icon name="Settings" aria-hidden />
             <span>{current ? `${current.name} settings` : "Space settings"}</span>
           </Menu.Item>
+          {extras.length ? <Menu.Label className="px-2 pt-2 pb-1 text-xs text-muted-foreground">BB</Menu.Label> : null}
           {extras.map((extra) => (
             <Menu.Item key={extra.id} className={MENU_ITEM} onSelect={extra.run}>
               <Icon name={extra.icon} aria-hidden />

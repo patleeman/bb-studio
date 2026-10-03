@@ -24,7 +24,7 @@ function useThreadItems(thread: PluginSidebarThread, onRename: () => void): Item
     ],
     [
       { id: "archive", label: "Archive", icon: "Archive", run: () => actions.archive(thread.id) },
-      { id: "delete", label: "Delete", icon: "Trash2", danger: true, run: () => actions.requestDelete(thread.id) },
+      { id: "delete", label: "Delete…", icon: "Trash2", danger: true, run: () => actions.requestDelete(thread.id) },
     ],
   ];
 }
@@ -43,7 +43,7 @@ export function ThreadMenu({ thread, children }: { thread: PluginSidebarThread; 
             <Menu.Root>
               <Menu.Trigger
                 aria-label={`Actions for ${thread.displayTitle}`}
-                className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md bg-sidebar-accent text-subtle-foreground hover:text-muted-foreground group-hover/thread:flex focus-visible:flex data-[state=open]:flex max-md:pointer-coarse:flex"
+                className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md bg-sidebar-accent text-subtle-foreground hover:text-muted-foreground group-hover/thread:flex focus-visible:flex data-[state=open]:flex"
               >
                 <Icon name="MoreHorizontal" className="size-4" />
               </Menu.Trigger>

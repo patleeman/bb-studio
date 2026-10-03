@@ -37,7 +37,7 @@ export function RowMenu({ label, groups, children }: { label: string; groups: Ro
           <Menu.Root>
             <Menu.Trigger
               aria-label={`Actions for ${label}`}
-              className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md bg-sidebar-accent text-subtle-foreground hover:text-muted-foreground group-hover/rowmenu:flex focus-visible:flex data-[state=open]:flex max-md:pointer-coarse:flex"
+              className="absolute top-1/2 right-1 hidden size-6 -translate-y-1/2 items-center justify-center rounded-md bg-sidebar-accent text-subtle-foreground hover:text-muted-foreground group-hover/rowmenu:flex focus-visible:flex data-[state=open]:flex"
             >
               <Icon name="MoreHorizontal" className="size-4" />
             </Menu.Trigger>

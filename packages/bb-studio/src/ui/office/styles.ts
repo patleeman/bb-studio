@@ -19,7 +19,7 @@ export const SECTION_HEADER =
   "group/section flex h-7 items-center gap-1 px-2 text-xs font-medium text-muted-foreground";
 
 export const SECTION_ACTION =
-  "ml-auto inline-flex size-6 items-center justify-center rounded-md text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-muted-foreground focus-visible:opacity-100 group-hover/section:opacity-100 max-md:pointer-coarse:opacity-100";
+  "ml-auto inline-flex size-6 items-center justify-center rounded-md text-subtle-foreground opacity-0 hover:bg-state-hover hover:text-muted-foreground focus-visible:opacity-100 group-hover/section:opacity-100 max-md:pointer-coarse:size-10 max-md:pointer-coarse:opacity-100";
 
 export const COUNT = "shrink-0 text-xs tabular-nums text-muted-foreground";
 
@@ -37,6 +37,6 @@ export const MENU_ITEM =
 
 /** Small icon buttons that appear on a row while it's hovered. */
 export const ROW_HOVER_BUTTON =
-  "hidden size-6 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground focus-visible:flex max-md:pointer-coarse:flex [&_svg]:size-3.5";
+  "hidden size-6 items-center justify-center rounded-md text-subtle-foreground hover:bg-state-hover hover:text-muted-foreground focus-visible:flex [&_svg]:size-3.5";
 
 export const MENU_SEPARATOR = "-mx-1 my-1 h-px bg-border";

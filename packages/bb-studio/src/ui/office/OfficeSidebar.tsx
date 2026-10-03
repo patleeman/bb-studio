@@ -70,7 +70,7 @@ export function folderRows(folder: TreeFolder, threads: readonly PluginSidebarTh
   const rows: Row[] = [
     ...threads.filter((thread) => thread.projectId === folder.id && isMyThread(thread) && !thread.isPinned)
       .map((thread) => ({ type: "thread" as const, at: Math.max(thread.updatedAt, thread.latestAttentionAt), thread })),
-    ...folder.items.filter((item) => !HIDDEN_KINDS.has(item.kind)).map((item) => ({ type: "item" as const, at: item.updatedAt, item })),
+    ...folder.items.filter((item) => !HIDDEN_KINDS.has(item.kind) && item.title.trim() && item.title !== "Untitled").map((item) => ({ type: "item" as const, at: item.updatedAt, item })),
   ];
   return rows
     .filter((row) => (row.type === "thread" && threadIsLive(row.thread)) || now - row.at < ACTIVE_WINDOW_MS)
@@ -166,7 +166,7 @@ function ItemButton({ item, author, active, indent }: { item: TreeItem; author: 
   );
 }
 
-export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
+export function OfficeSidebar({ activeThreadId, onNavigate, isCompactViewport }: PluginThreadListProps) {
   const { current } = useSpaces();
   const spaceId = current?.id ?? null;
   const pathname = usePathname();
@@ -208,7 +208,18 @@ export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListPr
         title="Team"
         action={<button type="button" aria-label="Add a bot" className={SECTION_ACTION} onClick={() => { openOffice("team/new"); onNavigate(); }}><Icon name="Plus" className="size-3.5" /></button>}
       >
-        {team.bots.length
+        {team.bots.length && isCompactViewport
+          // No hover on touch, so faces come with their names.
+          ? <div className="space-y-px pb-1">
+              {team.bots.map((bot) => (
+                <button key={bot.id} type="button" onClick={() => { openOffice(`team/${encodeURIComponent(bot.id)}`); onNavigate(); }} className={cn(ROW, "h-10")}>
+                  <Face name={bot.name} avatar={bot.avatar} state={bot.state} size="sm" />
+                  <span className={ROW_LABEL}>{bot.name}</span>
+                  {externalAgentName(bot.providerId) ? <span className="shrink-0 text-xs text-muted-foreground">{externalAgentName(bot.providerId)}</span> : null}
+                </button>
+              ))}
+            </div>
+          : team.bots.length
           ? <div className="flex flex-wrap gap-1.5 px-1.5 pt-0.5 pb-2">
               {team.bots.map((bot) => {
                 const selected = officeSub?.startsWith(`team/${bot.id}`) ?? false;
@@ -244,7 +255,7 @@ export function OfficeSidebar({ activeThreadId, onNavigate }: PluginThreadListPr
                 );
               })}
             </div>
-          : team.loading ? null
+          : team.data === null || spaceId === null || team.loading ? null
           : <p className="px-2 pb-2 text-xs text-muted-foreground">No bots in this space yet.</p>}
         {conversations.filter((conversation) => !conversation.isDirect).map((conversation) => (
           <button key={conversation.id} type="button" onClick={() => { openAppPath(conversation.href); onNavigate(); }} className={cn(ROW, pathname === conversation.href && ROW_ACTIVE)}>

@@ -1,6 +1,6 @@
 // A bot's desk. Chat is the ongoing DM (quick asks and its reports), Tasks is
 // the work you've handed it, Profile is its instructions and memory.
-import { ThreadChat } from "@get-bb/plugin-sdk/app";
+import { Markdown, ThreadChat } from "@get-bb/plugin-sdk/app";
 import { Icon, OUTLINE_BUTTON, PRIMARY_BUTTON, PageColumn, openAppPath } from "@bb-studio/kit/app";
 import { useState } from "react";
 import { DelegateDialog } from "./DelegateDialog";
@@ -10,6 +10,8 @@ import { TaskRow } from "./OfficeHome";
 import { useCall, useLive, useTeam, type BotDesk as Desk, type Space } from "./model";
 import { openOffice } from "./routes";
 import { cn } from "./styles";
+import { InboxRow } from "./InboxRow";
+import type { InboxEvent } from "./model";
 
 const TABS = [
   { id: "chat", label: "Chat" },
@@ -31,6 +33,9 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
   const health = useExternalHealth([desk.data?.bot.providerId]);
   const agentHealth = desk.data?.bot.providerId ? health[desk.data.bot.providerId] : undefined;
   const [delegating, setDelegating] = useState(false);
+  // This bot's recent reports and requests, so its desk isn't empty before a DM exists.
+  const activity = useLive<{ events: InboxEvent[] }>("inbox_list", { spaceId: space.id }, { pollMs: 60_000 });
+  const botEvents = (activity.data?.events ?? []).filter((event) => event.botId === botId).slice(0, 8);
   const [starting, setStarting] = useState(false);
 
   if (desk.error && !desk.data) return <PageColumn><p role="alert" className="text-sm text-destructive">{desk.error}</p></PageColumn>;
@@ -85,8 +90,16 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
                 <ThreadChat key={directThreadId} threadId={directThreadId} variant="full" layout="contained" className="min-h-0 flex-1" />
               </div>
             : <div className="mx-auto max-w-3xl px-10 py-10 text-sm text-muted-foreground @max-3xl/page:px-4">
-                <p>You haven't talked with {bot.name} directly yet.</p>
-                <button type="button" disabled={starting} onClick={() => void startDirect()} className={cn(OUTLINE_BUTTON, "mt-3")}>Message {bot.name}</button>
+                <div className="flex items-center gap-3">
+                  <p className="flex-1">You haven't messaged {bot.name} directly yet.</p>
+                  <button type="button" disabled={starting} onClick={() => void startDirect()} className={OUTLINE_BUTTON}>Message {bot.name}</button>
+                </div>
+                {botEvents.length
+                  ? <section className="mt-8 text-foreground">
+                      <h2 className="mb-1 text-sm font-medium text-muted-foreground">Recent from {bot.name}</h2>
+                      <ul>{botEvents.map((event) => <InboxRow key={event.key} event={event} bot={bot} onChanged={activity.refresh} />)}</ul>
+                    </section>
+                  : null}
               </div>
           : null}
         {tab === "tasks"
@@ -102,7 +115,7 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
                 <dt className="text-muted-foreground">Role</dt><dd>{bot.role ?? "Not set"}</dd>
                 <dt className="text-muted-foreground">Model</dt><dd>{bot.model ?? "Space default"}</dd>
                 {agent
-                  ? <><dt className="text-muted-foreground">Runs on</dt><dd>{agent}, an outside agent{agentHealth ? ` · ${agentHealth.online ? "online" : `offline${agentHealth.message ? `: ${agentHealth.message}` : ""}`}` : ""}</dd></>
+                  ? <><dt className="text-muted-foreground">Runs on</dt><dd>{agent}, an outside agent{agentHealth && !agentHealth.online && agentHealth.message ? <span className="block text-muted-foreground">{agentHealth.message}</span> : null}</dd></>
                   : null}
                 <dt className="text-muted-foreground">Trust</dt>
                 <dd>
@@ -113,8 +126,16 @@ export function BotDesk({ space, botId, tab }: { space: Space; botId: string; ta
               </dl>
               {desk.data.memory
                 ? <div className="mt-8 space-y-6">
-                    <section><h2 className="mb-2 text-sm font-medium text-muted-foreground">Mission</h2><pre className="whitespace-pre-wrap rounded-md border border-border p-3 font-sans text-sm">{desk.data.memory.mission || "No mission yet."}</pre></section>
-                    <section><h2 className="mb-2 text-sm font-medium text-muted-foreground">Memory</h2><pre className="whitespace-pre-wrap rounded-md border border-border p-3 font-sans text-sm">{desk.data.memory.memory || "Nothing remembered yet."}</pre></section>
+                    {/* Skip the mission when it only repeats the role shown above. */}
+                    {desk.data.memory.mission.trim() && desk.data.memory.mission.trim() !== (bot.role ?? "").trim()
+                      ? <section><h2 className="mb-2 text-sm font-medium text-muted-foreground">Mission</h2><Markdown content={desk.data.memory.mission} className="rounded-md border border-border p-3 text-sm" /></section>
+                      : null}
+                    <section>
+                      <h2 className="mb-2 text-sm font-medium text-muted-foreground">Memory</h2>
+                      {desk.data.memory.memory.replace(/^#\s*Memory\s*$/im, "").trim()
+                        ? <Markdown content={desk.data.memory.memory} className="rounded-md border border-border p-3 text-sm" />
+                        : <p className="text-sm text-muted-foreground">Nothing remembered yet. {bot.name} adds notes here as it works.</p>}
+                    </section>
                   </div>
                 : null}
               <button type="button" onClick={() => openAppPath(desk.data!.profileHref)} className={cn(OUTLINE_BUTTON, "mt-6")}><Icon name="Edit" aria-hidden />Edit profile</button>

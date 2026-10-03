@@ -43,7 +43,7 @@ export default definePluginApp((app) => {
   // The office (docs/office-model.md). Its sidebar replaces the folded
   // Sidebar and Navigation modules, gated the same way they were.
   registerOfficeApp(app, { sidebar: moduleApp(app, "sidebar"), navigation: moduleApp(app, "navigation") });
-  app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot) });
+  app.slots.navPanel({ id: "studio", title: "Library", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot) });
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   // Renders nothing itself; portals the tabs section into the Studio Sidebar.

@@ -14,8 +14,13 @@ import { openOffice } from "./routes";
 import { SpaceMark } from "./SpaceSwitcher";
 import { KIND_ICONS } from "./OfficeSidebar";
 import { cn } from "./styles";
+import { describeSchedule } from "./text";
 
-const SHOWN_REPORTS = 5;
+// Home is a glance: a few of each, with the full lists in the Inbox.
+const SHOWN_NEEDS = 3;
+const SHOWN_REPORTS = 3;
+const SHOWN_RECENT = 6;
+const RECENT_HIDDEN = new Set(["task", "dictation", "bot", "view", "space"]);
 
 function Block({ title, action, children }: { title: string; action?: ReactNode; children: ReactNode }) {
   return (
@@ -37,7 +42,10 @@ const STATUS: Record<WorkingTask["status"], { label: string; tone: string }> = {
 };
 
 export function TaskRow({ task, bot }: { task: WorkingTask; bot: TeamBot | undefined }) {
-  const status = STATUS[task.status];
+  // A standing duty that isn't mid-run is scheduled, not working.
+  const idleRecurring = task.recurring !== null && task.status === "working" && bot?.state !== "working";
+  const status = idleRecurring ? { label: "Scheduled", tone: "text-muted-foreground" } : STATUS[task.status];
+  const schedule = describeSchedule(task.recurring);
   return (
     <li className="border-b border-border last:border-b-0">
       <button type="button" onClick={() => openAppPath(task.href)} className="flex w-full items-center gap-3 py-2.5 text-left hover:bg-state-hover/50">
@@ -45,7 +53,7 @@ export function TaskRow({ task, bot }: { task: WorkingTask; bot: TeamBot | undef
         <span className="min-w-0 flex-1">
           <span className="flex items-center gap-2 text-sm font-medium">
             <span className="truncate">{task.title}</span>
-            {task.recurring ? <span className="flex shrink-0 items-center gap-1 rounded border border-border px-1 text-[11px] font-normal text-muted-foreground"><Icon name="Repeat" className="size-3" aria-hidden />{task.recurring}</span> : null}
+            {schedule ? <span className="flex shrink-0 items-center gap-1 rounded border border-border px-1 text-[11px] font-normal text-muted-foreground"><Icon name="Repeat" className="size-3" aria-hidden />{schedule}</span> : null}
           </span>
           <span className="block truncate text-sm text-muted-foreground">{bot?.name ?? "Bot"}{task.note ? ` · ${task.note}` : ""}</span>
         </span>
@@ -64,9 +72,13 @@ export function OfficeHome({ space }: { space: Space }) {
   const [notice, setNotice] = useState<string | null>(null);
 
   const needs = home.data?.needsYou ?? [];
-  const working = home.data?.working ?? [];
+  const allWorking = home.data?.working ?? [];
+  // Live work first; standing duties wait in a one-line summary until opened.
+  const working = allWorking.filter((task) => task.recurring === null || botById.get(task.botId)?.state === "working");
+  const duties = allWorking.filter((task) => !working.includes(task));
+  const [showDuties, setShowDuties] = useState(false);
   const reports = home.data?.reports ?? [];
-  const recent = home.data?.recent ?? [];
+  const recent = (home.data?.recent ?? []).filter((item) => !RECENT_HIDDEN.has(item.kind) && item.title.trim() && item.title !== "Untitled");
   const today = new Intl.DateTimeFormat(undefined, { weekday: "long", month: "long", day: "numeric" }).format(new Date());
 
   return (
@@ -93,22 +105,36 @@ export function OfficeHome({ space }: { space: Space }) {
       {notice ? <p role="status" className="mt-2 text-sm text-muted-foreground">{notice}</p> : null}
       {home.error && !home.data ? <p role="alert" className="mt-4 text-sm text-destructive">{home.error}</p> : null}
 
-      <Block title="Needs you">
+      <Block
+        title="Needs you"
+        action={needs.length > SHOWN_NEEDS ? <button type="button" onClick={() => openOffice("inbox")} className="text-sm text-muted-foreground hover:text-foreground">All {needs.length} in Inbox</button> : null}
+      >
         {needs.length
-          ? <ul>{needs.map((event) => <InboxRow key={event.key} event={event} bot={event.botId ? botById.get(event.botId) : undefined} onChanged={home.refresh} />)}</ul>
+          ? <ul>{needs.slice(0, SHOWN_NEEDS).map((event) => <InboxRow key={event.key} event={event} bot={event.botId ? botById.get(event.botId) : undefined} onChanged={home.refresh} />)}</ul>
           : home.data ? <p className="py-2 text-sm text-muted-foreground">Nothing is waiting on you.</p> : null}
       </Block>
 
-      {working.length
+      {working.length || duties.length
         ? <Block title="Your team is working on">
-            <ul>{working.map((task) => <TaskRow key={task.id} task={task} bot={botById.get(task.botId)} />)}</ul>
+            {working.length
+              ? <ul>{working.map((task) => <TaskRow key={task.id} task={task} bot={botById.get(task.botId)} />)}</ul>
+              : <p className="py-2 text-sm text-muted-foreground">Nothing running right now.</p>}
+            {duties.length
+              ? <>
+                  <button type="button" aria-expanded={showDuties} onClick={() => setShowDuties(!showDuties)} className="mt-1 flex items-center gap-1.5 py-1.5 text-sm text-muted-foreground hover:text-foreground">
+                    <Icon name={showDuties ? "ChevronDown" : "ChevronRight"} className="size-3.5" aria-hidden />
+                    {duties.length} standing {duties.length === 1 ? "duty" : "duties"} on a schedule
+                  </button>
+                  {showDuties ? <ul>{duties.map((task) => <TaskRow key={task.id} task={task} bot={botById.get(task.botId)} />)}</ul> : null}
+                </>
+              : null}
           </Block>
         : null}
 
       {reports.length
         ? <Block
             title="Reports"
-            action={reports.length > SHOWN_REPORTS ? <button type="button" onClick={() => openOffice("inbox")} className="text-sm text-muted-foreground hover:text-foreground">All reports</button> : null}
+            action={reports.length > SHOWN_REPORTS ? <button type="button" onClick={() => openOffice("inbox")} className="text-sm text-muted-foreground hover:text-foreground">All {reports.length} in Inbox</button> : null}
           >
             <ul>{reports.slice(0, SHOWN_REPORTS).map((event) => <InboxRow key={event.key} event={event} bot={event.botId ? botById.get(event.botId) : undefined} onChanged={home.refresh} />)}</ul>
           </Block>
@@ -117,7 +143,7 @@ export function OfficeHome({ space }: { space: Space }) {
       {recent.length
         ? <Block title="Recent work">
             <ul>
-              {recent.slice(0, 8).map((item) => {
+              {recent.slice(0, SHOWN_RECENT).map((item) => {
                 const author = item.authorBotId ? botById.get(item.authorBotId) : undefined;
                 return (
                   <li key={`${item.pluginId}:${item.id}`}>
