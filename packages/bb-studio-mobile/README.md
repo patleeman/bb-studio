@@ -31,6 +31,13 @@ bb plugin install .
 
 ## Staged preview
 
+![Native Office Inbox connected to staged BB](assets/office-inbox.png)
+
+The private iPhone simulator shows the staged Inbox request, review task, and
+report. [Office QA evidence](../../docs/review-evidence/2026-10-03/office/) includes
+Home, Work, and Team captures from the same server.
+
+
 ![Studio Mobile settings in the running BB app](assets/staged-preview.png)
 
 The plugin's settings page in a staged BB (`node scripts/staged-bb.mjs start`) shows the APNs key, key ID, team,

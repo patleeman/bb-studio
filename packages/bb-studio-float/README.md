@@ -10,15 +10,13 @@ right, or drag it anywhere.
 
 ![Live BB screenshot of Float's tab panel dragged over Studio](assets/staged-preview.png)
 
-Captured from a staged BB (`node scripts/staged-bb.mjs start`): a Studio
-page ("Offline mode launch"), the seeded "Draft the ORBIT-42 release notes"
-thread and the "Checkout flow" drawing, each floated from its sidebar menu,
-as three tabs in one panel. The drawing's tab was dragged to the front,
-then the pinned page was selected over the Studio list. The capture also
-checks the real Pages editor and an unsent thread draft through tab switches,
-folding, hiding, and moving Float, and verifies the pin in saved state.
-Before their first Float moves, it records the main Pages editor and drawing
-canvas and verifies that both original nodes move into their companions.
+Captured from stable BB with the Office sidebar, Orbit fixtures, and an open
+Page above Home. The capture uses the page header's **Move → Float this** action
+and verifies that the original live editor remains mounted when Home opens.
+
+```sh
+BB_CAPTURE_ONLY=office-float node scripts/capture-plugin-screenshots.mjs --plugin float
+```
 
 ![The original main Pages editor after a mobile header move](assets/first-main-transfer-mobile.png)
 

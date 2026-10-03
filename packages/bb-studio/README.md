@@ -62,6 +62,27 @@ work. Run `node scripts/staged-bb.mjs start`, source its `capture.env`, then use
 `scripts/capture-plugin-screenshots.mjs`. Capture definitions assert the live
 surface and fixture content before writing images.
 
+The Home capture shows the Orbit folder, three Team faces, a pending request,
+a review task, and a report. The same staged data is used for these views:
+
+| View | Live capture |
+| --- | --- |
+| Inbox, All spaces | [Inbox](assets/office-inbox.png) |
+| Team faces and folders | [Sidebar](assets/office-sidebar.png) |
+| Atlas's desk | [Chat](assets/office-bot-chat.png), [Tasks](assets/office-bot-tasks.png) |
+| Space settings | [Settings](assets/office-settings.png) |
+| Delegation | [Hand off work](assets/office-delegate.png) |
+| Ask first | [Approval card](assets/office-approval.png) |
+
+The approval is an inert staged request. Captures do not submit it or dispatch
+work to a bot. To reproduce the Office captures, source the staged `capture.env`
+and run:
+
+```sh
+node scripts/capture/seed-office.mjs
+BB_CAPTURE_ONLY=office-home,office-inbox,office-sidebar,office-bot-chat,office-bot-tasks,office-settings,office-delegate,office-approval node scripts/capture-plugin-screenshots.mjs --plugin studio
+```
+
 ## Commands and agent tools
 
 ```sh
