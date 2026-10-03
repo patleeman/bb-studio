@@ -68,6 +68,12 @@ function ThreadExplainers({ threadId }: { threadId?: string }) {
     const event = explainerEvent(payload);
     if (event && (!threadId || event.threadId === threadId)) load();
   });
+  const running = explainers?.some(explainer => rowState(explainer) === "running") ?? false;
+  useEffect(() => {
+    if (!running) return;
+    const timer = setInterval(load, POLL_MS);
+    return () => clearInterval(timer);
+  }, [running, load]);
   if (error) return <PanelMessage title="Couldn't load explainers" detail={error}><button type="button" className="rounded-md border border-border px-3 py-1.5 text-sm hover:bg-state-hover" onClick={load}>Retry</button></PanelMessage>;
   if (explainers === null) return <p className="p-4 text-sm text-muted-foreground">Loading…</p>;
   if (!explainers.length) {
