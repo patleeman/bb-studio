@@ -113,6 +113,7 @@ struct RouteDestination: View {
         case .feed: FeedView()
         case .feedPost(let id): FeedPostView(id: id).id(id)
         case .studioCollection: StudioView()
+        case .botDesk(let id): BotDeskView(botId: id).id(id)
         }
     }
 }

@@ -25,7 +25,6 @@ struct TeamTab: View {
             }
             .navigationBarTitleDisplayMode(.inline)
             .navigationDestination(for: Route.self) { RouteDestination(route: $0) }
-            .navigationDestination(for: BotDeskRoute.self) { BotDeskView(botId: $0.botId) }
             .sheet(isPresented: $adding) {
                 if let space = office.currentSpace { AddBotSheet(space: space) }
             }
@@ -110,7 +109,6 @@ struct AddBotSheet: View {
     }
 }
 
-struct BotDeskRoute: Hashable { var botId: String }
 
 private struct TeamList: View {
     @Environment(OfficeContext.self) private var office
@@ -131,7 +129,7 @@ private struct TeamList: View {
                 } else {
                     LazyVGrid(columns: columns, spacing: 16) {
                         ForEach(store.bots) { bot in
-                            NavigationLink(value: BotDeskRoute(botId: bot.id)) {
+                            NavigationLink(value: Route.botDesk(id: bot.id)) {
                                 VStack(spacing: 6) {
                                     Face(bot, size: 52)
                                     Text(bot.name).font(.caption).lineLimit(1)

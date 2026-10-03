@@ -25,6 +25,8 @@ enum Route: Hashable {
     case feedPost(id: String)
     /// Every Studio item, filtered by kind; reached from Work and Search.
     case studioCollection
+    /// A bot's desk in the office: its DM, tasks and profile.
+    case botDesk(id: String)
 }
 
 extension Route {
