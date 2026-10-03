@@ -353,6 +353,7 @@ struct StudioKind: Identifiable, Hashable {
 }
 
 struct StudioView: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     @EnvironmentObject private var app: AppModel
     private let operation = ServerOperation()
     private var client: BBClient { operation.client }
@@ -583,7 +584,8 @@ struct StudioView: View {
 
     /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
-        HStack(spacing: 10) {
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("talk") ? 2 : 0) + (store.plugins.contains("studio-tasks") ? 1 : 0)
+        return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.plugins.contains("talk") {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
                     if store.plugins.contains("pages") {
@@ -619,6 +621,7 @@ struct StudioView: View {
             VStack(spacing: 6) {
                 Image(systemName: symbol).font(.title2).foregroundStyle(tint)
                 Text(title).font(.footnote.weight(.medium)).foregroundStyle(.primary)
+                    .fixedSize(horizontal: false, vertical: true)
             }
             .frame(maxWidth: .infinity, minHeight: 72)
             .background(Color(.secondarySystemGroupedBackground), in: .rect(cornerRadius: 14))
@@ -1164,6 +1167,7 @@ struct StudioView: View {
 }
 
 struct StudioRow: View {
+    @Environment(\.dynamicTypeSize) private var dynamicTypeSize
     let item: StudioItem
     let project: String?
     var tags: [StudioTag] = []
@@ -1187,28 +1191,34 @@ struct StudioRow: View {
             .background(kind.tint.opacity(0.12), in: .rect(cornerRadius: 9))
             .clipShape(.rect(cornerRadius: 9))
             VStack(alignment: .leading, spacing: 3) {
-                HStack(alignment: .firstTextBaseline) {
+                (dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 3))
+                    : AnyLayout(HStackLayout(alignment: .firstTextBaseline))) {
                     Text(item.displayTitle)
                         .fontWeight(.medium)
                         .foregroundStyle(item.title.isEmpty ? .secondary : .primary)
-                        .lineLimit(2)
-                    Spacer(minLength: 4)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
+                    if !dynamicTypeSize.isAccessibilitySize { Spacer(minLength: 4) }
                     Text(Date(timeIntervalSince1970: item.updatedAt / 1000), format: .relative(presentation: .named, unitsStyle: .abbreviated))
                         .font(.caption)
                         .foregroundStyle(.secondary)
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .fixedSize(horizontal: false, vertical: true)
                 }
                 if let snippet {
                     Text(Self.highlighted(snippet, highlight)).font(.subheadline).foregroundStyle(.secondary).lineLimit(3)
                         .accessibilityIdentifier("studioSnippet")
                 } else if let preview = item.preview, !preview.isEmpty {
-                    Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(2)
+                    Text(preview).font(.subheadline).foregroundStyle(.secondary).lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 2)
                 }
-                HStack(spacing: 4) {
+                (dynamicTypeSize.isAccessibilitySize
+                    ? AnyLayout(VStackLayout(alignment: .leading, spacing: 4))
+                    : AnyLayout(HStackLayout(spacing: 4))) {
                     // Empty facts, like a task with no due day, and ones the badge already says, are left out.
                     let facts = item.facts.map(\.display).filter { !$0.isEmpty && $0 != item.badge?.label }
                     Text(([kind.label] + [project].compactMap { $0 } + facts).joined(separator: " · "))
-                        .lineLimit(1)
+                        .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .fixedSize(horizontal: false, vertical: true)
                     if let badge = item.badge {
                         Text(badge.label)
                             .font(.caption2.weight(.semibold))
@@ -1224,11 +1234,12 @@ struct StudioRow: View {
                             .padding(.vertical, 1)
                             .foregroundStyle(Color(hex: tag.color))
                             .background(Color(hex: tag.color).opacity(0.15), in: .capsule)
-                            .lineLimit(1)
+                            .lineLimit(dynamicTypeSize.isAccessibilitySize ? nil : 1)
+                        .fixedSize(horizontal: false, vertical: true)
                     }
                 }
                 .font(.caption)
-                .foregroundStyle(.tertiary)
+                .foregroundStyle(.secondary)
             }
         }
         .padding(.vertical, 2)

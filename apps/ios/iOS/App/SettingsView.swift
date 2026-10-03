@@ -18,7 +18,9 @@ struct SettingsView: View {
     var body: some View {
         Form {
             Section {
-                TextField("https://machine.tailnet.ts.net", text: $serverURL)
+                TextField("https://machine.tailnet.ts.net", text: $serverURL, axis: .vertical)
+                    .accessibilityLabel("BB server URL")
+                    .accessibilityIdentifier("settingsServerURL")
                     .textInputAutocapitalization(.never)
                     .autocorrectionDisabled()
                     .keyboardType(.URL)

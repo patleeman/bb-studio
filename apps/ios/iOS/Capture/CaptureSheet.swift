@@ -100,10 +100,11 @@ struct CaptureSheet: View {
                     Button { choose(option) } label: {
                         HStack(spacing: 16) {
                             Image(systemName: option.symbol)
-                                .font(.title2)
+                                .font(.system(size: 24))
                                 .frame(width: 32)
                                 .accessibilityHidden(true)
                             Text(option.title).font(.title3.weight(.semibold))
+                                .fixedSize(horizontal: false, vertical: true)
                             Spacer()
                             if option.rawValue == lastOption {
                                 Image(systemName: "clock.arrow.circlepath")
@@ -135,7 +136,7 @@ struct CaptureSheet: View {
                 Task { await saveNote() }
             } label: {
                 if saving { ProgressView().frame(maxWidth: .infinity) }
-                else { Text("Save note").frame(maxWidth: .infinity) }
+                else { Text("Save note").fixedSize(horizontal: false, vertical: true).frame(maxWidth: .infinity) }
             }
             .buttonStyle(.borderedProminent)
             .controlSize(.large)
