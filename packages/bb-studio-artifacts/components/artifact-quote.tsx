@@ -224,7 +224,7 @@ export function QuoteCard({
       <button
         type="button"
         {...{ [IGNORE]: "" }}
-        className="fixed z-40 flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm shadow-lg hover:bg-state-hover"
+        className="fixed z-50 flex h-8 items-center gap-1.5 rounded-md border border-border bg-background px-2.5 text-sm shadow-lg hover:bg-state-hover"
         style={{ top, left: clampLeft(rect.left, 180) }}
         // Keep the page's selection while the button takes the click.
         onMouseDown={(event) => event.preventDefault()}
@@ -239,7 +239,7 @@ export function QuoteCard({
     <section
       {...{ [IGNORE]: "" }}
       aria-label="Send to thread"
-      className="fixed z-40 flex flex-col gap-2 rounded-lg border border-border bg-background p-3 shadow-xl"
+      className="fixed z-50 flex flex-col gap-2 rounded-lg border border-border bg-background p-3 shadow-xl"
       style={{ top, left: clampLeft(rect.left, CARD_WIDTH), width: CARD_WIDTH }}
       onKeyDown={(event) => {
         if (event.key === "Escape") onClose();

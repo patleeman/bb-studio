@@ -60,6 +60,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
       try {
         await client.navigate(`/plugins/pages/pages/${notes.id}`);
         await client.waitForText("Release notes: October");
+        await client.navigate(`/plugins/pages/pages/${page.id}`);
+        await client.waitForText("Offline mode launch");
         await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
         await client.waitForSelector("canvas.excalidraw__canvas");
         await chat(drawingChat);
@@ -87,7 +89,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         if (!input.nodeId) throw new Error("New conversation has no native attachment input");
         await client.command("DOM.setFileInputFiles", { nodeId: input.nodeId, files: [attachment] });
         await client.waitForText("release-review.txt");
-        await client.evaluate(`window.bbChatDraft = document.querySelector(${JSON.stringify(prompt)})`);
+        await client.evaluate(`(() => { window.bbChatDraft = document.querySelector(${JSON.stringify(prompt)}); return true; })()`);
         const retained = async visible => {
           const state = await client.evaluate(`(() => {
             const prompt = document.querySelector(${JSON.stringify(prompt)});
@@ -107,12 +109,12 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
           throw new Error("Opening a new composer changed the existing item link");
 
         // A page in Float owns its Chat action while the main pane shows the drawing.
-        await client.navigate(`/plugins/pages/pages/${page.id}`);
+        await client.dragBy(`[data-studio-tab="pages:${page.id}"] a`, 0, 0);
         await client.waitForText("Offline mode launch");
         await client.clickAriaButtonWithPointer("Move");
         await client.clickElementWithTextAndPointer('[role="menuitem"]', "Float this");
         await client.waitForSelector(pageChat);
-        await client.navigate(`/plugins/excalidraw/drawings/${drawing.id}`);
+        await client.dragBy(`[data-studio-tab="excalidraw:${drawing.id}"] a`, 0, 0);
         await client.waitForSelector(pageChat);
         await chat(pageChat);
         await expectComposer("Offline mode launch", pageRef);
@@ -151,9 +153,21 @@ export default ({ projectId, threadId, seedPages, seedDrawing, pluginRpc, sleep 
         await pluginRpc("artifacts", "update", { id: artifactId, title: "Release diagram", description: "A deterministic diagram for cropped-image chat context." });
         await client.navigate(`/plugins/artifacts/artifacts/${artifactId}`);
         await client.waitForSelector('img[alt="release-diagram.png"]');
+        const deadline = Date.now() + 15000;
+        while (!(await client.evaluate(`document.querySelector('img[alt="release-diagram.png"]')?.naturalWidth === 640`))) {
+          if (Date.now() > deadline) throw new Error("The seeded release diagram did not load");
+          await sleep(100);
+        }
         await client.dragBy('img[alt="release-diagram.png"]', 90, 50, { atX: 130 });
-        await client.clickElementWithTextAndPointer("button", "Send to thread");
         await client.waitForSelector('section[aria-label="Send to thread"]');
+        const quoteTargets = await client.evaluate(`(() => {
+          const card = document.querySelector('section[aria-label="Send to thread"]');
+          return [...card.querySelectorAll('textarea,button')].filter(element => {
+            const rect = element.getBoundingClientRect(), hit = document.elementFromPoint(rect.x + rect.width/2, rect.y + rect.height/2);
+            return !hit || !element.contains(hit);
+          }).map(element => element.getAttribute('aria-label') ?? element.textContent);
+        })()`);
+        if (quoteTargets.length) throw new Error(`Quote controls are covered: ${JSON.stringify(quoteTargets)}`);
         await client.dragBy('textarea[aria-label="Note"]', 0, 0);
         await client.command("Input.insertText", { text: "Clarify this retry arrow before release." });
         await client.clickElementWithTextAndPointer('section[aria-label="Send to thread"] button', "Send");
