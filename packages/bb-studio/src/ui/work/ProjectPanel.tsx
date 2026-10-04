@@ -17,6 +17,7 @@ import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, floatWindowKey, openApp
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCall, useLive } from "./model";
 import { useWork } from "./projects";
+import { useStartThread } from "./StartThread";
 import { PROJECTS_PANEL, projectIdOf } from "./routes";
 import { ThreadGlyph } from "./Sidebar";
 import { Face } from "./Face";
@@ -176,6 +177,7 @@ function ProjectView({ projectId }: { projectId: string }) {
   const project = useProject(projectId);
   const { projects } = useSidebarThreads();
   const work = useWork();
+  const startThread = useStartThread();
   const threadActions = useSidebarThreadActions();
   const [error, setError] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
@@ -207,11 +209,12 @@ function ProjectView({ projectId }: { projectId: string }) {
         {leadThreadId
           ? <button type="button" onClick={() => setHandingOff(true)} title="Hand the lead to another agent" className={GHOST_BUTTON}><Icon name="Fork" className="size-4" />Hand off</button>
           : null}
-        <button type="button" onClick={() => threadActions.openNewThread({ projectId: startIn, focusPrompt: true })} className={GHOST_BUTTON}>
+        <button type="button" onClick={() => (work.canOrganize ? startThread.start(projectId) : threadActions.openNewThread({ projectId: startIn, focusPrompt: true }))} className={GHOST_BUTTON}>
           <Icon name="MessageSquarePlus" className="size-4" />New thread
         </button>
         {bbProject && !bbProject.isPersonal && !chief ? <button type="button" aria-label="Folder settings" title="Folder settings" onClick={() => openAppPath(bbProject.settingsHref)} className={GHOST_BUTTON}><Icon name="Settings" className="size-4" /></button> : null}
       </header>
+      {startThread.dialog}
       {leadThreadId
         ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4">
             {/* "inherit": send with the lead thread's own permission, not the composer's default. */}

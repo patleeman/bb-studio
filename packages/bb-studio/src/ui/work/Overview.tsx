@@ -17,6 +17,7 @@ import { inboxLink } from "./links";
 import { useCall, useLive, type InboxEvent } from "./model";
 import { useProject } from "./ProjectPanel";
 import { useWork } from "./projects";
+import { useStartThread } from "./StartThread";
 import { PROJECTS_PANEL, projectIdOf } from "./routes";
 import { RUNNING, ThreadGlyph } from "./Sidebar";
 import { plainPreview } from "./text";
@@ -93,6 +94,7 @@ export function ProjectOverview({ projectId, onOpenThread }: { projectId: string
   const inbox = useLive<{ events: InboxEvent[] }>("inbox_list", { spaceId: "all" }, { pollMs: 30_000 });
   const leadId = project.data?.leadThreadId ?? null;
   const work = useWork();
+  const startThread = useStartThread();
   const view = overviewOf(threads, projectId, leadId, inbox.data?.events ?? [], work.projectOf);
   const startIn = [work.chief, ...work.projects].find((entry) => entry?.id === projectId)?.bbProjectId ?? null;
   const run = project.data?.run?.enabled ? project.data.run : null;
@@ -107,6 +109,7 @@ export function ProjectOverview({ projectId, onOpenThread }: { projectId: string
 
   return (
     <div className="pb-4">
+      {startThread.dialog}
       {run
         ? <p className="flex items-center gap-2 px-4 pt-3 text-xs text-muted-foreground"><Icon name="Repeat" className="size-3.5" />The lead checks in {run.cadence === "hourly" ? "every hour" : run.cadence === "daily" ? "every day" : "on weekdays"} and reports to your Inbox.</p>
         : null}
@@ -131,7 +134,7 @@ export function ProjectOverview({ projectId, onOpenThread }: { projectId: string
         : null}
       <Section
         title="Threads"
-        action={<button type="button" aria-label="New thread in this project" title="New thread in this project" onClick={() => threadActions.openNewThread({ ...(startIn ? { projectId: startIn } : {}), focusPrompt: true })} className="inline-flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-4" /></button>}
+        action={<button type="button" aria-label="New thread in this project" title="New thread in this project" onClick={() => (work.canOrganize ? startThread.start(projectId) : threadActions.openNewThread({ ...(startIn ? { projectId: startIn } : {}), focusPrompt: true }))} className="inline-flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-4" /></button>}
       >
         {view.tree.map(({ thread, children }) => (
           <div key={thread.id} className="space-y-px">

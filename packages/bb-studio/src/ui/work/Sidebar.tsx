@@ -22,6 +22,7 @@ import { useCall } from "./model";
 import { useProject } from "./ProjectPanel";
 import { extendSelection, nest, sortThreads, useWork, type ThreadSort, type WorkProject } from "./projects";
 import { projectPath, PROJECTS_PANEL } from "./routes";
+import { useStartThread } from "./StartThread";
 import { MenuBody, RowMenu, ThreadMenu, type MenuEntry, type MoveTarget } from "./ThreadMenu";
 import { MENU, PORTAL_SCOPE, ROW, ROW_ACTIVE, ROW_GLYPH, ROW_LABEL, SECTION, SECTION_ACTION, cn } from "./styles";
 
@@ -101,12 +102,13 @@ function ProjectRename({ project, onDone }: { project: WorkProject; onDone: () =
   );
 }
 
-function ProjectRow({ project, threads, active, canOrganize, onOpen, onMoveThreads, onReorder, onChanged }: {
+function ProjectRow({ project, threads, active, canOrganize, onOpen, onNewThread, onMoveThreads, onReorder, onChanged }: {
   project: WorkProject;
   threads: readonly PluginSidebarThread[];
   active: boolean;
   canOrganize: boolean;
   onOpen: () => void;
+  onNewThread: () => void;
   onMoveThreads: (threadIds: string[], projectId: string) => void;
   onReorder: (draggedId: string, beforeId: string) => void;
   onChanged: () => void;
@@ -125,7 +127,7 @@ function ProjectRow({ project, threads, active, canOrganize, onOpen, onMoveThrea
   );
   const settings = project.bbProjectId ? bbProjects.find((entry) => entry.id === project.bbProjectId)?.settingsHref : null;
   const groups: MenuEntry[][] = [
-    [{ id: "new", label: "New thread", icon: "MessageSquarePlus", run: () => threadActions.openNewThread({ ...(project.bbProjectId ? { projectId: project.bbProjectId } : {}), focusPrompt: true }) }],
+    [{ id: "new", label: "New thread", icon: "MessageSquarePlus", run: () => (canOrganize ? onNewThread() : threadActions.openNewThread({ ...(project.bbProjectId ? { projectId: project.bbProjectId } : {}), focusPrompt: true })) }],
     [
       ...(canOrganize ? [{ id: "rename", label: "Rename", icon: "Edit", run: () => setRenaming(true) }] : []),
       ...(settings ? [{ id: "settings", label: "Folder settings", icon: "Settings", run: () => openAppPath(settings) }] : []),
@@ -193,6 +195,9 @@ function ThreadRow({ thread, depth, active, selected, selection, moveTargets, on
 function NewProjectDialog({ open, onOpenChange, onCreated }: { open: boolean; onOpenChange: (open: boolean) => void; onCreated: (projectId: string) => void }) {
   const call = useCall();
   const { projects: bbProjects } = useSidebarThreads();
+  // One Studio project per folder: hide folders another project already has.
+  const work = useWork();
+  const taken = new Set([work.chief, ...work.projects].map((project) => project?.bbProjectId).filter(Boolean));
   const [name, setName] = useState("");
   const [folder, setFolder] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -227,7 +232,7 @@ function NewProjectDialog({ open, onOpenChange, onCreated }: { open: boolean; on
               <span className="mb-1 block text-muted-foreground">Folder <span className="text-subtle-foreground">(optional, for code)</span></span>
               <select value={folder} onChange={(change) => setFolder(change.target.value)} className="h-8 w-full rounded-md border border-border bg-background px-2 text-sm outline-none focus:ring-1 focus:ring-ring">
                 <option value="">None</option>
-                {bbProjects.filter((project) => !project.isPersonal).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+                {bbProjects.filter((project) => !project.isPersonal && !taken.has(project.id)).map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
               </select>
             </label>
             {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
@@ -290,6 +295,7 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [anchor, setAnchor] = useState<string | null>(null);
   const [creating, setCreating] = useState(false);
+  const startThread = useStartThread();
   const setSort = (by: ThreadSort["by"]) => {
     // Choosing the current order again flips its direction, as in BB.
     const next = { by, desc: sort.by === by ? !sort.desc : by !== "alpha" };
@@ -410,6 +416,7 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
             active={pathname === projectPath(project.id) || activeProject === project.id}
             canOrganize={work.canOrganize}
             onOpen={() => openProject(project.id)}
+            onNewThread={() => startThread.start(project.id)}
             onMoveThreads={moveThreads}
             onReorder={reorder}
             onChanged={work.refresh}
@@ -440,6 +447,7 @@ export function Sidebar({ activeThreadId, onNavigate }: PluginThreadListProps) {
             moveMenu={work.canOrganize ? [moveTargets(null)!.map((target) => ({ id: target.id ?? "none", label: target.name, icon: target.id ? "Folder" : "MessageSquare", run: () => moveThreads([...selected], target.id) }))] : null}
           />
         : null}
+      {startThread.dialog}
       <NewProjectDialog open={creating} onOpenChange={setCreating} onCreated={(id) => { work.refresh(); openProject(id); }} />
     </div>
   );
