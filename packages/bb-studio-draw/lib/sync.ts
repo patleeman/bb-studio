@@ -154,9 +154,5 @@ export function useDrawingSync(
     setServerRev(rev: number) {
       serverRevRef.current = rev;
     },
-    /** Current known server revision (for status display). */
-    getServerRev() {
-      return serverRevRef.current;
-    },
   };
 }

@@ -74,7 +74,13 @@ export function toStudioItem(recording: Recording, transcript: string): StudioIt
   };
 }
 
-const LIVE = new Set(["recording", "paused"]);
+/**
+ * A window is capturing into it; deleting now would strand the audio still on
+ * its way. A paused or interrupted one (its microphone is released) can go.
+ */
+export function refuseWhileCapturing(recording: Recording | null): void {
+  if (recording?.status === "recording") throw new Error("Stop the recording before deleting it.");
+}
 
 /** Studio lists at most this many; past it, Studio keeps tags of items it didn't see. */
 const LIST_LIMIT = 10_000;
@@ -82,7 +88,7 @@ const LIST_LIMIT = 10_000;
 export function registerStudio(
   bb: BbPluginApi,
   schemas: StudioSchemas,
-  deps: { store: TalkStore; removeAudio(id: string): Promise<void>; readAudio?(file: string): Promise<Buffer>; changed(id: string): void },
+  deps: { store: TalkStore; removeAudio(id: string): Promise<void>; readAudio(file: string): Promise<Buffer>; changed(id: string): void },
 ): void {
   const { store } = deps;
   const mustGet = (id: string) => requireItem((key) => store.recording(key), id, "Recording not found.");
@@ -111,7 +117,6 @@ export function registerStudio(
       const row = mustGet(id);
       const output = format === "audio" ? [] : [{ name: `${row.title || "Untitled recording"}.md`, mime: "text/markdown", data: Buffer.from(`# ${row.title}\n\n${store.transcript(id)}\n`).toString("base64") }];
       if (format !== "markdown") {
-        if (!deps.readAudio) throw new Error("Audio export is unavailable.");
         for (const [index, segment] of store.segments(id).entries()) {
           const entry = store.segmentFile(id, segment.id);
           if (!entry) continue;
@@ -146,7 +151,7 @@ export function registerStudio(
       deps.changed(id);
     },
     delete: async (id: string) => {
-      if (LIVE.has(mustGet(id).status)) throw new Error("Stop the recording before deleting it.");
+      refuseWhileCapturing(mustGet(id));
       store.delete(id);
       await deps.removeAudio(id);
       deps.changed(id);

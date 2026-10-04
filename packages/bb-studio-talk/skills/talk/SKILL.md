@@ -89,8 +89,8 @@ or failed. Say so instead of guessing at the missing part.
 - **Mobile.** Recording runs while the BB app is in the foreground. If the
   app goes to the background, the microphone stops; Talk resumes when it
   returns, or shows *Resume* if the system needs a tap first.
-- **Failures.** Pieces that fail to transcribe retry with backoff for about a
-  day, or every 10 minutes while the voice service is off or signed out.
+- **Failures.** Pieces that fail to transcribe retry with backoff for about
+  nine hours, or every 10 minutes while the voice service is off or signed out.
   *Retry* on the recording's page requeues pieces that gave up. Audio is
   never discarded on failure.
 - **Empty recordings.** A dictation or recording that finishes with no

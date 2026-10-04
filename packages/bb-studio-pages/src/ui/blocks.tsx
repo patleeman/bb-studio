@@ -23,7 +23,7 @@ import { Icon } from "@bb-studio/kit/ui";
 import { cn } from "@bb-studio/kit/ui";
 import { chartSpecSchema, parseJsonWith, resolveChart, statItemsSchema, type StatItem } from "../chart-spec";
 import { ThreadTitle } from "@get-bb/plugin-sdk/app";
-import { calloutConfig, chartConfig, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";
+import { calloutConfig, chartConfig, EMBED_KINDS, type EmbedKind, embedConfig, isStudioEmbed, mentionConfig, statsConfig } from "../schema-config";
 import { PLUGIN_ID } from "../constants";
 import { codeBlockSpec } from "./code";
 import { usePagesUi } from "./context";
@@ -293,12 +293,9 @@ const EMBED_ICONS = {
   drawing: "Palette",
   artifact: "File",
   recording: "Mic",
-  task: "CircleCheck",
-  board: "GridView",
   table: "Rows2",
   item: "GridView",
-  space: "Layers",
-} as const;
+} as const satisfies Record<EmbedKind, string>;
 
 function hostOf(url: string): string {
   try {
@@ -365,7 +362,7 @@ function BookmarkCard({ target, title, description, image, loading, onEdit }: {
 }
 
 function EmbedView({ kind, target, title, description, image, onEdit, onPreview }: {
-  kind: keyof typeof EMBED_ICONS;
+  kind: EmbedKind;
   target: string;
   title: string;
   description: string;
@@ -450,7 +447,8 @@ function EmbedView({ kind, target, title, description, image, onEdit, onPreview 
 }
 
 const EmbedBlock = createReactBlockSpec(embedConfig, {
-  render: ({ block, editor }) => (
+  // Kinds since removed (old space widgets) render as nothing.
+  render: ({ block, editor }) => !(EMBED_KINDS as readonly string[]).includes(block.props.kind) ? null : (
     <div
       className={cn(
         "pages-embed my-1 w-full rounded-lg border border-border bg-card/50",

@@ -122,22 +122,11 @@ export default function plugin(bb: BbPluginApi) {
       changed(id);
       return { row };
     },
-    updateRow: ({ id, rowId, values }) => {
-      const row = store.updateRow(id, rowId, values);
-      changed(id);
-      return { row };
-    },
-    deleteRow: ({ id, rowId }) => {
-      store.deleteRow(id, rowId);
-      changed(id);
-      return { ok: true };
-    },
     patchRows: ({ id, ...patch }) => {
       const { table } = store.patchRows(id, patch);
       changed(id);
       return { table };
     },
-    query: (input) => queryPage(store.require(input.id), input),
     exportCsv: ({ id, viewId }) => {
       const table = store.require(id);
       return { csv: csv(table, query(table, viewId)) };
@@ -184,6 +173,13 @@ export default function plugin(bb: BbPluginApi) {
         const table = store.create("Untitled table", projectId);
         changed(table.id);
         return { item: item(table) };
+      },
+      studio_export: ({ id, format }) => {
+        const table = store.require(id);
+        const name = table.title.trim() || "Untitled table";
+        if (format === "csv") return { files: [{ name: `${name}.csv`, mime: "text/csv", data: Buffer.from(csv(table)).toString("base64") }] };
+        if (format === "markdown") return { files: [{ name: `${name}.md`, mime: "text/markdown", data: Buffer.from(markdown(table)).toString("base64") }] };
+        throw new Error(`Unsupported table format: ${format}`);
       },
       studio_action: () => ({
         message: "No table actions available.",
@@ -381,7 +377,7 @@ export default function plugin(bb: BbPluginApi) {
       { name: "export", summary: "Export CSV", usage: "bb tables export <id>" },
       {
         name: "import",
-        summary: "Import CSV from stdin",
+        summary: "Import CSV text",
         usage: "bb tables import <id> --csv <text>",
       },
     ],
@@ -450,7 +446,8 @@ export default function plugin(bb: BbPluginApi) {
             break;
           }
           case "import":
-            output = { imported: importCsv(tableId!, flags.values.csv ?? "") };
+            if (flags.values.csv === undefined) return { exitCode: 1, stderr: "usage: bb tables import <id> --csv <text>\n" };
+            output = { imported: importCsv(tableId!, flags.values.csv) };
             break;
           default:
             return {

@@ -9,7 +9,7 @@ import { COLUMN_TYPE_INFO, type Cell, type Column, type Filter, type FilterOp, t
 import { MENU_ITEM, newColumnId, uniqueName } from "./column-menu";
 import type { TableMeta } from "./state";
 
-export const VIEW_INFO: Record<ViewType, { label: string; icon: string }> = {
+const VIEW_INFO: Record<ViewType, { label: string; icon: string }> = {
   table: { label: "Table", icon: "Rows2" },
   board: { label: "Board", icon: "Columns2" },
   calendar: { label: "Calendar", icon: "Calendar" },
@@ -51,7 +51,7 @@ export function newViewId(): string {
 }
 
 /** A new view of `type`, adding the select or date column it needs when the table has none. */
-export function addView(table: Table, type: ViewType, name: string): TableMeta & { view: View } {
+function addView(table: Table, type: ViewType, name: string): TableMeta & { view: View } {
   let columns = table.columns;
   let groupBy: string | null = null;
   let dateBy: string | null = null;

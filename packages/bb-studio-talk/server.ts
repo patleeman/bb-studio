@@ -21,7 +21,7 @@ import { audioResponse } from "./src/server/audio-response";
 import { audioArchive } from "./src/server/audio-archive";
 import { MENTION_TRANSCRIPT_CHARS, mentionContext, mentionSubtitle } from "./src/server/mentions";
 import { MIGRATIONS, TalkStore } from "./src/server/store";
-import { registerStudio } from "./src/server/studio";
+import { refuseWhileCapturing, registerStudio } from "./src/server/studio";
 import { generateTitle } from "./src/server/titles";
 import { Transcriber } from "./src/server/transcriber";
 import { generateRecordingSummary } from "./src/server/meetings";
@@ -118,6 +118,9 @@ export default async function plugin(bb: BbPluginApi) {
     }
   }
   await discardEmpty();
+  function discardEmptyLater(id: string): void {
+    void discardEmpty(id).catch((error) => bb.log.warn(`Talk could not discard empty recording ${id}: ${String(error)}`));
+  }
 
   // ── Auto-titling ────────────────────────────────────────────────────────
   const titling = new Set<string>();
@@ -170,7 +173,6 @@ export default async function plugin(bb: BbPluginApi) {
       if (!lifetime.signal.aborted) bb.log.warn(`Talk could not summarize ${id}: ${String(error)}`);
     });
   }
-  for (const recording of store.list({ includeArchived: true, limit: 10_000 })) maybeSummarize(recording.id);
 
   // ── Transcription ───────────────────────────────────────────────────────
   const transcriber = new Transcriber({
@@ -187,7 +189,7 @@ export default async function plugin(bb: BbPluginApi) {
     onSegment(id) {
       changed(id);
       maybeTitle(id);
-      void discardEmpty(id);
+      discardEmptyLater(id);
       maybeSummarize(id);
     },
     warn: (message) => bb.log.warn(message),
@@ -260,7 +262,7 @@ export default async function plugin(bb: BbPluginApi) {
       }
       // The caller gets the final state; isEmptyRecording tells it why the
       // recording is about to disappear.
-      void discardEmpty(id);
+      discardEmptyLater(id);
       return recording;
     },
     recording_heartbeat: ({ id }) => {
@@ -274,18 +276,27 @@ export default async function plugin(bb: BbPluginApi) {
       const bytes = Buffer.from(input.audioBase64, "base64");
       if (bytes.length === 0) throw new Error("Empty audio segment.");
       const segmentId = `${input.sessionId}-${input.index}`;
-      if (store.segmentFile(recording.id, segmentId)) return { stored: false };
+      if (store.hasSegment(recording.id, segmentId)) return { stored: false };
+      // Permanent: the client sets the piece aside instead of retrying.
+      if (recording.audioRemoved) throw Object.assign(new Error("This recording's audio was deleted."), { code: "invalid_input" });
       const file = await files.write(recording.id, segmentId, input.mimeType, bytes);
-      const stored = store.addSegment({
-        recordingId: recording.id,
-        sessionId: input.sessionId,
-        index: input.index,
-        startedAt: input.startedAt,
-        durationMs: input.durationMs,
-        mimeType: input.mimeType,
-        bytes: bytes.length,
-        file,
-      });
+      let stored: boolean;
+      try {
+        stored = store.addSegment({
+          recordingId: recording.id,
+          sessionId: input.sessionId,
+          index: input.index,
+          startedAt: input.startedAt,
+          durationMs: input.durationMs,
+          mimeType: input.mimeType,
+          bytes: bytes.length,
+          file,
+        });
+      } catch (error) {
+        // The recording was deleted while the audio was being written.
+        await files.remove(file).catch(() => {});
+        throw error;
+      }
       // A straggler from an outbox that drained after the user stopped.
       if (stored && recording.status === "done") store.setStatus(recording.id, "finishing");
       transcriber.wake();
@@ -336,11 +347,7 @@ export default async function plugin(bb: BbPluginApi) {
       return mustGet(id);
     },
     recording_delete: async ({ id }) => {
-      // A window is capturing into it; deleting now would strand the audio
-      // still on its way. An interrupted one (its window is gone) can go.
-      if (store.recording(id)?.status === "recording") {
-        throw new Error("Stop the recording before deleting it.");
-      }
+      refuseWhileCapturing(store.recording(id));
       const deleted = store.delete(id);
       await files.removeRecording(id);
       if (deleted) changed(id);

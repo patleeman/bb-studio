@@ -407,16 +407,18 @@ export function DrawingEditor({
     }
   }
 
+  /** Deleting here: deleteDrawing() says so and goes back, not the realtime path. */
+  const deleting = useRef(false);
   // Deleted elsewhere (Studio, the CLI, another window) while open.
   useRealtime(REALTIME_CHANNEL, (payload) => {
     const event = payload as { type?: string; drawingId?: string } | null;
-    if (event?.type !== DRAWING_UPDATE_TYPE || event.drawingId !== drawingId) return;
+    if (event?.type !== DRAWING_UPDATE_TYPE || event.drawingId !== drawingId || deleting.current) return;
     void rpc.call("getDrawingUpdatedAt", { id: drawingId }).then(({ updatedAt }) => {
-      if (updatedAt !== 0) return;
+      if (updatedAt !== 0 || deleting.current) return;
       saveQueue.cancel();
       toast.info("This drawing was deleted.");
       onBack(true);
-    });
+    }).catch(() => { /* The next change event checks again. */ });
   });
 
   function rename(next: string) {
@@ -448,6 +450,7 @@ export function DrawingEditor({
   }
 
   async function deleteDrawing() {
+    deleting.current = true;
     try {
       await rpc.call("deleteDrawing", { id: drawingId });
       saveQueue.cancel();
@@ -455,6 +458,7 @@ export function DrawingEditor({
       toast.success("Drawing deleted");
       onBack(true);
     } catch (error) {
+      deleting.current = false;
       toast.error(errorMessage(error));
     }
   }

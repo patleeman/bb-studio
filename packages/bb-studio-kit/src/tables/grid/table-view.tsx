@@ -13,7 +13,7 @@ import { useTableState, type TableApi, type TableMeta } from "./state";
 import { Toolbar } from "./toolbar";
 
 /** Values that keep a new row in a filtered view. */
-export function filterDefaults(table: Table, view: View | undefined): Values {
+function filterDefaults(table: Table, view: View | undefined): Values {
   const values: Values = {};
   for (const filter of view?.filters ?? []) {
     const column = table.columns.find((each) => each.id === filter.columnId);

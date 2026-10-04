@@ -49,7 +49,7 @@ describe("checklists", () => {
   });
 
   it("hands an item to an agent and keeps its thread mention on the thread's state", async () => {
-    const { service, checklists, bb } = setup(() => ({}));
+    const { db, service, checklists, bb } = setup(() => ({}));
     const page = service.createPage({ projectId: "proj_1", parentId: null, title: "Plan", markdown: "- [ ] Ship it\n  - [ ] Nested stays\n", actor: HUMAN_USER_ID });
     const [item] = pageCheckboxes(readMarkdown(service.hub.open(page.id).doc, { ids: true }));
     const { threadId } = await checklists.handOff({ pageId: page.id, blockId: item!.blockId });
@@ -60,6 +60,6 @@ describe("checklists", () => {
     checklists.signal("thr_new", "active");
     checklists.signal("thr_new", "idle", "Done: shipped.");
     expect(read()).toBe(`- [ ] Ship it @[${checklistLabel("replied")}](thread:thr_new)\n  - [ ] Nested stays\n`);
-    expect(checklists.handoffs(page.id)).toMatchObject([{ thread_id: "thr_new", state: "replied", note: "Done: shipped." }]);
+    expect(db.prepare("SELECT * FROM checklist_handoffs WHERE page_id = ?").all(page.id)).toMatchObject([{ thread_id: "thr_new", state: "replied", note: "Done: shipped." }]);
   });
 });

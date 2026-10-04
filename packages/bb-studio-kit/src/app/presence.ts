@@ -30,7 +30,7 @@ async function lookUp(sdk: PluginLister, pluginId: string): Promise<boolean> {
 }
 
 /** null while checking; a failed check counts as absent. */
-export function usePluginPresent(pluginId: string): Presence {
+function usePluginPresent(pluginId: string): Presence {
   const sdk = useSdk() as unknown as PluginLister;
   const [present, setPresent] = useState<Presence>(() => fresh(pluginId));
   useEffect(() => {

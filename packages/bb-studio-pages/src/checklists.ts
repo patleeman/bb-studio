@@ -85,10 +85,6 @@ export class Checklists {
     this.services = studioServices(bb.sdk);
   }
 
-  handoffs(pageId: string): ChecklistHandoffRow[] {
-    return this.db.prepare("SELECT * FROM checklist_handoffs WHERE page_id = ? ORDER BY created_at DESC").all(pageId) as ChecklistHandoffRow[];
-  }
-
   private row(threadId: string): ChecklistHandoffRow | null {
     return (this.db.prepare("SELECT * FROM checklist_handoffs WHERE thread_id = ?").get(threadId) as ChecklistHandoffRow | undefined) ?? null;
   }

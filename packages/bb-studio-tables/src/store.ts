@@ -164,12 +164,6 @@ export class TableStore {
     return table.rows.find((row) => row.id === rowId)!;
   }
 
-  deleteRow(id: string, rowId: string): void {
-    const table = this.require(id);
-    if (!table.rows.some((row) => row.id === rowId)) throw new Error("Row not found.");
-    this.patchRows(id, { remove: [rowId] });
-  }
-
   /** Adds CSV rows, matching headers to columns by name and adding columns for the rest. */
   importCsv(id: string, source: string): number {
     const table = this.require(id);

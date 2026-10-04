@@ -2,6 +2,7 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import { afterEach, expect, it } from "vitest";
 import type { Table } from "@bb-studio/kit/tables";
 import plugin from "../server";
+import { queryPage } from "./query";
 
 const hosts: ReturnType<typeof createFakePluginHost>[] = [];
 afterEach(async () => { for (const host of hosts.splice(0)) await host.harness.lifecycle.dispose(); });
@@ -58,6 +59,18 @@ it("imports and exports all 1207 rows, including the final row beyond query page
   const source = '"Name","Notes"\r\n' + Array.from({ length: 1207 }, (_, i) => `"Row ${i}","${i === 1206 ? "last, row" : "x"}"\r\n`).join("");
   expect(await rpc.callRpc("importCsv", { id: table.id, csv: source })).toEqual({ imported: 1207 });
   expect(await rpc.callRpc("exportCsv", { id: table.id })).toEqual({ csv: source });
-  const page = await rpc.callRpc("query", { id: table.id, offset: 1200, limit: 100 });
+  const { table: saved } = await rpc.callRpc("get", { id: table.id }) as { table: Table };
+  const page = queryPage(saved, { id: table.id, offset: 1200, limit: 100 });
   expect(page).toMatchObject({ total: 1207, nextOffset: null, rows: expect.arrayContaining([expect.objectContaining({ values: expect.objectContaining({ name: "Row 1206" }) })]) });
+});
+
+it("exports a table to Studio as CSV or Markdown", async () => {
+  const rpc = fixture();
+  const table = await create(rpc);
+  await rpc.callRpc("importCsv", { id: table.id, csv: '"Name"\r\n"Ada"\r\n' });
+  const { files } = await rpc.callRpc("studio_export", { id: table.id, format: "csv" }) as { files: { name: string; mime: string; data: string }[] };
+  expect(files).toEqual([{ name: "CSV boundary.csv", mime: "text/csv", data: Buffer.from('"Name"\r\n"Ada"\r\n').toString("base64") }]);
+  const markdown = await rpc.callRpc("studio_export", { id: table.id, format: "markdown" }) as { files: { name: string }[] };
+  expect(markdown.files[0]!.name).toBe("CSV boundary.md");
+  await expect(rpc.callRpc("studio_export", { id: table.id, format: "pdf" })).rejects.toThrow(/Unsupported/);
 });

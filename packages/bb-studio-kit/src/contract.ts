@@ -41,8 +41,6 @@ export const STUDIO_ITEM_AT_METHOD = "itemAt";
 
 /** Studio Chat: "Work with this…" on Studio items. */
 export const STUDIO_CHAT_PLUGIN_ID = "studio-chat";
-/** Float, the windows along the bottom of the screen. */
-export const FLOAT_PLUGIN_ID = "float";
 /** CSS variable on the root element that moves the windows left, e.g. past a comments card. */
 export const FLOAT_RIGHT_VAR = "--studio-float-right";
 
@@ -161,8 +159,6 @@ export interface StudioProviderInfo {
 export interface StudioCreateEventDetail {
   projectId: string | null;
 }
-
-export type StudioItemsByPlugin = Record<string, StudioItem[]>;
 
 /** The tag RPC schemas shared by Studio and optional tag clients. */
 export function studioTagSchemas(z: typeof Zod) {
@@ -327,4 +323,4 @@ export function mentionPrompt(items: readonly { title: string; href: string }[])
 
 export { copyTitle, fillTemplate, fillTemplateJson } from "./template";
 
-export { parseStudioItemReference, parseStudioMentionReference, parseStudioItemHref, studioTextReferences, STUDIO_REFERENCE_ROUTES, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";
+export { parseStudioMentionReference, studioTextReferences, type StudioReference, type ReferenceProvider, type ReferenceRoute, type ReferenceOptions } from "./references";

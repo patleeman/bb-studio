@@ -86,14 +86,8 @@ export const tablesContract = defineRpcContract({
   update: { input: tableUpdateSchema, output: z.object({ table: tableSchema }) },
   remove: { input: z.object({ id }), output: z.object({ ok: z.boolean() }) },
   insert: { input: z.object({ id, values: valuesSchema }), output: z.object({ row: rowSchema }) },
-  updateRow: { input: z.object({ id, rowId: id, values: valuesSchema }), output: z.object({ row: rowSchema }) },
-  deleteRow: { input: z.object({ id, rowId: id }), output: z.object({ ok: z.boolean() }) },
   /** Edits, inserts and deletes rows in one save, as a paste or a multi-row delete does. */
   patchRows: { input: rowPatchSchema.extend({ id }), output: z.object({ table: tableSchema }) },
-  query: { input: tableQuerySchema, output: z.object({
-    rows: z.array(rowSchema), total: z.number(),
-    offset: z.number(), nextOffset: z.number().nullable(), revision: z.string(),
-  }) },
   exportCsv: { input: z.object({ id, viewId: id.optional() }), output: z.object({ csv: z.string() }) },
   importCsv: { input: z.object({ id, csv: z.string().max(2_000_000) }), output: z.object({ imported: z.number() }) },
   /** Studio items relation cells can link to. */

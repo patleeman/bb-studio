@@ -18,7 +18,7 @@ export interface TranscriberDeps {
 }
 
 const BACKOFF_MS = [5_000, 15_000, 60_000, 180_000, 600_000];
-/** Transient failures keep retrying for roughly a day before giving up. */
+/** Transient failures keep retrying for about nine hours (4 short waits, then 10 minutes each) before giving up. */
 export const MAX_ATTEMPTS = 60;
 /** While the voice service is off or signed out, check back every 10 minutes. */
 const UNAVAILABLE_RETRY_MS = 600_000;

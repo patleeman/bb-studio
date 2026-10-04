@@ -65,7 +65,9 @@ export function isUploadable(segment: Pick<OutboxSegment, "complete" | "rejected
  */
 export function isPermanentRejection(error: unknown): boolean {
   const code = (error as { code?: unknown } | null)?.code;
-  return code === "invalid_input" || code === "invalid_json";
+  if (code === "invalid_input" || code === "invalid_json") return true;
+  // A dictation whose audio expired takes no more audio.
+  return /audio was deleted/.test(error instanceof Error ? error.message : String(error));
 }
 
 /** A set-aside segment as the recovery view lists it, without its audio. */

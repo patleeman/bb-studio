@@ -2,7 +2,7 @@
 // thread's storage files, to tick and save, and what this thread has saved.
 // Opened from a message's action bar (params `{ seq }`) or the panel launcher
 // (the latest reply).
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Badge, Checkbox, EmptyState, Icon, PRIMARY_BUTTON, cn } from "@bb-studio/kit/app";
 import { errorMessage, plural, relativeTime } from "@bb-studio/kit/format";
@@ -42,22 +42,42 @@ function PickerList({ threadId, seq, onOpen }: { threadId: string; seq: number |
   const [picked, setPicked] = useState<Set<string> | null>(null);
   const [saving, setSaving] = useState(false);
 
+  // Only the latest load may land; an older one can answer after a newer one.
+  const latest = useRef(0);
   const load = useCallback(() => {
+    const request = ++latest.current;
+    const current = () => request === latest.current;
     rpc.call("candidates", { threadId, seq }).then(
       (result) => {
+        if (!current()) return;
         setCandidates(result);
         setError(null);
-        setPicked((current) => prunePicked(current, result));
+        setPicked((picked) => prunePicked(picked, result));
       },
-      (failure) => setError(errorMessage(failure)),
+      (failure) => {
+        if (current()) setError(errorMessage(failure));
+      },
     );
     rpc.call("threadArtifacts", { threadId }).then(
-      (result) => setSaved(result.artifacts),
+      (result) => {
+        if (current()) setSaved(result.artifacts);
+      },
       () => undefined,
     );
   }, [rpc, threadId, seq]);
   useEffect(load, [load]);
-  useRealtime(REALTIME_CHANNEL, load);
+  // Events carry only an artifact id, so any change reloads; a burst reloads once.
+  const reloadTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+  useEffect(() => () => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+  }, []);
+  useRealtime(REALTIME_CHANNEL, () => {
+    if (reloadTimer.current) clearTimeout(reloadTimer.current);
+    reloadTimer.current = setTimeout(() => {
+      reloadTimer.current = null;
+      load();
+    }, 300);
+  });
 
   const chosen = useMemo(() => [...(picked ?? [])], [picked]);
 

@@ -76,15 +76,6 @@ export function useSidebarHosted(): boolean {
   return host() !== null;
 }
 
-/** Expands one of this plugin's sections, e.g. when its search opens. */
-export function useExpandSidebarSection(id: string): () => void {
-  const pluginId = experimental_usePluginId();
-  return () => {
-    const key = sectionKey(pluginId, id);
-    if (isCollapsed(key)) setCollapsed(key, false);
-  };
-}
-
 /** Call after a sidebar row navigates: closes the sidebar on phones. */
 export function useSidebarNavigated(): () => void {
   return () => host()?.navigate();

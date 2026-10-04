@@ -38,8 +38,6 @@ export interface PagesUi {
   /** Makes an item in another add-on, in the page's project. */
   createItem(pageId: string, pluginId: string, kind: string): Promise<StudioEmbedItem>;
   createTable(input: { pageId: string; title: string; columns: Column[]; rows: Values[] }): Promise<Table>;
-  /** A space widget's space, through Studio; null without it. */
-  /** Makes an item in a space; resolves to where it opens. */
   /** Opens the composer on a draft. */
   compose(prompt: string): void;
 }

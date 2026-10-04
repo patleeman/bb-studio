@@ -224,13 +224,19 @@ function useRecording(id: string) {
   const rpc = useRpc<TalkRpcContract>();
   const [data, setData] = useState<{ recording: Recording; segments: Segment[] } | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Only the latest request may land; an older one can answer after a newer one.
+  const latest = useRef(0);
   const refetch = useCallback(() => {
+    const request = ++latest.current;
     rpc.call("recording_get", { id }).then(
       (result) => {
+        if (request !== latest.current) return;
         setData(result);
         setError(null);
       },
-      (cause) => setError(errorMessage(cause)),
+      (cause) => {
+        if (request === latest.current) setError(errorMessage(cause));
+      },
     );
   }, [rpc, id]);
   useEffect(() => {
@@ -486,7 +492,7 @@ function RecordingDetail({ id }: { id: string }) {
                 </button>
               ) : null}
             </>
-          ) : recording.status !== "finishing" ? (
+          ) : recording.status !== "finishing" && !recording.audioRemoved ? (
             <button
               type="button"
               className={OUTLINE_BUTTON}
@@ -597,5 +603,5 @@ function SegmentText({ segment, onPlay }: { segment: Segment; onPlay?: () => voi
 export function RecordingsPanel({ subPath }: PluginNavPanelProps) {
   const id = subPath.split("/")[0] ?? "";
   if (id === UNSENT_PATH) return <UnsentAudio />;
-  return /^rec_[a-z0-9]{8,32}$/.test(id) ? <RecordingDetail id={id} /> : <RecordingList />;
+  return /^rec_[a-z0-9]{8,32}$/.test(id) ? <RecordingDetail key={id} id={id} /> : <RecordingList />;
 }

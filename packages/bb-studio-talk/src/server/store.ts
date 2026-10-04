@@ -215,6 +215,11 @@ export class TalkStore {
     return result.changes > 0;
   }
 
+  /** Whether the segment was stored, even if its audio has since been removed. */
+  hasSegment(recordingId: string, segmentId: string): boolean {
+    return this.db.prepare(`SELECT 1 FROM segments WHERE recording_id = ? AND id = ?`).get(recordingId, segmentId) !== undefined;
+  }
+
   segmentFile(recordingId: string, segmentId: string): { file: string; mimeType: string } | null {
     const row = this.db
       .prepare(
@@ -477,8 +482,8 @@ export class TalkStore {
     );
   }
 
+  /** Segments go with it (ON DELETE CASCADE). */
   delete(id: string): boolean {
-    this.db.prepare(`DELETE FROM segments WHERE recording_id = ?`).run(id);
     return this.db.prepare(`DELETE FROM recordings WHERE id = ?`).run(id).changes > 0;
   }
 

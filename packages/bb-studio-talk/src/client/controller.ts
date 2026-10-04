@@ -600,6 +600,7 @@ export class TalkController {
     this.set({
       ...INITIAL,
       phase: "starting",
+      kind: recording.kind,
       recordingId: recording.id,
       recording,
       recordedMs: recording.durationMs,
@@ -659,6 +660,16 @@ export class TalkController {
       return;
     }
     this.set({ phase: "starting" });
+    // Deleted elsewhere while paused: audio recorded now would have nowhere to go.
+    const id = this.state.recordingId;
+    const gone = id ? await this.recordingGone(id) : false;
+    if (this.cancelled(epoch, locked)) return;
+    if (gone) {
+      this.unlock();
+      this.finishIdle();
+      this.announceDeleted();
+      return;
+    }
     try {
       await this.startCapture(epoch);
     } catch (error) {
@@ -759,7 +770,23 @@ export class TalkController {
     this.restartAttempts = 0;
     this.set({ phase: "recording", captureStartedAt: Date.now() });
     this.persistPhase("recording");
-    await this.rpc?.call("recording_state", { id: this.state.recordingId!, status: "recording" }).catch(() => {});
+    await this.rpc?.call("recording_state", { id: this.state.recordingId!, status: "recording" }).catch((error) => {
+      // Deleted elsewhere: stop; the outbox drops its audio and maybeFinish says so.
+      if (/No recording/.test(message(error))) void this.stop(false);
+    });
+  }
+
+  private async recordingGone(id: string): Promise<boolean> {
+    try {
+      await this.rpc?.call("recording_get", { id });
+      return false;
+    } catch (error) {
+      return /No recording/.test(message(error));
+    }
+  }
+
+  private announceDeleted(): void {
+    toast.info("The recording was deleted, so Talk stopped.");
   }
 
   private openSegment(capture: Capture): void {
@@ -971,6 +998,12 @@ export class TalkController {
       recording = await this.rpc.call("recording_state", { id, status: "finishing" });
       this.set({ recording });
     } catch (error) {
+      if (/No recording/.test(message(error))) {
+        // Deleted elsewhere: there is nothing left to finish.
+        if (this.state.recordingId === id) this.finishIdle();
+        this.announceDeleted();
+        return;
+      }
       this.set({ uploadError: message(error) });
       this.scheduleUpload();
       return;
@@ -1098,7 +1131,7 @@ export class TalkController {
     });
   }
 
-  async keepAsRecording(id: string): Promise<void> {
+  private async keepAsRecording(id: string): Promise<void> {
     if (!this.rpc) return;
     try {
       await this.rpc.call("recording_keep", { id });

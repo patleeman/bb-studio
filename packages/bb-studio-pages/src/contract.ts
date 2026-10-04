@@ -184,11 +184,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId, blockId: z.string().min(4).max(100), note: z.string().max(20_000).nullable().optional() }),
     output: z.object({ threadId: z.string() }),
   },
-  /** The page's checklist items handed to agents, newest first. */
-  checklistHandoffs: {
-    input: z.object({ id: pageId }),
-    output: z.object({ handoffs: z.array(z.object({ threadId: z.string(), blockId: z.string(), title: z.string(), state: z.string(), note: z.string().nullable(), updatedAt: z.number() })) }),
-  },
   /** A drawing embed's scene as SVG, for the inline whiteboard; null when it's gone. */
   whiteboardGet: { input: z.object({ id: itemId }), output: z.object({ whiteboard: whiteboardViewSchema.nullable() }) },
   /** Pen strokes and erasures from the inline whiteboard, merged into the drawing by Studio Draw. */
@@ -224,8 +219,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ space: z.object({ id: z.string(), name: z.string() }).nullable() }),
   },
-  /** An item made in a space from its actions widget; returns where to open it. */
-
   recordingView: {
     input: z.object({ id: itemId }),
     output: z.object({ recording: recordingCardSchema.nullable() }),
@@ -237,16 +230,6 @@ export const rpcContract = defineRpcContract({
   /** Markdown with stable block ids, for clients without the Yjs editor. */
   editableMarkdown: {
     input: z.object({ id: pageId }),
-    output: z.object({ markdown: z.string() }),
-  },
-  /** Compare the loaded document before applying one targeted human edit. */
-  editBlock: {
-    input: z.object({
-      id: pageId,
-      expected: z.string().max(200_000),
-      block: z.string().min(4).optional(),
-      markdown: z.string().max(200_000),
-    }),
     output: z.object({ markdown: z.string() }),
   },
   /**

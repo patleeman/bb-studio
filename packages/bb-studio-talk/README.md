@@ -234,7 +234,7 @@ The same message at a 390-pixel viewport, with the source pill in view.
 - **Interrupted recordings.** If a capture stops reporting for two minutes,
   for example because the laptop closed or the app was killed, the recording
   is marked *Interrupted*. **Resume recording** on its page continues it.
-- **Failed transcription.** Failed pieces retry with backoff for about a day.
+- **Failed transcription.** Failed pieces retry with backoff for about nine hours.
   If the voice service is off, they retry every 10 minutes. **Retry** requeues
   pieces that gave up and retries waiting ones at once. When a dictation you
   finished hits a failure, the pill says *Transcription failed*, shows the

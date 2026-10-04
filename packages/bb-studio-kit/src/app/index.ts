@@ -4,8 +4,6 @@ export {
   CollectionPage,
   type CollectionFilter,
   itemKey,
-  sortItems,
-  toggleSelection,
   type ActionResults,
   type CollectionHandlers,
   type CollectionItem,
@@ -15,13 +13,11 @@ export {
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
 export { ThreadItemsPanel } from "./thread-items";
-export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu, openNewItemThread, useNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
-export { RelatedPanel, type RelatedRef } from "./related-panel";
-export { SpaceMark, SpaceMenuItems, SpacePicker, type MenuSpace } from "./space-picker";
-export { spaceMembership, type SpaceHolder, type SpaceMembership } from "./space-state";
-export { CopyReferenceMenuItem, copyReferenceWithToast, ItemDeleteConfirm, ItemMenu } from "./item-menu";
-export { ITEM_LINK_PILLS, ITEM_PILL, ItemLinkText, ItemLinkTextarea, ItemPill, itemLinkIcon, mentionQuery, splitItemLinks } from "./item-links";
-export { copyItemReference, ITEM_REFERENCE_TYPE, itemReferenceFrom, itemReferenceText, parseItemReference } from "./item-reference";
+export { BarCrumb, BarSeparator, BarTitle, ChatButton, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu, openNewItemThread, type ChatMenuItem, type ItemThread } from "./item-header";
+export { type RelatedRef } from "./related-panel";
+export { CopyReferenceMenuItem, ItemDeleteConfirm, ItemMenu } from "./item-menu";
+export { ITEM_LINK_PILLS, ItemLinkText, ItemLinkTextarea } from "./item-links";
+export { itemReferenceFrom } from "./item-reference";
 export { ItemDirectiveCard } from "./directive-card";
 export { openAppPath, studioPath, panelHref } from "./nav";
 export {
@@ -60,7 +56,6 @@ export {
   useCompanionNavigate,
 } from "./float";
 export {
-  FLOAT_WINDOW_ATTRIBUTE,
   floatPanelFor,
   floatWindowKey,
   navigateFromFloat,
@@ -74,7 +69,6 @@ export {
 export {
   dropTarget,
   openPathInSplit,
-  pluginViewPath,
   setDragTarget,
   STUDIO_ITEM_CLICKS_OFF,
   STUDIO_TARGET_TYPE,
@@ -88,7 +82,7 @@ export {
 export { useOpenTarget, type OpenPlace } from "./move";
 export { CompanionView, CompanionOutlet, companionWorkbenchAvailable, openCompanion, useOpenCompanion, type CompanionPlacement, type CompanionViewProps } from "./companion";
 export { COMPOSER_MORE_ITEM, ComposerMore, useComposerMoreSide } from "./composer-more";
-export { usePluginPresent, useStudioChatPresent, useStudioPresent } from "./presence";
+export { useStudioChatPresent, useStudioPresent } from "./presence";
 export { usePathname } from "./route";
 export { NewConversationComposer, type NewConversationProps, type ConversationSubmit } from "./new-conversation";
 export {
@@ -102,7 +96,6 @@ export {
   SidebarSection,
   showSidebarSection,
   useHiddenSidebarSections,
-  useExpandSidebarSection,
   useSidebarDisplay,
   useSidebarHosted,
   useSidebarNavigated,

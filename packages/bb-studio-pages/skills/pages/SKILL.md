@@ -81,7 +81,7 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   renders, so show HTML *source* as ` ```html source ` (how HTML code blocks
   read back) or with another fence language (` ```xml `).
 - **Embeds:** a fenced ` ```embed ` block:
-  `{"kind":"bookmark|thread|page|drawing|artifact|recording|table|item|space","target":"https://… or an id","title":"…"}`.
+  `{"kind":"bookmark|thread|page|drawing|artifact|recording|table|item","target":"https://… or an id","title":"…"}`.
   Bookmarks may also carry `description` and `image`; leave them out and the
   editor fetches the link's preview when the page opens. `drawing`,
   `artifact`, `recording`, and `table` take the item's id
@@ -92,10 +92,6 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   a recording its player and transcript, and the
   rest a card. To give a page a database, make it with `tables_create` and
   embed it as a `table`; to track work in it, use checklists.
-  A Studio space's page holds `space` widgets with target
-  `<space id>/<section>`, where section is `actions`, `recent`, `threads`,
-  `channels` or `projects`; they show that part of the space live. Leave them
-  in place when editing a space's page unless the user asks otherwise.
 - **Mentions:** `@[Name](bot:bot_id)`, `@[Title](page:pg_id)`,
   `@[Title](thread:thr_id)`, `@[Title](item:plugin:id)`,
   `@[2026-10-01](date:2026-10-01)`.

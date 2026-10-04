@@ -42,7 +42,7 @@ export function formatBytes(bytes: number): string {
 }
 
 /** How many content matches an add-on excerpts; the rest match without a snippet. */
-export const SNIPPET_LIMIT = 50;
+const SNIPPET_LIMIT = 50;
 
 /**
  * One line of `text` around the first match of `query`, cut at word breaks

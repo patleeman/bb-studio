@@ -22,7 +22,7 @@ export function projectChoices(projects: readonly Project[]) {
 }
 
 /** Copies a reference to `item`; pasted into a Studio item, it shows as a pill. */
-export function copyReferenceWithToast(item: StudioItemLink) {
+function copyReferenceWithToast(item: StudioItemLink) {
   void copyItemReference(item).then((copied) => {
     if (copied) toast.success("Reference copied", { description: "Paste it into a page or another Studio item to link it." });
     else toast.error("Couldn't copy the reference.");

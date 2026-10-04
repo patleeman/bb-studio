@@ -220,22 +220,6 @@ export class PagesService {
     return result;
   }
 
-  /** One human block edit from a client without Yjs sync. */
-  editClientBlock(pageId: string, expected: string, block: string | undefined, markdown: string): string {
-    if (!this.store.meta(pageId)) throw new Error("Page not found.");
-    const page = this.hub.open(pageId);
-    if (readMarkdown(page.doc, { ids: true }) !== expected) {
-      throw new Error("Page changed while you were editing. Reload and try again.");
-    }
-    if (block && [...commentAnchors(page.doc).values()].some((anchor) => anchor.blockId === block)) {
-      throw new Error("This block has comments. Edit it in BB web to keep their anchors.");
-    }
-    const op: EditOp = block ? { op: "replace", block, markdown } : { op: "append", markdown };
-    applyEdits(page.doc, [op], { client: "rpc" });
-    this.hub.flush(page);
-    return readMarkdown(page.doc, { ids: true });
-  }
-
   /** Applies the whole page as plain Markdown, rewriting only the blocks that changed. */
   editClientDocument(pageId: string, expected: string, markdown: string): string {
     if (!this.store.meta(pageId)) throw new Error("Page not found.");

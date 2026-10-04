@@ -18,7 +18,6 @@ vi.mock("./presence", () => ({ useStudioChatPresent: () => true, useStudioPresen
 vi.mock("./float", () => ({ useInFloat: () => state.inFloat, useCanFloat: () => true, openFloat: state.float }));
 vi.mock("./move", () => ({ useOpenTarget: () => ({ open: state.split, anchor: null }) }));
 vi.mock("./related-panel", () => ({ RelatedPanel: () => null }));
-vi.mock("./space-picker", () => ({ SpacePicker: () => null }));
 vi.mock("../ui/icon", () => ({ Icon: () => null }));
 
 function Dialog({ mode, close }: { mode: string; close(): void }) {

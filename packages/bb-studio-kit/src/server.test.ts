@@ -2,18 +2,15 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 import { parseFlags, subcommand, takeFlag, takeOption, usage } from "./cli";
 import { studioSchemas } from "./contract";
-import { isId, newId } from "./ids";
-import { createChangeBus, defineItemMention, discoverProviders, fanOutProviders, mustGet, serveBytes, storeActions } from "./server";
+import { newId } from "./ids";
+import { createChangeBus, defineItemMention, discoverProviderSnapshot, fanOutProviders, mustGet, serveBytes } from "./server";
+import { storeActions } from "./server/provider";
 
 afterEach(() => vi.useRealTimers());
 
 describe("server helpers", () => {
-  it("makes one id scheme while recognizing stored drawing UUIDs", () => {
-    const id = newId("pg");
-    expect(id).toMatch(/^pg_[0-9a-f]{16}$/);
-    expect(isId("pg", id)).toBe(true);
-    expect(isId("drw", "550e8400-e29b-41d4-a716-446655440000")).toBe(true);
-    expect(isId("pg", "art_0123456789abcdef")).toBe(false);
+  it("makes one id scheme", () => {
+    expect(newId("pg")).toMatch(/^pg_[0-9a-f]{16}$/);
   });
 
   it("keeps existing CLI flag and usage output", () => {
@@ -72,7 +69,7 @@ describe("server helpers", () => {
   });
 
   it("discovers enabled providers and isolates fan-out failures", async () => {
-    const providers = await discoverProviders({
+    const { providers } = await discoverProviderSnapshot({
       plugins: {
         list: async () => ({ plugins: [
           { id: "pages", enabled: true, name: "Pages", status: "running", statusDetail: null, version: "1" },

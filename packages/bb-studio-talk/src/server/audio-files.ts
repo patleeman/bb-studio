@@ -58,6 +58,10 @@ export class AudioFiles {
     return readFile(this.inside(relativePath));
   }
 
+  async remove(relativePath: string): Promise<void> {
+    await rm(this.inside(relativePath), { force: true });
+  }
+
   async removeRecording(recordingId: string): Promise<void> {
     await rm(this.inside(recordingId), { recursive: true, force: true });
   }

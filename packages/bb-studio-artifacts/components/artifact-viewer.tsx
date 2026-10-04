@@ -74,12 +74,15 @@ export function ArtifactViewer({
   useEffect(closeQuote, [closeQuote, versionId, view]);
   const onBackRef = useRef(onBack);
   onBackRef.current = onBack;
+  /** Deleting here: remove() says so and goes back, not the realtime reload. */
+  const deleting = useRef(false);
 
   const load = useCallback(
     () =>
       rpc.call("get", { id: artifactId }).then(
         (result) => {
           if (!result.artifact) {
+            if (deleting.current) return;
             toast.info("This artifact was deleted.");
             onBackRef.current(true);
             return;
@@ -169,11 +172,13 @@ export function ArtifactViewer({
   }
 
   async function remove() {
+    deleting.current = true;
     try {
       await rpc.call("delete", { id: artifactId });
       toast.success("Artifact deleted");
       onBack(true);
     } catch (failure) {
+      deleting.current = false;
       toast.error(errorMessage(failure));
     }
   }

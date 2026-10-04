@@ -22,7 +22,7 @@ const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
   pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], talk: ["recordings"],
   "studio-tables": ["table"], "bot-teams": ["bot", "views"],
 };
-export const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
+const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "pages", path: "/plugins/pages/pages/" },
   { pluginId: "excalidraw", path: "/plugins/excalidraw/drawings/" },
   { pluginId: "artifacts", path: "/plugins/artifacts/artifacts/" },

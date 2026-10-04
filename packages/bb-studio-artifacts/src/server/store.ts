@@ -208,7 +208,7 @@ export class ArtifactStore {
             `INSERT INTO artifacts (id, title, description, project_id, source_thread_id, source_path, created_at, updated_at, updated_by)
              VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)`,
           )
-          .run(id, title ?? "", description ?? "", input.projectId, source?.thread ?? null, source?.path ?? null, at, at, writerKind(input.by));
+          .run(id, title ?? "", description ?? "", input.projectId, input.sourceThreadId ?? null, source?.path ?? null, at, at, writerKind(input.by));
       }
       this.db
         .prepare(

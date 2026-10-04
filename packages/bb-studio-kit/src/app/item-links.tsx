@@ -16,7 +16,7 @@ import { openAppPath } from "./nav";
 import { studioItemProps } from "./studio-item";
 
 /** The look of an item link: a quiet chip, like a mention on a page. */
-export const ITEM_PILL =
+const ITEM_PILL =
   "inline-flex max-w-full items-center gap-1 rounded bg-foreground/6 px-1 align-baseline font-medium text-foreground no-underline hover:bg-foreground/10";
 
 /** For a wrapper around rendered Markdown: its links to Studio items show as pills. */
@@ -38,7 +38,7 @@ export function splitItemLinks(text: string): ({ text: string } | { title: strin
   return parts;
 }
 
-export function ItemPill({ href, title, icon = itemLinkIcon(href), onMouseDown }: { href: string; title: string; icon?: string; onMouseDown?(event: MouseEvent): void }) {
+function ItemPill({ href, title, icon = itemLinkIcon(href), onMouseDown }: { href: string; title: string; icon?: string; onMouseDown?(event: MouseEvent): void }) {
   return (
     <a
       href={href}

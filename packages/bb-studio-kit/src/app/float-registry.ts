@@ -149,7 +149,7 @@ export function requestFloatTransfer(target: FloatTarget): void {
 export const floatTransfers = (): FloatTarget[] => [...(registry().transfers?.values() ?? [])].map(entry => entry.target);
 
 /** The attribute on a floating tab's body naming its window key. */
-export const FLOAT_WINDOW_ATTRIBUTE = "data-float-window";
+const FLOAT_WINDOW_ATTRIBUTE = "data-float-window";
 
 /**
  * Called while handling a click: when the click came from inside a floating

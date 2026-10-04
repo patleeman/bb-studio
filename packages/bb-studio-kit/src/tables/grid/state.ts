@@ -28,7 +28,7 @@ export function newRowId(): string {
 }
 
 /** The table with `change` applied, as the server will apply it. */
-export function applyChange(table: Table, change: Change): Table {
+function applyChange(table: Table, change: Change): Table {
   let next = table;
   if (change.meta) {
     const { columns, views, title } = change.meta;
@@ -44,7 +44,7 @@ export function applyChange(table: Table, change: Change): Table {
 }
 
 /** The change that takes `table` back from `change`. */
-export function invertChange(table: Table, change: Change): Change {
+function invertChange(table: Table, change: Change): Change {
   const inverse: Change = {};
   if (change.meta) {
     inverse.meta = {};

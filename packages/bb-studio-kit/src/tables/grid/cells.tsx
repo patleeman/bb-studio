@@ -40,7 +40,7 @@ export function OptionChip({ column, option }: { column: Pick<Column, "options">
 
 const DATE_FORMAT = new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric", year: "numeric", timeZone: "UTC" });
 
-export function formatDate(day: string): string {
+function formatDate(day: string): string {
   const time = Date.parse(`${day}T00:00:00Z`);
   return Number.isNaN(time) ? day : DATE_FORMAT.format(time);
 }

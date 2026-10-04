@@ -1,5 +1,4 @@
 import { parseFlags } from "@bb-studio/kit/cli";
-export { parseFlags } from "@bb-studio/kit/cli";
 import { defineItemMention, serveBytes } from "@bb-studio/kit/server";
 import { errorMessage } from "@bb-studio/kit/format";
 // Studio Artifacts (plugin id `artifacts`): keep the files agents make.
@@ -664,7 +663,3 @@ export default async function plugin(bb: BbPluginApi) {
     bb.log.info("disposed");
   });
 }
-
-
-
-export { MAX_ARTIFACT_BYTES };

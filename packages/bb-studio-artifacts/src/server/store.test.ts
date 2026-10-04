@@ -53,6 +53,13 @@ describe("ArtifactStore", () => {
     expect(store.list({ threadId: "thr_2" }).map((artifact) => artifact.id)).toEqual([b.id]);
   });
 
+  it("keeps the thread of content saved without a source path", () => {
+    const { store } = memoryStore();
+    const { artifact } = store.save(file("inline", { sourcePath: null }));
+    expect(artifact).toMatchObject({ source_thread_id: "thr_1", source_path: null });
+    expect(store.save(file("inline 2", { sourcePath: null })).outcome).toBe("created");
+  });
+
   it("adds a version to the artifact named by artifactId", () => {
     const { store } = memoryStore();
     const first = store.save(file("v1", { sourceThreadId: null, sourcePath: null })).artifact;

@@ -17,7 +17,6 @@ import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
 import { BAR_BUTTON, ICON_BUTTON } from "./pieces";
 import { useStudioChatPresent, useStudioPresent } from "./presence";
 import { RelatedPanel, type RelatedRef } from "./related-panel";
-import { SpacePicker } from "./space-picker";
 
 export type ItemThread = { title: string; href: string; ref?: RelatedRef };
 
@@ -26,7 +25,7 @@ export function openNewItemThread(navigate: ReturnType<typeof useBbNavigate>, it
 }
 
 /** The shared action used by item headers and narrow-screen menus. */
-export function useNewItemThread(item: ItemThread | undefined) {
+function useNewItemThread(item: ItemThread | undefined) {
   const navigate = useBbNavigate();
   return () => {
     if (item) openNewItemThread(navigate, item);
@@ -77,6 +76,8 @@ function ItemActions({ compact, children }: { compact: boolean; children: ReactN
   const root = useRef<HTMLDivElement>(null), trigger = useRef<HTMLButtonElement>(null);
   const id = useId();
   useEffect(() => {
+    // Opened while compact, it would reappear open when compact again.
+    if (!compact) setExpanded(false);
     if (!compact || !expanded) return;
     const dismiss = (event: PointerEvent) => {
       const target = event.target as Element;
@@ -135,19 +136,24 @@ function useBarSlot(anchor: React.RefObject<HTMLElement | null>, enabled: boolea
     if (!enabled) { setSlot(null); return; }
     // The title bar and the view mount together; give the slot a few frames.
     let frame = 0, tries = 0, current: HTMLElement | null = null;
+    const find = () => (anchor.current ? paneSlot(anchor.current) : null);
     const look = () => {
-      const found = anchor.current ? paneSlot(anchor.current) : null;
+      frame = 0;
+      const found = find();
       if (found || ++tries > 20) { current = found; setSlot(found); return; }
       frame = requestAnimationFrame(look);
     };
     look();
-    // BB swaps its title bar at the compact breakpoint: follow the slot to the new one.
+    // BB swaps its title bar at the compact breakpoint, and may lend one
+    // late: follow the slot to the new one, or keep looking, once a frame.
     const observer = new MutationObserver(() => {
-      if (!current || current.isConnected) return;
-      current = null;
-      tries = 0;
-      cancelAnimationFrame(frame);
-      look();
+      if (frame || current?.isConnected) return;
+      if (current) { current = null; tries = 0; look(); return; }
+      frame = requestAnimationFrame(() => {
+        frame = 0;
+        current = find();
+        if (current) setSlot(current);
+      });
     });
     observer.observe(document.body, { childList: true, subtree: true });
     return () => { cancelAnimationFrame(frame); observer.disconnect(); };
@@ -280,7 +286,6 @@ export function ItemHeader({
         </button> : null}
         {chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
         {tools ? <ItemActions compact={compact}>
-          {relatedRef && studio ? <SpacePicker item={relatedRef} /> : null}
           {relatedRef && studio ? <RelatedPanel ref={relatedRef} /> : null}
           {moved && !inFloat ? <ViewMoveMenu item={moved} onBack={onBack} /> : null}
           {trailing && ((relatedRef && studio) || (moved && !inFloat)) && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}

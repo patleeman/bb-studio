@@ -69,33 +69,6 @@ describe("replaceMarkdown", () => {
   });
 });
 
-describe("editClientBlock", () => {
-  it("changes one block in the live document and preserves other block ids", () => {
-    const { service, store } = setup();
-    const page = service.createPage({ projectId: null, parentId: null, title: "Plan", markdown: "# First\n\nSecond\n", actor: HUMAN_USER_ID });
-    const live = service.hub.open(page.id);
-    const before = readMarkdown(live.doc, { ids: true });
-    const ids = [...before.matchAll(/<!-- \^([^ ]+) -->/g)].map((match) => match[1]!);
-    expect(ids).toHaveLength(2);
-
-    const after = service.editClientBlock(page.id, before, ids[0], "## Changed");
-    expect(after).toContain(`<!-- ^${ids[0]} -->`);
-    expect(after).toContain(`<!-- ^${ids[1]} -->`);
-    expect(readMarkdown(live.doc)).toContain("Second");
-    expect(store.get(page.id)?.markdown).toContain("Changed");
-    expect(() => service.editClientBlock(page.id, before, ids[1], "Lost update")).toThrow("Page changed");
-    expect(readMarkdown(live.doc)).not.toContain("Lost update");
-  });
-
-  it("appends to an empty page", () => {
-    const { service } = setup();
-    const page = service.createPage({ projectId: null, parentId: null, title: "", actor: HUMAN_USER_ID });
-    const before = readMarkdown(service.hub.open(page.id).doc, { ids: true });
-    service.editClientBlock(page.id, before, undefined, "New note");
-    expect(readMarkdown(service.hub.open(page.id).doc)).toContain("New note");
-  });
-});
-
 describe("editClientDocument", () => {
   const ids = (doc: Y.Doc) => readBlocks(doc).map((block) => block.id);
 

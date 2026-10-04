@@ -221,7 +221,6 @@ async function registerPages(bb: BbPluginApi) {
     studioItems: async () => ({ items: await embeds.items() }),
     artifactView: async ({ id }) => ({ view: await embeds.artifactView(id) }),
     checklistHandOff: ({ id, blockId, note }) => checklists.handOff({ pageId: id, blockId, note: note ?? null }),
-    checklistHandoffs: ({ id }) => ({ handoffs: checklists.handoffs(id).map((row) => ({ threadId: row.thread_id, blockId: row.block_id, title: row.title, state: row.state, note: row.note, updatedAt: row.updated_at })) }),
     whiteboardGet: async ({ id }) => ({ whiteboard: await embeds.whiteboard(id) }),
     whiteboardSave: async ({ id, add, erase }) => ({ whiteboard: await embeds.saveWhiteboard(id, add, erase) }),
     studioCreate: async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
@@ -238,9 +237,6 @@ async function registerPages(bb: BbPluginApi) {
     editableMarkdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc, { ids: true }) };
-    },
-    editBlock: ({ id, expected, block, markdown }) => {
-      return { markdown: service.editClientBlock(id, expected, block, markdown) };
     },
     editDocument: ({ id, expected, markdown }) => ({ markdown: service.editClientDocument(id, expected, markdown) }),
     replaceMarkdown: ({ id, markdown, snapshotName }) => {

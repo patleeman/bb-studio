@@ -35,7 +35,7 @@ export type DrawingRow = {
   created_at: number;
   updated_at: number;
   project_id: string | null;
-  /** "user" or "agent". */
+  /** "user" (editor, app, Studio) or "agent" (agent, CLI); see writerKind. */
   updated_by: string | null;
   archived_at: number | null;
   template: number;

@@ -68,8 +68,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({
       name: nameSchema,
       projectId: z.string().min(1).max(200).nullable().optional(),
-      /** Files the drawing under this thread's project. */
-      threadId: z.string().min(1).max(200).optional(),
     }),
     output: z.object({ drawing: drawingMetaSchema }),
   },
@@ -141,14 +139,9 @@ export default async function plugin(bb: BbPluginApi) {
   // Agents write drawings a few elements at a time; Studio only needs to hear about it now and then.
   const changeBus = createChangeBus({ bb, channel: REALTIME_CHANNEL, pluginId: PLUGIN_ID, schemas: studio, event: (id, updatedAt, by) => ({ type: DRAWING_UPDATE_TYPE, drawingId: id, updatedAt, by }), delayMs: 1500 });
 
-  /** Tells open editors, galleries, and Studio that a drawing changed. */
+  /** Tells open editors, galleries, and Studio that a drawing changed. Drawings keep no versions. */
   function changed(id: string, updatedAt: number, by: Writer | "studio") {
     changeBus.changed(id, updatedAt, by);
-    const row = store.get(id);
-    if (row) void services.versionCreate({
-      ref: { pluginId: PLUGIN_ID, id }, bytes: Buffer.from(row.data).toString("base64"),
-      label: row.name || "Drawing", actor: { kind: by === "studio" ? "app" : by },
-    }).catch(() => { /* Studio is optional. */ });
   }
 
   function mustGet(id: string): DrawingRow {
@@ -193,9 +186,8 @@ export default async function plugin(bb: BbPluginApi) {
     listDrawings() {
       return { drawings: store.list().map(toMeta) };
     },
-    async createDrawing({ name, projectId, threadId }) {
-      const project = threadId ? (await bb.sdk.threads.get({ threadId })).projectId : (projectId ?? null);
-      return { drawing: toMeta(create(name, "app", project)) };
+    createDrawing({ name, projectId }) {
+      return { drawing: toMeta(create(name, "app", projectId ?? null)) };
     },
     getDrawing({ id }) {
       const row = store.get(id);
@@ -385,7 +377,7 @@ export default async function plugin(bb: BbPluginApi) {
       "Create a new empty Excalidraw drawing and return its id, name, and link. The user can open it from Drawings, or from Studio when it's installed.",
     parameters: z.object({ name: z.string().min(1).max(200) }),
     execute({ name }, ctx) {
-      const row = create(name, "agent");
+      const row = create(name, "agent", ctx.projectId ?? null);
       created(row.id, ctx.threadId);
       return `Created Excalidraw drawing "${name}" (id ${row.id}). Link: [${name.replace(/[[\]]/g, "")}](${drawingHref(row.id)})`;
     },
@@ -533,7 +525,7 @@ export default async function plugin(bb: BbPluginApi) {
               stderr: "usage: bb excalidraw create <name>\n",
             };
           }
-          const row = create(name, "cli");
+          const row = create(name, "cli", ctx.projectId ?? null);
           if (ctx.threadId) created(row.id, ctx.threadId);
           return { exitCode: 0, stdout: `${row.id}\t${name}\n` };
         }

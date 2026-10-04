@@ -38,13 +38,6 @@ export interface DiscoverySdk<T extends DiscoveredPlugin> {
 }
 
 /** Find installed, enabled providers; known add-ons retain their display order. */
-export async function discoverProviders<T extends DiscoveredPlugin>(
-  sdk: DiscoverySdk<T>,
-  options: { method: string; known: readonly string[]; exclude?: readonly string[] },
-): Promise<T[]> {
-  return (await discoverProviderSnapshot(sdk, options)).providers;
-}
-
 export async function discoverProviderSnapshot<T extends DiscoveredPlugin>(
   sdk: DiscoverySdk<T>,
   options: { method: string; known: readonly string[]; exclude?: readonly string[] },
