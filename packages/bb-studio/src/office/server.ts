@@ -82,7 +82,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     project_update: input => officeProjects.update(input),
     project_reorder: input => officeProjects.store.reorder(input),
     project_archive: ({ projectId, archived }) => officeProjects.archive(projectId, archived),
-    project_start: input => officeProjects.start(input),
+    project_thread_start: input => officeProjects.start(input),
     project_link: ({ projectId, refs }) => officeProjects.membershipMutation(projectId, refs),
     project_unlink: ({ refs }) => officeProjects.membershipMutation(null, refs),
     project_set_run: input => officeProjects.setRun(input),

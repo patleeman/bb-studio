@@ -135,11 +135,14 @@ it("renames, reorders, archives and restores Studio projects without deleting me
   expect(archived.archivedAt).not.toBeNull();
   expect(archived.run?.enabled).toBe(false);
   expect(x.timers).toHaveLength(0);
-  expect((await x.service.links.all()).threads[lead.leadThreadId!]).toBe(a.id);
+  expect((await x.service.links.all()).threads[lead.leadThreadId!]).toBeUndefined();
+  expect((await x.service.links.all()).items.some(item => item.projectId === a.id)).toBe(false);
+  expect(x.service.links.rows(a.id)).not.toHaveLength(0);
   expect(x.threads.has(lead.leadThreadId!)).toBe(true);
   expect(x.core).toHaveLength(3);
   await expect(x.service.start({ projectId: a.id, request })).rejects.toThrow("Restore");
   expect((await x.service.archive(a.id, false)).archivedAt).toBeNull();
+  expect((await x.service.links.all()).threads[lead.leadThreadId!]).toBe(a.id);
   const chief = (await x.service.list()).projects.find(p => p.role === "chief-of-staff")!;
   await expect(x.service.archive(chief.id, true)).rejects.toThrow("Chief of Staff");
 });

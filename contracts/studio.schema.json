@@ -7579,7 +7579,7 @@
         "additionalProperties": false
       }
     },
-    "project_start": {
+    "project_thread_start": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",

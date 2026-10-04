@@ -13,7 +13,8 @@ export class ProjectLinks {
   async all() {
     await this.projects.ensure();
     const threads: Record<string, string> = {};
-    const connected = new Map(this.projects.rows().filter(p => p.bb_project_id).map(p => [p.bb_project_id!, p.id]));
+    const active = new Set(this.projects.rows().filter(p => p.archived_at === null).map(p => p.id));
+    const connected = new Map(this.projects.rows().filter(p => p.bb_project_id && active.has(p.id)).map(p => [p.bb_project_id!, p.id]));
     const excluded = new Set((this.db.prepare("SELECT ref FROM office_project_unlinked").all() as { ref: string }[]).map(r => r.ref));
     for (let offset = 0; ; offset += 200) {
       const batch = await this.sdk.threads.list({ includeHidden: true, limit: 200, offset });
@@ -26,8 +27,11 @@ export class ProjectLinks {
       }
       if (batch.length < 200) break;
     }
-    for (const row of this.rows()) if (row.ref.startsWith("thread:")) threads[row.ref.slice(7)] = row.project_id;
-    const items = this.db.prepare("SELECT l.ref,l.project_id AS projectId,t.title,t.kind,t.href,t.icon FROM office_project_links l JOIN office_project_link_targets t USING(ref) WHERE l.ref LIKE 'item:%' ORDER BY l.added_at,l.ref").all() as (Target & { projectId: string })[];
+    for (const row of this.rows()) if (row.ref.startsWith("thread:")) {
+      if (active.has(row.project_id)) threads[row.ref.slice(7)] = row.project_id;
+      else delete threads[row.ref.slice(7)];
+    }
+    const items = this.db.prepare("SELECT l.ref,l.project_id AS projectId,t.title,t.kind,t.href,t.icon FROM office_project_links l JOIN office_project_link_targets t USING(ref) WHERE l.ref LIKE 'item:%' AND l.project_id IN (SELECT id FROM studio_projects WHERE archived_at IS NULL) ORDER BY l.added_at,l.ref").all() as (Target & { projectId: string })[];
     return { threads, items };
   }
   context(projectId: string): string {

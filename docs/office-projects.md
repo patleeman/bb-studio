@@ -29,7 +29,7 @@ page fields are nullable. Role is `project` or `chief-of-staff`. Run is null or
   Restore leaves Run disabled. Chief of Staff cannot be archived.
 - `project_setup({ projectId, request })` returns StudioProject, creating only
   the missing lead/page. Request is the native composer request from office_start.
-- `project_start({ projectId, request })` returns `{ threadId }` for a new worker.
+- `project_thread_start({ projectId, request })` returns `{ threadId }` for a new worker.
   Setup and start spawn in the connected BB project, otherwise Personal, then
   explicitly link the new thread. Archived projects must be restored first.
 - `project_threads({ projectId })` returns `{ threads: [{ id, title, status,
@@ -47,7 +47,10 @@ changing the underlying thread or item. Every thread in a connected BB project
 belongs implicitly unless an explicit owner overrides it. Unlink records an
 exclusion so an implicit member really becomes a one-off. Relinking clears the
 exclusion. Linking to Chief of Staff is ordinary membership, not an unlink.
-Archived Studio projects retain ownership. BB's default thread archive filter
+Archived Studio projects retain stored links, but their members are omitted from
+project_membership, so they appear as one-offs or Library items. Restore
+reactivates the links. An archived explicit owner suppresses implicit ownership
+in another connected project too. BB's default thread archive filter
 applies to implicit membership; explicit links persist until unlinked.
 
 Membership reads use one paginated BB thread list and local item metadata,

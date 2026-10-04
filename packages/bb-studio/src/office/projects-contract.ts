@@ -23,7 +23,7 @@ export const officeProjectsContract = defineRpcContract({
   project_update: { input: z.object({ projectId: id, name: projectNameSchema.optional(), bbProjectId: id.nullable().optional(), icon: z.string().max(100).nullable().optional() }), output: officeProjectSchema },
   project_reorder: { input: z.object({ projectId: id, previousProjectId: id.nullable(), nextProjectId: id.nullable() }), output: ok },
   project_archive: { input: z.object({ projectId: id, archived: z.boolean() }), output: officeProjectSchema },
-  project_start: { input: z.object({ projectId: id, request: conversationRequestSchema(z) }), output: z.object({ threadId: id }) },
+  project_thread_start: { input: z.object({ projectId: id, request: conversationRequestSchema(z) }), output: z.object({ threadId: id }) },
   project_set_run: { input: runSchema.omit({ time: true }).extend({ projectId: id, time: runSchema.shape.time.optional() }), output: officeProjectSchema },
   thread_handoff: { input: z.object({ threadId: id, request: conversationRequestSchema(z).extend({ prompt: z.string().max(100000).optional() }) }), output: z.object({ threadId: id }) },
   bots_overview: { input: z.object({}), output: z.object({ bots: z.array(z.object({
