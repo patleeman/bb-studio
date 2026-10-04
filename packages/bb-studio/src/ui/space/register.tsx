@@ -1,10 +1,10 @@
-// Registers Spaces: the dashboard and individual thread tabs in the main
-// panel, its Page as a fixed workbench tab, the Spaces
+// Registers Spaces: lead chat on the left; dashboard and Page in the
+// workbench on the right, the Spaces
 // sidebar section, the Space page beside every Space thread, and Hand off.
 import { retainPanel } from "@bb-studio/kit/app";
 import type { PluginAppBuilder } from "@get-bb/plugin-sdk/app";
 import { ThreadHandoffAction } from "./Handoff";
-import { ThreadSpaceOverview } from "./Overview";
+import { SpaceDashboardTab, ThreadSpaceOverview } from "./Overview";
 import { SPACES_PANEL } from "./routes";
 import { SidebarSpacesSection } from "./SidebarSpacesSection";
 import { SpacePageTab, SpacesPanel } from "./SpaceView";
@@ -18,6 +18,7 @@ export function registerSpaces(app: PluginAppBuilder): void {
     path: SPACES_PANEL,
     component: retainPanel(SPACES_PANEL, SpacesPanel),
     fixedTabs: [
+      { panelId: SPACES_PANEL, id: "overview", title: "Dashboard", icon: "Folder", component: SpaceDashboardTab, layout: "flush" },
       { panelId: SPACES_PANEL, id: "page", title: "Page", icon: "FileText", component: SpacePageTab, layout: "flush" },
     ],
   });

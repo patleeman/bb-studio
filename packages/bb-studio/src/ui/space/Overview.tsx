@@ -2,15 +2,19 @@
 // you, what's running, and every thread in it with sub-threads under their
 // parent, then its newest items. The plan itself lives on the Space's page.
 import {
+  ThreadChat,
+  type PluginNavPanelProps,
   experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreads as useSidebarThreads,
   type PluginSidebarThread,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { Icon, openAppPath } from "@bb-studio/kit/app";
-import { type ReactNode } from "react";
+import { GHOST_BUTTON, Icon, openAppPath } from "@bb-studio/kit/app";
+import { useState, type ReactNode } from "react";
 import { useSpaceLead, useSpaceOf, useSpaceOverview, type OverviewItem, type OverviewThread } from "./data";
 import { cn } from "./styles";
+import { spaceIdOf } from "./routes";
+import { StartThreadDialog } from "./SpaceView";
 
 export const RUNNING = new Set(["running", "starting", "active"]);
 const ITEMS_SHOWN = 8;
@@ -121,4 +125,42 @@ export function ThreadSpaceOverview({ threadId }: PluginThreadPanelProps) {
   const spaceOf = useSpaceOf();
   const spaceId = spaceOf(threadId);
   return spaceId ? <SpaceOverview spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">This thread isn't in a Space.</p>;
+}
+
+/** The right-hand dashboard stays beside the lead chat, including opened worker tabs. */
+export function SpaceDashboardTab({ subPath }: PluginNavPanelProps) {
+  const spaceId = spaceIdOf(subPath);
+  return spaceId ? <SpaceDashboard key={spaceId} spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">Open a Space to see its dashboard.</p>;
+}
+
+function SpaceDashboard({ spaceId }: { spaceId: string }) {
+  const lead = useSpaceLead(spaceId);
+  const { threads } = useSidebarThreads();
+  const [openThreads, setOpenThreads] = useState<string[]>([]);
+  const [activeThread, setActiveThread] = useState<string | null>(null);
+  const [starting, setStarting] = useState(false);
+  const leadLive = threads.find((thread) => thread.id === lead.data?.leadThreadId);
+  const openThread = (threadId: string) => {
+    setOpenThreads((current) => current.includes(threadId) ? current : [...current, threadId]);
+    setActiveThread(threadId);
+    return true;
+  };
+  const closeThread = (threadId: string) => {
+    setOpenThreads((current) => current.filter((id) => id !== threadId));
+    if (activeThread === threadId) setActiveThread(null);
+  };
+  return <div className="flex h-full min-h-0 flex-col">
+    {openThreads.length ? <nav aria-label="Space activity tabs" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border px-2 py-1">
+      <button type="button" aria-current={activeThread === null ? "page" : undefined} onClick={() => setActiveThread(null)} className={cn(GHOST_BUTTON, activeThread === null && "bg-state-hover")}>Status</button>
+      {openThreads.map((id) => <div key={id} className={cn("flex shrink-0 items-center rounded-md", activeThread === id && "bg-state-hover")}>
+        <button type="button" aria-current={activeThread === id ? "page" : undefined} onClick={() => setActiveThread(id)} className={cn(GHOST_BUTTON, "max-w-56")}><span className="truncate">{threads.find((thread) => thread.id === id)?.displayTitle ?? "Thread"}</span></button>
+        <button type="button" aria-label={`Close ${threads.find((thread) => thread.id === id)?.displayTitle ?? "thread"} tab`} onClick={() => closeThread(id)} className="rounded p-1 text-muted-foreground hover:bg-state-hover"><Icon name="X" className="size-3.5" /></button>
+      </div>)}
+    </nav> : null}
+    {activeThread ? <ThreadChat key={activeThread} threadId={activeThread} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" /> : <div className="min-h-0 flex-1 overflow-y-auto">
+      <p className="flex items-center gap-2 px-4 pt-4 text-sm"><ThreadGlyph thread={leadLive} />{leadLive?.hasPendingInteraction ? "Lead needs you" : leadLive && RUNNING.has(leadLive.runtimeStatus) ? "Lead is working" : "Lead is idle"}</p>
+      <SpaceOverview spaceId={spaceId} onOpenThread={openThread} onNewThread={() => setStarting(true)} />
+    </div>}
+    {starting ? <StartThreadDialog spaceId={spaceId} name={lead.data?.name ?? "this Space"} defaultProjectId={lead.data?.defaultProjectId ?? null} onClose={() => setStarting(false)} /> : null}
+  </div>;
 }

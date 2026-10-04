@@ -1,11 +1,10 @@
-// A Space opens on its dashboard, with named thread tabs in the main view
-// and its Page in the workbench beside it. Before
+// A Space as a project: the lead's chat in the middle, with the Space's
+// Dashboard and Page as fixed tabs in the workbench beside it. Before
 // the Space has a lead, BB's own composer starts one. The panel's root lists
 // every Space.
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
   ThreadChat,
-  experimental_useAppPanel as useAppPanel,
   experimental_NewThreadComposer as NewThreadComposer,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbNavigate,
@@ -21,7 +20,6 @@ import { HandoffDialog } from "./Handoff";
 import { PageEmbed } from "./PageEmbed";
 import { SPACES_PANEL, spaceIdOf } from "./routes";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE } from "./styles";
-import { SpaceOverview, ThreadGlyph, RUNNING } from "./Overview";
 
 export function SpacesPanel({ subPath }: PluginNavPanelProps) {
   const spaceId = spaceIdOf(subPath);
@@ -90,7 +88,7 @@ function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }
 }
 
 /** "New thread" in a Space: BB's composer; the server starts it in the Space's folder and adds it to the Space. */
-export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose, onStarted }: { spaceId: string; name: string; defaultProjectId: string | null; onClose: () => void; onStarted?: (threadId: string) => void }) {
+export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose }: { spaceId: string; name: string; defaultProjectId: string | null; onClose: () => void }) {
   const call = useCall();
   const navigate = useBbNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -98,8 +96,7 @@ export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose, on
     setError(null);
     try {
       const { threadId } = await call("space_thread_start", { spaceId, request }) as { threadId: string };
-      if (onStarted) onStarted(threadId);
-      else navigate.toThread(threadId);
+      navigate.toThread(threadId);
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -123,28 +120,15 @@ const spaceDialog = (spaceId: string, dialog: "edit" | "items" | "threads" | "pr
 
 function SpaceView({ spaceId }: { spaceId: string }) {
   const call = useCall();
-  const panel = useAppPanel();
   const lead = useSpaceLead(spaceId);
   const { spaces } = useSpaces();
-  const { projects, threads } = useSidebarThreads();
-  const [openThreads, setOpenThreads] = useState<string[]>([]);
-  const [activeThread, setActiveThread] = useState<string | null>(null);
+  const { projects } = useSidebarThreads();
   const [error, setError] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
   const [starting, setStarting] = useState(false);
   const space = spaces?.find((entry) => entry.id === spaceId);
   const name = lead.data?.name ?? space?.name ?? "Space";
   const leadThreadId = lead.data?.leadThreadId ?? null;
-  const leadLive = threads.find((thread) => thread.id === leadThreadId);
-  const openThread = (threadId: string) => {
-    setOpenThreads((current) => current.includes(threadId) ? current : [...current, threadId]);
-    setActiveThread(threadId);
-    return true;
-  };
-  const closeThread = (threadId: string) => {
-    setOpenThreads((current) => current.filter((id) => id !== threadId));
-    if (activeThread === threadId) setActiveThread(null);
-  };
   const startIn = lead.data?.defaultProjectId ?? space?.defaultProjectId ?? projects.find((project) => project.isPersonal)?.id ?? null;
 
   const start = async (request: NewThreadRequest) => {
@@ -180,32 +164,11 @@ function SpaceView({ spaceId }: { spaceId: string }) {
           </Menu.Portal>
         </Menu.Root>
       </header>
-      {starting ? <StartThreadDialog spaceId={spaceId} name={name} defaultProjectId={startIn} onClose={() => setStarting(false)} onStarted={openThread} /> : null}
-      {lead.error ? <p role="alert" className="px-4 py-2 text-sm text-destructive">{lead.error} <button type="button" onClick={lead.refresh} className="underline">Retry</button></p> : null}
+      {starting ? <StartThreadDialog spaceId={spaceId} name={name} defaultProjectId={startIn} onClose={() => setStarting(false)} /> : null}
       {leadThreadId
-        ? <div className="flex min-h-0 flex-1 flex-col">
-            <nav aria-label="Space views" className="flex shrink-0 items-center gap-1 overflow-x-auto border-b border-border px-4 py-1">
-              <button type="button" aria-current={activeThread === null ? "page" : undefined} onClick={() => setActiveThread(null)} className={`${GHOST_BUTTON} ${activeThread === null ? "bg-state-hover" : ""}`}>Dashboard</button>
-              {openThreads.map((id) => <div key={id} className={`flex shrink-0 items-center rounded-md ${activeThread === id ? "bg-state-hover" : ""}`}>
-                <button type="button" aria-current={activeThread === id ? "page" : undefined} onClick={() => setActiveThread(id)} className={`${GHOST_BUTTON} max-w-56`}><span className="truncate">{id === leadThreadId ? "Lead" : threads.find((thread) => thread.id === id)?.displayTitle ?? "Thread"}</span></button>
-                <button type="button" aria-label={`Close ${id === leadThreadId ? "lead" : threads.find((thread) => thread.id === id)?.displayTitle ?? "thread"} tab`} onClick={() => closeThread(id)} className="rounded p-1 text-muted-foreground hover:bg-state-hover"><Icon name="X" className="size-3.5" /></button>
-              </div>)}
-            </nav>
-            {activeThread === null ? <div className="min-h-0 flex-1 overflow-y-auto">
-              <div className="mx-auto w-full max-w-4xl px-4 py-6 sm:px-8">
-                <h2 className="text-lg font-semibold">{name}</h2>
-                {space?.description ? <p className="mt-2 text-sm text-muted-foreground">{space.description}</p> : null}
-                <div className="mt-4 flex flex-wrap items-center gap-3">
-                  <span className="inline-flex items-center gap-2 text-sm"><ThreadGlyph thread={leadLive} />{leadLive?.hasPendingInteraction ? "Lead needs you" : leadLive && RUNNING.has(leadLive.runtimeStatus) ? "Lead is working" : "Lead is idle"}</span>
-                  <button type="button" onClick={() => openThread(leadThreadId)} className={GHOST_BUTTON}><Icon name="MessageSquare" className="size-4" />Talk to lead</button>
-                  {lead.data?.pageId ? <button type="button" onClick={() => panel.openFixedTab({ surface: { kind: "current" }, tab: { panelId: SPACES_PANEL, id: "page" } })} className={GHOST_BUTTON}><Icon name="FileText" className="size-4" />Open space page</button> : null}
-                </div>
-                <SpaceOverview spaceId={spaceId} onOpenThread={openThread} onNewThread={() => setStarting(true)} />
-              </div>
-            </div> : <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4">
+        ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4">
             {/* "inherit": send with the lead thread's own permission, not the composer's default. */}
-            <ThreadChat key={activeThread} threadId={activeThread} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" />
-            </div>}
+            <ThreadChat key={leadThreadId} threadId={leadThreadId} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" />
             {startIn ? <HandoffDialog threadId={leadThreadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={() => lead.refresh()} /> : null}
           </div>
         : lead.loading
