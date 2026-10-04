@@ -44,21 +44,6 @@ final class NativePayloadContractTests: XCTestCase {
         XCTAssertEqual(detail.segments.first?.mimeType, "audio/mp4")
     }
 
-    func testTaskReminderUsesIntegerMilliseconds() async throws {
-        let client = try client("task-fields")
-        try await client.updateTaskFields("tsk_contract", priority: "high", labels: ["Review"], recurrence: "weekly", reminderAt: Date(timeIntervalSince1970: 1_700_000_000.123456))
-    }
-
-    func testTaskCreateAndHandoffPreserveRequiredNullFields() async throws {
-        let createClient = try client("task-create")
-        let task = try await createClient.createTask(title: "Contract task", description: "Task body", projectId: nil, due: nil, assignee: nil)
-        XCTAssertEqual(task.id, "tsk_contract")
-        XCTAssertEqual(task.openThreads, 0)
-        let handoffClient = try client("task-handoff")
-        let thread = try await handoffClient.handOffTask("tsk_contract", projectId: nil, note: nil, workspace: "worktree")
-        XCTAssertEqual(thread, "thr_contract")
-    }
-
     func testBotDocumentRevisionAndChannelDeliveryFailuresSurviveDecoding() async throws {
         let documentClient = try client("bot-document")
         let document = try await documentClient.saveBotDocument("bot_aaaaaaaaaaaaaaaa", file: "MEMORY.md", text: "Updated memory", version: "sha-v1")

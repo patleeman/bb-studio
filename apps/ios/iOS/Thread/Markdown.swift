@@ -55,8 +55,6 @@ struct MarkdownText: View {
             ArtifactCard(id: id)
         case .inlineVis(let vis):
             InlineVisCard(vis: vis)
-        case .task(let id):
-            TaskCard(id: id)
         case .feedPost(let source, let title):
             FeedPostCard(source: source, title: title)
         case .image(let alt, let src):
@@ -165,8 +163,6 @@ enum MarkdownBlock {
     case artifact(String)
     /// A workspace or thread-storage file shown in the reply.
     case inlineVis(InlineVis)
-    /// A Studio Tasks task, from an agent's `tasks_create`.
-    case task(String)
     /// A `::post{…}` line: the Studio Feed post the reply made.
     case feedPost(source: String, title: String)
     /// `![alt](src)`, shown below the text of its paragraph.
@@ -228,9 +224,6 @@ enum MarkdownBlock {
                 if directive.name == "artifact", let id = directive.attributes["id"], Artifact.isId(id) {
                     flush()
                     blocks.append(.artifact(id))
-                } else if directive.name == "task", let id = directive.attributes["id"], StudioTask.isId(id) {
-                    flush()
-                    blocks.append(.task(id))
                 } else if directive.name == "post", let title = directive.attributes["title"] {
                     flush()
                     blocks.append(.feedPost(source: trimmed, title: title))

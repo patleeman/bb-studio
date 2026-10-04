@@ -4,12 +4,11 @@ import WidgetKit
 struct WorkEntry: TimelineEntry {
     var serverURL: URL = ServerScope.selectedURL
     var date: Date
-    var tasks: [StudioTask]
     var attention: Int
     var approvals: Int
     var running: [ThreadEntry]
     var stale: Bool
-    static let placeholder = WorkEntry(date: .now, tasks: [], attention: 0, approvals: 0, running: [], stale: false)
+    static let placeholder = WorkEntry(date: .now, attention: 0, approvals: 0, running: [], stale: false)
 }
 
 struct WorkProvider: TimelineProvider {
@@ -22,17 +21,13 @@ struct WorkProvider: TimelineProvider {
             let client = BBClient()
             var entry = cached() ?? .placeholder
             do {
-                async let tasks = client.tasksBoard()
-                async let threads = client.threads(limit: 100)
-                let today = StudioTask.day(.now)
-                entry.tasks = try await tasks.filter { !$0.archived && $0.status != "done" && $0.due == today }
-                let threadRows = try await threads
+                let threadRows = try await client.threads(limit: 100)
                 let summary = ThreadSummary(threadRows)
                 entry.running = summary.running
                 entry.attention = summary.needsYou.count
                 entry.approvals = threadRows.filter { $0.hasPendingInteraction == true }.count
                 entry.stale = false
-                DiskCache.save(WorkCache(tasks: entry.tasks, attention: entry.attention, approvals: entry.approvals, running: entry.running), as: "work-widget", serverURL: client.baseURL)
+                DiskCache.save(WorkCache(attention: entry.attention, approvals: entry.approvals, running: entry.running), as: "work-widget", serverURL: client.baseURL)
             } catch { entry.stale = true }
             entry.date = .now
             entry.serverURL = client.baseURL
@@ -42,12 +37,11 @@ struct WorkProvider: TimelineProvider {
     }
     private func cached() -> WorkEntry? {
         guard let value = DiskCache.load(WorkCache.self, key: "work-widget") else { return nil }
-        return WorkEntry(date: .now, tasks: value.tasks, attention: value.attention, approvals: value.approvals, running: value.running, stale: false)
+        return WorkEntry(date: .now, attention: value.attention, approvals: value.approvals, running: value.running, stale: false)
     }
 }
 
 private struct WorkCache: Codable {
-    var tasks: [StudioTask]
     var attention: Int
     var approvals: Int
     var running: [ThreadEntry]
@@ -59,7 +53,7 @@ struct WorkWidget: Widget {
             WorkWidgetView(entry: entry).containerBackground(.fill.tertiary, for: .widget)
         }
         .configurationDisplayName("BB work")
-        .description("Tasks due today, bot attention, and running agents.")
+        .description("Bot attention, pending approvals, and running agents.")
         .supportedFamilies([.systemMedium, .systemLarge])
     }
 }
@@ -78,9 +72,6 @@ private struct WorkWidgetView: View {
                 if entry.stale { Image(systemName: "wifi.slash").foregroundStyle(.secondary) }
             }
             HStack(spacing: 12) {
-                Link(destination: AppLink.scoped(URL(string: "bbstudio://tasks")!, serverURL: entry.serverURL)) {
-                    Label("\(entry.tasks.count) due", systemImage: "calendar")
-                }
                 Link(destination: AppLink.scoped(URL(string: "bbstudio://inbox")!, serverURL: entry.serverURL)) {
                     Label("\(entry.attention) attention", systemImage: "exclamationmark.bubble")
                 }
@@ -92,18 +83,13 @@ private struct WorkWidgetView: View {
                 }
                 .accessibilityIdentifier("workReviewApprovals")
             }
-            ForEach(entry.tasks.prefix(3)) { task in
-                Link(destination: AppLink.scoped(URL(string: "bbstudio://task/\(task.id)")!, serverURL: entry.serverURL)) {
-                    Label(task.displayTitle, systemImage: "checkmark.circle").lineLimit(1)
-                }.accessibilityIdentifier("workTask_\(task.id)")
-            }
             ForEach(entry.running.prefix(2)) { thread in
                 Link(destination: AppLink.scoped(URL(string: "bbstudio://thread/\(thread.id)")!, serverURL: entry.serverURL)) {
                     Label(thread.displayTitle, systemImage: "circle.dotted.circle").lineLimit(1)
                 }
             }
-            if entry.tasks.isEmpty && entry.running.isEmpty {
-                Text("Nothing due or running.").foregroundStyle(.secondary)
+            if entry.running.isEmpty {
+                Text("Nothing running.").foregroundStyle(.secondary)
             }
             Spacer(minLength: 0)
         }

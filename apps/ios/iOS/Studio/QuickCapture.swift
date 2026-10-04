@@ -77,9 +77,6 @@ struct QuickWriteView: View {
             if running("pages") {
                 Button("Save as Page", systemImage: "doc.richtext") { Task { await savePage() } }
             }
-            if running("studio-tasks") {
-                Button("Save as Task", systemImage: "checklist") { Task { await saveTask() } }
-            }
             Button("Start a Thread", systemImage: "bubble.left.and.text.bubble.right") { startingThread = true }
             Button("Copy", systemImage: "doc.on.doc") {
                 UIPasteboard.general.string = trimmed
@@ -89,7 +86,7 @@ struct QuickWriteView: View {
         } label: {
             if saving { ProgressView() } else { Text("Save").fontWeight(.semibold) }
         } primaryAction: {
-            Task { running("pages") ? await savePage() : await saveTask() }
+            if running("pages") { Task { await savePage() } } else { startingThread = true }
         }
         .disabled(trimmed.isEmpty || saving)
         .accessibilityIdentifier("quickWriteSave")
@@ -102,22 +99,6 @@ struct QuickWriteView: View {
         }
     }
 
-    /// First line is the title; the rest is the description.
-    private func saveTask() async {
-        let lines = trimmed.split(separator: "\n", maxSplits: 1, omittingEmptySubsequences: false)
-        let first = String(lines.first ?? "")
-        let title = first.count > 120 ? PageTitle.from(first) : first
-        var description = lines.count > 1 ? String(lines[1]).trimmingCharacters(in: .whitespacesAndNewlines) : ""
-        if first.count > 120 { description = trimmed }
-        let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject", serverURL: client.baseURL)) ?? ""
-        await attempt {
-            let task = try await client.createTask(
-                title: title, description: description, projectId: project.isEmpty || project == "none" ? nil : project,
-                due: nil, assignee: nil)
-            operation.complete(on: app) { app.openStudio(kind: nil, .task(id: task.id)) }
-        }
-    }
-
     private func attempt(_ work: () async throws -> Void) async {
         saving = true
         defer { saving = false }
@@ -127,132 +108,6 @@ struct QuickWriteView: View {
             text = ""
             operation.complete(on: app) { dismiss() }
             Task { await StudioStore.shared.load(client) }
-        } catch {
-            self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
-        }
-    }
-}
-
-/// Add tasks one after another: return adds and clears the field for the next.
-struct QuickTaskView: View {
-    @EnvironmentObject private var app: AppModel
-    private let operation = ServerOperation()
-    private var client: BBClient { operation.client }
-    @Environment(\.dismiss) private var dismiss
-    @FocusState private var focused: Bool
-    @State private var title = ""
-    @State private var due: Due = .none
-    @State private var forAgent = false
-    @State private var added: [StudioTask] = []
-    @State private var adding = false
-    @State private var dictating = false
-    @State private var error: String?
-
-    enum Due: String, CaseIterable {
-        case none = "No date", today = "Today", tomorrow = "Tomorrow"
-
-        var day: String? {
-            switch self {
-            case .none: nil
-            case .today: StudioTask.day(.now)
-            case .tomorrow: StudioTask.day(Calendar.current.date(byAdding: .day, value: 1, to: .now) ?? .now)
-            }
-        }
-    }
-
-    var body: some View {
-        NavigationStack {
-            List {
-                Section {
-                    HStack {
-                        TextField("New task", text: $title, axis: .vertical)
-                            .focused($focused)
-                            .submitLabel(.done)
-                            .onChange(of: title) { _, value in
-                                // Return in a vertical field arrives as a newline: treat it as submit.
-                                guard value.contains("\n") else { return }
-                                title = value.replacingOccurrences(of: "\n", with: "")
-                                Task { await add() }
-                            }
-                            .accessibilityIdentifier("quickTaskTitle")
-                        if adding {
-                            ProgressView()
-                        } else {
-                            Button { dictating = true } label: { Image(systemName: "mic.fill") }
-                                .buttonStyle(.borderless)
-                                .accessibilityLabel("Dictate")
-                        }
-                    }
-                    Picker("Due", selection: $due) {
-                        ForEach(Due.allCases, id: \.self) { Text($0.rawValue).tag($0) }
-                    }
-                    .pickerStyle(.segmented)
-                    .listRowSeparator(.hidden)
-                    Toggle("For an agent", isOn: $forAgent)
-                } footer: {
-                    if let error { Text(error).foregroundStyle(.red) }
-                }
-                if !added.isEmpty {
-                    Section("Added") {
-                        ForEach(added.reversed()) { task in
-                            Button {
-                                operation.complete(on: app) { dismiss() }
-                                operation.complete(on: app) { app.openStudio(kind: nil, .task(id: task.id)) }
-                            } label: {
-                                Label {
-                                    Text(task.title).foregroundStyle(.primary)
-                                } icon: {
-                                    Image(systemName: "checkmark.circle.fill").foregroundStyle(.green)
-                                }
-                            }
-                            .accessibilityIdentifier("quickTaskAdded")
-                        }
-                    }
-                }
-            }
-            .navigationTitle("New Tasks")
-            .navigationBarTitleDisplayMode(.inline)
-            .toolbar {
-                ToolbarItem(placement: .cancellationAction) {
-                    Button("Board") {
-                        operation.complete(on: app) { dismiss() }
-                        operation.complete(on: app) { app.openStudio(kind: nil, .tasks) }
-                    }
-                }
-                ToolbarItem(placement: .confirmationAction) {
-                    Button(title.trimmingCharacters(in: .whitespaces).isEmpty ? "Done" : "Add") {
-                        if title.trimmingCharacters(in: .whitespaces).isEmpty { operation.complete(on: app) { dismiss() } } else { Task { await add() } }
-                    }
-                    .fontWeight(.semibold)
-                    .accessibilityIdentifier("quickTaskAdd")
-                }
-            }
-            .sheet(isPresented: $dictating) {
-                DictationView(threadId: nil, autoStart: true, insertLabel: ("Use as Task", "checklist")) { spoken in
-                    title = spoken
-                    Task { await add() }
-                }
-            }
-            .onAppear { focused = true }
-            .onDisappear { if !added.isEmpty { Task { await StudioStore.shared.load(client) } } }
-        }
-        .presentationDetents([.medium, .large])
-    }
-
-    private func add() async {
-        let trimmed = title.trimmingCharacters(in: .whitespacesAndNewlines)
-        guard !trimmed.isEmpty, !adding else { return }
-        adding = true
-        defer { adding = false }
-        let project = UserDefaults.standard.string(forKey: ServerScope.key("studioProject", serverURL: client.baseURL)) ?? ""
-        do {
-            let task = try await client.createTask(
-                title: trimmed, description: "", projectId: project.isEmpty || project == "none" ? nil : project,
-                due: due.day, assignee: forAgent ? "agent" : nil)
-            added.append(task)
-            title = ""
-            error = nil
-            focused = true
         } catch {
             self.error = (error as? BBError)?.message ?? BBClient.describe(error, server: client.baseURL)
         }

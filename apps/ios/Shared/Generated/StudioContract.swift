@@ -242,9 +242,6 @@ public enum Studio {
   public enum HomeOutputNeedsYouItemKind: Sendable, Hashable, Codable {
     case approval
     case question
-    case attention
-    case review
-    case due
     case reply
     case mention
     case unknown(String)
@@ -254,9 +251,6 @@ public enum Studio {
       switch value {
       case "approval": self = .approval
       case "question": self = .question
-      case "attention": self = .attention
-      case "review": self = .review
-      case "due": self = .due
       case "reply": self = .reply
       case "mention": self = .mention
       default: self = .unknown(value)
@@ -268,9 +262,6 @@ public enum Studio {
       switch self {
       case .approval: try container.encode("approval")
       case .question: try container.encode("question")
-      case .attention: try container.encode("attention")
-      case .review: try container.encode("review")
-      case .due: try container.encode("due")
       case .reply: try container.encode("reply")
       case .mention: try container.encode("mention")
       case .unknown(let value): try container.encode(value)
@@ -327,42 +318,6 @@ public enum Studio {
       self.threadId = threadId
       self.interactionId = interactionId
       self.responseKind = responseKind
-    }
-  }
-
-  public struct HomeOutputDueItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var due: String?
-    public var projectId: String?
-    public var archived: Bool?
-
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, due: String? = nil, projectId: String? = nil, archived: Bool? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.due = due
-      self.projectId = projectId
-      self.archived = archived
-    }
-  }
-
-  public struct HomeOutputReviewItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var due: String?
-    public var projectId: String?
-    public var archived: Bool?
-
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, due: String? = nil, projectId: String? = nil, archived: Bool? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.due = due
-      self.projectId = projectId
-      self.archived = archived
     }
   }
 
@@ -580,18 +535,14 @@ public enum Studio {
 
   public struct HomeOutput: Sendable, Hashable, Codable {
     public var needsYou: [HomeOutputNeedsYouItem]?
-    public var due: [HomeOutputDueItem]?
-    public var review: [HomeOutputReviewItem]?
     public var working: HomeOutputWorking?
     public var recent: [HomeOutputRecentItem]?
     public var automations: [HomeOutputAutomationsItem]?
     public var activity: [HomeOutputActivityItem]?
     public var dashboard: HomeOutputDashboard?
 
-    public init(needsYou: [HomeOutputNeedsYouItem]? = nil, due: [HomeOutputDueItem]? = nil, review: [HomeOutputReviewItem]? = nil, working: HomeOutputWorking? = nil, recent: [HomeOutputRecentItem]? = nil, automations: [HomeOutputAutomationsItem]? = nil, activity: [HomeOutputActivityItem]? = nil, dashboard: HomeOutputDashboard? = nil) {
+    public init(needsYou: [HomeOutputNeedsYouItem]? = nil, working: HomeOutputWorking? = nil, recent: [HomeOutputRecentItem]? = nil, automations: [HomeOutputAutomationsItem]? = nil, activity: [HomeOutputActivityItem]? = nil, dashboard: HomeOutputDashboard? = nil) {
       self.needsYou = needsYou
-      self.due = due
-      self.review = review
       self.working = working
       self.recent = recent
       self.automations = automations

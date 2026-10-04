@@ -1,7 +1,7 @@
 import SwiftUI
 
 enum CaptureOption: String, CaseIterable, Identifiable {
-    case voice, dictate, note, task, file, thread
+    case voice, dictate, note, file, thread
 
     var id: String { rawValue }
 
@@ -10,7 +10,6 @@ enum CaptureOption: String, CaseIterable, Identifiable {
         case .voice: "Record voice"
         case .dictate: "Dictate"
         case .note: "Note"
-        case .task: "Task"
         case .file: "Photo or file"
         case .thread: "New thread"
         }
@@ -21,7 +20,6 @@ enum CaptureOption: String, CaseIterable, Identifiable {
         case .voice: "record.circle"
         case .dictate: "mic.fill"
         case .note: "note.text"
-        case .task: "checkmark.circle"
         case .file: "photo.on.rectangle.angled"
         case .thread: "bubble.left.and.text.bubble.right"
         }
@@ -85,8 +83,6 @@ struct CaptureSheet: View {
                 DictationView(threadId: nil, autoStart: true, kind: "recording")
             case .dictation:
                 DictationView(threadId: nil, autoStart: true)
-            case .newTasks:
-                QuickTaskView()
             default:
                 EmptyView()
             }
@@ -203,7 +199,6 @@ struct CaptureSheet: View {
         case .note: writingNote = true
         case .voice: destination = .recording
         case .dictate: destination = .dictation(threadId: nil, autoStart: true)
-        case .task: destination = .newTasks
         case .file: choosingFile = true
         case .thread:
             operation.complete(on: app) { dismiss() }

@@ -37,9 +37,6 @@
                   "enum": [
                     "approval",
                     "question",
-                    "attention",
-                    "review",
-                    "due",
                     "reply",
                     "mention"
                   ]
@@ -85,102 +82,6 @@
               ],
               "additionalProperties": false
             }
-          },
-          "due": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    },
-                    "due": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "projectId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "archived": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "title",
-                    "status",
-                    "due",
-                    "projectId",
-                    "archived"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              {
-                "type": "null"
-              }
-            ]
-          },
-          "review": {
-            "anyOf": [
-              {
-                "type": "array",
-                "items": {
-                  "type": "object",
-                  "properties": {
-                    "id": {
-                      "type": "string"
-                    },
-                    "title": {
-                      "type": "string"
-                    },
-                    "status": {
-                      "type": "string"
-                    },
-                    "due": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "projectId": {
-                      "type": [
-                        "string",
-                        "null"
-                      ]
-                    },
-                    "archived": {
-                      "type": "boolean"
-                    }
-                  },
-                  "required": [
-                    "id",
-                    "title",
-                    "status",
-                    "due",
-                    "projectId",
-                    "archived"
-                  ],
-                  "additionalProperties": false
-                }
-              },
-              {
-                "type": "null"
-              }
-            ]
           },
           "working": {
             "type": "object",
@@ -532,8 +433,6 @@
           }
         },
         "required": [
-          "due",
-          "review",
           "working",
           "recent",
           "automations",

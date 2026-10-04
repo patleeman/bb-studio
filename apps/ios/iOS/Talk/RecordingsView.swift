@@ -52,7 +52,6 @@ struct RecordingDetailView: View {
                                 .disabled(generatingNotes)
                         }
                         if let summary = meetingNotes.summary, !summary.isEmpty { Text(summary).textSelection(.enabled) }
-
                     }
                     .padding(12)
                     .background(.fill.quaternary, in: .rect(cornerRadius: 12))
@@ -156,15 +155,6 @@ struct RecordingDetailView: View {
         do {
             try await client.regenerateRecordingNotes(id)
             await load()
-        } catch {
-            self.error = BBClient.describe(error, server: client.baseURL)
-        }
-    }
-
-    private func createTask(_ index: Int) async {
-        do {
-            let taskId = try await client.createTaskFromRecording(id, index: index)
-            operation.complete(on: app) { app.studioPath.append(.task(id: taskId)) }
         } catch {
             self.error = BBClient.describe(error, server: client.baseURL)
         }

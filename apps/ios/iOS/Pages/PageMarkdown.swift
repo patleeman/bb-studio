@@ -294,7 +294,7 @@ struct EmbedCard: View {
     @ObservedObject private var studio = StudioStore.shared
 
     /// Embeds of other add-ons' items, by the add-on that makes them.
-    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk", "task": "studio-tasks"]
+    private static let studioPlugins = ["drawing": "excalidraw", "artifact": "artifacts", "recording": "talk"]
 
     var body: some View {
         let target = embed.target ?? embed.url ?? embed.id ?? ""
@@ -329,7 +329,7 @@ struct EmbedCard: View {
         }
     }
 
-    /// A drawing, artifact, recording, task or any Studio item: its row from Studio, opening natively.
+    /// A drawing, artifact, recording or any Studio item: its row from Studio, opening natively.
     private func studioCard(_ kind: String, _ ref: (pluginId: String, id: String)) -> some View {
         let item = studio.items.first { $0.pluginId == ref.pluginId && $0.itemId == ref.id }
         let label = kind == "item" ? (item.map { StudioKind.of($0.kind).label } ?? "Studio item") : StudioKind.of(kind).label
@@ -339,7 +339,7 @@ struct EmbedCard: View {
                     StudioRow(item: item, project: nil)
                 } else {
                     HStack(spacing: 10) {
-                        Image(systemName: kind == "task" ? "checkmark.circle" : StudioKind.of(kind).symbol)
+                        Image(systemName: StudioKind.of(kind).symbol)
                             .foregroundStyle(.secondary).frame(width: 24)
                         VStack(alignment: .leading, spacing: 2) {
                             Text(embed.title.flatMap { $0.isEmpty ? nil : $0 } ?? label).font(.subheadline.weight(.semibold))
@@ -367,7 +367,7 @@ struct EmbedCard: View {
         if let route = href.flatMap(Route.init(href:)) ?? Self.route(ref) {
             app.push(route)
         } else if let href, let url = URL(string: href, relativeTo: app.client.baseURL) {
-            // Add-ons the app doesn't draw natively, like Studio Tasks, open in BB web.
+            // Add-ons the app doesn't draw natively open in BB web.
             UIApplication.shared.open(url)
         }
     }
@@ -412,6 +412,8 @@ struct EmbedCard: View {
         case "bookmark": target
         case "page": "Page"
         case "thread": "Thread"
+        // Task and board embeds came from the removed Tasks add-on.
+        case "task", "board": "No longer available"
         default: "Embed"
         }
     }

@@ -317,7 +317,7 @@ final class ReviewQualityUITests: XCTestCase {
 
         app.open(URL(string: "bbstudio://capture")!)
         XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 10))
-        for id in ["voice", "dictate", "note", "task", "file", "thread"] {
+        for id in ["voice", "dictate", "note", "file", "thread"] {
             let button = app.buttons["capture-\(id)"]
             reveal(button, in: app)
             checkTarget(button)

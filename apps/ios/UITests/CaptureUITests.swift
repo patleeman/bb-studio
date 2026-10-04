@@ -11,7 +11,7 @@ final class CaptureUITests: XCTestCase {
             notificationAlert.buttons["Don’t Allow"].tap()
         }
         XCTAssertTrue(app.navigationBars["Capture to BB"].waitForExistence(timeout: 10))
-        for id in ["voice", "dictate", "note", "task", "file", "thread"] {
+        for id in ["voice", "dictate", "note", "file", "thread"] {
             XCTAssertTrue(app.buttons["capture-\(id)"].exists, "Missing \(id)")
         }
         try? app.screenshot().pngRepresentation.write(to: URL(fileURLWithPath: "/tmp/qa-ui-ios6-capture.png"))

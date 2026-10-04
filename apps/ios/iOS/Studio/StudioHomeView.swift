@@ -42,28 +42,6 @@ struct StudioHomeView: View {
                                 Text("Needs you").foregroundStyle(Color.primary.opacity(0.75))
                             }
                         }
-                        if home.due?.isEmpty == false {
-                            Section {
-                                ForEach(Array((home.due ?? []).enumerated()), id: \.offset) { _, task in
-                                    if let id = task.id {
-                                        NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "calendar") }
-                                    }
-                                }
-                            } header: {
-                                Text("Due today").foregroundStyle(Color.primary.opacity(0.75))
-                            }
-                        }
-                        if home.review?.isEmpty == false {
-                            Section {
-                                ForEach(Array((home.review ?? []).enumerated()), id: \.offset) { _, task in
-                                    if let id = task.id {
-                                        NavigationLink(value: Route.task(id: id)) { Label(task.title ?? "Task", systemImage: "checkmark.circle") }
-                                    }
-                                }
-                            } header: {
-                                Text("In review").foregroundStyle(Color.primary.opacity(0.75))
-                            }
-                        }
                         if home.working?.threads?.isEmpty == false || home.working?.bots?.isEmpty == false {
                             Section {
                                 ForEach(Array((home.working?.threads ?? []).enumerated()), id: \.offset) { _, thread in

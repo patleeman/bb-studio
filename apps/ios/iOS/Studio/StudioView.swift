@@ -7,7 +7,7 @@ import SwiftUI
 final class StudioStore: ObservableObject {
     let serverURL = ServerScope.selectedURL
     static var shared = StudioStore()
-    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tasks", "studio-tables", "bot-teams"]
+    static let addOns: Set<String> = ["studio", "pages", "talk", "excalidraw", "artifacts", "studio-tables", "bot-teams"]
 
     /// Archived ones too; the list shows them on request.
     @Published private(set) var items: [StudioItem] = []
@@ -337,11 +337,9 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "dictation", label: "Dictation", plural: "Dictations", symbol: "mic", tint: .orange),
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
-        StudioKind(id: "task", label: "Task", plural: "Tasks", symbol: "checklist", tint: .green),
         StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
         StudioKind(id: "view", label: "Channel", plural: "Channels", symbol: "bubble.left.and.bubble.right", tint: .indigo),
         StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
-        StudioKind(id: "board", label: "Board", plural: "Boards", symbol: "rectangle.split.3x1", tint: .green),
         StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
     ]
 
@@ -411,7 +409,7 @@ struct StudioView: View {
                     }
                 }
             }
-            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages", "studio-tasks"]) {
+            if query.isEmpty, !selecting, !store.plugins.isDisjoint(with: ["talk", "pages"]) {
                 Section { quickActions }
                     .listRowInsets(EdgeInsets())
                     .listRowBackground(Color.clear)
@@ -586,7 +584,7 @@ struct StudioView: View {
 
     /// Capture first, file later: each tile opens straight into typing or recording.
     private var quickActions: some View {
-        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("talk") ? 2 : 0) + (store.plugins.contains("studio-tasks") ? 1 : 0)
+        let count = dynamicTypeSize.isAccessibilitySize ? 2 : 1 + (store.plugins.contains("talk") ? 2 : 0)
         return LazyVGrid(columns: Array(repeating: GridItem(.flexible(), spacing: 10), count: count), spacing: 10) {
             if store.plugins.contains("talk") {
                 tile("Dictate", "mic.fill", .orange) { recordingKind = "dictation" } menu: {
@@ -597,15 +595,10 @@ struct StudioView: View {
                 }
             }
             tile("Write", "square.and.pencil", .blue) { app.sheet = .write } menu: {
-                ForEach(store.creatable.filter { $0.id != "task" }, id: \.id) { kind in
+                ForEach(store.creatable, id: \.id) { kind in
                     Button("New \(kind.label)", systemImage: StudioKind.of(kind.id).symbol) {
                         Task { await create(kind) }
                     }
-                }
-            }
-            if store.plugins.contains("studio-tasks") {
-                tile("Task", "checklist", .green) { app.sheet = .newTasks } menu: {
-                    Button("Open Board", systemImage: "rectangle.split.3x1") { operation.complete(on: app) { app.push(.tasks) } }
                 }
             }
             if store.plugins.contains("talk") {
@@ -832,7 +825,6 @@ struct StudioView: View {
         case "talk": .recording(id: item.itemId)
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
-        case "studio-tasks": .task(id: item.itemId)
         case "studio-tables": .table(id: item.itemId)
         case "bot-teams": item.kind == "view" ? .savedView(id: item.itemId) : .bot(id: item.itemId)
         case "studio" where item.kind == "space": item.href.flatMap(Route.init(href:)) ?? .space(id: item.itemId)
@@ -913,7 +905,6 @@ struct StudioView: View {
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
-        case "task": "Tasks you and your agents track show up here."
         case "bot": "Bot Teams bots show up here. Set one up from a chat in BB web."
         case "space": "Spaces gather items, threads and projects. Make one with New."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."

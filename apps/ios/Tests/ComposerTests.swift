@@ -33,10 +33,10 @@ final class ComposerTests: XCTestCase {
     }
 
     func testStudioMentionUsesProviderItemId() throws {
-        let results = try JSONDecoder().decode(MentionResults.self, from: Data(#"{"groups":[{"pluginId":"studio-tasks","providerId":"task","label":"Tasks","items":[{"itemId":"task:task_123","title":"QA task"}]}]}"#.utf8))
+        let results = try JSONDecoder().decode(MentionResults.self, from: Data(#"{"groups":[{"pluginId":"pages","providerId":"page","label":"Pages","items":[{"itemId":"page:pg_123","title":"QA page"}]}]}"#.utf8))
         let mention = Mention.plugin(results.groups[0].pluginId, results.groups[0].items[0])
-        XCTAssertEqual(mention.resource["pluginId"]?.stringValue, "studio-tasks")
-        XCTAssertEqual(mention.resource["itemId"]?.stringValue, "task:task_123")
+        XCTAssertEqual(mention.resource["pluginId"]?.stringValue, "pages")
+        XCTAssertEqual(mention.resource["itemId"]?.stringValue, "page:pg_123")
     }
 
     func testPluginRPCBodiesMatchServerSchemas() async throws {

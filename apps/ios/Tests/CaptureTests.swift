@@ -8,7 +8,7 @@ final class CaptureTests: XCTestCase {
     }
 
     func testLastUsedOptionMovesFirstWithoutChangingTheRest() {
-        XCTAssertEqual(CaptureOption.ordered(last: .task), [.task, .voice, .dictate, .note, .file, .thread])
+        XCTAssertEqual(CaptureOption.ordered(last: .file), [.file, .voice, .dictate, .note, .thread])
         XCTAssertEqual(CaptureOption.ordered(last: nil), CaptureOption.allCases)
     }
 }

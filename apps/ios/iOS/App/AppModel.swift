@@ -14,8 +14,6 @@ enum Route: Hashable {
     case drawing(id: String)
     case recording(id: String)
     case artifact(id: String)
-    case tasks
-    case task(id: String)
     case table(id: String)
     case terminals(scope: TerminalScope, title: String)
     case bot(id: String)
@@ -44,7 +42,6 @@ extension Route {
         case ("artifacts", "artifacts"): self = .artifact(id: id)
         case ("excalidraw", "drawings"): self = .drawing(id: id)
         case ("talk", "recordings"): self = .recording(id: id)
-        case ("studio-tasks", "tasks"): self = .task(id: id)
         case ("studio-tables", "tables"): self = .table(id: id)
         case ("bot-teams", "bots"): self = .bot(id: id)
         // Channels lived at /views/<id>; both open the same channel.
@@ -61,7 +58,6 @@ enum Sheet: Identifiable, Hashable {
     case recording
     case voiceChat(threadId: String)
     case write
-    case newTasks
 
     var id: String {
         switch self {
@@ -70,7 +66,6 @@ enum Sheet: Identifiable, Hashable {
         case .recording: "recording"
         case .voiceChat(let threadId): "voice:\(threadId)"
         case .write: "write"
-        case .newTasks: "newTasks"
         }
     }
 }
@@ -191,8 +186,6 @@ final class AppModel: ObservableObject {
         case "pages": openStudio(kind: "page")
         case "recording", "recordings": openStudio(kind: "recording", id.map { .recording(id: $0) })
         case "artifact", "artifacts": openStudio(kind: "artifact", id.map { .artifact(id: $0) })
-        case "task": openStudio(kind: nil, id.map { .task(id: $0) } ?? .tasks)
-        case "tasks": openStudio(kind: nil, .tasks)
         case "bot": if let id { openStudio(kind: "bot", .bot(id: id)) }
         case "space": if let id { openStudio(kind: nil, .space(id: id)) }
         case "feed": open(.feed)
@@ -200,7 +193,6 @@ final class AppModel: ObservableObject {
         case "dictate": startDictation(threadId: id)
         case "record": sheet = .recording
         case "write": sheet = .write
-        case "new-task", "new-tasks": sheet = .newTasks
         case "voice": startVoiceChat(threadId: id)
         case "new": newThread()
         case "studio", "talk": openStudio(kind: nil)

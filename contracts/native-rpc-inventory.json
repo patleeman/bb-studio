@@ -117,42 +117,6 @@
     },
     {
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "statuses",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "get",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "board",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "update",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "create",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "studio-tasks",
-      "method": "handOffBot",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "talk",
       "method": "recording_get",
       "coverage": "generated method"
@@ -161,12 +125,6 @@
       "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
       "plugin": "talk",
       "method": "meeting_regenerate",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/BBClient+NewSurfaces.swift",
-      "plugin": "talk",
-      "method": "meeting_create_task",
       "coverage": "generated method"
     },
     {
@@ -768,90 +726,6 @@
       "plugin": "studio-chat",
       "method": "home",
       "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "board",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "get",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "create",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "update",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "move",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "archive",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "delete",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "unlink",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "linkables",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "link",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "handOff",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "sendBack",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "archiveThreads",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/Tasks.swift",
-      "plugin": "studio-tasks",
-      "method": "settings",
-      "coverage": "literal method checked against contract"
     },
     {
       "file": "apps/ios/iOS/Capture/CaptureSheet.swift",

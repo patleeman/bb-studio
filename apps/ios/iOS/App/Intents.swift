@@ -162,7 +162,7 @@ struct CaptureIntent: AppIntent {
 
 struct WriteIntent: AppIntent {
     static let title: LocalizedStringResource = "Write in BB Studio"
-    static let description = IntentDescription("Open a blank note to save as a page, task or thread.")
+    static let description = IntentDescription("Open a blank note to save as a page or start a thread.")
     static let openAppWhenRun = true
 
     @MainActor
@@ -172,22 +172,9 @@ struct WriteIntent: AppIntent {
     }
 }
 
-struct NewTaskIntent: AppIntent {
-    static let title: LocalizedStringResource = "New BB task"
-    static let description = IntentDescription("Add tasks to the Studio board, one after another.")
-    static let openAppWhenRun = true
-
-    @MainActor
-    func perform() async throws -> some IntentResult {
-        AppModel.shared.sheet = .newTasks
-        return .result()
-    }
-}
-
 struct BBShortcuts: AppShortcutsProvider {
     static var appShortcuts: [AppShortcut] {
         AppShortcut(intent: CaptureIntent(), phrases: ["Capture in \(.applicationName)"], shortTitle: "Capture", systemImageName: "square.and.arrow.down")
-        AppShortcut(intent: AddTaskIntent(), phrases: ["Add a task in \(.applicationName)"], shortTitle: "Add task", systemImageName: "checkmark.circle")
         AppShortcut(intent: OpenPageIntent(), phrases: ["Open a page in \(.applicationName)"], shortTitle: "Open page", systemImageName: "doc.text")
         AppShortcut(intent: SendToThreadIntent(), phrases: ["Send to a thread in \(.applicationName)"], shortTitle: "Send to thread", systemImageName: "paperplane")
         AppShortcut(intent: StartRecordingIntent(), phrases: ["Start recording in \(.applicationName)"], shortTitle: "Record", systemImageName: "record.circle")

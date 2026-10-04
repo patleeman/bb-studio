@@ -15,7 +15,6 @@ public enum Talk {
     public static let segment_put = "segment_put"
     public static let recording_retry = "recording_retry"
     public static let meeting_regenerate = "meeting_regenerate"
-    public static let meeting_create_task = "meeting_create_task"
     public static let dictation_cleanup = "dictation_cleanup"
     public static let recording_cleanup = "recording_cleanup"
     public static let recording_keep = "recording_keep"
@@ -49,8 +48,6 @@ public enum Talk {
   public typealias RecordingRetry = RecordingRetryOutput
 
   public typealias MeetingRegenerate = MeetingRegenerateOutput
-
-  public typealias MeetingCreateTask = MeetingCreateTaskOutput
 
   public typealias DictationCleanup = DictationCleanupOutput
 
@@ -2256,24 +2253,6 @@ public enum Talk {
 
     public init(recording: MeetingRegenerateOutputRecording? = nil) {
       self.recording = recording
-    }
-  }
-
-  public struct MeetingCreateTaskInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var index: Int?
-
-    public init(id: String? = nil, index: Int? = nil) {
-      self.id = id
-      self.index = index
-    }
-  }
-
-  public struct MeetingCreateTaskOutput: Sendable, Hashable, Codable {
-    public var taskId: String?
-
-    public init(taskId: String? = nil) {
-      self.taskId = taskId
     }
   }
 

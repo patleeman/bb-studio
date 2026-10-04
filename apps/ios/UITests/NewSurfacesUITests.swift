@@ -43,37 +43,6 @@ final class NewSurfacesUITests: XCTestCase {
         return search
     }
 
-    func testTaskFieldsAndRelated() throws {
-        let task = try XCTUnwrap(rpc("studio-tasks", "create", [
-            "title": "QA iOS7 task", "description": "Search and task fields", "projectId": projectId,
-        ])?["task"] as? [String: Any])
-        let id = try XCTUnwrap(task["id"] as? String)
-        addTeardownBlock {
-            let tasks = self.rpc("studio-tasks", "board", ["includeArchived": true])?["tasks"] as? [[String: Any]] ?? []
-            for child in tasks where child["parentId"] as? String == id || child["title"] as? String == "QA iOS7 subtask" {
-                if let childId = child["id"] as? String { _ = self.rpc("studio-tasks", "delete", ["id": childId]) }
-            }
-            _ = self.rpc("studio-tasks", "delete", ["id": id])
-        }
-        let app = launch()
-        app.open(URL(string: "bbstudio://task/\(id)")!)
-        XCTAssertTrue(app.navigationBars["QA iOS7 task"].waitForExistence(timeout: 15))
-        XCTAssertTrue(app.staticTexts["Related"].waitForExistence(timeout: 10))
-        app.buttons["More"].tap()
-        app.buttons["Priority, labels and reminders"].tap()
-        XCTAssertTrue(app.navigationBars["Task details"].waitForExistence(timeout: 10))
-        let subtask = app.textFields["New subtask"]
-        subtask.tap()
-        subtask.typeText("QA iOS7 subtask")
-        app.buttons["Add"].tap()
-        if !app.staticTexts["QA iOS7 subtask"].waitForExistence(timeout: 10) {
-            let tasks = rpc("studio-tasks", "board", ["includeArchived": false])?["tasks"] as? [[String: Any]] ?? []
-            XCTAssertTrue(tasks.contains { $0["title"] as? String == "QA iOS7 subtask" && $0["parentId"] == nil },
-                "The subtask should appear when the updated Tasks plugin is installed")
-        }
-        shot(app, "task-fields")
-    }
-
     func testTableViews() throws {
         guard rpc("studio-tables", "list", NSNull()) != nil else { throw XCTSkip("Studio Tables is not installed") }
         let created = try XCTUnwrap(rpc("studio-tables", "create", [
