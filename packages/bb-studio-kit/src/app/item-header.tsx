@@ -100,13 +100,16 @@ function ItemActions({ compact, children }: { compact: boolean; children: ReactN
 }
 
 // BB's title bar, laid out for a Studio bar: the bar replaces the panel's
-// fixed label and takes the row's width. If BB's header changes shape, the
-// bar still shows, on the right.
+// fixed label and takes the row's width, and, like the rest of the title bar
+// on macOS, drags the window everywhere but its controls. If BB's header
+// changes shape, the bar still shows, on the right.
 const BAR_CSS = `
 [data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:first-child { display: none; }
 [data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:last-child,
 [data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:last-child > div:first-child,
 [data-bb-plugin-root]:has(> [data-studio-bar-slot] [data-studio-bar]) { flex: 1 1 auto; min-width: 0; }
+[data-testid="app-page-header-content-row"] > div[class~="[app-region:no-drag]"]:has([data-studio-bar]) { app-region: drag; -webkit-app-region: drag; }
+[data-testid="app-page-header-content-row"] > div[class~="[app-region:no-drag]"]:has([data-studio-bar]) :is(button, a, input, select, textarea, [role="button"], [contenteditable="true"]) { app-region: no-drag; -webkit-app-region: no-drag; }
 `;
 
 /** A nav panel's headerContent: where its views' Studio bar goes. */
