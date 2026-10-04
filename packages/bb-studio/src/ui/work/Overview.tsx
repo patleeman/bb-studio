@@ -16,6 +16,7 @@ import type { ReactNode } from "react";
 import { inboxLink } from "./links";
 import { useCall, useLive, type InboxEvent } from "./model";
 import { useProject } from "./ProjectPanel";
+import { useWork } from "./projects";
 import { PROJECTS_PANEL, projectIdOf } from "./routes";
 import { RUNNING, ThreadGlyph } from "./Sidebar";
 import { plainPreview } from "./text";
@@ -43,8 +44,8 @@ export interface Overview {
   updates: InboxEvent[];
 }
 
-export function overviewOf(threads: readonly PluginSidebarThread[], projectId: string, leadId: string | null, events: readonly InboxEvent[]): Overview {
-  const own = threads.filter((thread) => thread.projectId === projectId && !thread.isArchived && !thread.isHidden);
+export function overviewOf(threads: readonly PluginSidebarThread[], projectId: string, leadId: string | null, events: readonly InboxEvent[], projectOf: (thread: PluginSidebarThread) => string | null = (thread) => thread.projectId): Overview {
+  const own = threads.filter((thread) => projectOf(thread) === projectId && !thread.isArchived && !thread.isHidden);
   const ids = new Set(own.map((thread) => thread.id));
   const newest = (a: PluginSidebarThread, b: PluginSidebarThread) => b.updatedAt - a.updatedAt;
   const rest = own.filter((thread) => thread.id !== leadId);
@@ -91,7 +92,9 @@ export function ProjectOverview({ projectId, onOpenThread }: { projectId: string
   const threadActions = useSidebarThreadActions();
   const inbox = useLive<{ events: InboxEvent[] }>("inbox_list", { spaceId: "all" }, { pollMs: 30_000 });
   const leadId = project.data?.leadThreadId ?? null;
-  const view = overviewOf(threads, projectId, leadId, inbox.data?.events ?? []);
+  const work = useWork();
+  const view = overviewOf(threads, projectId, leadId, inbox.data?.events ?? [], work.projectOf);
+  const startIn = [work.chief, ...work.projects].find((entry) => entry?.id === projectId)?.bbProjectId ?? null;
   const run = project.data?.run?.enabled ? project.data.run : null;
   const open = (threadId: string) => { if (!onOpenThread?.(threadId)) threadActions.open(threadId); };
   const openEvent = (event: InboxEvent) => {
@@ -128,7 +131,7 @@ export function ProjectOverview({ projectId, onOpenThread }: { projectId: string
         : null}
       <Section
         title="Threads"
-        action={<button type="button" aria-label="New thread in this project" title="New thread in this project" onClick={() => threadActions.openNewThread({ projectId, focusPrompt: true })} className="inline-flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-4" /></button>}
+        action={<button type="button" aria-label="New thread in this project" title="New thread in this project" onClick={() => threadActions.openNewThread({ ...(startIn ? { projectId: startIn } : {}), focusPrompt: true })} className="inline-flex size-6 items-center justify-center rounded-md hover:bg-state-hover hover:text-foreground"><Icon name="Plus" className="size-4" /></button>}
       >
         {view.tree.map(({ thread, children }) => (
           <div key={thread.id} className="space-y-px">
@@ -169,6 +172,8 @@ export function ProjectThreadTab(_props: PluginNavPanelProps) {
 /** Thread panel: the overview of the thread's project, from any of its threads. */
 export function ThreadProjectOverview({ threadId }: PluginThreadPanelProps) {
   const { threads } = useSidebarThreads();
-  const projectId = threads.find((thread) => thread.id === threadId)?.projectId ?? null;
+  const { projectOf } = useWork();
+  const thread = threads.find((entry) => entry.id === threadId);
+  const projectId = thread ? projectOf(thread) : null;
   return projectId ? <ProjectOverview projectId={projectId} /> : null;
 }

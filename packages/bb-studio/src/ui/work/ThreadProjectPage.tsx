@@ -10,12 +10,15 @@ import {
 } from "@get-bb/plugin-sdk/app";
 import { useEffect } from "react";
 import { PageEmbed, useProject } from "./ProjectPanel";
+import { useWork } from "./projects";
 
 export const PROJECT_PAGE_ACTION = "project-page";
 
 function useThreadProject(threadId: string | null): string | null {
   const { threads } = useSidebarThreads();
-  return threadId ? threads.find((thread) => thread.id === threadId)?.projectId ?? null : null;
+  const { projectOf } = useWork();
+  const thread = threadId ? threads.find((entry) => entry.id === threadId) : undefined;
+  return thread ? projectOf(thread) : null;
 }
 
 /** Workbench tab: the page of the thread's project. */

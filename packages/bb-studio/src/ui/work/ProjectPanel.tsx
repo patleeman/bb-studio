@@ -16,6 +16,7 @@ import * as Menu from "@radix-ui/react-dropdown-menu";
 import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, floatWindowKey, openAppPath, publishFloatBody, type FloatTarget } from "@bb-studio/kit/app";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 import { useCall, useLive } from "./model";
+import { useWork } from "./projects";
 import { PROJECTS_PANEL, projectIdOf } from "./routes";
 import { ThreadGlyph } from "./Sidebar";
 import { Face } from "./Face";
@@ -68,7 +69,7 @@ function BotsToFold() {
   const call = useCall();
   const navigate = useBbNavigate();
   const bots = useLive<{ bots: BotSummary[] }>("bots_overview", {}, { pollMs: 0 });
-  const personalId = useSidebarThreads().projects.find((project) => project.isPersonal)?.id ?? null;
+  const personalId = useWork().chief?.id ?? null;
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
   const list = bots.data?.bots ?? [];
@@ -115,16 +116,16 @@ function BotsToFold() {
 }
 
 function ProjectList() {
-  const { projects, threads } = useSidebarThreads();
+  const { threads } = useSidebarThreads();
   const navigate = useBbNavigate();
-  const work = projects.filter((project) => !project.isPersonal);
+  const { projects: work, projectOf } = useWork();
   return (
     <PageColumn className="max-w-2xl">
       <h1 className="text-2xl font-semibold">Projects</h1>
       <p className="mt-1 text-sm text-muted-foreground">Each project has a lead you talk to, and a page it keeps current. Ask the Chief of Staff to start one, or make one from BB's project menu.</p>
       <div className="mt-6 space-y-1">
         {work.map((project) => {
-          const count = threads.filter((thread) => thread.projectId === project.id && !thread.isArchived && !thread.isHidden).length;
+          const count = threads.filter((thread) => projectOf(thread) === project.id && !thread.isArchived && !thread.isHidden).length;
           return (
             <button key={project.id} type="button" onClick={() => navigate.toPluginPanel(PROJECTS_PANEL, { subPath: project.id })} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-state-hover">
               <Icon name="Folder" className="size-4 text-muted-foreground" />
@@ -174,12 +175,16 @@ function ProjectView({ projectId }: { projectId: string }) {
   const call = useCall();
   const project = useProject(projectId);
   const { projects } = useSidebarThreads();
+  const work = useWork();
   const threadActions = useSidebarThreadActions();
   const [error, setError] = useState<string | null>(null);
   const [handingOff, setHandingOff] = useState(false);
-  const bbProject = projects.find((entry) => entry.id === projectId);
-  const chief = project.data?.role === "chief-of-staff" || bbProject?.isPersonal === true;
-  const name = chief ? "Chief of Staff" : project.data?.name ?? bbProject?.name ?? "Project";
+  const studio = work.chief?.id === projectId ? work.chief : work.projects.find((entry) => entry.id === projectId);
+  const chief = project.data?.role === "chief-of-staff" || studio?.role === "chief-of-staff";
+  const name = chief ? "Chief of Staff" : project.data?.name ?? studio?.name ?? "Project";
+  // Threads start in the project's folder (a BB project), or in Personal.
+  const bbProject = projects.find((entry) => entry.id === studio?.bbProjectId) ?? null;
+  const startIn = bbProject?.id ?? projects.find((entry) => entry.isPersonal)?.id ?? projectId;
   const leadThreadId = project.data?.leadThreadId ?? null;
 
   const start = async (request: NewThreadRequest) => {
@@ -202,16 +207,16 @@ function ProjectView({ projectId }: { projectId: string }) {
         {leadThreadId
           ? <button type="button" onClick={() => setHandingOff(true)} title="Hand the lead to another agent" className={GHOST_BUTTON}><Icon name="Fork" className="size-4" />Hand off</button>
           : null}
-        <button type="button" onClick={() => threadActions.openNewThread({ projectId, focusPrompt: true })} className={GHOST_BUTTON}>
+        <button type="button" onClick={() => threadActions.openNewThread({ projectId: startIn, focusPrompt: true })} className={GHOST_BUTTON}>
           <Icon name="MessageSquarePlus" className="size-4" />New thread
         </button>
-        {bbProject && !chief ? <button type="button" aria-label="Project settings" title="Project settings" onClick={() => openAppPath(bbProject.settingsHref)} className={GHOST_BUTTON}><Icon name="Settings" className="size-4" /></button> : null}
+        {bbProject && !bbProject.isPersonal && !chief ? <button type="button" aria-label="Folder settings" title="Folder settings" onClick={() => openAppPath(bbProject.settingsHref)} className={GHOST_BUTTON}><Icon name="Settings" className="size-4" /></button> : null}
       </header>
       {leadThreadId
         ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4">
             {/* "inherit": send with the lead thread's own permission, not the composer's default. */}
             <ThreadChat key={leadThreadId} threadId={leadThreadId} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" />
-            <HandoffDialog threadId={leadThreadId} projectId={projectId} open={handingOff} onOpenChange={setHandingOff} onDone={() => project.refresh()} />
+            <HandoffDialog threadId={leadThreadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={() => project.refresh()} />
           </div>
         : project.loading
           ? null
@@ -222,7 +227,7 @@ function ProjectView({ projectId }: { projectId: string }) {
                   ? "It takes your one-offs, starts and staffs projects, and hands work to their leads. Tell it what you want handled."
                   : "Tell the lead what this project is about. It writes the project's page and gets going; you talk to it here."}
               </p>
-              <NewThreadComposer defaultProjectId={projectId} placeholder={chief ? "What should I take care of?" : "What's this project about?"} draftKey={`project-lead:${projectId}`} onSubmit={start} />
+              <NewThreadComposer defaultProjectId={startIn} placeholder={chief ? "What should I take care of?" : "What's this project about?"} draftKey={`project-lead:${projectId}`} onSubmit={start} />
               {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
             </div>}
     </div>

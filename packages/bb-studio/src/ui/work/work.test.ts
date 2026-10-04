@@ -2,6 +2,7 @@ import { describe, expect, it } from "vitest";
 import { isShown } from "./Navigation";
 import { inboxLink } from "./links";
 import { overviewOf } from "./Overview";
+import { extendSelection, nest, sortThreads } from "./projects";
 import { projectIdOf } from "./routes";
 
 describe("navigation", () => {
@@ -64,5 +65,26 @@ describe("overviewOf", () => {
   });
   it("keeps only this project's updates, newest first", () => {
     expect(view.updates.map((e) => e.key)).toEqual(["e3", "e1"]);
+  });
+});
+
+describe("thread list", () => {
+  const t = (id: string, updatedAt: number, extra: Record<string, unknown> = {}) => ({ id, updatedAt, createdAt: 100 - updatedAt, displayTitle: id, parentThreadId: null, ...extra }) as never;
+  const threads = [t("b", 2), t("a", 3), t("c", 1), t("a1", 5, { parentThreadId: "a" })];
+  it("sorts by updated, created and title, either way", () => {
+    const ids = (list: { id: string }[]) => list.map((x) => x.id);
+    expect(ids(sortThreads(threads, { by: "updated", desc: true }))).toEqual(["a1", "a", "b", "c"]);
+    expect(ids(sortThreads(threads, { by: "created", desc: true }))).toEqual(["c", "b", "a", "a1"]);
+    expect(ids(sortThreads(threads, { by: "alpha", desc: false }))).toEqual(["a", "a1", "b", "c"]);
+    expect(ids(sortThreads(threads, { by: "alpha", desc: true }))).toEqual(["c", "b", "a1", "a"]);
+  });
+  it("puts sub-threads under their parent", () => {
+    expect(nest(sortThreads(threads, { by: "updated", desc: true })).map((row) => `${row.thread.id}:${row.depth}`)).toEqual(["a:0", "a1:1", "b:0", "c:0"]);
+  });
+  it("toggles one, or selects a range from the anchor", () => {
+    const order = ["a", "b", "c", "d"];
+    expect([...extendSelection(order, new Set(), null, "b", false)]).toEqual(["b"]);
+    expect([...extendSelection(order, new Set(["b"]), null, "b", false)]).toEqual([]);
+    expect([...extendSelection(order, new Set(["d"]), "d", "b", true)].sort()).toEqual(["b", "c", "d"]);
   });
 });
