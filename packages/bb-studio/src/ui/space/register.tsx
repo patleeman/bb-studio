@@ -8,12 +8,12 @@ import { ThreadSpaceOverview } from "./Overview";
 import { SPACES_PANEL } from "./routes";
 import { SidebarSpacesSection } from "./SidebarSpacesSection";
 import { SpaceItemTab, SpaceThreadTab } from "./SpaceTabs";
-import { SpaceLeadHeader, SpacesPanel } from "./SpaceView";
+import { SpaceLeadHeader, SpacesHeader, SpacesPanel } from "./SpaceView";
 import { SPACE_ITEM_ACTION, SPACE_STATUS_ACTION, SPACE_THREAD_ACTION, newDraftId } from "./tabs";
 import { OpenSpacePage, SPACE_PAGE_ACTION, ThreadSpacePage } from "./ThreadSpacePage";
 
 export function registerSpaces(app: PluginAppBuilder): void {
-  app.slots.navPanel({ id: SPACES_PANEL, title: "Spaces", icon: "Folder", path: SPACES_PANEL, component: retainPanel(SPACES_PANEL, SpacesPanel) });
+  app.slots.navPanel({ id: SPACES_PANEL, title: "Spaces", icon: "Folder", path: SPACES_PANEL, component: retainPanel(SPACES_PANEL, SpacesPanel), headerContent: SpacesHeader });
   app.slots.threadPanelAction({ id: SPACE_STATUS_ACTION, title: "Space status", icon: "Activity", layout: "flush", component: ThreadSpaceOverview });
   app.slots.threadPanelAction({ id: SPACE_PAGE_ACTION, title: "Space page", icon: "FileText", layout: "flush", component: ThreadSpacePage });
   app.slots.threadPanelAction({ id: SPACE_THREAD_ACTION, title: "Space thread", icon: "MessageSquare", layout: "flush", component: SpaceThreadTab });

@@ -551,14 +551,13 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           ? "Nothing matches."
           : "No items yet.";
 
-  // New items go to the space's default project and join the space itself.
+  // New items go in the space's own folder; items follow their project, so that puts them in the space.
   const createInSpace = async (target: CollectionKind, into: SpaceView) => {
     if (target.create?.mode !== "rpc") return handlers.onCreate?.(target, into.defaultProjectId);
     try {
-      const { item } = await rpc.call("create", { pluginId: target.pluginId, kind: target.id, projectId: into.defaultProjectId });
-      await rpc.call("spaceMembers", { id: into.id, add: [{ pluginId: target.pluginId, id: item.id }], remove: [] });
+      const { href } = await rpc.call("createInSpace", { id: into.id, pluginId: target.pluginId, kind: target.id });
       refetch();
-      openAppPath(item.href);
+      openAppPath(href);
     } catch (cause) {
       toast.error(`Couldn't create a ${target.label.toLowerCase()}: ${errorMessage(cause)}`);
     }

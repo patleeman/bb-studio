@@ -20,6 +20,12 @@ import { HandoffDialog } from "./Handoff";
 import { SPACES_PANEL, spaceIdOf } from "./routes";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE } from "./styles";
 
+/** BB's title bar for the panel: New Space on the list of Spaces. */
+export function SpacesHeader({ subPath }: PluginNavPanelProps) {
+  if (spaceIdOf(subPath)) return null;
+  return <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(NEW_SPACE_EVENT, { cancelable: true }))} className={GHOST_BUTTON}><Icon name="Plus" className="size-4" />New Space</button>;
+}
+
 export function SpacesPanel({ subPath }: PluginNavPanelProps) {
   const spaceId = spaceIdOf(subPath);
   return spaceId ? <SpaceView key={spaceId} spaceId={spaceId} /> : <SpaceList />;
@@ -36,11 +42,7 @@ function SpaceList() {
   const navigate = useBbNavigate();
   return (
     <PageColumn className="max-w-2xl">
-      <div className="flex items-center gap-2">
-        <h1 className="flex-1 text-2xl font-semibold">Spaces</h1>
-        <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(NEW_SPACE_EVENT, { cancelable: true }))} className={GHOST_BUTTON}><Icon name="Plus" className="size-4" />New Space</button>
-      </div>
-      <p className="mt-1 text-sm text-muted-foreground">Each Space has a lead you talk to and a page it keeps current. Its threads, pages and projects live in it.</p>
+      <p className="text-sm text-muted-foreground">Each Space has a lead you talk to, a page it keeps current, and the threads and Studio items that belong to it.</p>
       <div className="mt-6 space-y-1">
         {(spaces ?? []).map((space) => (
           <button key={space.id} type="button" onClick={() => navigate.toPluginPanel(SPACES_PANEL, { subPath: space.id })} className="flex w-full items-center gap-3 rounded-md px-3 py-2.5 text-left hover:bg-state-hover">
