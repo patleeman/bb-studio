@@ -34,7 +34,7 @@ export interface SpaceLeadDeps {
   spaces: SpaceStore;
   /** The space's home page id, made from the space template if it has none; null without Pages. */
   ensurePage(spaceId: string): Promise<string | null>;
-  hub: { overview(): Promise<{ items: HubItem[]; providers: { pluginId: string; kinds: { id: string; background?: boolean }[] }[] }> };
+  hub: { overview(): Promise<{ items: HubItem[]; providers: { pluginId: string; kinds: { id: string; label: string; icon: string; background?: boolean }[] }[] }> };
   /** Open collections and sidebars refetch. */
   changed(): void;
 }
@@ -199,10 +199,18 @@ export class SpaceLeads {
       .map((thread) => ({ id: thread.id, title: threadTitle(thread), status: thread.status, updatedAt: thread.updatedAt ?? thread.createdAt ?? 0, parentThreadId: thread.parentThreadId ?? null, isLead: thread.id === leadThreadId }))
       .sort((a, b) => b.updatedAt - a.updatedAt || a.id.localeCompare(b.id));
     const background = backgroundKinds(providers);
+    const kinds = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind] as const)));
     const held = items
       .filter((item) => !item.archived && item.pluginId !== "studio" && !background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item) && !(item.pluginId === PAGES_PLUGIN_ID && item.id === space.pageId))
       .sort((a, b) => b.updatedAt - a.updatedAt)
-      .map((item) => ({ ref: `${item.pluginId}:${item.id}`, title: item.title || "Untitled", kind: item.kind, href: item.href, icon: item.icon ?? null, updatedAt: item.updatedAt }));
+      .map((item) => {
+        const kind = kinds.get(`${item.pluginId}:${item.kind}`);
+        return {
+          ref: `${item.pluginId}:${item.id}`, title: item.title || "Untitled", kind: item.kind, href: item.href, icon: item.icon ?? null, updatedAt: item.updatedAt,
+          kindLabel: kind?.label ?? item.kind, kindIcon: kind?.icon ?? "File",
+          preview: item.preview ?? null, thumbnailUrl: item.thumbnailUrl ?? null, updatedBy: item.updatedBy ?? null,
+        };
+      });
     const enriched = await spaceThreadStatus(this.deps.sdk, threads);
     return { ...enriched, items: held };
   }

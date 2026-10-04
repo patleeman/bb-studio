@@ -3406,6 +3406,30 @@ public enum Studio {
     }
   }
 
+  public enum SpaceOverviewOutputItemsItemUpdatedBy: Sendable, Hashable, Codable {
+    case user
+    case agent
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "user": self = .user
+      case "agent": self = .agent
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .user: try container.encode("user")
+      case .agent: try container.encode("agent")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
   public struct SpaceOverviewOutputItemsItem: Sendable, Hashable, Codable {
     public var ref: String?
     public var title: String?
@@ -3413,14 +3437,24 @@ public enum Studio {
     public var href: String?
     public var icon: String?
     public var updatedAt: Double?
+    public var kindLabel: String?
+    public var kindIcon: String?
+    public var preview: String?
+    public var thumbnailUrl: String?
+    public var updatedBy: SpaceOverviewOutputItemsItemUpdatedBy?
 
-    public init(ref: String? = nil, title: String? = nil, kind: String? = nil, href: String? = nil, icon: String? = nil, updatedAt: Double? = nil) {
+    public init(ref: String? = nil, title: String? = nil, kind: String? = nil, href: String? = nil, icon: String? = nil, updatedAt: Double? = nil, kindLabel: String? = nil, kindIcon: String? = nil, preview: String? = nil, thumbnailUrl: String? = nil, updatedBy: SpaceOverviewOutputItemsItemUpdatedBy? = nil) {
       self.ref = ref
       self.title = title
       self.kind = kind
       self.href = href
       self.icon = icon
       self.updatedAt = updatedAt
+      self.kindLabel = kindLabel
+      self.kindIcon = kindIcon
+      self.preview = preview
+      self.thumbnailUrl = thumbnailUrl
+      self.updatedBy = updatedBy
     }
   }
 

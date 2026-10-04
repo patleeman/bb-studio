@@ -177,7 +177,12 @@ const spaceOverview = z.object({
     kind: z.enum(["progress", "failure", "blocked"]), summary: z.string(), at: z.number(),
   })),
   /** `ref` is `<plugin>:<id>`. */
-  items: z.array(z.object({ ref: z.string(), title: z.string(), kind: z.string(), href: z.string(), icon: z.string().nullable(), updatedAt: z.number() })),
+  items: z.array(z.object({
+    ref: z.string(), title: z.string(), kind: z.string(), href: z.string(), icon: z.string().nullable(), updatedAt: z.number(),
+    /** The kind's name and icon, for cards. */
+    kindLabel: z.string(), kindIcon: z.string(),
+    preview: z.string().nullable(), thumbnailUrl: z.string().nullable(), updatedBy: z.enum(["user", "agent"]).nullable(),
+  })),
 });
 export type SpaceOverviewView = z.infer<typeof spaceOverview>;
 

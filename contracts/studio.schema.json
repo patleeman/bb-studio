@@ -4663,6 +4663,38 @@
                 },
                 "updatedAt": {
                   "type": "number"
+                },
+                "kindLabel": {
+                  "type": "string"
+                },
+                "kindIcon": {
+                  "type": "string"
+                },
+                "preview": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "thumbnailUrl": {
+                  "type": [
+                    "string",
+                    "null"
+                  ]
+                },
+                "updatedBy": {
+                  "anyOf": [
+                    {
+                      "type": "string",
+                      "enum": [
+                        "user",
+                        "agent"
+                      ]
+                    },
+                    {
+                      "type": "null"
+                    }
+                  ]
                 }
               },
               "required": [
@@ -4671,7 +4703,12 @@
                 "kind",
                 "href",
                 "icon",
-                "updatedAt"
+                "updatedAt",
+                "kindLabel",
+                "kindIcon",
+                "preview",
+                "thumbnailUrl",
+                "updatedBy"
               ],
               "additionalProperties": false
             }

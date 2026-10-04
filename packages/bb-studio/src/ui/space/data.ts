@@ -118,7 +118,10 @@ export interface SpaceLead {
 
 export interface OverviewThread { id: string; title: string; status: string; updatedAt: number; parentThreadId: string | null; isLead: boolean; progress?: string | null; progressAt?: number | null; blockedReason?: string | null; failureReason?: string | null }
 export interface OverviewActivity { id: string; threadId: string; title: string; summary: string; at: number; kind: string }
-export interface OverviewItem { ref: string; title: string; kind: string; href: string; icon: string | null; updatedAt: number }
+export interface OverviewItem {
+  ref: string; title: string; kind: string; href: string; icon: string | null; updatedAt: number;
+  kindLabel: string; kindIcon: string; preview: string | null; thumbnailUrl: string | null; updatedBy: "user" | "agent" | null;
+}
 
 export function useSpaces() {
   const live = useLive<{ spaces: SpaceView[] }>("spaces", null, { pollMs: 0 });
