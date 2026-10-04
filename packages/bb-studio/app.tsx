@@ -12,7 +12,6 @@ import { StudioPanel } from "./src/ui/StudioPanel";
 import { ComposerSpaces } from "./src/ui/ComposerSpaces";
 import { ComposerTrim } from "./src/ui/ComposerTrim";
 import { ActivityPanel } from "./src/ui/HomePanel";
-import { registerOfficeApp } from "./src/ui/office/register";
 import { registerSpaces } from "./src/ui/space/register";
 
 function StudioRoot({ subPath }: { subPath: string }) {
@@ -22,9 +21,6 @@ function StudioRoot({ subPath }: { subPath: string }) {
 }
 
 export default definePluginApp((app) => {
-  // The office (docs/office-model.md). The sidebar slots switch on once the
-  // Sidebar and Navigation modules are folded into core.
-  registerOfficeApp(app, { sidebar: false });
   // Spaces as projects: a lead, its page beside it (docs/spaces-as-projects.md).
   registerSpaces(app);
   app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot) });

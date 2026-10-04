@@ -12,7 +12,6 @@ the Studio rows that another surface already opens:
 | New channel | [Studio Sidebar](../bb-studio-sidebar) shows sections, since the Channels section has its own New channel. |
 | Explore | Always. Explore's panel in [Studio Pages](../bb-studio-pages); explainers open from their links. |
 | Companions | Always. [Float](../bb-studio-float)'s dock and toggle open it. |
-| Home | Always. It is [Studio](../bb-studio)'s legacy office panel. |
 | Chat | Always. [Studio Chat](../bb-studio-chat) starts chats from Studio items and its overlay. |
 
 Left-out rows are in neither the rows nor **More**; their plugins still run

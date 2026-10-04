@@ -24,8 +24,6 @@ export const RETIRED_PANELS = [
   "pages/explainers",
   // Float's Companions panel; Float's dock and toggle reach it.
   "float/companions",
-  // Studio's legacy office panel ("Home").
-  "studio/office",
   // Studio Chat's panel; chats start from Studio items and the overlay.
   "studio-chat/chats",
   // Old /views links redirect to channels; the row would only repeat Channels.

@@ -99,7 +99,6 @@ describe("Studio Navigation", () => {
     const retired = [
       item("pages/explainers", "Explore"),
       item("float/companions", "Companions"),
-      item("studio/office", "Home"),
       item("studio-chat/chats", "Chat", { isVisible: false }),
     ];
     renderNavigation([...ITEMS, ...retired]);

@@ -10,7 +10,6 @@ const teams = z.object({
   bots: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), working: z.boolean() })),
   directConversations: z.record(z.string(), z.array(z.object({ botId: z.string(), threadId: z.string() }))),
 });
-const roomJobs = z.object({ jobs: z.array(z.object({ botId: z.string(), startedAt: z.number().nullable(), updatedAt: z.number(), status: z.string(), threadId: z.string().nullable() })) });
 const automation = z.object({ id: z.string(), name: z.string(), projectId: z.string(), enabled: z.boolean(), nextRunAt: z.number().nullable() });
 const usage = z.object({ turns: z.number(), forks: z.number(), active: z.number(), errors: z.number(), routingMilliseconds: z.number(), limits: z.object({ turnsPerHour: z.number(), turnsPerDay: z.number(), minutesPerTurn: z.number(), concurrentForks: z.number() }) });
 
@@ -32,12 +31,6 @@ export function summarizeTurns(events: readonly { type: string; createdAt: numbe
     }
   }
   return { turns, failures, durationMs };
-}
-
-export function summarizeBotJobs(jobs: readonly { startedAt: number | null; updatedAt: number; status: string }[], since: number) {
-  const completed = jobs.filter((job) => job.startedAt !== null && job.updatedAt >= since);
-  return { turns: completed.length, failures: completed.filter((job) => job.status === "error").length,
-    durationMs: completed.reduce((total, job) => total + Math.max(0, job.updatedAt - job.startedAt!), 0) };
 }
 
 export async function homeData(sdk: Sdk, hub: StudioHub, services: StudioServices, providerComments: ProviderComments, projectId?: string, periodDays = 7) {

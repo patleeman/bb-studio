@@ -1,4 +1,4 @@
-import { GHOST_BUTTON, Icon, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
+import { Icon, PageColumn, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -7,7 +7,6 @@ import type { z } from "zod";
 import type { rpcContract } from "../contract";
 
 type Home = z.output<(typeof rpcContract)["home"]["output"]>;
-type Need = NonNullable<Home["needsYou"]>[number];
 
 /** The `home` RPC, kept fresh on Studio changes, visibility and a minute's tick. */
 function useHome(periodDays: number) {
@@ -28,58 +27,6 @@ function useHome(periodDays: number) {
   useEffect(() => { const timer = setInterval(refresh, 60_000); return () => clearInterval(timer); }, [refresh]);
   useRealtime(STUDIO_REALTIME_CHANNEL, refresh);
   return { data, error, setError, refresh };
-}
-
-const NEED_ICONS: Record<Need["kind"], string> = {
-  approval: "CircleCheck", question: "MessageSquare", reply: "CornerDownRight", mention: "MessageSquarePlus",
-};
-const SHOWN_NEEDS = 4;
-
-function NeedRow({ entry, onRespond }: { entry: Need; onRespond: (entry: Need, action: "approve" | "deny" | "answer", answer?: string) => Promise<void> }) {
-  const [answer, setAnswer] = useState("");
-  const [busy, setBusy] = useState(false);
-  const respond = async (action: "approve" | "deny" | "answer") => {
-    setBusy(true);
-    try { await onRespond(entry, action, answer); } finally { setBusy(false); }
-  };
-  return <li className="flex min-h-10 items-center gap-3 px-3 py-1.5 text-sm max-md:flex-wrap">
-    <Icon name={NEED_ICONS[entry.kind]} aria-hidden className="size-4 shrink-0 text-muted-foreground" />
-    <button type="button" onClick={() => openAppPath(entry.href)} title={entry.body} className="flex min-w-0 flex-1 items-baseline gap-2 text-left hover:underline focus-visible:outline-2 focus-visible:outline-ring">
-      <span className="shrink-0 font-medium">{entry.title}</span>
-      <span className="min-w-0 truncate text-muted-foreground">{entry.body}</span>
-    </button>
-    {entry.responseKind === "approval" ? <div className="flex shrink-0 gap-1.5">
-      <button disabled={busy} type="button" onClick={() => void respond("approve")} className={OUTLINE_BUTTON}>Approve once</button>
-      <button disabled={busy} type="button" onClick={() => void respond("deny")} className={GHOST_BUTTON}>Deny</button>
-    </div> : null}
-    {entry.responseKind === "question" ? <form onSubmit={(event) => { event.preventDefault(); void respond("answer"); }} className="flex shrink-0 gap-1.5">
-      <input aria-label={`Answer ${entry.title}`} placeholder="Answer" value={answer} onChange={(event) => setAnswer(event.target.value)} className="h-8 w-48 rounded-md border border-border bg-background px-2" />
-      <button disabled={busy || !answer.trim()} type="submit" className={OUTLINE_BUTTON}>Send</button>
-    </form> : null}
-  </li>;
-}
-
-/** What needs you, above the collection. Renders nothing when nothing does. */
-export function NeedsYou() {
-  const rpc = useRpc<typeof rpcContract>();
-  const { data, error, setError, refresh } = useHome(7);
-  const [expanded, setExpanded] = useState(false);
-  const respond = useCallback(async (entry: Need, action: "approve" | "deny" | "answer", answer?: string) => {
-    if (!entry.threadId || !entry.interactionId) return;
-    try { await rpc.call("homeRespond", { threadId: entry.threadId, interactionId: entry.interactionId, action, ...(answer === undefined ? {} : { answer }) }); refresh(); }
-    catch (cause) { setError(errorMessage(cause)); }
-  }, [refresh, rpc, setError]);
-  const needs = data?.needsYou ?? [];
-  if (!needs.length) return null;
-  const shown = expanded ? needs : needs.slice(0, SHOWN_NEEDS);
-  return <section aria-label="Needs you" className="mb-4 rounded-lg border border-border">
-    <h2 className="flex items-center justify-between px-3 pt-2 text-xs font-medium text-muted-foreground">
-      Needs you · {needs.length}
-      {needs.length > SHOWN_NEEDS ? <button type="button" onClick={() => setExpanded(!expanded)} className="hover:text-foreground">{expanded ? "Show less" : "Show all"}</button> : null}
-    </h2>
-    {error ? <p role="alert" className="px-3 pt-1 text-sm text-destructive">{error}</p> : null}
-    <ul className="m-0 list-none divide-y divide-border p-0">{shown.map((entry) => <NeedRow key={entry.id} entry={entry} onRespond={respond} />)}</ul>
-  </section>;
 }
 
 function Section({ title, children }: { title: string; children: React.ReactNode }) {
