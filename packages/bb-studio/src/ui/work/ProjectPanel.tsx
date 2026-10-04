@@ -254,30 +254,3 @@ export function ProjectPageTab({ subPath }: PluginNavPanelProps) {
   if (pageId) return <PageEmbed pageId={pageId} />;
   return project.loading ? null : <p className="p-4 text-sm text-muted-foreground">The project's page appears here once you start its lead.</p>;
 }
-
-/** Workbench tab: the project's threads, and a way to start another. */
-export function ProjectThreadsTab({ subPath }: PluginNavPanelProps) {
-  const projectId = projectIdOf(subPath);
-  const project = useProject(projectId);
-  const { threads } = useSidebarThreads();
-  const threadActions = useSidebarThreadActions();
-  if (!projectId) return null;
-  const leadId = project.data?.leadThreadId;
-  const own = threads
-    .filter((thread) => thread.projectId === projectId && !thread.isArchived && !thread.isHidden && thread.id !== leadId)
-    .sort((a, b) => b.updatedAt - a.updatedAt);
-  return (
-    <div className="space-y-px p-2">
-      <button type="button" onClick={() => threadActions.openNewThread({ projectId, focusPrompt: true })} className="flex h-8 w-full items-center gap-2 rounded-md px-2 text-left text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground">
-        <Icon name="Plus" className="size-4" />New thread in this project
-      </button>
-      {own.map((thread) => (
-        <button key={thread.id} type="button" onClick={() => threadActions.open(thread.id)} className={cn("flex h-8 w-full min-w-0 items-center gap-2 rounded-md px-2 text-left text-sm hover:bg-state-hover", thread.parentThreadId && "pl-6")}>
-          <span className="inline-flex size-4 shrink-0 items-center justify-center"><ThreadGlyph thread={thread} /></span>
-          <span className={cn("min-w-0 flex-1 truncate", thread.isUnread && "font-medium")}>{thread.displayTitle}</span>
-        </button>
-      ))}
-      {!own.length ? <p className="px-2 py-2 text-xs text-muted-foreground">No other threads yet. The lead starts them as the work needs, or start one here.</p> : null}
-    </div>
-  );
-}

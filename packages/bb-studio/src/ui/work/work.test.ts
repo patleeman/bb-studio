@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { isShown } from "./Navigation";
 import { inboxLink } from "./links";
+import { overviewOf } from "./Overview";
 import { projectIdOf } from "./routes";
 
 describe("navigation", () => {
@@ -35,5 +36,33 @@ describe("inboxLink", () => {
     expect(inboxLink({ href: "/plugins/studio/office-team/bot_1", item: null, threadId: "thr_1" })).toEqual({ kind: "thread", threadId: "thr_1" });
     expect(inboxLink({ href: "/plugins/studio/office", item: null, threadId: null })).toBeNull();
     expect(inboxLink({ href: null, item: { ref: "x", title: "x", href: "/plugins/studio/office-conversation/c1" }, threadId: null })).toBeNull();
+  });
+});
+
+describe("overviewOf", () => {
+  const thread = (id: string, extra: Record<string, unknown> = {}) => ({
+    id, projectId: "p", parentThreadId: null, isArchived: false, isHidden: false, hasPendingInteraction: false,
+    runtimeStatus: "idle", updatedAt: 1, isUnread: false, displayTitle: id, ...extra,
+  }) as never;
+  const threads = [
+    thread("lead", { updatedAt: 9 }),
+    thread("a", { updatedAt: 5, runtimeStatus: "running" }),
+    thread("a1", { parentThreadId: "a", updatedAt: 6, hasPendingInteraction: true }),
+    thread("b", { parentThreadId: "lead", updatedAt: 7 }),
+    thread("other", { projectId: "q" }),
+    thread("old", { isArchived: true }),
+  ];
+  const event = (key: string, threadId: string | null, createdAt: number) => ({ key, threadId, createdAt }) as never;
+  const view = overviewOf(threads, "p", "lead", [event("e1", "a", 1), event("e2", "other", 2), event("e3", "lead", 3)]);
+
+  it("nests sub-threads under their parent; the lead's children are top level", () => {
+    expect(view.tree.map(({ thread, children }) => [thread.id, children.map((child) => child.id)])).toEqual([["b", []], ["a", ["a1"]]]);
+  });
+  it("lists what needs you and what's running", () => {
+    expect(view.needsYou.map((t) => t.id)).toEqual(["a1"]);
+    expect(view.running.map((t) => t.id)).toEqual(["a"]);
+  });
+  it("keeps only this project's updates, newest first", () => {
+    expect(view.updates.map((e) => e.key)).toEqual(["e3", "e1"]);
   });
 });

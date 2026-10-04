@@ -17,7 +17,7 @@ import { projectPath, PROJECTS_PANEL } from "./routes";
 import { ThreadMenu } from "./ThreadMenu";
 import { ROW, ROW_ACTIVE, ROW_GLYPH, ROW_LABEL, SECTION, SECTION_ACTION, cn } from "./styles";
 
-const RUNNING = new Set(["running", "starting", "active"]);
+export const RUNNING = new Set(["running", "starting", "active"]);
 const THREADS_SHOWN = 25;
 
 /** A thread's state where BB draws it: needs you, running, unread, or nothing. */
