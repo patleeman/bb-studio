@@ -12,3 +12,16 @@ export function stateOf(thread: OverviewThread, live: PluginSidebarThread | unde
   return { label: "Idle", order: 2, tone: "text-muted-foreground", reason: thread.progress ?? "No active run." };
 }
 
+
+/** Who steers a thread: the lead, for the workers it started (at any depth), or you. */
+export function startedByLead(thread: OverviewThread, threads: ReadonlyMap<string, OverviewThread>, leadId: string | null): boolean {
+  if (!leadId) return false;
+  const seen = new Set<string>();
+  let parent = thread.parentThreadId;
+  while (parent && !seen.has(parent)) {
+    if (parent === leadId) return true;
+    seen.add(parent);
+    parent = threads.get(parent)?.parentThreadId ?? null;
+  }
+  return false;
+}

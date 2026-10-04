@@ -1,23 +1,22 @@
-// A Space as a project: the lead's chat in the middle, with the Space's
-// Dashboard and Page as fixed tabs in the workbench beside it. Before
-// the Space has a lead, BB's own composer starts one. The panel's root lists
-// every Space.
+// A Space opens on its lead's thread page: BB's own thread header and chat on
+// the left, and the Space's status, threads and items as workbench tabs on
+// the right. This panel only sends you there, or starts the lead of a Space
+// that has none. Its root lists every Space.
 import * as Menu from "@radix-ui/react-dropdown-menu";
 import {
-  ThreadChat,
   experimental_NewThreadComposer as NewThreadComposer,
   experimental_useSidebarThreads as useSidebarThreads,
   useBbNavigate,
   type NewThreadRequest,
   type PluginNavPanelProps,
+  type PluginThreadHeaderActionProps,
 } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@bb-studio/kit/ui";
-import { GHOST_BUTTON, Icon, PageColumn } from "@bb-studio/kit/app";
-import { useState } from "react";
+import { GHOST_BUTTON, Icon, openAppPath, PageColumn } from "@bb-studio/kit/app";
+import { useEffect, useState } from "react";
 import { NEW_SPACE_EVENT, SPACE_DIALOG_EVENT } from "../../ids";
-import { useCall, useSpaceLead, useSpaces, type Cadence, type SpaceLead } from "./data";
+import { useCall, useSpaceLead, useSpaceOf, useSpaces, type Cadence, type SpaceLead } from "./data";
 import { HandoffDialog } from "./Handoff";
-import { PageEmbed } from "./PageEmbed";
 import { SPACES_PANEL, spaceIdOf } from "./routes";
 import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE } from "./styles";
 
@@ -56,14 +55,14 @@ function SpaceList() {
   );
 }
 
-const RUN_LABELS: Record<Cadence, string> = {
+export const RUN_LABELS: Record<Cadence, string> = {
   every5minutes: "Every 5 minutes", every15minutes: "Every 15 minutes", every30minutes: "Every 30 minutes",
   hourly: "Every hour", every2hours: "Every 2 hours", every6hours: "Every 6 hours",
   daily: "Daily", weekdays: "Weekdays", weekly: "Weekly", custom: "Custom",
 };
 
 /** A heartbeat schedules future lead turns; it never interrupts a worker. */
-function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }) {
+export function RunMenu({ lead, onChanged, compact = false }: { lead: SpaceLead; onChanged: () => void; compact?: boolean }) {
   const call = useCall();
   const run = lead.run?.enabled ? lead.run : null;
   const [custom, setCustom] = useState(false);
@@ -91,7 +90,7 @@ function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }
   return <>
     <Menu.Root>
       <Menu.Trigger disabled={saving} className={GHOST_BUTTON} title={run ? `Heartbeat: ${RUN_LABELS[run.cadence]}` : "Heartbeat is off"}>
-        <Icon name="Repeat" className="size-4" />Heartbeat
+        <Icon name="Repeat" className="size-4" />{compact ? <span className="sr-only">Heartbeat</span> : "Heartbeat"}
       </Menu.Trigger>
       <Menu.Portal><Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
         <p className="max-w-64 px-2 pt-1 pb-2 text-xs text-muted-foreground">The lead checks the Space and reports to your Inbox. Turning this off leaves running threads working.</p>
@@ -123,7 +122,7 @@ function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }
 }
 
 /** "New thread" in a Space: BB's composer; the server starts it in the Space's folder and adds it to the Space. */
-export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose }: { spaceId: string; name: string; defaultProjectId: string | null; onClose: () => void }) {
+export function StartThreadDialog({ spaceId, name, defaultProjectId, onStarted, onClose }: { spaceId: string; name: string; defaultProjectId: string | null; onStarted?: (threadId: string) => void; onClose: () => void }) {
   const call = useCall();
   const navigate = useBbNavigate();
   const [error, setError] = useState<string | null>(null);
@@ -131,7 +130,8 @@ export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose }: 
     setError(null);
     try {
       const { threadId } = await call("space_thread_start", { spaceId, request }) as { threadId: string };
-      navigate.toThread(threadId);
+      if (onStarted) onStarted(threadId);
+      else navigate.toThread(threadId);
       onClose();
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
@@ -142,7 +142,7 @@ export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose }: 
     <Dialog open onOpenChange={(next) => { if (!next) onClose(); }}>
       <DialogContent className="sm:max-w-xl">
           <DialogTitle>New thread in {name}</DialogTitle>
-          <DialogDescription>It joins the Space, so the lead sees it and it shows in the Overview.</DialogDescription>
+          <DialogDescription>It joins the Space and you talk to it directly. The lead can see it but won’t steer it.</DialogDescription>
           <NewThreadComposer {...(defaultProjectId ? { defaultProjectId } : {})} placeholder="What should this thread do?" draftKey={`space-thread:${spaceId}`} onSubmit={submit} />
           {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
           </DialogContent>
@@ -150,80 +150,86 @@ export function StartThreadDialog({ spaceId, name, defaultProjectId, onClose }: 
   );
 }
 
-const spaceDialog = (spaceId: string, dialog: "edit" | "items" | "threads" | "projects" | "delete") =>
+export const spaceDialog = (spaceId: string, dialog: "edit" | "items" | "threads" | "projects" | "delete") =>
   window.dispatchEvent(new CustomEvent(SPACE_DIALOG_EVENT, { detail: { spaceId, dialog } }));
 
+const threadPath = (threadId: string) => `/threads/${encodeURIComponent(threadId)}`;
+
+/** Space options, for the lead's thread header and the setup page. */
+function SpaceOptions({ spaceId, onHandOff }: { spaceId: string; onHandOff?: () => void }) {
+  return (
+    <Menu.Root>
+      <Menu.Trigger aria-label="Space options" title="Space options" className={GHOST_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></Menu.Trigger>
+      <Menu.Portal>
+        <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
+          {onHandOff ? <Menu.Item className={MENU_ITEM} onSelect={onHandOff}><Icon name="Fork" />Hand off lead…</Menu.Item> : null}
+          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "edit")}><Icon name="Edit" />Edit Space</Menu.Item>
+          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "threads")}><Icon name="MessageSquare" />Manage threads</Menu.Item>
+          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "items")}><Icon name="FileText" />Manage items</Menu.Item>
+          <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "projects")}><Icon name="Folder" />Manage folders</Menu.Item>
+          <Menu.Separator className={MENU_SEPARATOR} />
+          <Menu.Item className={`${MENU_ITEM} text-destructive [&_svg]:text-destructive`} onSelect={() => spaceDialog(spaceId, "delete")}><Icon name="Trash2" />Delete Space…</Menu.Item>
+        </Menu.Content>
+      </Menu.Portal>
+    </Menu.Root>
+  );
+}
+
+/** The lead's thread header: Heartbeat and Space options. Nothing on other threads. */
+export function SpaceLeadHeader({ threadId, isCompactViewport }: PluginThreadHeaderActionProps) {
+  const spaceId = useSpaceOf()(threadId);
+  const lead = useSpaceLead(spaceId);
+  const { projects } = useSidebarThreads();
+  const [handingOff, setHandingOff] = useState(false);
+  if (!spaceId || !lead.data || lead.data.leadThreadId !== threadId) return null;
+  const startIn = lead.data.defaultProjectId ?? projects.find((project) => project.isPersonal)?.id ?? null;
+  return (
+    <div className="flex items-center gap-0.5">
+      <RunMenu lead={lead.data} onChanged={lead.refresh} compact={isCompactViewport} />
+      <SpaceOptions spaceId={spaceId} onHandOff={() => setHandingOff(true)} />
+      {startIn ? <HandoffDialog threadId={threadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={() => lead.refresh()} /> : null}
+    </div>
+  );
+}
+
+/** Sends you to the lead; a Space without one starts it here. */
 function SpaceView({ spaceId }: { spaceId: string }) {
   const call = useCall();
   const lead = useSpaceLead(spaceId);
   const { spaces } = useSpaces();
   const { projects } = useSidebarThreads();
   const [error, setError] = useState<string | null>(null);
-  const [handingOff, setHandingOff] = useState(false);
-  const [starting, setStarting] = useState(false);
   const space = spaces?.find((entry) => entry.id === spaceId);
   const name = lead.data?.name ?? space?.name ?? "Space";
   const leadThreadId = lead.data?.leadThreadId ?? null;
   const startIn = lead.data?.defaultProjectId ?? space?.defaultProjectId ?? projects.find((project) => project.isPersonal)?.id ?? null;
 
+  // Replace, so Back doesn't land here and bounce forward again.
+  useEffect(() => { if (leadThreadId) openAppPath(threadPath(leadThreadId), { replace: true, main: true }); }, [leadThreadId]);
+
   const start = async (request: NewThreadRequest) => {
     setError(null);
     try {
-      await call("space_lead_setup", { spaceId, request });
+      const next = await call("space_lead_setup", { spaceId, request }) as SpaceLead;
       lead.refresh();
+      if (next.leadThreadId) openAppPath(threadPath(next.leadThreadId), { replace: true, main: true });
     } catch (cause) {
       setError(cause instanceof Error ? cause.message : String(cause));
       throw cause;
     }
   };
 
+  if (leadThreadId || lead.loading) return null;
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <header className="flex h-11 shrink-0 items-center gap-1 border-b border-border px-4">
-        <span className="mr-1 inline-flex size-5 items-center justify-center"><SpaceMarkGlyph icon={lead.data?.icon ?? space?.icon ?? null} color={lead.data?.color ?? space?.color} /></span>
-        <h1 className="min-w-0 flex-1 truncate text-sm font-semibold">{name}</h1>
-        {lead.data && leadThreadId ? <RunMenu lead={lead.data} onChanged={lead.refresh} /> : null}
-        <button type="button" onClick={() => setStarting(true)} className={GHOST_BUTTON}><Icon name="MessageSquarePlus" className="size-4" />New thread</button>
-        <Menu.Root>
-          <Menu.Trigger aria-label="Space options" title="Space options" className={GHOST_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></Menu.Trigger>
-          <Menu.Portal>
-            <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
-              {leadThreadId ? <Menu.Item className={MENU_ITEM} onSelect={() => setHandingOff(true)}><Icon name="Fork" />Hand off lead…</Menu.Item> : null}
-              <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "edit")}><Icon name="Edit" />Edit Space</Menu.Item>
-              <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "threads")}><Icon name="MessageSquare" />Manage threads</Menu.Item>
-              <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "items")}><Icon name="FileText" />Manage items</Menu.Item>
-              <Menu.Item className={MENU_ITEM} onSelect={() => spaceDialog(spaceId, "projects")}><Icon name="Folder" />Manage folders</Menu.Item>
-              <Menu.Separator className={MENU_SEPARATOR} />
-              <Menu.Item className={`${MENU_ITEM} text-destructive [&_svg]:text-destructive`} onSelect={() => spaceDialog(spaceId, "delete")}><Icon name="Trash2" />Delete Space…</Menu.Item>
-            </Menu.Content>
-          </Menu.Portal>
-        </Menu.Root>
-      </header>
-      {starting ? <StartThreadDialog spaceId={spaceId} name={name} defaultProjectId={startIn} onClose={() => setStarting(false)} /> : null}
-      {leadThreadId
-        ? <div className="mx-auto flex min-h-0 w-full max-w-3xl flex-1 flex-col px-6 pb-4">
-            {/* "inherit": send with the lead thread's own permission, not the composer's default. */}
-            <ThreadChat key={leadThreadId} threadId={leadThreadId} variant="full" layout="contained" permissionPolicy="inherit" className="min-h-0 flex-1" />
-            {startIn ? <HandoffDialog threadId={leadThreadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={() => lead.refresh()} /> : null}
-          </div>
-        : lead.loading
-          ? null
-          : <div className="mx-auto w-full max-w-2xl px-6 pt-16">
-              <h2 className="text-xl font-semibold">Start {name}'s lead</h2>
-              <p className="mt-1 mb-5 text-sm text-muted-foreground">Tell the lead what this Space is about. It keeps the Space's page current, starts threads as the work needs, and you talk to it here.</p>
-              <NewThreadComposer {...(startIn ? { defaultProjectId: startIn } : {})} placeholder="What's this Space about?" draftKey={`space-lead:${spaceId}`} onSubmit={start} />
-              {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
-            </div>}
+    <div className="mx-auto w-full max-w-2xl px-6 pt-14">
+      <div className="flex items-center gap-3">
+        <span className="inline-flex size-7 items-center justify-center"><SpaceMarkGlyph icon={lead.data?.icon ?? space?.icon ?? null} color={lead.data?.color ?? space?.color} /></span>
+        <h1 className="min-w-0 flex-1 truncate text-xl font-semibold">{name}</h1>
+        <SpaceOptions spaceId={spaceId} />
+      </div>
+      <p className="mt-3 mb-5 text-sm text-muted-foreground">Start this Space's lead. Tell it what the Space is for: it keeps the Space's page current, starts the threads the work needs, and reports to your Inbox. You can still start and talk to any thread yourself.</p>
+      <NewThreadComposer {...(startIn ? { defaultProjectId: startIn } : {})} placeholder="What's this Space about?" draftKey={`space-lead:${spaceId}`} onSubmit={start} />
+      {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
     </div>
   );
-}
-
-/** Workbench tab: the Space's page, in the real Pages editor. */
-export function SpacePageTab({ subPath }: PluginNavPanelProps) {
-  const spaceId = spaceIdOf(subPath);
-  const lead = useSpaceLead(spaceId);
-  if (!spaceId) return <p className="p-4 text-sm text-muted-foreground">Open a Space to see its page.</p>;
-  const pageId = lead.data?.pageId;
-  if (pageId) return <PageEmbed pageId={pageId} />;
-  return lead.loading ? null : <p className="p-4 text-sm text-muted-foreground">The Space's page appears here once it has one.</p>;
 }

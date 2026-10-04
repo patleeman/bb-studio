@@ -22,7 +22,7 @@ type Sdk = BbPluginApi["sdk"];
 type Thread = Awaited<ReturnType<Sdk["threads"]["get"]>>;
 type Listed = Awaited<ReturnType<Sdk["threads"]["list"]>>[number];
 export const LEAD_ROLE = "space-lead";
-export const HEARTBEAT = "Heartbeat: check this space against its page; act if needed; post to the Feed only when something changed or needs the user.";
+export const HEARTBEAT = "Heartbeat: check this space against its page. Steer only the workers you started; for threads the user started, read and report but don't steer them. Post to the Feed only when something changed or needs the user.";
 const PAGE_SIZE = 200;
 const MAX_PAGES = 50;
 const SNAPSHOT_MS = 60_000;
@@ -254,7 +254,7 @@ export class SpaceLeads {
           `Continue the work from /threads/${encodeURIComponent(threadId)} (${threadTitle(old)}). Read that thread with bb thread if you need more context.`,
           `Latest response (excerpt):\n${(output ?? "No response yet.").slice(-12_000)}`,
           space ? `This thread is in the space ${space.name} (${spacePath(space.id)}). The space page ${page} holds its brief, plan, decisions and memory; read it before acting.` : "",
-          ledSpace && space ? `You are now this space's lead. Keep its page current, coordinate its worker threads, and report through the Studio Feed.` : "",
+          ledSpace && space ? `You are now this space's lead. Keep its page current, steer the workers you start (read but don't steer threads the user started), and report through the Studio Feed.` : "",
         ].filter(Boolean).join("\n\n");
         const next = await this.deps.sdk.threads.spawn({
           ...request,
@@ -288,9 +288,10 @@ export class SpaceLeads {
 /** The lead's standing instructions; agent-only, so the chat starts with the user's message. */
 export function leadInstructions(space: Space, pageId: string, projectId: string): string {
   return [
-    `You are the lead for the BB Studio space "${space.name}" (${space.id}). You own this space and coordinate its work.`,
+    `You are the lead for the BB Studio space "${space.name}" (${space.id}). You keep the space on track: its page, its plan, and the workers you start.`,
     `The space page ${pageHref(pageId)} (Pages page ${pageId}) is your brief, plan, decisions and memory. Read it with the Pages tools before acting, and keep it current: what the space is for, the plan and next steps, decisions and their reasons, and lasting facts, preferences and conventions. Every thread in the space shares it; tell each worker to read it first.`,
     `Start worker threads in this space: run bb thread spawn in project ${projectId}, then add each one with the studio_space_items tool (space "${space.id}", threads: [its id]). A thread is in one space at a time; adding it here moves it. Steer workers with bb thread tell, keep their scopes clear, and review their results.`,
+    `The user also starts threads in this space and talks to them directly. You can see them: read them with bb thread to keep the page and your reports current, but don't steer them, message them or take over their work unless the user asks you to.`,
     `Report progress, and anything that needs the user, with the Studio Feed (feed_post); it reaches the user's Inbox. Stay quiet when nothing changed.`,
     `The user's first message follows and says what the space is for.`,
   ].join("\n\n");

@@ -1,10 +1,12 @@
-// A Space's page beside any of its threads, not only the lead: a thread panel
-// tab, opened once by itself the first time you open a thread of a Space that
-// has a page, so every thread in a Space works with the page beside it.
+// A Space's page beside any of its threads: a thread panel tab, opened once by
+// itself the first time you open a thread of a Space that has a page. The
+// lead gets the Space's status instead, since it's the Space's home.
 import { useBbNavigate, type PluginThreadPanelProps } from "@get-bb/plugin-sdk/app";
 import { useEffect } from "react";
 import { useSpaceLead, useSpaceOf } from "./data";
-import { PageEmbed } from "./PageEmbed";
+import { PageEmbed } from "./ItemEmbed";
+import { listenForOpens } from "./open-in-space";
+import { openStatusTab } from "./tabs";
 
 export const SPACE_PAGE_ACTION = "space-page";
 
@@ -24,7 +26,8 @@ function opened(): Set<string> {
 }
 
 /**
- * Renders nothing; opens the Space page tab once per Space thread. Mounted
+ * Renders nothing; opens the Space status beside the lead, and the Space page
+ * beside other Space threads, once per thread per session. Mounted
  * from the thread header slot: that surface knows its thread and has
  * the side panel, where an app overlay has neither.
  */
@@ -35,14 +38,17 @@ export function OpenSpacePage({ threadId }: { threadId: string }) {
   const pageId = lead.data?.pageId ?? null;
   const leadId = lead.data?.leadThreadId ?? null;
   useEffect(() => {
-    // The lead already has the page beside it in the Space's own view.
-    if (!pageId || threadId === leadId) return;
+    // The lead is the Space's home: its status goes beside it. Other threads get the page.
+    const isLead = threadId === leadId;
+    if (!isLead && !pageId) return;
     const seen = opened();
     if (seen.has(threadId)) return;
-    if (navigate.openThreadPanel({ actionId: SPACE_PAGE_ACTION, title: "Space page" })) {
+    if (isLead ? openStatusTab(navigate) : navigate.openThreadPanel({ actionId: SPACE_PAGE_ACTION, title: "Space page" })) {
       seen.add(threadId);
       try { globalThis.sessionStorage?.setItem(OPENED_KEY, JSON.stringify([...seen])); } catch { /* private mode */ }
     }
   }, [threadId, pageId, leadId, navigate]);
+  // Opens what other plugins ask for beside this thread (see open-in-space.ts).
+  useEffect(() => listenForOpens(threadId, navigate), [threadId, navigate]);
   return null;
 }

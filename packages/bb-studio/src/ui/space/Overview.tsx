@@ -1,19 +1,22 @@
-// The Space's status belongs beside the lead chat. BB owns the workbench tabs.
+// A Space's status, beside its lead: what needs you, what's running and what
+// it's doing, the Space's Studio items, and recent activity. Built from the
+// threads' own events, so it stays true when the lead is busy or wrong.
+// Threads and items open as workbench tabs; the lead stays in the chat.
 import {
-  type PluginNavPanelProps,
-  experimental_useSidebarThreadActions as useSidebarThreadActions,
   experimental_useSidebarThreads as useSidebarThreads,
+  useBbNavigate,
   type PluginSidebarThread,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { GHOST_BUTTON, Icon, openAppPath } from "@bb-studio/kit/app";
-import { useState } from "react";
-import { useSpaceLead, useSpaceOf, useSpaceOverview } from "./data";
+import { GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
+import { useMemo, useState, type ReactNode } from "react";
+import { useSpaceLead, useSpaceOf, useSpaceOverview, type OverviewItem, type OverviewThread, type SpaceLead } from "./data";
+import { NewInSpaceMenu } from "./NewInSpace";
+import { RUN_LABELS, StartThreadDialog } from "./SpaceView";
+import { RUNNING, startedByLead, stateOf } from "./status";
 import { cn } from "./styles";
-import { spaceIdOf } from "./routes";
-import { StartThreadDialog } from "./SpaceView";
+import { openItemTab, openThreadTab } from "./tabs";
 
-import { RUNNING, stateOf } from "./status";
 export { RUNNING } from "./status";
 
 export function ThreadGlyph({ thread }: { thread: PluginSidebarThread | undefined }) {
@@ -24,64 +27,197 @@ export function ThreadGlyph({ thread }: { thread: PluginSidebarThread | undefine
 
 function relative(at: number) {
   const minutes = Math.max(0, Math.floor((Date.now() - at) / 60_000));
-  if (minutes < 1) return "Now";
+  if (minutes < 1) return "now";
   if (minutes < 60) return `${minutes}m ago`;
   if (minutes < 1440) return `${Math.floor(minutes / 60)}h ago`;
   return new Intl.DateTimeFormat(undefined, { month: "short", day: "numeric" }).format(at);
 }
 
+function Time({ at }: { at: number }) {
+  return <time dateTime={new Date(at).toISOString()} className="shrink-0 text-xs text-muted-foreground tabular-nums">{relative(at)}</time>;
+}
 
-export function SpaceOverview({ spaceId, onOpenThread, onNewThread }: { spaceId: string; onOpenThread?: (threadId: string) => boolean; onNewThread?: () => void }) {
-  const overview = useSpaceOverview(spaceId);
-  const { threads } = useSidebarThreads();
-  const actions = useSidebarThreadActions();
-  const live = new Map(threads.map((thread) => [thread.id, thread]));
-  const rows = (overview.data?.threads ?? []).map((thread) => ({ thread, live: live.get(thread.id), state: stateOf(thread, live.get(thread.id)) }))
-    .sort((a, b) => a.state.order - b.state.order || Number(b.thread.isLead) - Number(a.thread.isLead) || b.thread.updatedAt - a.thread.updatedAt);
-  const attention = rows.filter((row) => row.state.order === 0).length;
-  const working = rows.filter((row) => row.state.order === 1).length;
-  const open = (id: string) => { if (!onOpenThread?.(id)) actions.open(id); };
-  return <div className="mx-auto w-full max-w-4xl px-5 py-6 sm:px-7">
-    <header className="flex items-center justify-between gap-3">
-      <h1 className="text-xl font-semibold">Space status</h1>
-      <button type="button" onClick={overview.refresh} aria-label="Refresh space status" className={GHOST_BUTTON}><Icon name="RefreshCw" className="size-4" /></button>
-    </header>
-    {overview.error ? <p role="alert" className="mt-3 text-sm text-destructive">Couldn’t update space status. {overview.data ? "Showing the last loaded status." : ""} <button type="button" onClick={overview.refresh} className="underline">Retry</button></p> : null}
-    {overview.loading && !overview.data ? <p role="status" className="mt-4 text-sm text-muted-foreground">Loading space activity…</p> : null}
-    {overview.data ? <p className="mt-2 mb-6 text-sm text-muted-foreground">{attention ? `${attention} ${attention === 1 ? "thread needs" : "threads need"} attention. ` : "No threads need attention. "}{working ? `${working} ${working === 1 ? "thread is" : "threads are"} working.` : "No threads are running."}</p> : null}
-    <section aria-labelledby="space-threads-heading">
-      <div className="mb-3 flex items-center justify-between gap-2"><h2 id="space-threads-heading" className="text-sm font-semibold">Threads</h2>{onNewThread ? <button type="button" onClick={onNewThread} className={GHOST_BUTTON}><Icon name="Plus" className="size-3.5" />New thread</button> : null}</div>
-      <div className="overflow-hidden rounded-lg border border-border">
-        <div aria-hidden className="grid grid-cols-[minmax(0,1fr)_5rem] gap-3 border-b border-border bg-muted/30 px-4 py-2 text-xs text-muted-foreground sm:grid-cols-[minmax(0,1fr)_5rem_4rem]"><span>Thread / latest progress</span><span>State</span><span className="hidden text-right sm:block">Updated</span></div>
-        {rows.map(({ thread, live: current, state }) => <button key={thread.id} type="button" onClick={() => open(thread.id)} className="grid w-full grid-cols-[minmax(0,1fr)_5rem] items-start gap-3 border-b border-border px-4 py-3.5 text-left last:border-b-0 hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring sm:grid-cols-[minmax(0,1fr)_5rem_4rem]">
-          <span className="min-w-0"><span className="flex items-center gap-2 text-sm font-medium"><span className="truncate">{current?.displayTitle ?? thread.title}</span>{thread.isLead ? <span className="shrink-0 rounded border border-border px-1.5 py-0.5 text-[10px] font-normal text-muted-foreground">Lead</span> : null}</span><span className={cn("mt-1 block line-clamp-2 break-words text-xs leading-relaxed", state.order === 0 ? state.tone : "text-muted-foreground")}>{state.reason}</span></span>
-          <span className={cn("flex items-center gap-1.5 pt-0.5 text-xs", state.tone)}><span aria-hidden className={cn("size-1.5 shrink-0 rounded-full", state.order === 0 ? "bg-current" : state.order === 1 ? "bg-current motion-safe:animate-pulse" : "bg-muted-foreground/40")} />{state.label}</span>
-          <time dateTime={new Date(thread.progressAt ?? thread.updatedAt).toISOString()} className="hidden pt-0.5 text-right text-xs text-muted-foreground sm:block">{relative(thread.progressAt ?? thread.updatedAt)}</time>
-        </button>)}
-        {overview.data && !rows.length ? <p className="px-4 py-6 text-sm text-muted-foreground">No threads yet. Start a thread to give this Space some work.</p> : null}
+type Row = { thread: OverviewThread; title: string; state: ReturnType<typeof stateOf>; byLead: boolean; at: number };
+
+function Section({ title, count, action, children }: { title: string; count?: number; action?: ReactNode; children: ReactNode }) {
+  return (
+    <section className="mt-7 first:mt-5">
+      <div className="mb-2 flex items-center gap-2">
+        <h2 className="text-xs font-medium tracking-wide text-muted-foreground uppercase">{title}{count ? <span className="ml-1.5 tabular-nums">{count}</span> : null}</h2>
+        <div className="ml-auto flex items-center gap-1">{action}</div>
       </div>
+      {children}
     </section>
-    {overview.data?.activity?.length ? <section aria-labelledby="space-activity-heading" className="mt-7"><h2 id="space-activity-heading" className="mb-4 text-sm font-semibold">Recent activity</h2><ol className="space-y-4">{overview.data.activity.slice(0, 12).map((event) => <li key={event.id} className="flex items-start gap-3"><span aria-hidden className="mt-1.5 size-1.5 shrink-0 rounded-full bg-muted-foreground/50" /><div className="min-w-0 flex-1"><button type="button" onClick={() => open(event.threadId)} className="max-w-full text-left text-sm hover:underline">{event.summary}</button><p className="mt-1 truncate text-xs text-muted-foreground">{event.title}</p></div><time dateTime={new Date(event.at).toISOString()} className="shrink-0 pt-0.5 text-xs text-muted-foreground">{relative(event.at)}</time></li>)}</ol></section> : null}
-    {overview.data?.items.length ? <section aria-label="Space items" className="mt-7 border-t border-border pt-5"><h2 className="mb-3 text-sm font-semibold">Space items</h2><div className="flex flex-wrap gap-2">{overview.data.items.slice(0, 6).map((item) => <button key={item.ref} type="button" onClick={() => openAppPath(item.href)} className={cn(GHOST_BUTTON, "max-w-full border border-border")}><Icon name={item.kind === "page" ? "FileText" : "File"} className="size-3.5 shrink-0" /><span className="truncate">{item.title}</span></button>)}</div></section> : null}
-  </div>;
+  );
 }
 
-export function ThreadSpaceOverview({ threadId }: PluginThreadPanelProps) {
-  const spaceOf = useSpaceOf();
-  const spaceId = spaceOf(threadId);
-  return spaceId ? <SpaceOverview spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">This thread isn’t in a Space.</p>;
+function Who({ row }: { row: Row }) {
+  return <span className="text-xs text-muted-foreground">{row.thread.isLead ? "Lead" : row.byLead ? "Lead's worker" : "Yours"}</span>;
 }
 
-export function SpaceDashboardTab({ subPath }: PluginNavPanelProps) {
-  const spaceId = spaceIdOf(subPath);
-  return spaceId ? <SpaceDashboard key={spaceId} spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">Open a Space to see its status.</p>;
+function AttentionCard({ row, onOpen }: { row: Row; onOpen(): void }) {
+  return (
+    <button type="button" onClick={onOpen} className="group block w-full rounded-lg border border-border bg-background p-3.5 text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+      <span className="flex items-center gap-2">
+        <span aria-hidden className={cn("size-2 shrink-0 rounded-full bg-current", row.state.tone)} />
+        <span className="min-w-0 flex-1 truncate text-sm font-medium">{row.title}</span>
+        <span className={cn("shrink-0 text-xs font-medium", row.state.tone)}>{row.state.label}</span>
+      </span>
+      <span className="mt-1.5 block line-clamp-3 text-sm leading-relaxed break-words">{row.state.reason}</span>
+      <span className="mt-2 flex items-center gap-2"><Who row={row} /><span aria-hidden className="text-xs text-muted-foreground">·</span><Time at={row.at} /><span className="ml-auto text-xs text-muted-foreground opacity-0 group-hover:opacity-100 group-focus-visible:opacity-100">Open beside the lead →</span></span>
+    </button>
+  );
 }
 
-function SpaceDashboard({ spaceId }: { spaceId: string }) {
+function ThreadRow({ row, onOpen, live }: { row: Row; onOpen(): void; live: PluginSidebarThread | undefined }) {
+  return (
+    <button type="button" onClick={onOpen} className="flex w-full items-start gap-3 rounded-md px-2 py-2.5 text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+      <span className="mt-1.5 inline-flex size-3 shrink-0 items-center justify-center"><ThreadGlyph thread={live} /></span>
+      <span className="min-w-0 flex-1">
+        <span className="flex items-baseline gap-2"><span className="min-w-0 flex-1 truncate text-sm font-medium">{row.title}</span><Time at={row.at} /></span>
+        <span className="mt-0.5 block line-clamp-2 text-xs leading-relaxed break-words text-muted-foreground">{row.state.reason}</span>
+        <span className="mt-1 block"><Who row={row} /></span>
+      </span>
+    </button>
+  );
+}
+
+function ItemRow({ item, onOpen }: { item: OverviewItem; onOpen(): void }) {
+  return (
+    <button type="button" onClick={onOpen} className="flex w-full items-center gap-3 rounded-md px-2 py-2 text-left hover:bg-state-hover focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">
+      <span className="inline-flex size-4 shrink-0 items-center justify-center text-muted-foreground">
+        {item.icon ? <span className="text-sm leading-none">{item.icon}</span> : <Icon name={item.kind === "page" ? "FileText" : "File"} className="size-4" />}
+      </span>
+      <span className="min-w-0 flex-1 truncate text-sm">{item.title}</span>
+      <span className="shrink-0 text-xs text-muted-foreground capitalize">{item.kind}</span>
+      <Time at={item.updatedAt} />
+    </button>
+  );
+}
+
+function heartbeat(lead: SpaceLead | null): string | null {
+  if (!lead?.leadThreadId) return null;
+  return lead.run?.enabled ? `Heartbeat: ${RUN_LABELS[lead.run.cadence].toLowerCase()}` : "Heartbeat off";
+}
+
+/** The status page for a Space, opened beside one of its threads. */
+export function SpaceStatus({ spaceId }: { spaceId: string }) {
+  const overview = useSpaceOverview(spaceId);
   const lead = useSpaceLead(spaceId);
+  const navigate = useBbNavigate();
+  const { threads: sidebar } = useSidebarThreads();
   const [starting, setStarting] = useState(false);
-  return <div className="h-full min-h-0 overflow-y-auto">
-    <SpaceOverview spaceId={spaceId} onNewThread={() => setStarting(true)} />
-    {starting ? <StartThreadDialog spaceId={spaceId} name={lead.data?.name ?? "this Space"} defaultProjectId={lead.data?.defaultProjectId ?? null} onClose={() => setStarting(false)} /> : null}
-  </div>;
+  const [showIdle, setShowIdle] = useState(false);
+  const live = useMemo(() => new Map(sidebar.map((thread) => [thread.id, thread])), [sidebar]);
+  const leadId = lead.data?.leadThreadId ?? null;
+  const rows = useMemo<Row[]>(() => {
+    const all = overview.data?.threads ?? [];
+    const byId = new Map(all.map((thread) => [thread.id, thread]));
+    return all.map((thread) => ({
+      thread,
+      title: live.get(thread.id)?.displayTitle ?? thread.title,
+      state: stateOf(thread, live.get(thread.id)),
+      byLead: startedByLead(thread, byId, leadId),
+      at: Math.max(thread.progressAt ?? 0, thread.updatedAt),
+    })).sort((a, b) => b.at - a.at);
+  }, [leadId, live, overview.data?.threads]);
+  // The lead is the chat beside this tab; it shows here only when it needs you.
+  const attention = rows.filter((row) => row.state.order === 0);
+  const working = rows.filter((row) => row.state.order === 1 && !row.thread.isLead);
+  const idle = rows.filter((row) => row.state.order === 2 && !row.thread.isLead);
+  const leadRow = rows.find((row) => row.thread.isLead);
+  const items = overview.data?.items ?? [];
+  const open = (row: Row) => openThreadTab(navigate, { id: row.thread.id, title: row.title });
+  const name = lead.data?.name ?? "Space";
+  const beat = heartbeat(lead.data);
+
+  return (
+    <div className="h-full min-h-0 overflow-y-auto">
+      <div className="mx-auto w-full max-w-2xl px-5 pt-5 pb-10">
+        <header className="flex items-start gap-3">
+          <div className="min-w-0 flex-1">
+            <h1 className="truncate text-lg font-semibold">{name}</h1>
+            <p className="mt-1 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
+              {overview.data ? <>
+                <span className={attention.length ? "font-medium text-warning-foreground" : undefined}>{attention.length ? `${attention.length} need${attention.length === 1 ? "s" : ""} you` : "Nothing needs you"}</span>
+                <span>{working.length} working</span>
+                <span>{idle.length} idle</span>
+              </> : null}
+              {beat ? <span>{beat}</span> : null}
+            </p>
+          </div>
+          <button type="button" onClick={() => setStarting(true)} className={GHOST_BUTTON} title="Start a thread in this Space"><Icon name="MessageSquarePlus" className="size-4" />Thread</button>
+          <NewInSpaceMenu spaceId={spaceId} onCreated={(item) => openItemTab(navigate, item)} />
+          <button type="button" onClick={overview.refresh} aria-label="Refresh status" title="Refresh" className={GHOST_BUTTON}><Icon name="RefreshCw" className="size-4" /></button>
+        </header>
+
+        {overview.error ? <p role="alert" className="mt-3 text-sm text-destructive">Couldn't update the status. {overview.data ? "Showing the last loaded status." : ""} <button type="button" onClick={overview.refresh} className="underline">Retry</button></p> : null}
+        {overview.loading && !overview.data ? <p role="status" className="mt-6 text-sm text-muted-foreground">Loading…</p> : null}
+
+        {overview.data ? <>
+          {attention.length ? (
+            <Section title="Needs you" count={attention.length}>
+              <div className="space-y-2">{attention.map((row) => <AttentionCard key={row.thread.id} row={row} onOpen={() => open(row)} />)}</div>
+            </Section>
+          ) : null}
+
+          <Section title="Working" count={working.length}>
+            {working.length
+              ? <div className="-mx-2">{working.map((row) => <ThreadRow key={row.thread.id} row={row} live={live.get(row.thread.id)} onOpen={() => open(row)} />)}</div>
+              : <p className="text-sm text-muted-foreground">{leadRow?.state.order === 1 ? "Only the lead is working right now." : "Nothing is running."} <button type="button" onClick={() => setStarting(true)} className="underline underline-offset-2 hover:text-foreground">Start a thread</button></p>}
+          </Section>
+
+          <Section title="Studio" count={items.length} action={<NewInSpaceMenu spaceId={spaceId} label="New" onCreated={(item) => openItemTab(navigate, item)} />}>
+            {items.length
+              ? <div className="-mx-2">{items.slice(0, 8).map((item) => <ItemRow key={item.ref} item={item} onOpen={() => openItemTab(navigate, item)} />)}</div>
+              : <p className="text-sm text-muted-foreground">No pages, drawings or tables yet. Anything you make here stays in {name}.</p>}
+          </Section>
+
+          {overview.data.activity.length ? (
+            <Section title="Recent activity">
+              <ol className="space-y-3">
+                {overview.data.activity.slice(0, 8).map((event) => {
+                  const row = rows.find((candidate) => candidate.thread.id === event.threadId);
+                  const clickable = row && !row.thread.isLead;
+                  return (
+                    <li key={event.id} className="flex items-start gap-3">
+                      <span aria-hidden className={cn("mt-1.5 size-1.5 shrink-0 rounded-full", event.kind === "failure" ? "bg-destructive" : event.kind === "blocked" ? "bg-warning-foreground" : "bg-muted-foreground/50")} />
+                      <div className="min-w-0 flex-1">
+                        <p className="line-clamp-2 text-sm break-words">{event.summary}</p>
+                        {clickable
+                          ? <button type="button" onClick={() => open(row)} className="mt-0.5 max-w-full truncate text-xs text-muted-foreground hover:text-foreground hover:underline">{row.title}</button>
+                          : <p className="mt-0.5 truncate text-xs text-muted-foreground">{row?.thread.isLead ? "Lead" : event.title}</p>}
+                      </div>
+                      <Time at={event.at} />
+                    </li>
+                  );
+                })}
+              </ol>
+            </Section>
+          ) : null}
+
+          {idle.length ? (
+            <Section title="Idle" count={idle.length} action={<button type="button" onClick={() => setShowIdle((value) => !value)} className={GHOST_BUTTON} aria-expanded={showIdle}>{showIdle ? "Hide" : "Show"}</button>}>
+              {showIdle ? <div className="-mx-2">{idle.map((row) => <ThreadRow key={row.thread.id} row={row} live={live.get(row.thread.id)} onOpen={() => open(row)} />)}</div> : null}
+            </Section>
+          ) : null}
+        </> : null}
+      </div>
+      {starting && lead.data ? (
+        <StartThreadDialog
+          spaceId={spaceId}
+          name={name}
+          defaultProjectId={lead.data.defaultProjectId}
+          onStarted={(id) => openThreadTab(navigate, { id, title: "New thread" })}
+          onClose={() => setStarting(false)}
+        />
+      ) : null}
+    </div>
+  );
+}
+
+/** Workbench tab: the status of the thread's Space. */
+export function ThreadSpaceOverview({ threadId }: PluginThreadPanelProps) {
+  const spaceId = useSpaceOf()(threadId);
+  return spaceId ? <SpaceStatus key={spaceId} spaceId={spaceId} /> : <p className="p-4 text-sm text-muted-foreground">This thread isn't in a Space.</p>;
 }

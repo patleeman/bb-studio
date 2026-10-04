@@ -619,12 +619,14 @@ export default async function plugin(bb: BbPluginApi) {
       };
     },
     createInSpace: async ({ id, pluginId, kind }) => {
-      const space = spaces.get(id);
-      if (!space) throw new Error("That space no longer exists.");
-      const { item } = await hub.call(pluginId, "studio_create", { kind, projectId: space.defaultProjectId });
-      // Created directly in the Space catch-all project.
+      if (!spaces.get(id)) throw new Error("That space no longer exists.");
+      // Items follow their project: make sure the Space has its catch-all project first.
+      await folders.ensureCatchAll(id);
+      const projectId = spaces.get(id)?.defaultProjectId ?? null;
+      if (!projectId) throw new Error("This Space has no folder to create items in yet.");
+      const { item } = await hub.call(pluginId, "studio_create", { kind, projectId });
       tagsChanged();
-      return { href: item.href };
+      return { href: item.href, title: item.title || "Untitled" };
     },
     spaceMembers: ({ id, add, remove }) => {
       if (add.length) spaces.add(id, add);
