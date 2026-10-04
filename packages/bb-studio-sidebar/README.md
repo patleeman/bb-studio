@@ -49,7 +49,9 @@ section sits above Threads, and that it has no scroll area of its own.
 The By space capture creates two Spaces, Launch (🚀) and Research, and adds
 "Launch plan", "Launch checklist", and "Release digest" (attached to a paused
 automation) to Launch, and "Paper notes" and "Atlas weekly sync" (working as
-the Atlas bot) to Research. Research is set to show all automated threads, so
+the Atlas bot) to Research. The demo project's threads sit in Studio's
+Personal Space, which comes first in Studio's order. Research is set to show
+all automated threads, so
 Atlas weekly sync shows its bot mark; Launch keeps the default, so it ends with
 "1 automated thread hidden · Show". The live check verifies the section order,
 each Space's threads, the marks, and that Studio's own Spaces section is gone

@@ -9,8 +9,11 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       fixture.active += 1;
       if (fixture.preferences) return;
       ({ preferences: fixture.preferences } = await pluginRpc("thread-list-plus", "listPreferences", null));
-      for (const [key, spec] of Object.entries({ launch: { name: "Launch", icon: "🚀" }, research: { name: "Research", color: "#7c3aed" } })) {
-        fixture.spaces[key] = (await pluginRpc("studio", "createSpace", spec)).space;
+      // A Space is a project with its own folder, so a staged BB keeps them
+      // once made (deleteSpace refuses); reuse them on another run.
+      const { spaces: existing } = await pluginRpc("studio", "spaces", null);
+      for (const [key, spec] of Object.entries({ launch: { name: "Launch", icon: "🚀" }, research: { name: "Research" } })) {
+        fixture.spaces[key] = existing.find((space) => space.name === spec.name) ?? (await pluginRpc("studio", "createSpace", spec)).space;
       }
       for (const [key, title] of Object.entries({ plan: "Launch plan", checklist: "Launch checklist", digest: "Release digest", notes: "Paper notes", atlas: "Atlas weekly sync", loose: "Loose idea" })) fixture.threads[key] = await spawn(title);
       const automation = await pluginRpc("automations", "automations_create", {
@@ -30,14 +33,14 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       for (const [key, space] of [["plan", "launch"], ["digest", "launch"], ["atlas", "research"]]) {
         if (threads[fixture.threads[key]] !== fixture.spaces[space].id) throw new Error(`${key} isn't in ${space}: ${JSON.stringify(threads)}`);
       }
-      if (threads[fixture.threads.loose]) throw new Error("Loose idea joined a Space");
+      // Threads outside Launch and Research stay in their own project's Space (Personal, or none).
+      if ([fixture.spaces.launch.id, fixture.spaces.research.id].includes(threads[fixture.threads.loose])) throw new Error("Loose idea joined Launch or Research");
     };
     const cleanup = async () => {
       fixture.active -= 1;
       if (fixture.active > 0 || !fixture.preferences) return;
       for (const automationId of fixture.automations) await pluginRpc("automations", "automations_delete", { projectId, automationId }).catch(() => {});
       for (const id of Object.values(fixture.threads)) await bbCli(["thread", "delete", id, "--yes"]).catch(() => {});
-      for (const space of Object.values(fixture.spaces)) await pluginRpc("studio", "deleteSpace", { id: space.id }).catch(() => {});
       for (const key of ["organizationMode", "automatedThreads"]) await pluginRpc("thread-list-plus", "setPreference", { key, value: fixture.preferences[key] });
       Object.assign(fixture, { spaces: {}, threads: {}, automations: [], preferences: null });
     };
@@ -65,7 +68,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           emoji: section("space:${fixture.spaces.launch.id}")?.querySelector('[data-sidebar-space-mark]')?.textContent ?? null,
         };
       })())`));
-      const order = ["Launch", "Research", "Threads"].map((label) => layout.labels.indexOf(label));
+      const order = ["Launch", "Research"].map((label) => layout.labels.indexOf(label));
       if (order.some((index) => index < 0) || order.some((index, i) => i > 0 && index < order[i - 1])) throw new Error(`By space sections are out of order: ${JSON.stringify(layout)}`);
       if (!layout.launch.includes(fixture.threads.plan) || layout.launch.includes(fixture.threads.digest)) throw new Error(`Launch shows the wrong threads: ${JSON.stringify(layout)}`);
       if (!layout.research.includes(fixture.threads.atlas) || !layout.botMark) throw new Error(`Research lacks the marked bot thread: ${JSON.stringify(layout)}`);
@@ -73,9 +76,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       if (layout.studioSpaces) throw new Error("Studio's Spaces section still shows in By space");
       if (layout.emoji !== "🚀") throw new Error(`Launch lacks its emoji: ${JSON.stringify(layout)}`);
     };
+    // The thread list from its first Space down through Research.
     const clip = async (client) => client.evaluate(`(() => {
-      const rect = document.querySelector('[data-sidebar="sidebar"]').getBoundingClientRect();
-      return { x: rect.x, y: rect.y, width: rect.width, height: Math.min(rect.height, 760) };
+      const sidebar = document.querySelector('[data-sidebar="sidebar"]').getBoundingClientRect();
+      const first = document.querySelector('[data-sidebar-section-id^="space:"]').getBoundingClientRect();
+      const research = document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]').getBoundingClientRect();
+      const top = Math.max(sidebar.y, first.y - 8);
+      return { x: sidebar.x, y: top, width: sidebar.width, height: Math.min(research.bottom + 8, sidebar.bottom) - top };
     })()`);
     return [
       {
@@ -87,7 +94,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
           try {
             await seed();
             await showBySpace(client);
-            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]')?.scrollIntoView({ block: 'start' })`);
+            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]')?.scrollIntoView({ block: 'end' })`);
             await sleep(350);
           } catch (error) { await cleanup(); throw error; }
           return cleanup;
@@ -106,7 +113,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
             await client.clickAriaButtonWithPointer("Show 1 automated thread");
             await client.waitForSelector(`[data-automated-thread-id="${fixture.threads.digest}"][data-sidebar-automated-mark="automation"] [data-icon="Clock"]`);
             await client.waitForText("Showing 1 automated thread");
-            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.launch.id}"]')?.scrollIntoView({ block: 'start' })`);
+            await client.evaluate(`document.querySelector('[data-sidebar-section-id="space:${fixture.spaces.research.id}"]')?.scrollIntoView({ block: 'end' })`);
             await sleep(350);
           } catch (error) { await cleanup(); throw error; }
           return cleanup;
