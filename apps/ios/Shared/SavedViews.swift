@@ -17,10 +17,6 @@ extension BBClient {
         try await rpc("bot-teams", "viewUpdate", ["id": .string(view.id), "name": .string(name ?? view.name), "members": .array((members ?? view.members).map(\.json)), "archived": .bool(archived ?? view.archived), "expectedUpdatedAt": .number(view.updatedAt)])
     }
 
-    public func deleteSavedView(_ id: String) async throws {
-        let _: JSONValue = try await rpc("bot-teams", "viewDelete", ["id": .string(id)])
-    }
-
     public func sendToView(_ id: String, text: String, targets: [SavedViewMember], replyThreadId: String?, fresh: Bool, mode: String, requestId: String) async throws -> SavedViewSend {
         try await rpc("bot-teams", "viewSend", ["id": .string(id), "text": .string(text), "targets": .array(targets.map(\.json)), "replyThreadId": replyThreadId.map(JSONValue.string) ?? .null, "fresh": .bool(fresh), "mode": .string(mode), "requestId": .string(requestId)])
     }

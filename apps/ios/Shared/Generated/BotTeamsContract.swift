@@ -18,8 +18,6 @@ public enum BotTeams {
     public static let update = "update"
     public static let swapModel = "swapModel"
     public static let retire = "retire"
-    public static let retryJob = "retryJob"
-    public static let cancelJob = "cancelJob"
     public static let profiles = "profiles"
     public static let threadProfile = "threadProfile"
     public static let threadBots = "threadBots"
@@ -33,7 +31,6 @@ public enum BotTeams {
     public static let wake = "wake"
     public static let conversation = "conversation"
     public static let newConversation = "newConversation"
-    public static let handoffSource = "handoffSource"
     public static let usage = "usage"
     public static let saveLimits = "saveLimits"
   }
@@ -76,10 +73,6 @@ public enum BotTeams {
 
   public typealias Retire = RetireOutput
 
-  public typealias RetryJob = RetryJobOutput
-
-  public typealias CancelJob = CancelJobOutput
-
   public typealias ProfilesOutput = [ProfilesOutputItem]
 
   public typealias Profiles = ProfilesOutput
@@ -113,8 +106,6 @@ public enum BotTeams {
   public typealias Conversation = ConversationOutput
 
   public typealias NewConversation = NewConversationOutput
-
-  public typealias HandoffSource = HandoffSourceOutput
 
   public typealias Usage = UsageOutput
 
@@ -2301,293 +2292,6 @@ public enum BotTeams {
     }
   }
 
-  public struct RetryJobInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public enum RetryJobOutputDispatchAction: Sendable, Hashable, Codable {
-    case steer
-    case followup
-    case fork
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "steer": self = .steer
-      case "followup": self = .followup
-      case "fork": self = .fork
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .steer: try container.encode("steer")
-      case .followup: try container.encode("followup")
-      case .fork: try container.encode("fork")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RetryJobOutputPendingSteer: Sendable, Hashable, Codable {
-    public var priorPrompt: String?
-    public var attemptedAt: Double?
-
-    public init(priorPrompt: String? = nil, attemptedAt: Double? = nil) {
-      self.priorPrompt = priorPrompt
-      self.attemptedAt = attemptedAt
-    }
-  }
-
-  public enum RetryJobOutputStatus: Sendable, Hashable, Codable {
-    case queued
-    case dispatching
-    case running
-    case done
-    case error
-    case cancelled
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "queued": self = .queued
-      case "dispatching": self = .dispatching
-      case "running": self = .running
-      case "done": self = .done
-      case "error": self = .error
-      case "cancelled": self = .cancelled
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .queued: try container.encode("queued")
-      case .dispatching: try container.encode("dispatching")
-      case .running: try container.encode("running")
-      case .done: try container.encode("done")
-      case .error: try container.encode("error")
-      case .cancelled: try container.encode("cancelled")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public enum RetryJobOutputAttachmentsItemType: Sendable, Hashable, Codable {
-    case localFile
-    case localImage
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "localFile": self = .localFile
-      case "localImage": self = .localImage
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .localFile: try container.encode("localFile")
-      case .localImage: try container.encode("localImage")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RetryJobOutputAttachmentsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var roomId: String?
-    public var projectId: String?
-    public var name: String?
-    public var path: String?
-    public var mimeType: String?
-    public var type: RetryJobOutputAttachmentsItemType?
-    public var sizeBytes: Double?
-    public var alt: String?
-
-    public init(id: String? = nil, roomId: String? = nil, projectId: String? = nil, name: String? = nil, path: String? = nil, mimeType: String? = nil, type: RetryJobOutputAttachmentsItemType? = nil, sizeBytes: Double? = nil, alt: String? = nil) {
-      self.id = id
-      self.roomId = roomId
-      self.projectId = projectId
-      self.name = name
-      self.path = path
-      self.mimeType = mimeType
-      self.type = type
-      self.sizeBytes = sizeBytes
-      self.alt = alt
-    }
-  }
-
-  public enum RetryJobOutputOutputAttachmentsItemType: Sendable, Hashable, Codable {
-    case localFile
-    case localImage
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "localFile": self = .localFile
-      case "localImage": self = .localImage
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .localFile: try container.encode("localFile")
-      case .localImage: try container.encode("localImage")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct RetryJobOutputOutputAttachmentsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var roomId: String?
-    public var projectId: String?
-    public var name: String?
-    public var path: String?
-    public var mimeType: String?
-    public var type: RetryJobOutputOutputAttachmentsItemType?
-    public var sizeBytes: Double?
-    public var alt: String?
-
-    public init(id: String? = nil, roomId: String? = nil, projectId: String? = nil, name: String? = nil, path: String? = nil, mimeType: String? = nil, type: RetryJobOutputOutputAttachmentsItemType? = nil, sizeBytes: Double? = nil, alt: String? = nil) {
-      self.id = id
-      self.roomId = roomId
-      self.projectId = projectId
-      self.name = name
-      self.path = path
-      self.mimeType = mimeType
-      self.type = type
-      self.sizeBytes = sizeBytes
-      self.alt = alt
-    }
-  }
-
-  public struct RetryJobOutput: Sendable, Hashable, Codable {
-    public var contextMessageId: String?
-    public var rosterVersion: String?
-    public var delegationId: String?
-    public var rootTaskId: String?
-    public var parentTaskId: String?
-    public var coordinatorId: String?
-    public var returnOf: String?
-    public var timedOut: Bool?
-    public var timeoutNoticePending: Bool?
-    public var taskTitle: String?
-    public var queueReason: String?
-    public var queuePosition: Double?
-    public var dispatchAction: RetryJobOutputDispatchAction?
-    public var forkSourceThreadId: String?
-    public var requiresPromptMatch: Bool?
-    public var fallbackAttempted: Bool?
-    public var directMessageRequestIds: [String]?
-    public var pendingSteer: RetryJobOutputPendingSteer?
-    public var wrapUpRequestedAt: Double?
-    public var turnMs: Double?
-    public var clockAt: Double?
-    public var stallRetriedAt: Double?
-    public var automationId: String?
-    public var id: String?
-    public var botId: String?
-    public var conversationKey: String?
-    public var threadId: String?
-    public var text: String?
-    public var status: RetryJobOutputStatus?
-    public var cancellationPending: Bool?
-    public var activitySnippet: String?
-    public var retryOf: String?
-    public var reply: String?
-    public var error: String?
-    public var createdAt: Double?
-    public var updatedAt: Double?
-    public var startedAt: Double?
-    public var dispatchStartedAt: Double?
-    public var roomId: String?
-    public var runId: String?
-    public var triggerMessageId: String?
-    public var depth: Int?
-    public var attachments: [RetryJobOutputAttachmentsItem]?
-    public var outputAttachments: [RetryJobOutputOutputAttachmentsItem]?
-
-    public init(contextMessageId: String? = nil, rosterVersion: String? = nil, delegationId: String? = nil, rootTaskId: String? = nil, parentTaskId: String? = nil, coordinatorId: String? = nil, returnOf: String? = nil, timedOut: Bool? = nil, timeoutNoticePending: Bool? = nil, taskTitle: String? = nil, queueReason: String? = nil, queuePosition: Double? = nil, dispatchAction: RetryJobOutputDispatchAction? = nil, forkSourceThreadId: String? = nil, requiresPromptMatch: Bool? = nil, fallbackAttempted: Bool? = nil, directMessageRequestIds: [String]? = nil, pendingSteer: RetryJobOutputPendingSteer? = nil, wrapUpRequestedAt: Double? = nil, turnMs: Double? = nil, clockAt: Double? = nil, stallRetriedAt: Double? = nil, automationId: String? = nil, id: String? = nil, botId: String? = nil, conversationKey: String? = nil, threadId: String? = nil, text: String? = nil, status: RetryJobOutputStatus? = nil, cancellationPending: Bool? = nil, activitySnippet: String? = nil, retryOf: String? = nil, reply: String? = nil, error: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, startedAt: Double? = nil, dispatchStartedAt: Double? = nil, roomId: String? = nil, runId: String? = nil, triggerMessageId: String? = nil, depth: Int? = nil, attachments: [RetryJobOutputAttachmentsItem]? = nil, outputAttachments: [RetryJobOutputOutputAttachmentsItem]? = nil) {
-      self.contextMessageId = contextMessageId
-      self.rosterVersion = rosterVersion
-      self.delegationId = delegationId
-      self.rootTaskId = rootTaskId
-      self.parentTaskId = parentTaskId
-      self.coordinatorId = coordinatorId
-      self.returnOf = returnOf
-      self.timedOut = timedOut
-      self.timeoutNoticePending = timeoutNoticePending
-      self.taskTitle = taskTitle
-      self.queueReason = queueReason
-      self.queuePosition = queuePosition
-      self.dispatchAction = dispatchAction
-      self.forkSourceThreadId = forkSourceThreadId
-      self.requiresPromptMatch = requiresPromptMatch
-      self.fallbackAttempted = fallbackAttempted
-      self.directMessageRequestIds = directMessageRequestIds
-      self.pendingSteer = pendingSteer
-      self.wrapUpRequestedAt = wrapUpRequestedAt
-      self.turnMs = turnMs
-      self.clockAt = clockAt
-      self.stallRetriedAt = stallRetriedAt
-      self.automationId = automationId
-      self.id = id
-      self.botId = botId
-      self.conversationKey = conversationKey
-      self.threadId = threadId
-      self.text = text
-      self.status = status
-      self.cancellationPending = cancellationPending
-      self.activitySnippet = activitySnippet
-      self.retryOf = retryOf
-      self.reply = reply
-      self.error = error
-      self.createdAt = createdAt
-      self.updatedAt = updatedAt
-      self.startedAt = startedAt
-      self.dispatchStartedAt = dispatchStartedAt
-      self.roomId = roomId
-      self.runId = runId
-      self.triggerMessageId = triggerMessageId
-      self.depth = depth
-      self.attachments = attachments
-      self.outputAttachments = outputAttachments
-    }
-  }
-
-  public struct CancelJobInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct CancelJobOutput: Sendable, Hashable, Codable {
-    public var cancelled: Bool?
-
-    public init(cancelled: Bool? = nil) {
-      self.cancelled = cancelled
-    }
-  }
-
   public struct ProfilesInput: Sendable, Hashable, Codable {
 
 
@@ -3644,26 +3348,6 @@ public enum BotTeams {
       self.originalKey = originalKey
       self.providerId = providerId
       self.model = model
-    }
-  }
-
-  public struct HandoffSourceInput: Sendable, Hashable, Codable {
-    public var threadId: String?
-
-    public init(threadId: String? = nil) {
-      self.threadId = threadId
-    }
-  }
-
-  public struct HandoffSourceOutput: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var projectId: String?
-    public var title: String?
-
-    public init(threadId: String? = nil, projectId: String? = nil, title: String? = nil) {
-      self.threadId = threadId
-      self.projectId = projectId
-      self.title = title
     }
   }
 

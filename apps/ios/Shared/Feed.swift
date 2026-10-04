@@ -23,9 +23,7 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
-    /// What its thread is called: "#channel", or the thread's title.
+    /// What its thread is called.
     public var threadTitle: String?
     /// Read with the rest of its story. Servers from before per-post read state leave it out.
     @ReadByDefault public var read: Bool
@@ -37,15 +35,12 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
     public var isUrgent: Bool { priority == "urgent" }
     public var isResolved: Bool { resolvedAt != nil }
 
-    /// "Scout in #ops", or just who posted it.
-    public var from: String { channelName.map { "\(author) in #\($0)" } ?? author }
-
     public var created: Date { Date(timeIntervalSince1970: createdAt / 1000) }
 
-    /// Discuss's item for the thread it came from: "Open #ops", or the thread's title.
+    /// Discuss's item for the thread it came from.
     public var openThreadLabel: String {
         if let threadTitle, !threadTitle.isEmpty { return "Open \(threadTitle)" }
-        return channelName.map { "Open #\($0)" } ?? "Open thread"
+        return "Open thread"
     }
 
     /// App path that opens it in BB web, and that notifications carry.
@@ -53,7 +48,7 @@ public struct FeedPost: Decodable, Identifiable, Hashable, Sendable {
 
     /// What a new thread about it starts with, as BB web's Discuss does.
     public var discussPrompt: String {
-        "Let's discuss this feed post: \"\(title)\" (\(from)). Read it first with feed_read id \(id).\n\n"
+        "Let's discuss this feed post: \"\(title)\" (\(author)). Read it first with feed_read id \(id).\n\n"
     }
 }
 

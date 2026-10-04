@@ -68,12 +68,10 @@ public enum Draw {
   public struct CreateDrawingInput: Sendable, Hashable, Codable {
     public var name: String?
     public var projectId: String?
-    public var threadId: String?
 
-    public init(name: String? = nil, projectId: String? = nil, threadId: String? = nil) {
+    public init(name: String? = nil, projectId: String? = nil) {
       self.name = name
       self.projectId = projectId
-      self.threadId = threadId
     }
   }
 

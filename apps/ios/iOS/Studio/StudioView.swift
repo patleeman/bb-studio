@@ -287,19 +287,6 @@ final class StudioStore: ObservableObject {
         for index in items.indices { items[index].spaces?.removeAll { $0 == space.id } }
     }
 
-    /// Adds the item to the space, or takes it out when it was added on its own.
-    func toggle(_ space: StudioSpace, on item: StudioItem, client: BBClient) async throws {
-        let ref = (pluginId: item.pluginId, id: item.itemId)
-        let direct = space.itemKeys.contains(item.id)
-        saved(try await client.spaceMembers(space.id, add: direct ? [] : [ref], remove: direct ? [ref] : []))
-        update(item) { item in
-            var ids = item.spaces ?? []
-            if direct { ids.removeAll { $0 == space.id } } else if !ids.contains(space.id) { ids.append(space.id) }
-            item.spaces = ids
-        }
-    }
-
-    /// Refetches the spaces after a change made elsewhere, like a widget's sheet.
     func reloadSpaces(_ client: BBClient) async {
         guard let spaces = try? await client.studioSpaces() else { return }
         self.spaces = Self.sorted(spaces)
@@ -338,8 +325,6 @@ struct StudioKind: Identifiable, Hashable {
         StudioKind(id: "drawing", label: "Drawing", plural: "Drawings", symbol: "scribble.variable", tint: .purple),
         StudioKind(id: "artifact", label: "Artifact", plural: "Artifacts", symbol: "doc.text.image", tint: .teal),
         StudioKind(id: "table", label: "Table", plural: "Tables", symbol: "tablecells", tint: .cyan),
-        StudioKind(id: "view", label: "Channel", plural: "Channels", symbol: "bubble.left.and.bubble.right", tint: .indigo),
-        StudioKind(id: "bot", label: "Bot", plural: "Bots", symbol: "person.crop.square", tint: .indigo),
         StudioKind(id: "space", label: "Space", plural: "Spaces", symbol: "square.stack.3d.up", tint: .mint),
     ]
 
@@ -792,21 +777,6 @@ struct StudioView: View {
                         }
                     }
                 } label: { Label("Move to Project", systemImage: "folder") }
-                if !store.spaces.isEmpty, item.kind != "space" {
-                    Menu {
-                        ForEach(store.spaces) { space in
-                            let inherited = item.spaces?.contains(space.id) == true && !space.itemKeys.contains(item.id)
-                            Button { Task { await toggle(space, on: item) } } label: {
-                                if item.spaces?.contains(space.id) == true {
-                                    Label(inherited ? "\(space.name) (through its project)" : space.name, systemImage: "checkmark")
-                                } else {
-                                    Text(space.name)
-                                }
-                            }
-                            .disabled(inherited)
-                        }
-                    } label: { Label("Spaces", systemImage: "square.stack.3d.up") }
-                }
                 if store.info(item)?.canArchive == true {
                     Button { Task { await archive(item) } } label: {
                         Label(item.archived ? "Restore from Archive" : "Archive", systemImage: item.archived ? "tray.and.arrow.up" : "archivebox")
@@ -826,7 +796,6 @@ struct StudioView: View {
         case "excalidraw": .drawing(id: item.itemId)
         case "artifacts": .artifact(id: item.itemId)
         case "studio-tables": .table(id: item.itemId)
-        case "bot-teams": item.kind == "view" ? .savedView(id: item.itemId) : .bot(id: item.itemId)
         case "studio" where item.kind == "space": item.href.flatMap(Route.init(href:)) ?? .space(id: item.itemId)
         default: item.href.flatMap(Route.init(href:))
         }
@@ -905,7 +874,6 @@ struct StudioView: View {
         case "recording", "dictation": "Dictate or record, and Talk keeps the audio and transcript here."
         case "drawing": "Ask an agent to sketch something, or draw in BB web."
         case "artifact": "Files agents save from threads, and ones you save from a reply, show up here."
-        case "bot": "Bot Teams bots show up here. Set one up from a chat in BB web."
         case "space": "Spaces gather items, threads and projects. Make one with New."
         default: "Pages, recordings, dictations, drawings and artifacts show up here."
         }
@@ -951,16 +919,6 @@ struct StudioView: View {
         do {
             let item = try await store.create(kind, projectId: projectId, client: client)
             if let route = route(item) { operation.complete(on: app) { app.studioPath.append(route) } }
-        } catch {
-            flash(BBClient.describe(error, server: client.baseURL))
-        }
-    }
-
-    private func toggle(_ space: StudioSpace, on item: StudioItem) async {
-        do {
-            let had = item.spaces?.contains(space.id) == true
-            try await store.toggle(space, on: item, client: client)
-            flash(had ? "Removed from \(space.name)" : "Added to \(space.name)")
         } catch {
             flash(BBClient.describe(error, server: client.baseURL))
         }

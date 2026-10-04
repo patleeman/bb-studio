@@ -217,7 +217,7 @@ struct FeedMeta: View {
             HStack(spacing: 6) {
                 if post.isUrgent, !post.isResolved { FeedBadge(label: "Urgent", color: .red) }
                 if post.isResolved { FeedBadge(label: "Resolved", color: .green) }
-                Text(post.from).lineLimit(1)
+                Text(post.author).lineLimit(1)
                 if let topic = post.topic { Text("· \(topic)").lineLimit(1) }
                 Text("· \(post.created, style: .relative)").lineLimit(1)
             }
@@ -284,7 +284,7 @@ struct FeedPostView: View {
                             ForEach(Array(earlier)) { update in
                                 VStack(alignment: .leading, spacing: 6) {
                                     Text(update.title).font(.subheadline.weight(.semibold))
-                                    Text("\(update.from) · \(update.created, style: .relative)")
+                                    Text("\(update.author) · \(update.created, style: .relative)")
                                         .font(.caption).foregroundStyle(.secondary)
                                     if !update.body.isEmpty { MarkdownText(update.body).font(.subheadline) }
                                 }

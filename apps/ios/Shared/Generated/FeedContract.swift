@@ -4,7 +4,6 @@ import Foundation
 public enum Feed {
   public enum Method {
     public static let inbox_updates = "inbox.updates"
-    public static let inbox_follow = "inbox.follow"
     public static let inbox_read = "inbox.read"
     public static let attention = "attention"
     public static let list = "list"
@@ -23,8 +22,6 @@ public enum Feed {
   }
 
   public typealias InboxUpdates = InboxUpdatesOutput
-
-  public typealias InboxFollow = InboxFollowOutput
 
   public typealias InboxRead = InboxReadOutput
 
@@ -105,28 +102,6 @@ public enum Feed {
       self.updates = updates
       self.degraded = degraded
       self.failures = failures
-    }
-  }
-
-  public struct InboxFollowInput: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var followed: Bool?
-
-    public init(threadId: String? = nil, followed: Bool? = nil) {
-      self.threadId = threadId
-      self.followed = followed
-    }
-  }
-
-  public struct InboxFollowOutput: Sendable, Hashable, Codable {
-    public var followed: Bool?
-    public var automatic: Bool?
-    public var override: Bool?
-
-    public init(followed: Bool? = nil, automatic: Bool? = nil, override: Bool? = nil) {
-      self.followed = followed
-      self.automatic = automatic
-      self.override = override
     }
   }
 
@@ -288,14 +263,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: AttentionOutputPostsItemLink? = nil, embeds: [AttentionOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: AttentionOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: AttentionOutputPostsItemLink? = nil, embeds: [AttentionOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: AttentionOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -316,8 +289,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -485,14 +456,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: ListOutputPostsItemLink? = nil, embeds: [ListOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: ListOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: ListOutputPostsItemLink? = nil, embeds: [ListOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: ListOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -513,8 +482,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -674,14 +641,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: ReadOutputPostLink? = nil, embeds: [ReadOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: ReadOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: ReadOutputPostLink? = nil, embeds: [ReadOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: ReadOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -702,8 +667,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -857,14 +820,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: PostOutputPostLink? = nil, embeds: [PostOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: PostOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: PostOutputPostLink? = nil, embeds: [PostOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: PostOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -885,8 +846,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -1313,14 +1272,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: StoryOutputPostsItemLink? = nil, embeds: [StoryOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: StoryOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: StoryOutputPostsItemLink? = nil, embeds: [StoryOutputPostsItemEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: StoryOutputPostsItemPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -1341,8 +1298,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -1496,14 +1451,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: ForDirectiveOutputPostLink? = nil, embeds: [ForDirectiveOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: ForDirectiveOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: ForDirectiveOutputPostLink? = nil, embeds: [ForDirectiveOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: ForDirectiveOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -1524,8 +1477,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -1744,14 +1695,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: PublishOutputPostLink? = nil, embeds: [PublishOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: PublishOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: PublishOutputPostLink? = nil, embeds: [PublishOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: PublishOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -1772,8 +1721,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy
@@ -2009,14 +1956,12 @@ public enum Feed {
     public var botId: String?
     public var threadId: String?
     public var projectId: String?
-    public var channelId: String?
-    public var channelName: String?
     public var createdAt: Double?
     public var updatedAt: Double?
     public var editedBy: String?
     public var resolvedAt: Double?
 
-    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: EditOutputPostLink? = nil, embeds: [EditOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: EditOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, channelId: String? = nil, channelName: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
+    public init(id: String? = nil, title: String? = nil, body: String? = nil, preview: String? = nil, domains: [String]? = nil, image: String? = nil, avatar: String? = nil, link: EditOutputPostLink? = nil, embeds: [EditOutputPostEmbedsItem]? = nil, explorable: Bool? = nil, threadTitle: String? = nil, read: Bool? = nil, topic: String? = nil, story: String? = nil, storyPosts: Double? = nil, priority: EditOutputPostPriority? = nil, author: String? = nil, botId: String? = nil, threadId: String? = nil, projectId: String? = nil, createdAt: Double? = nil, updatedAt: Double? = nil, editedBy: String? = nil, resolvedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.body = body
@@ -2037,8 +1982,6 @@ public enum Feed {
       self.botId = botId
       self.threadId = threadId
       self.projectId = projectId
-      self.channelId = channelId
-      self.channelName = channelName
       self.createdAt = createdAt
       self.updatedAt = updatedAt
       self.editedBy = editedBy

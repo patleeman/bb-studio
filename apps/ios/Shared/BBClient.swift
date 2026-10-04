@@ -26,10 +26,6 @@ extension BBClient {
         error is CancellationError || (error as? URLError)?.code == .cancelled
     }
 
-    public static func isUnreachable(_ error: Error) -> Bool {
-        (error as? URLError).map { $0.code != .cancelled } ?? false
-    }
-
     /// The request never left the phone or never reached BB, so sending again can't duplicate it.
     /// Timeouts and dropped connections don't count: BB may have acted before the reply was lost.
     public static func neverArrived(_ error: Error) -> Bool {
@@ -450,14 +446,6 @@ extension BBClient {
         if let size = uploaded["sizeBytes"] { file["sizeBytes"] = size }
         if let mime = uploaded["mimeType"] { file["mimeType"] = mime }
         return .object(file)
-    }
-
-    // MARK: Health
-
-    /// `GET /health`: true when BB answers.
-    public func isHealthy() async -> Bool {
-        guard let (status, _) = try? await raw(method: "GET", path: "/health", body: nil) else { return false }
-        return status == 200
     }
 }
 

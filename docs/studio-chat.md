@@ -26,7 +26,8 @@ button.
 Sending from a new composer adds the item's mention pill. BB resolves it
 into a pointer with its title, ID, link, and the kind's `agentHint` tools.
 Kinds without a hint use `studio_list_items`. The agent reads fresh content
-with those tools. Page conversations go through Pages' `work` RPC, which
+with those tools. [Studio references](studio-references.md) covers the kit
+helpers that turn mentions and links back into a plugin ID and item ID. Page conversations go through Pages' `work` RPC, which
 keeps existing page-chat records and mobile integration intact.
 
 ## Linked conversations

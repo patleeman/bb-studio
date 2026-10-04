@@ -31,10 +31,8 @@ another desktop chat panel.
 | Draw | Retained canvas, shared item Chat and companion-aware related references | [Original first-move canvas and compact header](../packages/bb-studio-draw/README.md) |
 | Artifacts | Retained viewer, text/image/HTML quotes through shared Chat | [Viewer/quote formats and compact controls](../packages/bb-studio-artifacts/README.md) |
 | Tables | Retained table/view route, shared header and canonical item references | [Compact header, real editing/import and bounded rendering](../packages/bb-studio-tables/README.md) |
-| Tasks | Shared task/board header; current/earlier handoffs, discussions and dispatch use companions | [Retained handoff composer and real bot dispatch](../packages/bb-studio-tasks/README.md) |
 | Teams | Bot Chat, channels and member-thread entry points; `hasOwnChat` suppresses redundant automatic item chat | [Channel composer/file retention and conversation reuse](../packages/bb-studio-teams/README.md) |
 | Feed | `useOpenCompanion` opens the post, source thread or new discussion; retained reader route | [Source, discussion and item companions](../packages/bb-studio-feed/README.md) |
-| Explore | Shared explainer/page destinations; old owner-scoped panel and main fallback when companions are absent | [Explainer/page reuse and retained state](../packages/bb-studio-explore/README.md) |
 | Sidebar | Thread Float action uses `openFloat`; ordinary navigation/split stays host-owned | [Real sidebar first moves](../packages/bb-studio-float/README.md) |
 | Navigation | Host panel activation/split plus Studio's shared Quick Open placement | [Keyboard/focus checks](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/search-accessibility/README.md) |
 | Reactions | Composer bridge selects the displayed message's thread; drafts quotes/reactions into it | [Settings, selection and message actions](https://github.com/patleeman/bb-studio/blob/321665bec62f1c351a85b78aee7b532243b63f7d/docs/review-evidence/2026-10-02/reactions-explore/README.md); native right-click remains open |
@@ -74,7 +72,6 @@ requested placement and one saved tab for its target.
 | Artifacts | HTML iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-artifacts/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-artifacts/assets/companion-transfers-native.png) |
 | Talk | Recording title input; existing playback proof is linked above | [Main](../packages/bb-studio-talk/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-talk/assets/companion-transfers-native.png) |
 | Tables | Title input and seeded table row | [Main](../packages/bb-studio-tables/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tables/assets/companion-transfers-native.png) |
-| Tasks | Board title input and seeded task | [Main](../packages/bb-studio-tasks/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-tasks/assets/companion-transfers-native.png) |
 | Teams | Original profile input and unsaved name, preserving `/profile` route | [Main](../packages/bb-studio-teams/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-teams/assets/companion-transfers-native.png) |
 
 These checks exposed three defects: Teams reset resolved model defaults and
@@ -94,7 +91,7 @@ After sourcing the appropriate isolated `capture.env`, select `native` or
 BB_CAPTURE_PLUGIN= BB_CAPTURE_SUITE_TRANSFERS=1 \
 BB_CAPTURE_TRANSFER_SELECTION=1 BB_CAPTURE_TRANSFER_FRAME=1 \
 BB_CAPTURE_SUITE_HOST=native \
-BB_CAPTURE_ONLY=suite-native-pages,suite-native-draw,suite-native-artifacts,suite-native-talk,suite-native-tables,suite-native-tasks,suite-native-teams \
+BB_CAPTURE_ONLY=suite-native-pages,suite-native-draw,suite-native-artifacts,suite-native-talk,suite-native-tables,suite-native-teams \
 node scripts/capture-plugin-screenshots.mjs
 ```
 
@@ -124,7 +121,6 @@ Kit exports `ViewMoveMenu`, and conversation composers accept a `moveTarget`.
 | Feed reader | Search input, unapplied filter and seeded release post | [Main](../packages/bb-studio-feed/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/companion-transfers-native.png) |
 | Feed post | Original post heading | [Main](../packages/bb-studio-feed/assets/feed-post-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-post-companion-transfers-native.png) |
 | Feed discussion | Prompt, unsent wording, file input and selected attachment control | [Main](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-feed/assets/feed-discussion-companion-transfers-native.png) |
-| Explore explainer | Iframe, same embedded frame/loader and in-memory document value | [Main](../packages/bb-studio-explore/assets/companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/companion-transfers-native.png) |
 
 The chat check reproduced double encoding: the host passes an already-encoded
 item subpath, but main-view ownership encoded it again. Kit's shared
@@ -140,7 +136,7 @@ Run the supplemental captures after sourcing the matching isolated env file:
 BB_CAPTURE_PLUGIN= BB_CAPTURE_STAGE_ENV=/path/to/isolated/capture.env \
 BB_CAPTURE_SUITE_TRANSFERS=1 BB_CAPTURE_TRANSFER_FRAME=1 \
 BB_CAPTURE_SUITE_HOST=native \
-BB_CAPTURE_ONLY=suite-native-studio,suite-native-chat,suite-native-feed,suite-native-feed-post,suite-native-feed-discussion,suite-native-explore \
+BB_CAPTURE_ONLY=suite-native-studio,suite-native-chat,suite-native-feed,suite-native-feed-post,suite-native-feed-discussion \
 node scripts/capture-plugin-screenshots.mjs
 ```
 
@@ -165,8 +161,6 @@ placement assertions. All initial moves use the displayed Move menu.
 | Studio space without Pages | Original space-options control and synthetic fallback space | [Main](../packages/bb-studio/assets/studio-space-companion-transfers-stable.png) | [Workbench](../packages/bb-studio/assets/studio-space-companion-transfers-native.png) |
 | Plain chat draft | Original prompt/file input, unsent wording and one selected attachment control | [Main](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-plain-companion-transfers-native.png) |
 | Saved quote draft | Original prompt/file input, source quote, location, note, appended wording and one attachment control | [Main](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-chat/assets/chat-quote-companion-transfers-native.png) |
-| Explore collection | Original seeded explainer-row button and collection route | [Main](../packages/bb-studio-explore/assets/explore-list-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-list-companion-transfers-native.png) |
-| Explore thread list | Original seeded explainer-row button and thread-specific route | [Main](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-stable.png) | [Workbench](../packages/bb-studio-explore/assets/explore-thread-companion-transfers-native.png) |
 
 The legacy Studio alias exposed another route mismatch: the main wrapper
 registered `/collection`, while the inner view constructed Move for the root
@@ -187,7 +181,7 @@ Use the prior command with the following capture IDs (and their `stable`
 equivalents):
 
 ```sh
-BB_CAPTURE_ONLY=suite-native-studio-collection,suite-native-studio-activity,suite-native-studio-space,suite-native-chat-plain,suite-native-chat-quote,suite-native-explore-list,suite-native-explore-thread
+BB_CAPTURE_ONLY=suite-native-studio-collection,suite-native-studio-activity,suite-native-studio-space,suite-native-chat-plain,suite-native-chat-quote
 ```
 
 The integrated root checkpoint `19dbbf2` passes 1,641 JavaScript tests across

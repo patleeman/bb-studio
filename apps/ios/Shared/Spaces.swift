@@ -2,8 +2,8 @@ import Foundation
 
 // MARK: Studio spaces
 
-/// A place the user gathers Studio items, threads, channels and projects in.
-/// It opens as its own page in Pages, whose widgets show what it holds.
+/// A place the user gathers threads and projects in; items follow their project.
+/// It opens as its own page in Pages.
 public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
     public var id: String
     public var name: String
@@ -17,15 +17,13 @@ public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
     /// BB projects whose items and threads all belong to the space.
     public var projectIds: [String]
     public var threadIds: [String]
-    /// Items added one by one, as `<plugin>:<id>`.
-    public var itemKeys: [String]
     /// The space's page, or nil before it has one.
     public var pageId: String?
 
     public var emoji: String? { icon.flatMap { $0.isEmpty ? nil : $0 } }
 
     enum CodingKeys: String, CodingKey {
-        case id, name, color, icon, description, defaultProjectId, projectIds, threadIds, itemKeys, pageId
+        case id, name, color, icon, description, defaultProjectId, projectIds, threadIds, pageId
     }
 
     public init(from decoder: Decoder) throws {
@@ -38,7 +36,6 @@ public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
         defaultProjectId = try? c.decode(String.self, forKey: .defaultProjectId)
         projectIds = (try? c.decode([String].self, forKey: .projectIds)) ?? []
         threadIds = (try? c.decode([String].self, forKey: .threadIds)) ?? []
-        itemKeys = (try? c.decode([String].self, forKey: .itemKeys)) ?? []
         pageId = try? c.decode(String.self, forKey: .pageId)
     }
 
@@ -51,34 +48,6 @@ public struct StudioSpace: Codable, Identifiable, Hashable, Sendable {
 public struct ThreadSpaces: Decodable, Sendable {
     public var spaces: [StudioSpace]
     public var inherited: [String]
-}
-
-/// One widget on a space's page: `<space id>/<section>`.
-public struct SpaceWidgetTarget: Hashable, Sendable {
-    public enum Section: String, Sendable, CaseIterable {
-        case actions, recent, threads, channels, projects
-
-        public var label: String {
-            switch self {
-            case .actions: "Create"
-            case .recent: "Recent"
-            case .threads: "Threads"
-            case .channels: "Channels and messages"
-            case .projects: "Projects"
-            }
-        }
-    }
-
-    public var spaceId: String
-    public var section: Section
-
-    /// Pages' parse: an unknown or missing section shows the recent items.
-    public init?(_ target: String) {
-        let parts = target.split(separator: "/", maxSplits: 1, omittingEmptySubsequences: false).map(String.init)
-        guard let id = parts.first, !id.isEmpty else { return nil }
-        spaceId = id
-        section = parts.count > 1 ? Section(rawValue: parts[1]) ?? .recent : .recent
-    }
 }
 
 extension BBClient {
@@ -132,24 +101,5 @@ extension BBClient {
     public func spacePage(_ id: String) async throws -> String? {
         let result: Studio.SpacePageOutput = try await rpc("studio", Studio.Method.spacePage, ["id": .string(id)])
         return result.href
-    }
-
-    public func spaceWidget(_ id: String) async throws -> Studio.SpaceWidgetOutput {
-        try await rpc("studio", Studio.Method.spaceWidget, ["id": .string(id)])
-    }
-
-    /// An item made in the space's default project and added to the space; its path.
-    public func createInSpace(_ id: String, pluginId: String, kind: String) async throws -> String {
-        let result: Studio.CreateInSpaceOutput = try await rpc("studio", Studio.Method.createInSpace, [
-            "id": .string(id), "pluginId": .string(pluginId), "kind": .string(kind),
-        ])
-        guard let href = result.href else { throw BBError(status: 0, message: "Studio didn't say where the new item is.") }
-        return href
-    }
-
-    /// Open threads, channels and direct messages to pick from.
-    public func recentSpaceThreads() async throws -> [Studio.RecentThreadsOutputThreadsItem] {
-        let result: Studio.RecentThreadsOutput = try await rpc("studio", Studio.Method.recentThreads)
-        return result.threads ?? []
     }
 }

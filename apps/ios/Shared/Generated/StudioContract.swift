@@ -32,11 +32,9 @@ public enum Studio {
     public static let updateSpace = "updateSpace"
     public static let deleteSpace = "deleteSpace"
     public static let spaceMembers = "spaceMembers"
-    public static let spaceThreads = "spaceThreads"
     public static let spacesForThread = "spacesForThread"
     public static let pendingThreadSpaces = "pendingThreadSpaces"
     public static let spacePage = "spacePage"
-    public static let spaceWidget = "spaceWidget"
     public static let createInSpace = "createInSpace"
     public static let recentThreads = "recentThreads"
     public static let space_lead = "space_lead"
@@ -142,15 +140,11 @@ public enum Studio {
 
   public typealias SpaceMembers = SpaceMembersOutput
 
-  public typealias SpaceThreads = SpaceThreadsOutput
-
   public typealias SpacesForThread = SpacesForThreadOutput
 
   public typealias PendingThreadSpaces = PendingThreadSpacesOutput
 
   public typealias SpacePage = SpacePageOutput
-
-  public typealias SpaceWidget = SpaceWidgetOutput
 
   public typealias CreateInSpace = CreateInSpaceOutput
 
@@ -2489,71 +2483,6 @@ public enum Studio {
     }
   }
 
-  public struct SpaceThreadsInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public enum SpaceThreadsOutputThreadsItemKind: Sendable, Hashable, Codable {
-    case thread
-    case channel
-    case dm
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "channel": self = .channel
-      case "dm": self = .dm
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .channel: try container.encode("channel")
-      case .dm: try container.encode("dm")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceThreadsOutputThreadsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var projectId: String?
-    public var updatedAt: Double?
-    public var direct: Bool?
-    public var kind: SpaceThreadsOutputThreadsItemKind?
-    public var botName: String?
-
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, direct: Bool? = nil, kind: SpaceThreadsOutputThreadsItemKind? = nil, botName: String? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.projectId = projectId
-      self.updatedAt = updatedAt
-      self.direct = direct
-      self.kind = kind
-      self.botName = botName
-    }
-  }
-
-  public struct SpaceThreadsOutput: Sendable, Hashable, Codable {
-    public var threads: [SpaceThreadsOutputThreadsItem]?
-
-    public init(threads: [SpaceThreadsOutputThreadsItem]? = nil) {
-      self.threads = threads
-    }
-  }
-
   public struct SpacesForThreadInput: Sendable, Hashable, Codable {
     public var threadId: String?
 
@@ -2632,151 +2561,6 @@ public enum Studio {
     }
   }
 
-  public struct SpaceWidgetInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct SpaceWidgetOutputSpace: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var icon: String?
-    public var defaultProjectId: String?
-
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, defaultProjectId: String? = nil) {
-      self.id = id
-      self.name = name
-      self.icon = icon
-      self.defaultProjectId = defaultProjectId
-    }
-  }
-
-  public struct SpaceWidgetOutputRecentItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var title: String?
-    public var icon: String?
-    public var kindIcon: String?
-    public var kindLabel: String?
-    public var href: String?
-    public var updatedAt: Double?
-
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, kindLabel: String? = nil, href: String? = nil, updatedAt: Double? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.title = title
-      self.icon = icon
-      self.kindIcon = kindIcon
-      self.kindLabel = kindLabel
-      self.href = href
-      self.updatedAt = updatedAt
-    }
-  }
-
-  public enum SpaceWidgetOutputThreadsItemKind: Sendable, Hashable, Codable {
-    case thread
-    case channel
-    case dm
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "channel": self = .channel
-      case "dm": self = .dm
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .channel: try container.encode("channel")
-      case .dm: try container.encode("dm")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceWidgetOutputThreadsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var projectId: String?
-    public var updatedAt: Double?
-    public var direct: Bool?
-    public var kind: SpaceWidgetOutputThreadsItemKind?
-    public var botName: String?
-
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, direct: Bool? = nil, kind: SpaceWidgetOutputThreadsItemKind? = nil, botName: String? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.projectId = projectId
-      self.updatedAt = updatedAt
-      self.direct = direct
-      self.kind = kind
-      self.botName = botName
-    }
-  }
-
-  public struct SpaceWidgetOutputProjectsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var name: String?
-    public var items: Double?
-    public var threads: Double?
-    public var isDefault: Bool?
-
-    public init(id: String? = nil, name: String? = nil, items: Double? = nil, threads: Double? = nil, isDefault: Bool? = nil) {
-      self.id = id
-      self.name = name
-      self.items = items
-      self.threads = threads
-      self.isDefault = isDefault
-    }
-  }
-
-  public struct SpaceWidgetOutputKindsItem: Sendable, Hashable, Codable {
-    public var pluginId: String?
-    public var id: String?
-    public var label: String?
-    public var icon: String?
-    public var event: String?
-
-    public init(pluginId: String? = nil, id: String? = nil, label: String? = nil, icon: String? = nil, event: String? = nil) {
-      self.pluginId = pluginId
-      self.id = id
-      self.label = label
-      self.icon = icon
-      self.event = event
-    }
-  }
-
-  public struct SpaceWidgetOutput: Sendable, Hashable, Codable {
-    public var space: SpaceWidgetOutputSpace?
-    public var recent: [SpaceWidgetOutputRecentItem]?
-    public var itemCount: Double?
-    public var threads: [SpaceWidgetOutputThreadsItem]?
-    public var projects: [SpaceWidgetOutputProjectsItem]?
-    public var kinds: [SpaceWidgetOutputKindsItem]?
-    public var threadPrompt: String?
-
-    public init(space: SpaceWidgetOutputSpace? = nil, recent: [SpaceWidgetOutputRecentItem]? = nil, itemCount: Double? = nil, threads: [SpaceWidgetOutputThreadsItem]? = nil, projects: [SpaceWidgetOutputProjectsItem]? = nil, kinds: [SpaceWidgetOutputKindsItem]? = nil, threadPrompt: String? = nil) {
-      self.space = space
-      self.recent = recent
-      self.itemCount = itemCount
-      self.threads = threads
-      self.projects = projects
-      self.kinds = kinds
-      self.threadPrompt = threadPrompt
-    }
-  }
-
   public struct CreateInSpaceInput: Sendable, Hashable, Codable {
     public var id: String?
     public var pluginId: String?
@@ -2799,52 +2583,19 @@ public enum Studio {
     }
   }
 
-  public enum RecentThreadsOutputThreadsItemKind: Sendable, Hashable, Codable {
-    case thread
-    case channel
-    case dm
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "channel": self = .channel
-      case "dm": self = .dm
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .channel: try container.encode("channel")
-      case .dm: try container.encode("dm")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
   public struct RecentThreadsOutputThreadsItem: Sendable, Hashable, Codable {
     public var id: String?
     public var title: String?
     public var status: String?
     public var projectId: String?
     public var updatedAt: Double?
-    public var direct: Bool?
-    public var kind: RecentThreadsOutputThreadsItemKind?
-    public var botName: String?
 
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil, direct: Bool? = nil, kind: RecentThreadsOutputThreadsItemKind? = nil, botName: String? = nil) {
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, projectId: String? = nil, updatedAt: Double? = nil) {
       self.id = id
       self.title = title
       self.status = status
       self.projectId = projectId
       self.updatedAt = updatedAt
-      self.direct = direct
-      self.kind = kind
-      self.botName = botName
     }
   }
 
@@ -4209,11 +3960,9 @@ public enum Studio {
   }
 
   public struct SpaceTreeInput: Sendable, Hashable, Codable {
-    public var threadsFor: [String]?
 
-    public init(threadsFor: [String]? = nil) {
-      self.threadsFor = threadsFor
-    }
+
+    public init() {}
   }
 
   public struct SpaceTreeOutputSpacesItemItemsItem: Sendable, Hashable, Codable {
@@ -4240,47 +3989,6 @@ public enum Studio {
     }
   }
 
-  public enum SpaceTreeOutputSpacesItemThreadsItemKind: Sendable, Hashable, Codable {
-    case thread
-    case channel
-    case dm
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "thread": self = .thread
-      case "channel": self = .channel
-      case "dm": self = .dm
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .thread: try container.encode("thread")
-      case .channel: try container.encode("channel")
-      case .dm: try container.encode("dm")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct SpaceTreeOutputSpacesItemThreadsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var title: String?
-    public var status: String?
-    public var kind: SpaceTreeOutputSpacesItemThreadsItemKind?
-
-    public init(id: String? = nil, title: String? = nil, status: String? = nil, kind: SpaceTreeOutputSpacesItemThreadsItemKind? = nil) {
-      self.id = id
-      self.title = title
-      self.status = status
-      self.kind = kind
-    }
-  }
-
   public struct SpaceTreeOutputSpacesItem: Sendable, Hashable, Codable {
     public var id: String?
     public var name: String?
@@ -4289,10 +3997,8 @@ public enum Studio {
     public var href: String?
     public var items: [SpaceTreeOutputSpacesItemItemsItem]?
     public var itemCount: Double?
-    public var threads: [SpaceTreeOutputSpacesItemThreadsItem]?
-    public var threadCount: Double?
 
-    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, href: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil, threads: [SpaceTreeOutputSpacesItemThreadsItem]? = nil, threadCount: Double? = nil) {
+    public init(id: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, href: String? = nil, items: [SpaceTreeOutputSpacesItemItemsItem]? = nil, itemCount: Double? = nil) {
       self.id = id
       self.name = name
       self.icon = icon
@@ -4300,8 +4006,6 @@ public enum Studio {
       self.href = href
       self.items = items
       self.itemCount = itemCount
-      self.threads = threads
-      self.threadCount = threadCount
     }
   }
 

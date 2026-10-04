@@ -119,7 +119,6 @@ final class AppModel: ObservableObject {
         _ = TalkOutbox.shared
         BBClient.storedServerURL = url
         StudioStore.shared = StudioStore()
-        SpaceWidgets.shared = SpaceWidgets()
         PagesStore.shared = PagesStore()
         MutedThreads.shared = MutedThreads()
         ThreadTitles.store.titles = [:]

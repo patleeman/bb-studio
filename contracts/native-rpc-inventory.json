@@ -508,12 +508,6 @@
     {
       "file": "apps/ios/Shared/SavedViews.swift",
       "plugin": "bot-teams",
-      "method": "viewDelete",
-      "coverage": "literal method checked against contract"
-    },
-    {
-      "file": "apps/ios/Shared/SavedViews.swift",
-      "plugin": "bot-teams",
       "method": "viewSend",
       "coverage": "literal method checked against contract"
     },
@@ -593,24 +587,6 @@
       "file": "apps/ios/Shared/Spaces.swift",
       "plugin": "studio",
       "method": "spacePage",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "spaceWidget",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "createInSpace",
-      "coverage": "generated method"
-    },
-    {
-      "file": "apps/ios/Shared/Spaces.swift",
-      "plugin": "studio",
-      "method": "recentThreads",
       "coverage": "generated method"
     },
     {

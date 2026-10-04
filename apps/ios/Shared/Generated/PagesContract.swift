@@ -12,7 +12,6 @@ public enum Pages {
     public static let studioItems = "studioItems"
     public static let artifactView = "artifactView"
     public static let checklistHandOff = "checklistHandOff"
-    public static let checklistHandoffs = "checklistHandoffs"
     public static let whiteboardGet = "whiteboardGet"
     public static let whiteboardSave = "whiteboardSave"
     public static let studioCreate = "studioCreate"
@@ -24,7 +23,6 @@ public enum Pages {
     public static let recordingView = "recordingView"
     public static let markdown = "markdown"
     public static let editableMarkdown = "editableMarkdown"
-    public static let editBlock = "editBlock"
     public static let editDocument = "editDocument"
     public static let replaceMarkdown = "replaceMarkdown"
     public static let search = "search"
@@ -66,8 +64,6 @@ public enum Pages {
 
   public typealias ChecklistHandOff = ChecklistHandOffOutput
 
-  public typealias ChecklistHandoffs = ChecklistHandoffsOutput
-
   public typealias WhiteboardGet = WhiteboardGetOutput
 
   public typealias WhiteboardSave = WhiteboardSaveOutput
@@ -89,8 +85,6 @@ public enum Pages {
   public typealias Markdown = MarkdownOutput
 
   public typealias EditableMarkdown = EditableMarkdownOutput
-
-  public typealias EditBlock = EditBlockOutput
 
   public typealias EditDocument = EditDocumentOutput
 
@@ -556,40 +550,6 @@ public enum Pages {
 
     public init(threadId: String? = nil) {
       self.threadId = threadId
-    }
-  }
-
-  public struct ChecklistHandoffsInput: Sendable, Hashable, Codable {
-    public var id: String?
-
-    public init(id: String? = nil) {
-      self.id = id
-    }
-  }
-
-  public struct ChecklistHandoffsOutputHandoffsItem: Sendable, Hashable, Codable {
-    public var threadId: String?
-    public var blockId: String?
-    public var title: String?
-    public var state: String?
-    public var note: String?
-    public var updatedAt: Double?
-
-    public init(threadId: String? = nil, blockId: String? = nil, title: String? = nil, state: String? = nil, note: String? = nil, updatedAt: Double? = nil) {
-      self.threadId = threadId
-      self.blockId = blockId
-      self.title = title
-      self.state = state
-      self.note = note
-      self.updatedAt = updatedAt
-    }
-  }
-
-  public struct ChecklistHandoffsOutput: Sendable, Hashable, Codable {
-    public var handoffs: [ChecklistHandoffsOutputHandoffsItem]?
-
-    public init(handoffs: [ChecklistHandoffsOutputHandoffsItem]? = nil) {
-      self.handoffs = handoffs
     }
   }
 
@@ -2177,28 +2137,6 @@ public enum Pages {
   }
 
   public struct EditableMarkdownOutput: Sendable, Hashable, Codable {
-    public var markdown: String?
-
-    public init(markdown: String? = nil) {
-      self.markdown = markdown
-    }
-  }
-
-  public struct EditBlockInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var expected: String?
-    public var block: String?
-    public var markdown: String?
-
-    public init(id: String? = nil, expected: String? = nil, block: String? = nil, markdown: String? = nil) {
-      self.id = id
-      self.expected = expected
-      self.block = block
-      self.markdown = markdown
-    }
-  }
-
-  public struct EditBlockOutput: Sendable, Hashable, Codable {
     public var markdown: String?
 
     public init(markdown: String? = nil) {

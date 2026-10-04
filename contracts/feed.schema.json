@@ -92,51 +92,6 @@
         "additionalProperties": false
       }
     },
-    "inbox.follow": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threadId": {
-            "type": "string",
-            "minLength": 1
-          },
-          "followed": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "threadId"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "followed": {
-            "type": "boolean"
-          },
-          "automatic": {
-            "type": "boolean"
-          },
-          "override": {
-            "type": [
-              "boolean",
-              "null"
-            ]
-          }
-        },
-        "required": [
-          "followed",
-          "automatic",
-          "override"
-        ],
-        "additionalProperties": false
-      }
-    },
     "inbox.read": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -405,18 +360,6 @@
                     "null"
                   ]
                 },
-                "channelId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "channelName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "createdAt": {
                   "type": "number"
                 },
@@ -457,8 +400,6 @@
                 "botId",
                 "threadId",
                 "projectId",
-                "channelId",
-                "channelName",
                 "createdAt",
                 "updatedAt",
                 "editedBy",
@@ -740,18 +681,6 @@
                     "null"
                   ]
                 },
-                "channelId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "channelName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "createdAt": {
                   "type": "number"
                 },
@@ -792,8 +721,6 @@
                 "botId",
                 "threadId",
                 "projectId",
-                "channelId",
-                "channelName",
                 "createdAt",
                 "updatedAt",
                 "editedBy",
@@ -1058,18 +985,6 @@
                       "null"
                     ]
                   },
-                  "channelId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "channelName": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -1110,8 +1025,6 @@
                   "botId",
                   "threadId",
                   "projectId",
-                  "channelId",
-                  "channelName",
                   "createdAt",
                   "updatedAt",
                   "editedBy",
@@ -1365,18 +1278,6 @@
                       "null"
                     ]
                   },
-                  "channelId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "channelName": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -1417,8 +1318,6 @@
                   "botId",
                   "threadId",
                   "projectId",
-                  "channelId",
-                  "channelName",
                   "createdAt",
                   "updatedAt",
                   "editedBy",
@@ -1887,18 +1786,6 @@
                     "null"
                   ]
                 },
-                "channelId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "channelName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
                 "createdAt": {
                   "type": "number"
                 },
@@ -1939,8 +1826,6 @@
                 "botId",
                 "threadId",
                 "projectId",
-                "channelId",
-                "channelName",
                 "createdAt",
                 "updatedAt",
                 "editedBy",
@@ -2190,18 +2075,6 @@
                       "null"
                     ]
                   },
-                  "channelId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "channelName": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -2242,8 +2115,6 @@
                   "botId",
                   "threadId",
                   "projectId",
-                  "channelId",
-                  "channelName",
                   "createdAt",
                   "updatedAt",
                   "editedBy",
@@ -2594,18 +2465,6 @@
                   "null"
                 ]
               },
-              "channelId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "channelName": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
               "createdAt": {
                 "type": "number"
               },
@@ -2646,8 +2505,6 @@
               "botId",
               "threadId",
               "projectId",
-              "channelId",
-              "channelName",
               "createdAt",
               "updatedAt",
               "editedBy",
@@ -2968,18 +2825,6 @@
                       "null"
                     ]
                   },
-                  "channelId": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
-                  "channelName": {
-                    "type": [
-                      "string",
-                      "null"
-                    ]
-                  },
                   "createdAt": {
                     "type": "number"
                   },
@@ -3020,8 +2865,6 @@
                   "botId",
                   "threadId",
                   "projectId",
-                  "channelId",
-                  "channelName",
                   "createdAt",
                   "updatedAt",
                   "editedBy",

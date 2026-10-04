@@ -440,34 +440,6 @@ public struct ProfileThread: Codable, Identifiable, Hashable, Sendable {
     public var id: String { threadId }
 }
 
-public struct Room: Codable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var name: String
-    public var memberIds: [String]
-    public var archived: Bool?
-    public var paused: Bool?
-    public var lastReadAt: Double?
-    public var updatedAt: Double?
-    /// `smart`, `directed` or `everyone`.
-    public var responseBehavior: String?
-    /// Overrides every member's own permission mode while set: `accept-edits`, `auto` or `full`.
-    public var permissionMode: String?
-    /// The BB thread the channel runs in, which Studio spaces hold.
-    public var threadId: String?
-
-    public static let modes: [(id: String, name: String, detail: String)] = [
-        ("smart", "Smart", "A coordinator picks collaborators, work order, and busy-bot actions"),
-        ("directed", "Directed", "Only the bots you mention answer"),
-        ("everyone", "Everyone", "Every bot in the channel can answer"),
-    ]
-    public static let permissions: [(id: String?, name: String, detail: String)] = [
-        (nil, "Each bot's own", "Use the mode set in every bot's profile"),
-        ("accept-edits", "Accept Edits", "Sandboxed, and asks you to approve anything beyond it"),
-        ("auto", "Auto", "Sandboxed, and the provider reviews on its own"),
-        ("full", "Full Access", "No sandbox and no approvals"),
-    ]
-}
-
 /// A bot's latest thread with its profile, which the Watch messages.
 public struct DirectThread: Codable, Hashable, Sendable {
     public var threadId: String
@@ -488,66 +460,6 @@ public struct BotTeamsList: Codable, Sendable {
     public var views: [SavedThreadView]
     /// Each bot's latest thread with its profile.
     public var directThreads: [String: DirectThread]
-}
-
-public struct RoomMessage: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var roomId: String
-    public var botId: String?
-    public var speaker: String
-    public var text: String
-    public var createdAt: Double?
-
-    public var isOwner: Bool { botId == nil && speaker == "You" }
-}
-
-/// A bot's pending approval or question, forwarded into its channel. It's a
-/// core interaction on the bot's work thread.
-public struct ChannelApproval: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var threadId: String
-    public var botId: String
-    public var roomId: String
-    public var kind: String
-    public var title: String
-    public var detail: String?
-    public var createdAt: Double
-}
-
-public struct RoomPage: Decodable, Sendable {
-    public var messages: [RoomMessage]
-    public var hasOlder: Bool?
-    public var approvals: [ChannelApproval]?
-    public var room: Room?
-    public var runs: [RoomRun]?
-    public var jobs: [RoomJob]?
-
-    /// Bot work on this channel that hasn't finished.
-    public var activeJobs: [RoomJob] {
-        (jobs ?? []).filter { ["queued", "dispatching", "running"].contains($0.status) }
-    }
-
-    /// True while anything is left to stop: routing, queued turns, or bots at work.
-    public var busy: Bool {
-        !activeJobs.isEmpty || (runs ?? []).contains { ["queued", "running"].contains($0.status) }
-    }
-}
-
-/// One message's trip through the channel: routing, then each bot's turn.
-/// Its id is the message's id.
-public struct RoomRun: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var status: String
-    /// `pending`, `done` or `error`. An error leaves the message unanswered until retried.
-    public var routing: String?
-    public var routingError: String?
-}
-
-public struct RoomJob: Decodable, Identifiable, Hashable, Sendable {
-    public var id: String
-    public var botId: String
-    public var status: String
-    public var activitySnippet: String?
 }
 
 // MARK: Talk

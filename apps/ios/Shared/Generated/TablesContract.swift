@@ -9,10 +9,7 @@ public enum Tables {
     public static let update = "update"
     public static let remove = "remove"
     public static let insert = "insert"
-    public static let updateRow = "updateRow"
-    public static let deleteRow = "deleteRow"
     public static let patchRows = "patchRows"
-    public static let query = "query"
     public static let exportCsv = "exportCsv"
     public static let importCsv = "importCsv"
     public static let items = "items"
@@ -32,13 +29,7 @@ public enum Tables {
 
   public typealias Insert = InsertOutput
 
-  public typealias UpdateRow = UpdateRowOutput
-
-  public typealias DeleteRow = DeleteRowOutput
-
   public typealias PatchRows = PatchRowsOutput
-
-  public typealias Query = QueryOutput
 
   public typealias ExportCsv = ExportCsvOutput
 
@@ -1374,58 +1365,6 @@ public enum Tables {
     }
   }
 
-  public struct UpdateRowInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var rowId: String?
-    public var values: [String: StudioJSONValue]?
-
-    public init(id: String? = nil, rowId: String? = nil, values: [String: StudioJSONValue]? = nil) {
-      self.id = id
-      self.rowId = rowId
-      self.values = values
-    }
-  }
-
-  public struct UpdateRowOutputRow: Sendable, Hashable, Codable {
-    public var id: String?
-    public var values: [String: StudioJSONValue]?
-    public var createdAt: Double?
-    public var updatedAt: Double?
-
-    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
-      self.id = id
-      self.values = values
-      self.createdAt = createdAt
-      self.updatedAt = updatedAt
-    }
-  }
-
-  public struct UpdateRowOutput: Sendable, Hashable, Codable {
-    public var row: UpdateRowOutputRow?
-
-    public init(row: UpdateRowOutputRow? = nil) {
-      self.row = row
-    }
-  }
-
-  public struct DeleteRowInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var rowId: String?
-
-    public init(id: String? = nil, rowId: String? = nil) {
-      self.id = id
-      self.rowId = rowId
-    }
-  }
-
-  public struct DeleteRowOutput: Sendable, Hashable, Codable {
-    public var ok: Bool?
-
-    public init(ok: Bool? = nil) {
-      self.ok = ok
-    }
-  }
-
   public struct PatchRowsInputUpdateItem: Sendable, Hashable, Codable {
     public var rowId: String?
     public var values: [String: StudioJSONValue]?
@@ -1703,141 +1642,6 @@ public enum Tables {
 
     public init(table: PatchRowsOutputTable? = nil) {
       self.table = table
-    }
-  }
-
-  public enum QueryInputFiltersItemOp: Sendable, Hashable, Codable {
-    case contains
-    case eq
-    case neq
-    case gt
-    case lt
-    case empty
-    case not_empty
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "contains": self = .contains
-      case "eq": self = .eq
-      case "neq": self = .neq
-      case "gt": self = .gt
-      case "lt": self = .lt
-      case "empty": self = .empty
-      case "not-empty": self = .not_empty
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .contains: try container.encode("contains")
-      case .eq: try container.encode("eq")
-      case .neq: try container.encode("neq")
-      case .gt: try container.encode("gt")
-      case .lt: try container.encode("lt")
-      case .empty: try container.encode("empty")
-      case .not_empty: try container.encode("not-empty")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct QueryInputFiltersItem: Sendable, Hashable, Codable {
-    public var columnId: String?
-    public var op: QueryInputFiltersItemOp?
-    public var value: StudioJSONValue?
-
-    public init(columnId: String? = nil, op: QueryInputFiltersItemOp? = nil, value: StudioJSONValue? = nil) {
-      self.columnId = columnId
-      self.op = op
-      self.value = value
-    }
-  }
-
-  public enum QueryInputSortsItemDirection: Sendable, Hashable, Codable {
-    case asc
-    case desc
-    case unknown(String)
-
-    public init(from decoder: Decoder) throws {
-      let value = try decoder.singleValueContainer().decode(String.self)
-      switch value {
-      case "asc": self = .asc
-      case "desc": self = .desc
-      default: self = .unknown(value)
-      }
-    }
-
-    public func encode(to encoder: Encoder) throws {
-      var container = encoder.singleValueContainer()
-      switch self {
-      case .asc: try container.encode("asc")
-      case .desc: try container.encode("desc")
-      case .unknown(let value): try container.encode(value)
-      }
-    }
-  }
-
-  public struct QueryInputSortsItem: Sendable, Hashable, Codable {
-    public var columnId: String?
-    public var direction: QueryInputSortsItemDirection?
-
-    public init(columnId: String? = nil, direction: QueryInputSortsItemDirection? = nil) {
-      self.columnId = columnId
-      self.direction = direction
-    }
-  }
-
-  public struct QueryInput: Sendable, Hashable, Codable {
-    public var id: String?
-    public var viewId: String?
-    public var filters: [QueryInputFiltersItem]?
-    public var sorts: [QueryInputSortsItem]?
-    public var limit: Int?
-    public var offset: Int?
-    public var expectedRevision: String?
-
-    public init(id: String? = nil, viewId: String? = nil, filters: [QueryInputFiltersItem]? = nil, sorts: [QueryInputSortsItem]? = nil, limit: Int? = nil, offset: Int? = nil, expectedRevision: String? = nil) {
-      self.id = id
-      self.viewId = viewId
-      self.filters = filters
-      self.sorts = sorts
-      self.limit = limit
-      self.offset = offset
-      self.expectedRevision = expectedRevision
-    }
-  }
-
-  public struct QueryOutputRowsItem: Sendable, Hashable, Codable {
-    public var id: String?
-    public var values: [String: StudioJSONValue]?
-    public var createdAt: Double?
-    public var updatedAt: Double?
-
-    public init(id: String? = nil, values: [String: StudioJSONValue]? = nil, createdAt: Double? = nil, updatedAt: Double? = nil) {
-      self.id = id
-      self.values = values
-      self.createdAt = createdAt
-      self.updatedAt = updatedAt
-    }
-  }
-
-  public struct QueryOutput: Sendable, Hashable, Codable {
-    public var rows: [QueryOutputRowsItem]?
-    public var total: Double?
-    public var offset: Double?
-    public var nextOffset: Double?
-    public var revision: String?
-
-    public init(rows: [QueryOutputRowsItem]? = nil, total: Double? = nil, offset: Double? = nil, nextOffset: Double? = nil, revision: String? = nil) {
-      self.rows = rows
-      self.total = total
-      self.offset = offset
-      self.nextOffset = nextOffset
-      self.revision = revision
     }
   }
 

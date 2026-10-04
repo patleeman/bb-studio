@@ -2,15 +2,6 @@ import XCTest
 @testable import BBStudio
 
 final class SpacesTests: XCTestCase {
-    func testSpaceWidgetTargetReadsTheSection() {
-        XCTAssertEqual(SpaceWidgetTarget("sp_1/threads")?.spaceId, "sp_1")
-        XCTAssertEqual(SpaceWidgetTarget("sp_1/threads")?.section, .threads)
-        XCTAssertEqual(SpaceWidgetTarget("sp_1")?.section, .recent)
-        XCTAssertEqual(SpaceWidgetTarget("sp_1/nonsense")?.section, .recent)
-        XCTAssertNil(SpaceWidgetTarget(""))
-        XCTAssertNil(SpaceWidgetTarget("/actions"))
-    }
-
     func testSpacePathsOpenTheSpace() {
         XCTAssertEqual(Route(href: "/plugins/studio/spaces/sp_1"), .space(id: "sp_1"))
         XCTAssertEqual(Route(href: "/plugins/pages/pages/pg_1"), .page(id: "pg_1"))
@@ -37,7 +28,6 @@ final class SpacesTests: XCTestCase {
         let space = try JSONDecoder().decode(StudioSpace.self, from: Data(json.utf8))
         XCTAssertEqual(space.emoji, "🚀")
         XCTAssertNil(space.defaultProjectId)
-        XCTAssertEqual(space.itemKeys, ["pages:pg_2"])
 
         let item = try JSONDecoder().decode(
             StudioItem.self, from: Data(#"{"pluginId":"pages","id":"pg_2","kind":"page","spaces":["sp_1"]}"#.utf8))

@@ -224,8 +224,6 @@
           "botId": null,
           "threadId": null,
           "projectId": null,
-          "channelId": null,
-          "channelName": null,
           "createdAt": 1,
           "updatedAt": 2,
           "editedBy": null,

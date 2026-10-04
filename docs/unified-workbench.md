@@ -38,7 +38,6 @@ can open in the main view. Placement does not create another conversation.
 | Draw | Drawing editor, live changes, opening references beside it |
 | Artifacts | Text, image, file, and HTML viewers; selections and quotes |
 | Tables | Tables, views, cells that link Studio items, editing continuity |
-| Tasks | Boards, tasks, linked items, agent handoff |
 | Teams | Bot profiles, conversations, saved views, thread entry points |
 | Feed | Item and thread links from posts |
 | Explore | Explainer panels and links to pages |
@@ -173,9 +172,7 @@ required.
 
 The shared header now keeps Chat visible at narrow widths and groups secondary
 controls under Item actions. Its controls stay mounted through closing,
-resizing, and placement changes. Task boards use the same header, with a
-canonical board identity for Chat and the current Board/List/Calendar route
-for placement. Related uses a viewport-bounded popover and binds navigation
+resizing, and placement changes. Related uses a viewport-bounded popover and binds navigation
 to the companion that opened it, including portal-rendered links.
 
 The compact-layout implementation and capture definitions are pushed in
@@ -185,52 +182,13 @@ pass for [Pages](../packages/bb-studio-pages/assets/compact-header.png),
 [Draw](../packages/bb-studio-draw/assets/compact-header.png),
 [Artifacts](../packages/bb-studio-artifacts/assets/compact-header.png),
 [Talk](../packages/bb-studio-talk/assets/compact-header.png),
-[Tables](../packages/bb-studio-tables/assets/compact-header.png),
-[Tasks](../packages/bb-studio-tasks/assets/compact-header.png), and
+[Tables](../packages/bb-studio-tables/assets/compact-header.png), and
 [Teams](../packages/bb-studio-teams/assets/compact-header.png).
 Each checks the primary Chat action, every visible header button's bounds
 and hit target, page overflow, and the Related popover at 390 by 844 pixels.
 Visual review caught Tables' sticky grid header covering Export and More;
 the corrected layering passes both the hit checks and final screenshot review.
-All seven captures are visually checked, with seeded fixtures removed.
-
-Explore now registers shared companion views for its explainers and lists.
-Finding rows and the thread launcher use that policy; the legacy thread panel
-remains available without Float. Open in Pages now targets Pages rather than
-the owner-only SDK panel route. Its 67 tests and typecheck pass. The repeatable
-stable BB 0.45.0 [companion capture](../packages/bb-studio-explore/assets/companion-preview.png)
-uses Explore from pushed 6d900de with the suite installed from 786fd2f. Seeded
-writing/ready job states verify both list routes, progress becoming the saved
-document, destination reuse, exact iframe and scroll retention after switching
-to Pages and back, and the persisted pin. No worker runs. The live check caught
-an undefined RPC field in the new list and also verifies the running list
-refreshes if it misses the completion event.
-
-Task handoff confirmations, bot handoffs, current and earlier handoffs, and
-linked threads now use the shared companion policy in pushed commit 6854481.
-Tasks' 49 tests and typecheck pass. The stable BB 0.45.0 capture, with Tasks
-installed from `258d801`, now checks the current handoff, earlier handoff and
-linked discussion from the real task page. It verifies one companion per
-destination, the unchanged main task, and exact reply draft/attachment DOM
-retention after returning and folding. The
-[desktop](../packages/bb-studio-tasks/assets/companion-handoffs.png) and
-[phone](../packages/bb-studio-tasks/assets/companion-handoffs-mobile.png)
-screenshots are visually checked; all phone composer controls fit at 390 by
-844 pixels. Deterministic handoff rows and scheduled threads seed the workflow;
-all fixtures are deleted without running agents.
-The separate live dispatch check installs Tasks `6bec6a4` on stable BB 0.45.0.
-It creates an agent handoff through the real project-folder picker and edited
-note, then opens its confirmation and returns to the exact native reply draft
-and attachment. A temporary bot receives another task; after its conversation
-and link are renamed, a second Send to bot request returns that same thread.
-Both actual RPC responses succeed, with one handoff and one retained tab.
-The created conversations contain their task context and the agent's edited
-note. This exposed two fixed bugs: a missing host ID during ordinary handoff,
-and bot reuse depending on a mutable human link label. All 60 Tasks tests,
-typecheck and build pass. The
-[dispatch screenshot](../packages/bb-studio-tasks/assets/companion-dispatch.png)
-is visually checked. Brief fixture agent turns run; cleanup deletes their
-tasks, board and threads and retires the temporary bot.
+All six captures are visually checked, with seeded fixtures removed.
 
 Studio Chat's new-conversation composers now have shared companion routes.
 Ordinary item drafts retain their native draft keys; independent quote drafts

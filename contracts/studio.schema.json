@@ -3609,86 +3609,6 @@
         "additionalProperties": false
       }
     },
-    "spaceThreads": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "threads": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string"
-                },
-                "projectId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedAt": {
-                  "type": "number"
-                },
-                "direct": {
-                  "type": "boolean"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "thread",
-                    "channel",
-                    "dm"
-                  ]
-                },
-                "botName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "status",
-                "projectId",
-                "updatedAt",
-                "direct",
-                "kind",
-                "botName"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "threads"
-        ],
-        "additionalProperties": false
-      }
-    },
     "spacesForThread": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3862,239 +3782,6 @@
         "additionalProperties": false
       }
     },
-    "spaceWidget": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "minLength": 1,
-            "maxLength": 100
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "space": {
-            "type": "object",
-            "properties": {
-              "id": {
-                "type": "string"
-              },
-              "name": {
-                "type": "string"
-              },
-              "icon": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              },
-              "defaultProjectId": {
-                "type": [
-                  "string",
-                  "null"
-                ]
-              }
-            },
-            "required": [
-              "id",
-              "name",
-              "icon",
-              "defaultProjectId"
-            ],
-            "additionalProperties": false
-          },
-          "recent": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "pluginId": {
-                  "type": "string"
-                },
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "icon": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "kindIcon": {
-                  "type": "string"
-                },
-                "kindLabel": {
-                  "type": "string"
-                },
-                "href": {
-                  "type": "string"
-                },
-                "updatedAt": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "pluginId",
-                "id",
-                "title",
-                "icon",
-                "kindIcon",
-                "kindLabel",
-                "href",
-                "updatedAt"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "itemCount": {
-            "type": "number"
-          },
-          "threads": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "status": {
-                  "type": "string"
-                },
-                "projectId": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedAt": {
-                  "type": "number"
-                },
-                "direct": {
-                  "type": "boolean"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "thread",
-                    "channel",
-                    "dm"
-                  ]
-                },
-                "botName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "id",
-                "title",
-                "status",
-                "projectId",
-                "updatedAt",
-                "direct",
-                "kind",
-                "botName"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "projects": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "id": {
-                  "type": "string"
-                },
-                "name": {
-                  "type": "string"
-                },
-                "items": {
-                  "type": "number"
-                },
-                "threads": {
-                  "type": "number"
-                },
-                "isDefault": {
-                  "type": "boolean"
-                }
-              },
-              "required": [
-                "id",
-                "name",
-                "items",
-                "threads",
-                "isDefault"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "kinds": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "pluginId": {
-                  "type": "string"
-                },
-                "id": {
-                  "type": "string"
-                },
-                "label": {
-                  "type": "string"
-                },
-                "icon": {
-                  "type": "string"
-                },
-                "event": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                }
-              },
-              "required": [
-                "pluginId",
-                "id",
-                "label",
-                "icon",
-                "event"
-              ],
-              "additionalProperties": false
-            }
-          },
-          "threadPrompt": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "space",
-          "recent",
-          "itemCount",
-          "threads",
-          "projects",
-          "kinds",
-          "threadPrompt"
-        ],
-        "additionalProperties": false
-      }
-    },
     "createInSpace": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -4170,23 +3857,6 @@
                 },
                 "updatedAt": {
                   "type": "number"
-                },
-                "direct": {
-                  "type": "boolean"
-                },
-                "kind": {
-                  "type": "string",
-                  "enum": [
-                    "thread",
-                    "channel",
-                    "dm"
-                  ]
-                },
-                "botName": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
                 }
               },
               "required": [
@@ -4194,10 +3864,7 @@
                 "title",
                 "status",
                 "projectId",
-                "updatedAt",
-                "direct",
-                "kind",
-                "botName"
+                "updatedAt"
               ],
               "additionalProperties": false
             }
@@ -5576,18 +5243,7 @@
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
         "type": "object",
-        "properties": {
-          "threadsFor": {
-            "default": [],
-            "maxItems": 200,
-            "type": "array",
-            "items": {
-              "type": "string",
-              "minLength": 1,
-              "maxLength": 100
-            }
-          }
-        }
+        "properties": {}
       },
       "output": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5671,44 +5327,6 @@
                 },
                 "itemCount": {
                   "type": "number"
-                },
-                "threads": {
-                  "type": "array",
-                  "items": {
-                    "type": "object",
-                    "properties": {
-                      "id": {
-                        "type": "string"
-                      },
-                      "title": {
-                        "type": "string"
-                      },
-                      "status": {
-                        "type": "string"
-                      },
-                      "kind": {
-                        "type": "string",
-                        "enum": [
-                          "thread",
-                          "channel",
-                          "dm"
-                        ]
-                      }
-                    },
-                    "required": [
-                      "id",
-                      "title",
-                      "status",
-                      "kind"
-                    ],
-                    "additionalProperties": false
-                  }
-                },
-                "threadCount": {
-                  "type": [
-                    "number",
-                    "null"
-                  ]
                 }
               },
               "required": [
@@ -5718,9 +5336,7 @@
                 "color",
                 "href",
                 "items",
-                "itemCount",
-                "threads",
-                "threadCount"
+                "itemCount"
               ],
               "additionalProperties": false
             }

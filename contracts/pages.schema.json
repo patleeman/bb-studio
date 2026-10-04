@@ -862,69 +862,6 @@
         "additionalProperties": false
       }
     },
-    "checklistHandoffs": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$"
-          }
-        },
-        "required": [
-          "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "handoffs": {
-            "type": "array",
-            "items": {
-              "type": "object",
-              "properties": {
-                "threadId": {
-                  "type": "string"
-                },
-                "blockId": {
-                  "type": "string"
-                },
-                "title": {
-                  "type": "string"
-                },
-                "state": {
-                  "type": "string"
-                },
-                "note": {
-                  "type": [
-                    "string",
-                    "null"
-                  ]
-                },
-                "updatedAt": {
-                  "type": "number"
-                }
-              },
-              "required": [
-                "threadId",
-                "blockId",
-                "title",
-                "state",
-                "note",
-                "updatedAt"
-              ],
-              "additionalProperties": false
-            }
-          }
-        },
-        "required": [
-          "handoffs"
-        ],
-        "additionalProperties": false
-      }
-    },
     "whiteboardGet": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -3350,48 +3287,6 @@
         },
         "required": [
           "id"
-        ]
-      },
-      "output": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "markdown": {
-            "type": "string"
-          }
-        },
-        "required": [
-          "markdown"
-        ],
-        "additionalProperties": false
-      }
-    },
-    "editBlock": {
-      "input": {
-        "$schema": "https://json-schema.org/draft/2020-12/schema",
-        "type": "object",
-        "properties": {
-          "id": {
-            "type": "string",
-            "pattern": "^pg_[a-f0-9]{12}(?:[a-f0-9]{4})?$"
-          },
-          "expected": {
-            "type": "string",
-            "maxLength": 200000
-          },
-          "block": {
-            "type": "string",
-            "minLength": 4
-          },
-          "markdown": {
-            "type": "string",
-            "maxLength": 200000
-          }
-        },
-        "required": [
-          "id",
-          "expected",
-          "markdown"
         ]
       },
       "output": {
