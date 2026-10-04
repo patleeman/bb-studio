@@ -162,8 +162,8 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
               {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
             </span>
             {renaming ? null : <span className="min-w-0 flex-1 truncate">{item.title}</span>}
-            {item.pinned && !renaming ? <Icon name="Pin" aria-label="Pinned" className="size-3 shrink-0 text-subtle-foreground group-hover/item:hidden" /> : null}
           </a>
+          {item.pinned && !renaming ? <Icon name="Pin" aria-label="Pinned" className="pointer-events-none absolute top-1/2 right-2 size-3.5 -translate-y-1/2 text-subtle-foreground group-hover/item:hidden group-focus-within/item:hidden" /> : null}
           {renaming ? (
             <input
               autoFocus
@@ -182,6 +182,15 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
           <span className="absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
             <button
               type="button"
+              aria-label={`Close ${item.title}`}
+              title="Close"
+              onClick={onClose}
+              className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
+            >
+              <Icon name="X" className="size-3.5" />
+            </button>
+            <button
+              type="button"
               aria-label={`${item.title} options`}
               title="Options"
               aria-haspopup="menu"
@@ -190,25 +199,16 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
             >
               <Icon name="MoreHorizontal" className="size-3.5" />
             </button>
-            <button
-              type="button"
-              aria-label={`Close ${item.title}`}
-              title="Close"
-              onClick={onClose}
-              className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
-            >
-              <Icon name="X" className="size-3.5" />
-            </button>
           </span>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52" aria-label={`${item.title} actions`}>
         {canFloat ? <><ContextMenuItem onSelect={() => openFloat({ kind: "path", path: item.href, title: item.title })}><Icon name="AppWindow" className="size-4" />Float</ContextMenuItem><ContextMenuSeparator /></> : null}
-        <ContextMenuItem onSelect={pin}><Icon name={item.pinned ? "PinOff" : "Pin"} className="size-4" />{item.pinned ? "Unpin" : "Pin"}</ContextMenuItem>
-        <ContextMenuItem onSelect={() => setTimeout(() => setRenaming(true), 0)}><Icon name="Edit" className="size-4" />Rename</ContextMenuItem>
-        <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => copyText(`[${item.title}](${item.href})`, "Link copied")}><Icon name="Copy" className="size-4" />Copy link</ContextMenuItem>
         <ContextMenuItem onSelect={() => copyText(item.id, "ID copied")}><Icon name="Copy" className="size-4" />Copy ID</ContextMenuItem>
+        <ContextMenuSeparator />
+        <ContextMenuItem onSelect={pin}><Icon name={item.pinned ? "PinOff" : "Pin"} className="size-4" />{item.pinned ? "Unpin" : "Pin"}</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setTimeout(() => setRenaming(true), 0)}><Icon name="Edit" className="size-4" />Rename</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={onClose}><Icon name="X" className="size-4" />Close</ContextMenuItem>
         <ContextMenuItem onSelect={archive}><Icon name="Archive" className="size-4" />Archive</ContextMenuItem>
