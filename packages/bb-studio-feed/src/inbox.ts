@@ -44,3 +44,11 @@ export function inboxBadge(waiting: number, unread: number): string | null {
   if (!total) return null;
   return total > 99 ? "99+" : String(total);
 }
+
+/** Failures are visible for every thread, even without a profile or schedule. */
+export function failedThreads(threads: readonly (InboxThreadSource & { status: string; queuedWork: string })[]): WaitingThread[] {
+  return threads.filter(t => !t.isArchived && !t.isHidden && !t.hasPendingInteraction && (t.status === "error" || t.queuedWork === "failed"))
+    .map(t => ({ id: t.id, title: t.displayTitle, href: t.href, at: t.latestAttentionAt || t.updatedAt,
+      why: t.queuedWork === "failed" ? "A queued message could not be sent" : "The last run failed" }))
+    .sort((a, b) => b.at - a.at);
+}

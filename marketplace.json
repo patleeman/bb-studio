@@ -109,7 +109,7 @@
     {
       "id": "feed",
       "displayName": "Studio Feed",
-      "description": "Part of BB Studio. One feed of what your agents report. Agents post with the feed_post tool from any thread, channel or automation, and the post shows as a card where they wrote it. Read it like a news reader on desktop and mobile: unread first, posts open in place, stories group their updates, and linked pages and artifacts are previewed.",
+      "description": "Part of BB Studio. Bot results reach your Inbox automatically. Profiles and recurring schedules opt threads in automatically. Smart filtering keeps quiet runs out. Read results, failures and optional reports on desktop and mobile.",
       "icon": {
         "url": "./packages/bb-studio-feed/icons/feed.svg"
       },

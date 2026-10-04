@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { inboxBadge, waitingThreads, type InboxThreadSource } from "./inbox";
+import { inboxBadge, waitingThreads, failedThreads, type InboxThreadSource } from "./inbox";
 
 const thread = (id: string, overrides: Partial<InboxThreadSource> = {}): InboxThreadSource => ({
   id,
@@ -35,5 +35,12 @@ describe("inboxBadge", () => {
     expect(inboxBadge(0, 0)).toBeNull();
     expect(inboxBadge(2, 3)).toBe("5");
     expect(inboxBadge(60, 60)).toBe("99+");
+  });
+});
+
+describe("failedThreads", () => {
+  it("includes ordinary failures and failed queues without duplicating pending interactions", () => {
+    const failed = (id: string, extra = {}) => ({ ...thread(id, { hasPendingInteraction: false }), status: "error", queuedWork: "none", ...extra });
+    expect(failedThreads([failed("run"), failed("queue", { status: "idle", queuedWork: "failed" }), failed("hidden", { isHidden: true }), failed("pending", { hasPendingInteraction: true }), failed("archived", { isArchived: true })]).map(t => t.id)).toEqual(["run", "queue"]);
   });
 });

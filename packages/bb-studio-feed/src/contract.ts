@@ -2,6 +2,7 @@
 // types without server code.
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { conversationRequestSchema } from "@bb-studio/kit/contract";
+import { automaticContract } from "./automatic-contract";
 import { z } from "zod";
 import { MAX_BODY, MAX_STORY, MAX_TITLE, MAX_TOPIC, PRIORITIES } from "./shared";
 
@@ -67,6 +68,7 @@ export const postSchema = z.object({
 export type PostView = z.infer<typeof postSchema>;
 
 export const rpcContract = defineRpcContract({
+  ...automaticContract,
   /** Outstanding urgent posts, independent of read state and the reader's filters. */
   attention: {
     input: z.object({ cursor: z.string().max(200).optional(), limit: z.number().int().min(1).max(100).optional() }),

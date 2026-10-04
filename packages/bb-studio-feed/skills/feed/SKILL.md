@@ -11,8 +11,10 @@ desktop and phone, below the threads waiting on them.
 
 ## Posting
 
-Post when your task, your automation's prompt, or the user asks you to, or
-when a scheduled or automated run has a result worth reading later. Never post
+Bot threads (a profile, a recurring schedule, or both) and followed threads
+send meaningful final results to the Inbox automatically. No posting tool is
+needed for those updates. Use feed_post for a deliberate report when your
+task or the user asks for one. Never post
 chat, status, or "nothing new". When there is nothing new, finish without a final assistant message.
 
 Call `feed_post`:

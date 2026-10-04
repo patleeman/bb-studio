@@ -3,6 +3,9 @@ import Foundation
 
 public enum Feed {
   public enum Method {
+    public static let inbox_updates = "inbox.updates"
+    public static let inbox_follow = "inbox.follow"
+    public static let inbox_read = "inbox.read"
     public static let attention = "attention"
     public static let list = "list"
     public static let read = "read"
@@ -18,6 +21,12 @@ public enum Feed {
     public static let seen = "seen"
     public static let unread = "unread"
   }
+
+  public typealias InboxUpdates = InboxUpdatesOutput
+
+  public typealias InboxFollow = InboxFollowOutput
+
+  public typealias InboxRead = InboxReadOutput
 
   public typealias Attention = AttentionOutput
 
@@ -46,6 +55,98 @@ public enum Feed {
   public typealias Seen = SeenOutput
 
   public typealias Unread = UnreadOutput
+
+  public struct InboxUpdatesInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct InboxUpdatesOutputUpdatesItem: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var title: String?
+    public var headline: String?
+    public var body: String?
+    public var at: Double?
+    public var urgent: Bool?
+    public var read: Bool?
+    public var author: String?
+
+    public init(threadId: String? = nil, title: String? = nil, headline: String? = nil, body: String? = nil, at: Double? = nil, urgent: Bool? = nil, read: Bool? = nil, author: String? = nil) {
+      self.threadId = threadId
+      self.title = title
+      self.headline = headline
+      self.body = body
+      self.at = at
+      self.urgent = urgent
+      self.read = read
+      self.author = author
+    }
+  }
+
+  public struct InboxUpdatesOutputFailuresItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var name: String?
+    public var error: String?
+
+    public init(id: String? = nil, name: String? = nil, error: String? = nil) {
+      self.id = id
+      self.name = name
+      self.error = error
+    }
+  }
+
+  public struct InboxUpdatesOutput: Sendable, Hashable, Codable {
+    public var updates: [InboxUpdatesOutputUpdatesItem]?
+    public var degraded: Bool?
+    public var failures: [InboxUpdatesOutputFailuresItem]?
+
+    public init(updates: [InboxUpdatesOutputUpdatesItem]? = nil, degraded: Bool? = nil, failures: [InboxUpdatesOutputFailuresItem]? = nil) {
+      self.updates = updates
+      self.degraded = degraded
+      self.failures = failures
+    }
+  }
+
+  public struct InboxFollowInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var followed: Bool?
+
+    public init(threadId: String? = nil, followed: Bool? = nil) {
+      self.threadId = threadId
+      self.followed = followed
+    }
+  }
+
+  public struct InboxFollowOutput: Sendable, Hashable, Codable {
+    public var followed: Bool?
+    public var automatic: Bool?
+    public var override: Bool?
+
+    public init(followed: Bool? = nil, automatic: Bool? = nil, override: Bool? = nil) {
+      self.followed = followed
+      self.automatic = automatic
+      self.override = override
+    }
+  }
+
+  public struct InboxReadInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var at: Double?
+
+    public init(threadId: String? = nil, at: Double? = nil) {
+      self.threadId = threadId
+      self.at = at
+    }
+  }
+
+  public struct InboxReadOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
 
   public struct AttentionInput: Sendable, Hashable, Codable {
     public var cursor: String?

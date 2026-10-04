@@ -4,13 +4,46 @@
 > own. With [Studio Teams](../bb-studio-teams) it knows which bot and channel
 > posted. With [Studio Mobile](../bb-studio-mobile) it notifies your phone.
 
-One Inbox for what needs you and what your agents report. At the top,
-**Needs you** lists threads waiting on you. Below it, **Updates** is the feed:
-morning briefings, alerts, research digests, automation results. Any agent
-can post to it from any thread, Teams channel or automation. You read it as
-one list on desktop and phone. The sidebar row is **Inbox**; the plugin is
-still Studio Feed, with the id `feed`, the `bb feed` CLI and the `feed_*`
-tools, so existing posts and links keep working.
+The Inbox collects meaningful final results automatically from bot threads:
+a thread with a profile, a recurring agent automation, or both. A one-time
+schedule does not opt a thread in. Ordinary threads stay out by default.
+Thread headers have no Inbox control.
+
+The Inbox shows pending questions and approvals, failed threads and queued
+messages, failed automations, automatic **New results**, and optional **Reports**.
+Empty attention sections stay hidden. One result per thread updates in place;
+reading the source thread marks that result read. Having a thread pane open
+does not suppress delivery.
+
+Studio Decisions filters final replies, using the previous result to suppress
+repeats. It tries Jev first, then the configured fallback model. Empty replies and short “nothing new” messages never call the model.
+Explicit report cards do not create a duplicate automatic update. If Decisions
+cannot answer, the result remains visible with a filtering notice. Headlines
+use the first nonempty line of the original reply, limited to 140 characters.
+
+Pending triage survives reloads. Collection starts when this feature is first
+enabled, without importing old conversations. Later starts recover completions
+missed while Feed was unloaded. Failed work appears independently of triage.
+Automation failures refresh once a minute because stable BB has no automation
+lifecycle event.
+
+**Urgent bot notifications** is a separate setting, off by default. When enabled,
+only confident, urgent, unread automatic results notify Studio Mobile. Existing
+**Phone notifications** continues to control deliberate reports.
+
+The plugin remains `feed`, with the `bb feed` CLI and `feed_*` tools. Existing
+reports, story keys and links keep working.
+
+## Automatic Inbox preview
+
+![Automatic results above deliberate reports](assets/automatic-inbox-desktop.jpg)
+
+The staged check on stable BB 0.45.0 exercises the Inbox worker with a local
+fixture, automatic eligibility, host read marks, and the additive database upgrade.
+The same result fits a [390-pixel mobile viewport](assets/automatic-inbox-mobile.jpg).
+Lifecycle tests cover automatic profile and recurring-schedule eligibility,
+quiet replies, coalescing, reload persistence, unfollow during triage, and phone
+notification opt-in. No agent was started for the browser fixture.
 
 ## Staged preview
 
@@ -95,11 +128,10 @@ card where it was written, in the thread or the channel. The card shows the
 title, an **Urgent** badge, the topic, which update of a story it is, and
 whether you've read it, with **Open in Inbox** and **Mark read**.
 
-Agents post when their task, their automation's prompt, or you ask them to.
-They also post the result of a scheduled or automated run on their own when
-it's worth reading later: a digest, report, alert or finding. A run with
-nothing to say, or one that finishes without output, doesn't post. To steer an
-automation's posts, end its prompt with the title, topic and story to use.
+Agents use `feed_post` for a deliberate report when their task or you ask for
+one. Ordinary bot results reach the Inbox without a tool call. A run with
+nothing to say stays quiet. To request a richer report, specify the title,
+topic and story in the task.
 Agents are told to lead with a picture when they have one and to link the
 source first, which the feed shows as a card.
 

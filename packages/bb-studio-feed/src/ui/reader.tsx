@@ -13,7 +13,8 @@ import { Markdown, experimental_useSidebarThreads as useSidebarThreads, useBbNav
 import { useCallback, useEffect, useRef, useState, useLayoutEffect, useMemo, type ReactNode } from "react";
 import type { rpcContract } from "../contract";
 import { FEED_ICON, INBOX_TITLE, PANEL_PATH, REALTIME_CHANNEL, postHref } from "../shared";
-import { inboxBadge, waitingThreads } from "../inbox";
+import { AutomaticUpdates, useAutomaticUpdates } from "./automatic";
+import { inboxBadge, waitingThreads, failedThreads } from "../inbox";
 import { feedEvent, from, useDiscuss, useMinuteTick, type PostView } from "./feed";
 import { PostDiscussion } from "./discussion";
 import { loadFeedWindow } from "../window";
@@ -275,8 +276,10 @@ function FeedReader() {
         <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: INBOX_TITLE }} />
       </header>
       <NeedsYou />
+      <FailedThreads />
+      <AutomaticUpdates />
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h2 className="mr-auto text-lg font-semibold">Updates</h2>
+        <h2 className="mr-auto text-lg font-semibold">Reports</h2>
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
         <button type="button" className={OUTLINE_BUTTON} disabled={posts === null} onClick={markAllRead}>
           <Icon name="feed/mark-read" /> Mark all updates read
@@ -320,8 +323,8 @@ function FeedReader() {
       ) : (
         <div className={cn("grid items-start gap-x-10 gap-y-6", rail && "@5xl/page:grid-cols-[minmax(0,1fr)_17rem]")}>
           <main className="min-w-0">
-            {posts.length === 0 ? <EmptyState icon={FEED_ICON} title={JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "No posts match these filters" : "Nothing posted yet"}>
-              {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "Change or clear the filters to see more posts. Urgent still shows outstanding alerts." : "Ask an agent to post a report to the Inbox."}
+            {posts.length === 0 ? <EmptyState icon={FEED_ICON} title={JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "No posts match these filters" : "No reports yet"}>
+              {JSON.stringify(filters) !== JSON.stringify(emptyFilters()) ? "Change or clear the filters to see more posts. Urgent still shows outstanding alerts." : "Bot results arrive automatically. Reports you request appear here."}
             </EmptyState> : null}
             {days.map((group) => {
               const marker = dayMarker(group.at);
@@ -816,6 +819,7 @@ function useWaitingThreads() {
 function NeedsYou() {
   const { waiting, status } = useWaitingThreads();
   useMinuteTick();
+  if (!waiting.length && status !== "error") return null;
   return (
     <section aria-labelledby="inbox-needs-you" className="mb-8">
       <h2 id="inbox-needs-you" className="mb-2 flex items-center gap-2 text-lg font-semibold">
@@ -850,6 +854,10 @@ function NeedsYou() {
 export function UnreadCount() {
   const rpc = useRpc<typeof rpcContract>();
   const { waiting } = useWaitingThreads();
+  const { threads } = useSidebarThreads();
+  const failed = failedThreads(threads);
+  const { updates, failures } = useAutomaticUpdates();
+  const results = updates.filter(row => !row.read && !waiting.some(t => t.id === row.threadId) && !failed.some(t => t.id === row.threadId)).length;
   const [count, setCount] = useState(0);
   const load = useCallback(() => {
     rpc.call("unread", {}).then((result) => setCount(result.count), () => undefined);
@@ -858,12 +866,33 @@ export function UnreadCount() {
   useRealtime(REALTIME_CHANNEL, (payload) => {
     if (feedEvent(payload)) load();
   });
-  const badge = inboxBadge(waiting.length, count);
+  const badge = inboxBadge(waiting.length + failed.length + failures.length, count + results);
   if (!badge) return null;
-  const label = `${waiting.length} waiting on you, ${count} unread`;
+  const label = `${waiting.length} waiting on you, ${failed.length + failures.length} failed, ${count + results} unread`;
   return (
     <span title={label} aria-label={label} className={cn("text-xs tabular-nums", waiting.length ? "font-medium text-destructive" : "text-muted-foreground")}>
       {badge}
     </span>
   );
+}
+
+function FailedThreads() {
+  const { threads } = useSidebarThreads();
+  const failed = failedThreads(threads);
+  const { failures } = useAutomaticUpdates();
+  if (!failed.length && !failures.length) return null;
+  return <section aria-labelledby="inbox-failed" className="mb-8">
+    <h2 id="inbox-failed" className="mb-2 text-lg font-semibold">Failed</h2>
+    <ol className="divide-y divide-border/60">{failed.map(thread => <li key={thread.id}>
+      <a href={thread.href} className="block rounded py-2 text-sm focus-visible:outline focus-visible:outline-2">
+        <span className="font-medium">{thread.title}</span>
+        <span className="ml-2 text-muted-foreground">{thread.why}</span>
+      </a>
+    </li>)}</ol>
+    {failures.length ? <ol className="divide-y divide-border/60">{failures.map(item => <li key={item.id}>
+      <a href="/plugins/automations/automations" className="block rounded py-2 text-sm focus-visible:outline focus-visible:outline-2">
+        <span className="font-medium">{item.name}</span><span className="ml-2 text-muted-foreground">{item.error}</span>
+      </a>
+    </li>)}</ol> : null}
+  </section>;
 }

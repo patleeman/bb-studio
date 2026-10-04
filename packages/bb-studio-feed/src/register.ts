@@ -7,6 +7,7 @@
 //     when it's installed), realtime, and phone notifications (Studio Mobile).
 //   - It adds the RPC handlers, the feed_* tools, the instructions for
 //     `bb.agents.configure`, and `bb feed …`.
+import { registerAutomatic } from "./automatic";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import { STUDIO_PLUGIN_ID, studioSchemas } from "@bb-studio/kit/contract";
 import { relativeTime } from "@bb-studio/kit/format";
@@ -51,7 +52,7 @@ const MAX_EMBED_TEXT = 6_000;
 /** How long an item's preview is trusted before asking its add-on again. */
 const EMBED_CACHE_MS = 60_000;
 
-export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => NotifyMode }) {
+export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => NotifyMode; automaticNotify?: () => boolean }) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const store = new FeedStore(db);
@@ -226,7 +227,9 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
 
   // RPC ------------------------------------------------------------------------
 
+  const automatic = registerAutomatic(bb, db, { notify: options.automaticNotify ?? (() => false) });
   const rpc = {
+    ...automatic,
     attention: async ({ cursor, limit }: { cursor?: string; limit?: number }) => {
       const page = store.list({ attention: true, cursor, limit: limit ?? 40 });
       return { posts: await views(page.rows), nextCursor: page.nextCursor };
@@ -268,7 +271,12 @@ export function registerFeed(bb: BbPluginApi, options: { notifyMode: () => Notif
       })),
     read: async ({ postId, read }: { postId: string; read: boolean }) => ({ post: await one(service.markRead(postId, read)) }),
     remove: ({ postId }: { postId: string }) => ({ removed: service.remove(postId) }),
-    seen: ({ at }: { at?: number }) => ({ lastSeenAt: service.seen(at) }),
+    seen: ({ at }: { at?: number }) => {
+      const lastSeenAt = service.seen(at);
+      db.prepare("UPDATE inbox_updates SET read_at = ? WHERE at <= ? AND read_at IS NULL").run(lastSeenAt, lastSeenAt);
+      bb.realtime.publish(REALTIME_CHANNEL, { type: "automatic" });
+      return { lastSeenAt };
+    },
     unread: () => {
       const lastSeenAt = store.lastSeenAt();
       return { count: store.unreadCount(), lastSeenAt };

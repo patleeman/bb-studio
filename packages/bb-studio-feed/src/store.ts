@@ -1,5 +1,6 @@
 // The feed's posts. A story is the posts that share a story key; the feed
 // lists each story once, by its newest post.
+import { AUTOMATIC_MIGRATION, AUTOMATIC_FILTER_MIGRATION } from "./automatic-store";
 import { createHash } from "node:crypto";
 import { newId } from "@bb-studio/kit/ids";
 import type Database from "better-sqlite3";
@@ -71,6 +72,8 @@ export const MIGRATIONS = [
   `DELETE FROM feed_link_images;
    ALTER TABLE feed_link_images ADD COLUMN title TEXT NOT NULL DEFAULT '';
    ALTER TABLE feed_link_images ADD COLUMN description TEXT NOT NULL DEFAULT '';`,
+  AUTOMATIC_MIGRATION,
+  AUTOMATIC_FILTER_MIGRATION,
 ];
 
 /** A linked page's preview; empty strings when it has none. */
