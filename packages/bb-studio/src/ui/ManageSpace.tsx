@@ -1,25 +1,23 @@
-// A space's dialogs, opened from anywhere by a window event: its page's
-// widgets in Pages ask for them, since a plugin can't show another's dialogs.
-// After a change, a second event tells the page to refetch.
-import { openAppPath, useProjects, type CollectionItem, type CollectionKind } from "@bb-studio/kit/app";
+// A space's dialogs, opened from anywhere by a window event: the Space's
+// options menu, and Pages for a space's brief page, since a plugin can't show
+// another's dialogs. After a change, a second event says so.
+import { openAppPath, useProjects } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
-import { useBbContext, useRpc } from "@get-bb/plugin-sdk/app";
+import { useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useState } from "react";
 import { toast } from "sonner";
 import type { rpcContract, SpaceView } from "../contract";
 import { SPACE_CHANGED_EVENT, SPACE_DIALOG_EVENT } from "../ids";
-import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceProjectsDialog } from "./Spaces";
+import { AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceProjectsDialog } from "./Spaces";
 
-const DIALOGS = ["edit", "delete", "items", "threads", "channels", "projects"] as const;
+const DIALOGS = ["edit", "delete", "threads", "projects"] as const;
 type Dialog = (typeof DIALOGS)[number];
 
 export function ManageSpace() {
   const rpc = useRpc<typeof rpcContract>();
-  const context = useBbContext();
   const projects = useProjects();
   const [open, setOpen] = useState<{ spaceId: string; dialog: Dialog } | null>(null);
   const [space, setSpace] = useState<SpaceView | null>(null);
-  const [catalog, setCatalog] = useState<{ items: CollectionItem[]; kinds: CollectionKind[] } | null>(null);
 
   const load = useCallback(
     (spaceId: string) => rpc.call("spaces", null).then(({ spaces }) => setSpace(spaces.find((each) => each.id === spaceId) ?? null), () => setSpace(null)),
@@ -37,18 +35,6 @@ export function ManageSpace() {
     window.addEventListener(SPACE_DIALOG_EVENT, show);
     return () => window.removeEventListener(SPACE_DIALOG_EVENT, show);
   }, [load]);
-  // Adding items picks from every item, so only that dialog lists them.
-  useEffect(() => {
-    if (open?.dialog !== "items") return;
-    rpc.call("overview", null).then(
-      ({ items, providers }) =>
-        setCatalog({
-          items: items.filter((item) => !item.archived),
-          kinds: providers.filter((provider) => provider.state === "ready").flatMap((provider) => provider.kinds.map((kind) => ({ ...kind, pluginId: provider.pluginId }))),
-        }),
-      () => setCatalog({ items: [], kinds: [] }),
-    );
-  }, [rpc, open?.dialog]);
 
   if (!open || !space) return null;
   const close = () => setOpen(null);
@@ -63,7 +49,6 @@ export function ManageSpace() {
           rpc={rpc}
           space={space}
           projects={projects}
-          defaultProjectId={context.projectId ?? null}
           onClose={close}
           onSaved={() => {
             close();
@@ -89,11 +74,8 @@ export function ManageSpace() {
           }}
         />
       );
-    case "items":
-      return catalog ? <AddItemsDialog rpc={rpc} space={space} items={catalog.items} kinds={catalog.kinds} projects={projects} onClose={close} onChanged={changed} /> : null;
     case "threads":
-    case "channels":
-      return <AddThreadsDialog rpc={rpc} space={space} kind={open.dialog === "threads" ? "threads" : "conversations"} projects={projects} onClose={close} onChanged={changed} />;
+      return <AddThreadsDialog rpc={rpc} space={space} projects={projects} onClose={close} onChanged={changed} />;
     case "projects":
       return <SpaceProjectsDialog rpc={rpc} space={space} projects={projects} onClose={close} onChanged={changed} />;
   }

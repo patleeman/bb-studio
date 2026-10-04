@@ -37,11 +37,10 @@ import { applyItemChanges } from "../partial";
 import { compileQuery, facetCounts, formatQuery, parseQuery, resolveValue, type Query, type QueryVocabulary } from "../query";
 import { SearchFreshness, useSearchFreshness } from "./SearchFreshness";
 import { FacetRail, FiltersDialog, QueryBar } from "./QueryBar";
-import { AddItemsDialog, AddThreadsDialog, DeleteSpaceDialog, SpaceDialog, SpaceGlyph, type ThreadKind } from "./Spaces";
+import { SpaceGlyph } from "./Spaces";
 import { spaceViewHref } from "./space/routes";
 
 type Overview = { providers: ProviderView[]; items: (CollectionItem & { spaces?: string[] })[]; tags: TagView[]; spaces: SpaceView[]; views: SavedViewView[] };
-type SpaceDialogState = { type: "edit" | "items" | "delete"; space: SpaceView } | { type: "threads"; space: SpaceView; kind: ThreadKind } | null;
 const REFETCH_DEBOUNCE_MS = 300;
 const SEARCH_DEBOUNCE_MS = 200;
 const EMPTY_QUERY: Query = { filters: [], text: "" };
@@ -107,6 +106,7 @@ function downloadFile(file: { name: string; mime: string; data: string }): void 
 function defaultExportFormat(kind: string): string {
   if (kind === "drawing") return "png";
   if (kind === "artifact") return "original";
+  if (kind === "table") return "csv";
   return "markdown";
 }
 
@@ -229,7 +229,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
   const requested = decodeSegment(subPath.split("/").filter(Boolean)[0] ?? "") || "all";
   const setKind = useCallback((next: string) => navigate.toPluginPanel("studio", { subPath: next === "all" ? "" : encodeURIComponent(next) }), [navigate]);
   const openSpace = useCallback((id: string | null) => id ? openAppPath(spaceViewHref(id)) : navigate.toPluginPanel("studio", { subPath: "" }), [navigate]);
-  const [spaceDialog, setSpaceDialog] = useState<SpaceDialogState>(null);
 
   const [query, setQuery] = useStoredQuery(QUERY_KEY);
   // A link to a kind starts the query on it.
@@ -314,6 +313,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       exportFormats: (item) => item.kind === "page" ? [{ format: "markdown", label: "Markdown and assets" }, { format: "html", label: "HTML and assets" }, { format: "pdf", label: "PDF" }]
         : item.kind === "drawing" ? [{ format: "png", label: "PNG" }, { format: "svg", label: "SVG" }, { format: "excalidraw", label: "Excalidraw JSON" }]
           : item.kind === "task" ? [{ format: "markdown", label: "Markdown" }, { format: "csv", label: "CSV" }]
+          : item.kind === "table" ? [{ format: "csv", label: "CSV" }, { format: "markdown", label: "Markdown" }]
             : item.kind === "recording" || item.kind === "dictation" ? [{ format: "markdown", label: "Transcript Markdown" }, { format: "audio", label: "Audio segments" }, { format: "bundle", label: "Transcript and audio" }]
               : [{ format: "original", label: "Original file" }],
       onExport: async (item, format) => {
@@ -370,30 +370,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           refetch();
         }
       },
-      onSpace: async (items, spaceId, add) => {
-        // Show the change now; the refetch confirms it. Items in the space
-        // through their project stay in it.
-        const keys = new Set(items.map((item) => `${item.pluginId}:${item.id}`));
-        setData((previous) => {
-          if (!previous) return previous;
-          const through = previous.spaces.find((each) => each.id === spaceId)?.projectIds ?? [];
-          return {
-            ...previous,
-            items: previous.items.map((item) =>
-              !keys.has(`${item.pluginId}:${item.id}`) ? item
-                : add ? { ...item, spaces: [...new Set([...(item.spaces ?? []), spaceId])] }
-                  : item.projectId && through.includes(item.projectId) ? item
-                    : { ...item, spaces: (item.spaces ?? []).filter((id) => id !== spaceId) },
-            ),
-          };
-        });
-        const members = items.map((item) => ({ pluginId: item.pluginId, id: item.id }));
-        try {
-          await rpc.call("spaceMembers", { id: spaceId, add: add ? members : [], remove: add ? [] : members });
-        } finally {
-          refetch();
-        }
-      },
       onCreateTag: async (name): Promise<CollectionTag> => {
         const { tag } = await rpc.call("createTag", { name });
         setData((previous) => previous && { ...previous, tags: previous.tags.some((each) => each.id === tag.id) ? previous.tags : [...previous.tags, tag] });
@@ -422,7 +398,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     } })),
   ];
 
-  // Filtering to a space links to its page, where its threads, channels and projects are.
+  // Filtering to a space links to it, where its threads and projects are.
   const filteredSpaces = (data?.spaces ?? []).filter((each) =>
     query.filters.some((filter) => filter.field === "space" && !filter.negate && filter.value.toLowerCase() === each.name.toLowerCase()),
   );
@@ -433,7 +409,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
     </button>
   ));
   const collectionSpaces = useMemo(
-    () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, projectIds: each.projectIds, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
+    () => (data?.spaces ?? []).map((each) => ({ id: each.id, name: each.name, glyph: <SpaceGlyph space={each} className="w-3.5 text-center text-xs leading-none" /> })),
     [data?.spaces],
   );
   const notice = (
@@ -549,19 +525,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
           ? "Nothing matches."
           : "No items yet.";
 
-  const liveSpace = (each: SpaceView) => data?.spaces.find((candidate) => candidate.id === each.id) ?? each;
-  const deleteSpace = async (target: SpaceView) => {
-    setSpaceDialog(null);
-    try {
-      await rpc.call("deleteSpace", { id: target.id });
-      toast.success(`Deleted the space ${target.name}`);
-      openSpace(null);
-      refetch();
-    } catch (cause) {
-      toast.error(`Couldn't delete the space: ${errorMessage(cause)}`);
-    }
-  };
-
   return (
     <>
       <CollectionPage
@@ -593,30 +556,6 @@ export function StudioPanel({ subPath }: { subPath: string }) {
       <FiltersDialog open={filtersOpen} onClose={() => setFiltersOpen(false)}>
         {rail}
       </FiltersDialog>
-      {spaceDialog?.type === "edit" ? (
-        <SpaceDialog
-          rpc={rpc}
-          space={spaceDialog.space}
-          projects={projects}
-          defaultProjectId={context.projectId ?? null}
-          onClose={() => setSpaceDialog(null)}
-          onSaved={(saved) => {
-            setSpaceDialog(null);
-            refetch();
-            openSpace(saved.id);
-          }}
-          onDelete={() => setSpaceDialog({ type: "delete", space: spaceDialog.space })}
-        />
-      ) : null}
-      {spaceDialog?.type === "items" ? (
-        <AddItemsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} items={data?.items ?? []} kinds={kinds} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
-      ) : null}
-      {spaceDialog?.type === "threads" ? (
-        <AddThreadsDialog rpc={rpc} space={liveSpace(spaceDialog.space)} kind={spaceDialog.kind} projects={projects} onClose={() => setSpaceDialog(null)} onChanged={refetch} />
-      ) : null}
-      {spaceDialog?.type === "delete" ? (
-        <DeleteSpaceDialog space={spaceDialog.space} onClose={() => setSpaceDialog(null)} onConfirm={() => void deleteSpace(spaceDialog.space)} />
-      ) : null}
     </>
   );
 }
@@ -629,8 +568,8 @@ function spaceEmpty(spaces: readonly SpaceView[]): string {
   const elsewhere = [threads ? "threads" : null, projects ? "projects" : null].filter(Boolean).join(" and ");
   const which = spaces.length === 1 ? "this space" : "these spaces";
   return elsewhere
-    ? `No items in ${which} yet. Its ${elsewhere} are on its page.`
-    : `No items in ${which} yet. Open its page to add items, projects, threads and channels.`;
+    ? `No items in ${which} yet. Its ${elsewhere} are in the space.`
+    : `No items in ${which} yet. Open it to add projects and threads.`;
 }
 
 /** A path segment, or "" for a malformed one like `100%`. */

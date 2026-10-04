@@ -1,8 +1,7 @@
 // The Studio section of the sidebar: a tab for each Studio item the user has
 // opened, from any add-on. Opening an item's view adds its tab; × closes it,
 // and closing the one on screen opens the next. A tab's ⋯ or right-click
-// floats it or opens it in a split. A space's tab expands to what the space
-// holds (SidebarSpaces).
+// floats it or opens it in a split.
 import {
   DropdownMenuItem,
   Icon,
@@ -18,7 +17,7 @@ import {
   useSidebarNavigated,
   usePathname,
 } from "@bb-studio/kit/app";
-import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
+import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
 import { useCallback, useEffect, useRef, useState } from "react";
@@ -27,7 +26,6 @@ import { TABS_CHANNEL } from "../ids";
 import { itemAtPath } from "../tabs";
 import { SidebarItemRow } from "./SidebarItemRow";
 import { SidebarCreateMenu } from "./SidebarCreateMenu";
-import { SpaceMembers, useSpaceTree, type SpaceTree } from "./SidebarSpaces";
 
 const REFETCH_DEBOUNCE_MS = 300;
 const APP_NAMES: Record<string, string> = {
@@ -77,8 +75,6 @@ export function SidebarTabs() {
     { organization: "none", sort: "opened", direction: "ascending" },
     { organization: ["none", "app"], sort: ["opened", "alpha"] },
   );
-  // Spaces open as Studio's own items.
-  const spaceTree = useSpaceTree(hosted ? (tabs ?? []).filter((tab) => tab.pluginId === STUDIO_PLUGIN_ID).map((tab) => tab.id) : []);
 
   // Visiting an item's view opens its tab.
   const visited = useRef<string | null>(null);
@@ -171,9 +167,6 @@ export function SidebarTabs() {
                 key={`${tab.pluginId}:${tab.id}`}
                 tab={tab}
                 selected={tab === active}
-                spaces={tab.pluginId === STUDIO_PLUGIN_ID ? spaceTree : null}
-                path={path}
-                onNavigate={navigated}
                 onOpen={() => open(tab)}
                 onClose={() => close([tab])}
               />
@@ -185,33 +178,18 @@ export function SidebarTabs() {
   );
 }
 
-function TabRow({ tab, selected, spaces, path, onNavigate, onOpen, onClose }: {
-  tab: TabView;
-  selected: boolean;
-  /** For a space's tab, what it holds. */
-  spaces: SpaceTree | null;
-  path: string;
-  onNavigate(): void;
-  onOpen(): void;
-  onClose(): void;
-}) {
-  const expanded = spaces?.expanded(tab.id) ?? false;
+function TabRow({ tab, selected, onOpen, onClose }: { tab: TabView; selected: boolean; onOpen(): void; onClose(): void }) {
   return (
-    <>
-      <SidebarItemRow
-        id={tab.id}
-        href={tab.href}
-        title={tab.title}
-        kindIcon={tab.kindIcon}
-        glyph={tab.icon}
-        selected={selected}
-        onOpen={onOpen}
-        onClose={onClose}
-        expanded={expanded}
-        onToggle={spaces ? () => spaces.toggle(tab.id) : undefined}
-        rowProps={{ "data-studio-tab": `${tab.pluginId}:${tab.id}` }}
-      />
-      {spaces && expanded ? <SpaceMembers tree={spaces} spaceId={tab.id} path={path} onNavigate={onNavigate} /> : null}
-    </>
+    <SidebarItemRow
+      id={tab.id}
+      href={tab.href}
+      title={tab.title}
+      kindIcon={tab.kindIcon}
+      glyph={tab.icon}
+      selected={selected}
+      onOpen={onOpen}
+      onClose={onClose}
+      rowProps={{ "data-studio-tab": `${tab.pluginId}:${tab.id}` }}
+    />
   );
 }

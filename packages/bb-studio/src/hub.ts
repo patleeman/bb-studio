@@ -2,7 +2,7 @@ import { errorMessage as errorText } from "@bb-studio/kit/format";
 export { errorText };
 // Finds the Studio add-ons and fans Studio's requests out to them. Add-ons
 // publish `studio_describe` for discovery.
-import { STUDIO_PLUGIN_ID, type StudioItem, type StudioKind, type StudioProviderInfo } from "@bb-studio/kit/contract";
+import { STUDIO_PLUGIN_ID, type StudioItem, type StudioProviderInfo } from "@bb-studio/kit/contract";
 import { discoverProviderSnapshot, fanOutProviders, loadProviderItems, type ProviderItems } from "@bb-studio/kit/server";
 import type { z } from "zod";
 import type { ProviderView } from "./contract";
@@ -34,25 +34,11 @@ export interface HubSdk {
 type ProviderMethods = typeof schemas.provider;
 export type HubItem = StudioItem & { pluginId: string };
 
-/** Kinds Studio provides itself, listed alongside the add-ons'. */
-export interface LocalProvider {
-  kinds: StudioKind[];
-  items(): HubItem[];
-}
-
-
 export class StudioHub {
   private readonly described = new Map<string, { revision: string; expiresAt: number; info: StudioProviderInfo }>();
   private inventory: Map<string, string> | null = null;
 
-  constructor(
-    private readonly sdk: HubSdk,
-    private readonly local: LocalProvider | null = null,
-  ) {}
-
-  private localView(): ProviderView[] {
-    return this.local ? [{ pluginId: STUDIO_PLUGIN_ID, name: "Studio", state: "ready", detail: null, panel: null, kinds: this.local.kinds }] : [];
-  }
+  constructor(private readonly sdk: HubSdk) {}
 
   private inventoryMap(plugins: readonly PluginEntry[]): Map<string, string> {
     return new Map(plugins.filter(plugin => plugin.enabled && plugin.id !== STUDIO_PLUGIN_ID)
@@ -93,8 +79,7 @@ export class StudioHub {
     const installed = new Set(snapshot.installed.map((entry) => entry.id));
     for (const id of this.described.keys()) if (!installed.has(id)) this.described.delete(id);
     const candidates = snapshot.providers.filter((entry) => !only || only.has(entry.id));
-    const local = !only || only.has(STUDIO_PLUGIN_ID) ? this.localView() : [];
-    return { providers: [...await Promise.all(candidates.map((entry) => this.describe(entry))), ...local], discoveryComplete: snapshot.complete, installed };
+    return { providers: await Promise.all(candidates.map((entry) => this.describe(entry))), discoveryComplete: snapshot.complete, installed };
   }
 
   private async describe(entry: PluginEntry): Promise<ProviderView> {
@@ -127,7 +112,6 @@ export class StudioHub {
       providers,
       async (provider) => {
         if (provider.state !== "ready") return { provider, items: [] as HubItem[], truncated: false };
-        if (provider.pluginId === STUDIO_PLUGIN_ID) return { provider, items: this.local?.items() ?? [], truncated: false };
         const result = await loadProviderItems(() => this.call(provider.pluginId, "studio_list", null));
         if (result.status !== "ready") return { provider: { ...provider, state: "offline" as const, detail: result.status === "unavailable" ? result.error : null }, items: [] as HubItem[], truncated: false };
         return { provider, items: result.items.map((item) => ({ ...item, pluginId: provider.pluginId })), truncated: !result.complete };
@@ -144,7 +128,7 @@ export class StudioHub {
 
   async itemsResult(pluginId: string, ids?: string[]): Promise<ProviderItems<HubItem>> {
     if (ids?.length === 0) return { status: "ready", items: [], complete: true };
-    if (pluginId === STUDIO_PLUGIN_ID) return { status: "ready", items: this.local?.items().filter((item) => !ids || ids.includes(item.id)) ?? [], complete: true };
+    if (pluginId === STUDIO_PLUGIN_ID) return { status: "absent" };
     const snapshot = await this.providerSnapshot(new Set([pluginId])).catch(() => null);
     if (!snapshot) return { status: "unavailable", error: "Provider inventory is unavailable." };
     const info = snapshot.providers.find((provider) => provider.pluginId === pluginId);

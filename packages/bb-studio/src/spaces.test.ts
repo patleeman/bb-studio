@@ -2,11 +2,9 @@ import { createFakePluginHost } from "@get-bb/plugin-sdk/testing";
 import Database from "better-sqlite3";
 import { describe, expect, it } from "vitest";
 import { MIGRATIONS } from "./migrations";
-import { inSpace, linkedSpaceIds, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, THREAD_REF } from "./spaces";
-import { spaceViewHref } from "./ui/space/routes";
+import { inSpace, PERSONAL_PROJECT_ID, PROJECT_REF, spaceAssignments, SpaceStore, THREAD_REF } from "./spaces";
 import { spacePageMarkdown } from "./space-page";
 import { TagStore } from "./tags";
-import { firstThreadSpaceIds } from "./thread-item-refs";
 
 function stores() {
   const db = new Database(":memory:");
@@ -108,12 +106,5 @@ describe("spaces", () => {
     expect(spaces.find(space.id)?.id).toBe(space.id);
     expect(spaces.find("#launch plan")?.id).toBe(space.id);
     expect(spaces.find("nope")).toBeNull();
-  });
-
-  it("are joined by threads that link them", () => {
-    const link = spaceViewHref("spc_0123456789abcdef");
-    expect(linkedSpaceIds(`Work on ${link} and ${link}`)).toEqual(["spc_0123456789abcdef"]);
-    expect(firstThreadSpaceIds([{ type: "client/thread/start", data: { input: [{ type: "text", text: `In ${link}` }] } }])).toEqual(["spc_0123456789abcdef"]);
-    expect(firstThreadSpaceIds([])).toBeNull();
   });
 });

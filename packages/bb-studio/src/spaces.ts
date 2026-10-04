@@ -267,8 +267,3 @@ export function spaceAssignments(spaces: readonly Space[], items: readonly { plu
   }
   return map;
 }
-
-/** Space ids a new thread's first input links to, as `/plugins/studio/spaces/<id>` (spaceViewHref). */
-export function linkedSpaceIds(text: string): string[] {
-  return [...new Set([...text.matchAll(/\/plugins\/studio\/spaces\/(spc_[A-Za-z0-9]+)/g)].map((match) => match[1]!))];
-}

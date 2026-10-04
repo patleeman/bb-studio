@@ -173,7 +173,8 @@ it("spawns a space without a default project's lead in Personal and keeps a fail
 it("starts threads in the space and keeps each thread in one space", async () => {
   const x = await setup();
   const { threadId } = await x.leads.startThread(x.garden.id, request);
-  expect(x.spawn.mock.calls[0]![0]).toMatchObject({ projectId: "p" });
+  // The project picked in the composer is honored; the thread joins the space anyway.
+  expect(x.spawn.mock.calls[0]![0]).toMatchObject({ projectId: "elsewhere" });
   expect(x.spaces.threads.explicit(threadId)).toBe(x.garden.id);
   // Adding it elsewhere moves it; the explicit space beats the project's.
   x.spaces.add(x.kitchen.id, [{ pluginId: THREAD_REF, id: threadId }]);
@@ -224,6 +225,18 @@ it("turns the heartbeat on and off through Automations", async () => {
   await x.leads.setRun(x.garden.id, { enabled: true, cadence: "hourly" });
   expect(x.automations).toHaveLength(1);
   expect(await x.leads.setRun(x.garden.id, { enabled: false, cadence: "hourly" })).toMatchObject({ run: { enabled: false } });
+  expect(x.automations).toHaveLength(0);
+});
+
+it("keeps a space's heartbeat row when Automations can't turn it off", async () => {
+  const x = await setup();
+  await x.leads.setup(x.garden.id, request);
+  await x.leads.setRun(x.garden.id, { enabled: true, cadence: "daily" });
+  x.callRpc.mockRejectedValueOnce(Object.assign(new Error("Automations is down"), { status: 503 }));
+  await expect(x.leads.removeSpace(x.garden.id)).rejects.toThrow("Automations is down");
+  expect(x.leads.runs.get(x.garden.id)).toMatchObject({ enabled: true });
+  await x.leads.removeSpace(x.garden.id);
+  expect(x.leads.runs.get(x.garden.id)).toBeNull();
   expect(x.automations).toHaveLength(0);
 });
 

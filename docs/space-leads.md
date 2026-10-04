@@ -61,7 +61,8 @@ their project.
 - `space_lead_setup({ spaceId, request })` starts the lead from BB's composer
   request (Studio sets the project) and makes sure the page exists.
 - `space_thread_start({ spaceId, request })` → `{ threadId }`: a thread you
-  start, in the Space.
+  start, in the Space. It runs in the project picked in the composer, the
+  Space's folder by default.
 - `space_overview({ spaceId })` → `{ threads, activity, items }`: each thread
   with its latest progress and any failure or blocker, recent activity, and
   the Space's items. What the Status tab shows.
@@ -72,7 +73,6 @@ their project.
   the Space's folder.
 - `thread_handoff({ threadId, request })` → `{ threadId }`: continues a thread
   on another provider; a lead's successor becomes the lead.
-- `spaceWidget({ id })`: the Space's items, threads and projects, for the iOS
-  app's Space screen.
 
-Deleting a Space turns its Heartbeat off and forgets its lead.
+Deleting a Space turns its Heartbeat off and forgets its lead. If the
+Heartbeat can't be turned off, the Space stays and the delete fails.

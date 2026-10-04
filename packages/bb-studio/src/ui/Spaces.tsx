@@ -1,6 +1,6 @@
-// Spaces in Studio: the dialogs that make a space and fill it with items,
-// threads, channels and projects. A space itself opens on its lead's thread
-// (ui/space). Spaces are protected tags (src/spaces.ts); only the user makes one here.
+// Spaces in Studio: the dialogs that make a space and fill it with threads
+// and projects. A space itself opens on its lead's thread (ui/space). Spaces
+// are meta-projects (src/spaces.ts); only the user makes one here.
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,17 +10,14 @@ import {
   GHOST_BUTTON,
   Icon,
   ItemLinkTextarea,
-  ItemTile,
   OUTLINE_BUTTON,
   projectName,
-  type CollectionItem,
-  type CollectionKind,
   type Project,
 } from "@bb-studio/kit/app";
-import { errorMessage, untitled } from "@bb-studio/kit/format";
+import { errorMessage } from "@bb-studio/kit/format";
 import { Button, cn, Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, Input } from "@bb-studio/kit/ui";
 import { useRpc } from "@get-bb/plugin-sdk/app";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { STUDIO_PLUGIN_ID } from "@bb-studio/kit/contract";
 import type { rpcContract, SpaceThreadView, SpaceView } from "../contract";
@@ -31,23 +28,11 @@ type Rpc = ReturnType<typeof useRpc<typeof rpcContract>>;
 const PROJECT_REF = "bb-project";
 const THREAD_REF = "bb-thread";
 
-/** Threads, or Studio Teams' channels and direct messages, which are threads too. */
-export type ThreadKind = "threads" | "conversations";
-const ofKind = (thread: SpaceThreadView, kind: ThreadKind) => (thread.kind === "thread") === (kind === "threads");
-
 function threadIcon(thread: SpaceThreadView) {
-  if (thread.status === "active" || thread.status === "starting") return "Loading";
-  return thread.kind === "channel" ? "studio/hash" : thread.kind === "dm" ? "Bot" : "MessageSquare";
+  return thread.status === "active" || thread.status === "starting" ? "Loading" : "MessageSquare";
 }
 
-/** Where a thread lives, or who a direct message is with. */
-function threadPlace(thread: SpaceThreadView, projects: readonly Project[]) {
-  if (thread.kind === "channel") return "Channel";
-  if (thread.kind === "dm") return `With ${thread.botName}`;
-  return projectName(projects, thread.projectId);
-}
-
-/** Where a space opens: the Space view, its lead with the page beside it (ui/space). A new thread that links it joins it. */
+/** Where a space opens: the Space view, which goes to its lead's thread (ui/space). */
 export function spaceLink(space: SpaceView): string {
   return spaceViewHref(space.id);
 }
@@ -78,7 +63,6 @@ export function SpaceDialog({
   rpc,
   space,
   projects,
-  defaultProjectId,
   onClose,
   onSaved,
   onDelete,
@@ -87,7 +71,6 @@ export function SpaceDialog({
   /** null makes a new one. */
   space: SpaceView | null;
   projects: readonly Project[];
-  defaultProjectId: string | null;
   onClose(): void;
   onSaved(space: SpaceView): void;
   /** Asks to delete the space being edited. */
@@ -96,7 +79,8 @@ export function SpaceDialog({
   const [name, setName] = useState(space?.name ?? "");
   const [icon, setIcon] = useState(space?.icon ?? "");
   const [description, setDescription] = useState(space?.description ?? "");
-  const [project, setProject] = useState(space ? (space.defaultProjectId ?? "") : (defaultProjectId ?? ""));
+  // A new space gets a folder of its own unless the user picks a project, which then moves into it.
+  const [project, setProject] = useState(space?.defaultProjectId ?? "");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -119,7 +103,7 @@ export function SpaceDialog({
       <DialogContent className="sm:max-w-md">
         <DialogHeader>
           <DialogTitle>{space ? "Edit space" : "New space"}</DialogTitle>
-          <DialogDescription>A space gathers pages, boards, drawings, projects and threads in one place.</DialogDescription>
+          <DialogDescription>A space gathers projects, with their threads and Studio items, in one place.</DialogDescription>
         </DialogHeader>
         <form
           className="flex flex-col gap-3"
@@ -156,14 +140,14 @@ export function SpaceDialog({
               onChange={(event) => setProject(event.target.value)}
               className="h-9 rounded-md border border-border bg-background px-2 text-sm"
             >
-              <option value="">None (global)</option>
+              {space?.defaultProjectId ? null : <option value="">{space ? "None" : "A new folder in ~/Spaces"}</option>}
               {projects.map((each) => (
                 <option key={each.id} value={each.id}>
                   {each.name}
                 </option>
               ))}
             </select>
-            <span className="text-xs text-muted-foreground">New items go here, and it joins the space with its items and threads.</span>
+            <span className="text-xs text-muted-foreground">New items and threads go here. A project you pick moves into the space with its items and threads.</span>
           </label>
           {error ? <p className="text-sm text-red-500">{error}</p> : null}
           <DialogFooter>
@@ -185,105 +169,16 @@ export function SpaceDialog({
   );
 }
 
-/** Picks items to add to a space or take out of it. */
-export function AddItemsDialog({
-  rpc,
-  space,
-  items,
-  kinds,
-  projects,
-  onClose,
-  onChanged,
-}: {
-  rpc: Rpc;
-  space: SpaceView;
-  items: readonly CollectionItem[];
-  kinds: readonly CollectionKind[];
-  projects: readonly Project[];
-  onClose(): void;
-  onChanged(): void;
-}) {
-  const [query, setQuery] = useState("");
-  const [busy, setBusy] = useState<string | null>(null);
-  const kindOf = (item: CollectionItem) => kinds.find((kind) => kind.pluginId === item.pluginId && kind.id === item.kind);
-  const listed = useMemo(() => {
-    const text = query.trim().toLowerCase();
-    return items
-      .filter((item) => !item.archived && (!text || untitled(item.title).toLowerCase().includes(text)))
-      .slice()
-      .sort((a, b) => b.updatedAt - a.updatedAt)
-      .slice(0, 200);
-  }, [items, query]);
-
-  const toggle = async (item: CollectionItem, add: boolean) => {
-    const key = `${item.pluginId}:${item.id}`;
-    setBusy(key);
-    try {
-      const ref = [{ pluginId: item.pluginId, id: item.id }];
-      await rpc.call("spaceMembers", { id: space.id, add: add ? ref : [], remove: add ? [] : ref });
-      onChanged();
-    } catch (cause) {
-      toast.error(`Couldn't change the space: ${errorMessage(cause)}`);
-    } finally {
-      setBusy(null);
-    }
-  };
-
-  return (
-    <Dialog open onOpenChange={(next) => !next && onClose()}>
-      <DialogContent className="sm:max-w-lg">
-        <DialogHeader>
-          <DialogTitle>Add items to {space.name}</DialogTitle>
-          <DialogDescription>Items in the space's projects are already in it.</DialogDescription>
-        </DialogHeader>
-        <Input autoFocus value={query} placeholder="Search titles" onChange={(event) => setQuery(event.target.value)} />
-        <div className="-mx-2 flex max-h-96 flex-col overflow-y-auto">
-          {listed.map((item) => {
-            const key = `${item.pluginId}:${item.id}`;
-            const added = space.itemKeys.includes(key);
-            const viaProject = !added && item.projectId !== null && space.projectIds.includes(item.projectId);
-            const kind = kindOf(item);
-            return (
-              <div key={key} className="flex items-center gap-2 rounded-md px-2 py-1.5 hover:bg-state-hover">
-                <ItemTile icon={item.icon} kindIcon={kind?.icon ?? "File"} size="md" />
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-sm">{untitled(item.title)}</div>
-                  <div className="truncate text-xs text-muted-foreground">
-                    {kind?.label ?? item.kind} · {projectName(projects, item.projectId)}
-                  </div>
-                </div>
-                {viaProject ? (
-                  <span className="text-xs text-muted-foreground">In a project</span>
-                ) : (
-                  <button type="button" className={added ? GHOST_BUTTON : OUTLINE_BUTTON} disabled={busy === key} onClick={() => void toggle(item, !added)}>
-                    {added ? "Remove" : "Add"}
-                  </button>
-                )}
-              </div>
-            );
-          })}
-          {!listed.length ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">No items match.</p> : null}
-        </div>
-        <DialogFooter>
-          <Button onClick={onClose}>Done</Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
-  );
-}
-
 /** Picks open threads to add to a space. */
 export function AddThreadsDialog({
   rpc,
   space,
-  kind,
   projects,
   onClose,
   onChanged,
 }: {
   rpc: Rpc;
   space: SpaceView;
-  kind: ThreadKind;
   projects: readonly Project[];
   onClose(): void;
   onChanged(): void;
@@ -301,9 +196,7 @@ export function AddThreadsDialog({
     );
   }, [rpc]);
   const text = query.trim().toLowerCase();
-  const listed =
-    threads?.filter((thread) => ofKind(thread, kind) && (!text || `${thread.title} ${thread.botName ?? ""}`.toLowerCase().includes(text))) ?? [];
-  const noun = kind === "threads" ? "threads" : "channels and messages";
+  const listed = threads?.filter((thread) => !text || thread.title.toLowerCase().includes(text)) ?? [];
 
   const toggle = async (thread: SpaceThreadView, add: boolean) => {
     setBusy(thread.id);
@@ -322,16 +215,10 @@ export function AddThreadsDialog({
     <Dialog open onOpenChange={(next) => !next && onClose()}>
       <DialogContent className="sm:max-w-lg">
         <DialogHeader>
-          <DialogTitle>
-            Add {noun} to {space.name}
-          </DialogTitle>
-          <DialogDescription>
-            {kind === "threads"
-              ? "Threads in the space's projects are already in it. A thread stays in its project."
-              : "Studio Teams channels and direct messages with bots. Each stays where it is, and links back to the space."}
-          </DialogDescription>
+          <DialogTitle>Add threads to {space.name}</DialogTitle>
+          <DialogDescription>Threads in the space's projects are already in it. A thread is in one space at a time, so adding it moves it here.</DialogDescription>
         </DialogHeader>
-        <Input autoFocus value={query} placeholder={`Search ${noun}`} onChange={(event) => setQuery(event.target.value)} />
+        <Input autoFocus value={query} placeholder="Search threads" onChange={(event) => setQuery(event.target.value)} />
         <div className="-mx-2 flex max-h-96 flex-col overflow-y-auto">
           {threads === null ? <p className="px-2 py-6 text-center text-sm text-muted-foreground">Loading…</p> : null}
           {listed.map((thread) => {
@@ -342,7 +229,7 @@ export function AddThreadsDialog({
                 <Icon name={threadIcon(thread)} className="size-4 shrink-0 text-muted-foreground" />
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm">{thread.title}</div>
-                  <div className="truncate text-xs text-muted-foreground">{threadPlace(thread, projects)}</div>
+                  <div className="truncate text-xs text-muted-foreground">{projectName(projects, thread.projectId)}</div>
                 </div>
                 {viaProject ? (
                   <span className="text-xs text-muted-foreground">In a project</span>
@@ -356,7 +243,7 @@ export function AddThreadsDialog({
           })}
           {threads && !listed.length ? (
             <p className="px-2 py-6 text-center text-sm text-muted-foreground">
-              {text ? `No ${noun} match.` : kind === "threads" ? "No open threads." : "No channels or direct messages. They come from Studio Teams."}
+              {text ? "No threads match." : "No open threads."}
             </p>
           ) : null}
         </div>

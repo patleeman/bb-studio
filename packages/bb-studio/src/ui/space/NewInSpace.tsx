@@ -49,7 +49,13 @@ export function useCreateInSpace(spaceId: string | null) {
   return useCallback(async (kind: SpaceKind): Promise<CreatedItem | null> => {
     if (!spaceId) return null;
     if (kind.create?.mode === "event") {
-      const event = new CustomEvent<StudioCreateEventDetail>(kind.create.event, { detail: { projectId: lead.data?.defaultProjectId ?? null }, cancelable: true });
+      // The add-on makes it in this project; without the Space's folder it would land outside the Space.
+      const projectId = lead.data?.defaultProjectId;
+      if (!projectId) {
+        toast.error(lead.data ? "This Space has no folder to create items in yet." : "The Space is still loading. Try again in a moment.");
+        return null;
+      }
+      const event = new CustomEvent<StudioCreateEventDetail>(kind.create.event, { detail: { projectId }, cancelable: true });
       window.dispatchEvent(event);
       if (!event.defaultPrevented) toast.error(`${kind.providerName} isn't loaded yet. Reload BB and try again.`);
       return null;

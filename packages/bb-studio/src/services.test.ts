@@ -57,4 +57,16 @@ describe("Studio services", () => {
     expect(services.versionBytes(page, first.id)).toEqual(bytes);
     expect(db.prepare("SELECT COUNT(*) AS count FROM item_blobs").get()).toEqual({ count: 1 });
   });
+
+  it("forgets a deleted item's versions and the blobs only it used", () => {
+    const { db, services } = setup();
+    const shared = new Uint8Array([1, 2, 3]);
+    services.addVersion(page, shared, "Shared", actor);
+    services.addVersion(page, new Uint8Array([4]), "Own", actor);
+    services.addVersion(task, shared, "Copy", actor);
+    services.forgetVersions(page.pluginId, [page.id]);
+    expect(services.versions(page)).toEqual([]);
+    expect(services.versions(task)).toHaveLength(1);
+    expect(db.prepare("SELECT COUNT(*) AS count FROM item_blobs").get()).toEqual({ count: 1 });
+  });
 });

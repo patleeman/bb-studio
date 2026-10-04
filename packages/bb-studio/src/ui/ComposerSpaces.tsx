@@ -1,8 +1,7 @@
-// A thread's spaces under its composer, beside its project, machine and
-// branch, so a thread, channel or direct message links back to the spaces
-// it's in and can join one there. A new thread joins the spaces picked
-// before it starts. It sits in the row's ⋯ menu with the other Studio
-// controls there.
+// A thread's space under its composer, beside its project, machine and
+// branch, so a thread links back to the space it's in and can move to another
+// there. A new thread joins the space picked before it starts. It sits in the
+// row's ⋯ menu with the other Studio controls there.
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -97,7 +96,8 @@ function SpacesPicker() {
 
   const change = async (space: SpaceView, add: boolean) => {
     if (projectId) {
-      const next = add ? [...picked, space.id] : picked.filter((id) => id !== space.id);
+      // A thread is in one space, so a new pick replaces the last.
+      const next = add ? [space.id] : picked.filter((id) => id !== space.id);
       setPicked(next);
       savePick(projectId, next);
       await rpc.call("pendingThreadSpaces", { projectId, ids: next }).catch((cause) => toast.error(`Couldn't pick the space: ${errorMessage(cause)}`));

@@ -8,8 +8,8 @@ import { subcommand, takeFlag, takeOption, usage } from "@bb-studio/kit/cli";
 // - Studio can hide the add-ons' own sidebar entries, since its collection
 //   lists their items (src/sidebar.ts).
 // - Studio keeps tags, which group items across add-ons (src/tags.ts).
-// - Studio keeps spaces, protected tags that gather items, BB projects and
-//   threads into one place (src/spaces.ts).
+// - Studio keeps spaces, meta-projects: each BB project, and so its items and
+//   threads, is in one space (src/spaces.ts).
 // - Studio keeps saved views, named collection queries (src/views.ts). The
 //   query language (src/query.ts) drives the agent tool and CLI too.
 // - Studio keeps the sidebar's tabs, one per opened item (src/tabs.ts).
@@ -30,8 +30,7 @@ import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
 import { inSpace, spaceAssignments, SpaceStore, THREAD_REF, type Space } from "./src/spaces";
 import { spaceViewHref } from "./src/ui/space/routes";
 import { SpaceFolders } from "./src/space-folders";
-import { spaceItem } from "./src/space-items";
-import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
+import { spaceTreeItems } from "./src/space-tree";
 import { PAGES_PLUGIN_ID, pageHref, spacePageMarkdown } from "./src/space-page";
 import { backgroundKinds, compileQuery, parseQuery, type Filter, type Query } from "./src/query";
 import { ViewStore } from "./src/views";
@@ -42,7 +41,7 @@ import { ProviderHistory } from "./src/provider-history";
 import { ProviderComments } from "./src/provider-comments";
 import { routeCommentMentions } from "./src/comment-routing";
 import { homeData } from "./src/home";
-import { firstThreadItemRefs, firstThreadSpaceIds, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
+import { firstThreadItemRefs, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { respondToNeed } from "./src/needs-you";
 import { zipFiles } from "./src/export-zip";
 import { SpaceLeads } from "./src/space-lead";
@@ -59,7 +58,6 @@ function queryArg(arg: string): string {
 }
 
 export default async function plugin(bb: BbPluginApi) {
-  // Spaces list as Studio's own items; `spaces` is set up below, before any call.
   const hub = new StudioHub(bb.sdk);
   const changes = new ChangeLog();
   const db = bb.storage.database();
@@ -130,14 +128,10 @@ export default async function plugin(bb: BbPluginApi) {
       const providers = await mentionProviders(firstThreadMentionPlugins(events));
       const refs = firstThreadItemRefs(events, { providers });
       if (refs === null) return;
-      // A new thread that links a space joins it, as "New thread" in a space does.
-      const joined = (firstThreadSpaceIds(events) ?? []).filter((id) => spaces.get(id));
-      // Space membership follows the thread project, not linked Space pages.
-      if (joined.length) changes.append(null);
       for (const ref of refs) {
         services.linkThread({ threadId: thread.id, ref, role: "new-thread", state: thread.status, createdAt: thread.createdAt, updatedAt: Date.now(), metadata: {} });
       }
-      if (refs.length || joined.length) {
+      if (refs.length) {
         changes.append(null);
         bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
       }
@@ -165,8 +159,8 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   });
-  // Spaces picked in a new-thread composer join the thread its user starts
-  // there, with the first message, as a profile picked there does in Teams.
+  // A Space picked in a new-thread composer takes the thread its user starts
+  // there, with the first message. A thread is in one Space, so the last pick wins.
   const PENDING_SPACES_MS = 10 * 60_000;
   const pendingSpaces = new Map<string, { ids: string[]; at: number }>();
   bb.experimental_hooks.on("message.dispatch", (context) => {
@@ -175,9 +169,11 @@ export default async function plugin(bb: BbPluginApi) {
       context.originPluginId || context.thread.originPluginId) return { action: "proceed" };
     pendingSpaces.delete(context.project.id);
     if (Date.now() - pending.at > PENDING_SPACES_MS) return { action: "proceed" };
-    const joined = pending.ids.filter((id) => spaces.get(id));
-    // Space membership follows the thread project, not linked Space pages.
-    if (joined.length) tagsChanged();
+    const target = pending.ids.filter((id) => spaces.get(id)).at(-1);
+    if (target) {
+      spaces.add(target, [{ pluginId: THREAD_REF, id: context.thread.id }]);
+      threadsMoved();
+    }
     return { action: "proceed" };
   });
   /** Every window's sidebar refetches its tabs. */
@@ -200,66 +196,26 @@ export default async function plugin(bb: BbPluginApi) {
     const assigned = tags.assignments();
     const allSpaces = spaces.list();
     const inSpaces = spaceAssignments(allSpaces, result.items);
-    // A space's page lists as the space.
-    const homes = new Set(allSpaces.map((space) => space.pageId));
     return {
       providers: result.providers,
-      items: result.items.filter((item) => item.pluginId !== PAGES_PLUGIN_ID || !homes.has(item.id)).map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${item.pluginId}:${item.id}`) ?? [] })),
+      items: result.items.map((item) => ({ ...item, tags: assigned.get(`${item.pluginId}:${item.id}`) ?? [], spaces: inSpaces.get(`${item.pluginId}:${item.id}`) ?? [] })),
       tags: tags.list(),
       spaces: allSpaces,
       views: views.list(),
     };
   };
 
-  type ThreadView = SpaceThreadView;
-  type Conversation = { kind: "channel" | "dm"; name: string };
-  type ThreadLike = { id: string; title?: string | null; titleFallback?: string | null; status: string; projectId?: string | null; updatedAt?: number | null; createdAt?: number | null; archivedAt?: number | null };
-  const threadView = (thread: ThreadLike, direct: boolean, conversation?: Conversation): ThreadView => ({
-    id: thread.id,
-    title: conversation?.kind === "channel" ? conversation.name : thread.title || thread.titleFallback || "Untitled thread",
-    status: thread.status,
-    projectId: thread.projectId ?? null,
-    updatedAt: thread.updatedAt ?? thread.createdAt ?? 0,
-    direct,
-    kind: conversation?.kind ?? "thread",
-    botName: conversation?.kind === "dm" ? conversation.name : null,
-  });
-  const conversationList = z.object({
-    direct: z.array(z.object({ threadId: z.string(), botName: z.string() })),
-  });
-  /** Studio Teams' channels and direct messages by thread; none without it. */
-  const conversations = async (): Promise<Map<string, Conversation>> => {
-    const found = new Map<string, Conversation>();
-    const result = await bb.sdk.plugins
-      .callRpc({ pluginId: "bot-teams", method: "spaceConversations", input: null as never, outputSchema: conversationList, signal: AbortSignal.timeout(10_000) })
-      .catch(() => null);
-    for (const direct of result?.direct ?? []) found.set(direct.threadId, { kind: "dm", name: direct.botName });
-    return found;
-  };
-  /** A space's threads: the ones added to it and its projects' open ones, newest first. */
-  const spaceThreads = async (space: Space, conversationsOnce?: Promise<Map<string, Conversation>>): Promise<ThreadView[]> => {
-    const [byProject, added, known] = await Promise.all([
-      Promise.all(space.projectIds.map((projectId) => bb.sdk.threads.list({ projectId, archived: false, limit: 50 }).catch(() => []))),
-      Promise.all(space.threadIds.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null))),
-      // The tree asks Studio Teams once for every space.
-      conversationsOnce ?? conversations(),
-    ]);
-    const found = new Map<string, ThreadView>();
-    // A thread added to another space is there, not here.
-    const owners = spaces.threads.all();
-    for (const thread of byProject.flat()) if ((owners.get(thread.id) ?? space.id) === space.id) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
-    for (const thread of added) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, true, known.get(thread.id)));
-    return [...found.values()].sort((a, b) => b.updatedAt - a.updatedAt);
-  };
-  /** Recent open threads, with every channel and direct message, which may be hidden from lists. */
-  const recentThreads = async (): Promise<ThreadView[]> => {
-    const [listed, known] = await Promise.all([bb.sdk.threads.list({ archived: false, limit: 100 }), conversations()]);
-    const found = new Map<string, ThreadView>(listed.map((thread) => [thread.id, threadView(thread, false, known.get(thread.id))]));
-    const missing = [...known.keys()].filter((id) => !found.has(id));
-    const fetched = await Promise.all(missing.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)));
-    for (const thread of fetched) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
-    return [...found.values()].sort((a, b) => b.updatedAt - a.updatedAt);
-  };
+  /** Recent open threads, newest first, to pick from when adding one to a space. */
+  const recentThreads = async (): Promise<SpaceThreadView[]> =>
+    (await bb.sdk.threads.list({ archived: false, limit: 100 }))
+      .map((thread) => ({
+        id: thread.id,
+        title: thread.title || thread.titleFallback || "Untitled thread",
+        status: thread.status,
+        projectId: thread.projectId ?? null,
+        updatedAt: thread.updatedAt ?? thread.createdAt ?? 0,
+      }))
+      .sort((a, b) => b.updatedAt - a.updatedAt);
   /** The one space a thread is in, which scopes what its agent sees by default. */
   const threadSpaces = (threadId: string, projectId: string | null) => {
     const space = spaces.get(spaces.ownerOfThread({ id: threadId, projectId }));
@@ -270,25 +226,11 @@ export default async function plugin(bb: BbPluginApi) {
     changes.append(null);
     bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
   };
-  /**
-   * What a thread makes joins the spaces the thread is in, so work done in a
-   * space stays there without the user filing it.
-   */
-  const joinThreadSpaces = async (threadId: string, ref: ItemRef) => {
-    const thread = await bb.sdk.threads.get({ threadId }).catch(() => null);
-    const holding = threadSpaces(threadId, thread?.projectId ?? null);
-    if (!holding.length) return;
-    const item = (await hub.get(ref.pluginId, [ref.id]).catch(() => []))[0];
-    const joining = holding.filter((space) => !item || !inSpace(space, item));
-    // Item ownership follows its project; linking a thread does not refile it.
-    if (joining.length) tagsChanged();
-  };
   const pageResult = z.object({ page: z.object({ id: z.string(), archived: z.boolean(), title: z.string().optional(), icon: z.string().optional() }).nullable() });
   const callPages = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
     bb.sdk.plugins.callRpc({ pluginId: PAGES_PLUGIN_ID, method, input: input as never, outputSchema, signal: AbortSignal.timeout(10_000) }) as Promise<z.infer<T>>;
-  /** Appends the widgets in `sections` that the space's page lacks, and says how many. */
   const making = new Map<string, Promise<string | null>>();
-  /** A space's home page, made from the space template if it has none; null without Pages. */
+  /** A space's brief page, made from the space template if it has none; null without Pages. */
   const spacePage = (id: string): Promise<string | null> => {
     const pending = making.get(id);
     if (pending) return pending;
@@ -299,7 +241,7 @@ export default async function plugin(bb: BbPluginApi) {
         const found = await callPages("get", { id: space.pageId }, pageResult).catch(() => undefined);
         // Pages being down doesn't lose the page.
         if (found === undefined) return space.pageId;
-        // The page is the space, so an archived one comes back rather than a new one being made.
+        // An archived brief comes back rather than a new one being made.
         if (found.page?.archived) await callPages("update", { id: space.pageId, archived: false }, pageResult).catch(() => {});
         if (found.page) return space.pageId;
       }
@@ -317,8 +259,8 @@ export default async function plugin(bb: BbPluginApi) {
     return work;
   };
   /**
-   * A space is its page: deleting the page deletes the space, and renaming it
-   * renames the space. Checks the space pages among the changed ids, or all of
+   * A space's brief page keeps its name and icon: renaming the page renames
+   * the space, and deleting it leaves the space without a page. Checks the space pages among the changed ids, or all of
    * them when Pages doesn't say which. Only Pages answering that a page is
    * gone counts, never Pages being down.
    */
@@ -346,17 +288,19 @@ export default async function plugin(bb: BbPluginApi) {
     });
     if (touched) tagsChanged();
   };
-  /** Deletes an add-on's items and forgets their tags and tabs. */
+  /** Deletes an add-on's items and forgets their tags, tabs and versions. */
   const deleteItems = async (pluginId: string, ids: string[]) => {
     const result = await hub.call(pluginId, "studio_delete", { ids });
     tags.forget(pluginId, result.done);
+    services.forgetVersions(pluginId, result.done);
     if (tabs.forget(pluginId, result.done)) tabsChanged();
     return result;
   };
 
-  const deleteSpace = (id: string) => {
+  const deleteSpace = async (id: string) => {
     const pageId = spaces.get(id)?.pageId;
-    void spaceLeads.removeSpace(id).catch(() => {});
+    // A heartbeat that can't be turned off keeps the space, so deleting can be retried.
+    await spaceLeads.removeSpace(id);
     spaces.remove(id);
     // The page may hold the user's writing: archive it rather than delete it.
     if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
@@ -398,12 +342,8 @@ export default async function plugin(bb: BbPluginApi) {
   const itemForPath = async (path: string) => {
     const parts = path.split(/[?#]/)[0]!.split("/");
     const pluginId = parts[2];
-    // A space opens at /plugins/studio/spaces/<id>.
     const id = parts[4];
     if (!pluginId || !id) return null;
-    // A space's page opens as the space.
-    const home = pluginId === PAGES_PLUGIN_ID ? spaces.list().find((space) => space.pageId === decodeURIComponent(id)) : undefined;
-    if (home) return spaceItem(home);
     const items = await hub.get(pluginId, [decodeURIComponent(id)]).catch(() => []);
     return itemAtPath(items, path);
   };
@@ -462,14 +402,7 @@ export default async function plugin(bb: BbPluginApi) {
     },
     move: ({ pluginId, ids, projectId }) => hub.call(pluginId, "studio_move", { ids, projectId }),
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
-    remove: async ({ pluginId, ids }) => {
-      if (pluginId === STUDIO_PLUGIN_ID) {
-        const done = ids.filter((id) => spaces.get(id));
-        for (const id of done) deleteSpace(id);
-        return { done, failed: ids.filter((id) => !done.includes(id)).map((id) => ({ id, error: "That space no longer exists." })) };
-      }
-      return deleteItems(pluginId, ids);
-    },
+    remove: ({ pluginId, ids }) => deleteItems(pluginId, ids),
     action: ({ pluginId, action, ids }) => hub.call(pluginId, "studio_action", { action, ids }),
     createTag: ({ name }) => {
       const tag = tags.ensure(name);
@@ -494,8 +427,14 @@ export default async function plugin(bb: BbPluginApi) {
     spaces: () => ({ spaces: spaces.list() }),
     createSpace: async (input) => {
       const made = spaces.create(input);
+      try {
+        await folders.ensureCatchAll(made.id);
+      } catch (error) {
+        // No half-made space: the name stays free for a retry.
+        spaces.remove(made.id);
+        throw error;
+      }
       tagsChanged();
-      await folders.ensureCatchAll(made.id);
       return { space: spaces.get(made.id) ?? made };
     },
     updateSpace: ({ id, ...input }) => {
@@ -505,62 +444,23 @@ export default async function plugin(bb: BbPluginApi) {
       tagsChanged();
       return { space };
     },
-    deleteSpace: ({ id }) => {
-      deleteSpace(id);
+    deleteSpace: async ({ id }) => {
+      await deleteSpace(id);
       return { ok: true };
     },
     spacePage: async ({ id }) => {
       const pageId = await spacePage(id);
       return { href: pageId ? pageHref(pageId) : null };
     },
-    spaceWidget: async ({ id }) => {
-      const space = spaces.get(id);
-      if (!space) throw new Error("That space no longer exists.");
-      const [{ items, providers }, threads, projects] = await Promise.all([hub.overview(), spaceThreads(space), bb.sdk.projects.list().catch(() => [])]);
-      const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
-      const background = backgroundKinds(providers);
-      const held = items
-        .filter((item) => !item.archived && !background.has(`${item.pluginId}:${item.kind}`) && inSpace(space, item) && !(item.pluginId === PAGES_PLUGIN_ID && item.id === space.pageId))
-        .sort((a, b) => b.updatedAt - a.updatedAt);
-      return {
-        space: { id: space.id, name: space.name, icon: space.icon, defaultProjectId: space.defaultProjectId },
-        recent: held.slice(0, 8).map((item) => {
-          const kind = kindsOf.get(`${item.pluginId}:${item.kind}`);
-          return { pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kind?.icon ?? "File", kindLabel: kind?.label ?? item.kind, href: item.href, updatedAt: item.updatedAt };
-        }),
-        itemCount: held.length,
-        threads,
-        projects: space.projectIds.map((projectId) => ({
-          id: projectId,
-          name: projects.find((project) => project.id === projectId)?.name ?? projectId,
-          items: held.filter((item) => item.projectId === projectId).length,
-          threads: threads.filter((thread) => thread.projectId === projectId).length,
-          isDefault: space.defaultProjectId === projectId,
-        })),
-        kinds: providers
-          .filter((provider) => provider.state === "ready" && provider.pluginId !== STUDIO_PLUGIN_ID)
-          .flatMap((provider) =>
-            provider.kinds
-              .filter((kind) => kind.create && (kind.capabilities?.create ?? true))
-              .map((kind) => ({ pluginId: provider.pluginId, id: kind.id, label: kind.label, icon: kind.icon, event: kind.create?.mode === "event" ? kind.create.event : null })),
-          ),
-        threadPrompt: `Space: ${space.name} (${spaceViewHref(space.id)})\n\n`,
-      };
-    },
-    spaceTree: async ({ threadsFor }) => {
+    spaceTree: async () => {
       const all = spaces.list();
       if (!all.length) return { spaces: [] };
-      // Only expanded spaces show threads, and each costs a call per project.
-      const wanted = all.filter((space) => threadsFor.includes(space.id));
-      const known = wanted.length ? conversations() : Promise.resolve(new Map<string, Conversation>());
-      const [{ items, providers }, fetched] = await Promise.all([hub.overview(), Promise.all(wanted.map((space) => spaceThreads(space, known).catch(() => [])))]);
-      const threads = new Map(wanted.map((space, index) => [space.id, fetched[index]!]));
+      const { items, providers } = await hub.overview();
       const kindsOf = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind])));
       const options = { background: backgroundKinds(providers), pagesPluginId: PAGES_PLUGIN_ID, kindIcon: (item: HubItem) => kindsOf.get(`${item.pluginId}:${item.kind}`)?.icon ?? "File" };
       return {
         spaces: all.map((space) => {
           const tree = spaceTreeItems(space, items, options);
-          const held = threads.get(space.id);
           return {
             id: space.id,
             name: space.name,
@@ -569,8 +469,6 @@ export default async function plugin(bb: BbPluginApi) {
             href: space.pageId ? pageHref(space.pageId) : spaceViewHref(space.id),
             items: tree.items,
             itemCount: tree.count,
-            threads: (held ?? []).slice(0, TREE_THREADS).map(({ id, title, status, kind }) => ({ id, title, status, kind })),
-            threadCount: held ? held.length : null,
           };
         }),
       };
@@ -600,11 +498,6 @@ export default async function plugin(bb: BbPluginApi) {
     space_of_threads: async () => ({ threads: await spaceLeads.spaceOfThreads() }),
     space_set_run: ({ spaceId, ...run }) => spaceLeads.setRun(spaceId, run),
     thread_handoff: ({ threadId, request }) => spaceLeads.handoff(threadId, request),
-    spaceThreads: async ({ id }) => {
-      const space = spaces.get(id);
-      if (!space) throw new Error("That space no longer exists.");
-      return { threads: await spaceThreads(space) };
-    },
     saveView: ({ name, query }) => {
       const view = views.save(name, query);
       tagsChanged();
@@ -642,6 +535,7 @@ export default async function plugin(bb: BbPluginApi) {
       const byId = new Map(fresh?.map((item) => [item.id, item]));
       for (const id of fresh === null ? [] : (ids ?? [])) changes.append({ pluginId, id, kind: byId.get(id)?.kind ?? fallbackKind ?? "", removed: !byId.has(id), at: Date.now() });
       for (const id of removed ?? []) changes.append({ pluginId, id, kind: "", removed: true, at: Date.now() });
+      services.forgetVersions(pluginId, [...(removed ?? []), ...(fresh === null ? [] : (ids ?? []).filter((id) => !byId.has(id)))]);
       if (pluginId === PAGES_PLUGIN_ID) await syncSpacePages(ids || removed ? [...(ids ?? []), ...(removed ?? [])] : null);
       bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId, ids, removed });
       return { ok: true };
@@ -656,8 +550,8 @@ export default async function plugin(bb: BbPluginApi) {
     sidebar: () => readSidebar(),
     tabs: async () => ({ tabs: tabViews(await tabData()) }),
     visitTab: async ({ path }) => {
-      // Studio's own pages aren't items, except a space's.
-      if (!path.startsWith("/plugins/") || (path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`) && !path.startsWith(spaceViewHref("")))) return { tab: null };
+      // Studio's own pages aren't items.
+      if (!path.startsWith("/plugins/") || path.startsWith(`/plugins/${STUDIO_PLUGIN_ID}/`)) return { tab: null };
       const item = await itemForPath(path);
       if (!item) return { tab: null };
       if (tabs.open(item)) tabsChanged();
@@ -703,9 +597,8 @@ export default async function plugin(bb: BbPluginApi) {
     links: ({ ref }) => services.links(ref),
     replaceLinks: ({ ref, source, links }) => { services.replaceLinks(ref, source, links); return { ok: true }; },
     itemThreads: ({ ref }) => ({ threads: services.threads(ref) }),
-    linkItemThread: async ({ thread }) => {
+    linkItemThread: ({ thread }) => {
       services.linkThread(thread);
-      if (thread.role === "created") await joinThreadSpaces(thread.threadId, thread.ref).catch(() => {});
       return { ok: true };
     },
     threadItems: ({ threadId }) => ({ threads: services.threadsForThread(threadId) }),
@@ -966,28 +859,23 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_space_items",
     description:
-      "Add Studio items, this thread or other threads to one of the user's spaces, or take them out. A thread is in one space at a time, so adding it moves it. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file something in a space, or when a space's lead starts a worker thread. What this thread makes in Studio joins its space by itself.",
+      "Move this thread or other threads into one of the user's spaces, or take them out. A thread is in one space at a time, so adding it moves it; taking it out returns it to its project's space. Studio items follow their project, so they can't be added one by one. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file a thread in a space, or when a space's lead starts a worker thread.",
     parameters: z.object({
       space: z.string().min(1).max(100).describe("The space's name or id"),
-      add: z.array(z.string().max(500)).max(100).optional().describe("Item links, e.g. /plugins/pages/pages/pg_x"),
-      remove: z.array(z.string().max(500)).max(100).optional().describe("Item links to take out"),
       thisThread: z.enum(["add", "remove"]).optional().describe("Add this thread to the space, or take it out"),
       threads: z.array(z.string().min(1).max(200)).max(100).optional().describe("Ids of other threads to add to the space, e.g. workers you started"),
     }),
-    async execute({ space: name, add = [], remove = [], thisThread, threads = [] }, ctx) {
+    async execute({ space: name, thisThread, threads = [] }, ctx) {
       const space = requireSpace(name);
-      if (!add.length && !remove.length && !thisThread && !threads.length) return "Pass items to add or remove, threads, or thisThread.";
-      const added = await resolveItems(add);
-      const removed = await resolveItems(remove);
+      if (!thisThread && !threads.length) return "Pass threads or thisThread.";
       const thread = { pluginId: THREAD_REF, id: ctx.threadId };
       const others = (await Promise.all(threads.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)))).flatMap((found, index) => (found && found.deletedAt == null ? [{ pluginId: THREAD_REF, id: threads[index]! }] : []));
-      if (others.length < threads.length) added.missing.push(...threads.filter((threadId) => !others.some((other) => other.id === threadId)));
-      spaces.add(space.id, [...added.found, ...others, ...(thisThread === "add" ? [thread] : [])]);
-      spaces.removeMembers(space.id, [...removed.found, ...(thisThread === "remove" ? [thread] : [])]);
-      tagsChanged();
-      const lines = [`Space ${space.name}: added ${added.found.length}${others.length ? ` items and ${others.length} threads` : ""}, removed ${removed.found.length}.`];
+      const missing = threads.filter((threadId) => !others.some((other) => other.id === threadId));
+      spaces.add(space.id, [...others, ...(thisThread === "add" ? [thread] : [])]);
+      if (thisThread === "remove") spaces.removeMembers(space.id, [thread]);
+      threadsMoved();
+      const lines = others.length ? [`Space ${space.name}: added ${others.length} thread${others.length === 1 ? "" : "s"}.`] : [];
       if (thisThread) lines.push(thisThread === "add" ? "This thread is in the space." : "This thread is out of the space.");
-      const missing = [...added.missing, ...removed.missing];
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);
       return lines.join("\n");
     },

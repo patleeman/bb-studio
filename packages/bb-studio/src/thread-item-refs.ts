@@ -1,6 +1,5 @@
 import { parseStudioMentionReference, studioTextReferences, type ReferenceOptions, type ReferenceProvider } from "@bb-studio/kit/contract";
 import type { Ref } from "./services";
-import { linkedSpaceIds } from "./spaces";
 
 interface InputPart {
   type?: unknown;
@@ -21,13 +20,6 @@ function firstInput(events: readonly InputEvent[]): InputPart[] | null {
     return Array.isArray(input) && input.length ? input as InputPart[] : typeof data?.request?.params?.prompt === "string" && data.request.params.prompt
       ? [{ type: "text", text: data.request.params.prompt }] as InputPart[] : null;
   }).find((parts) => parts !== null) ?? null;
-}
-
-/** Spaces linked in the first composer input of a new thread. */
-export function firstThreadSpaceIds(events: readonly InputEvent[]): string[] | null {
-  const first = firstInput(events);
-  if (!first) return null;
-  return [...new Set(first.flatMap((part) => part.type === "text" && typeof part.text === "string" ? linkedSpaceIds(part.text) : []))];
 }
 
 /** Item references in the first composer input of a new thread. */

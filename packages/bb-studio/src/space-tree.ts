@@ -6,7 +6,6 @@ import { inSpace, type Space } from "./spaces";
 
 export const TREE_ITEMS = 50;
 export const TREE_DEPTH = 3;
-export const TREE_THREADS = 20;
 
 export interface TreeSource {
   pluginId: string;

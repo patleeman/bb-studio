@@ -151,7 +151,7 @@ export function StartThreadDialog({ spaceId, name, defaultProjectId, onStarted, 
   );
 }
 
-export const spaceDialog = (spaceId: string, dialog: "edit" | "items" | "threads" | "projects" | "delete") =>
+export const spaceDialog = (spaceId: string, dialog: "edit" | "threads" | "projects" | "delete") =>
   window.dispatchEvent(new CustomEvent(SPACE_DIALOG_EVENT, { detail: { spaceId, dialog } }));
 
 const threadPath = (threadId: string) => `/threads/${encodeURIComponent(threadId)}`;
@@ -165,7 +165,6 @@ function SpaceOptions({ spaceId, onHandOff }: { spaceId: string; onHandOff?: () 
         {onHandOff ? <DropdownMenuItem onSelect={onHandOff}><Icon name="Fork" className="size-4" />Hand off lead…</DropdownMenuItem> : null}
         <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "edit")}><Icon name="Edit" className="size-4" />Edit Space</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "threads")}><Icon name="MessageSquare" className="size-4" />Manage threads</DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "items")}><Icon name="FileText" className="size-4" />Manage items</DropdownMenuItem>
         <DropdownMenuItem onSelect={() => spaceDialog(spaceId, "projects")}><Icon name="Folder" className="size-4" />Manage folders</DropdownMenuItem>
         <DropdownMenuSeparator />
         <DropdownMenuItem variant="destructive" onSelect={() => spaceDialog(spaceId, "delete")}><Icon name="Trash2" className="size-4" />Delete Space…</DropdownMenuItem>
@@ -186,7 +185,7 @@ export function SpaceLeadHeader({ threadId }: PluginThreadHeaderActionProps) {
     <div className="flex items-center gap-0.5">
       <RunMenu lead={lead.data} onChanged={lead.refresh} />
       <SpaceOptions spaceId={spaceId} onHandOff={() => setHandingOff(true)} />
-      {startIn ? <HandoffDialog threadId={threadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={() => lead.refresh()} /> : null}
+      {startIn ? <HandoffDialog threadId={threadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={(next) => { lead.refresh(); openAppPath(threadPath(next), { replace: true, main: true }); }} /> : null}
     </div>
   );
 }

@@ -12,9 +12,9 @@ export const QUICK_OPEN_EVENT = "bb-studio:quick-open";
 export const NEW_SPACE_EVENT = "studio:new-space";
 
 /**
- * Window event that opens one of a space's dialogs from anywhere, such as its
- * page's widgets in Pages; detail `{ spaceId, dialog }`, where dialog is
- * "edit", "delete", "items", "threads", "channels" or "projects".
+ * Window event that opens one of a space's dialogs from anywhere, such as the
+ * Space's options menu or its brief page in Pages; detail `{ spaceId, dialog }`,
+ * where dialog is "edit", "delete", "threads" or "projects".
  */
 export const SPACE_DIALOG_EVENT = "studio:space-dialog";
 

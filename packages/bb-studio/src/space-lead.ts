@@ -142,9 +142,10 @@ export class SpaceLeads {
     });
   }
 
+  /** A thread in the project picked in the composer (the space's folder by default); it joins the space either way. */
   async startThread(spaceId: string, request: NewThreadRequestInput): Promise<{ threadId: string }> {
-    const space = this.space(spaceId);
-    const thread = await this.deps.sdk.threads.spawn({ ...request, projectId: await this.executionProject(space) });
+    this.space(spaceId);
+    const thread = await this.deps.sdk.threads.spawn(request);
     this.join(spaceId, thread.id);
     this.deps.changed();
     return { threadId: thread.id };
@@ -160,12 +161,18 @@ export class SpaceLeads {
     });
   }
 
-  /** Turns the heartbeat off before the space goes. */
-  async removeSpace(spaceId: string): Promise<void> {
-    const run = this.runs.get(spaceId);
-    if (run?.enabled) await this.runs.set(spaceId, null, { ...run, enabled: false }).catch(() => {});
-    this.deps.db.prepare("DELETE FROM space_leads WHERE space_id = ?").run(spaceId);
-    this.deps.db.prepare("DELETE FROM space_runs WHERE space_id = ?").run(spaceId);
+  /**
+   * Turns the heartbeat off and forgets the lead before the space goes. A
+   * heartbeat that can't be turned off throws and keeps its row, so the
+   * automation isn't orphaned and deleting can be retried.
+   */
+  removeSpace(spaceId: string): Promise<void> {
+    return this.serial(spaceId, async () => {
+      const run = this.runs.get(spaceId);
+      if (run?.enabled) await this.runs.set(spaceId, null, { ...run, enabled: false });
+      this.deps.db.prepare("DELETE FROM space_leads WHERE space_id = ?").run(spaceId);
+      this.deps.db.prepare("DELETE FROM space_runs WHERE space_id = ?").run(spaceId);
+    });
   }
 
   /** Where a thread is: its space's id. */

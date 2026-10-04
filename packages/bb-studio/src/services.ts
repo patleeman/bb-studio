@@ -119,6 +119,17 @@ export class StudioServices {
       .map((row) => ({ id: row.id, ref, sha256: row.sha256, label: row.label, actor: readActor(row.actor), createdAt: row.created_at }));
   }
 
+  /** Drops deleted items' versions, and any blob no version uses any more. */
+  forgetVersions(pluginId: string, ids: readonly string[]): void {
+    if (!ids.length) return;
+    this.db.transaction(() => {
+      const remove = this.db.prepare("DELETE FROM item_versions WHERE plugin_id = ? AND item_id = ?");
+      let removed = 0;
+      for (const id of ids) removed += remove.run(pluginId, id).changes;
+      if (removed) this.db.prepare("DELETE FROM item_blobs WHERE sha256 NOT IN (SELECT sha256 FROM item_versions)").run();
+    })();
+  }
+
   versionBytes(ref: Ref, id: string): Uint8Array | null {
     const row = this.db.prepare(`SELECT bytes FROM item_versions JOIN item_blobs USING (sha256)
       WHERE id = ? AND plugin_id = ? AND item_id = ?`).get(id, ref.pluginId, ref.id) as { bytes: Buffer } | undefined;

@@ -57,7 +57,7 @@ for (const kind of ["recording", "dictation"] as const) providerConformance(`Tal
   const changed: string[] = [];
   const removedAudio: string[] = [];
   registerTalk(bb as never, schemas, {
-    store, changed: (id) => { changed.push(id); }, removeAudio: async (id) => { removedAudio.push(id); },
+    store, changed: (id) => { changed.push(id); }, removeAudio: async (id) => { removedAudio.push(id); }, readAudio: async () => Buffer.alloc(0),
   });
   return {
     pluginId: "talk", kind, handlers, expectedContent: "Conformance transcript content",

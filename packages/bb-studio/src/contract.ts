@@ -55,14 +55,14 @@ const space = z.object({
   color: z.string(),
   icon: z.string().nullable(),
   description: z.string(),
-  /** Where the space's new items and threads go; null for global. */
+  /** Where the space's new items and threads go: its catch-all project. */
   defaultProjectId: z.string().nullable(),
   /** BB projects whose items and threads all belong to the space. */
   projectIds: z.array(z.string()),
   threadIds: z.array(z.string()),
-  /** Items added one by one, as `<plugin>:<id>`. */
+  /** Always empty: items follow their project. */
   itemKeys: z.array(z.string()),
-  /** The space's home page in Pages, or null before it has one. */
+  /** The space's brief page in Pages, or null before it has one. */
   pageId: z.string().nullable(),
 });
 export type SpaceView = z.infer<typeof space>;
@@ -72,7 +72,7 @@ const spaceFields = z.object({
   description: z.string().max(500).optional(),
   defaultProjectId: z.string().min(1).max(200).nullable().optional(),
 });
-/** An item, or `bb-project:<id>` for a whole project, or `bb-thread:<id>` for a thread. */
+/** `bb-project:<id>` for a whole project, or `bb-thread:<id>` for a thread. */
 const spaceMember = itemRef;
 const spaceThread = z.object({
   id: z.string(),
@@ -80,28 +80,8 @@ const spaceThread = z.object({
   status: z.string(),
   projectId: z.string().nullable(),
   updatedAt: z.number(),
-  /** Added to the space itself, not through one of its projects. */
-  direct: z.boolean(),
-  /** A Studio Teams channel or direct message, which is a thread too. */
-  kind: z.enum(["thread", "channel", "dm"]),
-  /** The bot a direct message is with. */
-  botName: z.string().nullable(),
 });
 export type SpaceThreadView = z.infer<typeof spaceThread>;
-/** What a space page's widgets show; Pages renders them. */
-const spaceWidget = z.object({
-  space: z.object({ id: z.string(), name: z.string(), icon: z.string().nullable(), defaultProjectId: z.string().nullable() }),
-  /** The space's newest items, and how many it has. */
-  recent: z.array(z.object({ pluginId: z.string(), id: z.string(), title: z.string(), icon: z.string().nullable(), kindIcon: z.string(), kindLabel: z.string(), href: z.string(), updatedAt: z.number() })),
-  itemCount: z.number(),
-  threads: z.array(spaceThread),
-  projects: z.array(z.object({ id: z.string(), name: z.string(), items: z.number(), threads: z.number(), isDefault: z.boolean() })),
-  /** Kinds a space can make; an event kind opens its own dialog. */
-  kinds: z.array(z.object({ pluginId: z.string(), id: z.string(), label: z.string(), icon: z.string(), event: z.string().nullable() })),
-  /** A composer draft that files a new thread in the space. */
-  threadPrompt: z.string(),
-});
-export type SpaceWidgetView = z.infer<typeof spaceWidget>;
 const savedView = z.object({ id: z.string(), name: z.string(), query: z.string() });
 export type SavedViewView = z.infer<typeof savedView>;
 const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.string()), spaces: z.array(z.string()) });
@@ -129,10 +109,6 @@ const treeSpace = z.object({
   items: z.array(tab.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
   /** Every item it holds; `items` stops at a cap. */
   itemCount: z.number(),
-  /** Only for the spaces asked for in `threadsFor`, as threads cost a call per project. */
-  threads: z.array(spaceThread.pick({ id: true, title: true, status: true, kind: true })),
-  /** Null when its threads weren't asked for. */
-  threadCount: z.number().nullable(),
 });
 export type SpaceTreeView = z.infer<typeof treeSpace>;
 
@@ -281,26 +257,21 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: spaceId, add: z.array(spaceMember).max(500).default([]), remove: z.array(spaceMember).max(500).default([]) }),
     output: z.object({ space }),
   },
-  /** Threads added to a space and its projects' open threads, newest first. */
-  spaceThreads: { input: z.object({ id: spaceId }), output: z.object({ threads: z.array(spaceThread) }) },
   /** The spaces a thread is in; `inherited` ones hold it through a project. */
   spacesForThread: { input: z.object({ threadId: z.string().min(1).max(200) }), output: z.object({ spaces: z.array(space), inherited: z.array(z.string()) }) },
-  /** Spaces picked in a project's new-thread composer; the next thread started there joins them. */
+  /** Spaces picked in a project's new-thread composer; the next thread started there moves to the last one. */
   pendingThreadSpaces: { input: z.object({ projectId: z.string().min(1).max(200), ids: z.array(spaceId).max(50) }), output: z.object({ ok: z.boolean() }) },
-  /** Where a space opens: its home page, made from the space template if it has none; null without Pages. */
+  /** A space's brief page, made from the space template if it has none; null without Pages. */
   spacePage: { input: z.object({ id: spaceId }), output: z.object({ href: z.string().nullable() }) },
-  /** What a space page's widgets show, for Pages. */
-  spaceWidget: { input: z.object({ id: spaceId }), output: spaceWidget },
-  /** Puts back the widgets the space's page lacks. */
-  /** An item made in a space's default project and added to the space. */
+  /** An item made in the space's catch-all project, so it's in the space. */
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string(), title: z.string().optional() }) },
-  /** Open threads, channels and direct messages to pick from when adding one to a space. */
+  /** Open threads to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
   /** A space's lead, page and heartbeat. Clears a lead thread that was deleted. */
   space_lead: { input: z.object({ spaceId }), output: spaceLead },
   /** Makes sure the space has its page and a lead thread; idempotent and serialized per space. */
   space_lead_setup: { input: z.object({ spaceId, request: newThreadRequest }), output: spaceLead },
-  /** Starts a thread in the space's default project (else Personal) and adds it to the space. */
+  /** Starts a thread in the project picked in the composer and adds it to the space. */
   space_thread_start: { input: z.object({ spaceId, request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** The space's open threads (added, or through its projects, unless another space holds them) and its items, newest first. */
   space_overview: { input: z.object({ spaceId }), output: spaceOverview },
@@ -317,7 +288,7 @@ export const rpcContract = defineRpcContract({
   studio_changed: schemas.changed,
   sidebar: { input: z.null(), output: sidebar },
   /** Every space with what it holds, for the sidebar's tree. */
-  spaceTree: { input: z.object({ threadsFor: z.array(spaceId).max(200).default([]) }), output: z.object({ spaces: z.array(treeSpace) }) },
+  spaceTree: { input: z.object({}), output: z.object({ spaces: z.array(treeSpace) }) },
   /** Open tabs, in order; tabs of deleted items are closed. */
   tabs: { input: z.null(), output: z.object({ tabs: z.array(tab) }) },
   /** Opens a tab for the item whose view is at `path`, if any. */
