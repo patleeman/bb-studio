@@ -1,5 +1,5 @@
 // The Studio panels Studio Navigation leaves out, by the label bb gives their rows.
-const LEFT_OUT = ["Pages", "Drawings", "Artifacts", "Recordings", "Tables", "New channel"];
+const LEFT_OUT = ["Pages", "Drawings", "Artifacts", "Recordings", "Tables"];
 const STUDIO_PLUGINS = ["studio", "pages", "excalidraw", "artifacts", "talk", "studio-tables", "bot-teams", "thread-list-plus", "studio-navigation"];
 // Staged by scripts/staged-bb.mjs: a plugin outside BB Studio whose row stays.
 const OUTSIDE_PLUGIN = "staged-forecast";
@@ -29,7 +29,7 @@ export default ({ projectId, threadId, bbCli, sleep }) => [
       })`));
       // Which rows sit in More depends on saved preferences, so look in both.
       const listed = [...shown.rows, ...shown.more];
-      for (const label of ["New thread", "Studio", "Teams", "Plugins", "Skills", "Forecast"]) {
+      for (const label of ["New thread", "Studio", "Teams", "Channels", "Plugins", "Skills", "Forecast"]) {
         if (!listed.some((row) => row.startsWith(label))) throw new Error(`The navigation is missing ${label}`);
       }
       for (const label of LEFT_OUT) {

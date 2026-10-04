@@ -101,18 +101,23 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
   );
 }
 
-/** A Space's Studio items: pages, drawings, tables… Each opens beside the lead. */
-export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, onOpen }: {
+/**
+ * A Space's Studio items: pages, drawings, tables… Each opens beside the lead.
+ * Studio sends only the first items; past those, a row opens the Space.
+ */
+export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, onOpen, onOpenSpace }: {
   spaceId: string;
   spaceName: string;
   defaultProjectId: string | null;
   items: SpaceItems | undefined;
   onOpen(request: OpenInSpaceRequest): void;
+  onOpenSpace(): void;
 }) {
   const [expanded, setExpanded] = useState(false);
   const list = items?.items ?? [];
   const shown = expanded ? list : list.slice(0, COLLAPSED_ITEMS);
-  const hidden = (items?.count ?? list.length) - shown.length;
+  const hidden = list.length - shown.length;
+  const total = items?.count ?? list.length;
   return (
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
@@ -148,6 +153,11 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
       {hidden > 0 || expanded ? (
         <button type="button" onClick={() => setExpanded((value) => !value)} className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, "h-7 pl-8 text-left text-xs text-muted-foreground")}>
           {expanded ? "Show less" : `Show ${hidden} more`}
+        </button>
+      ) : null}
+      {hidden === 0 && total > list.length ? (
+        <button type="button" onClick={onOpenSpace} className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, "h-7 pl-8 text-left text-xs text-muted-foreground")}>
+          {`All ${total} in ${spaceName}`}
         </button>
       ) : null}
     </div>

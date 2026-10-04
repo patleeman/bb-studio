@@ -208,7 +208,7 @@ describe("thread-list plugin", () => {
     expect(document.querySelector('[data-automated-thread-id="thr_child"]')).toBeNull();
   });
 
-  it("groups threads and Studio items by Space, leaving the lead to its dashboard", async () => {
+  it("groups threads and Studio items by Space, leaving the lead to its heading", async () => {
     localStorage.removeItem("bb-studio:sidebar-organization");
     const threads = [
       ...THREADS,

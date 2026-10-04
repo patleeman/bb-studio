@@ -3,12 +3,12 @@
   "schemaVersion": 1,
   "name": "bb-studio",
   "displayName": "BB Studio",
-  "description": "Studio for BB: pages, voice recordings, drawings, artifacts, tasks, bot teams and a sidebar, in one collection your agents can use.",
+  "description": "Studio for BB: pages, voice recordings, drawings, artifacts, tables, bot teams and a sidebar, in one collection your agents can use.",
   "plugins": [
     {
       "id": "studio",
       "displayName": "Studio",
-      "description": "The home of BB Studio. One collection for your pages, recordings, drawings, tasks and bots: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
+      "description": "The home of BB Studio. One collection for your pages, recordings, drawings, artifacts and tables: search, group with tags, filter by project, and hand anything to an agent. Add-ons plug in.",
       "icon": {
         "url": "./packages/bb-studio/icons/studio.svg"
       },
@@ -255,7 +255,7 @@
     {
       "id": "studio-navigation",
       "displayName": "Studio Navigation",
-      "description": "BB's sidebar navigation without the Studio rows that Studio and Studio Sidebar already open. Rows from BB and other plugins stay.",
+      "description": "BB's sidebar navigation without the add-on rows that Studio already opens. Rows from BB and other plugins stay.",
       "icon": "PanelLeft",
       "tags": [
         "sidebar",

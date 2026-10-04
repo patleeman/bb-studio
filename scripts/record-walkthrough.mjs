@@ -14,13 +14,14 @@
  * BB_WALKTHROUGH_SKIP_FAILED=1 leaves out scenes whose setup fails.
  */
 import { spawn } from "node:child_process";
-import { mkdir, mkdtemp, readdir, rm, writeFile } from "node:fs/promises";
+import { mkdir, mkdtemp, rm, writeFile } from "node:fs/promises";
 import { tmpdir } from "node:os";
 import { dirname, join, resolve } from "node:path";
-import { fileURLToPath, pathToFileURL } from "node:url";
+import { fileURLToPath } from "node:url";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
 import { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep } from "./capture/bb.mjs";
 import { seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc } from "./capture/seed.mjs";
+import { loadCaptures } from "./capture/entries.mjs";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const outFlag = process.argv.indexOf("--out");
@@ -90,12 +91,8 @@ const ownScenes = {
   },
 };
 
-const captures = [];
 const context = { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
-const capturesDir = join(repoRoot, "scripts/capture/captures");
-for (const file of (await readdir(capturesDir)).filter((name) => name.endsWith(".mjs")).sort()) {
-  captures.push(...(await import(pathToFileURL(join(capturesDir, file)).href)).default(context));
-}
+const captures = loadCaptures(context);
 
 /** Scrolls the page's tallest scroller down a little and back, so long surfaces move. */
 const drift = (progress) => `(() => {

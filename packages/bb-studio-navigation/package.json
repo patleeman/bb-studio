@@ -4,14 +4,14 @@
   "private": true,
   "type": "module",
   "license": "MIT",
-  "description": "BB's sidebar navigation without the Studio rows that Studio and Studio Sidebar already open.",
+  "description": "BB's sidebar navigation without the add-on rows that Studio already opens.",
   "engines": {
     "bb": ">=0.44.0",
     "bbPluginSdk": ">=0.5.29"
   },
   "bb": {
     "name": "Studio Navigation",
-    "description": "BB's sidebar navigation without the Studio rows that Studio and Studio Sidebar already open. Rows from BB and other plugins stay.",
+    "description": "BB's sidebar navigation without the add-on rows that Studio already opens. Rows from BB and other plugins stay.",
     "branding": {
       "icon": "PanelLeft"
     },

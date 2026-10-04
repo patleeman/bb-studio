@@ -6,22 +6,7 @@ import { fileURLToPath } from "node:url";
 import { CdpClient, ensureChrome } from "./capture/driver.mjs";
 import { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep } from "./capture/bb.mjs";
 import { seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc } from "./capture/seed.mjs";
-import bb_studio_sidebar from "./capture/captures/bb-studio-sidebar.mjs";
-import bb_studio_teams from "./capture/captures/bb-studio-teams.mjs";
-import bb_studio_draw from "./capture/captures/bb-studio-draw.mjs";
-import bb_studio_chat from "./capture/captures/bb-studio-chat.mjs";
-import bb_studio_float from "./capture/captures/bb-studio-float.mjs";
-import bb_studio_talk from "./capture/captures/bb-studio-talk.mjs";
-import bb_studio_pages from "./capture/captures/bb-studio-pages.mjs";
-import bb_studio from "./capture/captures/bb-studio.mjs";
-import bb_studio_artifacts from "./capture/captures/bb-studio-artifacts.mjs";
-import bb_studio_reactions from "./capture/captures/bb-studio-reactions.mjs";
-import bb_studio_feed from "./capture/captures/bb-studio-feed.mjs";
-import bb_studio_decisions from "./capture/captures/bb-studio-decisions.mjs";
-import bb_studio_mobile from "./capture/captures/bb-studio-mobile.mjs";
-import bb_studio_tables from "./capture/captures/bb-studio-tables.mjs";
-import bb_studio_navigation from "./capture/captures/bb-studio-navigation.mjs";
-import compactHeaders from "./capture/captures/compact-headers.mjs";
+import { loadCaptures } from "./capture/entries.mjs";
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 const pluginFlag = process.argv.indexOf("--plugin");
 if (pluginFlag >= 0 && !process.argv[pluginFlag + 1]) throw new Error("Usage: --plugin <plugin-id>");
@@ -35,24 +20,7 @@ const captureOnly = process.env.BB_CAPTURE_ONLY
   : null;
 if (!projectId || !threadId) throw new Error("Set BB_CAPTURE_PROJECT_ID and BB_CAPTURE_THREAD_ID to a seeded BB thread before capturing.");
 const context = { projectId, threadId, pluginRpc, bbCli, launchRoomThread, getLaunchRoomId, sleep, seedPages, seedDrawing, seedArtifact, seedTalkRecording, talkRpc };
-const captures = [
-  ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
-  ...bb_studio_sidebar(context),
-  ...bb_studio_teams(context),
-  ...bb_studio_draw(context),
-  ...bb_studio_chat(context),
-  ...bb_studio_float(context),
-  ...bb_studio_talk(context),
-  ...bb_studio_pages(context),
-  ...bb_studio(context),
-  ...bb_studio_artifacts(context),
-  ...bb_studio_reactions(context),
-  ...bb_studio_feed(context),
-  ...bb_studio_decisions(context),
-  ...bb_studio_mobile(context),
-  ...bb_studio_tables(context),
-  ...bb_studio_navigation(context)
-];
+const captures = loadCaptures(context);
 
 const { webSocketUrl, process: chromeProcess, profileDir } = await ensureChrome();
 const client = new CdpClient(webSocketUrl);

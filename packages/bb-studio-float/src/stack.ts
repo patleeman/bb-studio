@@ -226,14 +226,6 @@ export function goBack(state: FloatState, key: string): FloatState {
   };
 }
 
-/** Puts `target` in the tab instead of what it showed, for swapping with the main view. */
-export function replaceTab(state: FloatState, key: string, target: FloatTarget): FloatState {
-  const nextKey = tabKey(target);
-  if (nextKey === key || state.tabs.some((candidate) => candidate.key === nextKey)) return state;
-  const tabs = state.tabs.map((candidate) => (candidate.key === key ? { key: nextKey, target, pinned: candidate.pinned, opened: true } : candidate));
-  return { ...state, tabs, active: state.active === key ? nextKey : state.active };
-}
-
 /** Shows a tab, opening the panel if it's folded or hidden. */
 export function selectTab(state: FloatState, key: string): FloatState {
   if (!state.tabs.some((tab) => tab.key === key)) return state;

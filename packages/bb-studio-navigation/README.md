@@ -9,7 +9,6 @@ the Studio rows that another surface already opens:
 | Row | Left out while |
 | --- | --- |
 | Pages, Drawings, Artifacts, Recordings, Tables | Studio's row is there, since the Studio hub lists and opens every add-on. |
-| New channel | [Studio Sidebar](../bb-studio-sidebar) shows sections, since the Channels section has its own New channel. |
 | Explore | Always. Explore's panel in [Studio Pages](../bb-studio-pages); explainers open from their links. |
 | Companions | Always. [Float](../bb-studio-float)'s dock and toggle open it. |
 | Chat | Always. [Studio Chat](../bb-studio-chat) starts chats from Studio items and its overlay. |
@@ -17,7 +16,7 @@ the Studio rows that another surface already opens:
 Left-out rows are in neither the rows nor **More**; their plugins still run
 and their links still open. Everything else stays: BB's own rows (New thread,
 Search threads, Plugins, Skills, Automations), Inbox
-([Studio Feed](../bb-studio-feed)), Studio, Teams, and every panel from a
+([Studio Feed](../bb-studio-feed)), Studio, Teams, Channels, and every panel from a
 plugin outside BB Studio. Hide, reorder, **More**, and **Customize sidebar** work as in BB's
 Navigation. A row Studio Navigation leaves out keeps its place in BB's saved
 order, so it comes back where it was if you switch back. Row order is always
@@ -46,8 +45,8 @@ project, Orbit. Studio Navigation draws the rows and Studio Sidebar the thread
 list. The rows show BB's New thread, Plugins, Skills, and Automations, Studio
 Teams, Studio, and Forecast, a staged plugin outside BB Studio; **More** holds
 Search threads. The capture asserts that Studio Navigation draws the region,
-that those rows are present, and that none of Pages, Drawings, Artifacts,
-Recordings, Tables, or New channel appear in the rows or in **More**.
+that those rows and Channels are present, and that none of Pages, Drawings,
+Artifacts, Recordings, or Tables appear in the rows or in **More**.
 
 ## Development
 

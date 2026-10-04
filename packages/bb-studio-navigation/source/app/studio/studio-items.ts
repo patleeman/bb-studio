@@ -12,7 +12,6 @@ export const HUB_PANELS = [
   "artifacts/artifacts",
   "talk/recordings",
   "studio-tables/tables",
-  "bot-teams/channels",
 ];
 
 /**

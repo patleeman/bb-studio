@@ -34,7 +34,7 @@ describe("By space grouping", () => {
     expect(loose).toEqual([]);
   });
 
-  it("lists the lead's workers at the top level, since the lead lives on the dashboard", () => {
+  it("lists the lead's workers at the top level, since the Space's heading opens the lead", () => {
     const threads = buildSpaceThreadGroups(rows, spaces, spaceOf, { sp_a: "lead" }).groups[1]!.threads;
     const items = buildProjectThreadGroups(threads, compareStandardThreads, new Set(), false);
     expect(items.map((item) => item.kind === "thread" ? item.node.thread.id : item.kind)).toEqual(["newest", "child"]);

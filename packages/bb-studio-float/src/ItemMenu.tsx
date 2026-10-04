@@ -11,6 +11,7 @@ import {
   CopyReferenceMenuItem,
   cn,
   dropTarget,
+  floatPanelFor,
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
@@ -44,7 +45,7 @@ const floatTarget = (target: FloatTarget) => update((state) => openTab(state, ta
 
 const targetAt = (event: Event) => studioTargetAt(event.target instanceof Element ? event.target : null);
 
-/** Mod-click splits and Shift-click floats any item or thread. */
+/** Mod-click splits any item or thread; Shift-click floats one a window can show. */
 function useModifierClicks(split: (target: FloatTarget) => void) {
   useEffect(() => {
     const onClick = (event: MouseEvent) => {
@@ -54,6 +55,8 @@ function useModifierClicks(split: (target: FloatTarget) => void) {
       if (!mod && !event.shiftKey) return;
       const target = targetAt(event);
       if (!target) return;
+      // Shift-click on something no window can show: let the click do what it does.
+      if (!mod && target.kind === "path" && !floatPanelFor(target.path)) return;
       if ((event.target as Element).closest(`[${STUDIO_ITEM_CLICKS_OFF}]`)) return;
       event.preventDefault();
       event.stopPropagation();

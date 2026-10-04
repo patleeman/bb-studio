@@ -1,0 +1,38 @@
+/** The README capture entry modules, in capture order. Other files in captures/ are helpers. */
+import bb_studio_sidebar from "./captures/bb-studio-sidebar.mjs";
+import bb_studio_teams from "./captures/bb-studio-teams.mjs";
+import bb_studio_draw from "./captures/bb-studio-draw.mjs";
+import bb_studio_chat from "./captures/bb-studio-chat.mjs";
+import bb_studio_float from "./captures/bb-studio-float.mjs";
+import bb_studio_talk from "./captures/bb-studio-talk.mjs";
+import bb_studio_pages from "./captures/bb-studio-pages.mjs";
+import bb_studio from "./captures/bb-studio.mjs";
+import bb_studio_artifacts from "./captures/bb-studio-artifacts.mjs";
+import bb_studio_reactions from "./captures/bb-studio-reactions.mjs";
+import bb_studio_feed from "./captures/bb-studio-feed.mjs";
+import bb_studio_decisions from "./captures/bb-studio-decisions.mjs";
+import bb_studio_mobile from "./captures/bb-studio-mobile.mjs";
+import bb_studio_tables from "./captures/bb-studio-tables.mjs";
+import bb_studio_navigation from "./captures/bb-studio-navigation.mjs";
+import compactHeaders from "./captures/compact-headers.mjs";
+
+export function loadCaptures(context) {
+  return [
+    ...(process.env.BB_CAPTURE_COMPACT_HEADERS === "1" ? compactHeaders(context) : []),
+    ...bb_studio_sidebar(context),
+    ...bb_studio_teams(context),
+    ...bb_studio_draw(context),
+    ...bb_studio_chat(context),
+    ...bb_studio_float(context),
+    ...bb_studio_talk(context),
+    ...bb_studio_pages(context),
+    ...bb_studio(context),
+    ...bb_studio_artifacts(context),
+    ...bb_studio_reactions(context),
+    ...bb_studio_feed(context),
+    ...bb_studio_decisions(context),
+    ...bb_studio_mobile(context),
+    ...bb_studio_tables(context),
+    ...bb_studio_navigation(context),
+  ];
+}

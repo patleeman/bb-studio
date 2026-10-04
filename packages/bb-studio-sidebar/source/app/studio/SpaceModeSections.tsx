@@ -49,6 +49,7 @@ import {
 } from "../preferences/atoms.js";
 import {
   buildSpaceThreadGroups,
+  createSpaceResolver,
   spaceHref,
   spaceSectionKey,
   type StudioSpace,
@@ -236,11 +237,14 @@ export function SpaceModeSections({
     onProjectSelect?.();
   };
   const openBeside = (space: StudioSpace, leadThreadId: string | null, request: OpenInSpaceRequest) => {
+    // The open thread's Space as the list groups it: a child follows its root.
+    const selected = selectedThreadId ? threads.find((thread) => thread.id === selectedThreadId) : undefined;
+    const resolveSpace = createSpaceResolver(threads, spaceOf, new Set(spaces.map((candidate) => candidate.id)));
     openInSpace({
       spaceId: space.id,
       leadThreadId,
       currentThreadId: selectedThreadId ?? null,
-      currentSpaceId: selectedThreadId ? spaceOf[selectedThreadId] ?? null : null,
+      currentSpaceId: selected ? resolveSpace(selected) : null,
       request,
       fallbackPath: request.kind === "item" ? request.path : spaceHref(space.id),
     });
@@ -324,6 +328,7 @@ export function SpaceModeSections({
                   defaultProjectId={group.space.defaultProjectId}
                   items={items[group.space.id]}
                   onOpen={(request) => openBeside(group.space, group.leadThreadId, request)}
+                  onOpenSpace={() => openSpace(group.space, group.leadThreadId)}
                 />
                 <SpaceSubheading
                   title="Threads"

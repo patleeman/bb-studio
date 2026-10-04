@@ -119,12 +119,9 @@ describe("Studio Navigation", () => {
     }
   });
 
-  it("reaches channels through Studio, with a standalone fallback", () => {
+  it("keeps the Channels row, which the Studio hub doesn't list", () => {
     const channels = item("bot-teams/channels", "Channels");
     renderNavigation([...ITEMS, channels]);
-    expect(rowOrder()).not.toContain(channels.id);
-    cleanup();
-    renderNavigation([...ITEMS.filter(entry => entry !== STUDIO), channels]);
     expect(rowOrder()).toContain(channels.id);
   });
 

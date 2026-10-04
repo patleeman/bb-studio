@@ -12,7 +12,6 @@ import {
   goBack,
   navigateTab,
   openTab,
-  replaceTab,
   panelSize,
   pinTab,
   parseState,
@@ -267,11 +266,6 @@ describe("links inside a tab", () => {
     const moved = navigateTab(state, "path:/plugins/pages/pages/b", path("/plugins/pages/pages/a"));
     expect(moved.tabs.map((tab) => tab.key)).toEqual(["path:/plugins/pages/pages/a"]);
     expect(moved.active).toBe("path:/plugins/pages/pages/a");
-  });
-
-  it("swaps a tab's content for the main view's", () => {
-    const state = openTab(EMPTY, path("/plugins/pages/pages/a"));
-    expect(replaceTab(state, "path:/plugins/pages/pages/a", path("/plugins/pages/pages/m")).tabs).toEqual([{ key: "path:/plugins/pages/pages/m", target: path("/plugins/pages/pages/m"), pinned: false, opened: true }]);
   });
 });
 

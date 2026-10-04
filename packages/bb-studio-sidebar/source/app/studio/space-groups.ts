@@ -12,7 +12,7 @@ export interface StudioSpace {
 export interface SpaceThreadGroup {
   space: StudioSpace;
   leadThreadId: string | null;
-  /** The lead, when it's listed. It lives on the Space's dashboard, so it isn't in `threads`. */
+  /** The lead, when it's listed. The Space's heading opens it, so it isn't in `threads`. */
   lead: SidebarThread | null;
   /** Every other thread in the Space; the lead's workers show at the top level. */
   threads: SidebarThread[];
