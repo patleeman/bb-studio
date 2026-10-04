@@ -1,4 +1,4 @@
-import { Icon, PageColumn, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
+import { BarCrumb, BarSeparator, PageColumn, StudioBar, ViewMoveMenu, openAppPath, studioItemProps, studioThreadProps, threadLinkId } from "@bb-studio/kit/app";
 import { STUDIO_REALTIME_CHANNEL } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useBbContext, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -44,17 +44,17 @@ export function ActivityPanel() {
   const navigate = useBbNavigate();
   const [periodDays, setPeriodDays] = useState(7);
   const { data, error } = useHome(periodDays);
-  return <PageColumn>
-    <div className="flex flex-wrap items-center justify-between gap-3">
-      <div>
-        <button type="button" onClick={() => navigate.toPluginPanel("studio", { subPath: "" })} className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"><Icon name="ChevronLeft" className="size-4" /> Studio</button>
-        <h1 className="text-2xl font-semibold">Activity</h1>
-      </div>
-      <div className="flex items-center gap-3">
-        <label className="flex items-center gap-2 text-sm">Period <select value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="rounded-md border border-border bg-background px-2 py-1"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select></label>
-        <ViewMoveMenu item={{ href: "/plugins/studio/studio/activity", title: "Activity" }} onBack={() => navigate.toPluginPanel("studio", { subPath: "" })} />
-      </div>
-    </div>
+  const back = () => navigate.toPluginPanel("studio", { subPath: "" });
+  return <PageColumn className="pt-6">
+    <StudioBar>
+      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
+        <BarCrumb onClick={back} title="Back to Studio">Studio</BarCrumb>
+        <BarSeparator />
+        <BarCrumb current>Activity</BarCrumb>
+      </nav>
+      <select aria-label="Period" value={periodDays} onChange={(event) => setPeriodDays(Number(event.target.value))} className="h-7 rounded-md bg-transparent px-1.5 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground"><option value={1}>Today</option><option value={7}>7 days</option><option value={30}>30 days</option></select>
+      <ViewMoveMenu item={{ href: "/plugins/studio/studio/activity", title: "Activity" }} onBack={back} />
+    </StudioBar>
     {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
     {!data && !error ? <p className="text-sm text-muted-foreground">Loading activity…</p> : null}
     {data ? <div className="mt-4 space-y-6">

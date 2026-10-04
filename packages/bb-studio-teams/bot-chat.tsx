@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useBbNavigate, useRpc } from "@get-bb/plugin-sdk/app";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, FLOATING, Icon, openCompanion } from "@bb-studio/kit/app";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon, openCompanion } from "@bb-studio/kit/app";
 import type { rpcContract } from "./client-contract";
 import { message } from "./bot-ui";
 
@@ -24,10 +24,10 @@ export function BotChat({ id, disabled, onError }: { id: string; disabled?: bool
       if (request.current === sequence) { busy.current = false; setPending(false); }
     }
   };
-  return <div className={`${FLOATING} flex h-8 shrink-0 items-center rounded-md text-sm text-muted-foreground`}>
-    <button type="button" disabled={disabled || pending} onClick={() => void open(false)} title="Continue this bot’s conversation" className="flex h-full items-center gap-1.5 rounded-l-md pr-2 pl-2.5 hover:bg-state-hover hover:text-foreground disabled:opacity-50"><Icon name="MessageSquare" className="size-4" /> Chat</button>
+  return <div className="flex h-7 shrink-0 items-center rounded-md text-sm text-muted-foreground">
+    <button type="button" disabled={disabled || pending} onClick={() => void open(false)} title="Continue this bot’s conversation" className="flex h-full items-center gap-1.5 rounded-l-md pr-1.5 pl-2 hover:bg-state-hover hover:text-foreground disabled:opacity-50"><Icon name="MessageSquare" className="size-4" /> Chat</button>
     <DropdownMenu>
-      <DropdownMenuTrigger asChild><button type="button" aria-label="Chat options" disabled={disabled || pending} className="flex h-full items-center rounded-r-md px-1.5 hover:bg-state-hover hover:text-foreground disabled:opacity-50"><Icon name="ChevronDown" className="size-3.5" /></button></DropdownMenuTrigger>
+      <DropdownMenuTrigger asChild><button type="button" aria-label="Chat options" disabled={disabled || pending} className="flex h-full items-center rounded-r-md px-1 hover:bg-state-hover hover:text-foreground disabled:opacity-50 data-[state=open]:bg-state-active"><Icon name="ChevronDown" className="size-3.5" /></button></DropdownMenuTrigger>
       <DropdownMenuContent align="end"><DropdownMenuItem onSelect={() => void open(true)}><Icon name="MessageSquarePlus" className="size-4" /> New conversation</DropdownMenuItem></DropdownMenuContent>
     </DropdownMenu>
   </div>;

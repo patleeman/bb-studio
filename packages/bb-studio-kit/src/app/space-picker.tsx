@@ -10,8 +10,7 @@ import { STUDIO_PLUGIN_ID, STUDIO_REALTIME_CHANNEL } from "../contract";
 import { errorMessage } from "../format";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuLabel, DropdownMenuTrigger } from "../ui/dropdown-menu";
 import { Icon } from "../ui/icon";
-import { cn } from "../ui/utils";
-import { FLOATING_BUTTON, ICON_BUTTON, projectName, useProjects, type Project } from "./pieces";
+import { ICON_BUTTON, projectName, useProjects, type Project } from "./pieces";
 import type { RelatedRef } from "./related-panel";
 import { spaceMembership, type SpaceMembership } from "./space-state";
 
@@ -144,10 +143,8 @@ export function SpacePicker({ item }: { item: RelatedRef }) {
     <DropdownMenu onOpenChange={(open) => open && load()}>
       <DropdownMenuTrigger asChild>
         {first ? (
-          <button type="button" className={cn(FLOATING_BUTTON, "max-w-56")} aria-label={`Spaces: ${names}`} title={names}>
+          <button type="button" className={ICON_BUTTON} aria-label={`Spaces: ${names}`} title={`In ${names}`}>
             <SpaceMark icon={first.icon} />
-            <span className="truncate">{first.name}</span>
-            {holding.length > 1 ? <span className="shrink-0 text-xs">+{holding.length - 1}</span> : null}
           </button>
         ) : (
           <button type="button" className={ICON_BUTTON} aria-label="Add to space" title="Add to space">

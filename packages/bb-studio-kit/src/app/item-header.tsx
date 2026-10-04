@@ -1,6 +1,11 @@
-// The bar floating over every Studio item view: a back pill on the left,
-// then the view's own breadcrumb or status, and its buttons on the right.
+// Every Studio view has one bar, and it's BB's own: the page's title bar.
+// A nav panel lends Studio its title bar through StudioBarSlot; ItemHeader
+// fills it with a breadcrumb (the way back, then the item) on the left and
+// the item's tools on the right: icon buttons, one labelled action (Chat),
+// and a menu. Where there is no title bar (Float, workbench tabs) the same
+// bar sits at the top of the view.
 import { useEffect, useId, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { useBbNavigate } from "@get-bb/plugin-sdk/app";
 import { mentionPrompt } from "../contract";
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from "../ui/dropdown-menu";
@@ -9,7 +14,7 @@ import { cn } from "../ui/utils";
 import { openFloat, useCanFloat, useInFloat } from "./float";
 import { useOpenTarget } from "./move";
 import { useHomeThread, useItemChat, type ItemChatRef } from "./item-chat";
-import { FLOATING, FLOATING_BUTTON, ICON_BUTTON } from "./pieces";
+import { BAR_BUTTON, ICON_BUTTON } from "./pieces";
 import { useStudioChatPresent, useStudioPresent } from "./presence";
 import { RelatedPanel, type RelatedRef } from "./related-panel";
 import { SpacePicker } from "./space-picker";
@@ -44,7 +49,7 @@ export function ViewMoveMenu({ item, onBack }: { item: ItemThread; onBack?(): vo
       {anchor}
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Move" title="Float or split" className={FLOATING_BUTTON}>
+          <button type="button" aria-label="Move" title="Float or split" className={ICON_BUTTON}>
             <Icon name="AppWindow" />
           </button>
         </DropdownMenuTrigger>
@@ -90,8 +95,112 @@ function ItemActions({ compact, children }: { compact: boolean; children: ReactN
     {compact ? <button ref={trigger} type="button" aria-label="Item actions" title="Item actions" aria-expanded={expanded} aria-controls={id} className={ICON_BUTTON} onClick={() => setExpanded(value => !value)}><Icon name="MoreHorizontal" className="size-4" /></button> : null}
     <div id={id} data-studio-item-actions="" role="group" aria-label="Item actions" style={{ display: compact && !expanded ? "none" : undefined }} className={compact
       ? "absolute top-10 right-0 z-30 flex w-max max-w-[min(24rem,calc(100vw-2rem))] flex-wrap items-center gap-2 rounded-lg border border-border bg-background p-2 shadow-xl"
-      : "flex items-center gap-1.5"}>{children}</div>
+      : "flex items-center gap-0.5"}>{children}</div>
   </div>;
+}
+
+// BB's title bar, laid out for a Studio bar: the bar replaces the panel's
+// fixed label and takes the row's width. If BB's header changes shape, the
+// bar still shows, on the right.
+const BAR_CSS = `
+[data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:first-child { display: none; }
+[data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:last-child,
+[data-testid="app-page-header-content-row"]:has([data-studio-bar]) > div:last-child > div:first-child,
+[data-bb-plugin-root]:has(> [data-studio-bar-slot] [data-studio-bar]) { flex: 1 1 auto; min-width: 0; }
+`;
+
+/** A nav panel's headerContent: where its views' Studio bar goes. */
+export function StudioBarSlot() {
+  return <>
+    <style>{BAR_CSS}</style>
+    <div data-studio-bar-slot="" className="flex min-w-0 flex-1 items-center" />
+  </>;
+}
+
+/** The title bar slot of the pane this element is in, if its panel lends one. */
+function paneSlot(from: HTMLElement): HTMLElement | null {
+  for (let element = from.parentElement, depth = 0; element && depth < 24; element = element.parentElement, depth++) {
+    const slot = element.querySelector<HTMLElement>(":scope > header [data-studio-bar-slot]");
+    if (slot) return slot;
+  }
+  return null;
+}
+
+function useBarSlot(anchor: React.RefObject<HTMLElement | null>, enabled: boolean): HTMLElement | null {
+  const [slot, setSlot] = useState<HTMLElement | null>(null);
+  useLayoutEffect(() => {
+    if (!enabled) { setSlot(null); return; }
+    // The title bar and the view mount together; give the slot a few frames.
+    let frame = 0, tries = 0;
+    const look = () => {
+      const found = anchor.current ? paneSlot(anchor.current) : null;
+      if (found || ++tries > 20) { setSlot(found); return; }
+      frame = requestAnimationFrame(look);
+    };
+    look();
+    return () => cancelAnimationFrame(frame);
+  }, [anchor, enabled]);
+  return slot;
+}
+
+/**
+ * A Studio view's bar: in its panel's title bar when the panel lends one,
+ * otherwise at the top of the view. Children lay out in one row.
+ */
+export function StudioBar({ children, className }: { children: ReactNode; className?: string }) {
+  const anchor = useRef<HTMLDivElement>(null);
+  const inFloat = useInFloat();
+  const slot = useBarSlot(anchor, !inFloat);
+  const bar = <div data-studio-bar="" className="flex h-full min-w-0 flex-1 items-center gap-2">{children}</div>;
+  if (slot) return <>
+    <span ref={anchor} hidden />
+    {createPortal(bar, slot)}
+  </>;
+  return <div ref={anchor} className={cn("flex h-11 shrink-0 items-center border-b border-border bg-background px-2", className)}>{bar}</div>;
+}
+
+/** The parent crumb, then the item's own crumbs or title, separated like BB's breadcrumbs. */
+export function BarCrumb({ children, onClick, current = false, title }: { children: ReactNode; onClick?(): void; current?: boolean; title?: string }) {
+  const className = cn("flex h-7 min-w-0 shrink items-center gap-1.5 truncate rounded-md px-1.5 text-sm", current ? "font-medium text-foreground" : "text-muted-foreground", onClick && "hover:bg-state-hover hover:text-foreground");
+  return onClick
+    ? <button type="button" title={title} className={className} onClick={onClick}>{children}</button>
+    : <span title={title} aria-current={current ? "page" : undefined} className={className}>{children}</span>;
+}
+
+/** The item's name as the bar's last crumb, renamed in place. */
+export function BarTitle({ title, placeholder = "Untitled", label = "Name", disabled = false, onRename }: {
+  title: string;
+  placeholder?: string;
+  label?: string;
+  disabled?: boolean;
+  onRename(title: string): void;
+}) {
+  return (
+    <input
+      aria-label={label}
+      key={title}
+      defaultValue={title}
+      placeholder={placeholder}
+      maxLength={200}
+      disabled={disabled}
+      className="h-7 min-w-16 max-w-full shrink rounded-md bg-transparent px-1.5 text-sm font-medium text-foreground outline-none [field-sizing:content] placeholder:text-muted-foreground hover:bg-state-hover focus:bg-state-hover disabled:opacity-60"
+      onKeyDown={(event) => {
+        if (event.key === "Enter") event.currentTarget.blur();
+        if (event.key === "Escape") {
+          event.currentTarget.value = title;
+          event.currentTarget.blur();
+        }
+      }}
+      onBlur={(event) => {
+        const next = event.currentTarget.value.trim();
+        if (next !== title) onRename(next);
+      }}
+    />
+  );
+}
+
+export function BarSeparator() {
+  return <span aria-hidden className="shrink-0 text-sm text-muted-foreground/50">/</span>;
 }
 
 export function ItemHeader({
@@ -104,11 +213,12 @@ export function ItemHeader({
   chatAction,
   className,
 }: {
+  /** Where back goes, as the first crumb. */
   backLabel: string;
   onBack(): void;
-  /** Breadcrumbs or status beside the back pill. */
+  /** The item's crumbs, title, or status after the back crumb. */
   leading?: ReactNode;
-  /** The view's buttons, built from ICON_BUTTON and FLOATING_BUTTON. */
+  /** The view's own tools: ICON_BUTTONs, then the item menu. */
   trailing?: ReactNode;
   /** Adds the shared Chat action for this item. */
   thread?: ItemThread;
@@ -118,18 +228,20 @@ export function ItemHeader({
   chatAction?: ReactNode;
   className?: string;
 }) {
-  const header = useRef<HTMLDivElement>(null);
+  const anchor = useRef<HTMLDivElement>(null);
+  const inFloat = useInFloat();
+  const slot = useBarSlot(anchor, !inFloat);
   const [compact, setCompact] = useState(() => typeof window !== "undefined" && window.innerWidth < 600);
   useLayoutEffect(() => {
-    const measure = () => setCompact((header.current?.getBoundingClientRect().width || window.innerWidth) < 600);
+    const measured = slot ?? anchor.current;
+    const measure = () => setCompact((measured?.getBoundingClientRect().width || window.innerWidth) < 520);
     measure();
-    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(measure);
-    if (header.current) observer?.observe(header.current);
+    const observer = typeof ResizeObserver === "undefined" || !measured ? null : new ResizeObserver(measure);
+    if (measured) observer?.observe(measured);
     window.addEventListener("resize", measure);
     return () => { observer?.disconnect(); window.removeEventListener("resize", measure); };
-  }, []);
+  }, [slot]);
   const newThread = useNewItemThread(thread);
-  const inFloat = useInFloat();
   const moved = item ?? thread;
   // Studio Chat owns item links and conversation creation across item views.
   const studioChat = useStudioChatPresent();
@@ -139,42 +251,39 @@ export function ItemHeader({
   const relatedRef = chatItem?.ref ?? (path[1] === "plugins" && path[2] && path[4]
     ? { pluginId: path[2], id: decodeURIComponent(path[4]) }
     : null);
-  return (
-    <div
-      ref={header}
-      data-studio-item-header=""
-      className={cn(
-        "pointer-events-none absolute inset-x-0 top-0 z-40 flex items-start justify-between gap-2 p-3 max-md:p-2",
-        className,
-      )}
-    >
-      <div className="pointer-events-auto flex min-w-0 items-center gap-1.5">
-        {!inFloat ? <button
-          type="button"
-          aria-label={`Back to ${backLabel}`}
-          className={cn(
-            FLOATING,
-            "flex h-8 shrink-0 items-center gap-1 rounded-md pr-3 pl-2 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground",
-          )}
-          onClick={onBack}
-        >
-          <Icon name="ChevronLeft" className="size-4" /> <span className={compact ? "sr-only" : undefined}>{backLabel}</span>
-        </button> : null}
+  const tools = relatedRef && studio || (moved && !inFloat) || trailing;
+  const bar = (
+    <div data-studio-bar="" data-studio-item-header="" className="flex h-full min-w-0 flex-1 items-center gap-2">
+      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
+        {!inFloat ? <>
+          <BarCrumb onClick={onBack} title={`Back to ${backLabel}`}>{backLabel}</BarCrumb>
+          {leading ? <BarSeparator /> : null}
+        </> : null}
         {leading}
-      </div>
-      {trailing || thread || moved ? <div className="pointer-events-auto flex shrink-0 items-center gap-1.5">
+      </nav>
+      {chatAction !== null && (chatAction || thread || relatedRef) || tools ? <div className="flex shrink-0 items-center gap-0.5">
         {chatAction}
-        {chatAction === undefined && thread && studioChat === false ? <button type="button" className={FLOATING_BUTTON} onClick={newThread}>
+        {chatAction === undefined && thread && studioChat === false ? <button type="button" className={BAR_BUTTON} onClick={newThread}>
           <Icon name="MessageSquare" /> Chat
         </button> : null}
         {chatAction === undefined && relatedRef && studioChat ? <HomeThreadChip item={relatedRef} /> : null}
-        {(relatedRef && studio) || (moved && !inFloat) || trailing ? <ItemActions compact={compact}>
+        {tools ? <ItemActions compact={compact}>
           {relatedRef && studio ? <SpacePicker item={relatedRef} /> : null}
-          {relatedRef && studio ? <RelatedPanel ref={relatedRef} compact={inFloat} /> : null}
+          {relatedRef && studio ? <RelatedPanel ref={relatedRef} /> : null}
           {moved && !inFloat ? <ViewMoveMenu item={moved} onBack={onBack} /> : null}
+          {trailing && ((relatedRef && studio) || (moved && !inFloat)) && !compact ? <span aria-hidden className="mx-1 h-4 w-px bg-border" /> : null}
           {trailing}
         </ItemActions> : null}
       </div> : null}
+    </div>
+  );
+  if (slot) return <>
+    <span ref={anchor} hidden />
+    {createPortal(bar, slot)}
+  </>;
+  return (
+    <div ref={anchor} className={cn("flex h-11 shrink-0 items-center border-b border-border bg-background px-2", className)}>
+      {bar}
     </div>
   );
 }
@@ -186,10 +295,10 @@ function HomeThreadChip({ item }: { item: ItemChatRef }) {
   const openingDialog = useRef<(() => void) | null>(null);
   if (!host) return null;
   return (
-    <div data-studio-chat-item={`${item.pluginId}:${item.id}`} className={cn(FLOATING, "flex h-8 shrink-0 items-center rounded-md text-sm text-muted-foreground")}>
+    <div data-studio-chat-item={`${item.pluginId}:${item.id}`} className="flex h-7 shrink-0 items-center rounded-md text-sm text-muted-foreground">
       <button
         type="button"
-        className="flex h-full items-center gap-1.5 rounded-l-md pr-2 pl-2.5 hover:bg-state-hover hover:text-foreground disabled:opacity-50"
+        className="flex h-full items-center gap-1.5 rounded-l-md pr-1.5 pl-2 hover:bg-state-hover hover:text-foreground disabled:opacity-50"
         title={home ? `Continue "${home.title}"` : "Start a conversation about this item"}
         disabled={home === undefined}
         onClick={() => host.open(item)}
@@ -198,7 +307,7 @@ function HomeThreadChip({ item }: { item: ItemChatRef }) {
       </button>
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button type="button" aria-label="Chat options" className="flex h-full shrink-0 items-center rounded-r-md px-1.5 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
+          <button type="button" aria-label="Chat options" className="flex h-full shrink-0 items-center rounded-r-md px-1 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
             <Icon name="ChevronDown" className="size-3.5" />
           </button>
         </DropdownMenuTrigger>
@@ -216,10 +325,10 @@ function HomeThreadChip({ item }: { item: ItemChatRef }) {
             <Icon name="MessageSquarePlus" className="size-4" /> New conversation
           </DropdownMenuItem>
           <DropdownMenuItem onSelect={() => { openingDialog.current = () => host.choose(item); }}>
-            <Icon name="ArrowLeftRight" className="size-4" /> Choose conversation…
+            <Icon name="MoveTo" className="size-4" /> Choose conversation…
           </DropdownMenuItem>
           {home ? <DropdownMenuItem onSelect={() => void host.unlink(item)}>
-            <Icon name="Unlink" className="size-4" /> Unlink
+            <Icon name="CircleX" className="size-4" /> Unlink
           </DropdownMenuItem> : null}
         </DropdownMenuContent>
       </DropdownMenu>

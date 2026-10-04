@@ -2,7 +2,7 @@
 // sub-path filters it to a kind or opens a space, the sidebar's Studio tabs
 // (spaces among them), each thread's spaces under its composer, and Studio
 // search.
-import { FloatPanels, retainPanel } from "@bb-studio/kit/app";
+import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ManageSpace } from "./src/ui/ManageSpace";
 import { NewSpace } from "./src/ui/NewSpace";
@@ -23,7 +23,7 @@ function StudioRoot({ subPath }: { subPath: string }) {
 export default definePluginApp((app) => {
   // Spaces as projects: a lead, its page beside it (docs/spaces-as-projects.md).
   registerSpaces(app);
-  app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot) });
+  app.slots.navPanel({ id: "studio", title: "Studio", icon: "studio/studio", path: "studio", component: retainPanel("studio", StudioRoot), headerContent: StudioBarSlot });
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="studio" render={(subPath) => <StudioRoot subPath={subPath} />} /> });
   // Renders nothing itself; portals the tabs section into the Studio Sidebar.

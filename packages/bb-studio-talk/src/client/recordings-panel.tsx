@@ -5,6 +5,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { toast } from "sonner";
 import {
+  BarCrumb,
   AddOnCollection,
   Badge,
   DANGER_BUTTON,
@@ -26,7 +27,7 @@ import {
   type ProviderCall,
 } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
-import { errorMessage, formatBytes, shortDateTime } from "@bb-studio/kit/format";
+import { errorMessage, formatBytes, shortDateTime, untitled } from "@bb-studio/kit/format";
 import {
   useBbNavigate,
   useRealtime,
@@ -131,7 +132,7 @@ function UnsentAudio() {
   return (
     <div className="relative h-full">
       <ItemHeader backLabel={studio ? "Studio" : "Recordings"} onBack={toCollection} />
-      <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
+      <PageColumn className="max-w-3xl">
         <h1 className="text-2xl font-semibold tracking-tight">Unsent audio</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           The server refused these pieces of audio, so Talk kept them on this device instead of losing them. Retry
@@ -325,7 +326,7 @@ function RecordingDetail({ id }: { id: string }) {
     return (
       <div className="relative h-full">
         <ItemHeader backLabel={backLabel} onBack={() => toCollection()} />
-        <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
+        <PageColumn className="max-w-3xl">
           <p className="text-sm text-destructive">{error}</p>
         </PageColumn>
       </div>
@@ -335,7 +336,7 @@ function RecordingDetail({ id }: { id: string }) {
     return (
       <div className="relative h-full">
         <ItemHeader backLabel={backLabel} onBack={() => toCollection()} />
-        <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
+        <PageColumn className="max-w-3xl">
           <p className="text-sm text-muted-foreground">Loading…</p>
         </PageColumn>
       </div>
@@ -357,12 +358,15 @@ function RecordingDetail({ id }: { id: string }) {
   };
 
   return (
-    <div className="relative h-full">
+    <div className="flex h-full min-h-0 flex-col">
       <ItemHeader
         backLabel={backLabel}
         onBack={() => toCollection()}
         thread={{ title: recording.title, href: recordingHref(recording.id) }}
-        leading={badge ? <Badge label={badge.label} tone={badge.tone} /> : null}
+        leading={<>
+          <BarCrumb current><span className="truncate">{untitled(recording.title)}</span></BarCrumb>
+          {badge ? <span className="ml-1 shrink-0"><Badge label={badge.label} tone={badge.tone} /></span> : null}
+        </>}
         trailing={
           <>
             <button type="button" aria-label="Copy transcript" title="Copy transcript" className={ICON_BUTTON} disabled={transcript === ""} onClick={copy}>
@@ -403,7 +407,7 @@ function RecordingDetail({ id }: { id: string }) {
           </>
         }
       />
-      <PageColumn className="max-w-3xl @max-3xl/page:pt-16">
+      <PageColumn className="max-w-3xl">
         <EditableTitle
           title={recording.title}
           placeholder="Untitled recording"

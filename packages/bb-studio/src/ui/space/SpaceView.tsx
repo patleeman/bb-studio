@@ -12,18 +12,18 @@ import {
   type PluginThreadHeaderActionProps,
 } from "@get-bb/plugin-sdk/app";
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@bb-studio/kit/ui";
-import { GHOST_BUTTON, Icon, openAppPath, PageColumn } from "@bb-studio/kit/app";
+import { BAR_BUTTON, ICON_BUTTON, Icon, openAppPath, PageColumn, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { useEffect, useState } from "react";
 import { NEW_SPACE_EVENT, SPACE_DIALOG_EVENT } from "../../ids";
 import { useCall, useSpaceLead, useSpaceOf, useSpaces, type Cadence, type SpaceLead } from "./data";
 import { HandoffDialog } from "./Handoff";
 import { SPACES_PANEL, spaceIdOf } from "./routes";
-import { MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE } from "./styles";
+import { cn, MENU, MENU_ITEM, MENU_SEPARATOR, PORTAL_SCOPE } from "./styles";
 
 /** BB's title bar for the panel: New Space on the list of Spaces. */
 export function SpacesHeader({ subPath }: PluginNavPanelProps) {
   if (spaceIdOf(subPath)) return null;
-  return <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(NEW_SPACE_EVENT, { cancelable: true }))} className={GHOST_BUTTON}><Icon name="Plus" className="size-4" />New Space</button>;
+  return <button type="button" onClick={() => window.dispatchEvent(new CustomEvent(NEW_SPACE_EVENT, { cancelable: true }))} className={cn(BAR_BUTTON, "text-foreground")}><Icon name="Plus" className="size-4" />New Space</button>;
 }
 
 export function SpacesPanel({ subPath }: PluginNavPanelProps) {
@@ -64,7 +64,7 @@ export const RUN_LABELS: Record<Cadence, string> = {
 };
 
 /** A heartbeat schedules future lead turns; it never interrupts a worker. */
-export function RunMenu({ lead, onChanged, compact = false }: { lead: SpaceLead; onChanged: () => void; compact?: boolean }) {
+export function RunMenu({ lead, onChanged }: { lead: SpaceLead; onChanged: () => void }) {
   const call = useCall();
   const run = lead.run?.enabled ? lead.run : null;
   const [custom, setCustom] = useState(false);
@@ -91,8 +91,8 @@ export function RunMenu({ lead, onChanged, compact = false }: { lead: SpaceLead;
   };
   return <>
     <Menu.Root>
-      <Menu.Trigger disabled={saving} className={GHOST_BUTTON} title={run ? `Heartbeat: ${RUN_LABELS[run.cadence]}` : "Heartbeat is off"}>
-        <Icon name="Repeat" className="size-4" />{compact ? <span className="sr-only">Heartbeat</span> : "Heartbeat"}
+      <Menu.Trigger disabled={saving} aria-label="Heartbeat" aria-pressed={Boolean(run)} className={ICON_BUTTON} title={run ? `Heartbeat: ${RUN_LABELS[run.cadence]}` : "Heartbeat is off"}>
+        <Icon name="Repeat" className="size-4" />
       </Menu.Trigger>
       <Menu.Portal><Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
         <p className="max-w-64 px-2 pt-1 pb-2 text-xs text-muted-foreground">The lead checks the Space and reports to your Inbox. Turning this off leaves running threads working.</p>
@@ -118,7 +118,7 @@ export function RunMenu({ lead, onChanged, compact = false }: { lead: SpaceLead;
         <select aria-label="Heartbeat interval unit" value={unit} onChange={(event) => setUnit(event.target.value)} className="rounded border border-border bg-background px-3 py-2"><option value="minutes">minutes</option><option value="hours">hours</option></select>
       </div>
       {error ? <p role="alert" className="text-sm text-destructive">{error}</p> : null}
-      <button type="button" disabled={saving} onClick={saveCustom} className={GHOST_BUTTON}>{saving ? "Saving…" : "Save heartbeat"}</button>
+      <button type="button" disabled={saving} onClick={saveCustom} className={PRIMARY_BUTTON}>{saving ? "Saving…" : "Save heartbeat"}</button>
     </DialogContent></Dialog>
   </>;
 }
@@ -161,7 +161,7 @@ const threadPath = (threadId: string) => `/threads/${encodeURIComponent(threadId
 function SpaceOptions({ spaceId, onHandOff }: { spaceId: string; onHandOff?: () => void }) {
   return (
     <Menu.Root>
-      <Menu.Trigger aria-label="Space options" title="Space options" className={GHOST_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></Menu.Trigger>
+      <Menu.Trigger aria-label="Space options" title="Space options" className={ICON_BUTTON}><Icon name="MoreHorizontal" className="size-4" /></Menu.Trigger>
       <Menu.Portal>
         <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
           {onHandOff ? <Menu.Item className={MENU_ITEM} onSelect={onHandOff}><Icon name="Fork" />Hand off lead…</Menu.Item> : null}
@@ -178,7 +178,7 @@ function SpaceOptions({ spaceId, onHandOff }: { spaceId: string; onHandOff?: () 
 }
 
 /** The lead's thread header: Heartbeat and Space options. Nothing on other threads. */
-export function SpaceLeadHeader({ threadId, isCompactViewport }: PluginThreadHeaderActionProps) {
+export function SpaceLeadHeader({ threadId }: PluginThreadHeaderActionProps) {
   const spaceId = useSpaceOf()(threadId);
   const lead = useSpaceLead(spaceId);
   const { projects } = useSidebarThreads();
@@ -187,7 +187,7 @@ export function SpaceLeadHeader({ threadId, isCompactViewport }: PluginThreadHea
   const startIn = lead.data.defaultProjectId ?? projects.find((project) => project.isPersonal)?.id ?? null;
   return (
     <div className="flex items-center gap-0.5">
-      <RunMenu lead={lead.data} onChanged={lead.refresh} compact={isCompactViewport} />
+      <RunMenu lead={lead.data} onChanged={lead.refresh} />
       <SpaceOptions spaceId={spaceId} onHandOff={() => setHandingOff(true)} />
       {startIn ? <HandoffDialog threadId={threadId} projectId={startIn} open={handingOff} onOpenChange={setHandingOff} onDone={() => lead.refresh()} /> : null}
     </div>

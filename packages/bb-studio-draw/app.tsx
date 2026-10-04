@@ -21,7 +21,7 @@ import { ExcalidrawPicker } from "./components/excalidraw-picker";
 import { createExcalidrawComposerCustomization } from "./lib/composer-registration";
 import { blobToBase64, parseScene, renderSceneToPng } from "./lib/scene";
 import { callRpc } from "./lib/rpc";
-import { FloatPanels, retainPanel, ThreadItemsPanel } from "@bb-studio/kit/app";
+import { FloatPanels, retainPanel, StudioBarSlot, ThreadItemsPanel } from "@bb-studio/kit/app";
 import { DRAW_ICON, PANEL_PATH, PLUGIN_ID, REALTIME_CHANNEL } from "./src/shared";
 
 function DrawingsSurface({ threadId }: { threadId: string }) {
@@ -66,6 +66,7 @@ export default definePluginApp((app) => {
     icon: DRAW_ICON,
     path: PANEL_PATH,
     component: retainPanel(PANEL_PATH, DrawingsPanel),
+    headerContent: StudioBarSlot,
   });
 
   // Shows the panel in Float windows open on its paths.

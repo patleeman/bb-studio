@@ -22,8 +22,10 @@ import {
   Badge,
   Checkbox,
   DANGER_BUTTON,
+  BAR_BUTTON,
   EmptyState,
   GHOST_BUTTON,
+  ICON_BUTTON,
   Highlight,
   ItemTile,
   OUTLINE_BUTTON,
@@ -34,6 +36,7 @@ import {
   THUMBNAIL,
   type Project,
 } from "./pieces";
+import { BarCrumb, StudioBar } from "./item-header";
 import {
   DEFAULT_SORT,
   formatSort,
@@ -616,11 +619,12 @@ export function CollectionPage({
       <DropdownMenuTrigger asChild>
         <button
           type="button"
-          title="Sort and group"
-          className="flex h-9 shrink-0 items-center gap-1.5 rounded-md border border-border px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
+          aria-label="Display"
+          title={grouping === "none" ? "Sort and group" : `Grouped by ${GROUP_LABELS[grouping].toLowerCase()}`}
+          aria-pressed={grouping !== "none"}
+          className={ICON_BUTTON}
         >
           <Icon name="SlidersHorizontal" className="size-4" />
-          <span className="@max-xl/page:hidden">{grouping === "none" ? "Display" : `By ${GROUP_LABELS[grouping].toLowerCase()}`}</span>
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="w-52">
@@ -773,7 +777,15 @@ export function CollectionPage({
 
   const hasRail = filter !== undefined && filter.rail !== undefined;
   return (
-    <PageColumn className={cn(filter && "max-w-6xl")}>
+    <PageColumn className={cn("pt-6", filter && "max-w-6xl")}>
+      <StudioBar>
+        <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center"><BarCrumb current>{title}</BarCrumb></nav>
+        <div className="flex shrink-0 items-center gap-0.5">
+          {displayMenu}
+          {headerActions}
+          {newButton(cn(BAR_BUTTON, "text-foreground"))}
+        </div>
+      </StudioBar>
       {splitAnchor}
       {rowContext ? (
         <DropdownMenu key={`${rowContext.x},${rowContext.y}`} open modal={false} onOpenChange={(open) => !open && setRowContext(null)}>
@@ -785,8 +797,7 @@ export function CollectionPage({
           </DropdownMenuContent>
         </DropdownMenu>
       ) : null}
-      <h1 className="text-[28px] leading-tight font-semibold tracking-tight">{title}</h1>
-      <div className="mt-6 flex items-center gap-2">
+      <div className="flex items-center gap-2">
         {filter ? (
           <div className="min-w-0 flex-1">{filter.bar}</div>
         ) : (
@@ -812,11 +823,6 @@ export function CollectionPage({
             ) : null}
           </label>
         )}
-        <div className="ml-auto flex items-center gap-2">
-          {displayMenu}
-          {headerActions}
-          {newButton()}
-        </div>
       </div>
 
       {notice ? <div className="mt-4">{notice}</div> : null}

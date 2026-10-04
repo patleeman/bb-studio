@@ -15,7 +15,7 @@ export {
 export { AddOnCollection, type ProviderCall } from "./add-on";
 export { AddOnPanel, useAddOnPanel } from "./add-on-panel";
 export { ThreadItemsPanel } from "./thread-items";
-export { EditableTitle, ItemHeader, ViewMoveMenu, openNewItemThread, useNewItemThread, type ItemThread } from "./item-header";
+export { BarCrumb, BarSeparator, BarTitle, EditableTitle, ItemHeader, StudioBar, StudioBarSlot, ViewMoveMenu, openNewItemThread, useNewItemThread, type ItemThread } from "./item-header";
 export { RelatedPanel, type RelatedRef } from "./related-panel";
 export { SpaceMark, SpaceMenuItems, SpacePicker, type MenuSpace } from "./space-picker";
 export { spaceMembership, type SpaceHolder, type SpaceMembership } from "./space-state";
@@ -30,7 +30,7 @@ export {
   DANGER_BUTTON,
   EmptyState,
   FLOATING,
-  FLOATING_BUTTON,
+  BAR_BUTTON,
   GHOST_BUTTON,
   Highlight,
   ICON_BUTTON,

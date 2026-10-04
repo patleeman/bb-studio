@@ -18,7 +18,8 @@ import "../assets/excalidraw/excalidraw.css";
 import "../assets/excalidraw-theme.css";
 import {
   DropdownMenuItem,
-  FLOATING_BUTTON,
+  BAR_BUTTON,
+  BarTitle,
   ICON_BUTTON,
   Icon,
   ItemHeader,
@@ -471,7 +472,7 @@ export function DrawingEditor({
           ? "Live — agent edits appear here automatically"
           : "Reconnecting to live sync…"
       }
-      className="flex h-8 shrink-0 items-center gap-1.5 px-1 text-xs text-muted-foreground max-sm:hidden"
+      className="flex h-7 shrink-0 items-center gap-1.5 px-1.5 text-xs text-muted-foreground max-sm:hidden"
     >
       <span
         aria-hidden="true"
@@ -490,8 +491,8 @@ export function DrawingEditor({
   ) : (
     <>
       {threadId ? (
-        <button type="button" className={FLOATING_BUTTON} disabled={attaching} onClick={() => void attachAsImage()}>
-          <Icon name={attaching ? "Loading" : "Paperclip"} className={attaching ? SPIN : undefined} /> Attach
+        <button type="button" aria-label="Attach to thread" title="Attach to thread as an image" className={ICON_BUTTON} disabled={attaching} onClick={() => void attachAsImage()}>
+          <Icon name={attaching ? "Loading" : "Paperclip"} className={cn("size-4", attaching && SPIN)} />
         </button>
       ) : null}
       <button type="button" aria-label="Copy image" title="Copy image" className={ICON_BUTTON} onClick={() => void copyImage()}>
@@ -516,27 +517,17 @@ export function DrawingEditor({
       <ItemHeader
         thread={threadId || confirmDelete ? undefined : thread}
         item={thread}
-        className="relative shrink-0 items-center border-b border-border/70"
         backLabel={backLabel}
         onBack={() => onBack()}
         leading={
           <>
-            <input
-              aria-label="Drawing name"
+            <BarTitle
               key={`${drawingId}:${name}`}
-              defaultValue={name}
+              title={name}
+              label="Drawing name"
               placeholder="Untitled drawing"
-              maxLength={200}
               disabled={loading || recoveryDrafts.length > 0}
-              className="h-8 w-56 min-w-0 rounded-md bg-transparent px-2 text-sm font-medium outline-none placeholder:text-muted-foreground hover:bg-state-hover focus:bg-state-hover max-md:w-32"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-                if (event.key === "Escape") {
-                  event.currentTarget.value = name;
-                  event.currentTarget.blur();
-                }
-              }}
-              onBlur={(event) => rename(event.currentTarget.value)}
+              onRename={rename}
             />
             {loading ? null : status}
           </>
@@ -545,23 +536,23 @@ export function DrawingEditor({
       />
       {localError || draftLoadError ? <div role="alert" className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm text-destructive">
         <span className="min-w-0 flex-1">Local recovery storage failed: {localError || draftLoadError}. Keep this drawing open until the server says Saved.</span>
-        <button type="button" className={FLOATING_BUTTON} onClick={() => void draftSession.retry().then(checkDrafts)}>Retry local storage</button>
+        <button type="button" className={BAR_BUTTON} onClick={() => void draftSession.retry().then(checkDrafts)}>Retry local storage</button>
       </div> : null}
       {recoveryDraft ? <div className="flex flex-wrap items-center gap-2 border-b border-border px-3 py-2 text-sm" role="region" aria-label="Unsaved drawing recovery">
         <span className="min-w-0 flex-1">{baseRevision.current === recoveryDraft.baseRevision ? "An unsaved local draft is available." : "The server drawing changed or is unavailable. Save the local draft as a copy to keep both versions."}</span>
         {recoveryDrafts.length > 1 ? <select aria-label="Local draft to recover" value={recoveryDraft.id} onChange={event => setSelectedDraft(event.target.value)} disabled={recoveryBusy}>
           {recoveryDrafts.map(draft => <option key={draft.id} value={draft.id}>{new Date(draft.updatedAt).toLocaleString()}</option>)}
         </select> : null}
-        <button type="button" className={FLOATING_BUTTON} disabled={recoveryBusy} onClick={() => void recoverDraft("recover")}>Recover draft</button>
-        <button type="button" className={FLOATING_BUTTON} disabled={recoveryBusy} onClick={() => void recoverDraft("copy")}>Save as copy</button>
-        <button type="button" className={FLOATING_BUTTON} onClick={downloadDraft}>Download draft</button>
-        <button type="button" className={FLOATING_BUTTON} disabled={recoveryBusy} onClick={() => { if (confirm("Discard this unsaved local draft?")) void recoverDraft("discard"); }}>Discard draft</button>
+        <button type="button" className={BAR_BUTTON} disabled={recoveryBusy} onClick={() => void recoverDraft("recover")}>Recover draft</button>
+        <button type="button" className={BAR_BUTTON} disabled={recoveryBusy} onClick={() => void recoverDraft("copy")}>Save as copy</button>
+        <button type="button" className={BAR_BUTTON} onClick={downloadDraft}>Download draft</button>
+        <button type="button" className={BAR_BUTTON} disabled={recoveryBusy} onClick={() => { if (confirm("Discard this unsaved local draft?")) void recoverDraft("discard"); }}>Discard draft</button>
         {recoveryError ? <p role="alert" className="w-full text-destructive">{recoveryError} Your local draft is retained; retry or save a copy.</p> : null}
       </div> : null}
       {saveError ? (
         <div role="alert" className="flex shrink-0 items-center gap-2 border-b border-border px-3 py-2 text-sm text-destructive">
           <span className="min-w-0 flex-1">Changes are not saved: {saveError}</span>
-          <button type="button" className={FLOATING_BUTTON} onClick={() => saveQueue.retry()}>Retry save</button>
+          <button type="button" className={BAR_BUTTON} onClick={() => saveQueue.retry()}>Retry save</button>
         </div>
       ) : null}
       <div

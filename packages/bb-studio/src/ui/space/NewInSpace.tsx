@@ -2,7 +2,7 @@
 // belongs to the Space, and opens beside the lead. Shared by the status tab's
 // New menu and the "New in Space" tab in the workbench's New tab menu.
 import * as Menu from "@radix-ui/react-dropdown-menu";
-import { GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
+import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
 import type { StudioCreateEventDetail } from "@bb-studio/kit/contract";
 import { errorMessage } from "@bb-studio/kit/format";
 import { useRpc } from "@get-bb/plugin-sdk/app";
@@ -72,7 +72,7 @@ export function NewInSpaceMenu({ spaceId, onCreated, label = "New" }: { spaceId:
   const create = useCreateInSpace(spaceId);
   return (
     <Menu.Root onOpenChange={(open) => { if (open) load(); }}>
-      <Menu.Trigger className={GHOST_BUTTON} title="New Studio item in this Space"><Icon name="Plus" className="size-4" />{label}</Menu.Trigger>
+      <Menu.Trigger className={BAR_BUTTON} title="New Studio item in this Space"><Icon name="Plus" className="size-4" />{label}</Menu.Trigger>
       <Menu.Portal>
         <Menu.Content {...PORTAL_SCOPE} align="end" className={MENU}>
           {(kinds ?? []).map((kind) => (

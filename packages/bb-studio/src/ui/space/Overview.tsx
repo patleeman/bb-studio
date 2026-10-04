@@ -8,7 +8,7 @@ import {
   type PluginSidebarThread,
   type PluginThreadPanelProps,
 } from "@get-bb/plugin-sdk/app";
-import { GHOST_BUTTON, Icon } from "@bb-studio/kit/app";
+import { BAR_BUTTON, Icon } from "@bb-studio/kit/app";
 import { useMemo, useState, type ReactNode } from "react";
 import { useSpaceLead, useSpaceOf, useSpaceOverview, type OverviewItem, type OverviewThread, type SpaceLead } from "./data";
 import { NewInSpaceMenu } from "./NewInSpace";
@@ -149,7 +149,7 @@ export function SpaceStatus({ spaceId }: { spaceId: string }) {
               {beat ? <span>{beat}</span> : null}
             </p>
           </div>
-          <button type="button" onClick={() => setStarting(true)} className={GHOST_BUTTON} title="Start a thread in this Space"><Icon name="MessageSquarePlus" className="size-4" />Thread</button>
+          <button type="button" onClick={() => setStarting(true)} className={BAR_BUTTON} title="Start a thread in this Space"><Icon name="MessageSquarePlus" className="size-4" />Thread</button>
           <NewInSpaceMenu spaceId={spaceId} onCreated={(item) => openItemTab(navigate, item)} />
         </header>
 
@@ -199,7 +199,7 @@ export function SpaceStatus({ spaceId }: { spaceId: string }) {
           ) : null}
 
           {idle.length ? (
-            <Section title="Idle" count={idle.length} action={idle.length > IDLE_SHOWN ? <button type="button" onClick={() => setShowAllIdle((value) => !value)} className={GHOST_BUTTON} aria-expanded={showAllIdle}>{showAllIdle ? "Show fewer" : "Show all"}</button> : null}>
+            <Section title="Idle" count={idle.length} action={idle.length > IDLE_SHOWN ? <button type="button" onClick={() => setShowAllIdle((value) => !value)} className={BAR_BUTTON} aria-expanded={showAllIdle}>{showAllIdle ? "Show fewer" : "Show all"}</button> : null}>
               <div className="-mx-2">{(showAllIdle ? idle : idle.slice(0, IDLE_SHOWN)).map((row) => <ThreadRow key={row.thread.id} row={row} live={live.get(row.thread.id)} onOpen={() => open(row)} />)}</div>
             </Section>
           ) : null}

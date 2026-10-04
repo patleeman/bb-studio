@@ -8,7 +8,7 @@ const state = vi.hoisted(() => ({ call: vi.fn(), companion: vi.fn(), main: vi.fn
 vi.mock("@get-bb/plugin-sdk/app", () => ({ useRpc: () => ({ call: state.call }), useBbNavigate: () => ({ toThread: state.main }) }));
 vi.mock("../bot-ui", () => ({ message: (error: unknown) => error instanceof Error ? error.message : String(error) }));
 vi.mock("@bb-studio/kit/app", () => ({
-  FLOATING: "", Icon: () => null, openCompanion: state.companion,
+  Icon: () => null, openCompanion: state.companion,
   DropdownMenu: ({ children }: any) => children,
   DropdownMenuTrigger: ({ children }: any) => children,
   DropdownMenuContent: ({ children }: any) => children,

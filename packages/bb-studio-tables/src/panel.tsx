@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
-import { AddOnCollection, FLOATING_BUTTON, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, ThreadItemsPanel, useAddOnPanel } from "@bb-studio/kit/app";
+import { AddOnCollection, BAR_BUTTON, BarTitle, ICON_BUTTON, Icon, ItemHeader, ItemMenu, openAppPath, ThreadItemsPanel, useAddOnPanel } from "@bb-studio/kit/app";
 import { errorMessage } from "@bb-studio/kit/format";
 import { TABLES_CHANNEL, TABLES_PANEL, TABLES_PLUGIN_ID, parseTableSubPath, tableHref, tableSubPath, type TableTarget, type TablesContract } from "@bb-studio/kit/tables";
 import { TableView, type TableApi, type TableHost, type TableItem } from "@bb-studio/kit/table-grid";
@@ -92,7 +92,7 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
   if (error || !table)
     return (
       <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-        <ItemHeader className="relative shrink-0 items-center border-b border-border/70" backLabel={backLabel} onBack={() => onBack()} />
+        <ItemHeader backLabel={backLabel} onBack={() => onBack()} />
         <div className="space-y-3 p-6">
           <p role={error ? "alert" : "status"} className={`text-sm ${error ? "text-destructive" : "text-muted-foreground"}`}>
             {error || "Loading table…"}
@@ -100,7 +100,7 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
           {error && (
             <button
               type="button"
-              className={FLOATING_BUTTON}
+              className={BAR_BUTTON}
               onClick={() => {
                 setLoad({ table: null, error: "" });
                 setVersion((n) => n + 1);
@@ -115,29 +115,10 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
       <ItemHeader
-        className="relative shrink-0 items-center border-b border-border/70"
         backLabel={backLabel}
         onBack={() => onBack()}
         leading={
-          <input
-            aria-label="Table title"
-            key={table.title}
-            defaultValue={table.title}
-            maxLength={200}
-            className="h-8 min-w-24 max-w-md rounded-md bg-transparent px-2 text-sm font-medium outline-none [field-sizing:content] hover:bg-state-hover focus:bg-state-hover max-md:max-w-32"
-            onKeyDown={(event) => {
-              if (event.key === "Enter") event.currentTarget.blur();
-              if (event.key === "Escape") {
-                event.currentTarget.value = table.title;
-                event.currentTarget.blur();
-              }
-            }}
-            onBlur={(event) => {
-              const title = event.currentTarget.value.trim();
-              if (title && title !== table.title) rename(title);
-              else event.currentTarget.value = table.title;
-            }}
-          />
+          <BarTitle title={table.title} label="Table title" placeholder="Untitled table" onRename={(title) => { if (title) rename(title); }} />
         }
         thread={compact ? undefined : { title: table.title, href: tableHref({ tableId }) }}
         trailing={
@@ -153,25 +134,11 @@ function Editor({ target, onTargetChange, backLabel, onBack, compact = false }: 
                 if (picked) void importCsv(picked);
               }}
             />
-            <button
-              type="button"
-              className={compact ? ICON_BUTTON : FLOATING_BUTTON}
-              title="Add rows from a CSV, matching its headers to columns"
-              aria-label={compact ? "Import CSV" : undefined}
-              onClick={() => file.current?.click()}
-            >
-              <Icon name="PackageReceive" className={compact ? "size-4" : undefined} />
-              {compact ? null : " Import"}
+            <button type="button" className={ICON_BUTTON} title="Import CSV: add rows, matching its headers to columns" aria-label="Import CSV" onClick={() => file.current?.click()}>
+              <Icon name="PackageReceive" className="size-4" />
             </button>
-            <button
-              type="button"
-              className={compact ? ICON_BUTTON : FLOATING_BUTTON}
-              title="Download this view as CSV"
-              aria-label={compact ? "Export CSV" : undefined}
-              onClick={() => void exportCsv()}
-            >
-              <Icon name="Download" className={compact ? "size-4" : undefined} />
-              {compact ? null : " Export"}
+            <button type="button" className={ICON_BUTTON} title="Export this view as CSV" aria-label="Export CSV" onClick={() => void exportCsv()}>
+              <Icon name="Download" className="size-4" />
             </button>
             <ItemMenu reference={{ title: table.title, href: tableHref({ tableId }) }} />
           </>

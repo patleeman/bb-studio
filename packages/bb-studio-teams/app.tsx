@@ -5,7 +5,7 @@ import { useCallback, useEffect, useRef, useState } from "react";
 import { definePluginApp, useRpc, useRealtime, useBbNavigate, type PluginNavPanelProps } from "@get-bb/plugin-sdk/app";
 import type { Bot, BotListItem, Conversation, Job } from "./contract";
 import type { rpcContract } from "./client-contract";
-import { AddOnCollection, CopyReferenceMenuItem, type ProviderCall } from "@bb-studio/kit/app";
+import { AddOnCollection, BarCrumb, CopyReferenceMenuItem, StudioBarSlot, type ProviderCall } from "@bb-studio/kit/app";
 import type { StudioSchemas } from "@bb-studio/kit/contract";
 import { Button } from "@bb-studio/kit/ui";
 import { TabBar, ProfileForm, DocumentEditor, WorkList, ErrorMessage, message } from "./bot-ui";
@@ -105,7 +105,7 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
           ? "Working"
           : "Ready";
   return (
-    <div className="relative h-full min-h-0">
+    <div className="flex h-full min-h-0 flex-col">
       <ItemHeader
         item={{ href, title: bot.name }}
         chatAction={bot.retired ? null : <BotChat key={id} id={id} disabled={pending} onError={setError} />}
@@ -113,7 +113,10 @@ function BotDetail({ id, tab, href }: { id: string; tab: string; href: string })
         onBack={() =>
           openAppPath(studio ? studioPath("bot") : `/plugins/${PLUGIN_ID}/bots`)
         }
-        leading={<Badge label={statusLabel} tone={STATUS_TONES[botStatus]} />}
+        leading={<>
+          <BarCrumb current><span className="truncate">{bot.avatar ? `${bot.avatar} ` : ""}{bot.name}</span></BarCrumb>
+          <span className="ml-1 shrink-0"><Badge label={statusLabel} tone={STATUS_TONES[botStatus]} /></span>
+        </>}
         trailing={
           <>
             <DropdownMenu>
@@ -361,6 +364,7 @@ export default definePluginApp((app) => {
     icon: "Bot",
     path: "bots",
     component: retainPanel("bots", BotsPage),
+    headerContent: StudioBarSlot,
   });
   app.slots.navPanel({ id: "channels", title: "Channels", icon: "MessageSquare", path: "channels", component: retainPanel("channels", ViewsPage), headerContent: ViewHeader });
   app.slots.experimental_appOverlay({ id: "thread-badges", component: ThreadBadges });

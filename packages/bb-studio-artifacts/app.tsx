@@ -9,7 +9,7 @@
 //   - messageDirective `::artifact{id="art_…"}`: a card in a reply.
 //   - mention provider (server): `@artifact` works in every composer.
 import { toast } from "sonner";
-import { FloatPanels, retainPanel } from "@bb-studio/kit/app";
+import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { ArtifactCard } from "./components/artifact-card";
 import { ArtifactsPanel } from "./components/artifacts-panel";
@@ -25,6 +25,7 @@ export default definePluginApp((app) => {
     icon: ARTIFACT_ICON,
     path: PANEL_PATH,
     component: retainPanel(PANEL_PATH, ArtifactsPanel),
+    headerContent: StudioBarSlot,
   });
 
   // Shows the panel in Float windows open on its paths.

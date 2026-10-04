@@ -14,6 +14,7 @@ import {
   DropdownMenuTrigger,
   EmptyState,
   Icon,
+  ICON_BUTTON,
   GHOST_BUTTON,
   itemKey,
   PageColumn,
@@ -455,7 +456,8 @@ export function StudioPanel({ subPath }: { subPath: string }) {
         <button
           type="button"
           aria-label="Studio options"
-          className="flex size-9 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active"
+          title="Studio options"
+          className={ICON_BUTTON}
         >
           <Icon name="MoreHorizontal" className="size-4" />
         </button>
@@ -495,8 +497,7 @@ export function StudioPanel({ subPath }: { subPath: string }) {
 
   if (data && !providers.length) {
     return (
-      <PageColumn>
-        <h1 className="text-[28px] leading-tight font-semibold tracking-tight">Studio</h1>
+      <PageColumn className="pt-6">
         <EmptyState icon="studio/studio" title="No add-ons installed">
           Install one from Extensions.
         </EmptyState>

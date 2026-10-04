@@ -1,8 +1,8 @@
 import { untitled } from "@bb-studio/kit/format";
 import { ThreadTitle, useBbNavigate, useRealtime } from "@get-bb/plugin-sdk/app";
-import { ItemHeader, useFloatAvailable, useInFloat, useStudioChatPresent, useOpenCompanion } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarCrumb, BarSeparator, ItemHeader, useFloatAvailable, useInFloat, useStudioChatPresent, useOpenCompanion } from "@bb-studio/kit/app";
 import { FLOAT_RIGHT_VAR } from "@bb-studio/kit/contract";
-import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Fragment, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -19,7 +19,7 @@ import { HistoryDialog, KeepUpdatedDialog } from "./dialogs";
 import { PageChat } from "./PageChat";
 import { REALTIME_CHANNEL, type RealtimeEvent } from "../constants";
 import { PageEditor, type SidePanel } from "./PageEditor";
-import { actorName, FLOATING, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
+import { actorName, PageMenu, relativeTime, ICON_BUTTON, type BotsState, type Project, type Rpc } from "./shared";
 import { pageFieldKey, toggleTalk, useTalk, type TalkView } from "./talk";
 import { usePageTitle } from "./use-page-title";
 
@@ -135,7 +135,7 @@ function DictateButton({ talk, ready, onToggle }: { talk: TalkView; ready: boole
         aria-pressed
         disabled={working}
         onClick={onToggle}
-        className={cn(FLOATING, "flex h-8 items-center gap-1.5 rounded-md px-3 text-sm hover:bg-state-hover disabled:opacity-70")}
+        className={cn(BAR_BUTTON, "text-foreground")}
       >
         <Icon name={working ? "Mic" : "Square"} className={cn("size-3.5", working ? "animate-pulse" : "text-red-500")} />
         {talk.phase === "starting" ? "Starting…" : working ? "Transcribing…" : "Stop"}
@@ -168,19 +168,17 @@ function Breadcrumbs({ page, pages }: { page: PageMetaView; pages: PageMetaView[
     parent = found.parentId;
   }
   return (
-    <nav aria-label="Breadcrumbs" className={cn(FLOATING, "flex h-8 min-w-0 items-center gap-1 rounded-md px-3 text-sm text-muted-foreground max-md:hidden")}>
+    <>
       {trail.map((crumb) => (
-        <span key={crumb.id} className="flex min-w-0 items-center gap-1">
-          <button type="button" className="max-w-40 truncate hover:text-foreground" onClick={() => navigate.toPluginPanel("pages", { subPath: crumb.id })}>
-            {crumb.icon} {untitled(crumb.title)}
-          </button>
-          <Icon name="ChevronRight" className="size-3 shrink-0" />
-        </span>
+        <Fragment key={crumb.id}>
+          <BarCrumb onClick={() => navigate.toPluginPanel("pages", { subPath: crumb.id })}>
+            <span className="truncate max-md:max-w-24">{crumb.icon} {untitled(crumb.title)}</span>
+          </BarCrumb>
+          <BarSeparator />
+        </Fragment>
       ))}
-      <span className="max-w-64 truncate text-foreground">
-        {page.icon} {untitled(page.title)}
-      </span>
-    </nav>
+      <BarCrumb current><span className="truncate">{page.icon} {untitled(page.title)}</span></BarCrumb>
+    </>
   );
 }
 
@@ -293,7 +291,7 @@ function ActivityPill({
         <button
           type="button"
           aria-label={`Page activity: ${label}`}
-          className={cn(FLOATING, "flex h-8 max-w-56 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active")}
+          className={cn(BAR_BUTTON, "max-w-56")}
         >
           <Icon
             name={active.length ? "Spinner" : page.refresh ? "Repeat" : "Clock"}
@@ -445,9 +443,9 @@ export function PageView({
   return (
     // Floating chrome, the comments card and the chat are placed against this box.
     <div className="pages-doc relative flex h-full min-h-0 flex-col bg-background text-foreground">
-      {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-14 pb-2"><PersistenceBadge connection={connection} /></div> : null}
+      {persistenceVisible(connection) ? <div className="shrink-0 px-4 pt-3 pb-2"><PersistenceBadge connection={connection} /></div> : null}
       <div className="min-h-0 flex-1 overflow-auto">
-        <div className={cn("mx-auto w-full max-w-[828px] pt-4 pb-40", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
+        <div className={cn("mx-auto w-full max-w-[828px] pt-12 pb-40 max-md:pt-6", sidePanel && "min-[1280px]:max-w-[1168px] min-[1280px]:pr-[340px]")}>
           <div className="group/title px-[54px] max-md:px-4">
             {page.icon ? (
               <IconPicker page={page} rpc={rpc}>
@@ -580,7 +578,7 @@ export function PageView({
             className={ICON_BUTTON}
             onClick={() => setSidePanel((panel) => (panel === "comments" ? null : "comments"))}
           >
-            <Icon name="MessageSquare" className="size-4" />
+            <Icon name="MessageCirclePlus" className="size-4" />
           </button>
           <PageMenu
             page={page}

@@ -1,7 +1,7 @@
 import { untitled } from "@bb-studio/kit/format";
-import { FLOATING, NewConversationComposer, useOpenCompanion } from "@bb-studio/kit/app";
+import { NewConversationComposer, useOpenCompanion } from "@bb-studio/kit/app";
 import { useRef } from "react";
-import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon, cn } from "@bb-studio/kit/ui";
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger, Icon } from "@bb-studio/kit/ui";
 import type { PageMetaView } from "../contract";
 import type { Rpc } from "./shared";
 
@@ -11,15 +11,15 @@ export function PageChat({ page, threadId }: { page: PageMetaView; threadId: str
   const open = useOpenCompanion();
   const afterMenu = useRef<(() => void) | null>(null);
   const compose = () => open({ kind: "path", path: pageConversationPath(page.id), title: `Chat: ${untitled(page.title)}`, icon: "MessageSquare" });
-  return <div className={cn(FLOATING, "flex h-8 shrink-0 items-center rounded-md text-sm text-muted-foreground")}>
-    <button type="button" className="flex h-full items-center gap-1.5 rounded-l-md pr-2 pl-2.5 hover:bg-state-hover hover:text-foreground"
+  return <div className="flex h-7 shrink-0 items-center rounded-md text-sm text-muted-foreground">
+    <button type="button" className="flex h-full items-center gap-1.5 rounded-l-md pr-1.5 pl-2 hover:bg-state-hover hover:text-foreground"
       title={threadId ? "Continue this page's conversation" : "Start a conversation about this page"}
       onClick={() => threadId ? open({ kind: "thread", threadId }) : compose()}>
       <Icon name="MessageSquare" className="size-4 shrink-0" /> Chat
     </button>
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <button type="button" aria-label="Chat options" className="flex h-full shrink-0 items-center rounded-r-md px-1.5 hover:bg-state-hover hover:text-foreground">
+        <button type="button" aria-label="Chat options" className="flex h-full shrink-0 items-center rounded-r-md px-1 hover:bg-state-hover hover:text-foreground data-[state=open]:bg-state-active">
           <Icon name="ChevronDown" className="size-3.5" />
         </button>
       </DropdownMenuTrigger>

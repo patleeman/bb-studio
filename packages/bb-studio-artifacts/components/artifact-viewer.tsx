@@ -8,10 +8,10 @@ import {
   DropdownMenuSub,
   DropdownMenuSubContent,
   DropdownMenuSubTrigger,
-  FLOATING,
   GHOST_BUTTON,
   ICON_BUTTON,
   Icon,
+  BarTitle,
   ItemHeader,
   ItemDeleteConfirm,
   ItemMenu,
@@ -102,7 +102,7 @@ export function ArtifactViewer({
   if (!loaded?.artifact) {
     return (
       <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
-        <ItemHeader className="relative shrink-0 items-center border-b border-border/70" backLabel={backLabel} onBack={() => onBack()} />
+        <ItemHeader backLabel={backLabel} onBack={() => onBack()} />
         <div role="status" className="flex flex-1 items-center justify-center gap-2 text-sm text-muted-foreground">
           {error ?? (
             <>
@@ -185,19 +185,16 @@ export function ArtifactViewer({
   ) : (
     <>
       {canToggle ? (
-        <div role="group" aria-label="View" className={cn(FLOATING, "flex h-8 items-center rounded-md p-0.5 max-sm:hidden")}>
-          {(["preview", "source"] as const).map((each) => (
-            <button
-              key={each}
-              type="button"
-              aria-pressed={view === each}
-              className="h-7 rounded-[5px] px-2.5 text-xs text-muted-foreground hover:text-foreground aria-pressed:bg-state-active aria-pressed:text-foreground"
-              onClick={() => setView(each)}
-            >
-              {each === "preview" ? "Preview" : "Source"}
-            </button>
-          ))}
-        </div>
+        <button
+          type="button"
+          aria-label="Show source"
+          title={view === "source" ? "Show preview" : "Show source"}
+          aria-pressed={view === "source"}
+          className={ICON_BUTTON}
+          onClick={() => setView(view === "source" ? "preview" : "source")}
+        >
+          <Icon name="Code" className="size-4" />
+        </button>
       ) : null}
       {text || version.type === "image" ? (
         <button type="button" aria-label="Copy" title={version.type === "image" ? "Copy image" : "Copy text"} className={ICON_BUTTON} onClick={() => void copy()}>
@@ -249,28 +246,13 @@ export function ArtifactViewer({
   return (
     <div className="studio-root flex h-full min-h-0 flex-col bg-background text-foreground">
       <ItemHeader
-        className="relative shrink-0 items-center border-b border-border/70"
         backLabel={backLabel}
         onBack={() => onBack()}
         item={thread}
         leading={
           <>
-            <input
-              aria-label="Artifact title"
-              key={artifact.title}
-              defaultValue={artifact.title}
-              maxLength={200}
-              className="h-8 min-w-24 max-w-md rounded-md bg-transparent px-2 text-sm font-medium outline-none [field-sizing:content] hover:bg-state-hover focus:bg-state-hover max-md:max-w-32"
-              onKeyDown={(event) => {
-                if (event.key === "Enter") event.currentTarget.blur();
-                if (event.key === "Escape") {
-                  event.currentTarget.value = artifact.title;
-                  event.currentTarget.blur();
-                }
-              }}
-              onBlur={(event) => rename(event.currentTarget.value)}
-            />
-            <span className="shrink-0 truncate text-xs text-muted-foreground max-sm:hidden" title={version.name}>
+            <BarTitle title={artifact.title} label="Artifact title" onRename={rename} />
+            <span className="ml-1 shrink-0 truncate text-xs text-muted-foreground max-md:hidden" title={version.name}>
               {facts}
             </span>
           </>

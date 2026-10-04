@@ -6,7 +6,7 @@
 // or starts a new thread. A rail lists urgent posts and the stories still
 // developing. A post's own page (feed/<id>) is where notifications and reply
 // cards go.
-import { Badge, CopyReferenceMenuItem, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
+import { BAR_BUTTON, BarCrumb, BarSeparator, Badge, CopyReferenceMenuItem, StudioBar, DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuSeparator, DropdownMenuTrigger, EmptyState, GHOST_BUTTON, ITEM_LINK_PILLS, OUTLINE_BUTTON, PageColumn, ViewMoveMenu, cn, useOpenCompanion, studioItemProps } from "@bb-studio/kit/app";
 import { errorMessage, relativeTime, shortDateTime } from "@bb-studio/kit/format";
 import { Icon } from "@bb-studio/kit/ui";
 import { Markdown, experimental_useSidebarThreads as useSidebarThreads, useBbNavigate, useRealtime, useRpc } from "@get-bb/plugin-sdk/app";
@@ -269,20 +269,20 @@ function FeedReader() {
   const rail = showAttention || developing.length > 0;
 
   return (
-    <PageColumn className="max-w-6xl">
+    <PageColumn className="max-w-6xl pt-6">
+    <StudioBar>
+      <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center"><BarCrumb current>{INBOX_TITLE}</BarCrumb></nav>
+      <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: INBOX_TITLE }} />
+    </StudioBar>
     <div ref={readerRoot} onClickCapture={() => capturePosition.current()} className="min-w-0">
-      <header className="mb-5 flex flex-wrap items-center gap-x-4 gap-y-3">
-        <h1 className="mr-auto text-[28px] leading-tight font-semibold tracking-tight">{INBOX_TITLE}</h1>
-        <ViewMoveMenu item={{ href: "/plugins/feed/feed", title: INBOX_TITLE }} />
-      </header>
       <NeedsYou />
       <FailedThreads />
       <AutomaticUpdates />
       <div className="mb-4 flex flex-wrap items-center gap-x-4 gap-y-3">
         <h2 className="mr-auto text-lg font-semibold">Reports</h2>
         {unread ? <span className="text-sm text-muted-foreground tabular-nums">{unread} unread shown</span> : null}
-        <button type="button" className={OUTLINE_BUTTON} disabled={posts === null} onClick={markAllRead}>
-          <Icon name="feed/mark-read" /> Mark all updates read
+        <button type="button" className={BAR_BUTTON} disabled={posts === null} onClick={markAllRead}>
+          <Icon name="feed/mark-read" /> Mark all read
         </button>
       </div>
       <form role="search" aria-label="Filter updates" className="mb-4 flex flex-wrap items-end gap-3" noValidate onSubmit={(event) => { event.preventDefault(); applyFilters(draft); }}>
@@ -778,13 +778,14 @@ function PostPage({ postId }: { postId: string }) {
   const back = () => navigate.toPluginPanel(PANEL_PATH);
 
   return (
-    <PageColumn className="max-w-3xl">
-      <div className="mb-6 flex items-center justify-between gap-3">
-      <button type="button" className={cn(GHOST_BUTTON, "-ml-3")} onClick={back}>
-        <Icon name="ArrowLeft" /> {INBOX_TITLE}
-      </button>
-      {post ? <ViewMoveMenu item={{ href: postHref(post.id), title: post.title }} onBack={back} /> : null}
-      </div>
+    <PageColumn className="max-w-3xl pt-8">
+      <StudioBar>
+        <nav aria-label="Breadcrumb" className="flex min-w-0 flex-1 items-center gap-0.5">
+          <BarCrumb onClick={back} title={`Back to ${INBOX_TITLE}`}>{INBOX_TITLE}</BarCrumb>
+          {post ? <><BarSeparator /><BarCrumb current><span className="truncate">{post.title}</span></BarCrumb></> : null}
+        </nav>
+        {post ? <ViewMoveMenu item={{ href: postHref(post.id), title: post.title }} onBack={back} /> : null}
+      </StudioBar>
       {post === undefined ? (
         <div className="h-24 animate-pulse rounded-md bg-muted/40 motion-reduce:animate-none" />
       ) : post === null ? (

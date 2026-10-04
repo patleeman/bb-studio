@@ -10,16 +10,16 @@ import { cn } from "../ui/utils";
 export const FLOATING =
   "border border-border/70 bg-background/90 shadow-sm backdrop-blur supports-[backdrop-filter]:bg-background/75";
 
-export const ICON_BUTTON = cn(
-  FLOATING,
-  "flex size-8 shrink-0 items-center justify-center rounded-md text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active",
-);
+/**
+ * Studio's bars use BB's own chrome controls: borderless 28px buttons. An
+ * icon-only tool needs an aria-label and a title.
+ */
+export const ICON_BUTTON =
+  "inline-flex size-7 shrink-0 items-center justify-center rounded-md text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4";
 
-/** A labelled button floating in the item header. */
-export const FLOATING_BUTTON = cn(
-  FLOATING,
-  "flex h-8 shrink-0 items-center gap-1.5 rounded-md px-3 text-sm text-muted-foreground hover:bg-state-hover hover:text-foreground disabled:pointer-events-none disabled:opacity-40 data-[state=open]:bg-state-active [&_svg]:size-4",
-);
+/** A bar's one labelled action (Chat on an item, New on a collection), at the same height. */
+export const BAR_BUTTON =
+  "inline-flex h-7 shrink-0 items-center gap-1.5 rounded-md px-2 text-sm text-muted-foreground outline-none hover:bg-state-hover hover:text-foreground focus-visible:ring-2 focus-visible:ring-ring disabled:pointer-events-none disabled:opacity-40 aria-pressed:bg-state-active aria-pressed:text-foreground data-[state=open]:bg-state-active data-[state=open]:text-foreground [&_svg]:size-4";
 
 export const PRIMARY_BUTTON =
   "flex h-9 shrink-0 items-center gap-1.5 rounded-md bg-foreground px-4 text-sm font-medium text-background hover:bg-foreground/90 disabled:pointer-events-none disabled:opacity-50 data-[state=open]:bg-foreground/90 [&_svg]:size-4";

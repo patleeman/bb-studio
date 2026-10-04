@@ -6,7 +6,7 @@
 //     stories show next to it.
 //   - messageDirective `::post{id="…"}`: the post a reply made, as a
 //     card in its thread or channel.
-import { FloatPanels, retainPanel } from "@bb-studio/kit/app";
+import { FloatPanels, retainPanel, StudioBarSlot } from "@bb-studio/kit/app";
 import { definePluginApp } from "@get-bb/plugin-sdk/app";
 import { DIRECTIVE, INBOX_ICON, INBOX_TITLE, PANEL_PATH } from "./src/shared";
 import { PostCard } from "./src/ui/card";
@@ -19,6 +19,7 @@ export default definePluginApp((app) => {
     icon: INBOX_ICON,
     path: PANEL_PATH,
     component: retainPanel(PANEL_PATH, FeedPanel),
+    headerContent: StudioBarSlot,
     experimental_sidebarAccessory: UnreadCount,
   });
   // Shows the panel in Float windows open on its paths.

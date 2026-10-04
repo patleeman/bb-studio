@@ -4,6 +4,7 @@ import { z } from "zod";
 import { Icon } from "../ui/icon";
 import { Popover, PopoverContent, PopoverTrigger } from "../ui/popover";
 import { useCompanionNavigate } from "./float";
+import { ICON_BUTTON } from "./pieces";
 import { ItemLinkText, ItemLinkTextarea } from "./item-links";
 import { useStudioPresent } from "./presence";
 import { studioItemProps, studioThreadProps } from "./studio-item";
@@ -18,7 +19,7 @@ const commentsSchema = z.object({ comments: z.array(z.object({ id: z.string(), p
 const versionsSchema = z.object({ versions: z.array(z.object({ id: z.string(), label: z.string(), createdAt: z.number() }).passthrough()) });
 
 /** Related items and threads from Studio. Hidden when the hub is absent. */
-export function RelatedPanel({ ref: item, compact = false }: { ref: RelatedRef; compact?: boolean }) {
+export function RelatedPanel({ ref: item }: { ref: RelatedRef }) {
   const sdk = useSdk();
   const studio = useStudioPresent();
   const companionNavigate = useCompanionNavigate();
@@ -77,8 +78,8 @@ export function RelatedPanel({ ref: item, compact = false }: { ref: RelatedRef; 
   }, [open, item.pluginId, item.id, sdk]);
   if (!studio) return null;
   return <Popover open={open} onOpenChange={setOpen}>
-    <PopoverTrigger asChild><button type="button" aria-label="Related" title={compact ? "Related items" : undefined} className="flex h-8 items-center gap-1 rounded-md border border-border bg-background px-2 text-sm shadow-sm hover:bg-state-hover">
-      <Icon name="Layers" className="size-4" /> {compact ? null : "Related"}
+    <PopoverTrigger asChild><button type="button" aria-label="Related" title="Related items" className={ICON_BUTTON}>
+      <Icon name="Workflow" className="size-4" />
     </button></PopoverTrigger>
     <PopoverContent data-studio-related-panel="" aria-label="Related items" align="end" sideOffset={8} hideWhenDetached className="max-h-[min(70vh,var(--radix-popover-content-available-height))] w-72 max-w-[calc(100vw-1rem)] rounded-lg bg-background p-3 shadow-xl">
       <div className="mb-2 text-xs font-semibold text-muted-foreground">Related items</div>
