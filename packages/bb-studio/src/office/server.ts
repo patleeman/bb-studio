@@ -9,8 +9,9 @@ import { officeContract } from "./contract";
 import { FolderService } from "./folders";
 import { migrateOfficeSpaces } from "./migration";
 import { ProjectSpaceStore } from "./legacy-spaces";
+import { migrateThreadOwners } from "../space-threads";
 
-export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string } = {}) {
+export async function initializeOffice(bb: BbPluginApi, db: Database.Database, hub: StudioHub, options: { folderRoot?: string; onSpaceDeleted?: (spaceId: string) => void } = {}) {
   const projects = await bb.sdk.projects.list({ includePersonal: true });
   const migrated = db.prepare("SELECT 1 FROM sqlite_master WHERE name='office_migrations'").get()
     && db.prepare("SELECT 1 FROM office_migrations WHERE id='space-root-v1'").get();
@@ -25,6 +26,8 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     migrateOfficeSpaces(db, { projectIds: projects.map(p => p.id),
       projectForMember: m => projectByRef.get(`${m.pluginId}:${m.id}`), logConflict: m => bb.log.warn(m) });
   }
+  // One space per thread: explicit memberships kept from tag-based spaces move to space_threads.
+  migrateThreadOwners(db, m => bb.log.warn(m));
   const spaces = new ProjectSpaceStore(db);
   spaces.office.reconcileProjects(projects.map(p => p.id));
   const folders = new FolderService(db, spaces.office, {
@@ -57,7 +60,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
       for (const projectId of space.projectIds) {
         if ((await bb.sdk.threads.list({ projectId, limit: 1 })).length) throw new Error("This Space still contains threads.");
       }
-      spaces.office.removeEmptySpace(spaceId); changed(); return { ok: true };
+      spaces.office.removeEmptySpace(spaceId); spaces.threads.removeSpace(spaceId); options.onSpaceDeleted?.(spaceId); changed(); return { ok: true };
     },
     space_move_project: async ({ projectId, spaceId }) => {
       await bb.sdk.projects.get({ projectId });

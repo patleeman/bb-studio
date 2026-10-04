@@ -105,4 +105,21 @@ export const MIGRATIONS = [
      plugin_id TEXT NOT NULL, item_id TEXT NOT NULL, created_at INTEGER NOT NULL,
      PRIMARY KEY (plugin_id, item_id)
    );`,
+  // Space leads (src/space-lead.ts). A thread belongs to at most one space
+  // explicitly: thread_id is the key (src/space-threads.ts).
+  `CREATE TABLE IF NOT EXISTS space_threads (
+     thread_id TEXT PRIMARY KEY, space_id TEXT NOT NULL, added_at INTEGER NOT NULL
+   );
+   CREATE INDEX IF NOT EXISTS space_threads_space ON space_threads (space_id, added_at);
+   CREATE TABLE IF NOT EXISTS space_leads (
+     space_id TEXT PRIMARY KEY, lead_thread_id TEXT, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+   );
+   CREATE TABLE IF NOT EXISTS space_runs (
+     space_id TEXT PRIMARY KEY, enabled INTEGER NOT NULL, cadence TEXT NOT NULL, time TEXT NOT NULL,
+     automation_id TEXT, automation_project_id TEXT
+   );
+   CREATE TABLE IF NOT EXISTS space_thread_handoffs (
+     old_thread_id TEXT PRIMARY KEY, new_thread_id TEXT NOT NULL, space_id TEXT,
+     lead INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0
+   );`,
 ];

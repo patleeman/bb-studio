@@ -25,7 +25,7 @@ import { isPanelVisible, withPanelsVisible } from "./src/sidebar";
 import { MIGRATIONS } from "./src/migrations";
 import { itemAtPath, TabStore } from "./src/tabs";
 import { MAX_TAG_NAME, TagStore, type ItemRef, type Tag } from "./src/tags";
-import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, threadInSpace, type Space } from "./src/spaces";
+import { inSpace, spaceAssignments, SpaceStore, spacePath, THREAD_REF, type Space } from "./src/spaces";
 import { spaceItem, spaceKind } from "./src/space-items";
 import { spaceTreeItems, TREE_THREADS } from "./src/space-tree";
 import { PAGES_PLUGIN_ID, pageHref, pageWidgets, SPACE_TEMPLATE_VERSION, SPACE_WIDGETS, spacePageMarkdown, widgetsMarkdown, widgetsSince, type SpaceWidget } from "./src/space-page";
@@ -41,6 +41,7 @@ import { homeData } from "./src/home";
 import { firstThreadItemRefs, firstThreadSpaceIds, firstThreadMentionPlugins, mentionProviderLookup } from "./src/thread-item-refs";
 import { respondToNeed } from "./src/needs-you";
 import { zipFiles } from "./src/export-zip";
+import { SpaceLeads } from "./src/space-lead";
 
 const ORDER_KEY = "sidebar.pluginPanelOrder";
 const VISIBLE_KEY = "sidebar.visiblePluginPanels";
@@ -60,7 +61,9 @@ export default async function plugin(bb: BbPluginApi) {
   const db = bb.storage.database();
   bb.storage.migrate(db, MIGRATIONS);
   const tags = new TagStore(db);
-  const { spaces, folders: officeFolders } = await initializeOffice(bb, db, hub);
+  // Set up below; office deletes call it only after the plugin has loaded.
+  let leads: SpaceLeads | undefined;
+  const { spaces, folders: officeFolders } = await initializeOffice(bb, db, hub, { onSpaceDeleted: (id) => void leads?.removeSpace(id).catch(() => {}) });
   const tabs = new TabStore(db);
   const views = new ViewStore(db);
   const searchIndex = new SearchIndex(db, hub, () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" }));
@@ -232,7 +235,9 @@ export default async function plugin(bb: BbPluginApi) {
       conversationsOnce ?? conversations(),
     ]);
     const found = new Map<string, ThreadView>();
-    for (const thread of byProject.flat()) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
+    // A thread added to another space is there, not here.
+    const owners = spaces.threads.all();
+    for (const thread of byProject.flat()) if ((owners.get(thread.id) ?? space.id) === space.id) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
     for (const thread of added) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, true, known.get(thread.id)));
     return [...found.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   };
@@ -245,8 +250,11 @@ export default async function plugin(bb: BbPluginApi) {
     for (const thread of fetched) if (thread && !thread.archivedAt) found.set(thread.id, threadView(thread, false, known.get(thread.id)));
     return [...found.values()].sort((a, b) => b.updatedAt - a.updatedAt);
   };
-  /** The spaces a thread is in, which scope what its agent sees by default. */
-  const threadSpaces = (threadId: string, projectId: string | null) => spaces.list().filter((space) => threadInSpace(space, { id: threadId, projectId }));
+  /** The one space a thread is in, which scopes what its agent sees by default. */
+  const threadSpaces = (threadId: string, projectId: string | null) => {
+    const space = spaces.get(spaces.ownerOfThread({ id: threadId, projectId }));
+    return space ? [space] : [];
+  };
   /** Open collections refetch, as when an add-on's items change. */
   const tagsChanged = () => {
     changes.append(null);
@@ -371,6 +379,7 @@ export default async function plugin(bb: BbPluginApi) {
 
   const deleteSpace = (id: string) => {
     const pageId = spaces.get(id)?.pageId;
+    void leads?.removeSpace(id).catch(() => {});
     spaces.remove(id);
     // The page may hold the user's writing: archive it rather than delete it.
     if (pageId) void callPages("update", { id: pageId, archived: true }, pageResult).catch(() => {});
@@ -380,6 +389,15 @@ export default async function plugin(bb: BbPluginApi) {
   const renamePage = (space: Space) => {
     if (space.pageId) void callPages("update", { id: space.pageId, title: space.name, icon: space.icon ?? "" }, pageResult).catch(() => {});
   };
+  // Each space's lead thread works beside its page (src/space-lead.ts).
+  leads = new SpaceLeads({ db, sdk: bb.sdk, spaces, ensurePage: spacePage, hub, changed: tagsChanged });
+  const spaceLeads = leads;
+  /** A thread's space can change without a membership write; sidebars refetch space_of_threads. */
+  const threadsMoved = () => { spaceLeads.threadsChanged(); tagsChanged(); };
+  bb.events.on("thread.created", () => threadsMoved());
+  bb.events.on("thread.archived", () => threadsMoved());
+  bb.events.on("thread.unarchived", () => threadsMoved());
+  bb.events.on("thread.deleted", ({ thread }) => { spaces.threads.forget(thread.id); threadsMoved(); });
 
   const tabViews = ({ providers, items }: { providers: Awaited<ReturnType<typeof hub.providers>>; items: HubItem[] }): TabView[] => {
     const kindIcons = new Map(providers.flatMap((provider) => provider.kinds.map((kind) => [`${provider.pluginId}:${kind.id}`, kind.icon])));
@@ -615,6 +633,13 @@ export default async function plugin(bb: BbPluginApi) {
       if (!space) throw new Error("That space no longer exists.");
       return { space };
     },
+    space_lead: ({ spaceId }) => spaceLeads.get(spaceId),
+    space_lead_setup: ({ spaceId, request }) => spaceLeads.setup(spaceId, request),
+    space_thread_start: ({ spaceId, request }) => spaceLeads.startThread(spaceId, request),
+    space_overview: ({ spaceId }) => spaceLeads.overview(spaceId),
+    space_of_threads: async () => ({ threads: await spaceLeads.spaceOfThreads() }),
+    space_set_run: ({ spaceId, ...run }) => spaceLeads.setRun(spaceId, run),
+    thread_handoff: ({ threadId, request }) => spaceLeads.handoff(threadId, request),
     spaceThreads: async ({ id }) => {
       const space = spaces.get(id);
       if (!space) throw new Error("That space no longer exists.");
@@ -982,23 +1007,26 @@ export default async function plugin(bb: BbPluginApi) {
   bb.agents.registerTool({
     name: "studio_space_items",
     description:
-      "Add Studio items, or this thread, to one of the user's spaces, or take them out. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file something in a space. What this thread makes in Studio joins its spaces by itself.",
+      "Add Studio items, this thread or other threads to one of the user's spaces, or take them out. A thread is in one space at a time, so adding it moves it. Only the user makes, renames or deletes spaces, so name one that exists. Add when the user asks to file something in a space, or when a space's lead starts a worker thread. What this thread makes in Studio joins its space by itself.",
     parameters: z.object({
       space: z.string().min(1).max(100).describe("The space's name or id"),
       add: z.array(z.string().max(500)).max(100).optional().describe("Item links, e.g. /plugins/pages/pages/pg_x"),
       remove: z.array(z.string().max(500)).max(100).optional().describe("Item links to take out"),
       thisThread: z.enum(["add", "remove"]).optional().describe("Add this thread to the space, or take it out"),
+      threads: z.array(z.string().min(1).max(200)).max(100).optional().describe("Ids of other threads to add to the space, e.g. workers you started"),
     }),
-    async execute({ space: name, add = [], remove = [], thisThread }, ctx) {
+    async execute({ space: name, add = [], remove = [], thisThread, threads = [] }, ctx) {
       const space = requireSpace(name);
-      if (!add.length && !remove.length && !thisThread) return "Pass items to add or remove, or thisThread.";
+      if (!add.length && !remove.length && !thisThread && !threads.length) return "Pass items to add or remove, threads, or thisThread.";
       const added = await resolveItems(add);
       const removed = await resolveItems(remove);
       const thread = { pluginId: THREAD_REF, id: ctx.threadId };
-      spaces.add(space.id, [...added.found, ...(thisThread === "add" ? [thread] : [])]);
+      const others = (await Promise.all(threads.map((threadId) => bb.sdk.threads.get({ threadId }).catch(() => null)))).flatMap((found, index) => (found && found.deletedAt == null ? [{ pluginId: THREAD_REF, id: threads[index]! }] : []));
+      if (others.length < threads.length) added.missing.push(...threads.filter((threadId) => !others.some((other) => other.id === threadId)));
+      spaces.add(space.id, [...added.found, ...others, ...(thisThread === "add" ? [thread] : [])]);
       spaces.removeMembers(space.id, [...removed.found, ...(thisThread === "remove" ? [thread] : [])]);
       tagsChanged();
-      const lines = [`Space ${space.name}: added ${added.found.length}, removed ${removed.found.length}.`];
+      const lines = [`Space ${space.name}: added ${added.found.length}${others.length ? ` items and ${others.length} threads` : ""}, removed ${removed.found.length}.`];
       if (thisThread) lines.push(thisThread === "add" ? "This thread is in the space." : "This thread is out of the space.");
       const missing = [...added.missing, ...removed.missing];
       if (missing.length) lines.push(`Not found: ${missing.join(", ")}`);

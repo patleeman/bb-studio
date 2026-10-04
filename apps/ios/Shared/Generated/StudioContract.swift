@@ -40,6 +40,13 @@ public enum Studio {
     public static let restoreSpaceWidgets = "restoreSpaceWidgets"
     public static let createInSpace = "createInSpace"
     public static let recentThreads = "recentThreads"
+    public static let space_lead = "space_lead"
+    public static let space_lead_setup = "space_lead_setup"
+    public static let space_thread_start = "space_thread_start"
+    public static let space_overview = "space_overview"
+    public static let space_of_threads = "space_of_threads"
+    public static let space_set_run = "space_set_run"
+    public static let thread_handoff = "thread_handoff"
     public static let saveView = "saveView"
     public static let deleteView = "deleteView"
     public static let studio_changed = "studio_changed"
@@ -153,6 +160,20 @@ public enum Studio {
   public typealias RecentThreadsInput = StudioJSONValue
 
   public typealias RecentThreads = RecentThreadsOutput
+
+  public typealias SpaceLead = SpaceLeadOutput
+
+  public typealias SpaceLeadSetup = SpaceLeadSetupOutput
+
+  public typealias SpaceThreadStart = SpaceThreadStartOutput
+
+  public typealias SpaceOverview = SpaceOverviewOutput
+
+  public typealias SpaceOfThreads = SpaceOfThreadsOutput
+
+  public typealias SpaceSetRun = SpaceSetRunOutput
+
+  public typealias ThreadHandoff = ThreadHandoffOutput
 
   public typealias SaveView = SaveViewOutput
 
@@ -2903,6 +2924,1123 @@ public enum Studio {
 
     public init(threads: [RecentThreadsOutputThreadsItem]? = nil) {
       self.threads = threads
+    }
+  }
+
+  public struct SpaceLeadInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public enum SpaceLeadOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceLeadOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: SpaceLeadOutputRunCadence?
+    public var time: String?
+
+    public init(enabled: Bool? = nil, cadence: SpaceLeadOutputRunCadence? = nil, time: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+    }
+  }
+
+  public struct SpaceLeadOutput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var name: String?
+    public var icon: String?
+    public var color: String?
+    public var leadThreadId: String?
+    public var pageId: String?
+    public var pageHref: String?
+    public var defaultProjectId: String?
+    public var run: SpaceLeadOutputRun?
+
+    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, pageId: String? = nil, pageHref: String? = nil, defaultProjectId: String? = nil, run: SpaceLeadOutputRun? = nil) {
+      self.spaceId = spaceId
+      self.name = name
+      self.icon = icon
+      self.color = color
+      self.leadThreadId = leadThreadId
+      self.pageId = pageId
+      self.pageHref = pageHref
+      self.defaultProjectId = defaultProjectId
+      self.run = run
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceLeadSetupInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceLeadSetupInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: SpaceLeadSetupInputRequestExecutionInputSourcesModel?
+    public var permissionMode: SpaceLeadSetupInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: SpaceLeadSetupInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: SpaceLeadSetupInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: SpaceLeadSetupInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: SpaceLeadSetupInputRequestExecutionInputSourcesModel? = nil, permissionMode: SpaceLeadSetupInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: SpaceLeadSetupInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: SpaceLeadSetupInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: SpaceLeadSetupInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct SpaceLeadSetupInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: SpaceLeadSetupInputRequestReasoningLevel?
+    public var permissionMode: SpaceLeadSetupInputRequestPermissionMode?
+    public var serviceTier: SpaceLeadSetupInputRequestServiceTier?
+    public var executionInputSources: SpaceLeadSetupInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: SpaceLeadSetupInputRequestReasoningLevel? = nil, permissionMode: SpaceLeadSetupInputRequestPermissionMode? = nil, serviceTier: SpaceLeadSetupInputRequestServiceTier? = nil, executionInputSources: SpaceLeadSetupInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct SpaceLeadSetupInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var request: SpaceLeadSetupInputRequest?
+
+    public init(spaceId: String? = nil, request: SpaceLeadSetupInputRequest? = nil) {
+      self.spaceId = spaceId
+      self.request = request
+    }
+  }
+
+  public enum SpaceLeadSetupOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceLeadSetupOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: SpaceLeadSetupOutputRunCadence?
+    public var time: String?
+
+    public init(enabled: Bool? = nil, cadence: SpaceLeadSetupOutputRunCadence? = nil, time: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+    }
+  }
+
+  public struct SpaceLeadSetupOutput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var name: String?
+    public var icon: String?
+    public var color: String?
+    public var leadThreadId: String?
+    public var pageId: String?
+    public var pageHref: String?
+    public var defaultProjectId: String?
+    public var run: SpaceLeadSetupOutputRun?
+
+    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, pageId: String? = nil, pageHref: String? = nil, defaultProjectId: String? = nil, run: SpaceLeadSetupOutputRun? = nil) {
+      self.spaceId = spaceId
+      self.name = name
+      self.icon = icon
+      self.color = color
+      self.leadThreadId = leadThreadId
+      self.pageId = pageId
+      self.pageHref = pageHref
+      self.defaultProjectId = defaultProjectId
+      self.run = run
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum SpaceThreadStartInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceThreadStartInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: SpaceThreadStartInputRequestExecutionInputSourcesModel?
+    public var permissionMode: SpaceThreadStartInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: SpaceThreadStartInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: SpaceThreadStartInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: SpaceThreadStartInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: SpaceThreadStartInputRequestExecutionInputSourcesModel? = nil, permissionMode: SpaceThreadStartInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: SpaceThreadStartInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: SpaceThreadStartInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: SpaceThreadStartInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct SpaceThreadStartInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: SpaceThreadStartInputRequestReasoningLevel?
+    public var permissionMode: SpaceThreadStartInputRequestPermissionMode?
+    public var serviceTier: SpaceThreadStartInputRequestServiceTier?
+    public var executionInputSources: SpaceThreadStartInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: SpaceThreadStartInputRequestReasoningLevel? = nil, permissionMode: SpaceThreadStartInputRequestPermissionMode? = nil, serviceTier: SpaceThreadStartInputRequestServiceTier? = nil, executionInputSources: SpaceThreadStartInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct SpaceThreadStartInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var request: SpaceThreadStartInputRequest?
+
+    public init(spaceId: String? = nil, request: SpaceThreadStartInputRequest? = nil) {
+      self.spaceId = spaceId
+      self.request = request
+    }
+  }
+
+  public struct SpaceThreadStartOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
+    }
+  }
+
+  public struct SpaceOverviewInput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+
+    public init(spaceId: String? = nil) {
+      self.spaceId = spaceId
+    }
+  }
+
+  public struct SpaceOverviewOutputThreadsItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var title: String?
+    public var status: String?
+    public var updatedAt: Double?
+    public var parentThreadId: String?
+    public var isLead: Bool?
+
+    public init(id: String? = nil, title: String? = nil, status: String? = nil, updatedAt: Double? = nil, parentThreadId: String? = nil, isLead: Bool? = nil) {
+      self.id = id
+      self.title = title
+      self.status = status
+      self.updatedAt = updatedAt
+      self.parentThreadId = parentThreadId
+      self.isLead = isLead
+    }
+  }
+
+  public struct SpaceOverviewOutputItemsItem: Sendable, Hashable, Codable {
+    public var ref: String?
+    public var title: String?
+    public var kind: String?
+    public var href: String?
+    public var icon: String?
+    public var updatedAt: Double?
+
+    public init(ref: String? = nil, title: String? = nil, kind: String? = nil, href: String? = nil, icon: String? = nil, updatedAt: Double? = nil) {
+      self.ref = ref
+      self.title = title
+      self.kind = kind
+      self.href = href
+      self.icon = icon
+      self.updatedAt = updatedAt
+    }
+  }
+
+  public struct SpaceOverviewOutput: Sendable, Hashable, Codable {
+    public var threads: [SpaceOverviewOutputThreadsItem]?
+    public var items: [SpaceOverviewOutputItemsItem]?
+
+    public init(threads: [SpaceOverviewOutputThreadsItem]? = nil, items: [SpaceOverviewOutputItemsItem]? = nil) {
+      self.threads = threads
+      self.items = items
+    }
+  }
+
+  public struct SpaceOfThreadsInput: Sendable, Hashable, Codable {
+
+
+    public init() {}
+  }
+
+  public struct SpaceOfThreadsOutput: Sendable, Hashable, Codable {
+    public var threads: [String: String]?
+
+    public init(threads: [String: String]? = nil) {
+      self.threads = threads
+    }
+  }
+
+  public enum SpaceSetRunInputCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceSetRunInput: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: SpaceSetRunInputCadence?
+    public var spaceId: String?
+    public var time: String?
+
+    public init(enabled: Bool? = nil, cadence: SpaceSetRunInputCadence? = nil, spaceId: String? = nil, time: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.spaceId = spaceId
+      self.time = time
+    }
+  }
+
+  public enum SpaceSetRunOutputRunCadence: Sendable, Hashable, Codable {
+    case hourly
+    case daily
+    case weekdays
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "hourly": self = .hourly
+      case "daily": self = .daily
+      case "weekdays": self = .weekdays
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .hourly: try container.encode("hourly")
+      case .daily: try container.encode("daily")
+      case .weekdays: try container.encode("weekdays")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct SpaceSetRunOutputRun: Sendable, Hashable, Codable {
+    public var enabled: Bool?
+    public var cadence: SpaceSetRunOutputRunCadence?
+    public var time: String?
+
+    public init(enabled: Bool? = nil, cadence: SpaceSetRunOutputRunCadence? = nil, time: String? = nil) {
+      self.enabled = enabled
+      self.cadence = cadence
+      self.time = time
+    }
+  }
+
+  public struct SpaceSetRunOutput: Sendable, Hashable, Codable {
+    public var spaceId: String?
+    public var name: String?
+    public var icon: String?
+    public var color: String?
+    public var leadThreadId: String?
+    public var pageId: String?
+    public var pageHref: String?
+    public var defaultProjectId: String?
+    public var run: SpaceSetRunOutputRun?
+
+    public init(spaceId: String? = nil, name: String? = nil, icon: String? = nil, color: String? = nil, leadThreadId: String? = nil, pageId: String? = nil, pageHref: String? = nil, defaultProjectId: String? = nil, run: SpaceSetRunOutputRun? = nil) {
+      self.spaceId = spaceId
+      self.name = name
+      self.icon = icon
+      self.color = color
+      self.leadThreadId = leadThreadId
+      self.pageId = pageId
+      self.pageHref = pageHref
+      self.defaultProjectId = defaultProjectId
+      self.run = run
+    }
+  }
+
+  public enum ThreadHandoffInputRequestReasoningLevel: Sendable, Hashable, Codable {
+    case none
+    case low
+    case medium
+    case high
+    case xhigh
+    case max
+    case ultra
+    case ultracode
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "none": self = .none
+      case "low": self = .low
+      case "medium": self = .medium
+      case "high": self = .high
+      case "xhigh": self = .xhigh
+      case "max": self = .max
+      case "ultra": self = .ultra
+      case "ultracode": self = .ultracode
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .none: try container.encode("none")
+      case .low: try container.encode("low")
+      case .medium: try container.encode("medium")
+      case .high: try container.encode("high")
+      case .xhigh: try container.encode("xhigh")
+      case .max: try container.encode("max")
+      case .ultra: try container.encode("ultra")
+      case .ultracode: try container.encode("ultracode")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestPermissionMode: Sendable, Hashable, Codable {
+    case accept_edits
+    case auto
+    case full
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "accept-edits": self = .accept_edits
+      case "auto": self = .auto
+      case "full": self = .full
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .accept_edits: try container.encode("accept-edits")
+      case .auto: try container.encode("auto")
+      case .full: try container.encode("full")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestServiceTier: Sendable, Hashable, Codable {
+    case `default`
+    case fast
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "default": self = .`default`
+      case "fast": self = .fast
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .`default`: try container.encode("default")
+      case .fast: try container.encode("fast")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestExecutionInputSourcesModel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestExecutionInputSourcesPermissionMode: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestExecutionInputSourcesProviderId: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestExecutionInputSourcesReasoningLevel: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public enum ThreadHandoffInputRequestExecutionInputSourcesServiceTier: Sendable, Hashable, Codable {
+    case client_preference
+    case explicit
+    case unknown(String)
+
+    public init(from decoder: Decoder) throws {
+      let value = try decoder.singleValueContainer().decode(String.self)
+      switch value {
+      case "client-preference": self = .client_preference
+      case "explicit": self = .explicit
+      default: self = .unknown(value)
+      }
+    }
+
+    public func encode(to encoder: Encoder) throws {
+      var container = encoder.singleValueContainer()
+      switch self {
+      case .client_preference: try container.encode("client-preference")
+      case .explicit: try container.encode("explicit")
+      case .unknown(let value): try container.encode(value)
+      }
+    }
+  }
+
+  public struct ThreadHandoffInputRequestExecutionInputSources: Sendable, Hashable, Codable {
+    public var model: ThreadHandoffInputRequestExecutionInputSourcesModel?
+    public var permissionMode: ThreadHandoffInputRequestExecutionInputSourcesPermissionMode?
+    public var providerId: ThreadHandoffInputRequestExecutionInputSourcesProviderId?
+    public var reasoningLevel: ThreadHandoffInputRequestExecutionInputSourcesReasoningLevel?
+    public var serviceTier: ThreadHandoffInputRequestExecutionInputSourcesServiceTier?
+
+    public init(model: ThreadHandoffInputRequestExecutionInputSourcesModel? = nil, permissionMode: ThreadHandoffInputRequestExecutionInputSourcesPermissionMode? = nil, providerId: ThreadHandoffInputRequestExecutionInputSourcesProviderId? = nil, reasoningLevel: ThreadHandoffInputRequestExecutionInputSourcesReasoningLevel? = nil, serviceTier: ThreadHandoffInputRequestExecutionInputSourcesServiceTier? = nil) {
+      self.model = model
+      self.permissionMode = permissionMode
+      self.providerId = providerId
+      self.reasoningLevel = reasoningLevel
+      self.serviceTier = serviceTier
+    }
+  }
+
+  public struct ThreadHandoffInputRequest: Sendable, Hashable, Codable {
+    public var projectId: String?
+    public var providerId: String?
+    public var model: String?
+    public var reasoningLevel: ThreadHandoffInputRequestReasoningLevel?
+    public var permissionMode: ThreadHandoffInputRequestPermissionMode?
+    public var serviceTier: ThreadHandoffInputRequestServiceTier?
+    public var executionInputSources: ThreadHandoffInputRequestExecutionInputSources?
+    public var environment: [String: StudioJSONValue]?
+    public var input: [[String: StudioJSONValue]]?
+    public var sendAt: Int?
+
+    public init(projectId: String? = nil, providerId: String? = nil, model: String? = nil, reasoningLevel: ThreadHandoffInputRequestReasoningLevel? = nil, permissionMode: ThreadHandoffInputRequestPermissionMode? = nil, serviceTier: ThreadHandoffInputRequestServiceTier? = nil, executionInputSources: ThreadHandoffInputRequestExecutionInputSources? = nil, environment: [String: StudioJSONValue]? = nil, input: [[String: StudioJSONValue]]? = nil, sendAt: Int? = nil) {
+      self.projectId = projectId
+      self.providerId = providerId
+      self.model = model
+      self.reasoningLevel = reasoningLevel
+      self.permissionMode = permissionMode
+      self.serviceTier = serviceTier
+      self.executionInputSources = executionInputSources
+      self.environment = environment
+      self.input = input
+      self.sendAt = sendAt
+    }
+  }
+
+  public struct ThreadHandoffInput: Sendable, Hashable, Codable {
+    public var threadId: String?
+    public var request: ThreadHandoffInputRequest?
+
+    public init(threadId: String? = nil, request: ThreadHandoffInputRequest? = nil) {
+      self.threadId = threadId
+      self.request = request
+    }
+  }
+
+  public struct ThreadHandoffOutput: Sendable, Hashable, Codable {
+    public var threadId: String?
+
+    public init(threadId: String? = nil) {
+      self.threadId = threadId
     }
   }
 

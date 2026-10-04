@@ -1,5 +1,5 @@
 import { defineRpcContract } from "@get-bb/plugin-sdk";
-import { studioSchemas, studioTagSchemas } from "@bb-studio/kit/contract";
+import { conversationRequestSchema, studioSchemas, studioTagSchemas } from "@bb-studio/kit/contract";
 import { z } from "zod";
 
 export const schemas = studioSchemas(z);
@@ -139,6 +139,32 @@ const treeSpace = z.object({
 });
 export type SpaceTreeView = z.infer<typeof treeSpace>;
 
+/** A space's heartbeat: an automation that wakes its lead. Time is HH:MM; hourly uses its minute. */
+export const spaceRunSchema = z.object({ enabled: z.boolean(), cadence: z.enum(["hourly", "daily", "weekdays"]), time: z.string().regex(/^(?:[01]\d|2[0-3]):[0-5]\d$/) });
+export type SpaceRun = z.infer<typeof spaceRunSchema>;
+/** A space as a meta-project: its lead thread works beside the space's page. */
+const spaceLead = z.object({
+  spaceId: z.string(),
+  name: z.string(),
+  icon: z.string().nullable(),
+  color: z.string(),
+  leadThreadId: z.string().nullable(),
+  pageId: z.string().nullable(),
+  pageHref: z.string().nullable(),
+  defaultProjectId: z.string().nullable(),
+  run: spaceRunSchema.nullable(),
+});
+export type SpaceLeadView = z.infer<typeof spaceLead>;
+/** The full request from experimental_NewThreadComposer; Studio picks the project. */
+const newThreadRequest = conversationRequestSchema(z);
+export type NewThreadRequestInput = z.output<typeof newThreadRequest>;
+const spaceOverview = z.object({
+  threads: z.array(z.object({ id: z.string(), title: z.string(), status: z.string(), updatedAt: z.number(), parentThreadId: z.string().nullable(), isLead: z.boolean() })),
+  /** `ref` is `<plugin>:<id>`. */
+  items: z.array(z.object({ ref: z.string(), title: z.string(), kind: z.string(), href: z.string(), icon: z.string().nullable(), updatedAt: z.number() })),
+});
+export type SpaceOverviewView = z.infer<typeof spaceOverview>;
+
 export const rpcContract = defineRpcContract({
   home: {
     input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
@@ -234,6 +260,20 @@ export const rpcContract = defineRpcContract({
   createInSpace: { input: z.object({ id: spaceId, pluginId, kind: z.string().min(1).max(100) }), output: z.object({ href: z.string() }) },
   /** Open threads, channels and direct messages to pick from when adding one to a space. */
   recentThreads: { input: z.null(), output: z.object({ threads: z.array(spaceThread) }) },
+  /** A space's lead, page and heartbeat. Clears a lead thread that was deleted. */
+  space_lead: { input: z.object({ spaceId }), output: spaceLead },
+  /** Makes sure the space has its page and a lead thread; idempotent and serialized per space. */
+  space_lead_setup: { input: z.object({ spaceId, request: newThreadRequest }), output: spaceLead },
+  /** Starts a thread in the space's default project (else Personal) and adds it to the space. */
+  space_thread_start: { input: z.object({ spaceId, request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
+  /** The space's open threads (added, or through its projects, unless another space holds them) and its items, newest first. */
+  space_overview: { input: z.object({ spaceId }), output: spaceOverview },
+  /** The one space each thread is in. Refetch on Studio's realtime channel. */
+  space_of_threads: { input: z.object({}), output: z.object({ threads: z.record(z.string(), z.string()) }) },
+  /** Turns the lead's heartbeat on or off. */
+  space_set_run: { input: spaceRunSchema.omit({ time: true }).extend({ spaceId, time: spaceRunSchema.shape.time.optional() }), output: spaceLead },
+  /** Continues a thread in a new one on the chosen provider and archives the old one; a lead stays the lead. */
+  thread_handoff: { input: z.object({ threadId: z.string().min(1).max(200), request: newThreadRequest }), output: z.object({ threadId: z.string() }) },
   /** Saves a collection query by name, replacing a view with that name. */
   saveView: { input: z.object({ name: z.string().min(1).max(60), query: z.string().max(500) }), output: z.object({ view: savedView }) },
   deleteView: { input: z.object({ id: z.string().min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
