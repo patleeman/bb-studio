@@ -1,7 +1,7 @@
 // Hand work to a bot. Who, what, and when; the bot works on its own and
 // reports to the Inbox. Context items ride along, and the result comes back
 // to the folder the work came from.
-import * as Dialog from "@radix-ui/react-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogTitle } from "@bb-studio/kit/ui";
 import { GHOST_BUTTON, PRIMARY_BUTTON } from "@bb-studio/kit/app";
 import { useEffect, useId, useState } from "react";
 import { Face } from "./Face";
@@ -67,15 +67,13 @@ export function DelegateDialog({ open, onOpenChange, bots, initialBotId, context
   };
 
   return (
-    <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
-        <Dialog.Overlay className="fixed inset-0 z-50 bg-black/40 motion-safe:animate-in motion-safe:fade-in" />
-        <Dialog.Content className="fixed top-1/2 left-1/2 z-50 w-[min(480px,calc(100vw-2rem))] -translate-x-1/2 -translate-y-1/2 rounded-lg border border-border bg-popover p-5 text-popover-foreground shadow-xl outline-none">
-          <Dialog.Title className="text-base font-semibold">Hand off work</Dialog.Title>
-          <Dialog.Description className="mt-1 text-sm text-muted-foreground">
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent className="sm:max-w-md">
+          <DialogTitle>Hand off work</DialogTitle>
+          <DialogDescription>
             {context ? <>With <span className="text-foreground">{context.title}</span> as context. </> : null}
             The bot works on its own and reports to your Inbox.
-          </Dialog.Description>
+          </DialogDescription>
 
           <fieldset className="mt-4">
             <legend className="mb-2 text-xs font-medium text-muted-foreground">Who</legend>
@@ -119,11 +117,10 @@ export function DelegateDialog({ open, onOpenChange, bots, initialBotId, context
 
           {error ? <p role="alert" className="mt-3 text-sm text-destructive">{error}</p> : null}
           <div className="mt-5 flex justify-end gap-2">
-            <Dialog.Close className={GHOST_BUTTON}>Cancel</Dialog.Close>
+            <button type="button" onClick={() => onOpenChange(false)} className={GHOST_BUTTON}>Cancel</button>
             <button type="button" disabled={busy || !botId || !brief.trim()} onClick={() => void submit()} className={PRIMARY_BUTTON}>Delegate</button>
           </div>
-        </Dialog.Content>
-      </Dialog.Portal>
-    </Dialog.Root>
+        </DialogContent>
+    </Dialog>
   );
 }
