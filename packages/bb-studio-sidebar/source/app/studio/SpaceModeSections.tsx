@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useAtom, useAtomValue } from "jotai";
-import { openAppPath } from "@bb-studio/kit/app";
+import { openAppPath, usePathname } from "@bb-studio/kit/app";
 import { Icon } from "@/components/ui/icon";
 import { DropdownMenuItem } from "@/components/ui/dropdown-menu";
 import type { SidebarThread } from "../model/sidebar-thread.js";
@@ -343,6 +343,8 @@ function SpaceSidebarSection({
   children: ReactNode;
 }) {
   const [actionsOpen, setActionsOpen] = useState(false);
+  const pathname = usePathname();
+  const selected = pathname === spaceHref(space.id) || pathname.startsWith(`${spaceHref(space.id)}/`);
   return (
     <SortableSidebarSection
       id={sectionId}
@@ -351,6 +353,7 @@ function SpaceSidebarSection({
       labelMark={<SpaceMark space={space} />}
       onLabelClick={onOpen}
       labelClickLabel={`Open ${space.name}`}
+      labelSelected={selected}
       disabled
       dropParentKey={sectionId}
       actionsMobileAlways

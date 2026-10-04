@@ -66,6 +66,7 @@ export interface TopLevelSidebarSectionProps {
   /** Studio: clicking the label opens what the section stands for. */
   onLabelClick?: () => void;
   labelClickLabel?: string;
+  labelSelected?: boolean;
   onRename?: () => void;
   children: ReactNode;
   dropParentKey?: string;
@@ -92,6 +93,7 @@ export function TopLevelSidebarSection({
   labelMark,
   onLabelClick,
   labelClickLabel,
+  labelSelected = false,
   onRename,
   children,
   dropParentKey,
@@ -206,6 +208,7 @@ export function TopLevelSidebarSection({
           SIDEBAR_GROUP_TEXT_CLASS,
           SIDEBAR_STANDARD_ROW_PADDING_CLASS,
           "rounded-md pr-0 transition-colors",
+          labelSelected && "bg-sidebar-accent text-sidebar-accent-foreground",
           !stickyHeader && "relative top-auto",
           dragBindings && !dragBindings.disabled && "select-none",
         )}
@@ -220,6 +223,7 @@ export function TopLevelSidebarSection({
               className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               title={label}
               aria-label={labelClickLabel ?? label}
+              aria-current={labelSelected ? "page" : undefined}
               onPointerDown={(event) => event.stopPropagation()}
               onClick={(event) => {
                 event.preventDefault();

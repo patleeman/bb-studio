@@ -1,3 +1,4 @@
+import { usePathname } from "@bb-studio/kit/app";
 import {
   useCallback,
   useState,
@@ -165,8 +166,10 @@ function NavigationRowChrome({
   const [isContextMenuOpen, setIsContextMenuOpen] = useState(false);
   const isActionsOpen = isDropdownOpen || isContextMenuOpen;
   const [disablePending, setDisablePending] = useState(false);
+  const pathname = usePathname();
   const isActive =
-    item.id === activeItemId && item.action.kind !== "new-thread";
+    item.id === activeItemId && item.action.kind !== "new-thread" &&
+    !(item.id === "studio/spaces" && pathname.startsWith("/plugins/studio/spaces/"));
   const Accessory = item.experimental_Accessory;
   const { onKeyDown: _keyboardDragActivator, ...pointerDragListeners } =
     dragBindings?.listeners ?? {};
