@@ -391,7 +391,7 @@ function RecordingDetail({ id }: { id: string }) {
                 ) : null}
                 {recording.kind === "recording" && recording.status === "done" ? (
                   <DropdownMenuItem onSelect={() => run(() => rpc.call("meeting_regenerate", { id }))}>
-                    <Icon name="List" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
+                    <Icon name="ListView" className="size-4" /> {recording.meetingNotes ? "Regenerate summary" : "Generate summary"}
                   </DropdownMenuItem>
                 ) : null}
                 {recording.status === "done" ? (

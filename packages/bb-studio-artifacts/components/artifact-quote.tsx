@@ -230,7 +230,7 @@ export function QuoteCard({
         onMouseDown={(event) => event.preventDefault()}
         onClick={onWrite}
       >
-        <Icon name="MessageSquareQuote" fallback="MessageSquare" className="size-4" /> Send to thread
+        <Icon name="MessageSquare" className="size-4" /> Send to thread
       </button>
     );
   }

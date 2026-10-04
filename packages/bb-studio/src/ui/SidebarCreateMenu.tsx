@@ -59,7 +59,7 @@ export function SidebarCreateMenu({ onNavigate }: { onNavigate(): void }) {
             <Icon name={target.icon} aria-hidden className="size-4" /> {target.label}
           </DropdownMenuItem>
         ))}
-        {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="RefreshCw" /> Retry loading items</DropdownMenuItem>
+        {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="ArrowReloadHorizontal" /> Retry loading items</DropdownMenuItem>
           : providers === null ? <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
             : !targets.length ? <DropdownMenuItem disabled>No items available to create</DropdownMenuItem> : null}
       </DropdownMenuContent>

@@ -14,7 +14,7 @@ import { OpenSpacePage, SPACE_PAGE_ACTION, ThreadSpacePage } from "./ThreadSpace
 
 export function registerSpaces(app: PluginAppBuilder): void {
   app.slots.navPanel({ id: SPACES_PANEL, title: "Spaces", icon: "Folder", path: SPACES_PANEL, component: retainPanel(SPACES_PANEL, SpacesPanel), headerContent: SpacesHeader });
-  app.slots.threadPanelAction({ id: SPACE_STATUS_ACTION, title: "Space status", icon: "Activity", layout: "flush", component: ThreadSpaceOverview });
+  app.slots.threadPanelAction({ id: SPACE_STATUS_ACTION, title: "Space status", icon: "ChartColumn", layout: "flush", component: ThreadSpaceOverview });
   app.slots.threadPanelAction({ id: SPACE_PAGE_ACTION, title: "Space page", icon: "FileText", layout: "flush", component: ThreadSpacePage });
   app.slots.threadPanelAction({ id: SPACE_THREAD_ACTION, title: "Space thread", icon: "MessageSquare", layout: "flush", component: SpaceThreadTab });
   // Each pick opens its own tab, which becomes the item made in it.

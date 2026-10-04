@@ -93,7 +93,7 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
             <Icon name={kind.icon} className="size-4" />{kind.label}
           </DropdownMenuItem>
         ))}
-        {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="RefreshCw" className="size-4" />Retry</DropdownMenuItem>
+        {error ? <DropdownMenuItem onSelect={(event) => { event.preventDefault(); load(); }} title={error}><Icon name="ArrowReloadHorizontal" className="size-4" />Retry</DropdownMenuItem>
           : kinds === null ? <DropdownMenuItem disabled>Loading…</DropdownMenuItem>
             : !kinds.length ? <DropdownMenuItem disabled>Nothing to create</DropdownMenuItem> : null}
       </DropdownMenuContent>
