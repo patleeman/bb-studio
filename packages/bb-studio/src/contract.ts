@@ -39,11 +39,10 @@ const { tag, tagId, tagName, itemRef } = tagSchemas;
 const actor = z.object({ kind: z.enum(["user", "agent", "bot", "cli", "app", "editor"]), id: z.string().optional(), name: z.string().optional() });
 const link = z.object({ from: itemRef, to: itemRef, kind: z.enum(["mention", "embed", "task-link", "related"]), source: pluginId });
 const activityEvent = z.object({ actor, verb: z.string().min(1).max(100), ref: itemRef, at: z.number(), summary: z.string().max(2000) });
-const homeTask = z.object({ id: z.string(), title: z.string(), status: z.string(), due: z.string().nullable(), projectId: z.string().nullable(), archived: z.boolean() });
 const homeThread = z.object({ id: z.string(), title: z.string(), status: z.string(), projectId: z.string() });
 const homeBot = z.object({ id: z.string(), name: z.string(), projectId: z.string() });
 const homeActivity = activityEvent.extend({ id: z.number(), href: z.string() });
-const needEntry = z.object({ id: z.string(), source: z.string(), kind: z.enum(["approval", "question", "attention", "review", "due", "reply", "mention"]), title: z.string(), body: z.string(), href: z.string(), createdAt: z.number(), priority: z.number(), threadId: z.string().optional(), interactionId: z.string().optional(), responseKind: z.enum(["approval", "question"]).optional() });
+const needEntry = z.object({ id: z.string(), source: z.string(), kind: z.enum(["approval", "question", "reply", "mention"]), title: z.string(), body: z.string(), href: z.string(), createdAt: z.number(), priority: z.number(), threadId: z.string().optional(), interactionId: z.string().optional(), responseKind: z.enum(["approval", "question"]).optional() });
 const usageLimits = z.object({ turnsPerHour: z.number(), turnsPerDay: z.number(), minutesPerTurn: z.number(), concurrentForks: z.number() });
 const thread = z.object({ threadId: z.string(), ref: itemRef, role: z.string(), state: z.string(), createdAt: z.number(), updatedAt: z.number(), metadata: z.record(z.string(), z.string()) });
 const comment = z.object({ id: z.string(), ref: itemRef, parentId: z.string().nullable(), anchor: z.string().nullable(), actor, body: z.string(), createdAt: z.number(), resolvedAt: z.number().nullable() });
@@ -170,7 +169,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({ projectId: z.string().optional(), periodDays: z.number().int().min(1).max(90).default(7) }),
     output: z.object({
       needsYou: z.array(needEntry).optional(),
-      due: z.array(homeTask).nullable(), review: z.array(homeTask).nullable(),
       working: z.object({ threads: z.array(homeThread), bots: z.array(homeBot).nullable() }),
       recent: z.array(z.object({ pluginId: z.string(), id: z.string(), title: z.string(), href: z.string(), kind: z.string(), updatedAt: z.number() })),
       automations: z.array(z.object({ id: z.string(), name: z.string(), projectId: z.string(), enabled: z.boolean(), nextRunAt: z.number().nullable() })).nullable(),

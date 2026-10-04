@@ -2,21 +2,15 @@
 // Pages starts a thread with the item as its prompt, puts a mention of the
 // thread at the end of the item, and keeps the mention's label on the
 // thread's state (working, needs input, replied, failed…). The user checks
-// the item off after reviewing, as with Studio Tasks.
-//
-// `bb pages migrate-boards` turns each Studio Tasks board into a page of
-// checklists, once per board. The board and its tasks stay as they are; each
-// item links its task, so checking it moves the task (and moving the task to
-// Done checks it).
+// the item off after reviewing.
 import type Database from "better-sqlite3";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { untitled } from "@bb-studio/kit/format";
 import { pageCheckboxes } from "@bb-studio/kit/page-checkbox";
 import { primaryHostId, studioServices } from "@bb-studio/kit/server";
-import { z } from "zod";
-import { HUMAN_USER_ID, PLUGIN_ID } from "./constants";
+import { PLUGIN_ID } from "./constants";
 import { readMarkdown, tagChecklistThread } from "./doc";
-import { pageUrl, type PagesService } from "./service";
+import type { PagesService } from "./service";
 import type { PageStore } from "./store";
 
 export const CHECKLIST_STATES = ["starting", "working", "needs-input", "replied", "failed", "archived", "deleted"] as const;
@@ -58,7 +52,7 @@ export interface ChecklistHandoffRow {
   updated_at: number;
 }
 
-/** A checklist item's text, without its task link and agent mentions. */
+/** A checklist item's text, without agent mentions (and task links on pages made from Studio Tasks boards). */
 export function checklistTitle(title: string): string {
   return title
     .replace(/\s*@\[[^\]]*\]\(thread:[^)]+\)/g, "")
@@ -66,11 +60,6 @@ export function checklistTitle(title: string): string {
     .replace(/\s*@?\[[^\]]*\]\(item:studio-tasks:[^)]+\)/g, "")
     .replace(/^↳\s*/, "")
     .trim();
-}
-
-/** Escapes text for a Markdown line. */
-function inline(text: string): string {
-  return untitled(text).replace(/\s+/g, " ").replace(/([\\`*_[\]<>#|])/g, "\\$1");
 }
 
 /** The first message of a handed-off thread: the item, and a mention of its page. */
@@ -83,54 +72,6 @@ export function checklistPrompt(page: { id: string; title: string }, item: strin
   if (note?.trim()) text += `\n${note.trim()}\n`;
   text += "\nThe page has the item's context. When you're done, end with a one-line summary of what you did. Don't check the item off: the user does that after reviewing.";
   return { type: "text" as const, text, mentions };
-}
-
-const boardSchema = z.object({ id: z.string(), title: z.string(), projectId: z.string().nullable(), archived: z.boolean(), template: z.boolean().optional(),
-  columns: z.array(z.object({ id: z.string(), label: z.string() })) });
-const taskSchema = z.object({
-  id: z.string(), title: z.string(), status: z.string(), parentId: z.string().nullable().optional(), archived: z.boolean(),
-  handoff: z.object({ threadId: z.string(), state: z.string(), note: z.string().nullable() }).nullable().optional(),
-});
-type BoardTask = z.infer<typeof taskSchema>;
-
-/** A board as checklists: a heading per column, subtasks right after their task. */
-export function boardMarkdown(board: { title: string; columns: { id: string; label: string }[] }, tasks: BoardTask[]): string {
-  const live = tasks.filter((task) => !task.archived);
-  const ids = new Set(live.map((task) => task.id));
-  const children = new Map<string, BoardTask[]>();
-  for (const task of live) {
-    if (task.parentId && ids.has(task.parentId)) children.set(task.parentId, [...(children.get(task.parentId) ?? []), task]);
-  }
-  // Subtasks follow their task as items of their own, not nested: Studio
-  // Tasks rewrites an item's line when its task moves, which would drop
-  // nested items.
-  const line = (task: BoardTask, depth: number): string[] => {
-    const mention = task.handoff ? ` @[${checklistLabel(toState(task.handoff.state))}](thread:${task.handoff.threadId})` : "";
-    const own = `- [${task.status === "done" ? "x" : " "}] ${depth ? "↳ " : ""}${inline(task.title)} [Task](item:studio-tasks:${task.id})${mention}`;
-    return [own, ...(children.get(task.id) ?? []).flatMap((child) => line(child, depth + 1))];
-  };
-  const top = live.filter((task) => !task.parentId || !ids.has(task.parentId));
-  const known = new Set(board.columns.map((column) => column.id));
-  const columns = [...board.columns, ...[...new Set(top.map((task) => task.status))].filter((id) => !known.has(id)).map((id) => ({ id, label: id }))];
-  const sections = columns.flatMap((column) => {
-    const rows = top.filter((task) => task.status === column.id);
-    return rows.length ? [`## ${inline(column.label)}\n\n${rows.flatMap((task) => line(task, 0)).join("\n")}`] : [];
-  });
-  const intro = `> Made from the Studio Tasks board "${inline(board.title)}". The board is unchanged. Each item links its task: checking it off moves the task to Done.`;
-  return [intro, ...(sections.length ? sections : ["- [ ] "])].join("\n\n") + "\n";
-}
-
-function toState(state: string): ChecklistState {
-  if ((CHECKLIST_STATES as readonly string[]).includes(state)) return state as ChecklistState;
-  return state === "ready" ? "replied" : "replied";
-}
-
-export interface BoardMigration {
-  boardId: string;
-  title: string;
-  pageId: string | null;
-  tasks: number;
-  status: "created" | "exists" | "would-create";
 }
 
 export class Checklists {
@@ -204,50 +145,6 @@ export class Checklists {
       // The item may have been deleted or turned into something else.
       this.bb.log.info(`checklist ${row.page_id}/${row.block_id}: ${error instanceof Error ? error.message : String(error)}`);
     }
-  }
-
-  /**
-   * Makes a page of checklists for each Studio Tasks board that doesn't have
-   * one yet. Idempotent: a board whose page exists is skipped. Studio Tasks'
-   * boards and tasks aren't changed; each task gets a link to its item.
-   */
-  async migrateBoards(options: { dryRun?: boolean; includeArchived?: boolean } = {}): Promise<BoardMigration[]> {
-    const call = <T extends z.ZodType>(method: string, input: unknown, outputSchema: T) =>
-      this.bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method, input: input as never, outputSchema }) as Promise<z.infer<T>>;
-    const { boards } = await call("boards", { includeArchived: options.includeArchived === true }, z.object({ boards: z.array(boardSchema) }));
-    const results: BoardMigration[] = [];
-    for (const board of boards) {
-      if (board.template) continue;
-      const done = this.db.prepare("SELECT page_id FROM board_migrations WHERE board_id = ?").get(board.id) as { page_id: string } | undefined;
-      if (done && this.store.meta(done.page_id)) {
-        results.push({ boardId: board.id, title: untitled(board.title), pageId: done.page_id, tasks: 0, status: "exists" });
-        continue;
-      }
-      const { tasks } = await call("board", { boardId: board.id }, z.object({ tasks: z.array(taskSchema) }));
-      const live = tasks.filter((task) => !task.archived);
-      if (options.dryRun) {
-        results.push({ boardId: board.id, title: untitled(board.title), pageId: null, tasks: live.length, status: "would-create" });
-        continue;
-      }
-      const page = this.service.createPage({ projectId: board.projectId, parentId: null, title: untitled(board.title), icon: "☑️", markdown: boardMarkdown(board, live), actor: HUMAN_USER_ID });
-      const now = Date.now();
-      this.db.prepare("INSERT OR REPLACE INTO board_migrations (board_id, page_id, tasks, migrated_at) VALUES (?, ?, ?, ?)").run(board.id, page.id, live.length, now);
-      const markdown = readMarkdown(this.service.hub.open(page.id).doc, { ids: true });
-      const byTask = new Map(live.map((task) => [task.id, task]));
-      for (const checkbox of pageCheckboxes(markdown)) {
-        const task = checkbox.taskId ? byTask.get(checkbox.taskId) : undefined;
-        if (!task) continue;
-        // Adds a link on the task, as "Task from checkbox" does, so Done checks the item.
-        await call("link", { id: task.id, link: { target: "item", pluginId: PLUGIN_ID, itemId: page.id, label: untitled(board.title), href: `${pageUrl(page.id)}#${checkbox.blockId}` } }, z.object({ ok: z.boolean() }))
-          .catch((error) => this.bb.log.warn(`couldn't link ${task.id} to its item: ${String(error)}`));
-        if (task.handoff) {
-          this.db.prepare("INSERT OR IGNORE INTO checklist_handoffs (thread_id, page_id, block_id, title, state, note, created_at, updated_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)")
-            .run(task.handoff.threadId, page.id, checkbox.blockId, untitled(task.title), toState(task.handoff.state), task.handoff.note, now, now);
-        }
-      }
-      results.push({ boardId: board.id, title: untitled(board.title), pageId: page.id, tasks: live.length, status: "created" });
-    }
-    return results;
   }
 }
 

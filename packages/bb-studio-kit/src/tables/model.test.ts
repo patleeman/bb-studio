@@ -96,7 +96,7 @@ describe("table model", () => {
     expect(convertCell("a, b, a", { type: "multi-select" })).toEqual(["a", "b"]);
     expect(convertCell("2026-02-03", { type: "date" })).toBe("2026-02-03");
     expect(convertCell("example.com", { type: "url" })).toBe("https://example.com");
-    expect(convertCell("studio-tasks:task_1", { type: "relation" })).toEqual({ pluginId: "studio-tasks", itemId: "task_1" });
+    expect(convertCell("talk:rec_1", { type: "relation" })).toEqual({ pluginId: "talk", itemId: "rec_1" });
   });
   it("carries values to a new type and cleans views of removed columns", () => {
     const next = withColumns(table, [

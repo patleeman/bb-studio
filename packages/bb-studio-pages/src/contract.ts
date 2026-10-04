@@ -31,34 +31,6 @@ export const studioItemSchema = z.object({
 
 export type StudioEmbedItem = z.infer<typeof studioItemSchema>;
 
-/** What a task embed shows and edits. */
-export const taskCardSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  status: z.string(),
-  statusLabel: z.string(),
-  projectId: z.string().nullable(),
-  due: z.string().nullable(),
-  assignee: z.string().nullable(),
-  priority: z.string(),
-  labels: z.array(z.string()),
-  subtasks: z.object({ total: z.number(), done: z.number() }),
-  archived: z.boolean(),
-});
-export type TaskCard = z.infer<typeof taskCardSchema>;
-export const taskColumnSchema = z.object({ id: z.string(), label: z.string() });
-export type TaskColumn = z.infer<typeof taskColumnSchema>;
-
-/** What a board embed shows: its columns, and its tasks in board order. */
-export const boardCardSchema = z.object({
-  id: z.string(),
-  title: z.string(),
-  projectId: z.string().nullable(),
-  columns: z.array(taskColumnSchema),
-  archived: z.boolean(),
-});
-export type BoardCard = z.infer<typeof boardCardSchema>;
-
 /** What a recording embed plays and shows. */
 export const recordingCardSchema = z.object({
   id: z.string(),
@@ -240,11 +212,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: pageId }),
     output: z.object({ handoffs: z.array(z.object({ threadId: z.string(), blockId: z.string(), title: z.string(), state: z.string(), note: z.string().nullable(), updatedAt: z.number() })) }),
   },
-  /** Makes a page of checklists for each Studio Tasks board without one; boards are left as they are. */
-  migrateBoards: {
-    input: z.object({ dryRun: z.boolean().optional(), includeArchived: z.boolean().optional() }),
-    output: z.object({ boards: z.array(z.object({ boardId: z.string(), title: z.string(), pageId: z.string().nullable(), tasks: z.number(), status: z.enum(["created", "exists", "would-create"]) })) }),
-  },
   /** A drawing embed's scene as SVG, for the inline whiteboard; null when it's gone. */
   whiteboardGet: { input: z.object({ id: itemId }), output: z.object({ whiteboard: whiteboardViewSchema.nullable() }) },
   /** Pen strokes and erasures from the inline whiteboard, merged into the drawing by Studio Draw. */
@@ -252,7 +219,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: itemId, add: z.array(whiteboardStrokeSchema).max(200), erase: z.array(z.string().min(1).max(200)).max(2000) }),
     output: z.object({ whiteboard: whiteboardViewSchema }),
   },
-  /** A new item of another add-on, such as a task, table or drawing, in the page's project. */
+  /** A new item of another add-on, such as a table or drawing, in the page's project. */
   studioCreate: {
     input: z.object({ pageId, pluginId: z.string().min(1).max(100), kind: z.string().min(1).max(100) }),
     output: z.object({ item: studioItemSchema }),
@@ -273,33 +240,6 @@ export const rpcContract = defineRpcContract({
       rows: z.array(valuesSchema).max(5000),
     }),
     output: z.object({ table: tableSchema }),
-  },
-  /** A task embed's task and its board's columns. */
-  taskView: {
-    input: z.object({ id: itemId }),
-    output: z.object({ task: taskCardSchema.nullable(), columns: z.array(taskColumnSchema) }),
-  },
-  taskUpdate: {
-    input: z.object({
-      id: itemId,
-      title: z.string().trim().min(1).max(300).optional(),
-      status: z.string().min(1).max(60).optional(),
-      /** With a status: the task's place in that column. */
-      index: z.number().int().min(0).optional(),
-      due: z.string().nullable().optional(),
-    }),
-    output: z.object({ ok: z.boolean() }),
-  },
-  /** A board embed's board and its tasks. */
-  boardView: {
-    input: z.object({ id: itemId }),
-    output: z.object({ board: boardCardSchema.nullable(), tasks: z.array(taskCardSchema) }),
-  },
-  boardRename: { input: z.object({ id: itemId, title: z.string().trim().max(200) }), output: z.object({ ok: z.boolean() }) },
-  /** A task added from a board embed, at the top of a column. */
-  boardTaskCreate: {
-    input: z.object({ boardId: itemId, title: z.string().trim().min(1).max(300), status: z.string().min(1).max(60).optional() }),
-    output: z.object({ taskId: z.string() }),
   },
   /** A space widget's space, through Studio; null without Studio or the space. */
   spaceView: {
@@ -328,10 +268,6 @@ export const rpcContract = defineRpcContract({
   editableMarkdown: {
     input: z.object({ id: pageId }),
     output: z.object({ markdown: z.string() }),
-  },
-  taskFromCheckbox: {
-    input: z.object({ id: pageId, blockId: z.string().min(8).max(100) }),
-    output: z.object({ taskId: z.string() }),
   },
   /** Compare the loaded document before applying one targeted human edit. */
   editBlock: {

@@ -40,7 +40,7 @@ export const postSchema = z.object({
       content: z.object({ type: z.enum(["markdown", "image", "html", "pdf"]), text: z.string().nullable(), url: z.string().nullable() }).nullable(),
     }),
   ),
-  /** A finding Studio Explore saved here: Explore can write a page explaining it. */
+  /** A finding Explore (in Studio Pages) saved here: Explore can write a page explaining it. */
   explorable: z.boolean(),
   /** What the thread it came from is called: "#channel", or the thread's title. */
   threadTitle: z.string().nullable(),
@@ -113,7 +113,7 @@ export const rpcContract = defineRpcContract({
     input: z.object({}),
     output: z.object({ topics: z.array(z.object({ topic: z.string(), posts: z.number() })) }),
   },
-  /** A post from another plugin, such as Studio Explore. */
+  /** A post from another plugin, such as Explore in Studio Pages. */
   publish: {
     input: z.object({
       title: z.string().trim().min(1).max(MAX_TITLE),
@@ -127,7 +127,7 @@ export const rpcContract = defineRpcContract({
     }),
     output: z.object({ post: postSchema }),
   },
-  /** Asks Studio Explore to write a page explaining a finding it saved here; the post links it when it's done. */
+  /** Asks Explore in Studio Pages to write a page explaining a finding it saved here; the post links it when it's done. */
   explore: {
     input: z.object({ postId }),
     output: z.object({ status: z.enum(["started", "ready", "unavailable"]), href: z.string().nullable() }),

@@ -5,7 +5,6 @@ import { createRequire } from "node:module";
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
 import { studioSchemas } from "@bb-studio/kit/contract";
 import { untitled } from "@bb-studio/kit/format";
-import { pageCheckboxes } from "@bb-studio/kit/page-checkbox";
 import { createStudioNotifier } from "@bb-studio/kit/server";
 import * as Y from "yjs";
 import { z } from "zod";
@@ -223,7 +222,6 @@ async function registerPages(bb: BbPluginApi) {
     artifactView: async ({ id }) => ({ view: await embeds.artifactView(id) }),
     checklistHandOff: ({ id, blockId, note }) => checklists.handOff({ pageId: id, blockId, note: note ?? null }),
     checklistHandoffs: ({ id }) => ({ handoffs: checklists.handoffs(id).map((row) => ({ threadId: row.thread_id, blockId: row.block_id, title: row.title, state: row.state, note: row.note, updatedAt: row.updated_at })) }),
-    migrateBoards: async (input) => ({ boards: await checklists.migrateBoards(input) }),
     whiteboardGet: async ({ id }) => ({ whiteboard: await embeds.whiteboard(id) }),
     whiteboardSave: async ({ id, add, erase }) => ({ whiteboard: await embeds.saveWhiteboard(id, add, erase) }),
     studioCreate: async ({ pageId, pluginId, kind }) => ({ item: await embeds.create(pluginId, kind, requireMeta(pageId).project_id) }),
@@ -231,11 +229,6 @@ async function registerPages(bb: BbPluginApi) {
     tableUpdate: (input) => embeds.table("update", input),
     tablePatchRows: (input) => embeds.table("patchRows", input),
     tableCreate: ({ pageId, ...input }) => embeds.createTable({ ...input, projectId: requireMeta(pageId).project_id }),
-    taskView: ({ id }) => embeds.task(id),
-    taskUpdate: (input) => embeds.updateTask(input),
-    boardView: ({ id }) => embeds.board(id),
-    boardRename: ({ id, title }) => embeds.renameBoard(id, title),
-    boardTaskCreate: ({ boardId, title, status }) => embeds.createBoardTask(boardId, title, status),
     recordingView: async ({ id }) => ({ recording: await embeds.recording(id) }),
     spaceView: async ({ id }) => ({ view: await embeds.space(id) }),
     spaceOfPage: async ({ id }) => ({ space: await embeds.spaceOfPage(id) }),
@@ -247,27 +240,6 @@ async function registerPages(bb: BbPluginApi) {
     editableMarkdown: ({ id }) => {
       requireMeta(id);
       return { markdown: readMarkdown(service.hub.open(id).doc, { ids: true }) };
-    },
-    taskFromCheckbox: async ({ id, blockId }) => {
-      const meta = store.meta(id);
-      if (!meta) throw new Error("Page not found.");
-      const expected = readMarkdown(service.hub.open(id).doc, { ids: true });
-      const checkbox = pageCheckboxes(expected).find((row) => row.blockId === blockId.replace(/-/g, "").slice(0, 8));
-      if (!checkbox) throw new Error("Select a checkbox block first.");
-      if (checkbox.taskId) throw new Error("This checkbox already has a task.");
-      const result = await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "create",
-        input: { title: checkbox.title, projectId: meta.project_id, status: checkbox.checked ? "done" : "todo" } as never,
-        outputSchema: z.object({ task: z.object({ id: z.string() }) }) });
-      try {
-        await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "link",
-          input: { id: result.task.id, link: { target: "item", pluginId: "pages", itemId: id, label: meta.title || "Page", href: `${pageUrl(id)}#${checkbox.blockId}` } } as never,
-          outputSchema: z.object({ ok: z.boolean() }) });
-        service.editClientBlock(id, expected, checkbox.blockId, `${checkbox.line} [Task](item:studio-tasks:${result.task.id})`);
-      } catch (error) {
-        await bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "delete", input: { id: result.task.id } as never, outputSchema: z.object({ ok: z.boolean() }) }).catch(() => {});
-        throw error;
-      }
-      return { taskId: result.task.id };
     },
     editBlock: ({ id, expected, block, markdown }) => {
       return { markdown: service.editClientBlock(id, expected, block, markdown) };
@@ -431,12 +403,6 @@ async function registerPages(bb: BbPluginApi) {
   service.onPublish = (event) => {
     if (event.type === "page") {
       studioNotifier.changed(event.pageId); syncLinks(event.pageId);
-      const markdown = readMarkdown(service.hub.open(event.pageId).doc, { ids: true });
-      for (const checkbox of pageCheckboxes(markdown).filter((row) => row.taskId).slice(0, 100)) {
-        void bb.sdk.plugins.callRpc({ pluginId: "studio-tasks", method: "syncCheckbox",
-          input: { id: checkbox.taskId!, checked: checkbox.checked } as never,
-          outputSchema: z.object({ ok: z.boolean() }) }).catch(() => { /* Tasks may not be installed. */ });
-      }
       const meta = store.meta(event.pageId);
       if (meta) void services.recordActivity({
         ref: { pluginId: PLUGIN_ID, id: event.pageId },
@@ -489,7 +455,6 @@ async function registerPages(bb: BbPluginApi) {
       { name: "show", summary: "Print a page (id or title) as Markdown", usage: "bb pages show <page-id> [--ids]" },
       { name: "create", summary: "Create a page from a title and optional Markdown", usage: "bb pages create <title> [--global] [--markdown <text>]" },
       { name: "append", summary: "Append Markdown to a page", usage: "bb pages append <page-id> <markdown…>" },
-      { name: "migrate-boards", summary: "Make a page of checklists from each Studio Tasks board (once per board; boards are kept)", usage: "bb pages migrate-boards [--dry-run] [--include-archived]" },
     ],
     async run(argv, ctx) {
       const { command, rest } = subcommand(argv);
@@ -534,16 +499,8 @@ async function registerPages(bb: BbPluginApi) {
             applyEdits(service.hub.open(meta.id).doc, [{ op: "append", markdown }], origin);
             return { exitCode: 0, stdout: `Appended to ${meta.id}.\n` };
           }
-          case "migrate-boards": {
-            const dryRun = flag("--dry-run") === true;
-            const boards = await checklists.migrateBoards({ dryRun, includeArchived: flag("--include-archived") === true });
-            if (!boards.length) return { exitCode: 0, stdout: "No Studio Tasks boards.\n" };
-            const verb = { created: "created", exists: "already a page", "would-create": "would create" } as const;
-            const lines = boards.map((board) => `${board.boardId}\t${board.title}\t${verb[board.status]}${board.pageId ? `\t${board.pageId}` : ""}${board.status === "exists" ? "" : `\t${board.tasks} task(s)`}`);
-            return { exitCode: 0, stdout: `${lines.join("\n")}\n${dryRun ? "Dry run: nothing was changed.\n" : ""}` };
-          }
           default:
-            return usage("bb pages <list|show|create|append|migrate-boards> …");
+            return usage("bb pages <list|show|create|append> …");
         }
       } catch (error) {
         return { exitCode: 1, stderr: `${errorText(error)}\n` };

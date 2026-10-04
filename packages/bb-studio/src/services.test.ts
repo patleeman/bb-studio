@@ -4,7 +4,7 @@ import { MIGRATIONS } from "./migrations";
 import { StudioServices, type Ref } from "./services";
 
 const page: Ref = { pluginId: "pages", id: "opaque-page" };
-const task: Ref = { pluginId: "studio-tasks", id: "opaque-task" };
+const task: Ref = { pluginId: "talk", id: "opaque-task" };
 const actor = { kind: "user" as const };
 
 function setup() {

@@ -1,15 +1,13 @@
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { z } from "zod";
 import type { HubItem } from "./hub";
 import type { ProviderComments } from "./provider-comments";
 import type { ItemComment, StudioServices } from "./services";
 
-const attentionPage = z.object({ items: z.array(z.object({ id: z.string(), roomId: z.string(), reason: z.string(), createdAt: z.number(), channelName: z.string(), message: z.object({ id: z.string(), text: z.string() }) })), nextOffset: z.number().nullable() });
 
 export interface NeedEntry {
   id: string;
   source: string;
-  kind: "approval" | "question" | "attention" | "review" | "due" | "reply" | "mention";
+  kind: "approval" | "question" | "reply" | "mention";
   title: string;
   body: string;
   href: string;
@@ -21,9 +19,6 @@ export interface NeedEntry {
 }
 
 type Sdk = Pick<BbPluginApi["sdk"], "threads" | "plugins">;
-type Task = { id: string; title: string; status: string; due: string | null; projectId: string | null; archived: boolean; priority?: "none" | "low" | "medium" | "high" | "urgent"; updatedAt?: number };
-type Room = { id: string; projectId: string };
-const localDay = () => { const date = new Date(); return [date.getFullYear(), String(date.getMonth() + 1).padStart(2, "0"), String(date.getDate()).padStart(2, "0")].join("-"); };
 const mentionedUser = (body: string) => /@(?:user|you)\b/i.test(body) || /@\[[^\]]+\]\(user:[^)]+\)/i.test(body);
 
 export function commentNeeds(comments: readonly ItemComment[], item: HubItem): NeedEntry[] {
@@ -78,17 +73,8 @@ export async function respondToNeed(sdk: Sdk, input: { threadId: string; interac
 }
 
 export async function needsYouData(sdk: Sdk, services: StudioServices, providerComments: ProviderComments,
-  items: readonly HubItem[], tasks: readonly Task[] | null, rooms: readonly Room[] | null, projectId?: string,
-  inReview: (task: Task) => boolean = (task) => task.status === "review"): Promise<NeedEntry[]> {
+  items: readonly HubItem[], projectId?: string): Promise<NeedEntry[]> {
   const entries: NeedEntry[] = [];
-  const today = localDay();
-  for (const task of tasks ?? []) {
-    if (task.archived || (projectId && task.projectId !== projectId && task.projectId !== null)) continue;
-    const href = `/plugins/studio-tasks/tasks/${task.id}`;
-    const boost = task.priority === "urgent" ? 15 : task.priority === "high" ? 8 : 0;
-    if (inReview(task)) entries.push({ id: `task:review:${task.id}`, source: "studio-tasks", kind: "review", title: task.title, body: "Ready for review", href, createdAt: task.updatedAt ?? Date.now(), priority: 80 + boost });
-    if (task.status !== "done" && task.due && task.due <= today) entries.push({ id: `task:due:${task.id}`, source: "studio-tasks", kind: "due", title: task.title, body: task.due < today ? `Overdue since ${task.due}` : "Due today", href, createdAt: task.updatedAt ?? Date.now(), priority: 60 + boost });
-  }
   for (let offset = 0; ; offset += 200) {
     const page = await sdk.threads.list({ ...(projectId ? { projectId } : {}), archived: false, limit: 200, offset }).catch(() => []);
     const pending = page.filter((thread) => thread.hasPendingInteraction);

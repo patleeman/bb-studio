@@ -1,6 +1,6 @@
 // Embeds of other Studio add-ons' items: a drawing shows its picture, an
-// artifact its content, a table its live grid, a task an editable row, a
-// board its columns, a recording its player and transcript, and the rest a card. Each opens the
+// artifact its content, a table its live grid, a recording its player and
+// transcript, and the rest a card. Each opens the
 // item in its own add-on.
 import { useEffect, useMemo, useState } from "react";
 import { studioItemProps } from "@bb-studio/kit/app";
@@ -9,7 +9,7 @@ import { cn } from "@bb-studio/kit/ui";
 import type { StudioEmbedItem } from "../contract";
 import { STUDIO_EMBEDS, isEmbedKindItem, studioRef, studioSubtitle, type StudioEmbedKind } from "../schema-config";
 import { usePagesUi, type ArtifactView } from "./context";
-import { BoardEmbed, RecordingBody, TableEmbed, TaskBody } from "./live-embeds";
+import { RecordingBody, TableEmbed } from "./live-embeds";
 import { Whiteboard } from "./whiteboard";
 
 export function useStudioItems(enabled = true): StudioEmbedItem[] | null {
@@ -48,8 +48,6 @@ const FALLBACK_ICONS: Record<StudioEmbedKind | "item", string> = {
   drawing: "Palette",
   artifact: "File",
   recording: "Mic",
-  task: "CircleCheck",
-  board: "GridView",
   table: "Rows2",
   item: "GridView",
 };
@@ -152,25 +150,12 @@ export function StudioEmbed({ kind, target, onEdit, onTargetChange }: {
   onTargetChange?(target: string): void;
 }) {
   if (kind === "table") return <TableEmbed target={target} onTargetChange={onTargetChange} />;
-  if (kind === "board") return <BoardEmbed target={target} onTargetChange={onTargetChange} />;
-  // An "item" embed of a board is a board too, though its view isn't kept.
-  const ref = kind === "item" ? studioRef(kind, target) : null;
-  if (ref && isEmbedKindItem("board", ref.pluginId, ref.id)) return <BoardEmbed target={ref.id} />;
   return <ItemEmbed kind={kind} target={target} onEdit={onEdit} />;
 }
 
 function ItemEmbed({ kind, target, onEdit }: { kind: StudioEmbedKind | "item"; target: string; onEdit?: () => void }) {
-  const ui = usePagesUi();
   const { item, loading } = useStudioItem(kind, target);
-  // A task is its own live row; a header would repeat it and go stale.
   const link = item ? studioItemProps({ href: item.href, title: item.title, icon: item.kindIcon }, { drag: false }) : {};
-  if (item && isEmbedKindItem("task", item.pluginId, item.id)) {
-    return (
-      <div className="contents" {...link}>
-        <TaskBody id={item.id} onOpen={() => ui.openPath(item.href)} />
-      </div>
-    );
-  }
   return (
     <div className="overflow-hidden" {...link}>
       <ItemHeader item={item} kind={kind} target={target} loading={loading} onEdit={onEdit} />
@@ -187,7 +172,7 @@ export function StudioPicker({ kind, onPick, onCancel }: { kind: StudioEmbedKind
   const matches = useMemo(() => {
     const words = query.toLowerCase().split(/\s+/).filter(Boolean);
     return (items ?? [])
-      .filter((item) => kind === "item" || isEmbedKindItem(kind, item.pluginId, item.id))
+      .filter((item) => kind === "item" || isEmbedKindItem(kind, item.pluginId))
       .filter((item) => words.every((word) => `${item.title} ${item.kindLabel} ${item.preview ?? ""}`.toLowerCase().includes(word)))
       .slice(0, 8);
   }, [items, kind, query]);

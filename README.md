@@ -1,7 +1,7 @@
 # BB Studio
 
 A suite of [BB](https://getbb.app) plugins for writing, talking, drawing,
-tracking tasks, running bot teams, and keeping what your agents make. Every
+running bot teams, and keeping what your agents make. Every
 item lives in one Studio collection that you can search, tag, and hand to an
 agent.
 
@@ -9,14 +9,12 @@ agent.
 
 | Plugin | ID | What it does |
 | --- | --- | --- |
-| [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tasks, tables and bots, with search, tags, project filters, templates and tabs. |
-| [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents. |
-| [Studio Explore](packages/bb-studio-explore/) | `explore` | Experimental. Agents end answers with things they noticed along the way; click one for a page explaining it. Needs Studio Pages. |
+| [Studio](packages/bb-studio/) | `studio` | The hub. Home for what needs you today, plus one collection for pages, recordings, drawings, artifacts, tables and bots, with search, tags, project filters, templates and tabs. |
+| [Studio Pages](packages/bb-studio-pages/) | `pages` | Collaborative pages you write with your agents, with checklists you hand to agents, inline whiteboards, and Explore: pages explaining what an agent noticed along the way. |
 | [Studio Feed](packages/bb-studio-feed/) | `feed` | One feed of what your agents report. An agent ends a reply with a `::post` line, from any thread, channel or automation; read it on desktop and phone and discuss any post. |
 | [Studio Talk](packages/bb-studio-talk/) | `talk` | Long-form dictation and recording that saves audio as you speak and transcribes it. |
 | [Studio Draw](packages/bb-studio-draw/) | `excalidraw` | Excalidraw drawings you sketch with your agents. |
 | [Studio Artifacts](packages/bb-studio-artifacts/) | `artifacts` | Keeps the images, pages, reports and files your agents make. |
-| [Studio Tasks](packages/bb-studio-tasks/) | `studio-tasks` | Boards of tasks you can hand to agents and embed in pages; each task follows its thread from working to review. |
 | [Studio Tables](packages/bb-studio-tables/) | `studio-tables` | Structured tables with typed columns, rows, views, CSV import and export, and agent tools. |
 | [Studio Teams](packages/bb-studio-teams/) | `bot-teams` | Persistent bot profiles and saved views of ordinary threads, with shared memory and missions. |
 | [Studio Chat](packages/bb-studio-chat/) | `studio-chat` | One Chat action opens an item's linked conversation or a new composer. Choose or start another from its menu. |
@@ -29,14 +27,13 @@ agent.
 
 Every add-on works on its own. With Studio installed, their items also appear in
 Studio's collection. Studio Reactions and Studio Decisions don't use Studio at
-all. Studio Teams needs Studio Decisions to choose recipients in views, and Studio
-Explore needs Studio Pages.
+all. Studio Teams needs Studio Decisions to choose recipients in views.
 
 ## iOS app
 
 [`apps/ios`](apps/ios/) is BB Studio for iPhone and Apple Watch: BB's threads,
 approvals, terminals and automations, plus native Studio, Pages, Talk, Draw,
-Artifacts, Tasks, Tables and Teams. It talks to your BB server and uses the plugins
+Artifacts, Tables and Teams. It talks to your BB server and uses the plugins
 above; install `mobile` for push notifications. See its
 [README](apps/ios/README.md) to build it and ship it to TestFlight.
 
@@ -55,13 +52,10 @@ Install BB Studio from https://github.com/patleeman/bb-studio in my BB.
    a one-line description each:
    - studio: the Studio collection; recommended, since the others plug into it
    - pages: collaborative pages
-   - explore: Studio Explore (experimental); pages explaining what an agent
-     noticed along the way; needs pages
    - feed: Studio Feed; one feed of what agents and automations post
    - talk: dictation and voice recordings with transcripts
    - excalidraw: Excalidraw drawings
    - artifacts: keeps files your agents make
-   - studio-tasks: a task board you hand to agents
    - studio-tables: structured tables with views and CSV import and export
    - bot-teams: bot profiles and saved thread views
    - studio-chat: Chat on Studio items, with New conversation and Choose conversation in its menu
@@ -98,7 +92,7 @@ bb plugin remove talk
 bb plugin install talk@bb-studio --yes
 ```
 
-Your items (pages, recordings, drawings, tasks, bots) are kept, but removing a
+Your items (pages, recordings, drawings, bots) are kept, but removing a
 plugin deletes its settings and secrets, so note them first.
 
 ## Development
@@ -123,7 +117,7 @@ pnpm test
 pnpm check:compat        # every plugin installs on the current stable BB
 bb marketplace add path:.   # try the catalog from a local checkout
 pnpm plugins:install     # install every plugin from this checkout
-scripts/refresh-locks.sh bb-studio-tasks  # refresh a plugin npm lock in a clean clone
+scripts/refresh-locks.sh bb-studio-pages  # refresh a plugin npm lock in a clean clone
 node scripts/staged-bb.mjs start         # stage the suite; stop removes it
 node scripts/staged-bb.mjs start --plugin studio-chat # all plugins, only this capture's fixtures
 ```

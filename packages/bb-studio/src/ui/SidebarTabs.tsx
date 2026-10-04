@@ -35,7 +35,6 @@ const APP_NAMES: Record<string, string> = {
   talk: "Talk",
   excalidraw: "Drawings",
   artifacts: "Artifacts",
-  "studio-tasks": "Tasks",
   "bot-teams": "Teams",
 };
 

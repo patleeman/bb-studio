@@ -1,6 +1,6 @@
 # Float
 
-> **Float** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
+> **Float** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Float any thread, channel, Studio item or Studio view into a panel of tabs
 that stays on screen while you work somewhere else. It docks at the bottom

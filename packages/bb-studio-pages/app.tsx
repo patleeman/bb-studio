@@ -26,7 +26,7 @@ function TalkBridge() {
 }
 
 export default definePluginApp((app) => {
-  // Explore is part of Pages; it stays hidden while the standalone Explore plugin is enabled.
+  // Explore: "Along the way" findings and their explainer pages.
   registerExploreApp(app);
   // Shows the panel in Float windows open on its paths.
   app.slots.experimental_appOverlay({ id: "float", component: () => <FloatPanels path="pages" render={(subPath) => <PagesPanel subPath={subPath} />} /> });

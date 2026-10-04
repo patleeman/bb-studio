@@ -15,7 +15,6 @@ const plugins = [
   ["bot-teams", "BotTeams", "../packages/bb-studio-teams/client-contract.ts", "rpcContract"],
   ["talk", "Talk", "../packages/bb-studio-talk/src/shared/contract.ts", "rpcContract"],
   ["pages", "Pages", "../packages/bb-studio-pages/src/contract.ts", "rpcContract"],
-  ["studio-tasks", "Tasks", "../packages/bb-studio-tasks/server.ts", "rpcContract"],
   ["artifacts", "Artifacts", "../packages/bb-studio-artifacts/server.ts", "rpcContract"],
   ["excalidraw", "Draw", "../packages/bb-studio-draw/server.ts", "rpcContract"],
   ["studio-chat", "Chat", "../packages/bb-studio-chat/src/contract.ts", "rpcContract"],

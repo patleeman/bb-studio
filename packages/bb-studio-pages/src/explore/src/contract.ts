@@ -54,11 +54,6 @@ export type ExplainerView = z.infer<typeof explainerSchema>;
 export type JobView = z.infer<typeof jobSchema>;
 
 export const rpcContract = defineRpcContract({
-  /** Looks up a linked task; only an explicit create request adds one. */
-  taskForFinding: {
-    input: z.object({ threadId, messageId, label: z.string().trim().min(1).max(MAX_LABEL_LENGTH * 2), parentId: explainerId.nullable().optional(), create: z.boolean().default(false) }),
-    output: z.object({ available: z.boolean(), task: z.object({ id: z.string(), title: z.string() }).nullable() }),
-  },
   /** Opens, attaches to, or starts the explainer for a finding. */
   explore: {
     input: z.object({

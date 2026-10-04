@@ -107,32 +107,6 @@
       }
     },
     {
-      "id": "explore",
-      "displayName": "Studio Explore",
-      "description": "Experimental. Part of BB Studio. Agents end answers that read code with a few things they noticed along the way; click one and a Studio Page explaining it is written in the background. Needs Studio Pages.",
-      "icon": {
-        "url": "./packages/bb-studio-explore/icons/explore.svg"
-      },
-      "tags": [
-        "experimental",
-        "agents",
-        "documents",
-        "developer-tools",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-explore",
-          "ref": "main"
-        }
-      }
-    },
-    {
       "id": "feed",
       "displayName": "Studio Feed",
       "description": "Part of BB Studio. One feed of what your agents report. Agents post with the feed_post tool from any thread, channel or automation, and the post shows as a card where they wrote it. Read it like a news reader on desktop and mobile: unread first, posts open in place, stories group their updates, and linked pages and artifacts are previewed.",
@@ -226,30 +200,6 @@
         "git": {
           "url": "https://github.com/patleeman/bb-studio.git",
           "subdir": "packages/bb-studio-artifacts",
-          "ref": "main"
-        }
-      }
-    },
-    {
-      "id": "studio-tasks",
-      "displayName": "Studio Tasks",
-      "description": "Part of BB Studio. Boards of tasks you can hand to agents; each task follows its thread from working to review.",
-      "icon": {
-        "url": "./packages/bb-studio-tasks/assets/icon.svg"
-      },
-      "tags": [
-        "tasks",
-        "agents",
-        "bb-studio"
-      ],
-      "author": {
-        "name": "Patrick Lee",
-        "github": "patleeman"
-      },
-      "source": {
-        "git": {
-          "url": "https://github.com/patleeman/bb-studio.git",
-          "subdir": "packages/bb-studio-tasks",
           "ref": "main"
         }
       }

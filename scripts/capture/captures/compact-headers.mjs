@@ -10,11 +10,6 @@ export default context => {
       await pluginRpc("studio-tables", "insert", { id: table.id, values: { name: "Review notes" } });
       return { path: `/plugins/studio-tables/tables/${table.id}`, ready: 'input[aria-label="Table title"]', cleanup: () => pluginRpc("studio-tables", "remove", { id: table.id }) };
     } },
-    { id: "tasks", packageDir: "bb-studio-tasks", seed: async () => {
-      const { board } = await pluginRpc("studio-tasks", "boardCreate", { title: "Release checklist", projectId });
-      await pluginRpc("studio-tasks", "create", { title: "Review the launch notes", projectId, boardId: board.id, assignee: "me" });
-      return { path: `/plugins/studio-tasks/tasks/${board.id}`, ready: 'input[aria-label="Board title"]', cleanup: () => pluginRpc("studio-tasks", "boardDelete", { id: board.id }) };
-    } },
     { id: "teams", packageDir: "bb-studio-teams", seed: async () => {
       const { bots } = await pluginRpc("bot-teams", "list", null);
       const bot = bots.find(b => b.handle === "atlas"); if (!bot) throw new Error("Missing staged Atlas profile");

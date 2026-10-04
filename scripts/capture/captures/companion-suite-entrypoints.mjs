@@ -1,7 +1,4 @@
-import { randomUUID } from "node:crypto";
 import { readFile } from "node:fs/promises";
-import { createRequire } from "node:module";
-import { join } from "node:path";
 import { usageReportHtml } from "../seed.mjs";
 
 export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => {
@@ -38,30 +35,8 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
       const { post, cleanup } = await seedPost();
       return { path: `/plugins/feed/feed/${post.id}/discussion`, ready: '.feed-discussion-composer [contenteditable="true"]', draft: "Keep this unsent Feed discussion", attachment: true, cleanup };
     } },
-    { id: "explore", packageDir: "bb-studio-explore", seed: async () => {
-      const dataDir = await requireStage();
-      const require = createRequire(new URL("../../../packages/bb-studio-explore/package.json", import.meta.url));
-      const Database = require("better-sqlite3");
-      const db = new Database(join(dataDir, "plugins/explore/data.db"), { fileMustExist: true });
-      const id = `expl_transfer_${randomUUID()}`, now = Date.now();
-      let page;
-      const cleanup = async () => {
-        db.prepare("DELETE FROM explore_explainers WHERE id = ?").run(id);
-        db.close();
-        if (page) await pluginRpc("pages", "remove", { id: page.id });
-      };
-      try {
-        ({ page } = await pluginRpc("pages", "create", { title: "Release usage explainer", projectId, parentId: null, markdown: `\`\`\`html\n${usageReportHtml({ draft: false })}\n\`\`\`` }));
-        db.prepare("INSERT INTO explore_explainers (id,key,thread_id,message_id,emoji,label,project_id,status,page_id,generated_at,created_at,updated_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,?)")
-          .run(id, id, threadId, `msg_transfer_${id}`, "🏗️", page.title, projectId, "ready", page.id, now, now, now);
-        const { explainers } = await pluginRpc("explore", "explainers", {});
-        if (!explainers.some(explainer => explainer.id === id)) throw new Error("Explore RPC cannot read the transfer fixture");
-        return { path: `/plugins/explore/explainers/${id}`, ready: `iframe[title="${page.title}"]`, embedded: true, cleanup };
-      } catch (error) { await cleanup(); throw error; }
-    } },
   ];
   const studio = fixtures.find(fixture => fixture.id === "studio");
-  const explore = fixtures.find(fixture => fixture.id === "explore");
   return [...fixtures,
     { id: "studio-collection", packageDir: "bb-studio", seed: async () => ({ ...await studio.seed(), path: "/plugins/studio/studio/collection" }) },
     { id: "studio-activity", packageDir: "bb-studio", seed: async () => {
@@ -113,10 +88,5 @@ export default ({ projectId, threadId, pluginRpc, seedPages, bbCli, sleep }) => 
         };
       } catch (error) { await cleanup(); throw error; }
     } },
-    ...["list", "thread"].map(kind => ({ id: `explore-${kind}`, packageDir: "bb-studio-explore", seed: async () => {
-      const seeded = await explore.seed();
-      const id = seeded.path.split('/').at(-1);
-      return { ...seeded, path: `/plugins/explore/explainers${kind === "thread" ? `/thread/${threadId}` : ""}`, ready: `button[data-explainer-open="${id}"]`, embedded: false, visibleText: "Release usage explainer" };
-    } })),
   ];
 };

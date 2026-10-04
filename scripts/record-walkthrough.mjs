@@ -44,19 +44,16 @@ const ACCENT = "#c8ff3d";
 
 // [capture ID, headline (*accent*), line under it, seconds, CSS width]
 const SCENES = [
-  ["studio-needs-you", "What needs *you* today.", "Reviews, due tasks and what your agents changed.", 3.5],
-  ["studio", "*Everything* in one place.", "Pages, recordings, drawings, tasks and tables.", 3.5, 1040],
+  ["studio", "*Everything* in one place.", "Pages, recordings, drawings and tables.", 3.5, 1040],
   ["studio-search", "Search *all* of it.", "⌘⇧K looks inside every item.", 3.5],
   ["pages", "Pages you write *with* agents.", "Live stats, charts and checklists.", 4],
   ["talk", "Talk. It *transcribes*.", "Long recordings, saved as you speak.", 3.5],
   ["excalidraw", "*Sketch* it together.", "Excalidraw, shared with your agents.", 3],
-  ["studio-tasks", "Hand tasks to *agents*.", "Each task follows its thread to review.", 3.5],
   ["studio-tables", "Real *tables*.", "Typed columns, views, CSV and agent tools.", 3],
   ["artifacts", "Keep what they *make*.", "Reports, images and files, all saved.", 3],
   ["feed", "One *feed* of reports.", "From every thread, channel and automation.", 4],
   ["bots", "Bots that work as a *team*.", "Channels, delegation and memory.", 4, 900],
   ["reactions-smart", "Answer in *one tap*.", "Replies come with suggested answers.", 3.5],
-  ["explore", "See what they *noticed*.", "Click a finding for a page explaining it.", 3.5],
   ["float", "Keep it all *open*.", "Threads, channels and items as floating tabs.", 3.5, 960],
   ["studio-chat", "Chat about *what you see*.", "The agent knows what's on screen.", 3.5],
 ];
@@ -71,27 +68,6 @@ const ownScenes = {
       await client.navigate(`/plugins/pages/pages/${page.id}`);
       for (const text of ["Offline mode launch", "Crash-free sessions", "Launch checklist"]) await client.waitForText(text);
       await client.waitForSelector(".recharts-bar-rectangle");
-      await sleep(800);
-    } catch (error) {
-      await cleanup();
-      throw error;
-    }
-    return cleanup;
-  },
-  "studio-tasks": async (client) => {
-    const { board } = await pluginRpc("studio-tasks", "boardCreate", { title: "Fall launch", projectId });
-    const cleanup = () => pluginRpc("studio-tasks", "boardDelete", { id: board.id }).catch(() => {});
-    try {
-      const tasks = [
-        { title: "Write the launch post", status: "todo", assignee: "me", due: "2026-10-06", priority: "high", labels: ["launch"] },
-        { title: "Update the pricing page copy", status: "todo", assignee: "agent" },
-        { title: "Fix the flaky checkout test", status: "in_progress", assignee: "agent" },
-        { title: "Add offline sync to settings", status: "review", assignee: "agent" },
-        { title: "Draft the Q3 usage report", status: "done", assignee: "me" },
-      ];
-      for (const task of tasks) await pluginRpc("studio-tasks", "create", { ...task, projectId, boardId: board.id });
-      await client.navigate(`/plugins/studio-tasks/tasks/${board.id}`);
-      for (const text of ["To do", "In progress", "Review", "Done", ...tasks.map((task) => task.title)]) await client.waitForText(text);
       await sleep(800);
     } catch (error) {
       await cleanup();

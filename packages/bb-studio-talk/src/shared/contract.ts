@@ -151,10 +151,6 @@ export const rpcContract = defineRpcContract({
     input: z.object({ id: recordingId }),
     output: z.object({ recording: recordingSchema }),
   },
-  meeting_create_task: {
-    input: z.object({ id: recordingId, index: z.number().int().min(0).max(100) }),
-    output: z.object({ taskId: z.string() }),
-  },
   /** A finished dictation's transcript, tidied for inserting; null keeps the raw text. */
   dictation_cleanup: {
     input: z.object({ id: recordingId }),

@@ -1,6 +1,6 @@
 ---
 name: studio
-description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, artifacts and tasks — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (Studio Pages, Studio Talk, Studio Draw, Studio Artifacts, Studio Tasks) fit together.
+description: Use when the user refers to BB Studio or "my stuff" across pages, Talk recordings, drawings, artifacts and tables — finding an item they made, "the doc about X", "that recording from Tuesday", "what's in Studio" — or asks how Studio and its add-ons (Studio Pages, Studio Talk, Studio Draw, Studio Artifacts, Studio Tables) fit together.
 ---
 
 # Studio
@@ -14,7 +14,7 @@ the core: one collection that lists every item from every installed add-on.
 | Studio Talk | `talk` | Recordings, dictations | the `talk` skill and `bb talk` |
 | Studio Draw | `excalidraw` | Drawings | the `draw` skill and `excalidraw_*` tools |
 | Studio Artifacts | `artifacts` | Artifacts: saved images, HTML, reports, files | the `artifacts` skill and `artifacts_*` tools |
-| Studio Tasks | `studio-tasks` | Task boards, and tasks on them you can hand to agents | the `studio-tasks` skill and `tasks_*` tools |
+| Studio Tables | `studio-tables` | Tables with typed columns and views | the `tables_*` tools |
 
 Items belong to a BB project or are global. Every item has a link
 (`/plugins/<plugin id>/<panel>/<item id>`); put it in replies as
@@ -35,7 +35,7 @@ Items belong to a BB project or are global. Every item has a link
   `#tags`; an item that matched on its content has the matching text on a `>`
   line below it (`snippet` in `--json`).
 - CLI: `bb studio list [query…] [--all] [--json]`, with the same query, e.g.
-  `bb studio list kind:task -tag:done`;
+  `bb studio list kind:page -tag:done`;
   `bb studio tags` lists the tags and how many items each has, and
   `bb studio spaces` lists the spaces.
 - `bb studio providers` shows which add-ons are installed and whether each is
@@ -47,7 +47,7 @@ content itself.
 ## Tags
 
 Tags group items across add-ons, like a "Launch" tag on a page, a drawing and
-a task. Studio keeps them; add-ons don't. Use `studio_tag_items` with
+a table. Studio keeps them; add-ons don't. Use `studio_tag_items` with
 `items` (item links, or `<plugin id>:<item id>`), `add` and `remove` (tag
 names). Adding a name that doesn't exist yet creates the tag. Tag when the
 user asks to group, file or label items; don't invent tags on your own.
@@ -55,8 +55,8 @@ user asks to group, file or label items; don't invent tags on your own.
 ## Deleting
 
 `studio_delete_items` with `items` (item links) permanently deletes pages,
-recordings, drawings, artifacts, tasks, task boards and other add-on items.
-A page takes its sub-pages with it, and a board its tasks. There's no undo, so delete only what the user asked
+recordings, drawings, artifacts, tables and other add-on items.
+A page takes its sub-pages with it. There's no undo, so delete only what the user asked
 to remove, and confirm first when the request is vague, like "clean up old
 stuff". It doesn't delete spaces.
 
@@ -77,7 +77,7 @@ and later. A thread is in a space when it was added to it or its project is.
 - A new thread whose first message links a space
   (`/plugins/studio/studio/space/<id>`) joins it.
 - What a thread in a space makes joins that space by itself: pages, drawings,
-  boards, tasks, tables and new artifacts. So does a sub-page made under the
+  tables and new artifacts. So does a sub-page made under the
   space's page or under an item in the space. Don't file those again.
 
 ## In the app

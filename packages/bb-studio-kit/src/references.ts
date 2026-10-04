@@ -20,14 +20,13 @@ export interface ReferenceOptions {
 
 const LEGACY_NAMESPACES: Record<string, readonly string[]> = {
   pages: ["page"], excalidraw: ["drawing"], artifacts: ["artifact"], talk: ["recordings"],
-  "studio-tasks": ["task"], "studio-tables": ["table"], "bot-teams": ["bot", "views"],
+  "studio-tables": ["table"], "bot-teams": ["bot", "views"],
 };
 export const STUDIO_REFERENCE_ROUTES: readonly ReferenceRoute[] = [
   { pluginId: "pages", path: "/plugins/pages/pages/" },
   { pluginId: "excalidraw", path: "/plugins/excalidraw/drawings/" },
   { pluginId: "artifacts", path: "/plugins/artifacts/artifacts/" },
   { pluginId: "talk", path: "/plugins/talk/recordings/" },
-  { pluginId: "studio-tasks", path: "/plugins/studio-tasks/tasks/" },
   { pluginId: "studio-tables", path: "/plugins/studio-tables/tables/", subpaths: ["view/:id", "row/:id", "view/:id/row/:id"] },
   { pluginId: "bot-teams", path: "/plugins/bot-teams/bots/", subpaths: ["profile"] },
   { pluginId: "bot-teams", path: "/plugins/bot-teams/channels/" },

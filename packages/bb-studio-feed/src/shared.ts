@@ -23,9 +23,10 @@ export const MAX_BODY = 20_000;
 /** A post or a story changed. */
 export type RealtimeEvent = { type: "post"; postId: string; story: string | null } | { type: "removed"; postId: string } | { type: "seen" };
 
-/** Stories Studio Explore posts a saved finding under; the reader offers to explore them. */
+/** Stories Explore (in Studio Pages) posts a saved finding under; the reader offers to explore them. */
 export const EXPLORE_STORY_PREFIX = "explore-";
-export const EXPLORE_PLUGIN_ID = "explore";
+/** Explore runs inside Studio Pages, which registers its RPC methods with an `explore_` prefix. */
+export const EXPLORE_PLUGIN_ID = "pages";
 
 /** The line a reply ends with to show a post `feed_post` made, as a card. */
 export const cardLine = (postId: string) => `::${DIRECTIVE}{id="${postId}"}`;

@@ -55,10 +55,6 @@ and Pages keeps the label on the thread's state. Leave the mention in place
 when editing the item. If you are that agent, end with a one-line summary
 and don't check the item off; the user does that after reviewing.
 
-`bb pages migrate-boards [--dry-run]` makes a page of checklists from each
-Studio Tasks board, once per board, without changing the boards. Run it only
-when the user asks.
-
 ## Markdown
 
 Pages reads and writes GitHub-flavoured Markdown plus:
@@ -85,19 +81,17 @@ Pages reads and writes GitHub-flavoured Markdown plus:
   renders, so show HTML *source* as ` ```html source ` (how HTML code blocks
   read back) or with another fence language (` ```xml `).
 - **Embeds:** a fenced ` ```embed ` block:
-  `{"kind":"bookmark|thread|page|drawing|artifact|recording|task|board|table|item|space","target":"https://… or an id","title":"…"}`.
+  `{"kind":"bookmark|thread|page|drawing|artifact|recording|table|item|space","target":"https://… or an id","title":"…"}`.
   Bookmarks may also carry `description` and `image`; leave them out and the
   editor fetches the link's preview when the page opens. `drawing`,
-  `artifact`, `recording`, `task`, `board`, and `table` take the item's id
-  in Excalidraw, Artifacts, Talk, Studio Tasks, or Studio Tables; a table may
-  name a view as `<table id>/view/<view id>`, and a board (`brd_…`, from
-  `tasks_boards`) shows as a checklist with `<board id>/view/list`. `item` embeds anything in
+  `artifact`, `recording`, and `table` take the item's id
+  in Excalidraw, Artifacts, Talk, or Studio Tables; a table may
+  name a view as `<table id>/view/<view id>`. `item` embeds anything in
   Studio, with `plugin:id` as the target (`studio_list_items` lists ids). A
   drawing shows its picture, an artifact its content, a table its live grid,
-  a task an editable card, a board its columns of draggable cards, a recording its player and transcript, and the
+  a recording its player and transcript, and the
   rest a card. To give a page a database, make it with `tables_create` and
-  embed it as a `table`; to track work in it, make a board with
-  `tasks_board_create` and embed it as a `board`.
+  embed it as a `table`; to track work in it, use checklists.
   A Studio space's page holds `space` widgets with target
   `<space id>/<section>`, where section is `actions`, `recent`, `threads`,
   `channels` or `projects`; they show that part of the space live. Leave them

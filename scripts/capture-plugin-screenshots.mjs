@@ -15,9 +15,7 @@ import bb_studio_talk from "./capture/captures/bb-studio-talk.mjs";
 import bb_studio_pages from "./capture/captures/bb-studio-pages.mjs";
 import bb_studio from "./capture/captures/bb-studio.mjs";
 import bb_studio_artifacts from "./capture/captures/bb-studio-artifacts.mjs";
-import bb_studio_tasks from "./capture/captures/bb-studio-tasks.mjs";
 import bb_studio_reactions from "./capture/captures/bb-studio-reactions.mjs";
-import bb_studio_explore from "./capture/captures/bb-studio-explore.mjs";
 import bb_studio_feed from "./capture/captures/bb-studio-feed.mjs";
 import bb_studio_decisions from "./capture/captures/bb-studio-decisions.mjs";
 import bb_studio_mobile from "./capture/captures/bb-studio-mobile.mjs";
@@ -48,9 +46,7 @@ const captures = [
   ...bb_studio_pages(context),
   ...bb_studio(context),
   ...bb_studio_artifacts(context),
-  ...bb_studio_tasks(context),
   ...bb_studio_reactions(context),
-  ...bb_studio_explore(context),
   ...bb_studio_feed(context),
   ...bb_studio_decisions(context),
   ...bb_studio_mobile(context),

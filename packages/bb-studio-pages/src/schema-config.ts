@@ -49,44 +49,26 @@ export const htmlConfig = {
 /** The longest HTML source an ```html fence may hold; longer ones stay code. */
 export const MAX_HTML_CHARS = 200_000;
 
+/** "task" and "board" embedded the retired Studio Tasks; they stay so pages that have them still open. */
 export const EMBED_KINDS = ["thread", "page", "bookmark", "drawing", "artifact", "recording", "task", "board", "table", "item", "space"] as const;
 export type EmbedKind = (typeof EMBED_KINDS)[number];
 
 /**
  * Embeds of other Studio add-ons' items. Their target is the item's id; an
  * "item" embed reaches any add-on with a `pluginId:itemId` target. A table's
- * or board's target may name the view it shows: `<table id>/view/<view id>`,
- * `<board id>/view/list`. Tasks and boards share an add-on; their ids'
- * prefixes tell them apart.
+ * target may name the view it shows: `<table id>/view/<view id>`.
  */
 export const STUDIO_EMBEDS = {
   drawing: { pluginId: "excalidraw", panel: "drawings", label: "Drawing" },
   artifact: { pluginId: "artifacts", panel: "artifacts", label: "Artifact" },
   recording: { pluginId: "talk", panel: "recordings", label: "Recording" },
-  task: { pluginId: "studio-tasks", panel: "tasks", label: "Task", idPrefix: "tsk_" },
-  board: { pluginId: "studio-tasks", panel: "tasks", label: "Board", idPrefix: "brd_" },
   table: { pluginId: "studio-tables", panel: "tables", label: "Table" },
 } as const;
 export type StudioEmbedKind = keyof typeof STUDIO_EMBEDS;
 
 /** Whether an add-on's item is the kind an embed shows. */
-export function isEmbedKindItem(kind: StudioEmbedKind, pluginId: string, id: string): boolean {
-  const embed: { pluginId: string; idPrefix?: string } = STUDIO_EMBEDS[kind];
-  return embed.pluginId === pluginId && (!embed.idPrefix || id.startsWith(embed.idPrefix));
-}
-
-/** The ways a board embed shows its tasks. */
-export const BOARD_EMBED_VIEWS = ["board", "list"] as const;
-export type BoardEmbedView = (typeof BOARD_EMBED_VIEWS)[number];
-
-/** A board embed's target: `<board id>`, or `<board id>/view/list`. */
-export function parseBoardTarget(target: string): { boardId: string; view: BoardEmbedView } {
-  const [boardId = "", , view] = target.split("/");
-  return { boardId, view: view === "list" ? "list" : "board" };
-}
-
-export function boardTarget(boardId: string, view: BoardEmbedView): string {
-  return view === "board" ? boardId : `${boardId}/view/${view}`;
+export function isEmbedKindItem(kind: StudioEmbedKind, pluginId: string): boolean {
+  return STUDIO_EMBEDS[kind].pluginId === pluginId;
 }
 
 export function isStudioEmbed(kind: string): kind is StudioEmbedKind | "item" {
@@ -95,9 +77,9 @@ export function isStudioEmbed(kind: string): kind is StudioEmbedKind | "item" {
 
 /** The add-on item an embed or mention points at, if it points at one. */
 export function studioRef(kind: string, target: string): { pluginId: string; id: string } | null {
-  if (kind === "table" || kind === "board") {
+  if (kind === "table") {
     const [id] = target.split("/");
-    return id ? { pluginId: STUDIO_EMBEDS[kind].pluginId, id } : null;
+    return id ? { pluginId: STUDIO_EMBEDS.table.pluginId, id } : null;
   }
   if (kind in STUDIO_EMBEDS) return target ? { pluginId: STUDIO_EMBEDS[kind as StudioEmbedKind].pluginId, id: target } : null;
   if (kind !== "item") return null;
@@ -107,7 +89,7 @@ export function studioRef(kind: string, target: string): { pluginId: string; id:
 
 /** The embed kind and target for an add-on's item. */
 export function studioEmbedFor(pluginId: string, id: string): { kind: StudioEmbedKind | "item"; target: string } {
-  const kind = (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find((each) => isEmbedKindItem(each, pluginId, id));
+  const kind = (Object.keys(STUDIO_EMBEDS) as StudioEmbedKind[]).find((each) => isEmbedKindItem(each, pluginId));
   return kind ? { kind, target: id } : { kind: "item", target: `${pluginId}:${id}` };
 }
 

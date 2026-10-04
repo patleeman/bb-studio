@@ -575,7 +575,7 @@ function ResolutionButton({ post }: { post: PostView }) {
   </>;
 }
 
-/** A finding Studio Explore saved: write the page explaining it. The post links the page when it's done. */
+/** A finding Explore saved: write the page explaining it. The post links the page when it's done. */
 function ExploreButton({ post }: { post: PostView }) {
   const rpc = useRpc<typeof rpcContract>();
   const open = useOpenCompanion();
@@ -595,10 +595,10 @@ function ExploreButton({ post }: { post: PostView }) {
       type="button"
       className={OUTLINE_BUTTON}
       disabled={state !== "idle"}
-      title={state === "unavailable" ? "Studio Explore isn't installed or couldn't find this finding" : "Write a page explaining this"}
+      title={state === "unavailable" ? "Studio Pages isn't installed or Explore couldn't find this finding" : "Write a page explaining this"}
       onClick={explore}
     >
-      <Icon name={state === "working" ? "Loading" : "explore/explore"} fallback="Search" className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
+      <Icon name={state === "working" ? "Loading" : "pages/explore"} fallback="Search" className={cn(state === "working" && "animate-spin motion-reduce:animate-none")} />
       {state === "working" ? "Exploring…" : state === "unavailable" ? "Can't explore" : "Explore"}
     </button>
   );

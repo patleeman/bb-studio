@@ -58,7 +58,6 @@ const ITEMS = [
   item("weather/forecast", "Forecast"),
   item("artifacts/artifacts", "Artifacts"),
   item("talk/recordings", "Recordings"),
-  item("studio-tasks/tasks", "Tasks"),
   item("studio-tables/tables", "Tables"),
   item("__bb__/skills", "Skills"),
 ];
@@ -98,7 +97,7 @@ describe("Studio Navigation", () => {
 
   it("leaves out retired Studio panels, visible or hidden", () => {
     const retired = [
-      item("explore/explainers", "Explore"),
+      item("pages/explainers", "Explore"),
       item("float/companions", "Companions"),
       item("studio/office", "Home"),
       item("studio-chat/chats", "Chat", { isVisible: false }),
@@ -170,7 +169,6 @@ describe("Studio Navigation", () => {
           "bot-teams/bots",
           "artifacts/artifacts",
           "talk/recordings",
-          "studio-tasks/tasks",
           "studio-tables/tables",
           "__bb__/skills",
         ],

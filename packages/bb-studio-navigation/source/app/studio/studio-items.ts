@@ -11,7 +11,6 @@ export const HUB_PANELS = [
   "excalidraw/drawings",
   "artifacts/artifacts",
   "talk/recordings",
-  "studio-tasks/tasks",
   "studio-tables/tables",
   "bot-teams/channels",
 ];
@@ -21,9 +20,7 @@ export const HUB_PANELS = [
  * still run and their links still open.
  */
 export const RETIRED_PANELS = [
-  // Studio Explore, folded into Studio Pages.
-  "explore/explainers",
-  // The same panel inside Pages; explainers open from their links.
+  // Explore's panel inside Pages; explainers open from their links.
   "pages/explainers",
   // Float's Companions panel; Float's dock and toggle reach it.
   "float/companions",

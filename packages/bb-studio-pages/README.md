@@ -1,6 +1,6 @@
 # Studio Pages
 
-> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, tracking tasks, running bot teams, and keeping what your agents make: [Studio](../bb-studio), Studio Pages, [Studio Talk](../bb-studio-talk), [Studio Draw](../bb-studio-draw), [Studio Artifacts](../bb-studio-artifacts), [Studio Tasks](../bb-studio-tasks), [Studio Chat](../bb-studio-chat), and [Studio Teams](../bb-studio-teams).
+> **Studio Pages** is part of **BB Studio**, a suite of plugins for writing, talking, drawing, running bot teams, and keeping what your agents make. See the [suite overview](../../README.md).
 
 Collaborative documents for BB that you write together with your agents.
 Pages gives you a Notion-style block editor with live multiplayer editing,
@@ -110,15 +110,11 @@ afterwards.
   empty line to turn it into a card; web links fetch their title,
   description, and preview image.
 - **Studio embeds.** The `/` menu's Studio group embeds a drawing, artifact,
-  recording, task, task board, or live table, picked by search, or makes a
-  new task, board, table, or drawing in the page's project and embeds it.
+  recording, or live table, picked by search, or makes a new table or
+  drawing in the page's project and embeds it.
   Embeds stay live:
   - a table is the full Studio Tables grid, edited in place, with its views,
     board and calendar; the view shown is kept with the page;
-  - a task is an editable card: done, title, status, due date, assignee,
-    subtasks and labels;
-  - a board shows its columns, with cards you drag between them or add to,
-    or its tasks as a checklist; the view shown is kept with the page;
   - a recording plays in the page, with its summary, decisions and
     transcript; click a line to play from there;
   - a drawing is an inline whiteboard: it shows the drawing, and **Sketch**
@@ -277,20 +273,6 @@ of that thread at the end of the item, labelled with the thread's state:
 open the thread. Check the item off yourself after reviewing; the agent is
 told not to.
 
-### Boards to pages
-
-`bb pages migrate-boards` makes one page of checklists for each Studio Tasks
-board: a heading per column, an item per task (subtasks right after their
-task, marked ↳; done tasks checked), and the task's agent thread mentioned on its item. Each item links
-its task, so checking it moves the task to Done, and moving the task to Done
-checks it. It runs once per board: a board whose page exists is skipped. The
-boards and tasks are left as they are; the only change in Studio Tasks is a
-link from each task to its item. Add `--dry-run` to list what it would make,
-or `--include-archived` to include archived boards. Template boards are
-skipped.
-
 ## Explore
 
-[Explore](../bb-studio-explore/README.md) is built into Pages. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page. The directive, the `explore_explain` tool, the Explore panel and the thread tab work as they do in the standalone plugin. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate`.
-
-The standalone Studio Explore plugin can stay installed. While it is enabled it stays in charge and Explore in Pages stays hidden. To switch, disable Studio Explore and reload Pages: on that first load Pages copies Explore's database into its own `explore.db` (an SQLite backup, read-only on the original) and copies its saved settings once. The standalone plugin's files are never changed, so enabling it again goes back to its own data.
+Explore is experimental. Agents end answers that read code with a few things they noticed **Along the way**; clicking one writes an explainer page under the project's **Explore** page, opened in the thread's **Explore** tab. A finding can also be saved to [Studio Feed](../bb-studio-feed) to read later, and each evening Explore posts a digest of findings nobody explored. Agents can write an explainer themselves with the `explore_explain` tool. Explore keeps its explainers in its own `explore.db` next to Pages' database. Its settings appear in Pages' settings with an **Explore:** prefix, and the CLI is `bb pages explore list|open|regenerate`.

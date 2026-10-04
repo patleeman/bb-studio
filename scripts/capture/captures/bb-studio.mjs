@@ -107,34 +107,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
     },
   },
   {
-    id: "studio-needs-you",
-    packageDir: "bb-studio",
-    fileName: "needs-you.png",
-    privateSidebar: true,
-    setup: async (client) => {
-      const ids = [];
-      const cleanup = async () => { for (const id of ids) await pluginRpc("studio-tasks", "delete", { id }).catch(() => {}); };
-      try {
-        const today = new Date();
-        const due = [today.getFullYear(), String(today.getMonth() + 1).padStart(2, "0"), String(today.getDate()).padStart(2, "0")].join("-");
-        for (const input of [
-          { title: "QA Review launch copy", status: "review", assignee: "me" },
-          { title: "QA Ship onboarding guide", status: "todo", assignee: "me", due },
-        ]) {
-          const { task } = await pluginRpc("studio-tasks", "create", { ...input, projectId });
-          ids.push(task.id);
-        }
-        await pluginRpc("studio", "recordActivity", { ref: { pluginId: "studio-tasks", id: ids[0] }, actor: { kind: "user" }, verb: "updated", at: Date.now(), summary: "QA Review launch copy is ready" });
-        await client.navigate("/plugins/studio/studio");
-        for (const label of ["Needs you", "QA Ship onboarding guide", "QA Review launch copy"]) await client.waitForText(label);
-        const needs = await client.evaluate(`document.querySelector('section[aria-label="Needs you"]')?.innerText ?? ""`);
-        if (!needs.includes("QA Ship onboarding guide") || !needs.includes("QA Review launch copy")) throw new Error("The collection's Needs you strip did not show the staged task requests");
-        await sleep(600);
-      } catch (error) { await cleanup(); throw error; }
-      return cleanup;
-    },
-  },
-  {
     id: "studio",
     packageDir: "bb-studio",
     privateSidebar: true,
@@ -223,20 +195,11 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await pages.cleanup();
         throw error;
       });
-      const taskIds = [];
       const cleanup = async () => {
         await pages.cleanup();
         await artifact.cleanup();
-        for (const id of taskIds) await pluginRpc("studio-tasks", "delete", { id }).catch(() => {});
       };
       try {
-        for (const task of [
-          { title: "Write the launch post", status: "todo", assignee: "me", description: "Announce offline sync and the new team plans." },
-          { title: "Add offline sync to settings", status: "review", assignee: "agent" },
-        ]) {
-          const { task: created } = await pluginRpc("studio-tasks", "create", { ...task, projectId });
-          taskIds.push(created.id);
-        }
         // Artifacts search their saved text through Studio's index.
         await bbCli(["studio", "reindex"]);
         const found = await pluginRpc("studio", "searchAll", { query: "weekly active teams", limit: 40 });
@@ -256,9 +219,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForText("Recently changed");
         await client.waitForText("Hand to agent");
         await client.command("Input.insertText", { text: "offline sync" });
-        // The task's title matches; the page and the other task match on content.
-        await client.waitForText("Add offline sync to settings");
-        await client.waitForText("Announce offline sync and the new team plans.");
+        // The pages match on title and content.
         await client.waitForText("Offline sync for every team");
         await client.waitForText("Ship offline sync to beta teams");
         const snippets = await client.evaluate(`document.querySelectorAll(".studio-quick-open-snippet mark").length`);

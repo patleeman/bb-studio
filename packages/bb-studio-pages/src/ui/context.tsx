@@ -2,7 +2,7 @@ import { createContext, useContext } from "react";
 import type { Column, Table, Values } from "@bb-studio/kit/tables";
 import type { TableApi } from "@bb-studio/kit/table-grid";
 import type { WhiteboardStroke, WhiteboardView } from "../whiteboard";
-import type { BoardCard, BotView, PageMetaView, RecordingCard, SpaceWidgetView, StudioEmbedItem, TaskCard, TaskColumn } from "../contract";
+import type { BotView, PageMetaView, RecordingCard, SpaceWidgetView, StudioEmbedItem } from "../contract";
 
 export interface ArtifactView {
   type: "image" | "html" | "markdown" | "code" | "text" | "pdf" | "other";
@@ -23,18 +23,12 @@ export interface PagesUi {
   /** Opens a BB path, such as another add-on's item. */
   openPath(path: string): void;
   linkPreview(url: string): Promise<{ title: string; description: string; image: string }>;
-  /** Items from the other Studio add-ons (drawings, artifacts, recordings, tasks…). */
+  /** Items from the other Studio add-ons (drawings, artifacts, recordings…). */
   studioItems(): Promise<StudioEmbedItem[]>;
   artifactView(id: string): Promise<ArtifactView | null>;
   /** A live table embed's table, read and edited through Pages. */
   table(id: string): Promise<Table | null>;
   tableApi(id: string): TableApi;
-  task(id: string): Promise<{ task: TaskCard | null; columns: TaskColumn[] }>;
-  updateTask(input: { id: string; title?: string; status?: string; index?: number; due?: string | null }): Promise<unknown>;
-  /** A live board embed's board and tasks, read and edited through Pages. */
-  board(id: string): Promise<{ board: BoardCard | null; tasks: TaskCard[] }>;
-  renameBoard(id: string, title: string): Promise<unknown>;
-  createBoardTask(input: { boardId: string; title: string; status?: string }): Promise<{ taskId: string }>;
   recording(id: string): Promise<RecordingCard | null>;
   /** Hands a checklist item to an agent; resolves to its thread. */
   handOffChecklist(pageId: string, blockId: string): Promise<{ threadId: string }>;
@@ -67,11 +61,6 @@ export const PagesUiContext = createContext<PagesUi>({
   artifactView: () => Promise.resolve(null),
   table: unavailable,
   tableApi: () => ({ update: unavailable, patchRows: unavailable }),
-  task: unavailable,
-  updateTask: unavailable,
-  board: unavailable,
-  renameBoard: unavailable,
-  createBoardTask: unavailable,
   recording: unavailable,
   handOffChecklist: unavailable,
   whiteboard: unavailable,

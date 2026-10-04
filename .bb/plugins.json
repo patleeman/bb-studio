@@ -20,10 +20,6 @@
       "source": "./packages/bb-studio-pages"
     },
     {
-      "name": "explore",
-      "source": "./packages/bb-studio-explore"
-    },
-    {
       "name": "feed",
       "source": "./packages/bb-studio-feed"
     },
@@ -38,10 +34,6 @@
     {
       "name": "artifacts",
       "source": "./packages/bb-studio-artifacts"
-    },
-    {
-      "name": "studio-tasks",
-      "source": "./packages/bb-studio-tasks"
     },
     {
       "name": "bot-teams",

@@ -24,7 +24,6 @@ import { type BotView, type PageMetaView, type rpcContract } from "../contract";
 import { DOCUMENT_FRAGMENT, SPACE_SECTIONS, STUDIO_EMBEDS, THREADS_MAP, type StudioEmbedKind } from "../schema-config";
 import { linkEmbed, referenceMention } from "./links";
 import { handOffChecklist, PageSideMenu, placeEmbed } from "./block-menu";
-import { focusNewTask } from "./live-embeds";
 import { pageSpaceId, SPACE_SECTION_LABELS } from "./space-embeds";
 import { pageSchema } from "./blocks";
 import { createHighlighter } from "./code";
@@ -50,15 +49,11 @@ const STUDIO_EMBED_SUBTEXT: Record<StudioEmbedKind, string> = {
   drawing: "Embed an Excalidraw drawing",
   artifact: "Embed an artifact: image, HTML, PDF or text",
   recording: "Embed a Talk recording",
-  task: "Embed a Studio task",
-  board: "Embed a live task board",
   table: "Embed a live Studio table",
 };
-const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", task: "CircleCheck", board: "GridView", table: "Rows2" };
+const STUDIO_EMBED_ICONS: Record<StudioEmbedKind, string> = { drawing: "Palette", artifact: "File", recording: "Mic", table: "Rows2" };
 /** Slash items that make a new item in another add-on and embed it. */
 const STUDIO_NEW: { kind: StudioEmbedKind; aliases: string[] }[] = [
-  { kind: "task", aliases: ["todo", "to do", "issue"] },
-  { kind: "board", aliases: ["kanban", "tasks", "sprint", "backlog"] },
   { kind: "table", aliases: ["database", "spreadsheet", "sheet", "grid"] },
   { kind: "drawing", aliases: ["whiteboard", "excalidraw", "sketch", "diagram", "draw"] },
 ];
@@ -225,18 +220,6 @@ export function PageEditor({
   const slashItems = useMemo(() => {
     const custom: DefaultReactSuggestionItem[] = [
       {
-        title: "Task from checkbox",
-        subtext: "Create a linked Studio task from this checkbox",
-        aliases: ["task", "checkbox", "to do"],
-        group: "Studio",
-        icon: <Icon name="CircleCheck" className="size-4" />,
-        onItemClick: () => {
-          const block = editor.getTextCursorPosition().block;
-          if (block.type !== "checkListItem") { toast.error("Select a checkbox first."); return; }
-          void rpc.call("taskFromCheckbox", { id: page.id, blockId: block.id }).then(() => toast.success("Task created"), (error) => toast.error(String(error)));
-        },
-      },
-      {
         title: "Hand to agent",
         subtext: "Start an agent on this checklist item and link its thread here",
         aliases: ["agent", "delegate", "assign", "handoff", "checkbox", "to do"],
@@ -333,7 +316,6 @@ export function PageEditor({
           const blockId = editor.getTextCursorPosition().block.id;
           void ui.createItem(page.id, STUDIO_EMBEDS[kind].pluginId, kind).then(
             (item) => {
-              if (kind === "task") focusNewTask(item.id);
               if (kind === "drawing") editWhiteboardWhenShown(item.id);
               placeEmbed(editor, blockId, { kind, target: item.id });
             },

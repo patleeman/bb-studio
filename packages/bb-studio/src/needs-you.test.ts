@@ -16,21 +16,17 @@ describe("Needs you", () => {
 
   it("derives current requests and drops resolved sources", async () => {
     let pending = true;
-    let attentionOpen = true;
-    let review = true;
     const sdk = {
       threads: {
         list: async () => [{ id: "t1", title: "Thread", titleFallback: null, hasPendingInteraction: pending }],
         interactions: { list: async () => pending ? [{ id: "i1", status: "pending", payload: { kind: "approval" }, createdAt: 1 }] : [] },
       },
-      plugins: { callRpc: async ({ outputSchema }: { outputSchema: { parse: (value: unknown) => unknown } }) => outputSchema.parse({ items: attentionOpen ? [{ id: "a1", roomId: "r1", reason: "decision", createdAt: 1, channelName: "Team", message: { id: "m1", text: "Choose" } }] : [], nextOffset: null }) },
     };
     const services = { openComments: () => [] };
     const comments = { list: async () => [] };
-    const tasks = () => [{ id: "task", title: "Task", status: review ? "review" : "done", due: null, projectId: "project", archived: false }];
-    const read = () => needsYouData(sdk as never, services as never, comments as never, [], tasks(), [{ id: "r1", projectId: "project" }], "project");
-    expect((await read()).map((entry) => entry.kind)).toEqual(["approval", "review"]);
-    pending = false; attentionOpen = false; review = false;
+    const read = () => needsYouData(sdk as never, services as never, comments as never, [], "project");
+    expect((await read()).map((entry) => entry.kind)).toEqual(["approval"]);
+    pending = false;
     expect(await read()).toEqual([]);
   });
 

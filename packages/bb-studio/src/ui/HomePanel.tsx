@@ -31,7 +31,7 @@ function useHome(periodDays: number) {
 }
 
 const NEED_ICONS: Record<Need["kind"], string> = {
-  approval: "CircleCheck", question: "MessageSquare", attention: "BellDot", review: "Eye", due: "Calendar", reply: "CornerDownRight", mention: "MessageSquarePlus",
+  approval: "CircleCheck", question: "MessageSquare", reply: "CornerDownRight", mention: "MessageSquarePlus",
 };
 const SHOWN_NEEDS = 4;
 

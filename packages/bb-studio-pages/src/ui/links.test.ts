@@ -18,10 +18,6 @@ describe("linkEmbed", () => {
     expect(linkEmbed(`${ORIGIN}/plugins/excalidraw/drawings/drw_1`, ORIGIN)).toEqual({ kind: "drawing", target: "drw_1" });
     expect(linkEmbed(`${ORIGIN}/plugins/artifacts/artifacts/art_0123456789abcdef`, ORIGIN)).toEqual({ kind: "artifact", target: "art_0123456789abcdef" });
     expect(linkEmbed(`${ORIGIN}/plugins/talk/recordings/rec_1/`, ORIGIN)).toEqual({ kind: "recording", target: "rec_1" });
-    expect(linkEmbed(`${ORIGIN}/plugins/studio-tasks/tasks/tsk_1`, ORIGIN)).toEqual({ kind: "task", target: "tsk_1" });
-    expect(linkEmbed(`${ORIGIN}/plugins/studio-tasks/tasks/brd_1`, ORIGIN)).toEqual({ kind: "board", target: "brd_1" });
-    expect(linkEmbed(`${ORIGIN}/plugins/studio-tasks/tasks/brd_1/list`, ORIGIN)).toEqual({ kind: "board", target: "brd_1/view/list" });
-    expect(linkEmbed(`${ORIGIN}/plugins/studio-tasks/tasks/brd_1/calendar`, ORIGIN)).toEqual({ kind: "board", target: "brd_1" });
     expect(linkEmbed(`${ORIGIN}/plugins/studio-tables/tables/tbl_1`, ORIGIN)).toEqual({ kind: "table", target: "tbl_1" });
     // A table link keeps its view and leaves the row to the embed.
     expect(linkEmbed(`${ORIGIN}/plugins/studio-tables/tables/tbl_1/view/view_2/row/row_3`, ORIGIN)).toEqual({ kind: "table", target: "tbl_1/view/view_2" });

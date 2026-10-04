@@ -135,43 +135,6 @@ async function seedSmartReactionsThread(project, machine, orbitDir) {
 }
 
 /**
- * A thread that asks a narrow question about Orbit's upload code with Explore
- * on. The code has more wrong with it than the question covers, so the reply
- * ends with an ::explore line of things noticed along the way. GPT-6.1-Sol
- * leaves the line out, and Claude Sonnet 5 sometimes drops its closing quote,
- * which BB then shows as text, so this keeps the first well-formed reply of
- * three and deletes the others. Smart reactions are off meanwhile, so the
- * reply ends with the rows alone.
- */
-async function seedExploreThread(project, machine, orbitDir) {
-  await bb("plugin", "config", "explore", "set", "explore", "true");
-  await bb("plugin", "config", "emoji-react", "set", "smartReactions", "false");
-  const replies = [];
-  try {
-    for (let attempt = 1; attempt <= 3; attempt++) {
-      const thread = await bb(
-        "thread", "spawn", "--project", project.id, "--machine", machine.id, "--environment", orbitDir,
-        "--provider", "claude-code", "--model", "claude-sonnet-5", "--reasoning-level", "medium",
-        "--title", "How does Orbit retry uploads?",
-        "--prompt", "Read src/retry.ts and src/queue.ts. In one sentence: how many times does uploadWithRetry call upload before it gives up?",
-      );
-      await bb("thread", "wait", thread.id, "--timeout", "5m");
-      const events = await bb("thread", "messages", thread.id);
-      const reply = events.findLast((event) => event.type === "item/completed" && event.data.item.type === "agentMessage")?.data.item.text ?? "";
-      if (/::explore\{items="[^"]+"\}\s*$/.test(reply)) {
-        await bb("thread", "read", thread.id);
-        return thread;
-      }
-      replies.push(reply);
-      await bb("thread", "delete", thread.id, "--yes");
-    }
-  } finally {
-    await bb("plugin", "config", "emoji-react", "set", "smartReactions", "true");
-  }
-  throw new Error(`No retry reply ended with a well-formed ::explore line:\n${replies.join("\n---\n")}`);
-}
-
-/**
  * Studio Teams' README fixture (packages/bb-studio-teams/docs/QA.md): four
  * bots, a Launch room where Atlas and Scribe give the fixed replies their
  * missions spell out, a Design review channel, a paused automation, and
@@ -246,7 +209,7 @@ async function start() {
   const orbitDir = join(stagedDir, "orbit");
   await mkdir(orbitDir);
   await writeFile(join(orbitDir, "README.md"), "# Orbit\n\nThe ORBIT-42 release.\n");
-  // Code for the Explore thread to read, with more in it than the question asks about.
+  // Code for staged agent threads to read.
   await cp(join(fixturesDir, "orbit"), join(orbitDir, "src"), { recursive: true });
   await run("git", ["init", "-q"], { cwd: orbitDir });
   await run("git", ["add", "README.md", "src"], { cwd: orbitDir });
@@ -263,8 +226,6 @@ async function start() {
   process.stdout.write(`Seeding fixtures${capturePlugin ? ` for ${capturePlugin}` : " for the suite"}\n`);
   const smartReactionsThread = !capturePlugin || ["emoji-react", "artifacts"].includes(capturePlugin)
     ? await seedSmartReactionsThread(project, machine, orbitDir) : null;
-  const exploreThread = !capturePlugin || capturePlugin === "explore"
-    ? await seedExploreThread(project, machine, orbitDir) : null;
   if (!capturePlugin || capturePlugin === "bot-teams") await seedTeams(machine);
 
   const envFile = join(stagedDir, "capture.env");
@@ -275,12 +236,11 @@ async function start() {
       `export BB_SERVER_URL=${serverUrl}`,
       `export BB_CAPTURE_PROJECT_ID=${project.id}`,
       `export BB_CAPTURE_THREAD_ID=${threads[0].id}`,
-      "unset BB_CAPTURE_SMART_REACTIONS_THREAD_ID BB_CAPTURE_WORKSPACE_THREAD_ID BB_CAPTURE_EXPLORE_THREAD_ID",
+      "unset BB_CAPTURE_SMART_REACTIONS_THREAD_ID BB_CAPTURE_WORKSPACE_THREAD_ID",
       ...(smartReactionsThread ? [
         `export BB_CAPTURE_SMART_REACTIONS_THREAD_ID=${smartReactionsThread.id}`,
         `export BB_CAPTURE_WORKSPACE_THREAD_ID=${smartReactionsThread.id}`,
       ] : []),
-      ...(exploreThread ? [`export BB_CAPTURE_EXPLORE_THREAD_ID=${exploreThread.id}`] : []),
       "unset BB_CAPTURE_ONLY BB_CAPTURE_PLUGIN",
       ...(capturePlugin ? [`export BB_CAPTURE_PLUGIN=${capturePlugin}`] : []),
       `export BB_CAPTURE_CDP_PORT=${port + 2}`,
