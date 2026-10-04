@@ -18,15 +18,14 @@ paused Talk recording, a drawing, three Orbit pages and the staged bots.
 ![Live BB screenshot of the New menu with a Pages filter](assets/new-menu.png)
 
 The New menu stays open to every available kind with a Pages filter active.
-The capture checks that Bots and Pages filters offer the same menu as the
+The capture checks that Drawings and Pages filters offer the same menu as the
 unfiltered collection.
 
 ![Live BB screenshot of the Studio sidebar plus menu](assets/sidebar-new-menu.png)
 
 The **+** beside Studio opens a menu of the installed add-ons' creation actions.
 The staged capture checks keyboard opening, creates a page in the open thread's
-project, opens the New space dialog, and checks that the plus stays visible
-while its menu is open.
+project, and checks that the plus stays visible while its menu is open.
 
 ![Live BB screenshot of Needs you above the Studio collection](assets/needs-you.png)
 
@@ -36,11 +35,9 @@ and the task board below.
 
 ![Live BB screenshot of a space's page](assets/space-page.png)
 
-A staged "Launch" space with the Orbit project, opened from Studio: its page in
-Pages, made from the space template. Under the intro are the space's live
-widgets: buttons that make a thread or any add-on's item in the space, its
-three recent Orbit pages, and the project's threads, with channels and
-projects further down.
+A staged "Launch" space's page in Pages: its brief, with the space's purpose
+and empty Plan and Decisions sections for its lead to keep current. Live
+status is the lead's Status tab, not the page.
 
 ![Live BB screenshot of Studio search](assets/search.png)
 

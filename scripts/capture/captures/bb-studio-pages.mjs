@@ -13,7 +13,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       const { page, cleanup } = await seedPages();
       try {
         await client.navigate(`/plugins/pages/pages/${page.id}`);
-        await client.waitForSelector('nav[aria-label="Breadcrumbs"]');
+        await client.waitForSelector('nav[aria-label="Breadcrumb"]');
         await client.waitForAriaButton("Comments");
         await client.waitForAriaButton("Page actions");
         await client.waitForSelector('[data-studio-item-header] button');
@@ -157,7 +157,8 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForSelector('input[aria-label="Search and filter studio"]');
         await client.waitForSelector('button[aria-label="Remove Kind Pages"]');
         await client.waitForSelector('[role="grid"]');
-        await client.waitForText("New page");
+        // New offers every kind, even with the list filtered to pages.
+        if (!await client.evaluate(`[...document.querySelectorAll("button")].some(button => button.innerText.trim() === "New")`)) throw new Error("The collection has no New button");
         await client.waitForText("Offline mode launch");
         await client.waitForText("Rollout risks");
         await client.waitForText("Release notes: October");

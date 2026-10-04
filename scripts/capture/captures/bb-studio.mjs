@@ -21,7 +21,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForSelector('[role="menu"][aria-label="New Studio item"]');
         await client.waitForSelector('[role="menu"][aria-label="New Studio item"] [role="menuitem"]:not([data-disabled])');
         const labels = await client.evaluate(`[...document.querySelectorAll('[role="menu"][aria-label="New Studio item"] [role="menuitem"]')].map(each => each.innerText.trim())`);
-        for (const label of ["Page", "Drawing", "Table", "Space", "Recording"]) {
+        for (const label of ["Page", "Drawing", "Table", "Recording"]) {
           if (!labels.includes(label)) throw new Error(`Sidebar New menu did not offer ${label}`);
         }
         if (labels.includes("Artifact")) throw new Error("The sidebar offers an artifact even though artifacts cannot be created here");
@@ -39,12 +39,6 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForSelector(`[data-studio-tab="pages:${pageId}"]`);
         const { items } = await pluginRpc("studio", "items", { pluginId: "pages", ids: [pageId] });
         if (items[0]?.projectId !== projectId) throw new Error("Sidebar New Page did not use the open thread's project");
-        await openNew();
-        await client.clickElementWithTextAndPointer('[role="menuitem"]', "Space");
-        await client.waitForSelector('[role="dialog"]');
-        const dialog = await client.evaluate(`document.querySelector('[role="dialog"]').innerText`);
-        if (!dialog.includes("New space") || !dialog.includes("Default project")) throw new Error("Sidebar New Space did not open its creation dialog");
-        await client.clickElementWithTextAndPointer('[role="dialog"] button', "Cancel");
         await client.navigate(`/projects/${projectId}/threads/${threadId}`);
         await openNew();
         await client.command("Input.dispatchMouseEvent", { type: "mouseMoved", x: 800, y: 800 });
@@ -90,14 +84,16 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.evaluate(`localStorage.setItem('studio:query:all', ''); localStorage.setItem('studio:collection:view', 'list')`);
         await client.navigate("/plugins/studio/studio/collection");
         const unfiltered = await openNew();
-        for (const label of ["Page", "Drawing", "Bot"]) {
+        for (const label of ["Page", "Drawing", "Table"]) {
           if (!unfiltered.includes(label)) throw new Error(`New menu did not offer ${label}`);
         }
-        for (const kind of ["bot", "page"]) {
+        // Bots and channels live in Teams, not Studio.
+        if (unfiltered.includes("Bot")) throw new Error("The New menu still offers a bot");
+        for (const kind of ["drawing", "page"]) {
           await client.navigate("/plugins/studio/studio/collection");
           await client.evaluate(`localStorage.setItem('studio:query:all', ${JSON.stringify(`kind:${kind}`)})`);
           await client.navigate("/plugins/studio/studio/collection");
-          await client.waitForAriaButton(kind === "bot" ? "Remove Kind Bots" : "Remove Kind Pages");
+          await client.waitForAriaButton(kind === "drawing" ? "Remove Kind Drawings" : "Remove Kind Pages");
           const filtered = await openNew();
           if (JSON.stringify(filtered) !== JSON.stringify(unfiltered)) throw new Error(`The ${kind} filter changed the New menu`);
         }
@@ -126,14 +122,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         recordingId = await seedTalkRecording(projectId, { transcribe: false });
         const { space } = await pluginRpc("studio", "createSpace", { name: "Launch review", defaultProjectId: projectId });
         spaceId = space.id;
-        await pluginRpc("studio", "spaceMembers", { id: spaceId, add: [{ pluginId: "pages", id: pages.page.id }] });
         await client.navigate("/plugins/studio/studio/collection");
         await client.evaluate(`localStorage.setItem("studio:collection:view", "grid"); localStorage.setItem("studio:query:all", "")`);
         await client.navigate("/plugins/studio/studio/collection");
         await client.waitForSelector('input[aria-label="Search and filter studio"]');
         await client.waitForSelector('nav[aria-label="Filters"]');
         const rail = await client.evaluate(`document.querySelector('nav[aria-label="Filters"]')?.innerText ?? ""`);
-        for (const label of ["Spaces", "Launch review", "Kind", "Pages", "Recordings", "Drawings", "Project", "Orbit"]) {
+        for (const label of ["Space", "Launch review", "Kind", "Pages", "Recordings", "Drawings", "Project", "Orbit"]) {
           if (!rail.includes(label)) throw new Error(`The filter rail didn't show ${label}: ${rail}`);
         }
         await client.waitForText("Pages");
@@ -169,12 +164,13 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
       try {
         const { space } = await pluginRpc("studio", "createSpace", { name: "Launch", icon: "🚀", description: "Everything for the Orbit launch: plans, notes and the people working on it.", defaultProjectId: projectId });
         spaceId = space.id;
-        if (!space.pageId) throw new Error("The new space didn't get a page");
-        await client.navigate(`/plugins/pages/pages/${space.pageId}`);
-        await client.waitForSelector('[data-space-widget="actions"]');
-        for (const label of ["Recent", "Channels and messages", "Space settings", "Offline mode launch", "Add or remove projects", "Orbit"]) await client.waitForText(label);
-        const widgets = await client.evaluate(`[...document.querySelectorAll("[data-space-widget]")].map((each) => each.dataset.spaceWidget).join(",")`);
-        if (widgets !== "actions,recent,threads,channels,projects") throw new Error(`The space page showed widgets ${widgets}`);
+        const { href } = await pluginRpc("studio", "spacePage", { id: space.id });
+        if (!href) throw new Error("The new space didn't get a page");
+        await client.navigate(href);
+        // The page is the Space's brief: its purpose, a plan and decisions. Live status is the lead's Status tab.
+        await client.waitForSelector(".ProseMirror[contenteditable=true]");
+        for (const label of ["Everything for the Orbit launch", "Plan", "Decisions"]) await client.waitForText(label);
+        if (await client.evaluate(`!!document.querySelector("[data-space-widget]")`)) throw new Error("The space page still shows live widgets");
         await sleep(1000);
       } catch (error) {
         await cleanup();
@@ -214,7 +210,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         for (const type of ["rawKeyDown", "keyUp"]) {
           await client.command("Input.dispatchKeyEvent", { type, modifiers: modifiers | 8, key: "K", code: "KeyK", windowsVirtualKeyCode: 75 });
         }
-        await client.waitForSelector('.studio-quick-open [role="dialog"][aria-label="Search Studio"]');
+        await client.waitForSelector('[role="dialog"].studio-quick-open input[aria-label="Search Studio"]');
         await client.waitForText("Recently changed");
         await client.waitForText("Hand to agent");
         await client.command("Input.insertText", { text: "offline sync" });

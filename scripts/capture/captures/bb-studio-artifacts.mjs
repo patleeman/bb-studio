@@ -10,8 +10,7 @@ export default ({ projectId, threadId, seedPages, seedDrawing, seedArtifact, see
         await client.waitForInputValue("Artifact title", "Q3 usage report");
         await client.waitForText("HTML ·");
         await client.waitForText("· v2");
-        await client.waitForText("Preview");
-        await client.waitForText("Source");
+        await client.waitForAriaButton("Show source");
         // Studio Chat names the artifact's thread: the one that saved it.
         const { thread: saver } = JSON.parse(await bbCli(["thread", "get", process.env.BB_CAPTURE_WORKSPACE_THREAD_ID ?? threadId, "--json"]));
         await client.waitForSelector(`[data-studio-chat-item="artifacts:${artifactId}"] > button[title=${JSON.stringify(`Continue "${saver.title}"`)}]`);

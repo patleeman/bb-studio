@@ -72,7 +72,7 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
         if (fixtures.length !== 7 || fixtures.some((post) => post.read)) throw new Error("Expected seven unread fixture stories");
         const unread = listed.posts.filter((post) => !post.read).length;
         await client.navigate("/plugins/feed/feed");
-        await client.waitForText("Mark all updates read");
+        await client.waitForText("Mark all read");
         // The reader intentionally restores filters from earlier captures.
         // This fixture shows the complete feed, so clear them through its UI.
         await client.evaluate(`(() => {
@@ -86,8 +86,8 @@ export default ({ bbCli, sleep, pluginRpc, projectId }) => [
         })()`);
         await client.waitForText("Today");
         await client.waitForText("Payments API error rate above 2% for 15 minutes");
-        await client.waitForText("Needs you");
-        await client.waitForText("Updates");
+        await client.waitForText("Urgent");
+        await client.waitForText("Reports");
         await client.waitForText("Developing");
         await client.waitForText("3 updates");
         await client.waitForText("Dentist at 3:00 PM · Reply to the landlord about the lease renewal");
