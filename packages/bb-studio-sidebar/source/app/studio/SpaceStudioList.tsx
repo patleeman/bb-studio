@@ -103,7 +103,7 @@ function NewItemMenu({ spaceId, spaceName, defaultProjectId, onCreated }: {
 /**
  * A Space's open Studio items, like tabs: each opens beside the lead, and ×
  * closes it here without touching the item. Opening any of the Space's items
- * adds it; the Studio label, or a last row, opens the rest in a Studio tab.
+ * adds it; the Studio label, or the button beside +, opens the rest in a Studio tab.
  */
 export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, onOpen }: {
   spaceId: string;
@@ -131,7 +131,22 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
         count={open.length || undefined}
         onOpen={() => onOpen({ kind: "items" })}
         openLabel={`All Studio items in ${spaceName}`}
-        action={<NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={onOpen} />}
+        action={(
+          <span className="inline-flex items-center gap-0.5">
+            {total ? (
+              <button
+                type="button"
+                aria-label={`All Studio items in ${spaceName}`}
+                title={`All ${total} ${total === 1 ? "item" : "items"}`}
+                onClick={() => onOpen({ kind: "items" })}
+                className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
+              >
+                <Icon name="Layers" className="size-3.5" />
+              </button>
+            ) : null}
+            <NewItemMenu spaceId={spaceId} spaceName={spaceName} defaultProjectId={defaultProjectId} onCreated={onOpen} />
+          </span>
+        )}
       />
       {open.map((item) => (
         <div key={key(item)} className="group/item relative" data-space-studio-item={key(item)}>
@@ -161,12 +176,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
         <button type="button" onClick={() => onOpen({ kind: "new-item" })} className={quietRow}>
           <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Plus" className="size-3.5" /></span>
           <span className="truncate">New page, drawing or table</span>
-        </button>
-      ) : null}
-      {total > open.length ? (
-        <button type="button" onClick={() => onOpen({ kind: "items" })} className={open.length ? cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, "h-7 pl-8 text-left text-xs text-muted-foreground") : quietRow}>
-          {open.length ? null : <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}><Icon name="Layers" className="size-3.5" /></span>}
-          <span className="truncate">{open.length ? `All ${total} in ${spaceName}` : `Browse ${total} ${total === 1 ? "item" : "items"}`}</span>
         </button>
       ) : null}
     </div>

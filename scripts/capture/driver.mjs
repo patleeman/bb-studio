@@ -335,9 +335,10 @@ export class CdpClient {
       const rect = element.getBoundingClientRect();
       return { x: rect.left + Math.min(rect.width / 2, 80), y: rect.top + rect.height / 2 };
     })()`);
-    for (const type of ["mousePressed", "mouseReleased"]) {
-      await this.command("Input.dispatchMouseEvent", { type, x: point.x, y: point.y, button: "right", clickCount: 1 });
-    }
+    await this.command("Input.dispatchMouseEvent", { type: "mousePressed", x: point.x, y: point.y, button: "right", clickCount: 1 });
+    // Release clear of the menu, as in openThreadContextMenu: a menu that opens
+    // over the pointer would take the release as picking an item.
+    await this.command("Input.dispatchMouseEvent", { type: "mouseReleased", x: point.x + 400, y: point.y, button: "right", clickCount: 1 });
     await sleep(700);
   }
 
