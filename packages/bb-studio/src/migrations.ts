@@ -126,4 +126,8 @@ export const MIGRATIONS = [
      created_at INTEGER NOT NULL
    );
    CREATE INDEX office_tab_splits_space ON office_tab_splits(space_id);`,
+  `CREATE TABLE office_projects (
+     project_id TEXT PRIMARY KEY, lead_thread_id TEXT, page_id TEXT,
+     created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
+   );`,
 ];

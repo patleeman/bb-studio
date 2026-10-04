@@ -1,3 +1,4 @@
+import { OfficeProjects } from "./projects";
 import { OfficeTabs } from "./tabs";
 import { officeTabHandlers } from "./tab-service";
 import { tabCatalog } from "./tab-catalog";
@@ -59,6 +60,7 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
     },
   });
   const changed = () => bb.realtime.publish(STUDIO_REALTIME_CHANNEL, { pluginId: "studio" });
+  const officeProjects = new OfficeProjects(db, bb.sdk, changed);
   const ensureFolders = async () => { for (const space of spaces.office.list()) await folders.ensureCatchAll(space.id); };
   const inbox = new Inbox(db, [interactionSource(bb.sdk), legacyAttentionSource(db), commentSource(hub, new StudioServices(db), new ProviderComments(bb.sdk)), pageRequestSource(bb.sdk, hub), ...(options.moduleServices ? moduleInboxSources(options.moduleServices) : [])], projectId => spaces.office.forProject(projectId).id);
   const search = options.searchIndex ?? new SearchIndex(db, hub, changed);
@@ -68,6 +70,9 @@ export async function initializeOffice(bb: BbPluginApi, db: Database.Database, h
   const { home: _homeContract, ...registeredContract } = officeContract;
   bb.rpc.register(registeredContract, {
     ...tabHandlers,
+    project_get: ({ projectId }) => officeProjects.get(projectId),
+    project_setup: input => officeProjects.setup(input),
+    project_threads: ({ projectId }) => officeProjects.threads(projectId),
     office_start: async input => {
       const result = await startOffice(input, bb.sdk.threads, spaces.office, folders, hub, options.moduleServices);
       changed(); return result;

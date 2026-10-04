@@ -1,3 +1,4 @@
+import { officeProjectsContract } from "./projects-contract";
 import { defineRpcContract } from "@get-bb/plugin-sdk";
 import { z } from "zod";
 import { conversationRequestSchema } from "@bb-studio/kit/contract";
@@ -78,6 +79,7 @@ export const officeTeamContract = defineRpcContract({
 /** Office RPCs use project ownership for Space membership. Legacy camelCase
  * RPCs remain separate while the existing UI is replaced. */
 export const officeContract = defineRpcContract({
+  ...officeProjectsContract,
   ...inboxContract,
   ...officeTabsContract,
   ...officeTeamContract,
