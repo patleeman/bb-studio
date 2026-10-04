@@ -1,7 +1,7 @@
 // Draw as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage drawings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { copyTitle, fillTemplate, fillTemplateJson, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { copyTitle, eachId, fillTemplate, fillTemplateJson, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import { getNonDeletedElements, parseSceneData } from "../../lib/merge";
 import { DRAW_ICON, PLUGIN_ID, drawingHref, thumbnailUrl } from "../shared";
@@ -116,6 +116,12 @@ export function registerStudio(
       deps.changed(row.id);
       return { item: toStudioItem(row) };
     },
+    studio_rename: ({ id, title }) =>
+      eachId([id], () => {
+        mustGet(id);
+        store.rename(id, title, "app");
+        deps.changed(id);
+      }),
     studio_duplicate: ({ id, projectId }) => ({ item: duplicate(id, projectId) }),
     studio_template: ({ id, template }) => { mustGet(id); store.setTemplate(id, template); deps.changed(id); return { item: toStudioItem(mustGet(id)) }; },
     studio_instantiate: ({ id, projectId, variables }) => { if (!mustGet(id).template) throw new Error("Drawing is not a template."); return { item: duplicate(id, projectId, variables) }; },

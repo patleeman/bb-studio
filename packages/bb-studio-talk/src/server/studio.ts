@@ -1,7 +1,7 @@
 // Talk as a Studio add-on: the `studio_*` methods Studio calls to list and
 // manage recordings in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import type { Recording } from "../shared/contract";
 import { NEW_RECORDING_EVENT, TALK_ICON, formatLength, recordingBadge, recordingHref } from "../shared/format";
@@ -109,6 +109,12 @@ export function registerStudio(
         truncated: rows.length === LIST_LIMIT,
       };
     },
+    studio_rename: ({ id, title }) =>
+      eachId([id], () => {
+        mustGet(id);
+        store.rename(id, title, "user");
+        deps.changed(id);
+      }),
     studio_create: () => {
       throw new Error("Start a recording from Talk's microphone.");
     },

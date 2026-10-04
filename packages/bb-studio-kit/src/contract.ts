@@ -262,6 +262,7 @@ export function studioSchemas(z: typeof Zod) {
       studio_move: { input: z.object({ ids, projectId }), output: results },
       studio_archive: { input: z.object({ ids, archived: z.boolean() }), output: results },
       studio_delete: { input: z.object({ ids }), output: results },
+      studio_rename: { input: z.object({ id: z.string().min(1).max(200), title: z.string().trim().min(1).max(200) }), output: results },
       studio_action: {
         input: z.object({ action: z.string(), ids }),
         output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),

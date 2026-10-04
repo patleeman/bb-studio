@@ -74,6 +74,17 @@ describe("the Talk Studio provider", () => {
     expect(changed).toEqual(["rec_aaaaaaaa"]);
   });
 
+  it("renames a recording as the user's title", async () => {
+    const { store, call, changed } = setup();
+    store.create({ id: "rec_aaaaaaaa", kind: "recording", projectId: null, threadId: null });
+    expect(await call("studio_rename", { id: "rec_aaaaaaaa", title: "Standup" })).toEqual({ done: ["rec_aaaaaaaa"], failed: [] });
+    expect(store.recording("rec_aaaaaaaa")!.title).toBe("Standup");
+    // A generated title no longer replaces it.
+    expect(store.rename("rec_aaaaaaaa", "Model title", "auto")).toBeNull();
+    expect(changed).toEqual(["rec_aaaaaaaa"]);
+    expect((await call("studio_rename", { id: "rec_missing1", title: "X" })).failed).toEqual([{ id: "rec_missing1", error: "Recording not found." }]);
+  });
+
   it("won't delete a recording that's still capturing", async () => {
     const { store, call, removed } = setup();
     store.create({ id: "rec_live0000", kind: "recording", projectId: null, threadId: null });

@@ -88,7 +88,7 @@ const listedItem = schemas.item.extend({ pluginId: z.string(), tags: z.array(z.s
 
 export { TABS_CHANNEL } from "./ids";
 
-const tab = z.object({
+const itemLink = z.object({
   pluginId: z.string(),
   id: z.string(),
   title: z.string(),
@@ -97,6 +97,8 @@ const tab = z.object({
   kindIcon: z.string(),
   href: z.string(),
 });
+/** An open tab; pinned tabs come first and are never closed to make room. */
+const tab = itemLink.extend({ pinned: z.boolean() });
 export type TabView = z.infer<typeof tab>;
 
 /** A space in the sidebar's tree, with its newest items, sub-items under their parents. */
@@ -106,10 +108,10 @@ const treeSpace = z.object({
   icon: z.string().nullable(),
   color: z.string(),
   href: z.string(),
-  items: z.array(tab.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
+  items: z.array(itemLink.extend({ updatedAt: z.number(), parentId: z.string().nullable(), depth: z.number() })),
   /** Every item it holds; `items` stops at a cap. */
   itemCount: z.number(),
-  /** Its items open as tabs, in the order they were opened. */
+  /** Its items open as tabs, in tab order: pinned first, then as opened. */
   open: z.array(tab),
 });
 export type SpaceTreeView = z.infer<typeof treeSpace>;
@@ -244,6 +246,7 @@ export const rpcContract = defineRpcContract({
   move: { input: z.object({ pluginId, ids, projectId }), output: schemas.results },
   archive: { input: z.object({ pluginId, ids, archived: z.boolean() }), output: schemas.results },
   remove: { input: z.object({ pluginId, ids }), output: schemas.results },
+  rename: { input: z.object({ pluginId, id: z.string().min(1).max(200), title: z.string().trim().min(1).max(200) }), output: schemas.results },
   action: {
     input: z.object({ pluginId, action: z.string().min(1).max(100), ids }),
     output: z.object({ message: z.string().nullable(), text: z.string().nullable() }),
@@ -301,6 +304,8 @@ export const rpcContract = defineRpcContract({
   /** Opens a tab for the item whose view is at `path`, if any. */
   visitTab: { input: z.object({ path: z.string().min(1).max(2000) }), output: z.object({ tab: tab.nullable() }) },
   closeTabs: { input: z.object({ items: z.array(itemRef).min(1).max(100) }), output: z.object({ ok: z.boolean() }) },
+  /** Pins or unpins an item's tab; pinning opens it if it isn't open. */
+  pinTab: { input: z.object({ pluginId, id: z.string().min(1).max(200), pinned: z.boolean() }), output: z.object({ ok: z.boolean() }) },
   setSidebar: { input: z.object({ visible: z.boolean() }), output: sidebar },
   /** The item a path opens, or an item by id, with its kind. Studio Chat calls it. */
   itemAt: schemas.itemAt,

@@ -74,3 +74,12 @@ it("exports a table to Studio as CSV or Markdown", async () => {
   expect(markdown.files[0]!.name).toBe("CSV boundary.md");
   await expect(rpc.callRpc("studio_export", { id: table.id, format: "pdf" })).rejects.toThrow(/Unsupported/);
 });
+
+it("renames a table from Studio", async () => {
+  const rpc = fixture();
+  const table = await create(rpc);
+  expect(await rpc.callRpc("studio_rename", { id: table.id, title: "  Guest list  " })).toEqual({ done: [table.id], failed: [] });
+  expect((await rpc.callRpc("get", { id: table.id }) as { table: Table }).table.title).toBe("Guest list");
+  await expect(rpc.callRpc("studio_rename", { id: table.id, title: "   " })).rejects.toThrow(/validation/);
+  expect(((await rpc.callRpc("studio_rename", { id: "missing", title: "X" })) as { failed: unknown[] }).failed).toHaveLength(1);
+});

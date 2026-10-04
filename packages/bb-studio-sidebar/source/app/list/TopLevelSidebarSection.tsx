@@ -192,6 +192,7 @@ export function TopLevelSidebarSection({
       data-sidebar-sticky-header={stickyHeader ? undefined : "false"}
       className={cn(
         "group/sidebar-section relative min-w-0 rounded-md transition-colors",
+        labelMark && "mt-2",
         isDropTargetActive && "bg-sidebar-accent/60",
       )}
       onClickCapture={handleClickCapture}
@@ -205,7 +206,7 @@ export function TopLevelSidebarSection({
         className={cn(
           SIDEBAR_HOVER_ACTIONS_ROW_CLASS,
           CHROME_SECTION_LABEL_CLASS,
-          SIDEBAR_GROUP_TEXT_CLASS,
+          labelMark ? "text-[13px] font-semibold text-sidebar-foreground" : SIDEBAR_GROUP_TEXT_CLASS,
           SIDEBAR_STANDARD_ROW_PADDING_CLASS,
           "rounded-md pr-0 transition-colors",
           labelSelected && "bg-sidebar-accent text-sidebar-accent-foreground",
@@ -220,7 +221,7 @@ export function TopLevelSidebarSection({
           {labelEditor ?? (onLabelClick ? (
             <button
               type="button"
-              className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
+              className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
               title={label}
               aria-label={labelClickLabel ?? label}
               aria-current={labelSelected ? "page" : undefined}

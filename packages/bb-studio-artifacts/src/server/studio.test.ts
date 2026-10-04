@@ -17,6 +17,15 @@ function setup() {
 }
 
 describe("the Artifacts Studio provider", () => {
+  it("renames an artifact", async () => {
+    const { store, call, changed, save } = setup();
+    const source = save("notes.txt", "hello", { title: "Notes" });
+    expect(await call("studio_rename", { id: source.id, title: "Meeting notes" })).toEqual({ done: [source.id], failed: [] });
+    expect(store.get(source.id)!.title).toBe("Meeting notes");
+    expect(changed).toEqual([source.id]);
+    expect((await call("studio_rename", { id: "art_missing", title: "X" })).failed).toEqual([{ id: "art_missing", error: "Artifact not found." }]);
+  });
+
   it("duplicates the latest file and exports its original bytes", async () => {
     const { call, save } = setup();
     const source = save("notes.txt", "hello", { title: "Notes" });

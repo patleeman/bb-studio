@@ -116,4 +116,5 @@ export const MIGRATIONS = [
        lead INTEGER NOT NULL DEFAULT 0, archived INTEGER NOT NULL DEFAULT 0
      );`,
   `ALTER TABLE space_runs ADD COLUMN cron TEXT;`,
+  `ALTER TABLE tabs ADD COLUMN pinned INTEGER NOT NULL DEFAULT 0;`,
 ];

@@ -326,7 +326,7 @@ export default async function plugin(bb: BbPluginApi) {
     return tabs.list().flatMap((ref) => {
       const item = byKey.get(`${ref.pluginId}:${ref.id}`);
       if (!item) return [];
-      return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kindIcons.get(`${item.pluginId}:${item.kind}`) ?? "File", href: item.href }];
+      return [{ pluginId: item.pluginId, id: item.id, title: untitled(item.title), icon: item.icon, kindIcon: kindIcons.get(`${item.pluginId}:${item.kind}`) ?? "File", href: item.href, pinned: ref.pinned }];
     });
   };
 
@@ -403,6 +403,7 @@ export default async function plugin(bb: BbPluginApi) {
     move: ({ pluginId, ids, projectId }) => hub.call(pluginId, "studio_move", { ids, projectId }),
     archive: ({ pluginId, ids, archived }) => hub.call(pluginId, "studio_archive", { ids, archived }),
     remove: ({ pluginId, ids }) => deleteItems(pluginId, ids),
+    rename: ({ pluginId, id, title }) => hub.call(pluginId, "studio_rename", { id, title }),
     action: ({ pluginId, action, ids }) => hub.call(pluginId, "studio_action", { action, ids }),
     createTag: ({ name }) => {
       const tag = tags.ensure(name);
@@ -563,6 +564,10 @@ export default async function plugin(bb: BbPluginApi) {
       let closed = false;
       for (const item of items) closed = tabs.close(item) || closed;
       if (closed) tabsChanged();
+      return { ok: true };
+    },
+    pinTab: ({ pluginId, id, pinned }) => {
+      if (tabs.pin({ pluginId, id }, pinned)) tabsChanged();
       return { ok: true };
     },
     setSidebar: async ({ visible: show }) => {

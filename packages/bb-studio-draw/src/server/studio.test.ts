@@ -25,6 +25,14 @@ describe("the Draw Studio provider", () => {
     expect(drawingText(store.get(item.id)!.data)).toEqual(["Launch"]);
     expect((await call("studio_duplicate", { id: row.id, projectId: null })).item.title).toBe("{{name}} map (copy)");
   });
+  it("renames a drawing", async () => {
+    const { store, call, changed } = setup();
+    const row = store.create({ name: "Sketch", by: "app" });
+    expect(await call("studio_rename", { id: row.id, title: "Floor plan" })).toEqual({ done: [row.id], failed: [] });
+    expect(store.get(row.id)!.name).toBe("Floor plan");
+    expect(changed).toEqual([row.id]);
+    expect((await call("studio_rename", { id: "dr_missing", title: "X" })).failed).toEqual([{ id: "dr_missing", error: "Drawing not found." }]);
+  });
   it("exports SVG and PNG from a stored scene", async () => {
     const { store, call } = setup();
     const row = store.create({ name: "Sketch", by: "app" });

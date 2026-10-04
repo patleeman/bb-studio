@@ -5,7 +5,7 @@ import { STUDIO_CHANGED_METHOD, STUDIO_PLUGIN_ID, type StudioSchemas } from "../
 
 
 export type StudioProviderHandlers = PluginRpcHandlers<StudioSchemas["provider"]>;
-type OptionalMethods = "studio_duplicate" | "studio_template" | "studio_instantiate" | "studio_export";
+type OptionalMethods = "studio_rename" | "studio_duplicate" | "studio_template" | "studio_instantiate" | "studio_export";
 export type StudioProviderRegistration = Omit<StudioProviderHandlers, OptionalMethods> & Partial<Pick<StudioProviderHandlers, OptionalMethods>>;
 
 /**
@@ -16,6 +16,7 @@ export type StudioProviderRegistration = Omit<StudioProviderHandlers, OptionalMe
 export function registerStudioProvider(bb: Pick<BbPluginApi, "rpc">, schemas: StudioSchemas, handlers: StudioProviderRegistration): void {
   const unsupported = () => { throw new Error("This provider does not support this operation."); };
   bb.rpc.register(schemas.provider, {
+    studio_rename: unsupported,
     studio_duplicate: unsupported,
     studio_template: unsupported,
     studio_instantiate: unsupported,

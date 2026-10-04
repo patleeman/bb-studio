@@ -2861,6 +2861,70 @@
         "additionalProperties": false
       }
     },
+    "rename": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "title": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          }
+        },
+        "required": [
+          "pluginId",
+          "id",
+          "title"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "done": {
+            "type": "array",
+            "items": {
+              "type": "string"
+            }
+          },
+          "failed": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "id": {
+                  "type": "string"
+                },
+                "error": {
+                  "type": "string"
+                }
+              },
+              "required": [
+                "id",
+                "error"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "done",
+          "failed"
+        ],
+        "additionalProperties": false
+      }
+    },
     "action": {
       "input": {
         "$schema": "https://json-schema.org/draft/2020-12/schema",
@@ -5383,6 +5447,9 @@
                       },
                       "href": {
                         "type": "string"
+                      },
+                      "pinned": {
+                        "type": "boolean"
                       }
                     },
                     "required": [
@@ -5391,7 +5458,8 @@
                       "title",
                       "icon",
                       "kindIcon",
-                      "href"
+                      "href",
+                      "pinned"
                     ],
                     "additionalProperties": false
                   }
@@ -5451,6 +5519,9 @@
                 },
                 "href": {
                   "type": "string"
+                },
+                "pinned": {
+                  "type": "boolean"
                 }
               },
               "required": [
@@ -5459,7 +5530,8 @@
                 "title",
                 "icon",
                 "kindIcon",
-                "href"
+                "href",
+                "pinned"
               ],
               "additionalProperties": false
             }
@@ -5515,6 +5587,9 @@
                   },
                   "href": {
                     "type": "string"
+                  },
+                  "pinned": {
+                    "type": "boolean"
                   }
                 },
                 "required": [
@@ -5523,7 +5598,8 @@
                   "title",
                   "icon",
                   "kindIcon",
-                  "href"
+                  "href",
+                  "pinned"
                 ],
                 "additionalProperties": false
               },
@@ -5571,6 +5647,45 @@
         },
         "required": [
           "items"
+        ]
+      },
+      "output": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "ok": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "ok"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "pinTab": {
+      "input": {
+        "$schema": "https://json-schema.org/draft/2020-12/schema",
+        "type": "object",
+        "properties": {
+          "pluginId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 200
+          },
+          "pinned": {
+            "type": "boolean"
+          }
+        },
+        "required": [
+          "pluginId",
+          "id",
+          "pinned"
         ]
       },
       "output": {

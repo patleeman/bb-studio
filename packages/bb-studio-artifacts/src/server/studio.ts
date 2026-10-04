@@ -1,7 +1,7 @@
 // Artifacts as a Studio add-on: the `studio_*` methods Studio calls to list
 // and manage artifacts in its collection.
 import type { BbPluginApi } from "@get-bb/plugin-sdk";
-import { copyTitle, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
+import { copyTitle, eachId, type StudioItem, type StudioKind, type StudioSchemas } from "@bb-studio/kit/contract";
 import { createStoreProvider, mustGet as requireItem } from "@bb-studio/kit/server";
 import { ARTIFACT_ICON, PLUGIN_ID, TYPE_LABELS, artifactHref, contentUrl, formatBytes, isTextType } from "../shared";
 import { displayTitle, versionType, type ArtifactStore, type ArtifactWithVersion } from "./store";
@@ -143,6 +143,11 @@ export function registerStudio(
     studio_create: () => {
       throw new Error("Artifacts are saved from threads, not created in Studio.");
     },
+    studio_rename: ({ id, title }) =>
+      eachId([id], () => {
+        store.update(id, { title }, "app");
+        deps.changed(id);
+      }),
     studio_duplicate: ({ id, projectId }) => {
       const source = mustGet(id);
       const bytes = store.bytes(source.version.sha256);

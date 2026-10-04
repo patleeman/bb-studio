@@ -3,7 +3,7 @@ import { z } from "zod";
 import { parseFlags, subcommand, takeFlag, takeOption, usage } from "./cli";
 import { studioSchemas } from "./contract";
 import { newId } from "./ids";
-import { createChangeBus, defineItemMention, discoverProviderSnapshot, fanOutProviders, mustGet, serveBytes } from "./server";
+import { createChangeBus, defineItemMention, discoverProviderSnapshot, fanOutProviders, mustGet, registerStudioProvider, serveBytes } from "./server";
 import { storeActions } from "./server/provider";
 
 afterEach(() => vi.useRealTimers());
@@ -66,6 +66,17 @@ describe("server helpers", () => {
     });
     expect(mustGet(() => 0, "id", "No item")).toBe(0);
     expect(() => mustGet(() => null, "id", "No item")).toThrow("No item");
+  });
+
+  it("defaults rename to unsupported and validates its title", () => {
+    const register = vi.fn();
+    const schemas = studioSchemas(z);
+    registerStudioProvider({ rpc: { register } } as unknown as Parameters<typeof registerStudioProvider>[0], schemas, {} as Parameters<typeof registerStudioProvider>[2]);
+    const handlers = register.mock.calls[0]![1] as { studio_rename(input: unknown): unknown };
+    expect(() => handlers.studio_rename({ id: "pg_1", title: "New" })).toThrow("does not support");
+    expect(schemas.provider.studio_rename.input.parse({ id: "pg_1", title: "  New  " })).toEqual({ id: "pg_1", title: "New" });
+    expect(() => schemas.provider.studio_rename.input.parse({ id: "pg_1", title: "   " })).toThrow();
+    expect(() => schemas.provider.studio_rename.input.parse({ id: "pg_1", title: "x".repeat(201) })).toThrow();
   });
 
   it("discovers enabled providers and isolates fan-out failures", async () => {

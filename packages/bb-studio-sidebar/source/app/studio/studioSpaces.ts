@@ -52,6 +52,7 @@ const treeSchema = z.object({
       icon: z.string().nullable().catch(null),
       kindIcon: z.string().catch("File"),
       href: z.string(),
+      pinned: z.boolean().catch(false),
     }).passthrough()).catch([]),
   }).passthrough()),
 });
@@ -64,6 +65,8 @@ export interface SpaceSidebarItem {
   icon: string | null;
   kindIcon: string;
   href: string;
+  /** Pinned items stay at the top of the Space's list. */
+  pinned: boolean;
 }
 
 export interface SpaceItems {
@@ -128,7 +131,7 @@ export function useStudioSpacesSync(spaceMode: boolean, threadCount: number): vo
           spaceOf = of.threads;
           leads = Object.fromEntries(leadRows);
           items = Object.fromEntries(tree.spaces.map((space) => [space.id, {
-            open: space.open.map(({ pluginId, id, title, icon, kindIcon, href }) => ({ pluginId, id, title, icon, kindIcon, href })),
+            open: space.open.map(({ pluginId, id, title, icon, kindIcon, href, pinned }) => ({ pluginId, id, title, icon, kindIcon, href, pinned })),
             count: space.itemCount,
           }]));
         }

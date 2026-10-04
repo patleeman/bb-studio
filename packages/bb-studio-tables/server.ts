@@ -1,4 +1,4 @@
-import { studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
+import { eachId, studioSchemas, type StudioItem, type StudioKind } from "@bb-studio/kit/contract";
 import { parseFlags, subcommand } from "@bb-studio/kit/cli";
 import { createChangeBus, createStoreProvider, defineItemMention, studioIndex, studioServices } from "@bb-studio/kit/server";
 import {
@@ -174,6 +174,11 @@ export default function plugin(bb: BbPluginApi) {
         changed(table.id);
         return { item: item(table) };
       },
+      studio_rename: ({ id, title }) =>
+        eachId([id], () => {
+          store.update(id, { title });
+          changed(id);
+        }),
       studio_export: ({ id, format }) => {
         const table = store.require(id);
         const name = table.title.trim() || "Untitled table";

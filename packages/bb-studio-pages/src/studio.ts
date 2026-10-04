@@ -174,6 +174,12 @@ export function registerStudio(bb: BbPluginApi, service: PagesService, schemas: 
         store.update(id, { archived_at: archived ? Date.now() : null }, HUMAN_USER_ID);
         service.publish({ type: "tree", projectId: meta.project_id });
       }),
+    studio_rename: ({ id, title }) =>
+      eachId([id], () => {
+        const meta = requireMeta(id);
+        store.update(id, { title }, HUMAN_USER_ID);
+        service.publish({ type: "tree", projectId: meta.project_id });
+      }),
     studio_delete: ({ ids }) => {
       const gone = new Set<string>();
       return eachId(ids, (id) => {

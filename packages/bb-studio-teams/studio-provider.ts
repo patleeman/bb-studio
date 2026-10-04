@@ -100,6 +100,7 @@ export function registerStudio(
   // Studio and Pages collect items only from discoverable providers.
   const unsupported = () => { throw new Error("Bots and channels don't support this."); };
   bb.rpc.register(schemas.provider, {
+    studio_rename: unsupported,
     studio_duplicate: unsupported,
     studio_template: unsupported,
     studio_instantiate: unsupported,

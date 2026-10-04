@@ -323,7 +323,7 @@ index 3b0cf9e..35ba05d 100644
 +}
 +
 diff --git a/source/app/list/TopLevelSidebarSection.tsx b/source/app/list/TopLevelSidebarSection.tsx
-index 74dd671..7ba5359 100644
+index 74dd671..9b9cc6c 100644
 --- a/source/app/list/TopLevelSidebarSection.tsx
 +++ b/source/app/list/TopLevelSidebarSection.tsx
 @@ -47,0 +48 @@ import { usePluginThreadRowStatusForThreads } from "./groupRollups.js";
@@ -340,15 +340,20 @@ index 74dd671..7ba5359 100644
 +  onLabelClick,
 +  labelClickLabel,
 +  labelSelected = false,
-@@ -199,0 +211 @@ export function TopLevelSidebarSection({
+@@ -183,0 +195 @@ export function TopLevelSidebarSection({
++        labelMark && "mt-2",
+@@ -197 +209 @@ export function TopLevelSidebarSection({
+-          SIDEBAR_GROUP_TEXT_CLASS,
++          labelMark ? "text-[13px] font-semibold text-sidebar-foreground" : SIDEBAR_GROUP_TEXT_CLASS,
+@@ -199,0 +212 @@ export function TopLevelSidebarSection({
 +          labelSelected && "bg-sidebar-accent text-sidebar-accent-foreground",
-@@ -207 +219,18 @@ export function TopLevelSidebarSection({
+@@ -207 +220,18 @@ export function TopLevelSidebarSection({
 -          {labelEditor ?? (
 +          {labelEditor ? null : labelMark}
 +          {labelEditor ?? (onLabelClick ? (
 +            <button
 +              type="button"
-+              className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:underline focus-visible:ring-2 focus-visible:ring-sidebar-ring"
++              className="min-w-0 cursor-pointer truncate rounded-sm text-left outline-none hover:text-sidebar-accent-foreground focus-visible:ring-2 focus-visible:ring-sidebar-ring"
 +              title={label}
 +              aria-label={labelClickLabel ?? label}
 +              aria-current={labelSelected ? "page" : undefined}
@@ -362,10 +367,10 @@ index 74dd671..7ba5359 100644
 +              {label}
 +            </button>
 +          ) : (
-@@ -223 +252 @@ export function TopLevelSidebarSection({
+@@ -223 +253 @@ export function TopLevelSidebarSection({
 -          )}
 +          ))}
-@@ -297 +326,4 @@ export function TopLevelSidebarSection({
+@@ -297 +327,4 @@ export function TopLevelSidebarSection({
 -        <div className="mt-1">{children}</div>
 +        <div className="mt-1">
 +          {children}

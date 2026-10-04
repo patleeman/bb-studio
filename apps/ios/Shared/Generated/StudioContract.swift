@@ -22,6 +22,7 @@ public enum Studio {
     public static let move = "move"
     public static let archive = "archive"
     public static let remove = "remove"
+    public static let rename = "rename"
     public static let action = "action"
     public static let createTag = "createTag"
     public static let renameTag = "renameTag"
@@ -52,6 +53,7 @@ public enum Studio {
     public static let tabs = "tabs"
     public static let visitTab = "visitTab"
     public static let closeTabs = "closeTabs"
+    public static let pinTab = "pinTab"
     public static let setSidebar = "setSidebar"
     public static let itemAt = "itemAt"
     public static let links = "links"
@@ -117,6 +119,8 @@ public enum Studio {
   public typealias Archive = ArchiveOutput
 
   public typealias Remove = RemoveOutput
+
+  public typealias Rename = RenameOutput
 
   public typealias Action = ActionOutput
 
@@ -185,6 +189,8 @@ public enum Studio {
   public typealias VisitTab = VisitTabOutput
 
   public typealias CloseTabs = CloseTabsOutput
+
+  public typealias PinTab = PinTabOutput
 
   public typealias SetSidebar = SetSidebarOutput
 
@@ -2143,6 +2149,38 @@ public enum Studio {
     }
   }
 
+  public struct RenameInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var title: String?
+
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.title = title
+    }
+  }
+
+  public struct RenameOutputFailedItem: Sendable, Hashable, Codable {
+    public var id: String?
+    public var error: String?
+
+    public init(id: String? = nil, error: String? = nil) {
+      self.id = id
+      self.error = error
+    }
+  }
+
+  public struct RenameOutput: Sendable, Hashable, Codable {
+    public var done: [String]?
+    public var failed: [RenameOutputFailedItem]?
+
+    public init(done: [String]? = nil, failed: [RenameOutputFailedItem]? = nil) {
+      self.done = done
+      self.failed = failed
+    }
+  }
+
   public struct ActionInput: Sendable, Hashable, Codable {
     public var pluginId: String?
     public var action: String?
@@ -4028,14 +4066,16 @@ public enum Studio {
     public var icon: String?
     public var kindIcon: String?
     public var href: String?
+    public var pinned: Bool?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, pinned: Bool? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
       self.icon = icon
       self.kindIcon = kindIcon
       self.href = href
+      self.pinned = pinned
     }
   }
 
@@ -4076,14 +4116,16 @@ public enum Studio {
     public var icon: String?
     public var kindIcon: String?
     public var href: String?
+    public var pinned: Bool?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, pinned: Bool? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
       self.icon = icon
       self.kindIcon = kindIcon
       self.href = href
+      self.pinned = pinned
     }
   }
 
@@ -4110,14 +4152,16 @@ public enum Studio {
     public var icon: String?
     public var kindIcon: String?
     public var href: String?
+    public var pinned: Bool?
 
-    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil) {
+    public init(pluginId: String? = nil, id: String? = nil, title: String? = nil, icon: String? = nil, kindIcon: String? = nil, href: String? = nil, pinned: Bool? = nil) {
       self.pluginId = pluginId
       self.id = id
       self.title = title
       self.icon = icon
       self.kindIcon = kindIcon
       self.href = href
+      self.pinned = pinned
     }
   }
 
@@ -4148,6 +4192,26 @@ public enum Studio {
   }
 
   public struct CloseTabsOutput: Sendable, Hashable, Codable {
+    public var ok: Bool?
+
+    public init(ok: Bool? = nil) {
+      self.ok = ok
+    }
+  }
+
+  public struct PinTabInput: Sendable, Hashable, Codable {
+    public var pluginId: String?
+    public var id: String?
+    public var pinned: Bool?
+
+    public init(pluginId: String? = nil, id: String? = nil, pinned: Bool? = nil) {
+      self.pluginId = pluginId
+      self.id = id
+      self.pinned = pinned
+    }
+  }
+
+  public struct PinTabOutput: Sendable, Hashable, Codable {
     public var ok: Bool?
 
     public init(ok: Bool? = nil) {

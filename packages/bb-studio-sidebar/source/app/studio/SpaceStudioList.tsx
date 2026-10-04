@@ -1,5 +1,5 @@
-import { useCallback, useRef, useState, type ReactNode } from "react";
-import { openFloat, openPathInSplit, useCanFloat } from "@bb-studio/kit/app";
+import { useCallback, useState, type ReactNode } from "react";
+import { openFloat, useCanFloat } from "@bb-studio/kit/app";
 import { toast } from "sonner";
 import { useSdk } from "@get-bb/plugin-sdk/app";
 import { z } from "zod";
@@ -23,14 +23,11 @@ import {
 import type { OpenInSpaceRequest } from "./openInSpace.js";
 import type { SpaceItems } from "./studioSpaces.js";
 
-/** "Studio" or "Threads" inside a Space, with its own + on hover; a title with `onOpen` opens its view. */
-export function SpaceSubheading({ title, action, onOpen, openLabel }: { title: string; action?: ReactNode; onOpen?(): void; openLabel?: string }) {
-  const label = title;
+/** "Studio" or "Threads" inside a Space, with its own controls on hover. */
+export function SpaceSubheading({ title, action }: { title: string; action?: ReactNode }) {
   return (
     <div className={cn("group/sub flex h-7 items-center gap-1 pr-0.5 pl-2 text-xs", SIDEBAR_GROUP_TEXT_CLASS)}>
-      {onOpen
-        ? <span className="min-w-0 flex-1 truncate"><button type="button" onClick={onOpen} aria-label={openLabel} title={openLabel} className="max-w-full truncate rounded-sm text-left hover:text-foreground hover:underline focus-visible:outline focus-visible:outline-2 focus-visible:outline-ring">{label}</button></span>
-        : <span className="min-w-0 flex-1 truncate">{label}</span>}
+      <span className="min-w-0 flex-1 truncate">{title}</span>
       {action ? <span className="opacity-0 transition-opacity group-hover/sub:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">{action}</span> : null}
     </div>
   );
@@ -111,13 +108,30 @@ function copyText(text: string, done: string) {
   navigator.clipboard.writeText(text).then(() => toast.success(done), () => toast.error("Couldn't copy."));
 }
 
-/** An open Studio item: click opens it beside the lead; right-click has the rest, as a thread's menu does. */
+/** Opens a row's context menu from its ⋯, below the button, as right-click would. */
+function openMenu(button: HTMLElement) {
+  const rect = button.getBoundingClientRect();
+  button.dispatchEvent(new MouseEvent("contextmenu", { bubbles: true, cancelable: true, clientX: rect.left, clientY: rect.bottom }));
+}
+
+/** An open Studio item: click opens it beside the lead; right-click or ⋯ has the rest, as a thread's menu does. */
 function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): void; onClose(): void }) {
   const sdk = useSdk();
-  const row = useRef<HTMLAnchorElement>(null);
   const canFloat = useCanFloat({ kind: "path", path: item.href, title: item.title });
-  const call = (method: "archive" | "remove", input: Record<string, unknown>) =>
+  const [renaming, setRenaming] = useState(false);
+  const call = (method: "archive" | "remove" | "rename", input: Record<string, unknown>) =>
     sdk.plugins.callRpc({ pluginId: "studio", method, input: input as never, outputSchema: resultsSchema, signal: AbortSignal.timeout(15_000) });
+  const rename = (title: string) => {
+    setRenaming(false);
+    const next = title.trim();
+    if (!next || next === item.title) return;
+    void call("rename", { pluginId: item.pluginId, id: item.id, title: next }).catch(
+      (cause: unknown) => toast.error(`Couldn't rename: ${cause instanceof Error ? cause.message : String(cause)}`),
+    );
+  };
+  const pin = () => void sdk.plugins.callRpc({ pluginId: "studio", method: "pinTab", input: { pluginId: item.pluginId, id: item.id, pinned: !item.pinned } as never, outputSchema: z.object({ ok: z.boolean() }), signal: AbortSignal.timeout(15_000) }).catch(
+    (cause: unknown) => toast.error(`Couldn't ${item.pinned ? "unpin" : "pin"}: ${cause instanceof Error ? cause.message : String(cause)}`),
+  );
   const archive = () => void call("archive", { pluginId: item.pluginId, ids: [item.id], archived: true }).then(
     () => toast.success(`Archived ${item.title}`),
     (cause: unknown) => toast.error(`Couldn't archive: ${cause instanceof Error ? cause.message : String(cause)}`),
@@ -134,7 +148,6 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
       <ContextMenuTrigger asChild>
         <div className="group/item relative" data-space-studio-item={`${item.pluginId}:${item.id}`}>
           <a
-            ref={row}
             href={item.href}
             title={item.title}
             onClick={(event) => {
@@ -143,28 +156,56 @@ function StudioItemRow({ item, onOpen, onClose }: { item: OpenItem; onOpen(): vo
               onOpen();
             }}
             onAuxClick={(event) => { if (event.button === 1) { event.preventDefault(); onClose(); } }}
-            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-8 pl-2 text-left")}
+            className={cn(SIDEBAR_ROW_BASE_CLASS, SIDEBAR_ROW_INTERACTIVE_STATE_CLASS, COARSE_POINTER_ROW_HEIGHT_CLASS, "pr-14 pl-2 text-left")}
           >
             <span className={cn(SIDEBAR_ROW_GLYPH_SLOT_CLASS, "size-4")}>
               {item.icon ? <span className="text-[13px] leading-none">{item.icon}</span> : <Icon name={item.kindIcon} className="size-4" />}
             </span>
-            <span className="min-w-0 flex-1 truncate">{item.title}</span>
+            {renaming ? null : <span className="min-w-0 flex-1 truncate">{item.title}</span>}
+            {item.pinned && !renaming ? <Icon name="Pin" aria-label="Pinned" className="size-3 shrink-0 text-subtle-foreground group-hover/item:hidden" /> : null}
           </a>
-          <button
-            type="button"
-            aria-label={`Close ${item.title}`}
-            title="Close"
-            onClick={onClose}
-            className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "absolute top-1/2 right-0.5 inline-flex -translate-y-1/2 items-center justify-center opacity-0 transition-opacity group-hover/item:opacity-100 focus-visible:opacity-100 max-md:pointer-coarse:opacity-100")}
-          >
-            <Icon name="X" className="size-3.5" />
-          </button>
+          {renaming ? (
+            <input
+              autoFocus
+              defaultValue={item.title}
+              aria-label={`Rename ${item.title}`}
+              maxLength={200}
+              onFocus={(event) => event.currentTarget.select()}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") { event.preventDefault(); rename(event.currentTarget.value); }
+                if (event.key === "Escape") { event.preventDefault(); setRenaming(false); }
+              }}
+              onBlur={(event) => rename(event.currentTarget.value)}
+              className="absolute inset-y-0.5 right-1 left-8 rounded-sm border border-sidebar-ring bg-sidebar px-1.5 text-sm outline-none"
+            />
+          ) : null}
+          <span className="absolute top-1/2 right-0.5 flex -translate-y-1/2 items-center gap-0.5 opacity-0 transition-opacity group-hover/item:opacity-100 focus-within:opacity-100 has-[[data-state=open]]:opacity-100 max-md:pointer-coarse:opacity-100">
+            <button
+              type="button"
+              aria-label={`${item.title} options`}
+              title="Options"
+              aria-haspopup="menu"
+              onClick={(event) => openMenu(event.currentTarget)}
+              className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
+            >
+              <Icon name="MoreHorizontal" className="size-3.5" />
+            </button>
+            <button
+              type="button"
+              aria-label={`Close ${item.title}`}
+              title="Close"
+              onClick={onClose}
+              className={cn(SIDEBAR_CONTROL_BUTTON_CLASS, "inline-flex items-center justify-center")}
+            >
+              <Icon name="X" className="size-3.5" />
+            </button>
+          </span>
         </div>
       </ContextMenuTrigger>
       <ContextMenuContent className="w-52" aria-label={`${item.title} actions`}>
-        <ContextMenuItem onSelect={onOpen}><Icon name="ArrowUpRight" className="size-4" />Open</ContextMenuItem>
-        <ContextMenuItem onSelect={() => { if (!row.current || !openPathInSplit(row.current, item.href)) onOpen(); }}><Icon name="Columns2" className="size-4" />Open in split</ContextMenuItem>
-        {canFloat ? <ContextMenuItem onSelect={() => openFloat({ kind: "path", path: item.href, title: item.title })}><Icon name="AppWindow" className="size-4" />Float</ContextMenuItem> : null}
+        {canFloat ? <><ContextMenuItem onSelect={() => openFloat({ kind: "path", path: item.href, title: item.title })}><Icon name="AppWindow" className="size-4" />Float</ContextMenuItem><ContextMenuSeparator /></> : null}
+        <ContextMenuItem onSelect={pin}><Icon name={item.pinned ? "PinOff" : "Pin"} className="size-4" />{item.pinned ? "Unpin" : "Pin"}</ContextMenuItem>
+        <ContextMenuItem onSelect={() => setTimeout(() => setRenaming(true), 0)}><Icon name="Edit" className="size-4" />Rename</ContextMenuItem>
         <ContextMenuSeparator />
         <ContextMenuItem onSelect={() => copyText(`[${item.title}](${item.href})`, "Link copied")}><Icon name="Copy" className="size-4" />Copy link</ContextMenuItem>
         <ContextMenuItem onSelect={() => copyText(item.id, "ID copied")}><Icon name="Copy" className="size-4" />Copy ID</ContextMenuItem>
@@ -205,8 +246,6 @@ export function SpaceStudioList({ spaceId, spaceName, defaultProjectId, items, o
     <div role="group" aria-label={`${spaceName} Studio items`}>
       <SpaceSubheading
         title="Studio"
-        onOpen={() => onOpen({ kind: "items" })}
-        openLabel={`All Studio items in ${spaceName}`}
         action={(
           <span className="inline-flex items-center gap-0.5">
             {total ? (

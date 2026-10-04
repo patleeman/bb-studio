@@ -124,6 +124,16 @@ describe("the Studio provider", async () => {
     expect(store.meta(parent)!.project_id).toBeNull();
   });
 
+  it("renames a page and tells open views", async () => {
+    const { store, create, call, events } = setup();
+    const id = create("Plan", "proj_a");
+    events.length = 0;
+    expect(await call("studio_rename", { id, title: "Launch plan" })).toEqual({ done: [id], failed: [] });
+    expect(store.meta(id)!.title).toBe("Launch plan");
+    expect(events).toEqual([{ type: "tree", projectId: "proj_a" }]);
+    expect(await call("studio_rename", { id: "pg_missing", title: "X" })).toEqual({ done: [], failed: [{ id: "pg_missing", error: "Page not found." }] });
+  });
+
   it("counts sub-pages deleted with their parent as done", async () => {
     const { store, create, call } = setup();
     const parent = create("Parent", "proj_a");
